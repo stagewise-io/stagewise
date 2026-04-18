@@ -2,6 +2,7 @@ import { BaseAgent, type BaseAgentConfig } from '../shared/base-agent';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import { z } from 'zod';
+import filesystemPrimer from '../shared/prompts/fragments/filesystem.md?raw';
 import systemPrompt from './system-prompt.md?raw';
 
 const finishToolOutputSchema = z.object({
@@ -46,7 +47,7 @@ export class WorkspaceMdAgent extends BaseAgent<
   } satisfies BaseAgentConfig<typeof finishToolOutputSchema>;
 
   protected getSystemPrompt = async (): Promise<string> => {
-    return systemPrompt;
+    return `${filesystemPrimer}\n\n${systemPrompt}`;
   };
 
   protected async onCreated(): Promise<void> {
@@ -71,6 +72,16 @@ export class WorkspaceMdAgent extends BaseAgent<
       await this.toolbox.handleMountWorkspace(this.instanceId, path);
     }
 
+    // Resolve the mount prefix for the workspace we just mounted
+    const mounts = this.toolbox.getMountedPathsForAgent(this.instanceId);
+    let resolvedPrefix = '';
+    for (const [prefix, mountedPath] of mounts) {
+      if (mountedPath === workspacePath) {
+        resolvedPrefix = prefix;
+        break;
+      }
+    }
+
     const workspaceMdEntries = await this.toolbox.getWorkspaceMd(
       this.instanceId,
     );
@@ -89,7 +100,9 @@ export class WorkspaceMdAgent extends BaseAgent<
         {
           type: 'text',
           text: `
-${reason ? `Update the file \`.stagewise/WORKSPACE.md\`. You need to update because of the following reason: ${reason}` : 'Generate a new file `.stagewise/WORKSPACE.md` after analyzing the project.'}
+Your workspace is mounted at prefix \`${resolvedPrefix}\`. Use \`${resolvedPrefix}/\` for all tool calls.
+
+${reason ? `Update the file \`${resolvedPrefix}/.stagewise/WORKSPACE.md\`. You need to update because of the following reason: ${reason}` : `Generate a new file \`${resolvedPrefix}/.stagewise/WORKSPACE.md\` after analyzing the project.`}
 
 ${workspaceMdParts}`.trim(),
         },

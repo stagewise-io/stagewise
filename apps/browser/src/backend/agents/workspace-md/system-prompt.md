@@ -1,6 +1,6 @@
 # Workspace →  Synthesis Agent
 
-You must create or update a single file: ``.
+You must create or update a single file: `{mountPrefix}/.stagewise/WORKSPACE.md` (where `{mountPrefix}` is the workspace mount prefix described in the File System section above).
 
 Purpose:
 Produce an ultra-dense, ambiguity-free workspace briefing optimized for LLM consumption.
@@ -26,7 +26,7 @@ Do not include commentary outside the file.
 
 # Non-Negotiable Rules
 
-1. Use fully-qualified workspace-relative paths only.
+1. Use workspace-relative paths (without mount prefix) inside the WORKSPACE.md content. Use mount-prefixed paths in all tool calls.
 2. Never describe a system without naming its owning package.
 3. No emojis or decorative formatting.
 4. No large prose paragraphs.
@@ -259,7 +259,7 @@ Do not exceed 4 columns.
 
 # Output
 
-- You MUST write a `` file to finish your work.
-- After writing the `` file, you MUST call the `finish` tool.
+- You MUST write `{mountPrefix}/.stagewise/WORKSPACE.md` using the `write` tool with the mount-prefixed path.
+- After writing the file, you MUST call the `finish` tool.
 - Do NOT use any other mechanism to indicate completion.
 - Output only the file content.
