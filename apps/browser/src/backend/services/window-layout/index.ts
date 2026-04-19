@@ -361,6 +361,8 @@ export class WindowLayoutService extends DisposableService {
       this.syncThemeColorsListener = null;
     }
 
+    ipcMain.removeHandler('request-turnstile-token');
+
     app.applicationMenu = null;
 
     if (this.baseWindow && !this.baseWindow.isDestroyed()) {
@@ -578,6 +580,54 @@ export class WindowLayoutService extends DisposableService {
     ipcMain.on('sync-theme-colors', this.syncThemeColorsListener);
     this.logger.debug(
       '[WindowLayoutService] Listening for theme color sync requests',
+    );
+
+    // Turnstile proxy: let console pages loaded inside webContents request
+    // a Turnstile token from the renderer UI where the challenge succeeds.
+    const CONSOLE_ORIGINS = new Set([
+      new URL(
+        process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io',
+      ).origin,
+    ]);
+    ipcMain.handle(
+      'request-turnstile-token',
+      async (event): Promise<string | null> => {
+        try {
+          const senderUrl = event.sender.getURL();
+          const senderOrigin = new URL(senderUrl).origin;
+          if (!CONSOLE_ORIGINS.has(senderOrigin)) {
+            this.logger.warn(
+              `[WindowLayoutService] Rejected turnstile proxy from origin: ${senderOrigin}`,
+            );
+            return null;
+          }
+        } catch {
+          return null;
+        }
+
+        const uiWebContents = this.uiController?.getView()?.webContents;
+        if (!uiWebContents || uiWebContents.isDestroyed()) {
+          this.logger.warn(
+            '[WindowLayoutService] UI webContents unavailable for turnstile proxy',
+          );
+          return null;
+        }
+
+        try {
+          const token: string | null = await uiWebContents.executeJavaScript(
+            'window.__solveTurnstile ? window.__solveTurnstile() : Promise.resolve(null)',
+          );
+          return token;
+        } catch (err) {
+          this.logger.error(
+            `[WindowLayoutService] Turnstile proxy solve failed: ${err}`,
+          );
+          return null;
+        }
+      },
+    );
+    this.logger.debug(
+      '[WindowLayoutService] Listening for turnstile proxy requests',
     );
   }
 

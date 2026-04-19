@@ -24,5 +24,16 @@ export declare global {
           portProxy: MessagePortProxy;
         }
       | undefined;
+    /**
+     * Turnstile captcha proxy — only available on console origins
+     * (console.stagewise.io / localhost:4000).
+     * Exposed via contextBridge; requests are relayed through the main
+     * process to the renderer UI where the Turnstile challenge succeeds.
+     */
+    __stagewise_captcha?:
+      | {
+          requestTurnstileToken: () => Promise<string | null>;
+        }
+      | undefined;
   }
 }

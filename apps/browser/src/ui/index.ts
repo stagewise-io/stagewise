@@ -32,6 +32,11 @@ import '@ui/app.css';
 import { App } from '@ui/app';
 import { initThemeColorSync } from '@ui/utils/theme-color-sync';
 
+// Register global Turnstile solver for cross-context token proxy.
+// Must live in the UI renderer (not pages) because vite.ui.config.ts
+// has envDir set to read VITE_TURNSTILE_SITE_KEY from apps/browser/.env.
+import '@ui/services/turnstile-solver';
+
 // Global safety net: capture unhandled errors and rejections to PostHog
 window.addEventListener('error', (event) => {
   posthog.captureException(event.error ?? event, {

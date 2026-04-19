@@ -8,6 +8,7 @@ import * as buildConstants from './build-constants';
 export default defineConfig({
   root: path.resolve(__dirname, './src/ui'),
   base: './',
+  envDir: path.resolve(__dirname),
   plugins: [react(), tailwindcss()],
   define: {
     'process.env': 'import.meta.env',

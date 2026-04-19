@@ -147,6 +147,7 @@ jobs:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
       UPDATE_SERVER_ORIGIN: ${{ vars.UPDATE_SERVER_ORIGIN }}
+      VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       # PostHog CLI (source map upload during packaging)
       POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
       POSTHOG_CLI_PROJECT_ID: ${{ secrets.POSTHOG_CLI_PROJECT_ID }}

@@ -5,7 +5,8 @@
     "POSTHOG_API_KEY",
     "POSTHOG_HOST",
     "STAGEWISE_CONSOLE_URL",
-    "API_URL"
+    "API_URL",
+    "VITE_TURNSTILE_SITE_KEY"
   ],
   "tasks": {
     "build": {

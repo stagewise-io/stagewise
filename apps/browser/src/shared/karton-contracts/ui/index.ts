@@ -780,7 +780,10 @@ export type KartonContract = {
       clearLogChannel: (filename: string) => Promise<void>;
     };
     userAccount: {
-      sendOtp: (email: string) => Promise<{ error?: string }>;
+      sendOtp: (
+        email: string,
+        turnstileToken: string,
+      ) => Promise<{ error?: string }>;
       verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
       refreshStatus: () => Promise<void>;
       logout: () => Promise<void>;
