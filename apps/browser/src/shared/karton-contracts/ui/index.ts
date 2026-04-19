@@ -7,6 +7,7 @@ import type {
   MountPermission,
   MentionFileCandidate,
   AttachmentMetadata,
+  ShellSessionSnapshot,
 } from './agent/metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
@@ -505,6 +506,9 @@ export type AppState = {
       pendingShellOutputs?: Record<string, string[]>;
       /** Maps toolCallId → sessionId for in-flight shell commands. */
       pendingShellSessionIds?: Record<string, string>;
+      /** Live shell session manifest — pushed eagerly on lifecycle events. */
+      shells?: { sessions: ShellSessionSnapshot[] };
+
       activeApp?: {
         appId: string;
         pluginId?: string;

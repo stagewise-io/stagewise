@@ -278,6 +278,33 @@ describeIfShell('SessionManager (integration)', () => {
     expect(elapsed).toBeLessThan(8000);
   });
 
+  it('matches outputPattern against terminal buffer when logger exists', async () => {
+    const logsDir = fs.mkdtempSync(path.join(cwd, 'sm-bufmatch-'));
+    try {
+      sm = new SessionManager(shell as DetectedShell, () => logsDir);
+      const sid = sm.createSession('agent-test', cwd, env);
+      await waitForReady(sm, sid);
+
+      const start = Date.now();
+      const r = await sm.executeCommand(sid, {
+        command: 'echo "BUFFER_MARKER_123"; sleep 30',
+        waitUntil: {
+          outputPattern: 'BUFFER_MARKER_123',
+          timeoutMs: 10000,
+        },
+      });
+      const elapsed = Date.now() - start;
+
+      expect(r.output).toContain('BUFFER_MARKER_123');
+      expect(r.timedOut).toBe(false);
+      expect(elapsed).toBeLessThan(8000);
+    } finally {
+      sm?.killAll();
+      await new Promise((r) => setTimeout(r, 300));
+      fs.rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
   // ─── Abort ───────────────────────────────────────────────────
 
   it('aborts via AbortSignal', async () => {
@@ -333,7 +360,11 @@ describeIfShell('SessionManager (integration)', () => {
 
     const r = await resultPromise;
     expect(r.sessionExited).toBe(true);
-    expect(sm.getSession(sid)).toBeUndefined();
+
+    // Session is retained (deactivated) after kill — not removed
+    const session = sm.getSession(sid);
+    expect(session?.exited).toBe(true);
+    expect(session?.deactivated).toBe(true);
   });
 
   it('destroyAgent kills all sessions for that agent', async () => {

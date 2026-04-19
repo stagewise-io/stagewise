@@ -5,6 +5,7 @@ import {
   IconEyeOutline18,
   IconBookOpenOutline18,
   IconBugOutline18,
+  IconTerminalOutline18,
 } from 'nucleo-ui-outline-18';
 import { cn, resolveDisplayPath } from '@ui/utils';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
@@ -14,6 +15,7 @@ import { isLogPath, LOGS_PREFIX } from '@shared/log-ownership';
 const PLUGIN_SKILL_RE = /^plugins\/([^/]+)\/SKILL\.md$/;
 const WORKSPACE_SKILL_RE =
   /^[^/]+\/\.(?:stagewise|agents)\/skills\/([^/]+)\/SKILL\.md$/;
+const SHELL_LOG_RE = /^shells\/[^/]+\.shell\.log$/;
 
 export const ReadToolPart = ({
   part,
@@ -45,6 +47,11 @@ export const ReadToolPart = ({
       .replace(new RegExp(`^${LOGS_PREFIX}/`), '')
       .replace(/\.jsonl$/, '');
   }, [relativePath]);
+
+  const isShellLog = useMemo(
+    () => SHELL_LOG_RE.test(relativePath),
+    [relativePath],
+  );
 
   const attachmentMetadata = useAttachmentMetadata();
   const displayPath = relativePath
@@ -128,6 +135,28 @@ export const ReadToolPart = ({
     return (
       <ToolPartUINotCollapsible
         icon={<IconBugOutline18 className="size-3 shrink-0" />}
+        part={part}
+        minimal={minimal}
+        disableShimmer={disableShimmer}
+        streamingText={streamingText}
+        finishedText={finishedText}
+      />
+    );
+  }
+
+  if (isShellLog) {
+    const streamingText = 'Reading shell output...';
+
+    const finishedText =
+      part.state === 'output-available' ? (
+        <span className="flex min-w-0 gap-1">
+          <span className="shrink-0 font-medium">Read shell output</span>
+        </span>
+      ) : undefined;
+
+    return (
+      <ToolPartUINotCollapsible
+        icon={<IconTerminalOutline18 className="size-3 shrink-0" />}
         part={part}
         minimal={minimal}
         disableShimmer={disableShimmer}

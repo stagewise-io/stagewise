@@ -30,9 +30,13 @@ export class ShellService extends DisposableService {
   private readonly outputFlushTimers = new Map<string, NodeJS.Timeout>();
   private readonly outputMaxIntervalTimers = new Map<string, NodeJS.Timeout>();
 
+  /** Per-agent throttle timers for pushing the shells manifest to Karton. */
+  private readonly shellManifestTimers = new Map<string, NodeJS.Timeout>();
+
   private static readonly FLUSH_DEBOUNCE_MS = 100;
   private static readonly FLUSH_MAX_INTERVAL_MS = 300;
   private static readonly MAX_STREAMING_BYTES = 51_200;
+  private static readonly MANIFEST_THROTTLE_MS = 500;
 
   constructor(
     logger: Logger,
@@ -97,6 +101,9 @@ export class ShellService extends DisposableService {
       this.sessionManager = new SessionManager(this.shell, (agentId) =>
         getAgentShellLogsDir(agentId),
       );
+      this.sessionManager.onSessionStateChange = (agentInstanceId) => {
+        this.pushShellsToKarton(agentInstanceId);
+      };
     } else {
       this.logger.warn(
         '[ShellService] No usable shell detected — shell tool will be unavailable',
@@ -146,6 +153,7 @@ export class ShellService extends DisposableService {
         }
         this.outputBuffers.get(targetToolCallId)!.push(stripAnsi(chunk));
         this.scheduleFlush(agentInstanceId, targetToolCallId);
+        this.scheduleShellManifestPush(agentInstanceId);
       };
     };
 
@@ -174,6 +182,11 @@ export class ShellService extends DisposableService {
     } else {
       // Re-target streaming output to the current tool call
       this.sessionManager.setOnData(sessionId, makeOnData(toolCallId));
+    }
+
+    // Push updated session manifest to Karton state on new session creation
+    if (!request.sessionId) {
+      this.pushShellsToKarton(agentInstanceId);
     }
 
     // Publish session ID to Karton state so the UI can cancel in-flight commands
@@ -258,10 +271,49 @@ export class ShellService extends DisposableService {
           lineCount,
           logPath,
           tailContent: tailContent || undefined,
+          lastLine: s.logger?.getLastLine() || undefined,
+          cwd: s.cwd,
+          createdAt: s.createdAt,
         };
       }),
     };
     return snapshot;
+  }
+
+  private pushShellsToKarton(agentInstanceId: string): void {
+    if (!this.kartonService) return;
+    const snapshot = this.getShellSnapshot(agentInstanceId);
+    this.kartonService.setState((draft) => {
+      if (!draft.toolbox[agentInstanceId]) {
+        draft.toolbox[agentInstanceId] = {
+          workspace: { mounts: [] },
+          pendingFileDiffs: [],
+          editSummary: [],
+          pendingUserQuestion: null,
+        };
+      }
+      draft.toolbox[agentInstanceId].shells = snapshot;
+    });
+  }
+
+  /**
+   * Leading+trailing edge throttled push of the shells manifest to Karton.
+   * Pushes immediately on the first call, then suppresses for
+   * MANIFEST_THROTTLE_MS, then pushes once more (trailing edge) to
+   * capture the latest state.
+   */
+  private scheduleShellManifestPush(agentId: string): void {
+    if (this.shellManifestTimers.has(agentId)) return;
+    // Leading edge — push immediately
+    this.pushShellsToKarton(agentId);
+    // Cooldown — trailing edge fires after the interval
+    this.shellManifestTimers.set(
+      agentId,
+      setTimeout(() => {
+        this.shellManifestTimers.delete(agentId);
+        this.pushShellsToKarton(agentId);
+      }, ShellService.MANIFEST_THROTTLE_MS),
+    );
   }
 
   deleteShellLogs(agentInstanceId: string): void {
@@ -347,6 +399,9 @@ export class ShellService extends DisposableService {
 
     this.outputMaxIntervalTimers.clear();
     this.outputBuffers.clear();
+
+    for (const timer of this.shellManifestTimers.values()) clearTimeout(timer);
+    this.shellManifestTimers.clear();
   }
 }
 

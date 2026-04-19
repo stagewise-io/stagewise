@@ -6,11 +6,9 @@ import { SessionLogger } from './session-logger';
 import {
   DEFAULT_TIMEOUT_MS,
   DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS,
+  DEFAULT_TIMEOUT_STDIN_MS,
   HEAD_LINES,
-  MAX_COLLECT_BYTES,
   MAX_SESSIONS_PER_AGENT,
-  SESSION_EXIT_GRACE_MS,
-  SESSION_IDLE_TIMEOUT_MS,
   SHELL_INTEGRATION_DETECT_MS,
   TAIL_LINES,
   type DetectedShell,
@@ -18,6 +16,9 @@ import {
   type SessionCommandRequest,
   type SessionCommandResult,
 } from './types';
+
+/** Cap for rawOutput accumulator used only for pattern matching. */
+const MAX_RAW_OUTPUT_BYTES = 1_024 * 1_024;
 
 // ─── ANSI stripping ──────────────────────────────────────────────
 // Strips ANSI/VT escape sequences from PTY output for clean text.
@@ -79,6 +80,7 @@ printf '\\033]133;A\\007'
 const ZSH_INTEGRATION = `
 if [[ -n "$__STAGEWISE_SHELL_INTEGRATION" ]]; then return 0 2>/dev/null || true; fi
 export __STAGEWISE_SHELL_INTEGRATION=1
+PROMPT_EOL_MARK=''
 __stagewise_command_executed=0
 autoload -Uz add-zsh-hook 2>/dev/null
 __stagewise_precmd() {
@@ -155,14 +157,16 @@ interface PendingCommand {
   resolve: (result: SessionCommandResult) => void;
   sessionId: string;
   commandId: string;
-  outputLines: string[];
-  collectedBytes: number;
-  truncatedEarly: boolean;
+  /** Absolute buffer line at command start (baseY + cursorY). */
+  markLine: number;
   timeoutHandle: NodeJS.Timeout | null;
   abortHandler: (() => void) | null;
   waitUntil?: SessionCommandRequest['waitUntil'];
-  /** Accumulated raw output for pattern matching */
+  /** Accumulated raw output for pattern matching (capped at 1 MB). */
   rawOutput: string;
+  rawOutputCapped: boolean;
+  /** Serialized buffer text captured at the moment of a buffer-based pattern match. */
+  bufferSnapshot?: string;
 }
 
 // ─── SessionManager ──────────────────────────────────────────────
@@ -177,6 +181,11 @@ export class SessionManager {
   private readonly getShellLogsDir:
     | ((agentInstanceId: string) => string)
     | null;
+  /**
+   * Optional observer called whenever a session's state changes
+   * (created, exited, killed). Receives the agentInstanceId affected.
+   */
+  onSessionStateChange: ((agentInstanceId: string) => void) | null = null;
 
   constructor(
     shell: DetectedShell,
@@ -208,8 +217,8 @@ export class SessionManager {
     const spawnArgs = this.getSpawnArgs();
     const ptyProcess = pty.spawn(this.shell.path, spawnArgs, {
       name: 'xterm-256color',
-      cols: 120,
-      rows: 30,
+      cols: 80,
+      rows: 24,
       cwd,
       env: { ...env, TERM: 'xterm-256color' },
     });
@@ -226,13 +235,13 @@ export class SessionManager {
       lastActivityAt: Date.now(),
       exited: false,
       exitCode: null,
-      idleTimerHandle: null,
-      graceTimerHandle: null,
+      deactivated: false,
       detectTimerHandle: null,
       ready: false,
       readyPromise: null!,
       readyResolve: null!,
       onData: onData ?? null,
+      cwd,
       logger: this.getShellLogsDir
         ? new SessionLogger(
             path.join(
@@ -249,16 +258,19 @@ export class SessionManager {
     });
 
     this.sessions.set(sessionId, session);
+    this.onSessionStateChange?.(agentInstanceId);
 
     // Wire PTY data → parser
+    // IMPORTANT: appendRaw feeds the headless terminal which must be current
+    // before the parser fires synchronous resolution events (commandDone,
+    // sentinelDone) that read the buffer via collectOutput.
     ptyProcess.onData((data: string) => {
-      parser.write(data);
-      // Only forward output to the agent/UI once the session is ready
-      // (i.e. after the integration script has been consumed).
       if (session.ready) {
-        session.onData?.(sessionId, data);
+        session.logger?.appendRaw(Buffer.from(data, 'utf-8'));
         session.logger?.append(stripAnsi(data));
+        session.onData?.(sessionId, data);
       }
+      parser.write(data);
     });
 
     // Wire PTY exit
@@ -277,7 +289,7 @@ export class SessionManager {
     });
 
     parser.on('commandDone', (event) => {
-      this.resolveCurrentCommand(sessionId, event.output, event.exitCode);
+      this.resolveCurrentCommand(sessionId, event.exitCode);
     });
 
     parser.on('sentinelDone', (id, exitCode) => {
@@ -302,9 +314,6 @@ export class SessionManager {
 
     // Source shell integration script
     this.sourceShellIntegration(session);
-
-    // Start idle timeout
-    this.resetIdleTimer(sessionId);
 
     return sessionId;
   }
@@ -360,17 +369,17 @@ export class SessionManager {
     }
 
     return new Promise<SessionCommandResult>((resolve) => {
+      const mark = session.logger?.getMarkPosition() ?? 0;
       const pending: PendingCommand = {
         resolve,
         sessionId,
         commandId,
-        outputLines: [],
-        collectedBytes: 0,
-        truncatedEarly: false,
+        markLine: mark,
         timeoutHandle: null,
         abortHandler: null,
         waitUntil: request.waitUntil,
         rawOutput: '',
+        rawOutputCapped: false,
       };
 
       this.pendingCommands.set(commandId, pending);
@@ -382,7 +391,9 @@ export class SessionManager {
       // that forget the param don't leave the tool hanging for 2 minutes.
       const timeoutMs = request.waitUntil
         ? (request.waitUntil.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-        : DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS;
+        : request.rawInput
+          ? DEFAULT_TIMEOUT_STDIN_MS
+          : DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS;
       pending.timeoutHandle = setTimeout(() => {
         this.resolveCommandWithTimeout(commandId);
       }, timeoutMs);
@@ -410,7 +421,14 @@ export class SessionManager {
 
       // Write the command to the PTY
       const command = request.command;
-      if (session.shellIntegrationActive) {
+      if (request.rawInput) {
+        // Raw stdin: write bytes verbatim — no \r, no sentinel
+        session.pty.write(command);
+      } else if (command.length === 0) {
+        // Empty command, no rawInput — don't write anything to the PTY.
+        // The agent is just waiting for output; the pending command will
+        // resolve via timeout, pattern match, or session exit.
+      } else if (session.shellIntegrationActive) {
         // Shell integration handles boundaries via OSC 133
         session.pty.write(`${command}\r`);
       } else if (session.parser.currentMode === 'sentinel') {
@@ -428,7 +446,6 @@ export class SessionManager {
       }
 
       session.lastActivityAt = Date.now();
-      this.resetIdleTimer(sessionId);
     });
   }
 
@@ -438,27 +455,42 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
 
+    const { agentInstanceId } = session;
+
     // Resolve any pending commands
     this.resolveAllPendingForSession(sessionId, 'Session killed.');
 
-    this.cleanupSession(session);
+    // Mark as exited before deactivation so Karton sees the final state
+    session.exited = true;
+    session.exitCode ??= null;
+    this.deactivateSession(session);
+    this.onSessionStateChange?.(agentInstanceId);
     return true;
   }
 
   destroyAgent(agentInstanceId: string): void {
-    const sessionIds = [...this.sessions.entries()]
-      .filter(([, s]) => s.agentInstanceId === agentInstanceId)
-      .map(([id]) => id);
-
-    for (const id of sessionIds) {
-      this.killSession(id);
+    const sessions = [...this.sessions.values()].filter(
+      (s) => s.agentInstanceId === agentInstanceId,
+    );
+    for (const s of sessions) {
+      this.resolveAllPendingForSession(s.id, 'Agent destroyed.');
+      this.removeSession(s);
     }
   }
 
   killAll(): void {
-    for (const [id] of this.sessions) {
-      this.killSession(id);
+    for (const session of [...this.sessions.values()]) {
+      this.resolveAllPendingForSession(session.id, 'All sessions killed.');
+      this.removeSession(session);
     }
+  }
+
+  resizeSession(sessionId: string, cols: number, rows: number): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.deactivated) return false;
+    session.pty.resize(cols, rows);
+    session.logger?.resize(cols, rows);
+    return true;
   }
 
   getSession(sessionId: string): PtySession | undefined {
@@ -490,7 +522,6 @@ export class SessionManager {
 
   private resolveCurrentCommand(
     sessionId: string,
-    output: string,
     exitCode: number | null,
   ): void {
     const commandId = this.sessionCommandMap.get(sessionId);
@@ -499,10 +530,7 @@ export class SessionManager {
     const pending = this.pendingCommands.get(commandId);
     if (!pending) return;
 
-    // Use OSC-provided output, but also include any accumulated lines
-    // for the case where output events fired before commandDone.
-    const finalOutput =
-      output.length > 0 ? stripAnsi(output) : this.collectOutput(pending);
+    const finalOutput = this.collectOutput(pending);
 
     this.cleanupPending(commandId);
     this.sessionCommandMap.delete(sessionId);
@@ -573,16 +601,25 @@ export class SessionManager {
   }
 
   private collectOutput(pending: PendingCommand): string {
-    if (pending.outputLines.length === 0) return '';
-    const capped = applyHeadTailCap(pending.outputLines);
-    let cleaned = stripAnsi(capped);
-    // Strip sentinel artifacts that appear in sentinel-mode output.
-    // These are no-ops when shell integration (OSC 133) is active.
-    // 1. Echoed eval wrapper line (contains the %d printf specifier)
-    cleaned = cleaned.replace(/^[^\n]*__STAGE_DONE_[^\n]*%d[^\n]*\n?/, '');
-    // 2. Resolved sentinel marker line
-    cleaned = cleaned.replace(/__STAGE_DONE_[a-zA-Z0-9_-]+_-?\d+__\n?/g, '');
-    return cleaned.trimEnd();
+    // If a buffer snapshot was captured at pattern-match time, return it
+    // directly. This avoids a second serialization that may produce a
+    // different (possibly empty) range if the cursor moved since the match.
+    if (pending.bufferSnapshot != null) {
+      const snapLines = pending.bufferSnapshot.split('\n');
+      return applyHeadTailCap(snapLines).trimEnd();
+    }
+
+    const session = this.sessions.get(pending.sessionId);
+    if (!session?.logger) return stripAnsi(pending.rawOutput).trimEnd();
+
+    const logger = session.logger;
+    const isAlt = logger.isAlternateBufferActive();
+    const lines = isAlt
+      ? logger.serializeAlternate()
+      : logger.serializeFrom(pending.markLine);
+
+    if (lines.length === 0) return '';
+    return applyHeadTailCap(lines).trimEnd();
   }
 
   private cleanupPending(commandId: string): void {
@@ -603,29 +640,37 @@ export class SessionManager {
     if (!commandId) return;
 
     const pending = this.pendingCommands.get(commandId);
-    if (!pending || pending.truncatedEarly) return;
+    if (!pending) return;
 
-    const byteLen = Buffer.byteLength(data, 'utf-8');
-    pending.collectedBytes += byteLen;
-
-    if (pending.collectedBytes > MAX_COLLECT_BYTES) {
-      pending.truncatedEarly = true;
-      pending.outputLines.push(
-        '[output truncated: exceeded 5MB collection limit]',
-      );
-      return;
+    // Accumulate raw output for pattern matching only (capped at 1 MB).
+    if (!pending.rawOutputCapped) {
+      pending.rawOutput += data;
+      if (Buffer.byteLength(pending.rawOutput, 'utf-8') > MAX_RAW_OUTPUT_BYTES)
+        pending.rawOutputCapped = true;
     }
-
-    const lines = data.split(/\r?\n/);
-    pending.outputLines.push(...lines);
-    pending.rawOutput += data;
 
     // Check output pattern if configured
     if (pending.waitUntil?.outputPattern) {
+      const session = this.sessions.get(sessionId);
+      const logger = session?.logger;
+
       try {
         const re = new RegExp(pending.waitUntil.outputPattern);
-        if (re.test(pending.rawOutput)) {
-          this.resolveCommand(pending.commandId, null);
+
+        if (logger) {
+          // Buffer-based matching: test against visible terminal state.
+          // The buffer is already up-to-date (writeSync in appendRaw
+          // runs before the parser emits the output event that calls us).
+          const lines = logger.serializeFrom(pending.markLine);
+          const visibleText = lines.join('\n');
+          if (re.test(visibleText)) {
+            pending.bufferSnapshot = visibleText;
+            this.resolveCommand(pending.commandId, null);
+          }
+        } else if (!pending.rawOutputCapped) {
+          // Fallback: no logger — match against raw ANSI stream.
+          if (re.test(pending.rawOutput))
+            this.resolveCommand(pending.commandId, null);
         }
       } catch {
         // Invalid regex — ignore
@@ -641,6 +686,7 @@ export class SessionManager {
 
     session.exited = true;
     session.exitCode = exitCode;
+    this.onSessionStateChange?.(session.agentInstanceId);
 
     // Unblock anyone waiting on readyPromise (e.g. shell crashed during detection)
     this.markReady(session);
@@ -657,27 +703,14 @@ export class SessionManager {
       `Shell exited with code ${exitCode}.`,
     );
 
-    // Clear idle timer
-    if (session.idleTimerHandle) {
-      clearTimeout(session.idleTimerHandle);
-      session.idleTimerHandle = null;
-    }
-
-    // Start grace timer — remove session after grace period
-    session.graceTimerHandle = setTimeout(() => {
-      this.cleanupSession(session);
-    }, SESSION_EXIT_GRACE_MS);
+    // Deactivate (close logger, kill PTY) but keep in sessions map for UI visibility
+    this.deactivateSession(session);
   }
 
-  private cleanupSession(session: PtySession): void {
-    if (session.idleTimerHandle) {
-      clearTimeout(session.idleTimerHandle);
-      session.idleTimerHandle = null;
-    }
-    if (session.graceTimerHandle) {
-      clearTimeout(session.graceTimerHandle);
-      session.graceTimerHandle = null;
-    }
+  private deactivateSession(session: PtySession): void {
+    if (session.deactivated) return;
+    session.deactivated = true;
+
     if (session.detectTimerHandle) {
       clearTimeout(session.detectTimerHandle);
       session.detectTimerHandle = null;
@@ -693,23 +726,12 @@ export class SessionManager {
 
     session.logger?.close();
     session.parser.reset();
-    this.sessions.delete(session.id);
     this.sessionCommandMap.delete(session.id);
   }
 
-  private resetIdleTimer(sessionId: string): void {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.exited) return;
-
-    if (session.idleTimerHandle) {
-      clearTimeout(session.idleTimerHandle);
-    }
-
-    session.idleTimerHandle = setTimeout(() => {
-      if (!session.exited) {
-        this.killSession(sessionId);
-      }
-    }, SESSION_IDLE_TIMEOUT_MS);
+  private removeSession(session: PtySession): void {
+    this.deactivateSession(session);
+    this.sessions.delete(session.id);
   }
 
   private sourceShellIntegration(session: PtySession): void {

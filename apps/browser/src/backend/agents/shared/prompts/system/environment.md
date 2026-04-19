@@ -151,9 +151,17 @@ return `Saved as ${fileName}`;
 Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session.
 
 - **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
+- **`command`:** Writes text + Enter to the shell. Registers output capture — the tool waits and returns output.
 - **`wait_until`:** Controls when the tool returns. `timeout_ms` = time cap, `output_pattern` = regex match on output, `exited` = wait for process exit. Omitting `wait_until` defaults to **20 s**. When `wait_until` is provided without an explicit `timeout_ms`, the cap is **120 s**.
 - **Timeout ≠ error.** `timed_out: true` returns partial output; session stays alive. Reuse `session_id` to continue.
-- **Interrupt:** send `\x03` as command. **Terminate:** `exit\r` or `kill: true`.
+- **`stdin`:** Write raw bytes to the PTY. Use for interactive input: control sequences, answering prompts, or interrupting processes. Requires `session_id`. Mutually exclusive with `command` and `kill`. Supports `wait_until` for output capture (default timeout: **5 s** without `wait_until`). Common sequences:
+  - `\x03` — Ctrl+C (interrupt running process)
+  - `\x1b[A` / `\x1b[B` / `\x1b[C` / `\x1b[D` — Arrow keys (Up/Down/Right/Left)
+  - `\x1b` — Escape
+  - `\t` — Tab
+  - `\r` — Enter
+  - `y\r` — Type "y" then Enter
+- **Terminate:** `kill: true` with `session_id` to hard-kill a session.
 - Sessions auto-close after 10 min idle or on agent suspension.
 - Result includes `session_id`, `output`, `exit_code` (`null` if still running), `session_exited`, `timed_out`.
 - OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
@@ -162,6 +170,12 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 // Start dev server (long-running), then health-check in a new session
 { "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000 } }
 { "command": "curl localhost:3000/health", "cwd": "w1" }
+// Interrupt a running dev server
+{ "session_id": "abc12345", "stdin": "\x03" }
+// Answer "yes" to an interactive prompt
+{ "session_id": "abc12345", "stdin": "y\r" }
+// Select menu option and wait for next prompt
+{ "session_id": "abc12345", "stdin": "\x1b[B\r", "wait_until": { "output_pattern": "linter|Which", "timeout_ms": 5000 } }
 ```
 
 ### 3. Browser Access (CDP)

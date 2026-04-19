@@ -21,20 +21,19 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
  * short enough to avoid a 2-minute hang on `pnpm dev`.
  */
 export const DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS = 20_000;
+
+/**
+ * Shorter timeout (ms) for raw stdin input without explicit `waitUntil`.
+ * Interactive prompts respond quickly; 5s avoids long hangs on menu selections.
+ */
+export const DEFAULT_TIMEOUT_STDIN_MS = 5_000;
 export const HEAD_LINES = 100;
 export const TAIL_LINES = 300;
-export const MAX_COLLECT_BYTES = 5 * 1024 * 1024;
 
 // ─── Session types ────────────────────────────────────────────────
 
 /** Maximum concurrent PTY sessions per agent instance. */
 export const MAX_SESSIONS_PER_AGENT = 5;
-
-/** Grace period (ms) after PTY exit before the session is removed. */
-export const SESSION_EXIT_GRACE_MS = 60_000;
-
-/** Idle timeout (ms) — sessions with no writes are terminated. */
-export const SESSION_IDLE_TIMEOUT_MS = 10 * 60_000;
 
 /**
  * Grace period (ms) to wait for OSC 133 shell integration detection
@@ -52,8 +51,8 @@ export interface PtySession {
   lastActivityAt: number;
   exited: boolean;
   exitCode: number | null;
-  idleTimerHandle: NodeJS.Timeout | null;
-  graceTimerHandle: NodeJS.Timeout | null;
+  /** True once the PTY has been killed, logger closed, and timers cleared. Session stays in the map for UI visibility. */
+  deactivated: boolean;
   /** Timer for shell integration detection grace period. */
   detectTimerHandle: NodeJS.Timeout | null;
   /** True once the integration script has been consumed and the session is ready for real commands. */
@@ -65,12 +64,16 @@ export interface PtySession {
   onData: ((sessionId: string, data: string) => void) | null;
   /** Append-only log writer for the session's full output history. */
   logger: SessionLogger | null;
+  /** Working directory the session was started in. */
+  cwd: string;
 }
 
 export interface SessionCommandRequest {
   command: string;
   cwd?: string;
   sessionId?: string;
+  /** When true, write command bytes verbatim — no `\r`, no sentinel wrapping. */
+  rawInput?: boolean;
   waitUntil?: {
     timeoutMs?: number;
     exited?: boolean;

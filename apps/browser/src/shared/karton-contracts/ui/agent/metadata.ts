@@ -259,6 +259,12 @@ export const shellSessionSnapshotSchema = z.object({
   logPath: z.string(),
   /** Last ~400 chars of log output. Only populated when lineCount > 0. */
   tailContent: z.string().optional(),
+  /** Last visible terminal line, derived from headless xterm buffer. */
+  lastLine: z.string().optional(),
+  /** Working directory the session was started in. */
+  cwd: z.string(),
+  /** Unix ms timestamp of session creation. */
+  createdAt: z.number(),
 });
 
 export type ShellSessionSnapshot = z.infer<typeof shellSessionSnapshotSchema>;
