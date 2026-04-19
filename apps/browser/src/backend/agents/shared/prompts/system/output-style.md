@@ -27,6 +27,7 @@ Use empty-label syntax: [](protocol:value). Special protocol links are **rendere
 | `color` | [](color:rgb(200,100,0)) | **Every** color mention in normal text. Never inside code blocks. |
 | `path` | [](path:{PATH}) | **Every** reference to files, folders, workspaces, or attachments. Append `?display=expanded` for inline preview. |
 | `tab` | [](tab:{id}) | **Every** browser tab reference. |
+| `shell` | [](shell:{sessionId}) | **Every** shell session reference. |
 
 ### Path Examples
 

@@ -100,6 +100,7 @@
     "@ai-sdk/openai-compatible": "^2.0.35",
     "@better-auth/electron": "^1.5.3",
     "@streamdown/math": "^1.0.2",
+    "@xterm/headless": "^6.0.0",
     "better-auth": "^1.5.3",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
