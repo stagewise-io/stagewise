@@ -23,6 +23,15 @@ import { wrapLanguageModel } from 'ai';
 type ProviderOptions = Parameters<typeof streamText>[0]['providerOptions'];
 
 /**
+ * Converts an OpenRouter-style Anthropic model ID (dots in version, e.g.
+ * `claude-opus-4.7`) to the native Anthropic API format (hyphens, e.g.
+ * `claude-opus-4-7`). Idempotent on IDs that already use hyphens.
+ */
+function toNativeAnthropicModelId(modelId: string): string {
+  return modelId.replace(/\./g, '-');
+}
+
+/**
  * Middleware that tells the SDK all HTTP(S) URLs are natively supported by the
  * stagewise gateway. Without this the SDK downloads every image/file URL and
  * inlines the content as base64, causing "payload too large" errors.
@@ -368,7 +377,7 @@ export class ModelProviderService {
         const p = createAnthropic({ apiKey, baseURL });
         return {
           model: this.telemetryService.withTracing(
-            p(modelId as any),
+            p(toNativeAnthropicModelId(modelId) as any),
             posthogConfig,
           ),
           headers,
@@ -473,7 +482,7 @@ export class ModelProviderService {
         const provider = createAnthropic({ apiKey, baseURL });
         return {
           model: this.telemetryService.withTracing(
-            provider(modelId as any),
+            provider(toNativeAnthropicModelId(modelId) as any),
             posthogConfig,
           ),
           headers,
@@ -650,7 +659,7 @@ export class ModelProviderService {
         const provider = createAnthropic({ apiKey, baseURL });
         return {
           model: this.telemetryService.withTracing(
-            provider(customModel.modelId as any),
+            provider(toNativeAnthropicModelId(customModel.modelId) as any),
             posthogConfig,
           ),
           headers,
