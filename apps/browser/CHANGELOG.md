@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.63 (2026-04-19)
+
+### Bug Fixes
+
+* fixing model-id-mismatch for direct anthropic requests (cc3ff69)
+
 ## 1.0.0-alpha.62 (2026-04-19)
 
 ### Features
