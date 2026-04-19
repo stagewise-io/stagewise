@@ -335,6 +335,30 @@ if (pagesApiPortProxy) {
   });
 }
 
+declare const STAGEWISE_CONSOLE_URL: string;
+
+/**
+ * Check if the current page is the stagewise console (web or local dev).
+ * Only these origins get access to the Turnstile captcha proxy bridge.
+ * STAGEWISE_CONSOLE_URL is injected at build time via vite.web-content-preload.config.ts.
+ */
+const IS_CONSOLE_ORIGIN = (() => {
+  try {
+    const consoleOrigin = new URL(STAGEWISE_CONSOLE_URL).origin;
+    return window.location.origin === consoleOrigin;
+  } catch {
+    return false;
+  }
+})();
+
+// Expose captcha proxy to console pages so they can request a Turnstile
+// token from the renderer UI (where the Turnstile challenge succeeds).
+if (IS_CONSOLE_ORIGIN) {
+  contextBridge.exposeInMainWorld('__stagewise_captcha', {
+    requestTurnstileToken: () => ipcRenderer.invoke('request-turnstile-token'),
+  });
+}
+
 // Dominant captures in capture phase
 window.addEventListener(
   'keydown',

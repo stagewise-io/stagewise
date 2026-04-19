@@ -101,7 +101,10 @@ export class PagesService extends DisposableService {
   private updatePreferencesHandler?: (patches: Patch[]) => Promise<void>;
   private clearPermissionExceptionsHandler?: () => Promise<void>;
   // Auth handlers (delegated to AuthService via main.ts)
-  private sendOtpHandler?: (email: string) => Promise<{ error?: string }>;
+  private sendOtpHandler?: (
+    email: string,
+    turnstileToken: string,
+  ) => Promise<{ error?: string }>;
   private verifyOtpHandler?: (
     email: string,
     code: string,
@@ -1530,11 +1533,15 @@ export class PagesService extends DisposableService {
     // Auth procedure handlers
     this.kartonServer.registerServerProcedureHandler(
       'sendOtp',
-      async (_callingClientId: string, email: string) => {
+      async (
+        _callingClientId: string,
+        email: string,
+        turnstileToken: string,
+      ) => {
         if (!this.sendOtpHandler) {
           return { error: 'Auth service not available' };
         }
-        return this.sendOtpHandler(email);
+        return this.sendOtpHandler(email, turnstileToken);
       },
     );
 
@@ -1653,7 +1660,10 @@ export class PagesService extends DisposableService {
    * This should be called by main.ts to wire up to AuthService.
    */
   public setAuthHandlers(handlers: {
-    sendOtp: (email: string) => Promise<{ error?: string }>;
+    sendOtp: (
+      email: string,
+      turnstileToken: string,
+    ) => Promise<{ error?: string }>;
     verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
     logout: () => Promise<void>;
   }): void {

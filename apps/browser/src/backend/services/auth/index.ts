@@ -125,8 +125,12 @@ export class AuthService extends DisposableService {
   private registerProcedureHandlers(): void {
     this.uiKarton.registerServerProcedureHandler(
       'userAccount.sendOtp',
-      async (_callingClientId: string, email: string) => {
-        return this.sendOtp(email);
+      async (
+        _callingClientId: string,
+        email: string,
+        turnstileToken: string,
+      ) => {
+        return this.sendOtp(email, turnstileToken);
       },
     );
 
@@ -195,11 +199,17 @@ export class AuthService extends DisposableService {
   // OTP flow
   // ---------------------------------------------------------------------------
 
-  public async sendOtp(email: string): Promise<{ error?: string }> {
+  public async sendOtp(
+    email: string,
+    turnstileToken?: string,
+  ): Promise<{ error?: string }> {
     try {
       const { error } = await this.authClient.emailOtp.sendVerificationOtp({
         email,
         type: 'sign-in',
+        fetchOptions: turnstileToken
+          ? { headers: { 'x-captcha-response': turnstileToken } }
+          : undefined,
       });
       if (error) {
         this.logger.error(`[AuthService] Failed to send OTP: ${error.message}`);

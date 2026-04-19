@@ -5,6 +5,7 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTurnstile } from '@ui/hooks/use-turnstile';
 import {
   Tooltip,
   TooltipTrigger,
@@ -59,6 +60,15 @@ export function StepAuth({
   const emailRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
   const anthropicKeyRef = useRef<HTMLInputElement>(null);
+
+  const {
+    containerRef: turnstileRef,
+    token: turnstileToken,
+    ready: turnstileReady,
+    error: turnstileError,
+    enabled: turnstileEnabled,
+    reset: resetTurnstile,
+  } = useTurnstile();
 
   const [apiKey1, setApiKey1] = useState('');
   const [apiKey2, setApiKey2] = useState('');
@@ -183,18 +193,34 @@ export function StepAuth({
 
   const handleSendOtp = useCallback(async () => {
     if (!email.trim()) return;
+    if (turnstileEnabled && !turnstileToken && !turnstileError) {
+      setError('Security verification not ready. Please wait a moment.');
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
-      const result = await sendOtp(email.trim());
-      if (result?.error) setError(result.error);
-      else setPhase('waiting-for-otp');
+      const result = await sendOtp(email.trim(), turnstileToken ?? '');
+      if (result?.error) {
+        setError(result.error);
+        resetTurnstile();
+      } else {
+        setPhase('waiting-for-otp');
+      }
     } catch {
       setError('Failed to send verification code.');
+      resetTurnstile();
     } finally {
       setLoading(false);
     }
-  }, [email, sendOtp]);
+  }, [
+    email,
+    sendOtp,
+    turnstileToken,
+    turnstileEnabled,
+    resetTurnstile,
+    turnstileError,
+  ]);
 
   const handleVerifyOtp = useCallback(async () => {
     if (!code.trim()) return;
@@ -322,6 +348,9 @@ export function StepAuth({
         )}
       </div>
 
+      {/* Turnstile container — visible so interactive challenges can render */}
+      <div ref={turnstileRef} />
+
       {mode === 'stagewise' && phase === 'form-input' && (
         <div className="flex gap-2">
           <Input
@@ -342,9 +371,15 @@ export function StepAuth({
             className="shrink-0"
             size="sm"
             onClick={() => void handleSendOtp()}
-            disabled={loading || !email.trim()}
+            disabled={
+              loading ||
+              !email.trim() ||
+              (turnstileEnabled && !turnstileError && !turnstileToken)
+            }
           >
-            Sign in
+            {turnstileEnabled && !turnstileReady && !turnstileError
+              ? 'Loading...'
+              : 'Sign in'}
           </Button>
         </div>
       )}
@@ -376,6 +411,7 @@ export function StepAuth({
               setPhase('form-input');
               setCode('');
               setError(null);
+              resetTurnstile();
             }}
           >
             Use a different email

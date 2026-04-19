@@ -224,7 +224,10 @@ export type PagesApiContract = {
       baseUrl?: string,
     ) => Promise<ApiKeyValidationResult>;
     /** Send an OTP code to the given email for sign-in */
-    sendOtp: (email: string) => Promise<{ error?: string }>;
+    sendOtp: (
+      email: string,
+      turnstileToken: string,
+    ) => Promise<{ error?: string }>;
     /** Verify an OTP code for the given email */
     verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
     /** Log the current user out */

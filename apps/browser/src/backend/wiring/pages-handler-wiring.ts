@@ -68,7 +68,8 @@ export function wirePagesHandlers(deps: {
 
   // --- Auth handlers ---
   pagesService.setAuthHandlers({
-    sendOtp: (email) => authService.sendOtp(email),
+    sendOtp: (email, turnstileToken) =>
+      authService.sendOtp(email, turnstileToken),
     verifyOtp: (email, code) => authService.verifyOtp(email, code),
     logout: () => authService.logout(),
   });

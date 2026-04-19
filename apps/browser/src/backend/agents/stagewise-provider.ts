@@ -1,4 +1,3 @@
-import { createHash, createHmac } from 'node:crypto';
 import type { JSONObject, SharedV3ProviderMetadata } from '@ai-sdk/provider';
 import {
   createOpenAICompatible,
@@ -10,31 +9,13 @@ import { deepMergeProviderOptions } from './model-provider';
 declare const __APP_VERSION__: string;
 
 /**
- * Creates a fetch wrapper that signs every outgoing request with an
- * HMAC-SHA256 signature so the API server can verify it originated
- * from a real stagewise client.
+ * Creates a fetch wrapper that attaches the stagewise client identifier
+ * header for observability / request logging on the API server.
  */
-function createSigningFetch(apiKey: string): typeof globalThis.fetch {
+function createClientFetch(): typeof globalThis.fetch {
   return async (input, init) => {
-    const url =
-      typeof input === 'string'
-        ? new URL(input)
-        : new URL((input as Request).url);
-    const method = init?.method ?? 'POST';
-    const body = (init?.body as string) ?? '';
-
-    const bodyHash = createHash('sha256').update(body).digest('hex');
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signingData = `${timestamp}\n${method}\n${url.pathname}\n${bodyHash}`;
-    const signature = createHmac('sha256', apiKey)
-      .update(signingData)
-      .digest('hex');
-
     const headers = new Headers(init?.headers);
     headers.set('X-Stagewise-Client', `electron/${__APP_VERSION__}`);
-    headers.set('X-Stagewise-Ts', timestamp);
-    headers.set('X-Stagewise-Sig', signature);
-
     return globalThis.fetch(input, { ...init, headers });
   };
 }
@@ -116,7 +97,7 @@ export function createStagewise(
     name: 'stagewise',
     apiKey: settings.apiKey,
     baseURL: settings.baseURL,
-    fetch: createSigningFetch(settings.apiKey),
+    fetch: createClientFetch(),
     metadataExtractor: stagewiseMetadataExtractor,
     includeUsage: true,
     supportsStructuredOutputs: true,

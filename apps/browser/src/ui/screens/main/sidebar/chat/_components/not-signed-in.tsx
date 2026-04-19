@@ -5,6 +5,7 @@ import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { Logo } from '@ui/components/ui/logo';
 import { useState, useCallback } from 'react';
 import { cn } from '@ui/utils';
+import { useTurnstile } from '@ui/hooks/use-turnstile';
 
 type OtpPhase = 'email' | 'code';
 
@@ -18,20 +19,38 @@ export function NotSignedIn() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const {
+    containerRef,
+    token,
+    ready,
+    error: turnstileError,
+    enabled,
+    reset,
+  } = useTurnstile();
+
   const handleSendOtp = useCallback(async () => {
     if (!email.trim()) return;
+    if (enabled && !token && !turnstileError) {
+      setError('Security verification not ready. Please wait a moment.');
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
-      const result = await sendOtp(email.trim());
-      if (result?.error) setError(result.error);
-      else setPhase('code');
+      const result = await sendOtp(email.trim(), token ?? '');
+      if (result?.error) {
+        setError(result.error);
+        reset();
+      } else {
+        setPhase('code');
+      }
     } catch {
       setError('Failed to send verification code.');
+      reset();
     } finally {
       setLoading(false);
     }
-  }, [email, sendOtp]);
+  }, [email, sendOtp, token, enabled, reset, turnstileError]);
 
   const handleVerifyOtp = useCallback(async () => {
     if (!code.trim()) return;
@@ -47,6 +66,10 @@ export function NotSignedIn() {
     }
   }, [email, code, verifyOtp]);
 
+  const canSend = enabled
+    ? (!!token || turnstileError) && !!email.trim()
+    : !!email.trim();
+
   return (
     <div className="flex size-full flex-col items-center justify-center gap-4 p-6 text-center">
       <div className="flex flex-col items-center justify-center gap-2">
@@ -58,6 +81,9 @@ export function NotSignedIn() {
           Get access to the latest models with stagewise.
         </span>
       </div>
+
+      {/* Turnstile container — visible so interactive challenges can render */}
+      <div ref={containerRef} />
 
       {phase === 'email' && (
         <div className="flex gap-2">
@@ -78,9 +104,9 @@ export function NotSignedIn() {
             size="sm"
             className="shrink-0"
             onClick={() => void handleSendOtp()}
-            disabled={loading || !email.trim()}
+            disabled={loading || !canSend}
           >
-            Sign in
+            {enabled && !ready && !turnstileError ? 'Loading...' : 'Sign in'}
           </Button>
         </div>
       )}
@@ -123,6 +149,7 @@ export function NotSignedIn() {
               setPhase('email');
               setCode('');
               setError(null);
+              reset();
             }}
           >
             Use a different email
