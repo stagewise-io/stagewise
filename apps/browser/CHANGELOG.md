@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha.62 (2026-04-19)
+
+### Features
+
+* integrate Cloudflare Turnstile for enhanced security in OTP flow (eff2fa4)
+
 ## 1.0.0-alpha.61 (2026-04-18)
 
 ### Bug Fixes
