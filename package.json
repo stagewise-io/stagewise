@@ -28,7 +28,7 @@
     "version:stagewise:release": "tsx scripts/release/index.ts --package stagewise --channel release",
     "version:karton": "tsx scripts/release/index.ts --package karton",
     "extract:compression-test-data": "tsx scripts/experiments/extract-compression-test-data.ts",
-    "postinstall": "node -e \"const{chmodSync,existsSync}=require('fs');const p='node_modules/node-pty/prebuilds/'+process.platform+'-'+process.arch+'/spawn-helper';if(existsSync(p)){chmodSync(p,0o755);console.log('node-pty: fixed spawn-helper permissions')}\""
+    "postinstall": "node -e \"const{chmodSync,existsSync}=require('fs');const p='node_modules/node-pty/prebuilds/'+process.platform+'-'+process.arch+'/spawn-helper';try{if(existsSync(p)){chmodSync(p,0o755);console.log('node-pty: fixed spawn-helper permissions')}}catch(e){console.warn('node-pty: spawn-helper chmod failed:',e.message)}\""
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.6",

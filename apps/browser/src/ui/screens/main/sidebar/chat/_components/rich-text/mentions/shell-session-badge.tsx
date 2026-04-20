@@ -24,10 +24,10 @@ export function ShellSessionBadge({
   });
 
   const label = useMemo(() => {
-    if (!session) return sessionId;
+    if (!session?.cwd) return sessionId;
     const cwd = session.cwd;
-    const lastSlash = cwd.lastIndexOf('/');
-    return lastSlash >= 0 ? cwd.slice(lastSlash + 1) : cwd;
+    const lastSep = Math.max(cwd.lastIndexOf('/'), cwd.lastIndexOf('\\'));
+    return lastSep >= 0 ? cwd.slice(lastSep + 1) : cwd;
   }, [session, sessionId]);
 
   const isExited = session?.exited ?? false;
