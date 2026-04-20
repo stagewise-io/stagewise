@@ -1,0 +1,22 @@
+{
+  "name": "@stagewise/leonardo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsx build.ts",
+    "build:exe": "tsx build.ts --sea && tsx scripts/package-exe.ts",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "@stagewise/typescript-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "esbuild": "0.25.9",
+    "postject": "^1.0.0-alpha.6",
+    "rimraf": "^5.0.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
