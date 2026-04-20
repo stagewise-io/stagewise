@@ -25,17 +25,26 @@ export function parseVersion(version: string): ParsedVersion | null {
 
   if (parsed.prerelease.length > 0) {
     prereleaseStr = parsed.prerelease.join('.');
-    const typeStr = String(parsed.prerelease[0]);
-    if (typeStr === 'alpha') {
-      prereleaseType = 'alpha';
-    } else if (typeStr === 'beta') {
-      prereleaseType = 'beta';
-    }
-    if (
-      parsed.prerelease.length > 1 &&
-      typeof parsed.prerelease[1] === 'number'
-    ) {
-      prereleaseNum = parsed.prerelease[1];
+    const first = String(parsed.prerelease[0]);
+
+    // New format: single concatenated identifier like "alpha063" / "beta063".
+    // This is SemVer 1.0-compatible so Squirrel.Windows' embedded NuGet parser
+    // (used client-side on Windows) can handle the filename-derived version.
+    const concatenatedMatch = first.match(/^(alpha|beta)(\d+)$/);
+    if (concatenatedMatch) {
+      prereleaseType = concatenatedMatch[1] as 'alpha' | 'beta';
+      prereleaseNum = Number.parseInt(concatenatedMatch[2], 10);
+    } else if (first === 'alpha' || first === 'beta') {
+      // Legacy format: two identifiers like ["alpha", 63].
+      // Kept so the server can still reason about historical releases
+      // that haven't been superseded yet.
+      prereleaseType = first;
+      if (
+        parsed.prerelease.length > 1 &&
+        typeof parsed.prerelease[1] === 'number'
+      ) {
+        prereleaseNum = parsed.prerelease[1];
+      }
     }
   }
 

@@ -23,7 +23,7 @@ const windowsSignConfig = getWindowsSignConfig();
  * Set via RELEASE_CHANNEL environment variable in CI workflows.
  *
  * - 'dev': Local development or CI builds on non-release commits
- * - 'prerelease': Alpha or beta releases (alpha.x, beta.x versions)
+ * - 'prerelease': Alpha or beta releases (alphaNNN, betaNNN versions)
  * - 'release': Production releases (stable versions without prerelease suffix)
  */
 

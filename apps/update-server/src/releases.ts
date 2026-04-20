@@ -23,7 +23,7 @@ function findAsset(release: Release, pattern: RegExp): GitHubAsset | null {
 }
 
 // Build flexible regex: appName[-suffix]-version-arch.ext
-// Example: stagewise-prerelease-1.0.0-beta.1-arm64.dmg
+// Example: stagewise-prerelease-1.0.0-beta001-arm64.dmg
 // Note: extension should be raw (e.g., '.dmg'), not pre-escaped
 function buildAssetPattern(
   appName: string,
@@ -43,7 +43,7 @@ function buildAssetPattern(
 }
 
 // Build pattern for macOS update ZIP: appName[-suffix]-darwin-arch-version.zip
-// Example: stagewise-prerelease-darwin-arm64-1.0.0-beta.1.zip
+// Example: stagewise-prerelease-darwin-arm64-1.0.0-beta001.zip
 function buildMacOSZipPattern(
   appName: string,
   version: string,
@@ -65,8 +65,8 @@ const archAliases: Record<string, string[]> = {
 };
 
 // For Linux packages that use different version formats and separators
-// Example deb: stagewise-prerelease_1.0.0.beta.1_amd64.deb
-// Example rpm: stagewise-prerelease-1.0.0.beta.1-1.x86_64.rpm
+// Example deb: stagewise-prerelease_1.0.0.beta001_amd64.deb
+// Example rpm: stagewise-prerelease-1.0.0.beta001-1.x86_64.rpm
 function findLinuxAsset(
   release: Release,
   appName: string,
