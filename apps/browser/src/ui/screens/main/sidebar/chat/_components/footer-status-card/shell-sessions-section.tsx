@@ -34,7 +34,7 @@ function SessionRow({
 
   return (
     <div
-      className="flex w-full cursor-pointer flex-row items-center gap-1.5 rounded px-1 py-0.5 text-foreground text-xs hover:bg-surface-1"
+      className="flex w-full flex-row items-center gap-1.5 rounded px-1 py-0.5 text-foreground text-xs"
       onClick={() => onOpenTerminal(session.id)}
     >
       {/* CWD */}
