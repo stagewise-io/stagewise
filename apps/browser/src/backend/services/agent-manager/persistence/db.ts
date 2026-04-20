@@ -1,6 +1,15 @@
 import { drizzle } from 'drizzle-orm/libsql/driver';
 import * as schema from './schema';
-import { and, notInArray, ilike, desc, isNull, eq, sql } from 'drizzle-orm';
+import {
+  and,
+  notInArray,
+  ilike,
+  desc,
+  isNull,
+  eq,
+  sql,
+  gte,
+} from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
 import { migrateDatabase } from '@/utils/migrate-database';
@@ -10,6 +19,7 @@ import type { Logger } from '@/services/logger';
 import {
   AgentTypes,
   type AgentHistoryEntry,
+  type AgentMessage,
 } from '@shared/karton-contracts/ui/agent';
 import { getAgentDbPath } from '@/utils/paths';
 
@@ -17,6 +27,7 @@ export class AgentPersistenceDB {
   private _dbDriver: Client;
   private _db: LibSQLDatabase<typeof schema>;
   private _logger: Logger;
+  private _lastPersistedIds = new Map<string, string[]>();
 
   private constructor(logger: Logger) {
     const dbPath = getAgentDbPath();
@@ -82,7 +93,7 @@ export class AgentPersistenceDB {
         title: schema.agentInstances.title,
         createdAt: schema.agentInstances.createdAt,
         lastMessageAt: schema.agentInstances.lastMessageAt,
-        messageCount: sql<number>`json_array_length(${schema.agentInstances.history})`,
+        messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
       })
       .from(schema.agentInstances)
@@ -118,46 +129,183 @@ export class AgentPersistenceDB {
     id: string,
   ): Promise<schema.StoredAgentInstance | null> {
     this._logger.debug(`[AgentPersistenceDB] Fetching agent instance: ${id}`);
-    const results = await this._db
-      .selectDistinct()
-      .from(schema.agentInstances)
-      .where(eq(schema.agentInstances.id, id))
-      .limit(1)
-      .catch((error) => {
-        this._logger.error(
-          `[AgentPersistenceDB] Failed to fetch agent instance: ${error}`,
-        );
-        return null;
-      });
+    try {
+      const results = await this._db
+        .selectDistinct()
+        .from(schema.agentInstances)
+        .where(eq(schema.agentInstances.id, id))
+        .limit(1);
 
-    return results?.[0] ?? null;
+      const row = results?.[0] ?? null;
+      if (!row) return null;
+
+      // Reconstruct history from normalised message rows
+      const messageRows = await this._db
+        .select()
+        .from(schema.agentMessages)
+        .where(eq(schema.agentMessages.agentInstanceId, id))
+        .orderBy(schema.agentMessages.seq);
+
+      const history: AgentMessage[] = messageRows.map((r) => ({
+        id: r.messageId,
+        role: r.role as AgentMessage['role'],
+        parts: r.parts as AgentMessage['parts'],
+        metadata: r.metadata as AgentMessage['metadata'],
+      }));
+
+      // Initialise dirty-tracking baseline
+      this._lastPersistedIds.set(
+        id,
+        messageRows.map((r) => r.messageId),
+      );
+
+      return { ...row, history };
+    } catch (error) {
+      this._logger.error(
+        `[AgentPersistenceDB] Failed to fetch agent instance: ${error}`,
+      );
+      return null;
+    }
   }
 
   /**
    * Stores or updates an agent instance in the persistence layer.
+   * History is persisted incrementally into the `agentMessages` table —
+   * only changed / new messages are written.
    *
-   * @param agentInstance The agent instance to store
+   * @param agentInstance Scalar agent metadata (without history)
+   * @param history       Current in-memory message history
    */
   public async storeAgentInstance(
-    agentInstance: schema.NewStoredAgentInstance,
+    agentInstance: Omit<schema.NewStoredAgentInstance, 'history'>,
+    history: AgentMessage[],
+    dirtyMessageIndices?: number[],
   ): Promise<void> {
-    this._logger.debug(
-      `[AgentPersistenceDB] Storing agent instance: ${agentInstance.id}`,
-    );
-    await this._db
-      .insert(schema.agentInstances)
-      .values(agentInstance)
-      .onConflictDoUpdate({
-        target: schema.agentInstances.id,
-        set: {
-          ...agentInstance,
-        },
-      })
-      .catch((error) => {
-        this._logger.error(
-          `[AgentPersistenceDB] Failed to store agent instance: ${error.message}, ${error.stack}`,
-        );
+    const id = agentInstance.id;
+    this._logger.debug(`[AgentPersistenceDB] Storing agent instance: ${id}`);
+
+    // Compute divergence point outside the transaction (pure, no I/O)
+    const lastIds = this._lastPersistedIds.get(id) ?? [];
+    const divergePoint = this._findDivergencePoint(history, lastIds);
+
+    try {
+      await this._db.transaction(async (tx) => {
+        // 1. Upsert scalar metadata (legacy history column gets $defaultFn → [])
+        await tx
+          .insert(schema.agentInstances)
+          .values(agentInstance as schema.NewStoredAgentInstance)
+          .onConflictDoUpdate({
+            target: schema.agentInstances.id,
+            set: {
+              ...agentInstance,
+            },
+          });
+
+        // 2. Incremental message persistence via divergence detection
+
+        // Delete divergent / truncated messages
+        if (divergePoint < lastIds.length) {
+          await tx
+            .delete(schema.agentMessages)
+            .where(
+              and(
+                eq(schema.agentMessages.agentInstanceId, id),
+                gte(schema.agentMessages.seq, divergePoint),
+              ),
+            );
+        }
+
+        // Insert new / replacement messages from the divergence point
+        if (divergePoint < history.length) {
+          const newMsgs = history.slice(divergePoint);
+          await tx.insert(schema.agentMessages).values(
+            newMsgs.map((msg, i) => ({
+              agentInstanceId: id,
+              seq: divergePoint + i,
+              messageId: msg.id,
+              role: msg.role,
+              parts: msg.parts as unknown[],
+              metadata: (msg.metadata ?? null) as unknown,
+            })),
+          );
+        } else if (history.length > 0) {
+          // No structural change — update the last message in case of
+          // in-place mutations (streaming content, attachment draining)
+          const lastMsg = history[history.length - 1];
+          await tx
+            .update(schema.agentMessages)
+            .set({
+              messageId: lastMsg.id,
+              role: lastMsg.role,
+              parts: lastMsg.parts as unknown[],
+              metadata: (lastMsg.metadata ?? null) as unknown,
+            })
+            .where(
+              and(
+                eq(schema.agentMessages.agentInstanceId, id),
+                eq(schema.agentMessages.seq, history.length - 1),
+              ),
+            );
+        }
+
+        // 3. Targeted updates for in-place mutations on non-tail messages
+        //    (e.g. history compression writing compressedHistory metadata)
+        if (dirtyMessageIndices && dirtyMessageIndices.length > 0) {
+          for (const idx of dirtyMessageIndices) {
+            // Skip out-of-bounds or indices already written by divergence path
+            if (idx < 0 || idx >= history.length || idx >= divergePoint)
+              continue;
+            const msg = history[idx];
+            await tx
+              .update(schema.agentMessages)
+              .set({
+                messageId: msg.id,
+                role: msg.role,
+                parts: msg.parts as unknown[],
+                metadata: (msg.metadata ?? null) as unknown,
+              })
+              .where(
+                and(
+                  eq(schema.agentMessages.agentInstanceId, id),
+                  eq(schema.agentMessages.seq, idx),
+                ),
+              );
+          }
+        }
       });
+
+      // Update dirty-tracking state only after successful commit
+      this._lastPersistedIds.set(
+        id,
+        history.map((m) => m.id),
+      );
+    } catch (error) {
+      this._logger.error(
+        `[AgentPersistenceDB] Failed to store agent instance: ${(error as Error).message}, ${(error as Error).stack}`,
+      );
+    }
+  }
+
+  /**
+   * Finds the first index where the current history diverges from the
+   * last-persisted message IDs.  Optimises for the common case (pure
+   * append) with a single comparison at the tail of the shared range.
+   */
+  private _findDivergencePoint(
+    history: AgentMessage[],
+    lastIds: string[],
+  ): number {
+    const minLen = Math.min(history.length, lastIds.length);
+    if (minLen === 0) return 0;
+    // Fast path: if the last shared position matches, no undo occurred
+    if (history[minLen - 1].id === lastIds[minLen - 1]) {
+      return minLen;
+    }
+    // Slow path: linear scan for the divergence point
+    for (let i = 0; i < minLen; i++) {
+      if (history[i].id !== lastIds[i]) return i;
+    }
+    return minLen;
   }
 
   /**
@@ -225,7 +373,7 @@ export class AgentPersistenceDB {
    */
   public async deleteAgentInstance(id: string): Promise<void> {
     this._logger.debug(`[AgentPersistenceDB] Deleting agent instance: ${id}`);
-    // We should also delete all persisted child agents as well (do it recursively to catch all agents)
+    // Recursively delete all persisted child agents
     const childAgentInstanceIds = await this._db
       .select({ id: schema.agentInstances.id })
       .from(schema.agentInstances)
@@ -233,6 +381,16 @@ export class AgentPersistenceDB {
     for (const childAgentInstanceId of childAgentInstanceIds) {
       await this.deleteAgentInstance(childAgentInstanceId.id);
     }
+
+    // Delete associated messages first
+    await this._db
+      .delete(schema.agentMessages)
+      .where(eq(schema.agentMessages.agentInstanceId, id))
+      .catch((error) => {
+        this._logger.error(
+          `[AgentPersistenceDB] Failed to delete agent messages: ${error}`,
+        );
+      });
 
     await this._db
       .delete(schema.agentInstances)
@@ -242,5 +400,8 @@ export class AgentPersistenceDB {
           `[AgentPersistenceDB] Failed to delete agent instance: ${error}`,
         );
       });
+
+    // Clean up dirty-tracking state
+    this._lastPersistedIds.delete(id);
   }
 }

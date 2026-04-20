@@ -511,7 +511,8 @@ export class AgentManagerService extends DisposableService {
             draft.agents.instances[agentInstanceId].type = type;
           });
         },
-        persist: () => this.persistAgentState(agentInstanceId),
+        persist: (dirtyMessageIndices?: number[]) =>
+          this.persistAgentState(agentInstanceId, dirtyMessageIndices),
       },
       this.toolbox,
       this.telemetryService,
@@ -653,7 +654,10 @@ export class AgentManagerService extends DisposableService {
     return createdAgent;
   }
 
-  private async persistAgentState(instanceId: string) {
+  private async persistAgentState(
+    instanceId: string,
+    dirtyMessageIndices?: number[],
+  ) {
     // Store agent state into DB.
     const agent = this.activeAgents.get(instanceId);
 
@@ -670,21 +674,24 @@ export class AgentManagerService extends DisposableService {
     const mountedWorkspaces =
       this.toolbox.getWorkspaceSnapshotForPersistence(instanceId);
 
-    await this.agentPersistenceDB?.storeAgentInstance({
-      id: instanceId,
-      type: agent.agentType,
-      title: agentState.title,
-      history: agentState.history,
-      activeModelId: agentState.activeModelId,
-      createdAt: agentState.history[0].metadata?.createdAt ?? new Date(0), // Fallback should never be reached
-      lastMessageAt:
-        agentState.history[agentState.history.length - 1].metadata?.createdAt ??
-        new Date(), // Fallback should never be reached
-      queuedMessages: agentState.queuedMessages,
-      inputState: agentState.inputState,
-      usedTokens: agentState.usedTokens,
-      mountedWorkspaces,
-    });
+    await this.agentPersistenceDB?.storeAgentInstance(
+      {
+        id: instanceId,
+        type: agent.agentType,
+        title: agentState.title,
+        activeModelId: agentState.activeModelId,
+        createdAt: agentState.history[0].metadata?.createdAt ?? new Date(0), // Fallback should never be reached
+        lastMessageAt:
+          agentState.history[agentState.history.length - 1].metadata
+            ?.createdAt ?? new Date(), // Fallback should never be reached
+        queuedMessages: agentState.queuedMessages,
+        inputState: agentState.inputState,
+        usedTokens: agentState.usedTokens,
+        mountedWorkspaces,
+      },
+      agentState.history,
+      dirtyMessageIndices,
+    );
   }
 
   /**

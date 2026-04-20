@@ -1,4 +1,4 @@
--- VERSION: 3
+-- VERSION: 7
 
 CREATE TABLE IF NOT EXISTS meta(
   key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS agentInstances(
   last_message_at INTEGER NOT NULL,
   active_model_id TEXT NOT NULL,
   title TEXT NOT NULL,
-  history TEXT NOT NULL,
+  history TEXT NOT NULL DEFAULT '{"json":[]}',  -- deprecated: kept for rollback safety
   queued_messages TEXT NOT NULL,
   input_state TEXT NOT NULL,
   used_tokens INTEGER NOT NULL,
@@ -23,3 +23,15 @@ CREATE TABLE IF NOT EXISTS agentInstances(
 
 CREATE INDEX IF NOT EXISTS agentInstances_created_at_index ON agentInstances(created_at);
 CREATE INDEX IF NOT EXISTS agentInstances_last_message_at_index ON agentInstances(last_message_at);
+
+CREATE TABLE IF NOT EXISTS agentMessages(
+  agent_instance_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  message_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  parts TEXT NOT NULL,
+  metadata TEXT,
+  PRIMARY KEY (agent_instance_id, seq)
+);
+
+CREATE INDEX IF NOT EXISTS agent_messages_agent_id_index ON agentMessages(agent_instance_id);

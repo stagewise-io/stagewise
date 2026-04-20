@@ -327,7 +327,7 @@ export abstract class BaseAgent<
   private readonly state: {
     get: () => AgentState;
     set: (recipe: (draft: AgentState) => void) => void;
-    persist: () => Promise<void>;
+    persist: (dirtyMessageIndices?: number[]) => Promise<void>;
   };
 
   /**
@@ -430,7 +430,7 @@ export abstract class BaseAgent<
     state: {
       get: () => AgentState;
       set: (recipe: (draft: AgentState) => void) => void;
-      persist: () => Promise<void>;
+      persist: (dirtyMessageIndices?: number[]) => Promise<void>;
     },
     toolbox: ToolboxService,
     telemetryService: TelemetryService,
@@ -1830,7 +1830,10 @@ export abstract class BaseAgent<
         );
       });
 
-      await this.saveState();
+      const boundarySeq = this.state
+        .get()
+        .history.findIndex((m) => m.id === boundaryMessageId);
+      await this.saveState(boundarySeq >= 0 ? [boundarySeq] : undefined);
     } catch (e) {
       // Fail silently — compression is best-effort. The agent continues
       // without compression until the context window is exhausted, at which
@@ -1848,10 +1851,10 @@ export abstract class BaseAgent<
   /**
    * Updates the persisted state of the agent
    */
-  private async saveState(): Promise<void> {
+  private async saveState(dirtyMessageIndices?: number[]): Promise<void> {
     if (!this.config.persistent) return;
 
-    await this.state.persist();
+    await this.state.persist(dirtyMessageIndices);
   }
 
   /**
