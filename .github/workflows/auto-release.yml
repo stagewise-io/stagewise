@@ -66,10 +66,13 @@ jobs:
             echo "${name}_version=${version}" >> $GITHUB_OUTPUT
             echo "${name}_tag=${tag}" >> $GITHUB_OUTPUT
 
-            # Determine channel from version
-            if [[ "$version" == *"-alpha."* ]]; then
+            # Determine channel from version.
+            # Accepts both the new format (`1.0.0-alpha063`) and the legacy
+            # format (`1.0.0-alpha.63`) so re-runs of historical release PRs
+            # continue to classify correctly.
+            if [[ "$version" =~ -alpha(\.[0-9]+|[0-9]+)$ ]]; then
               echo "${name}_channel=alpha" >> $GITHUB_OUTPUT
-            elif [[ "$version" == *"-beta."* ]]; then
+            elif [[ "$version" =~ -beta(\.[0-9]+|[0-9]+)$ ]]; then
               echo "${name}_channel=beta" >> $GITHUB_OUTPUT
             else
               echo "${name}_channel=release" >> $GITHUB_OUTPUT

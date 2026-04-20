@@ -231,7 +231,7 @@ export class AutoUpdateService extends DisposableService {
 
   /**
    * Infer the default update channel from the installed version string.
-   * e.g. "1.0.0-alpha.3" → 'alpha', "1.0.0-beta.1" → 'beta'
+   * e.g. "1.0.0-alpha003" → 'alpha', "1.0.0-beta001" → 'beta'
    */
   private inferChannelFromVersion(): UpdateChannel {
     const version = __APP_VERSION__;

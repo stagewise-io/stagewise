@@ -6,7 +6,50 @@ import semver from 'semver';
 import type { ParsedVersion, ReleaseChannel, VersionBump } from './types.js';
 
 /**
- * Parse a version string into its components
+ * Zero-pad a prerelease number to 3 digits.
+ *
+ * The new-format prerelease identifier is intentionally lexicographically
+ * sortable: `alpha010` > `alpha009` only if both are padded, because
+ * SemVer 2.0 compares non-purely-numeric identifiers as strings.
+ *
+ * The counter is therefore capped at `PRERELEASE_NUM_MAX` (= 999 for 3-digit
+ * padding). Beyond that boundary the string comparison flips — for example
+ * `semver.gt('1.0.0-alpha1000', '1.0.0-alpha999')` returns `false` because
+ * the character `'1'` sorts before `'9'`. Letting a bump slip through would
+ * silently break update-ordering on the server side. We therefore hard-fail
+ * here and force a conscious decision (bump base version, promote channel,
+ * or widen padding in a coordinated migration).
+ */
+const PRERELEASE_NUM_PADDING = 3;
+const PRERELEASE_NUM_MAX = 10 ** PRERELEASE_NUM_PADDING - 1;
+function padPrereleaseNum(n: number): string {
+  if (n > PRERELEASE_NUM_MAX) {
+    throw new Error(
+      `Prerelease number ${n} exceeds the maximum supported value (${PRERELEASE_NUM_MAX}). ` +
+        `The prerelease identifier is zero-padded to ${PRERELEASE_NUM_PADDING} digits so ` +
+        `SemVer string-comparison keeps the natural ordering. Going beyond ${PRERELEASE_NUM_MAX} ` +
+        `would break ordering (e.g. "alpha1000" < "alpha999" lexically, so the update server ` +
+        `would serve an older release as "newer"). ` +
+        `Options: bump the base version (patch/minor/major) so the counter resets, ` +
+        `promote to the next channel (alpha -> beta -> release), or widen ` +
+        `PRERELEASE_NUM_PADDING (requires a coordinated migration of all published tags).`,
+    );
+  }
+  return String(n).padStart(PRERELEASE_NUM_PADDING, '0');
+}
+
+/**
+ * Parse a version string into its components.
+ *
+ * Accepts both the current format and the legacy format so historical
+ * releases can still be reasoned about (e.g. re-running the bump script
+ * against a repo whose latest tag predates the format switch).
+ *
+ * - New format: `1.0.0-alpha063` (single concatenated prerelease identifier,
+ *   SemVer 1.0-compatible so Squirrel.Windows' NuGet parser accepts it).
+ *   `semver.parse(...).prerelease` is `['alpha063']`.
+ * - Legacy format: `1.0.0-alpha.63` (dot-separated, SemVer 2.0 only).
+ *   `semver.parse(...).prerelease` is `['alpha', 63]`.
  */
 export function parseVersion(version: string): ParsedVersion {
   const parsed = semver.parse(version);
@@ -17,10 +60,20 @@ export function parseVersion(version: string): ParsedVersion {
   let prerelease: ReleaseChannel | null = null;
   let prereleaseNum: number | null = null;
 
-  if (parsed.prerelease.length >= 2) {
-    const channel = parsed.prerelease[0];
-    if (channel === 'alpha' || channel === 'beta') {
-      prerelease = channel;
+  if (parsed.prerelease.length >= 1) {
+    const first = String(parsed.prerelease[0]);
+
+    // New format: single identifier like "alpha063" / "beta063".
+    const concatenatedMatch = first.match(/^(alpha|beta)(\d+)$/);
+    if (concatenatedMatch) {
+      prerelease = concatenatedMatch[1] as ReleaseChannel;
+      prereleaseNum = Number.parseInt(concatenatedMatch[2] ?? '0', 10);
+    } else if (
+      (first === 'alpha' || first === 'beta') &&
+      parsed.prerelease.length >= 2
+    ) {
+      // Legacy format: two identifiers like ["alpha", 63].
+      prerelease = first;
       prereleaseNum =
         typeof parsed.prerelease[1] === 'number'
           ? parsed.prerelease[1]
@@ -40,13 +93,18 @@ export function parseVersion(version: string): ParsedVersion {
 }
 
 /**
- * Calculate the next version based on current version, bump type, and target channel
+ * Calculate the next version based on current version, bump type, and target channel.
+ *
+ * Prerelease identifiers are zero-padded to 3 digits and concatenated with
+ * the channel name (e.g. `alpha001`, not `alpha.1`). This keeps the version
+ * string SemVer 1.0-compatible so Squirrel.Windows' embedded NuGet parser
+ * can handle it.
  *
  * Version transitions:
- * - Same prerelease channel: increment prerelease number (1.0.0-alpha.1 -> 1.0.0-alpha.2)
- * - Upgrade channel (alpha->beta): reset prerelease number (1.0.0-alpha.5 -> 1.0.0-beta.1)
- * - To release: remove prerelease (1.0.0-beta.3 -> 1.0.0)
- * - From release to prerelease: apply bump, add prerelease (1.0.0 -> 1.0.1-alpha.1)
+ * - Same prerelease channel: increment prerelease number (1.0.0-alpha001 -> 1.0.0-alpha002)
+ * - Upgrade channel (alpha->beta): reset prerelease number (1.0.0-alpha005 -> 1.0.0-beta001)
+ * - To release: remove prerelease (1.0.0-beta003 -> 1.0.0)
+ * - From release to prerelease: apply bump, add prerelease (1.0.0 -> 1.0.1-alpha001)
  */
 export function calculateNextVersion(
   currentVersion: string,
@@ -77,13 +135,13 @@ export function calculateNextVersion(
         `Failed to bump version ${currentVersion} with ${bumpType}`,
       );
     }
-    return `${bumpedBase}-${targetChannel}.1`;
+    return `${bumpedBase}-${targetChannel}${padPrereleaseNum(1)}`;
   }
 
   // If same channel, increment the prerelease number
   if (current.prerelease === targetChannel) {
     const nextNum = (current.prereleaseNum || 0) + 1;
-    return `${current.base}-${targetChannel}.${nextNum}`;
+    return `${current.base}-${targetChannel}${padPrereleaseNum(nextNum)}`;
   }
 
   // Channel upgrade (alpha -> beta)
@@ -101,8 +159,8 @@ export function calculateNextVersion(
     );
   }
 
-  // Upgrade channel: reset to .1
-  return `${current.base}-${targetChannel}.1`;
+  // Upgrade channel: reset to 001
+  return `${current.base}-${targetChannel}${padPrereleaseNum(1)}`;
 }
 
 /**

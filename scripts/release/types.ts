@@ -24,7 +24,7 @@ export interface PackageConfig {
 }
 
 export interface ParsedVersion {
-  /** Full version string (e.g., "1.0.0-alpha.1") */
+  /** Full version string (e.g., "1.0.0-alpha001") */
   full: string;
   /** Major version number */
   major: number;
@@ -34,7 +34,7 @@ export interface ParsedVersion {
   patch: number;
   /** Prerelease channel (alpha, beta) or null for release */
   prerelease: ReleaseChannel | null;
-  /** Prerelease number (e.g., 1 in "alpha.1") or null */
+  /** Prerelease number (e.g., 1 in "alpha001") or null */
   prereleaseNum: number | null;
   /** Base version without prerelease (e.g., "1.0.0") */
   base: string;

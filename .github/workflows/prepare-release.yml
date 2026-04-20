@@ -81,7 +81,10 @@ jobs:
         if: inputs.new-cycle && inputs.package == 'stagewise'
         run: |
           VERSION=$(node -p "require('./apps/browser/package.json').version")
-          if [[ "$VERSION" != *"-alpha."* ]] && [[ "$VERSION" != *"-beta."* ]]; then
+          # Accepts both the new format (`1.0.0-alpha063`) and the legacy
+          # format (`1.0.0-alpha.63`) so repos in either state can start
+          # a new cycle.
+          if [[ ! "$VERSION" =~ -alpha(\.[0-9]+|[0-9]+)$ ]] && [[ ! "$VERSION" =~ -beta(\.[0-9]+|[0-9]+)$ ]]; then
             echo "::error::Current version $VERSION is not a prerelease. --new-cycle requires a prerelease version."
             exit 1
           fi
