@@ -197,7 +197,11 @@ const ATTACHMENT_LINK_PATTERNS: Array<{
   { prefix: 'tab:', parse: (rest) => ({ type: 'tab', id: rest }) },
   {
     prefix: 'shell:',
-    parse: (rest) => ({ type: 'shell', sessionId: rest }),
+    parse: (rest) => {
+      const sessionId = rest.trim();
+      if (!sessionId) return null;
+      return { type: 'shell', sessionId };
+    },
   },
 
   // ── Legacy protocols (read-time aliases) ─────────────────────────────────

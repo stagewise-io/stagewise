@@ -57,7 +57,10 @@ function SessionRow({
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={() => onKill(session.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onKill(session.id);
+              }}
             >
               <XIcon className="size-3" />
             </Button>

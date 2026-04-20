@@ -545,7 +545,10 @@ export function StatusCard() {
 
     const shellSection = ShellSessionsSection({
       sessions: shellSessions,
-      onKill: (sessionId) => void killShellSession(openAgentId!, sessionId),
+      onKill: (sessionId) => {
+        if (!openAgentId) return;
+        void killShellSession(openAgentId, sessionId);
+      },
       onOpenTerminal: openShellTerminalPage,
     });
     if (shellSection) result.push(shellSection);
