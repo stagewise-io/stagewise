@@ -61,7 +61,7 @@ export function ShellSessionBadge({
         selected={false}
         isEditable={false}
         onDelete={() => {}}
-        className={cn('cursor-pointer', isExited && 'opacity-50')}
+        className={cn(isExited && 'opacity-50')}
         onClick={handleClick}
       />
     </InlineBadgeWrapper>
