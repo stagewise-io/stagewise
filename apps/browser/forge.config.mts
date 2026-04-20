@@ -245,7 +245,7 @@ const config: ForgeConfig = {
   buildIdentifier: buildConstants.__APP_RELEASE_CHANNEL__,
   packagerConfig: {
     asar: {
-      unpack: '**/{sharp,@img}/**',
+      unpack: '**/{sharp,@img,node-pty}/**',
     },
     extraResource: [
       './bundled',
