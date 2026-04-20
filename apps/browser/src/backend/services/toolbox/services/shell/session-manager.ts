@@ -1,5 +1,6 @@
 import * as pty from 'node-pty';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { OscParser, wrapWithSentinel } from './osc-parser';
 import { SessionLogger } from './session-logger';
@@ -250,6 +251,7 @@ export class SessionManager {
             ),
           )
         : null,
+      initScriptPath: null,
     };
 
     // Wire ready promise
@@ -525,7 +527,9 @@ export class SessionManager {
     exitCode: number | null,
   ): void {
     const commandId = this.sessionCommandMap.get(sessionId);
-    if (!commandId) return;
+    if (!commandId) {
+      return;
+    }
 
     const pending = this.pendingCommands.get(commandId);
     if (!pending) return;
@@ -727,6 +731,16 @@ export class SessionManager {
     session.logger?.close();
     session.parser.reset();
     this.sessionCommandMap.delete(session.id);
+
+    // Best-effort cleanup of temp init script (may already be removed by the shell)
+    if (session.initScriptPath) {
+      try {
+        fs.unlinkSync(session.initScriptPath);
+      } catch {
+        // Already removed by the shell's `rm -f`
+      }
+      session.initScriptPath = null;
+    }
   }
 
   private removeSession(session: PtySession): void {
@@ -760,9 +774,19 @@ export class SessionManager {
     }
 
     if (script) {
-      // Source via eval to avoid temp-file creation.
-      // Use printf to write the script, then eval it.
-      session.pty.write(`eval $'${escapeForShell(script)}'\r`);
+      // Write to a temp file and dot-source it. This avoids ZLE echoing
+      // the entire script char-by-char (which can exceed the detection
+      // timeout with rich prompt frameworks like starship/p10k).
+      const tempPath = `/tmp/sw-${session.id}.sh`;
+      try {
+        fs.writeFileSync(tempPath, script, { mode: 0o600 });
+        session.initScriptPath = tempPath;
+        // Dot-source is POSIX (cannot be aliased). Cleanup handled by deactivateSession.
+        session.pty.write(`. ${tempPath}\r`);
+      } catch {
+        // Temp file write failed — fall back to eval through the line editor.
+        session.pty.write(`eval $'${escapeForShell(script)}'\r`);
+      }
     }
   }
 
