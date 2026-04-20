@@ -78,7 +78,11 @@ export const agentInstances = sqliteTable(
     lastMessageAt: integer('last_message_at', { mode: 'timestamp' }).notNull(),
     activeModelId: modelId('active_model_id').notNull(),
     title: text('title').notNull(),
-    history: _sqliteJson('history').notNull().$type<AgentMessage[]>(),
+    /** @deprecated Kept for rollback safety. Read/write via agentMessages table instead. */
+    history: _sqliteJson('history')
+      .notNull()
+      .$type<AgentMessage[]>()
+      .$defaultFn(() => [] as AgentMessage[]),
     queuedMessages: _sqliteJson('queued_messages')
       .notNull()
       .$type<(AgentMessage & { role: 'user' })[]>(),
@@ -96,6 +100,29 @@ export const agentInstances = sqliteTable(
   ],
 );
 
+export const agentMessages = sqliteTable(
+  'agentMessages',
+  {
+    agentInstanceId: text('agent_instance_id').notNull(),
+    seq: integer('seq').notNull(),
+    messageId: text('message_id').notNull(),
+    role: text('role').notNull(),
+    parts: _sqliteJson('parts').notNull().$type<unknown[]>(),
+    metadata: _sqliteJson('metadata').$type<unknown>(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.agentInstanceId, table.seq] }),
+    index('agent_messages_agent_id_index').on(table.agentInstanceId),
+  ],
+);
+
+const _agentMessageRelations = relations(agentMessages, ({ one }) => ({
+  agentInstance: one(agentInstances, {
+    fields: [agentMessages.agentInstanceId],
+    references: [agentInstances.id],
+  }),
+}));
+
 const _agentInstanceRelations = relations(agentInstances, ({ one, many }) => ({
   parentAgentInstance: one(agentInstances, {
     fields: [agentInstances.parentAgentInstanceId],
@@ -104,6 +131,7 @@ const _agentInstanceRelations = relations(agentInstances, ({ one, many }) => ({
   childAgentInstances: many(agentInstances, {
     relationName: 'childAgentInstances',
   }),
+  messages: many(agentMessages),
 }));
 
 export type NewStoredAgentInstance = typeof agentInstances.$inferInsert;

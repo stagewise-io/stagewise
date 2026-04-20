@@ -4,6 +4,7 @@ import { up as v003Up } from './v003-unify-tab-ids';
 import { up as v004Up } from './v004-rename-tool-suffixes';
 import { up as v005Up } from './v005-backfill-file-attachment-filename';
 import { up as v006Up } from './v006-rename-readfile-to-read';
+import { up as v007Up } from './v007-normalize-history';
 
 const registry: MigrationScript[] = [
   { version: 2, name: 'add-mounted-workspaces', up: v002Up },
@@ -11,7 +12,8 @@ const registry: MigrationScript[] = [
   { version: 4, name: 'rename-tool-suffixes', up: v004Up },
   { version: 5, name: 'backfill-file-attachment-filename', up: v005Up },
   { version: 6, name: 'rename-file-tools', up: v006Up },
+  { version: 7, name: 'normalize-history', up: v007Up },
 ];
-const schemaVersion = 6;
+const schemaVersion = 7;
 
 export { registry, schemaVersion };
