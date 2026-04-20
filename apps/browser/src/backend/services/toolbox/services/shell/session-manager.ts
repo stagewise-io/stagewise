@@ -269,9 +269,12 @@ export class SessionManager {
     // before the parser fires synchronous resolution events (commandDone,
     // sentinelDone) that read the buffer via collectOutput.
     ptyProcess.onData((data: string) => {
+      // FIX: always feed the headless xterm emulator + logger so markLine
+      // and serializeFrom stay accurate even during session startup. Only
+      // gate the UI-facing streaming callback (session.onData).
+      session.logger?.appendRaw(Buffer.from(data, 'utf-8'));
+      session.logger?.append(stripAnsi(data));
       if (session.ready) {
-        session.logger?.appendRaw(Buffer.from(data, 'utf-8'));
-        session.logger?.append(stripAnsi(data));
         session.onData?.(sessionId, data);
       }
       parser.write(data);
@@ -284,16 +287,45 @@ export class SessionManager {
 
     // Wire parser events
     parser.on('integrationDetected', () => {
+      // FIX: integrationDetected alone does NOT mean the shell is ready.
+      // The sourcing command (`. /tmp/sw-*.sh`) is still "in flight" from
+      // bash's perspective and will emit its own 133;D right after the
+      // first 133;A. Flagging ready here causes that D to resolve the
+      // first user command with empty output. Mark ready on the first
+      // commandDone instead; keep the detect timer armed as a safety
+      // fallback.
       session.shellIntegrationActive = true;
-      this.markReady(session);
-      if (session.detectTimerHandle) {
-        clearTimeout(session.detectTimerHandle);
-        session.detectTimerHandle = null;
-      }
     });
 
+    // Swallow the first commandDone after integration — it's the shell
+    // integration script's own completion, not a user command.
+    let sourcingComplete = false;
+
     parser.on('commandDone', (event) => {
+      if (session.shellIntegrationActive && !sourcingComplete) {
+        sourcingComplete = true;
+        this.markReady(session);
+        if (session.detectTimerHandle) {
+          clearTimeout(session.detectTimerHandle);
+          session.detectTimerHandle = null;
+        }
+        return;
+      }
       this.resolveCurrentCommand(sessionId, event.exitCode);
+    });
+
+    // FIX: When OSC 133;C fires, the prompt + command echo are already in
+    // the xterm buffer and the cursor is on the row right before the
+    // command's first output line. Moving the markLine here ensures
+    // serializeFrom() returns only the command output (no prompt echo).
+    parser.on('commandStart', () => {
+      if (!session.ready) return;
+      const cid = this.sessionCommandMap.get(sessionId);
+      if (!cid) return;
+      const pending = this.pendingCommands.get(cid);
+      if (!pending) return;
+      const newMark = session.logger?.getMarkPosition();
+      if (newMark !== undefined) pending.markLine = newMark;
     });
 
     parser.on('sentinelDone', (id, exitCode) => {
