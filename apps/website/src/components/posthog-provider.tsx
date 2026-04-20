@@ -44,9 +44,10 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       // Requires "Cookieless server hash mode" enabled in PostHog project settings:
       //   Project Settings → Web analytics → Cookieless server hash mode
       //
-      // cookieless_mode and defaults are runtime options present in posthog-js
-      // v1.367.0 but not yet reflected in the TypeScript config types — cast needed.
-      ...(!isAccepted ? ({ cookieless_mode: true } as any) : {}),
+      // 'always': force cookieless mode for all non-accepted users (both pending
+      // and denied). 'on_reject' would only activate for explicitly opted-out
+      // users, leaving pending visitors in full-tracking mode — wrong.
+      ...(!isAccepted ? { cookieless_mode: 'always' as const } : {}),
 
       // Write the opt-in/out flag to a cookie so server-side middleware can read it.
       opt_out_capturing_persistence_type: 'cookie',
@@ -61,9 +62,14 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     // pending / declined: cookieless mode is already active — no call needed.
 
     // Capture the initial pageview.
+    // Strip query strings for non-accepted users: query params may contain
+    // personal data (e.g. tokens, email addresses) and must not be forwarded
+    // to PostHog until the user has explicitly consented.
     posthog.capture('$pageview', {
       $current_url:
-        window.origin + window.location.pathname + window.location.search,
+        window.origin +
+        window.location.pathname +
+        (isAccepted ? window.location.search : ''),
     });
 
     // React to consent changes from the cookie banner without a page reload.
@@ -104,10 +110,15 @@ function PostHogPageView() {
       return;
     }
     if (pathname && posthog && posthogInitialized) {
+      // Only include query string for accepted users — same rationale as the
+      // initial pageview capture above.
+      const isAccepted = getCookieConsent() === 'accepted';
       let url = window.origin + pathname;
-      const search = searchParams.toString();
-      if (search) {
-        url += `?${search}`;
+      if (isAccepted) {
+        const search = searchParams.toString();
+        if (search) {
+          url += `?${search}`;
+        }
       }
       posthog.capture('$pageview', { $current_url: url });
     }
