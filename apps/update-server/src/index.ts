@@ -1,5 +1,5 @@
 import express from 'express';
-import { config } from './config.js';
+import { config, validateConfig } from './config.js';
 import { getReleases, startRefreshInterval } from './github.js';
 import routes from './routes.js';
 
@@ -14,6 +14,14 @@ app.get('/health', (_req, res) => {
 app.use('/', routes);
 
 async function start() {
+  // Fail fast on missing required configuration (e.g. PUBLIC_URL in prod).
+  try {
+    validateConfig();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+
   // Initial fetch of releases
   console.log('Fetching initial releases...');
   try {

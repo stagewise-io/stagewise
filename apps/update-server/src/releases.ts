@@ -146,6 +146,7 @@ export async function findMacOSDownloadAsset(
 export async function findWindowsUpdateAsset(
   channel: Channel,
   arch: string,
+  baseUrl: string,
   currentVersion?: string,
 ): Promise<{ release: Release; releasesContent: string } | null> {
   const releases = await getReleases();
@@ -182,8 +183,14 @@ export async function findWindowsUpdateAsset(
       if (!response.ok) continue;
 
       const content = await response.text();
-      // Transform relative file paths to full URLs
-      const transformed = transformReleasesContent(content, release);
+      // Transform relative file paths to proxy URLs with arch-free filenames
+      const transformed = transformReleasesContent(
+        content,
+        release,
+        baseUrl,
+        channel,
+        arch,
+      );
 
       return { release, releasesContent: transformed };
     } catch {
@@ -194,9 +201,33 @@ export async function findWindowsUpdateAsset(
   return null;
 }
 
-function transformReleasesContent(content: string, release: Release): string {
+/**
+ * Rewrites a Squirrel.Windows RELEASES manifest so that each nupkg entry
+ * points at the update server's own proxy endpoint with an arch-free filename.
+ *
+ * Background: the build pipeline renames nupkg files to
+ * `{appName}-{version}-{arch}-full.nupkg` so that the same release can host
+ * multiple architectures on GitHub. Squirrel.Windows, however, parses the
+ * nupkg filename as `{id}-{version}-full.nupkg` and feeds the extracted
+ * version into `System.Version.Parse`. An embedded `-{arch}` segment (e.g.
+ * `-x64`) breaks that parser ("'63-x64' is not a valid version string").
+ *
+ * Fix: the URL surfaced to Squirrel ends with the CLEAN filename
+ * (no `-{arch}`). When Squirrel requests that URL, our proxy endpoint
+ * re-adds the arch suffix and 302-redirects to the real GitHub asset.
+ * The payload bytes and SHA1 are unchanged.
+ */
+function transformReleasesContent(
+  content: string,
+  release: Release,
+  baseUrl: string,
+  channel: string,
+  arch: string,
+): string {
   const lines = content.trim().split('\n');
   const transformed: string[] = [];
+
+  const archFullSuffix = `-${arch}-full.nupkg`;
 
   for (const line of lines) {
     const parts = line.trim().split(/\s+/);
@@ -206,17 +237,72 @@ function transformReleasesContent(content: string, release: Release): string {
     const fileName = parts[1];
     const size = parts[2] || '0';
 
-    // Find the matching asset to get the full URL
+    // Find the matching asset to confirm it exists on the release
     const asset = release.assets.find((a) => a.name === fileName);
-    if (asset) {
-      transformed.push(`${hash} ${asset.browser_download_url} ${size}`);
-    } else {
+    if (!asset) {
       // Keep original if asset not found
       transformed.push(line);
+      continue;
     }
+
+    // Only full-packages are renamed by the build pipeline and thus only
+    // full-packages need to go through the filename-rewriting proxy.
+    // Delta packages (`*-delta.nupkg`) never receive an arch suffix and
+    // are served directly from GitHub to avoid an unnecessary hop — the
+    // proxy route also rejects anything not ending in `-full.nupkg`.
+    if (!fileName.endsWith(archFullSuffix)) {
+      transformed.push(`${hash} ${asset.browser_download_url} ${size}`);
+      continue;
+    }
+
+    // Strip the arch suffix from the filename we hand to Squirrel.
+    // The proxy endpoint will add it back before redirecting.
+    const cleanFileName = `${fileName.slice(
+      0,
+      -archFullSuffix.length,
+    )}-full.nupkg`;
+
+    const trimmedBase = baseUrl.replace(/\/+$/, '');
+    const proxyUrl = `${trimmedBase}/update/${encodeURIComponent(
+      config.appName,
+    )}/${encodeURIComponent(channel)}/win/${encodeURIComponent(
+      arch,
+    )}/nupkg/${encodeURIComponent(cleanFileName)}`;
+
+    transformed.push(`${hash} ${proxyUrl} ${size}`);
   }
 
   return transformed.join('\n');
+}
+
+/**
+ * Resolve the actual GitHub-hosted nupkg asset for a given arch-free
+ * filename by re-inserting the arch suffix. Used by the nupkg proxy route.
+ */
+export async function findNupkgAsset(
+  channel: Channel,
+  arch: string,
+  cleanFileName: string,
+): Promise<AssetMatch | null> {
+  if (!cleanFileName.endsWith('-full.nupkg')) return null;
+
+  const archAssetName = `${cleanFileName.slice(
+    0,
+    -'-full.nupkg'.length,
+  )}-${arch}-full.nupkg`;
+
+  const releases = await getReleases();
+
+  for (const release of releases) {
+    if (!matchesChannel(release.parsedVersion, channel)) continue;
+
+    const asset = release.assets.find((a) => a.name === archAssetName);
+    if (asset) {
+      return { release, asset };
+    }
+  }
+
+  return null;
 }
 
 export async function findWindowsDownloadAsset(
