@@ -773,7 +773,7 @@ export const executeShellCommandToolInputSchema = z.object({
 });
 
 export const executeShellCommandToolOutputSchema = z.object({
-  session_id: z.string(),
+  session_id: z.string().nullable(),
   output: z.string(),
   exit_code: z.number().nullable(),
   session_exited: z.boolean(),

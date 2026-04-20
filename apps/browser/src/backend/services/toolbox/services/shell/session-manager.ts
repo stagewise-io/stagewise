@@ -249,6 +249,8 @@ export class SessionManager {
               this.getShellLogsDir(agentInstanceId),
               `${sessionId}.shell.log`,
             ),
+            80,
+            24,
           )
         : null,
       initScriptPath: null,
@@ -461,6 +463,13 @@ export class SessionManager {
 
     // Resolve any pending commands
     this.resolveAllPendingForSession(sessionId, 'Session killed.');
+
+    // Kill the PTY process before marking exited (deactivateSession skips kill when exited=true)
+    try {
+      session.pty.kill();
+    } catch {
+      // Already dead
+    }
 
     // Mark as exited before deactivation so Karton sees the final state
     session.exited = true;

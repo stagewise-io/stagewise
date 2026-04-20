@@ -44,12 +44,12 @@ export class SessionLogger {
   /** Cached last line, populated on close() so reads remain safe after dispose. */
   private _cachedLastLine: string | null = null;
 
-  constructor(filePath: string) {
+  constructor(filePath: string, cols = 80, rows = 24) {
     this.filePath = filePath;
     mkdirSync(path.dirname(filePath), { recursive: true });
     this._terminal = new Terminal({
-      cols: 120,
-      rows: 30,
+      cols,
+      rows,
       scrollback: 5000,
       allowProposedApi: true,
     });
