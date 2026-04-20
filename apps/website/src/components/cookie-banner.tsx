@@ -37,13 +37,18 @@ export function CookieBanner() {
       <div className="flex flex-col items-start gap-3 rounded-2xl border border-border bg-background/80 p-4 backdrop-blur-lg dark:bg-background/80">
         <div className="flex flex-col items-start gap-1">
           <h2 className="font-semibold text-base text-foreground">
-            Cookie Consent
+            Cookie preferences
           </h2>
           <p className="text-muted-foreground text-sm">
-            We use analytics to improve our website. Accepting enables
-            personalized, cross-session analytics. Declining limits tracking to
-            anonymous aggregate counts only — no cookies or personal data
-            stored.
+            To help us build a better experience, we'd like to use analytics
+            cookies to understand how you use our site. If you decline, we only
+            use essential cookies and collect anonymous, cookieless analytics.{' '}
+            <a
+              href="/privacy"
+              className="underline transition-colors hover:text-foreground"
+            >
+              Privacy Policy
+            </a>
           </p>
         </div>
         <div className="flex w-full flex-row-reverse items-start justify-start gap-2">
