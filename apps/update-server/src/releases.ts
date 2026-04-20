@@ -143,20 +143,38 @@ export async function findMacOSDownloadAsset(
   return null;
 }
 
+/**
+ * Serve the Squirrel.Windows RELEASES manifest for the latest release in
+ * the requested channel.
+ *
+ * IMPORTANT: unlike macOS, we do NOT filter out releases that are not
+ * newer than `currentVersion`. Squirrel.Windows performs its own
+ * comparison: it parses the version out of each nupkg entry in the
+ * RELEASES body and compares it to the installed package. If we return
+ * an empty body when the client is already on the latest version,
+ * Squirrel.Windows throws "Remote release File is empty or corrupted"
+ * because its downloader treats any non-parseable body as an error,
+ * regardless of HTTP status code.
+ *
+ * Therefore we always return a valid RELEASES manifest pointing at the
+ * newest channel-matching release, and let Squirrel decide. When
+ * installed == latest, Squirrel silently reports "no update", matching
+ * the UX of the macOS code path.
+ *
+ * The `currentVersion` parameter is still accepted for symmetry with
+ * the macOS endpoint and potential future telemetry, but is intentionally
+ * unused for filtering.
+ */
 export async function findWindowsUpdateAsset(
   channel: Channel,
   arch: string,
   baseUrl: string,
-  currentVersion?: string,
+  _currentVersion?: string,
 ): Promise<{ release: Release; releasesContent: string } | null> {
   const releases = await getReleases();
 
   for (const release of releases) {
     if (!matchesChannel(release.parsedVersion, channel)) continue;
-
-    // Skip if not newer than current version
-    if (currentVersion && !isNewerVersion(release.version, currentVersion))
-      continue;
 
     // Look for RELEASES file
     const releasesFileName = `RELEASES-win32-${arch}`;
