@@ -39,7 +39,7 @@ export const MAX_SESSIONS_PER_AGENT = 5;
  * Grace period (ms) to wait for OSC 133 shell integration detection
  * before falling back to sentinel mode.
  */
-export const SHELL_INTEGRATION_DETECT_MS = 2_000;
+export const SHELL_INTEGRATION_DETECT_MS = 5_000;
 
 export interface PtySession {
   id: string;
@@ -66,6 +66,8 @@ export interface PtySession {
   logger: SessionLogger | null;
   /** Working directory the session was started in. */
   cwd: string;
+  /** Path to the temp init script file, for cleanup. */
+  initScriptPath: string | null;
 }
 
 export interface SessionCommandRequest {
