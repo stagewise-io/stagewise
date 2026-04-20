@@ -14,13 +14,20 @@ export default defineConfig({
       fileName: 'main',
     },
     rollupOptions: {
-      external: ['@libsql/client', 'sharp'],
+      external: ['@libsql/client', 'sharp', 'node-pty', '@xterm/headless'],
     },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src/backend'),
       '@shared': path.resolve(__dirname, './src/shared'),
+      // @xterm/headless has a broken `module` field pointing to a non-existent
+      // file. Pin resolution to the actual CJS entry so Vite's commonjs resolver
+      // doesn't crash during its pre-scan. The package is also in rollup externals.
+      '@xterm/headless': path.resolve(
+        __dirname,
+        '../../node_modules/@xterm/headless/lib-headless/xterm-headless.js',
+      ),
     },
     conditions: ['node'],
     mainFields: ['module', 'main'],

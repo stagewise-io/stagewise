@@ -37,6 +37,7 @@ function makeSnapshot(
     plans: { entries: [] },
     logs: { entries: [] },
     logIngest: null,
+    shells: { sessions: [] },
     ...overrides,
   };
 }

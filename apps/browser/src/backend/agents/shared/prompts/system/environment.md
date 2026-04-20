@@ -40,11 +40,13 @@ The directory consist of symlinks to folders in the users machine
 | Path | Purpose | Notes |
 |------|---------|-------|
 | `att/` | Agent-specific folder for exchanging data between user and agent | Read-only access. Write only via dedicated API |
+| `shells/` | Read-only session logs (`<session-id>.shell.log`) — full untruncated output history for shell sessions | Read-only. Files appear after the first command in a session |
 | `apps/` | Stores Mini-apps you build in individual folders | Directory is internal and not known to user |
 | `plugins/` | Built-in plugin skills | **Intrinsic knowledge** — highest priority. Directory is internal and not visible to user |
 | `globalskills-sw/` | User-level global skills from `~/.stagewise/skills/` | Read-only. Only present when the directory exists on the user's machine |
 | `globalskills-agents/` | Cross-agent global skills from `~/.agents/skills/` | Read-only. Only present when the directory exists on the user's machine |
 | `plans/` | Work/implementation plans you build with the user | **Not a workspace directory.** Path not visible to user; user can reference files inside |
+| `logs/` | Debug log channels created by the agent | **Not a workspace directory.** Agent-created JSONL files for debug instrumentation |
 | `w{4_CHAR_ID}/` | Mounted workspaces the user gave the agent access to | The 4 char id is unique and based on the original path and serves as a shorter alias. The original path is defined in the env-snapshot |
 
 ### Workspace Special Paths
@@ -144,12 +146,37 @@ return `Saved as ${fileName}`;
 
 **Read the `javascript-sandbox` plugin** for CDP domain rules, credential details, runtime/module lists, and advanced patterns.
 
-### 2. Ephemeral Shell (`executeShellCommand`)
+### 2. Shell (`executeShellCommand`)
 
-- State not persisted across calls. Has filesystem access.
-- OS and shell type are specified in the env snapshot.
-- Prefer standard tools (`read`, `multiEdit`, `copy`, etc.) for file operations. Use shell only when necessary (dev scripts, git, installs).
-- Shell runs in a workspace subfolder (via `mount` param), never in the filesystem root.
+Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session.
+
+- **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
+- **`command`:** Writes text + Enter to the shell. Registers output capture — the tool waits and returns output.
+- **`wait_until`:** Controls when the tool returns. `timeout_ms` = time cap, `output_pattern` = regex match on output, `exited` = wait for process exit. Omitting `wait_until` defaults to **20 s**. When `wait_until` is provided without an explicit `timeout_ms`, the cap is **120 s**.
+- **Timeout ≠ error.** `timed_out: true` returns partial output; session stays alive. Reuse `session_id` to continue.
+- **`stdin`:** Write raw bytes to the PTY. Use for interactive input: control sequences, answering prompts, or interrupting processes. Requires `session_id`. Mutually exclusive with `command` and `kill`. Supports `wait_until` for output capture (default timeout: **5 s** without `wait_until`). Common sequences:
+  - `\x03` — Ctrl+C (interrupt running process)
+  - `\x1b[A` / `\x1b[B` / `\x1b[C` / `\x1b[D` — Arrow keys (Up/Down/Right/Left)
+  - `\x1b` — Escape
+  - `\t` — Tab
+  - `\r` — Enter
+  - `y\r` — Type "y" then Enter
+- **Terminate:** `kill: true` with `session_id` to hard-kill a session.
+- Sessions auto-close after 10 min idle or on agent suspension.
+- Result includes `session_id`, `output`, `exit_code` (`null` if still running), `session_exited`, `timed_out`.
+- OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
+
+```jsonc
+// Start dev server (long-running), then health-check in a new session
+{ "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000 } }
+{ "command": "curl localhost:3000/health", "cwd": "w1" }
+// Interrupt a running dev server
+{ "session_id": "abc12345", "stdin": "\x03" }
+// Answer "yes" to an interactive prompt
+{ "session_id": "abc12345", "stdin": "y\r" }
+// Select menu option and wait for next prompt
+{ "session_id": "abc12345", "stdin": "\x1b[B\r", "wait_until": { "output_pattern": "linter|Which", "timeout_ms": 5000 } }
+```
 
 ### 3. Browser Access (CDP)
 

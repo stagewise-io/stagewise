@@ -27,7 +27,8 @@
     "version:browser:beta": "tsx scripts/release/index.ts --package browser --channel beta",
     "version:browser:release": "tsx scripts/release/index.ts --package browser --channel release",
     "version:karton": "tsx scripts/release/index.ts --package karton",
-    "extract:compression-test-data": "tsx scripts/experiments/extract-compression-test-data.ts"
+    "extract:compression-test-data": "tsx scripts/experiments/extract-compression-test-data.ts",
+    "postinstall": "node -e \"const{chmodSync,existsSync}=require('fs');const p='node_modules/node-pty/prebuilds/'+process.platform+'-'+process.arch+'/spawn-helper';if(existsSync(p)){chmodSync(p,0o755);console.log('node-pty: fixed spawn-helper permissions')}\""
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.6",
@@ -37,6 +38,8 @@
     "@stagewise/typescript-config": "workspace:*",
     "@types/node": "22.15.2",
     "@types/semver": "^7.7.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "conventional-changelog-cli": "^5.0.0",
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "conventional-recommended-bump": "^11.2.0",
@@ -80,6 +83,7 @@
       "nucleo-ui-fill-duo-18",
       "nucleo-ui-outline-18",
       "nucleo-ui-outline-duo-18",
+      "node-pty",
       "sharp",
       "utf-8-validate"
     ],
@@ -98,8 +102,10 @@
     "@ai-sdk/openai-compatible": "^2.0.35",
     "@better-auth/electron": "^1.5.3",
     "@streamdown/math": "^1.0.2",
+    "@xterm/headless": "^6.0.0",
     "better-auth": "^1.5.3",
     "gray-matter": "^4.0.3",
+    "node-pty": "^1.1.0",
     "tsx": "^4.20.3"
   },
   "config": {

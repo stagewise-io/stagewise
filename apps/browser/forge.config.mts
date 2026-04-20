@@ -46,6 +46,7 @@ const nativeDependencies = [
   'sharp',
   '@img',
   'detect-libc',
+  'node-pty',
   'semver',
 ];
 

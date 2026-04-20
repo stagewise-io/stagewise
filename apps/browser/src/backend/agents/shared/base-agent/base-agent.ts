@@ -2089,10 +2089,9 @@ export abstract class BaseAgent<
         createdAt: new Date(),
         partsMetadata: [],
       };
-      target.metadata.environmentSnapshot = sparsifySnapshot(
-        fullSnapshot,
-        previousEffective,
-      );
+      const sparse = sparsifySnapshot(fullSnapshot, previousEffective);
+
+      target.metadata.environmentSnapshot = sparse;
     });
 
     // ─── Populate pathReferences on the last user message ─────────────

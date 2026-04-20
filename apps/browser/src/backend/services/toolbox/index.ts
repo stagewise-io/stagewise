@@ -36,6 +36,7 @@ import {
   getLogsDir,
   getPlansDir,
   getTempRoot,
+  getAgentShellLogsDir,
 } from '@/utils/paths';
 import { existsSync, mkdirSync, truncateSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
@@ -163,6 +164,7 @@ export class ToolboxService extends DisposableService {
   private globalSkillsRuntimes = new Map<string, ClientRuntimeNode>();
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
   private attRuntimes = new Map<string, ClientRuntimeNode>();
+  private shellsRuntimes = new Map<string, ClientRuntimeNode>();
 
   private mountManagerService: MountManagerService | null = null;
   private unsubPreferenceSync: (() => void) | null = null;
@@ -197,6 +199,7 @@ export class ToolboxService extends DisposableService {
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
     runtimes.set(LOGS_PREFIX, this.getOrCreateLogsRuntime());
     runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
+    runtimes.set('shells', this.getOrCreateShellsRuntime(agentInstanceId));
     return runtimes;
   }
 
@@ -279,6 +282,19 @@ export class ToolboxService extends DisposableService {
       rgBinaryBasePath: getRipgrepBasePath(),
     });
     this.attRuntimes.set(agentInstanceId, runtime);
+    return runtime;
+  }
+
+  private getOrCreateShellsRuntime(agentInstanceId: string): ClientRuntimeNode {
+    const existing = this.shellsRuntimes.get(agentInstanceId);
+    if (existing) return existing;
+    const shellLogsDir = getAgentShellLogsDir(agentInstanceId);
+    mkdirSync(shellLogsDir, { recursive: true });
+    const runtime = new ClientRuntimeNode({
+      workingDirectory: shellLogsDir,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    this.shellsRuntimes.set(agentInstanceId, runtime);
     return runtime;
   }
 
@@ -1003,6 +1019,14 @@ export class ToolboxService extends DisposableService {
       permissions: READ_ONLY_PERMISSIONS,
     });
 
+    const shellLogsDir = getAgentShellLogsDir(agentInstanceId);
+    mkdirSync(shellLogsDir, { recursive: true });
+    mounts.push({
+      prefix: 'shells',
+      absolutePath: shellLogsDir,
+      permissions: READ_ONLY_PERMISSIONS,
+    });
+
     mounts.push({
       prefix: 'plugins',
       absolutePath: getPluginsPath(),
@@ -1067,8 +1091,44 @@ export class ToolboxService extends DisposableService {
     return this.shellService?.getShellInfo() ?? null;
   }
 
-  public cancelShellCommand(toolCallId: string): void {
-    this.shellService?.cancelCommand(toolCallId);
+  public killShellSession(sessionId: string): void {
+    this.shellService?.killSession(sessionId);
+  }
+
+  public getShellReplayBuffer(
+    agentInstanceId: string,
+    sessionId: string,
+  ): {
+    found: boolean;
+    data: string;
+    exited: boolean;
+    exitCode: number | null;
+  } {
+    return (
+      this.shellService?.getShellReplayBuffer(agentInstanceId, sessionId) ?? {
+        found: false,
+        data: '',
+        exited: true,
+        exitCode: null,
+      }
+    );
+  }
+
+  public openTerminalStream(agentInstanceId: string, sessionId: string): void {
+    this.shellService?.openTerminalStream(agentInstanceId, sessionId);
+  }
+
+  public closeTerminalStream(agentInstanceId: string, sessionId: string): void {
+    this.shellService?.closeTerminalStream(agentInstanceId, sessionId);
+  }
+
+  public resizeTerminal(
+    agentInstanceId: string,
+    sessionId: string,
+    cols: number,
+    rows: number,
+  ): void {
+    this.shellService?.resizeTerminal(agentInstanceId, sessionId, cols, rows);
   }
 
   public getBrowserSnapshot(): BrowserSnapshot {
@@ -1122,6 +1182,11 @@ export class ToolboxService extends DisposableService {
       {
         prefix: 'att',
         path: getAgentBlobDir(agentInstanceId),
+        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
+      },
+      {
+        prefix: 'shells',
+        path: getAgentShellLogsDir(agentInstanceId),
         permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
       },
       {
@@ -1242,6 +1307,16 @@ export class ToolboxService extends DisposableService {
             token: this.logIngestService.getToken(),
           }
         : null,
+      shells: (() => {
+        const shellSnap = this.shellService?.getShellSnapshot(
+          agentInstanceId,
+        ) ?? {
+          sessions: [],
+        };
+        return shellSnap;
+      })() ?? {
+        sessions: [],
+      },
     };
 
     return snapshot;
@@ -1668,8 +1743,10 @@ export class ToolboxService extends DisposableService {
     this.sandboxService?.destroyAgent(agentInstanceId);
     this.shellService?.destroyAgent(agentInstanceId);
     this.appsRuntimes.delete(agentInstanceId);
+    this.shellsRuntimes.delete(agentInstanceId);
     if (deleteBlobs) {
       void deleteAgentBlobs(agentInstanceId);
+      this.shellService?.deleteShellLogs(agentInstanceId);
     }
     this.cancelPendingQuestions(agentInstanceId);
   }
@@ -1850,13 +1927,13 @@ export class ToolboxService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
-      'toolbox.cancelShellCommand',
+      'toolbox.killShellSession',
       async (
         _callingClientId: string,
         _agentInstanceId: string,
-        toolCallId: string,
+        sessionId: string,
       ) => {
-        this.cancelShellCommand(toolCallId);
+        this.killShellSession(sessionId);
       },
     );
 

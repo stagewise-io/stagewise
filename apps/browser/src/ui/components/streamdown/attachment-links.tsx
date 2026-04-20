@@ -22,6 +22,7 @@ import { FileContextMenu } from '@ui/components/file-context-menu';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 
 import { TabMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/tab-mention-badge';
+import { ShellSessionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/shell-session-badge';
 import {
   getRenderer,
   resolveAttachmentBlobUrl,
@@ -134,7 +135,8 @@ export type AttachmentLinkData =
       /** Query params after the path (e.g. `?display=expanded`) */
       params?: Record<string, string>;
     }
-  | { type: 'tab'; id: string };
+  | { type: 'tab'; id: string }
+  | { type: 'shell'; sessionId: string };
 
 /**
  * Parses a `path:` unified link into AttachmentLinkData.
@@ -193,6 +195,10 @@ const ATTACHMENT_LINK_PATTERNS: Array<{
     parse: (rest) => ({ type: 'color', color: decodeURIComponent(rest) }),
   },
   { prefix: 'tab:', parse: (rest) => ({ type: 'tab', id: rest }) },
+  {
+    prefix: 'shell:',
+    parse: (rest) => ({ type: 'shell', sessionId: rest }),
+  },
 
   // ── Legacy protocols (read-time aliases) ─────────────────────────────────
   { prefix: 'att:', parse: (rest) => parsePathLink(`att/${rest}`) },
@@ -287,6 +293,8 @@ export function getAttachmentKey(linkData: AttachmentLinkData): string {
       return `color-${linkData.color}`;
     case 'tab':
       return `tab-${linkData.id}`;
+    case 'shell':
+      return `shell-${linkData.sessionId}`;
   }
 }
 
@@ -556,5 +564,7 @@ export const AttachmentLinkRouter = ({
       return <ColorBadge color={linkData.color} />;
     case 'tab':
       return <TabMentionBadge tabId={linkData.id} />;
+    case 'shell':
+      return <ShellSessionBadge sessionId={linkData.sessionId} />;
   }
 };

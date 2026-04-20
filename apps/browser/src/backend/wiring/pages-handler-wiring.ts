@@ -166,4 +166,16 @@ export function wirePagesHandlers(deps: {
     checkForUpdates: () => autoUpdateService.checkForUpdates(),
     quitAndInstall: () => autoUpdateService.quitAndInstall(),
   });
+
+  // --- Shell terminal handlers ---
+  pagesService.setShellTerminalHandlers({
+    getReplayBuffer: (agentInstanceId, sessionId) =>
+      toolboxService.getShellReplayBuffer(agentInstanceId, sessionId),
+    openStream: (agentInstanceId, sessionId) =>
+      toolboxService.openTerminalStream(agentInstanceId, sessionId),
+    closeStream: (agentInstanceId, sessionId) =>
+      toolboxService.closeTerminalStream(agentInstanceId, sessionId),
+    resizeTerminal: (agentInstanceId, sessionId, cols, rows) =>
+      toolboxService.resizeTerminal(agentInstanceId, sessionId, cols, rows),
+  });
 }

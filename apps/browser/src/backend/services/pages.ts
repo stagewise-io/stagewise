@@ -17,6 +17,7 @@ import {
   type WorkspaceMountInfo,
 } from '@shared/karton-contracts/pages-api';
 import type { PlanEntry } from '@shared/karton-contracts/ui';
+import type { ShellSessionSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
 import type {
   UserPreferences,
@@ -130,6 +131,30 @@ export class PagesService extends DisposableService {
   // Auto-update handlers (delegated to AutoUpdateService via wiring)
   private autoUpdateCheckHandler?: () => void;
   private autoUpdateQuitAndInstallHandler?: () => void;
+  // Shell terminal handlers (delegated to ToolboxService.shellService via wiring)
+  private shellTerminalGetReplayBufferHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+  ) => {
+    found: boolean;
+    data: string;
+    exited: boolean;
+    exitCode: number | null;
+  };
+  private shellTerminalOpenStreamHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+  ) => void;
+  private shellTerminalCloseStreamHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+  ) => void;
+  private shellTerminalResizeHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+    cols: number,
+    rows: number,
+  ) => void;
 
   private readonly telemetryService: TelemetryService;
 
@@ -1958,6 +1983,115 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Set shell terminal handlers. Called by pages-handler-wiring.
+   */
+  public setShellTerminalHandlers(handlers: {
+    getReplayBuffer: (
+      agentInstanceId: string,
+      sessionId: string,
+    ) => {
+      found: boolean;
+      data: string;
+      exited: boolean;
+      exitCode: number | null;
+    };
+    openStream: (agentInstanceId: string, sessionId: string) => void;
+    closeStream: (agentInstanceId: string, sessionId: string) => void;
+    resizeTerminal: (
+      agentInstanceId: string,
+      sessionId: string,
+      cols: number,
+      rows: number,
+    ) => void;
+  }): void {
+    this.shellTerminalGetReplayBufferHandler = handlers.getReplayBuffer;
+    this.shellTerminalOpenStreamHandler = handlers.openStream;
+    this.shellTerminalCloseStreamHandler = handlers.closeStream;
+    this.shellTerminalResizeHandler = handlers.resizeTerminal;
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shellTerminal.getReplayBuffer',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+      ) => {
+        if (!this.shellTerminalGetReplayBufferHandler)
+          return { found: false, data: '', exited: true, exitCode: null };
+
+        return this.shellTerminalGetReplayBufferHandler(
+          agentInstanceId,
+          sessionId,
+        );
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shellTerminal.openStream',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+      ) => {
+        this.shellTerminalOpenStreamHandler?.(agentInstanceId, sessionId);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shellTerminal.closeStream',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+      ) => {
+        this.shellTerminalCloseStreamHandler?.(agentInstanceId, sessionId);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shellTerminal.resizeTerminal',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+        cols: number,
+        rows: number,
+      ) => {
+        this.shellTerminalResizeHandler?.(
+          agentInstanceId,
+          sessionId,
+          cols,
+          rows,
+        );
+      },
+    );
+  }
+
+  /**
+   * Sync shell session metadata to the Pages API Karton state.
+   * Called by pages-state-sync when shell sessions change.
+   */
+  public syncShellSessionsState(
+    sessions: Record<string, ShellSessionSnapshot[]>,
+  ): void {
+    this.kartonServer.setState((draft) => {
+      draft.shellSessions = sessions;
+    });
+  }
+
+  /**
+   * Sync pending shell terminal chunks to the Pages API Karton state.
+   * Called by pages-state-sync when streaming chunks change.
+   */
+  public syncPendingShellTerminalChunks(
+    chunks: Record<string, string[]>,
+  ): void {
+    this.kartonServer.setState((draft) => {
+      draft.pendingShellTerminalChunks = chunks;
+    });
+  }
+
+  /**
    * Close all connections and clean up resources.
    */
   protected async onTeardown(): Promise<void> {
@@ -2007,6 +2141,14 @@ export class PagesService extends DisposableService {
       'autoUpdate.checkForUpdates',
     );
     this.kartonServer.removeServerProcedureHandler('autoUpdate.quitAndInstall');
+    this.kartonServer.removeServerProcedureHandler(
+      'shellTerminal.getReplayBuffer',
+    );
+    this.kartonServer.removeServerProcedureHandler('shellTerminal.openStream');
+    this.kartonServer.removeServerProcedureHandler('shellTerminal.closeStream');
+    this.kartonServer.removeServerProcedureHandler(
+      'shellTerminal.resizeTerminal',
+    );
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
@@ -2032,6 +2174,10 @@ export class PagesService extends DisposableService {
     this.sendOtpHandler = undefined;
     this.verifyOtpHandler = undefined;
     this.logoutHandler = undefined;
+    this.shellTerminalGetReplayBufferHandler = undefined;
+    this.shellTerminalOpenStreamHandler = undefined;
+    this.shellTerminalCloseStreamHandler = undefined;
+    this.shellTerminalResizeHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');

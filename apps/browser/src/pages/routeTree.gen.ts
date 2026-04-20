@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as InternalAppRouteRouteImport } from './routes/_internal-app/route'
+import { Route as ShellTerminalAgentInstanceIdRouteImport } from './routes/shell-terminal/$agentInstanceId'
 import { Route as PlanFilenameRouteImport } from './routes/plan/$filename'
 import { Route as DiffReviewAgentInstanceIdRouteImport } from './routes/diff-review/$agentInstanceId'
 import { Route as InternalAppHistoryRouteImport } from './routes/_internal-app/history'
@@ -38,6 +39,12 @@ const InternalAppRouteRoute = InternalAppRouteRouteImport.update({
   id: '/_internal-app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShellTerminalAgentInstanceIdRoute =
+  ShellTerminalAgentInstanceIdRouteImport.update({
+    id: '/shell-terminal/$agentInstanceId',
+    path: '/shell-terminal/$agentInstanceId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PlanFilenameRoute = PlanFilenameRouteImport.update({
   id: '/plan/$filename',
   path: '/plan/$filename',
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
+  '/shell-terminal/$agentInstanceId': typeof ShellTerminalAgentInstanceIdRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
   '/agent-settings/custom-providers': typeof InternalAppAgentSettingsCustomProvidersRoute
   '/agent-settings/general': typeof InternalAppAgentSettingsGeneralRoute
@@ -165,6 +173,7 @@ export interface FileRoutesByTo {
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
+  '/shell-terminal/$agentInstanceId': typeof ShellTerminalAgentInstanceIdRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
   '/agent-settings/custom-providers': typeof InternalAppAgentSettingsCustomProvidersRoute
   '/agent-settings/general': typeof InternalAppAgentSettingsGeneralRoute
@@ -187,6 +196,7 @@ export interface FileRoutesById {
   '/_internal-app/history': typeof InternalAppHistoryRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
+  '/shell-terminal/$agentInstanceId': typeof ShellTerminalAgentInstanceIdRoute
   '/_error-pages/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
   '/_internal-app/agent-settings/custom-providers': typeof InternalAppAgentSettingsCustomProvidersRoute
   '/_internal-app/agent-settings/general': typeof InternalAppAgentSettingsGeneralRoute
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
+    | '/shell-terminal/$agentInstanceId'
     | '/error/page-load-failed'
     | '/agent-settings/custom-providers'
     | '/agent-settings/general'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
+    | '/shell-terminal/$agentInstanceId'
     | '/error/page-load-failed'
     | '/agent-settings/custom-providers'
     | '/agent-settings/general'
@@ -249,6 +261,7 @@ export interface FileRouteTypes {
     | '/_internal-app/history'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
+    | '/shell-terminal/$agentInstanceId'
     | '/_error-pages/error/page-load-failed'
     | '/_internal-app/agent-settings/custom-providers'
     | '/_internal-app/agent-settings/general'
@@ -264,6 +277,7 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   DiffReviewAgentInstanceIdRoute: typeof DiffReviewAgentInstanceIdRoute
   PlanFilenameRoute: typeof PlanFilenameRoute
+  ShellTerminalAgentInstanceIdRoute: typeof ShellTerminalAgentInstanceIdRoute
   ErrorPagesErrorPageLoadFailedRoute: typeof ErrorPagesErrorPageLoadFailedRoute
 }
 
@@ -281,6 +295,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: ''
       preLoaderRoute: typeof InternalAppRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shell-terminal/$agentInstanceId': {
+      id: '/shell-terminal/$agentInstanceId'
+      path: '/shell-terminal/$agentInstanceId'
+      fullPath: '/shell-terminal/$agentInstanceId'
+      preLoaderRoute: typeof ShellTerminalAgentInstanceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plan/$filename': {
@@ -477,6 +498,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   DiffReviewAgentInstanceIdRoute: DiffReviewAgentInstanceIdRoute,
   PlanFilenameRoute: PlanFilenameRoute,
+  ShellTerminalAgentInstanceIdRoute: ShellTerminalAgentInstanceIdRoute,
   ErrorPagesErrorPageLoadFailedRoute: ErrorPagesErrorPageLoadFailedRoute,
 }
 export const routeTree = rootRouteImport

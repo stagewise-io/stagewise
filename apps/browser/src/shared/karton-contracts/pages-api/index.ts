@@ -29,6 +29,7 @@ import type {
   GlobalConfig,
   ModelProvider,
 } from '../ui/shared-types';
+import type { ShellSessionSnapshot } from '../ui/agent/metadata';
 import type { ApiKeyValidationResult, AuthStatus, PlanEntry } from '../ui';
 import type { FileDiff } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
@@ -100,6 +101,11 @@ export type PagesApiState = {
     arch: string; // Architecture (e.g., 'x64', 'arm64').
     otherVersions: Record<string, string | undefined>; // Other versions of the app.
   };
+  /** Shell session metadata keyed by agentInstanceId, synced from UI Karton */
+  shellSessions: Record<string, ShellSessionSnapshot[]>;
+  /** Base64-encoded raw PTY chunks for sessions with an open terminal viewer.
+   *  Keyed by `agentInstanceId:sessionId`. */
+  pendingShellTerminalChunks: Record<string, string[]>;
   /** Auto-update status synced from the backend AutoUpdateService */
   autoUpdate: {
     status:
@@ -273,6 +279,32 @@ export type PagesApiContract = {
       /** Quit the app and install the downloaded update */
       quitAndInstall: () => Promise<void>;
     };
+    shellTerminal: {
+      /** Fetch the raw replay buffer for an existing shell session */
+      getReplayBuffer: (
+        agentInstanceId: string,
+        sessionId: string,
+      ) => Promise<{
+        found: boolean;
+        data: string;
+        exited: boolean;
+        exitCode: number | null;
+      }>;
+      /** Begin streaming raw PTY chunks for a session to Karton state */
+      openStream: (agentInstanceId: string, sessionId: string) => Promise<void>;
+      /** Stop streaming for a session */
+      closeStream: (
+        agentInstanceId: string,
+        sessionId: string,
+      ) => Promise<void>;
+      /** Resize the PTY backing a session to match the frontend terminal */
+      resizeTerminal: (
+        agentInstanceId: string,
+        sessionId: string,
+        cols: number,
+        rows: number,
+      ) => Promise<void>;
+    };
   };
 };
 
@@ -294,6 +326,8 @@ export const defaultState: PagesApiState = {
   configuredCredentialIds: [],
   plugins: [],
   plans: [],
+  shellSessions: {},
+  pendingShellTerminalChunks: {},
   homePage: {
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
