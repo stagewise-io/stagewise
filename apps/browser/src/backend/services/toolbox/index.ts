@@ -203,6 +203,9 @@ export class ToolboxService extends DisposableService {
   /** Builtin commands discovered at startup — stored for refresh merging. */
   private builtinSkills: SkillDefinition[] = [];
 
+  /** Monotonically increasing counter to discard stale `rebuildSkillsList` results. */
+  private skillsRebuildGeneration = 0;
+
   private plansRuntime: ClientRuntimeNode | null = null;
   private plansWatcher: FSWatcher | null = null;
   private plansWatcherDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -1250,10 +1253,18 @@ export class ToolboxService extends DisposableService {
    */
   public setBuiltinSkills(cmds: SkillDefinition[]): void {
     this.builtinSkills = cmds;
-    // Push builtins immediately (no workspace skills yet).
-    this.uiKarton.setState((draft) => {
-      draft.skills = cmds.map(toSkillDefinitionUI);
-    });
+    // Trigger a full rebuild for all active agents so builtins get
+    // merged with any already-discovered workspace/plugin skills.
+    const activeIds = Object.keys(this.uiKarton.state.agents.instances);
+    if (activeIds.length > 0) {
+      for (const id of activeIds) void this.rebuildSkillsList(id);
+    } else {
+      // No agents yet — push builtins directly so they're available
+      // when the first agent is created.
+      this.uiKarton.setState((draft) => {
+        draft.skills = cmds.map(toSkillDefinitionUI);
+      });
+    }
   }
 
   /**
@@ -1262,7 +1273,11 @@ export class ToolboxService extends DisposableService {
    * Called on mount/unmount to keep the slash-command list in sync.
    */
   private async rebuildSkillsList(agentInstanceId: string): Promise<void> {
+    const gen = ++this.skillsRebuildGeneration;
     const commands = await this.getSkillsList(agentInstanceId);
+    // Discard result if a newer rebuild was triggered while we
+    // were awaiting (prevents stale lists from overwriting).
+    if (gen !== this.skillsRebuildGeneration) return;
     this.uiKarton.setState((draft) => {
       draft.skills = commands
         .filter((c) => c.userInvocable !== false)
