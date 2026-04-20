@@ -80,6 +80,14 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
         // If PostHog can't hot-swap from cookieless mode, full cookies activate
         // on the next page load (the consent cookie is already persisted).
         posthog.opt_in_capturing();
+        // Backfill the landing page URL with query params now that consent is
+        // given. The initial $pageview was sent without query params (privacy
+        // guard for pending users), so UTM/referral params would otherwise be
+        // lost for users who accept on the same page load.
+        posthog.capture('$pageview', {
+          $current_url:
+            window.origin + window.location.pathname + window.location.search,
+        });
       }
       // 'denied': no action — already running in cookieless mode.
     };
