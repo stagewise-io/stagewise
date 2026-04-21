@@ -47,6 +47,7 @@ const nativeDependencies = [
   '@img',
   'detect-libc',
   'node-pty',
+  '@xterm/headless',
   'semver',
 ];
 
