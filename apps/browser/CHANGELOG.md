@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha064 (2026-04-21)
+
+### Bug Fixes
+
+* normalize agent-intances-db (separate messages) (86b0590)
+
 ## 1.0.0-alpha.63 (2026-04-19)
 
 ### Bug Fixes
