@@ -70,6 +70,53 @@ const copyNativeDependencies = (
 };
 
 /**
+ * Removes cross-platform prebuilds from native modules after copying.
+ *
+ * node-pty ships prebuilds for every OS (darwin-arm64, darwin-x64, linux-x64,
+ * win32-x64, etc.). When Electron Forge unpacks native modules from the ASAR,
+ * ALL prebuilds end up on disk. On Windows, signtool then tries to sign the
+ * macOS Mach-O .node files — which fails because signtool only handles PE
+ * binaries. Removing non-target prebuilds before packaging avoids this and
+ * also shrinks the final bundle.
+ */
+const pruneNonPlatformPrebuilds = (
+  buildPath: string,
+  _electronVersion: string,
+  platform: string,
+  arch: string,
+  callback: (error?: Error) => void,
+) => {
+  const targetPrefix = `${platform}-${arch}`;
+  const prebuildsDir = path.join(
+    buildPath,
+    'node_modules',
+    'node-pty',
+    'prebuilds',
+  );
+
+  if (!fs.existsSync(prebuildsDir)) {
+    callback();
+    return;
+  }
+
+  try {
+    for (const entry of fs.readdirSync(prebuildsDir)) {
+      if (entry === targetPrefix) continue;
+      const full = path.join(prebuildsDir, entry);
+      if (fs.statSync(full).isDirectory()) {
+        fs.rmSync(full, { recursive: true, force: true });
+        console.log(
+          `[forge.config] Pruned non-target prebuild: node-pty/prebuilds/${entry}`,
+        );
+      }
+    }
+  } catch (err) {
+    console.warn('[forge.config] Warning: failed to prune prebuilds:', err);
+  }
+  callback();
+};
+
+/**
  * Downloads the VC++ 2015-2022 runtime DLLs from the official NuGet package
  * (VCRuntime.CefSharp.140, authored and signed by Microsoft) and copies the
  * x64 DLLs next to the packaged executable.
@@ -252,7 +299,11 @@ const config: ForgeConfig = {
       `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
     ],
     prune: true,
-    afterCopy: [copyNativeDependencies, uploadSourceMapsAndCleanup],
+    afterCopy: [
+      copyNativeDependencies,
+      pruneNonPlatformPrebuilds,
+      uploadSourceMapsAndCleanup,
+    ],
     afterComplete: [copyVcRedist], // sources DLLs directly from VS install on the runner
     icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon`,
     appCopyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
