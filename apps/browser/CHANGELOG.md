@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha066 (2026-04-22)
+
+### Bug Fixes
+
+* fix stuck base-agent on intermediary tool-calls (2aedc13)
+
 ## 1.0.0-alpha065 (2026-04-21)
 
 ### Features
