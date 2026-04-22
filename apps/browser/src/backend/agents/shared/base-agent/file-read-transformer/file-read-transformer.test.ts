@@ -178,7 +178,10 @@ describe('fileReadTransformer – XML wrapping', () => {
   });
 
   it('uses <preview> instead of <content> in preview mode', async () => {
-    const content = 'line 1\nline 2\nline 3\n';
+    // Generate 200 lines of content to exceed the preview-promotion
+    // line threshold (150) so the file stays in preview mode instead
+    // of being promoted to a full read.
+    const content = `${Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join('\n')}\n`;
     const filePath = path.join(ctx.workDir, 'prev.ts');
     await nodeFs.writeFile(filePath, content);
     const hash = sha256(content);

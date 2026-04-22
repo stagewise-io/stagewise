@@ -49,6 +49,8 @@ const nativeDependencies = [
   'node-pty',
   '@xterm/headless',
   'semver',
+  'web-tree-sitter',
+  '@vscode/tree-sitter-wasm',
 ];
 
 const copyNativeDependencies = (
@@ -293,7 +295,7 @@ const config: ForgeConfig = {
   buildIdentifier: buildConstants.__APP_RELEASE_CHANNEL__,
   packagerConfig: {
     asar: {
-      unpack: '**/{sharp,@img,node-pty}/**',
+      unpack: '**/{sharp,@img,node-pty,web-tree-sitter,@vscode}/**',
     },
     extraResource: [
       './bundled',

@@ -2,6 +2,11 @@ import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 
 export default defineConfig({
+  ssr: {
+    // web-tree-sitter ships WASM and uses CJS patterns — let Node
+    // resolve it natively instead of Vite trying to transform it.
+    external: ['web-tree-sitter'],
+  },
   test: {
     globals: true,
     environment: 'node',

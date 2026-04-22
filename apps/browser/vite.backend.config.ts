@@ -14,7 +14,14 @@ export default defineConfig({
       fileName: 'main',
     },
     rollupOptions: {
-      external: ['@libsql/client', 'sharp', 'node-pty', '@xterm/headless'],
+      external: [
+        '@libsql/client',
+        'sharp',
+        'node-pty',
+        '@xterm/headless',
+        'web-tree-sitter',
+        '@vscode/tree-sitter-wasm',
+      ],
     },
   },
   resolve: {

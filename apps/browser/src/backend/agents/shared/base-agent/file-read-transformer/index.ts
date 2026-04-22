@@ -36,11 +36,26 @@ import {
   baseMetadata,
   getMaxReadChars,
   getMaxPreviewLines,
+  isBinaryBuffer,
 } from './format-utils';
 
 /** Default content limits used when callers don't supply explicit values. */
 const DEFAULT_MAX_READ_CHARS = 500 * 80;
 const DEFAULT_MAX_PREVIEW_LINES = 30;
+
+/**
+ * Maximum file size (bytes) for which a preview request is promoted
+ * to a full-content read. Files below this threshold are small enough
+ * that the preview would save negligible tokens while costing an
+ * extra tool-call round-trip when the agent re-reads.
+ */
+export const PREVIEW_PROMOTION_MAX_BYTES = 6 * 1024;
+
+/**
+ * Maximum line count for preview → full-read promotion. Both byte
+ * and line thresholds must hold for promotion to fire.
+ */
+export const PREVIEW_PROMOTION_MAX_LINES = 150;
 import type {
   FileTransformResult,
   FileTransformer,
@@ -61,7 +76,9 @@ import {
   archiveTransformer,
   rawImageTransformer,
   diskImageTransformer,
+  sourceCodeTransformer,
 } from './transformers/index';
+import { LANGUAGE_MAP } from '@shared/ast/language-map';
 
 // ---------------------------------------------------------------------------
 // Extension → transformer lookup table
@@ -122,6 +139,19 @@ const TRANSFORMER_BY_EXT: Record<string, FileTransformer> = {
   '.img': diskImageTransformer,
   '.dmg': diskImageTransformer,
 };
+
+// Source-code files — AST-based preview with symbol outline.
+// Registered dynamically from the language map so adding a new grammar
+// only requires updating `language-map.ts`.
+for (const [ext, grammar] of Object.entries(LANGUAGE_MAP)) {
+  if (grammar !== null) {
+    const dotExt = `.${ext}`;
+    // Don't override existing transformers (e.g. images, markdown, svg).
+    if (!TRANSFORMER_BY_EXT[dotExt]) {
+      TRANSFORMER_BY_EXT[dotExt] = sourceCodeTransformer;
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Known-binary extensions — never sent to the model
@@ -343,7 +373,10 @@ export async function fileReadTransformer(
 
   // Normalise readParams — strip undefined values so an empty object
   // and a missing value produce the same cache key.
-  const effectiveReadParams: ReadParams = readParams ?? {};
+  // Declared `let` because the preview-promotion block below may
+  // reassign it when a small file's preview request is promoted to a
+  // full-content read.
+  let effectiveReadParams: ReadParams = readParams ?? {};
 
   // ── 1. Resolve to absolute path + stat ──────────────────────────────
   const absolutePath = resolveMountedPath(mountedPath, agentId, mountPaths);
@@ -394,6 +427,38 @@ export async function fileReadTransformer(
       );
     }
     currentHash = hashBuffer(buf);
+  }
+
+  // ── 2b. Preview promotion ───────────────────────────────
+  // Small text files in preview mode are promoted to full reads.
+  // This saves a tool-call round-trip (the agent almost always
+  // re-reads after a preview) and aligns the cache key with later
+  // full-read requests for the same file.
+  //
+  // Gates:
+  //   - must be in preview mode
+  //   - must not be a directory (different transformer path)
+  //   - must not be a binary buffer (let the binary guard handle it)
+  //   - must fit within PREVIEW_PROMOTION_MAX_BYTES
+  //   - must fit within PREVIEW_PROMOTION_MAX_LINES
+  if (
+    effectiveReadParams.preview &&
+    !isDirectory &&
+    buf.length <= PREVIEW_PROMOTION_MAX_BYTES &&
+    !isBinaryBuffer(buf)
+  ) {
+    const lineCount = buf.toString('utf-8').split('\n').length;
+    if (lineCount <= PREVIEW_PROMOTION_MAX_LINES) {
+      logger.debug(
+        `[fileReadTransformer] Promoting preview → full read for ${mountedPath} ` +
+          `(size=${buf.length}B, lines=${lineCount})`,
+      );
+      // Strip `preview` but preserve any other flags (e.g. startLine/
+      // endLine — though those shouldn't appear alongside preview in
+      // practice; defensive).
+      const { preview: _preview, ...rest } = effectiveReadParams;
+      effectiveReadParams = rest;
+    }
   }
 
   // ── 3. Build cache key ─────────────────────────────────────────────
@@ -553,6 +618,7 @@ async function runTransformer(
   }
 
   transformer ??= TRANSFORMER_BY_EXT[ext] ?? textTransformer;
+
   return transformer(buf, mountedPath, stats, ctx, originalFileName);
 }
 
@@ -737,6 +803,9 @@ function buildReadParamsSuffix(
   if (params.startPage !== undefined) parts.push(`sp=${params.startPage}`);
   if (params.endPage !== undefined) parts.push(`ep=${params.endPage}`);
   if (params.preview) parts.push('pv=1');
+  // Version tag — bump when preview output format changes
+  // (e.g. AST outline replaces line-based preview for source files).
+  if (params.preview) parts.push('pvv=7');
   if (params.depth !== undefined) parts.push(`d=${params.depth}`);
 
   // Include the runtime content-limit settings so that changing them
