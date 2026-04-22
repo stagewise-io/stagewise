@@ -808,7 +808,7 @@ export abstract class BaseAgent<
       .map((part) => (part as AgentToolUIPart | DynamicToolUIPart).toolCallId);
 
     if (undoneToolCallIds.length > 0 && undoToolCalls) {
-      await this.toolbox.undoToolCalls(undoneToolCallIds);
+      await this.toolbox.undoToolCalls(undoneToolCallIds, this.instanceId);
     }
 
     this.state.set((draft) => {
@@ -910,7 +910,7 @@ export abstract class BaseAgent<
       .map((part) => (part as AgentToolUIPart | DynamicToolUIPart).toolCallId);
 
     if (undoneToolCallIds.length > 0 && undoToolCalls) {
-      await this.toolbox.undoToolCalls(undoneToolCallIds);
+      await this.toolbox.undoToolCalls(undoneToolCallIds, this.instanceId);
     }
 
     this.state.set((draft) => {

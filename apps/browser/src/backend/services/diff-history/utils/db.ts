@@ -164,6 +164,10 @@ export async function retrieveContentForOid(
  * Returns a Map from oid to decompressed content.
  * Deduplicates input oids and filters out nulls/undefined automatically.
  * External (LFS) oids are automatically filtered out - they won't appear in the result.
+ *
+ * Uses iterative batch fetching to load all snapshot rows (including delta
+ * chain targets) in 2–3 queries instead of one query per OID per chain hop
+ * (the old N+1 pattern that caused 777 individual queries / 355ms blocks).
  */
 export async function retrieveContentsForOids(
   db: SnapshotDb,
@@ -175,28 +179,109 @@ export async function retrieveContentsForOids(
     return new Map();
   }
 
-  // Batch lookup: filter to only inline (non-external) oids
-  const snapshotInfo = await db
-    .select({
-      oid: schema.snapshots.oid,
-      is_external: schema.snapshots.is_external,
-    })
-    .from(schema.snapshots)
-    .where(inArray(schema.snapshots.oid, uniqueOids))
-    .all();
+  // ── Phase 1: Batch-fetch all snapshot rows, chasing delta targets ──
+  // Each iteration fetches a "level" of the delta chain graph. Typically
+  // completes in 1–2 rounds (most recent edits are keyframes; older edits
+  // point one hop forward to the keyframe).
+  const snapshotMap = new Map<
+    string,
+    {
+      oid: string;
+      payload: Buffer;
+      delta_target_oid: string | null;
+      is_external: boolean;
+    }
+  >();
 
-  const inlineOids = snapshotInfo
-    .filter((s) => !s.is_external)
-    .map((s) => s.oid);
+  let oidsToFetch = uniqueOids;
+  while (oidsToFetch.length > 0) {
+    // SQLite variable limit is 999; chunk at 500 for safety.
+    const rows: Array<{
+      oid: string;
+      payload: Buffer;
+      delta_target_oid: string | null;
+      is_external: boolean;
+    }> = [];
+    for (let i = 0; i < oidsToFetch.length; i += 500) {
+      const chunk = oidsToFetch.slice(i, i + 500);
+      const chunkRows = await db
+        .select()
+        .from(schema.snapshots)
+        .where(inArray(schema.snapshots.oid, chunk))
+        .all();
+      for (const row of chunkRows) {
+        rows.push({
+          oid: row.oid,
+          payload: row.payload as Buffer,
+          delta_target_oid: row.delta_target_oid,
+          is_external: row.is_external,
+        });
+      }
+    }
 
+    for (const row of rows) {
+      snapshotMap.set(row.oid, row);
+    }
+
+    // Collect delta targets we haven't fetched yet.
+    const nextOids = new Set<string>();
+    for (const row of rows) {
+      if (row.delta_target_oid && !snapshotMap.has(row.delta_target_oid)) {
+        nextOids.add(row.delta_target_oid);
+      }
+    }
+    oidsToFetch = [...nextOids];
+  }
+
+  // ── Phase 2: Resolve delta chains in memory (zero I/O) ──
   const contents = new Map<string, Buffer>();
 
-  await Promise.all(
-    inlineOids.map(async (oid) => {
-      const content = await retrieveContentForOid(db, oid);
-      if (content) contents.set(oid, content);
-    }),
-  );
+  // Cache decompressed keyframe content so files sharing a keyframe
+  // (common in reverse-delta scheme) only gunzip once.
+  const keyframeContentCache = new Map<string, Buffer>();
+
+  for (const requestedOid of uniqueOids) {
+    const snap = snapshotMap.get(requestedOid);
+    if (!snap) throw new Error(`Snapshot not found for oid: ${requestedOid}`);
+
+    if (snap.is_external) continue;
+
+    // Walk forward from the requested OID to the keyframe.
+    const chain: NonNullable<typeof snap>[] = [];
+    let currentOid: string | null = requestedOid;
+    const visited = new Set<string>();
+    while (currentOid) {
+      if (visited.has(currentOid)) {
+        throw new Error(`Delta chain cycle detected at oid: ${currentOid}`);
+      }
+      visited.add(currentOid);
+      const s = snapshotMap.get(currentOid);
+      if (!s) throw new Error(`Snapshot not found: ${currentOid}`);
+      chain.push(s);
+      if (s.delta_target_oid === null) break;
+      currentOid = s.delta_target_oid;
+    }
+
+    // Start from keyframe (last in chain).
+    const keyframe = chain.pop()!;
+    if (keyframe.is_external) continue;
+
+    let content =
+      keyframeContentCache.get(keyframe.oid) ?? gunzipSync(keyframe.payload);
+    if (!keyframeContentCache.has(keyframe.oid)) {
+      keyframeContentCache.set(keyframe.oid, content);
+    }
+
+    // Apply deltas in reverse order (newest to oldest).
+    while (chain.length > 0) {
+      const deltaSnapshot = chain.pop()!;
+      content = Buffer.from(
+        fossilDelta.applyDelta(content, deltaSnapshot.payload),
+      );
+    }
+
+    contents.set(requestedOid, content);
+  }
 
   return contents;
 }
@@ -282,6 +367,83 @@ export async function getPendingOperationsForAgentInstanceId(
     )
     .where(or(...conditions))
     .orderBy(schema.operations.filepath, schema.operations.idx)
+    .all();
+
+  return rows.map((row) => ({
+    idx: row.idx,
+    filepath: row.filepath,
+    operation: row.operation,
+    snapshot_oid: row.snapshot_oid,
+    reason: row.reason,
+    contributor: row.contributor,
+    isExternal: row.isExternal ?? false,
+  })) as OperationWithExternal[];
+}
+
+/**
+ * Like `getPendingOperationsForAgentInstanceId` but scoped to a single
+ * filepath. Used by the targeted-update path in `updateDiffKartonState`
+ * when a specific file is known to have changed.
+ */
+export async function getPendingOperationsForAgentInstanceIdAndFilepath(
+  db: SnapshotDb,
+  agentInstanceId: AgentInstanceId,
+  filepath: string,
+): Promise<OperationWithExternal[]> {
+  const contributor = `agent-${agentInstanceId}` as `agent-${AgentInstanceId}`;
+
+  const summaryQuery = sql`
+    SELECT
+      o.filepath,
+      (SELECT snapshot_oid FROM operations o2
+       WHERE o2.filepath = o.filepath AND o2.operation = 'baseline'
+       ORDER BY o2.idx DESC LIMIT 1) as latest_baseline_oid,
+      (SELECT snapshot_oid FROM operations o2
+       WHERE o2.filepath = o.filepath AND o2.operation = 'edit'
+       ORDER BY o2.idx DESC LIMIT 1) as latest_edit_oid,
+      (SELECT MAX(o2.idx) FROM operations o2
+       WHERE o2.filepath = o.filepath
+       AND o2.operation = 'baseline' AND o2.reason = 'init') as latest_init_idx
+    FROM operations o
+    WHERE o.contributor = ${contributor} AND o.filepath = ${filepath}
+    GROUP BY o.filepath
+  `;
+
+  const summaryResult = await db.all<FileSummary>(summaryQuery);
+
+  const pendingFiles = summaryResult.filter(
+    (row) =>
+      row.latest_init_idx !== null &&
+      row.latest_baseline_oid !== row.latest_edit_oid,
+  );
+
+  if (pendingFiles.length === 0) return [];
+
+  const initIdx = pendingFiles[0].latest_init_idx;
+  if (initIdx === null) return [];
+
+  const rows = await db
+    .select({
+      idx: schema.operations.idx,
+      filepath: schema.operations.filepath,
+      operation: schema.operations.operation,
+      snapshot_oid: schema.operations.snapshot_oid,
+      reason: schema.operations.reason,
+      contributor: schema.operations.contributor,
+      isExternal: schema.snapshots.is_external,
+    })
+    .from(schema.operations)
+    .leftJoin(
+      schema.snapshots,
+      eq(schema.operations.snapshot_oid, schema.snapshots.oid),
+    )
+    .where(
+      and(
+        eq(schema.operations.filepath, filepath),
+        gte(schema.operations.idx, initIdx),
+      ),
+    )
+    .orderBy(schema.operations.idx)
     .all();
 
   return rows.map((row) => ({
@@ -396,6 +558,89 @@ export async function getAllOperationsForAgentInstanceId(
     }
   }
 
+  return result;
+}
+
+/**
+ * Like `getAllOperationsForAgentInstanceId` but scoped to a single filepath.
+ * Returns session-filtered operations where the agent contributed at least
+ * one edit. Used by the targeted-update path when a specific file changed.
+ */
+export async function getAllOperationsForAgentInstanceIdAndFilepath(
+  db: SnapshotDb,
+  agentInstanceId: AgentInstanceId,
+  filepath: string,
+): Promise<OperationWithExternal[]> {
+  const contributor = `agent-${agentInstanceId}` as `agent-${AgentInstanceId}`;
+
+  // Quick check: did the agent contribute to this filepath at all?
+  const hasContribution = await db
+    .select({ idx: schema.operations.idx })
+    .from(schema.operations)
+    .where(
+      and(
+        eq(schema.operations.filepath, filepath),
+        eq(schema.operations.contributor, contributor),
+      ),
+    )
+    .limit(1)
+    .all();
+  if (hasContribution.length === 0) return [];
+
+  // Fetch all ops for the filepath (with snapshot join).
+  const allOps = await db
+    .select({
+      idx: schema.operations.idx,
+      filepath: schema.operations.filepath,
+      operation: schema.operations.operation,
+      snapshot_oid: schema.operations.snapshot_oid,
+      reason: schema.operations.reason,
+      contributor: schema.operations.contributor,
+      isExternal: schema.snapshots.is_external,
+    })
+    .from(schema.operations)
+    .leftJoin(
+      schema.snapshots,
+      eq(schema.operations.snapshot_oid, schema.snapshots.oid),
+    )
+    .where(eq(schema.operations.filepath, filepath))
+    .orderBy(schema.operations.idx)
+    .all();
+
+  if (allOps.length === 0) return [];
+
+  // Apply the same session-inclusion logic as the bulk variant.
+  const initIndices = allOps
+    .filter((op) => op.reason === 'init')
+    .map((op) => op.idx);
+
+  const result: OperationWithExternal[] = [];
+  for (let i = 0; i < initIndices.length; i++) {
+    const sessionStart = initIndices[i];
+    const sessionEnd =
+      initIndices[i + 1] !== undefined
+        ? BigInt(initIndices[i + 1]) - 1n
+        : allOps[allOps.length - 1].idx;
+    const sessionOps = allOps.filter(
+      (op) => op.idx >= sessionStart && op.idx <= sessionEnd,
+    );
+    const agentContributed = sessionOps.some(
+      (op) => op.contributor === contributor && op.operation === 'edit',
+    );
+    if (agentContributed) {
+      for (const op of sessionOps) {
+        result.push({
+          idx: op.idx,
+          filepath: op.filepath,
+          operation: op.operation,
+          snapshot_oid: op.snapshot_oid,
+          reason: op.reason,
+          contributor: op.contributor,
+          isExternal: op.isExternal ?? false,
+        } as OperationWithExternal);
+      }
+    }
+  }
   return result;
 }
 
@@ -1001,4 +1246,53 @@ export function deleteFileHistory(db: SnapshotDb, filepath: string): void {
   db.delete(schema.operations)
     .where(eq(schema.operations.filepath, filepath))
     .run();
+}
+
+/**
+ * Returns a Map<filepath, maxIdx> for the given set of filepaths.
+ * Used as the self-invalidating cache key in the diff-history output cache:
+ * a newer max idx for a filepath strictly means the cached FileDiff is stale
+ * (the operations table is append-only).
+ */
+export async function getLatestOperationIdxPerFilepath(
+  db: SnapshotDb,
+  filepaths: string[],
+): Promise<Map<string, number>> {
+  if (filepaths.length === 0) return new Map();
+  const result = new Map<string, number>();
+  // SQLite variable limit is 999; chunk at 500 for safety.
+  for (let i = 0; i < filepaths.length; i += 500) {
+    const chunk = filepaths.slice(i, i + 500);
+    const rows = await db
+      .select({
+        filepath: schema.operations.filepath,
+        maxIdx: sql<number>`MAX(${schema.operations.idx})`.as('maxIdx'),
+      })
+      .from(schema.operations)
+      .where(inArray(schema.operations.filepath, chunk))
+      .groupBy(schema.operations.filepath);
+    for (const row of rows) result.set(row.filepath, Number(row.maxIdx));
+  }
+  return result;
+}
+
+/**
+ * Returns the agent-instance-ids of agents that have any operations for the
+ * given filepath. Used to scope chokidar file-change events to only the
+ * hydrated agents affected by that file.
+ */
+export async function getAgentInstanceIdsWithOperationsForFilepath(
+  db: SnapshotDb,
+  filepath: string,
+): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ contributor: schema.operations.contributor })
+    .from(schema.operations)
+    .where(
+      and(
+        eq(schema.operations.filepath, filepath),
+        sql`${schema.operations.contributor} LIKE 'agent-%'`,
+      ),
+    );
+  return rows.map((r) => r.contributor.replace(/^agent-/, ''));
 }
