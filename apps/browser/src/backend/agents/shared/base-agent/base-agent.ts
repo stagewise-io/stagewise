@@ -540,21 +540,27 @@ export abstract class BaseAgent<
 
     this.logger.debug(`[BaseAgent:${this.instanceId}] Sending user message`);
 
-    // Auto-deny any pending approval requests before the user message enters
-    // history. Without this, a user message would sit after the assistant's
-    // tool call but before any tool result, causing canRunStep() to block and
-    // later approve/deny clicks to produce duplicate tool parts.
+    // Auto-deny any pending approval requests and force-terminate any
+    // non-terminal tool parts before the user message enters history.
+    // Without this, stale tool states (approval-requested, input-streaming,
+    // input-available) would cause canRunStep() to block indefinitely.
     this.state.set((draft) => {
+      const terminalStates = new Set([
+        'output-available',
+        'output-error',
+        'output-denied',
+        'approval-responded',
+      ]);
       for (const historyMsg of draft.history) {
         if (historyMsg.role !== 'assistant') continue;
         for (let i = 0; i < historyMsg.parts.length; i++) {
           const p = historyMsg.parts[i];
-          if (
-            (p.type.startsWith('tool-') || p.type === 'dynamic-tool') &&
-            (p as AgentToolUIPart | DynamicToolUIPart).state ===
-              'approval-requested'
-          ) {
-            const toolPart = p as AgentToolUIPart | DynamicToolUIPart;
+          if (!(p.type.startsWith('tool-') || p.type === 'dynamic-tool'))
+            continue;
+          const toolPart = p as AgentToolUIPart | DynamicToolUIPart;
+          if (terminalStates.has(toolPart.state)) continue;
+
+          if (toolPart.state === 'approval-requested') {
             const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
               ...toolPart,
               state: 'output-denied' as const,
@@ -566,6 +572,20 @@ export abstract class BaseAgent<
                   'User sent new message before tool call approval was granted.',
               },
             } as AgentToolUIPart | DynamicToolUIPart;
+            historyMsg.parts[i] = updatedToolPart;
+          } else {
+            // Force-terminate stale non-terminal states (input-streaming,
+            // input-available, etc.) that survived from a previous session.
+            // @ts-expect-error - input may be partial, but keeping the
+            // original type is the only sensible choice here
+            const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
+              ...toolPart,
+              state: 'output-error',
+              input: toolPart.input ?? {},
+              approval: undefined,
+              errorText:
+                'Tool execution interrupted — agent session ended before tool call finished.',
+            };
             historyMsg.parts[i] = updatedToolPart;
           }
         }
