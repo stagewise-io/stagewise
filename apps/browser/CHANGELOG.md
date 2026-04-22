@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha067 (2026-04-22)
+
+### Features
+
+* add kimi-k2.6 (d99a089)
+
 ## 1.0.0-alpha066 (2026-04-22)
 
 ### Bug Fixes
