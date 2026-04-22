@@ -351,7 +351,9 @@ describe('content limits – preview mode', () => {
   it('preview respects maxPreviewLines', async () => {
     setMaxPreviewLines(5);
 
-    const content = generateLines(50);
+    // Generate 200 lines so the file exceeds the preview-promotion
+    // line threshold (150) and stays in preview mode.
+    const content = generateLines(200);
     const filePath = path.join(ctx.workDir, 'file.ts');
     await nodeFs.writeFile(filePath, content);
     const hash = sha256(content);
@@ -365,7 +367,7 @@ describe('content limits – preview mode', () => {
     expect(text).toContain('1|line 0001');
     expect(text).toContain('5|line 0005');
     expect(text).not.toContain('6|line 0006');
-    expect(text).toContain('45 more lines');
+    expect(text).toContain('195 more lines');
   });
 });
 
@@ -559,9 +561,11 @@ describe('content limits – per-request options override globals', () => {
 
   it('maxPreviewLines on options overrides global setter', async () => {
     // Set global preview limit high so it would NOT truncate.
-    setMaxPreviewLines(200);
+    setMaxPreviewLines(500);
 
-    const content = generateLines(50);
+    // Generate 200 lines so the file exceeds the preview-promotion
+    // line threshold (150) and stays in preview mode.
+    const content = generateLines(200);
     const filePath = path.join(ctx.workDir, 'per-req-preview.ts');
     await nodeFs.writeFile(filePath, content);
     const hash = sha256(content);
@@ -581,7 +585,7 @@ describe('content limits – per-request options override globals', () => {
     expect(text).toContain('1|line 0001');
     expect(text).toContain('7|line 0007');
     expect(text).not.toContain('8|line 0008');
-    expect(text).toContain('43 more lines');
+    expect(text).toContain('193 more lines');
   });
 
   it('per-request maxReadChars affects line-range reads', async () => {

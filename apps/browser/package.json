@@ -27,6 +27,7 @@
   "dependencies": {
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@libsql/client": "^0.15.15",
+    "@vscode/tree-sitter-wasm": "^0.3.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@streamdown/math": "^1.0.2",
     "@tiptap/extension-mention": "^3.20.0",
@@ -49,6 +50,7 @@
     "react-virtuoso": "^4.18.1",
     "sharp": "^0.34.5",
     "tiptap-markdown": "^0.9.0",
+    "web-tree-sitter": "^0.26.6",
     "yauzl": "^3.2.0"
   },
   "devDependencies": {

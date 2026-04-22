@@ -12,3 +12,4 @@ export { pdfTransformer } from './pdf';
 export { archiveTransformer } from './archive';
 export { rawImageTransformer } from './raw-image';
 export { diskImageTransformer } from './disk-image';
+export { sourceCodeTransformer } from './source-code';

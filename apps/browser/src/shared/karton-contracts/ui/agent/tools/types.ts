@@ -80,7 +80,7 @@ export const readToolInputSchema = z.object({
     .default(false)
     .optional()
     .describe(
-      'Only request a short preview of the file structure and heavily truncated content instead of full content.',
+      'Only request a short preview of the file structure and heavily truncated content instead of full content. For source code, returns an AST symbol outline (functions, classes, signatures, line numbers). For markdown, returns a heading outline. Small files are auto-promoted to full content.',
     ),
 });
 

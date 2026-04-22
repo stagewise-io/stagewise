@@ -11,7 +11,11 @@ import { resolveMountedRelativePath } from '../../utils/path-mounting';
 
 export const DESCRIPTION = `Read metadata and contents of a file. Equals \`cat\` / \`echo\` in bash. For directories, use \`ls\` instead.
 If the file is not in context after the tool call, this **ALWAYS** implies that the file has **NOT** changed since the last read that is already in your context!
-Large files are truncated to a dynamic token budget. To read a large file efficiently, issue multiple parallel read calls with non-overlapping \`start_line\`/\`end_line\` ranges.`;
+Large files are truncated to a dynamic token budget. To read a large file efficiently, issue multiple parallel read calls with non-overlapping \`start_line\`/\`end_line\` ranges.
+
+The \`preview\` parameter controls the output format:
+- **\`preview: true\`** — Returns a structural outline instead of raw content. For source code files (ts, tsx, js, jsx, py, go, rs, java, c, cpp, cs, rb, php, sh, css), produces an AST-based symbol outline listing functions, classes, interfaces, types, and exports with their signatures and line numbers. For markdown files, produces a heading outline. For other text files, returns a short line-head summary. Small files (≤150 lines / ≤6 KB) are auto-promoted to full content regardless.
+- **\`preview: false\` (default)** — Returns the full file content, line-numbered and truncated to budget.`;
 
 /**
  * Read tool
