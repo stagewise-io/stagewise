@@ -963,8 +963,11 @@ export class ToolboxService extends DisposableService {
    *        of the earliest related tool call in the list, and all other tool calls affecting the same file
    *        are also to be treated as "reverted".
    */
-  public async undoToolCalls(toolCallIds: string[]): Promise<void> {
-    return this.diffHistoryService.undoToolCalls(toolCallIds);
+  public async undoToolCalls(
+    toolCallIds: string[],
+    agentInstanceId?: string,
+  ): Promise<void> {
+    return this.diffHistoryService.undoToolCalls(toolCallIds, agentInstanceId);
   }
 
   public getWorkspaceSnapshot(agentInstanceId: string): WorkspaceSnapshot {

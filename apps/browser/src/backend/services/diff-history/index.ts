@@ -5,6 +5,7 @@ import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { type Client, createClient } from '@libsql/client';
 import * as schema from './schema';
 import chokidar, { type FSWatcher } from 'chokidar';
+import { LRUMap } from './utils/lru-map';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import fs from 'node:fs/promises';
@@ -23,8 +24,10 @@ import {
 } from '@shared/karton-contracts/ui/shared-types';
 import {
   getAllOperationsForAgentInstanceId,
+  getAllOperationsForAgentInstanceIdAndFilepath,
   getAllPendingOperations,
   getPendingOperationsForAgentInstanceId,
+  getPendingOperationsForAgentInstanceIdAndFilepath,
   insertOperation,
   copyContentToPath,
   retrieveContentsForOids,
@@ -35,10 +38,15 @@ import {
   storeLargeContent,
   hasPendingEditsForFilepath,
   streamContent,
+  getLatestOperationIdxPerFilepath,
+  getAgentInstanceIdsWithOperationsForFilepath,
 } from './utils/db';
 import {
   acceptAndRejectHunks as acceptAndRejectHunksUtils,
   buildContributorMap,
+  buildContributorMapIncremental,
+  type ContributorMapState,
+  type ContributorMaps,
   createFileDiffsFromGenerations,
   type OperationWithContent,
   segmentFileOperationsIntoGenerations,
@@ -79,6 +87,73 @@ export class DiffHistoryService extends DisposableService {
   private hydratedAgentInstanceIds = new Set<string>();
   private blobsDir: string;
   private readonly boundOnStateChange: () => void;
+
+  /**
+   * Per-file diff output cache, keyed by `${agentId}::${filepath}::${mode}`.
+   * Entries self-invalidate via `latestIdx` comparison against the ops table
+   * (append-only, so a newer idx strictly means staleness). Cleared on agent
+   * removal (pruneRemovedAgentInstances) and teardown.
+   */
+  private fileDiffCache = new Map<
+    string,
+    { latestIdx: number; diff: FileDiff }
+  >();
+
+  /**
+   * Intermediate contributor-map state cache. Key format:
+   *   `${agentId}::${filepath}::${mode}::${firstOpIdx}`
+   *
+   * Value holds the `ContributorMapState` after processing all operations
+   * up to and including `latestOpIdx`. Subsequent calls can resume from
+   * this state and replay only operations whose `idx > latestOpIdx`,
+   * turning the ~O(N-history-length) `buildContributorMap` rebuild into
+   * an O(new_ops) extension.
+   *
+   * The `firstOpIdx` is part of the key so that pending-mode trimming
+   * (which can shift the starting baseline after an accept) does not
+   * reuse a stale state from the pre-trim sequence.
+   */
+  private contributorStateCache = new Map<
+    string,
+    { latestOpIdx: number; state: ContributorMapState }
+  >();
+
+  /**
+   * Decompressed snapshot content cache, keyed by OID (SHA-256 hash).
+   * OIDs are content-addressed and immutable — once stored, the mapping
+   * never changes, so no invalidation is needed. Cleared only on teardown
+   * to bound memory across the service lifetime.
+   */
+  private oidContentCache = new LRUMap<string, string>(4096);
+
+  /**
+   * Monotonically increasing counter bumped on every operations-table
+   * mutation. Used by `updateDiffKartonState` to skip DB queries when
+   * the table has not changed since the last computation for a given agent.
+   */
+  private _opsSeq = 0;
+
+  /**
+   * Per-agent snapshot of the last `updateDiffKartonState` result, keyed
+   * by `agentInstanceId`. Entries are valid while `opsSeq` matches
+   * `this._opsSeq`. Cleared on agent removal and teardown.
+   */
+  private _agentDiffSnapshot = new Map<
+    string,
+    {
+      opsSeq: number;
+      pendingFileDiffs: FileDiff[];
+      editSummary: FileDiff[];
+    }
+  >();
+
+  private cacheKey(
+    agentId: string,
+    filepath: string,
+    mode: 'pending' | 'summary',
+  ): string {
+    return `${agentId}::${filepath}::${mode}`;
+  }
 
   private constructor(
     logger: Logger,
@@ -183,7 +258,8 @@ export class DiffHistoryService extends DisposableService {
           return;
         }
         this.logDebug(`File changed: ${path}`);
-        await this.updateAllHydratedAgentStates();
+        this._opsSeq++;
+        await this.updateAgentsAffectedByFilepath(path);
       })
       .on('unlink', async (path) => {
         if (this.filesIgnoredByWatcher.has(path)) return;
@@ -193,7 +269,8 @@ export class DiffHistoryService extends DisposableService {
           reason: 'user-save',
         });
         this.logDebug(`File unlinked: ${path}`);
-        await this.updateAllHydratedAgentStates();
+        this._opsSeq++;
+        await this.updateAgentsAffectedByFilepath(path);
       });
 
     this.uiKarton.registerStateChangeCallback(this.boundOnStateChange);
@@ -207,7 +284,11 @@ export class DiffHistoryService extends DisposableService {
       if (this.hydratedAgentInstanceIds.has(id)) continue;
       this.hydratedAgentInstanceIds.add(id);
       this.updateDiffKartonState(id)
-        .then(() => this.updateWatcher())
+        .then((result) => {
+          for (const diff of result.pendingFileDiffs) {
+            this.ensureWatched(diff.path);
+          }
+        })
         .catch((error) => {
           this.logError(
             `Failed to hydrate diff state for agent instance ${id}`,
@@ -229,6 +310,15 @@ export class DiffHistoryService extends DisposableService {
     for (const id of this.hydratedAgentInstanceIds) {
       if (!currentIds.has(id)) {
         this.hydratedAgentInstanceIds.delete(id);
+        // Drop cached FileDiff entries for the removed agent so memory does
+        // not grow unboundedly across the app session.
+        const prefix = `${id}::`;
+        for (const key of this.fileDiffCache.keys()) {
+          if (key.startsWith(prefix)) this.fileDiffCache.delete(key);
+        }
+        for (const key of this.contributorStateCache.keys()) {
+          if (key.startsWith(prefix)) this.contributorStateCache.delete(key);
+        }
       }
     }
   }
@@ -328,7 +418,48 @@ export class DiffHistoryService extends DisposableService {
       );
     }
 
-    await this.updateAllHydratedAgentStates();
+    this._opsSeq++;
+    // Scoped update: only the editing agent is affected by its own tool call,
+    // and we know exactly which file changed — pass the hint so
+    // `updateDiffKartonState` can take the targeted-patch fast path.
+    await this.updateHydratedAgentState(edit.agentInstanceId, [edit.path]);
+    this.ensureWatched(edit.path);
+  }
+
+  /**
+   * Recomputes and publishes diff state for a single hydrated agent.
+   * No-op if the agent is not currently hydrated. Does not update the
+   * watcher — caller is responsible for that.
+   */
+  private async updateHydratedAgentState(
+    agentInstanceId: string,
+    changedFilepaths?: string[],
+  ): Promise<void> {
+    if (!this.hydratedAgentInstanceIds.has(agentInstanceId)) return;
+    await this.updateDiffKartonState(agentInstanceId, changedFilepaths);
+  }
+
+  /**
+   * Scoped update triggered by file-watcher events (user-save, unlink):
+   * looks up which hydrated agents have any operations for the given filepath
+   * and updates only those agents, then refreshes the watcher.
+   */
+  private async updateAgentsAffectedByFilepath(
+    filepath: string,
+  ): Promise<void> {
+    const affectedIds = await getAgentInstanceIdsWithOperationsForFilepath(
+      this.db,
+      filepath,
+    );
+    for (const id of affectedIds) {
+      if (this.hydratedAgentInstanceIds.has(id)) {
+        await this.updateHydratedAgentState(id, [filepath]);
+      }
+    }
+    // Unwatch if the user-save resolved all pending diffs for this file;
+    // otherwise the file stays watched (unwatchResolvedFiles is a no-op
+    // for files that still have pending operations).
+    await this.unwatchResolvedFiles([filepath]);
   }
 
   private async updateAllHydratedAgentStates(): Promise<void> {
@@ -337,7 +468,10 @@ export class DiffHistoryService extends DisposableService {
     await this.updateWatcher();
   }
 
-  private async updateDiffKartonState(agentInstanceId: string): Promise<{
+  private async updateDiffKartonState(
+    agentInstanceId: string,
+    changedFilepaths?: string[],
+  ): Promise<{
     pendingFileDiffs: FileDiff[];
     editSummary: FileDiff[];
   }> {
@@ -353,29 +487,151 @@ export class DiffHistoryService extends DisposableService {
         };
       });
 
-    const appsDir = getAgentAppsDir(agentInstanceId);
-    const plansDir = getPlansDir();
-    const logsDir = getLogsDir();
-    const isInternalPath = (d: { path: string }) =>
-      d.path.startsWith(appsDir + path.sep) ||
-      d.path.startsWith(plansDir + path.sep) ||
-      d.path.startsWith(logsDir + path.sep);
+    // Fast path: if the operations table has not changed since the last
+    // computation for this agent, replay the cached result without any
+    // DB queries (~0ms instead of ~80ms).
+    const snapshot = this._agentDiffSnapshot.get(agentInstanceId);
+    if (snapshot && snapshot.opsSeq === this._opsSeq) {
+      this.uiKarton.setState((draft) => {
+        draft.toolbox[agentInstanceId].pendingFileDiffs =
+          snapshot.pendingFileDiffs;
+        draft.toolbox[agentInstanceId].editSummary = snapshot.editSummary;
+      });
+      return {
+        pendingFileDiffs: snapshot.pendingFileDiffs,
+        editSummary: snapshot.editSummary,
+      };
+    }
 
-    const pendingFileDiffs = (
-      await this.getPendingFileDiffsForAgentInstanceId(agentInstanceId)
-    ).filter((d) => !isInternalPath(d));
+    // Targeted-patch path: when the caller tells us exactly which files
+    // changed AND we have a prior snapshot to patch, we can skip the full
+    // ops-table scan and only query for the changed file(s). This is the
+    // hot path for tool edits (which always touch exactly one file).
+    if (changedFilepaths && changedFilepaths.length > 0 && snapshot) {
+      const nextPending = [...snapshot.pendingFileDiffs];
+      const nextSummary = [...snapshot.editSummary];
+
+      for (const filepath of changedFilepaths) {
+        // Internal paths (apps/, plans/, logs/) never make it into the UI.
+        if (this.isInternalFilepath(agentInstanceId, filepath)) {
+          // Still drop any lingering entry for this filepath in case the
+          // classification changed (extremely unlikely, but safe).
+          const dropIdxP = nextPending.findIndex((d) => d.path === filepath);
+          if (dropIdxP !== -1) nextPending.splice(dropIdxP, 1);
+          const dropIdxS = nextSummary.findIndex((d) => d.path === filepath);
+          if (dropIdxS !== -1) nextSummary.splice(dropIdxS, 1);
+          continue;
+        }
+
+        // Pending diff for the changed file.
+        const pendingOps =
+          await getPendingOperationsForAgentInstanceIdAndFilepath(
+            this.db,
+            agentInstanceId,
+            filepath,
+          );
+        const pendingDiffs = await this.getFileDiffForOperations(
+          agentInstanceId,
+          pendingOps,
+          'pending',
+        );
+        const newPending = pendingDiffs.find((d) => d.path === filepath);
+        const existingPendingIdx = nextPending.findIndex(
+          (d) => d.path === filepath,
+        );
+        if (existingPendingIdx !== -1)
+          nextPending.splice(existingPendingIdx, 1);
+        if (newPending) nextPending.push(newPending);
+
+        // Summary diff for the changed file.
+        const allOps = await getAllOperationsForAgentInstanceIdAndFilepath(
+          this.db,
+          agentInstanceId,
+          filepath,
+        );
+        const summaryDiffs = await this.getFileDiffForOperations(
+          agentInstanceId,
+          allOps,
+          'summary',
+        );
+        const newSummary = summaryDiffs.find((d) => d.path === filepath);
+        const existingSummaryIdx = nextSummary.findIndex(
+          (d) => d.path === filepath,
+        );
+        if (existingSummaryIdx !== -1)
+          nextSummary.splice(existingSummaryIdx, 1);
+        if (newSummary) nextSummary.push(newSummary);
+      }
+
+      this.uiKarton.setState((draft) => {
+        draft.toolbox[agentInstanceId].pendingFileDiffs = nextPending;
+        draft.toolbox[agentInstanceId].editSummary = nextSummary;
+      });
+
+      this._agentDiffSnapshot.set(agentInstanceId, {
+        opsSeq: this._opsSeq,
+        pendingFileDiffs: nextPending,
+        editSummary: nextSummary,
+      });
+
+      return { pendingFileDiffs: nextPending, editSummary: nextSummary };
+    }
+
+    // Full-recompute path: no snapshot to patch, or no filepath hint.
+    // Internal-path filtering (apps/, plans/, logs/) is handled inside
+    // getFileDiffForOperations so those paths never enter the output cache.
+    const pendingFileDiffs =
+      await this.getPendingFileDiffsForAgentInstanceId(agentInstanceId);
+    const editSummary =
+      await this.getEditSummaryForAgentInstanceId(agentInstanceId);
     this.uiKarton.setState((draft) => {
       draft.toolbox[agentInstanceId].pendingFileDiffs = pendingFileDiffs;
-    });
-    const editSummary = (
-      await this.getEditSummaryForAgentInstanceId(agentInstanceId)
-    ).filter((d) => !isInternalPath(d));
-    this.uiKarton.setState((draft) => {
       draft.toolbox[agentInstanceId].editSummary = editSummary;
     });
+
+    this._agentDiffSnapshot.set(agentInstanceId, {
+      opsSeq: this._opsSeq,
+      pendingFileDiffs,
+      editSummary,
+    });
+
     return { pendingFileDiffs, editSummary };
   }
 
+  /**
+   * Lightweight watcher update: ensures a single filepath is watched.
+   * Use on hot paths (registerAgentEdit, file-watcher events) where we
+   * already know the file has pending edits and just needs to be added
+   * to the watch set — avoids the expensive full-table scan.
+   */
+  private ensureWatched(filepath: string): void {
+    if (!this.currentlyWatchedFiles.has(filepath)) {
+      this.watcher?.add(filepath);
+      this.currentlyWatchedFiles.add(filepath);
+    }
+  }
+
+  /**
+   * Targeted unwatch: checks only the given filepaths for remaining pending
+   * operations and unwatches any that are fully resolved.
+   * Use instead of `updateWatcher()` when the set of affected files is known.
+   */
+  private async unwatchResolvedFiles(filepaths: string[]): Promise<void> {
+    for (const filepath of filepaths) {
+      if (!this.currentlyWatchedFiles.has(filepath)) continue;
+      const stillPending = await hasPendingEditsForFilepath(this.db, filepath);
+      if (!stillPending) {
+        this.watcher?.unwatch(filepath);
+        this.currentlyWatchedFiles.delete(filepath);
+      }
+    }
+  }
+
+  /**
+   * Full watcher reconciliation: queries all pending operations to build
+   * the authoritative watch set, adding new files and removing resolved ones.
+   * Use only on cold paths (accept/reject/undo) where files may need unwatching.
+   */
   private async updateWatcher(): Promise<void> {
     const pendingDiffs = await getAllPendingOperations(this.db);
     const pendingSet = new Set(pendingDiffs.map((diff) => diff.filepath));
@@ -423,7 +679,12 @@ export class DiffHistoryService extends DisposableService {
     hunkIdsToReject: string[],
   ) {
     const pendingOperations = await getAllPendingOperations(this.db);
-    const pendingDiffs = await this.getFileDiffForOperations(
+    // Uncached: this path aggregates pending ops across ALL agents for hunk
+    // lookup (not per-agent), so it does not share a cache key with the
+    // per-agent computation. This call fires only on explicit user
+    // accept/reject actions, which are infrequent.
+    const pendingDiffs = await this.computeFileDiffsUncached(
+      null,
       pendingOperations,
       'pending',
     );
@@ -440,12 +701,25 @@ export class DiffHistoryService extends DisposableService {
         `Failed to reject hunks: ${failedRejectedHunkIds?.join(', ')}`,
         failedRejectedHunkIds,
       );
+    const changedFilepaths: string[] = [];
     for (const [filePath, fileResult] of Object.entries(result)) {
       await this.doAccept(filePath, fileResult);
       await this.doReject(filePath, fileResult);
+      changedFilepaths.push(filePath);
     }
 
-    await this.updateAllHydratedAgentStates();
+    this._opsSeq++;
+    // Scoped update: we know exactly which files were affected. Rather than
+    // recomputing every hydrated agent's full state (O(agents × files)),
+    // only patch the affected files in each hydrated agent's cached snapshot.
+    // Accept/reject can affect multiple agents because operations for a given
+    // filepath may have been created by different agents, so we still iterate
+    // all hydrated agents — but pass the filepath hint so each one takes the
+    // targeted-patch fast path instead of a full recompute.
+    for (const id of this.hydratedAgentInstanceIds) {
+      await this.updateDiffKartonState(id, changedFilepaths);
+    }
+    await this.unwatchResolvedFiles(changedFilepaths);
   }
 
   private async storeExternalFile(filePath: string, meta: OperationMeta) {
@@ -610,7 +884,20 @@ export class DiffHistoryService extends DisposableService {
         setTimeout(() => this.unignoreFileForWatcher(filePath), 500);
       }
     }
-    await this.updateAllHydratedAgentStates();
+
+    this._opsSeq++;
+    // Fan out to all hydrated agents — other agents may also have
+    // pending/edit-summary state for the same files that the undo touched.
+    // This mirrors the cross-agent invalidation in acceptAndRejectHunks.
+    if (agentInstanceId) {
+      const changedFiles = Object.keys(undoTargets);
+      for (const id of this.hydratedAgentInstanceIds) {
+        await this.updateHydratedAgentState(id, changedFiles);
+      }
+      await this.unwatchResolvedFiles(changedFiles);
+    } else {
+      await this.updateAllHydratedAgentStates();
+    }
   }
 
   /**
@@ -731,8 +1018,7 @@ export class DiffHistoryService extends DisposableService {
       this.db,
       agentInstanceId,
     );
-    const fileDiffs = await this.getFileDiffForOperations(allops, 'summary');
-    return fileDiffs;
+    return this.getFileDiffForOperations(agentInstanceId, allops, 'summary');
   }
 
   private async getPendingFileDiffsForAgentInstanceId(
@@ -742,43 +1028,75 @@ export class DiffHistoryService extends DisposableService {
       this.db,
       agentInstanceId,
     );
-    const fileDiffs = await this.getFileDiffForOperations(
+    return this.getFileDiffForOperations(
+      agentInstanceId,
       pendingOps,
       'pending',
     );
-    return fileDiffs;
   }
 
-  private async getFileDiffForOperations(
+  /**
+   * Returns true if the given filepath is an internal path (apps/, plans/, logs/)
+   * that should not be surfaced to the UI.
+   */
+  private isInternalFilepath(
+    agentInstanceId: string,
+    filepath: string,
+  ): boolean {
+    const appsDir = getAgentAppsDir(agentInstanceId);
+    const plansDir = getPlansDir();
+    const logsDir = getLogsDir();
+    return (
+      filepath.startsWith(appsDir + path.sep) ||
+      filepath.startsWith(plansDir + path.sep) ||
+      filepath.startsWith(logsDir + path.sep)
+    );
+  }
+
+  /**
+   * Trims operations for `pending` mode so each filepath starts at its latest
+   * baseline. Extracted from the old getFileDiffForOperations so both cached
+   * and uncached paths can share this logic.
+   */
+  private trimPendingOpsToLatestBaseline(
+    ops: OperationWithExternal[],
+  ): OperationWithExternal[] {
+    // Trim operations to start from the latest baseline per filepath.
+    // After a partial accept, the latest baseline is the accept baseline,
+    // not the init baseline. This ensures pending diffs show only
+    // changes since the last accept.
+    const latestBaselineIdx = new Map<string, number>();
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i];
+      if (op.operation === 'baseline') latestBaselineIdx.set(op.filepath, i);
+    }
+    if (latestBaselineIdx.size === 0) return ops;
+
+    const trimmed: OperationWithExternal[] = [];
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i];
+      const startIdx = latestBaselineIdx.get(op.filepath);
+      if (startIdx !== undefined && i >= startIdx) trimmed.push(op);
+      else if (startIdx === undefined) trimmed.push(op);
+    }
+    return trimmed;
+  }
+
+  /**
+   * Runs the full diff-compute pipeline over the given operations with no
+   * caching and no internal-path filtering. Used by the global accept/reject
+   * path (acceptAndRejectHunks) which passes ops spanning all agents, and as
+   * the inner implementation for per-filepath recomputation on cache misses.
+   */
+  private async computeFileDiffsUncached(
+    agentInstanceId: string | null,
     operations: OperationWithExternal[],
     mode: 'pending' | 'summary',
   ): Promise<FileDiff[]> {
-    let ops = operations;
-
-    if (mode === 'pending') {
-      // Trim operations to start from the latest baseline per filepath.
-      // After a partial accept, the latest baseline is the accept baseline,
-      // not the init baseline. This ensures pending diffs show only
-      // changes since the last accept.
-      const latestBaselineIdx = new Map<string, number>();
-      for (let i = 0; i < ops.length; i++) {
-        const op = ops[i];
-        if (op.operation === 'baseline') latestBaselineIdx.set(op.filepath, i);
-      }
-      if (latestBaselineIdx.size > 0) {
-        const trimmed: OperationWithExternal[] = [];
-        const seen = new Set<string>();
-        for (let i = 0; i < ops.length; i++) {
-          const op = ops[i];
-          const startIdx = latestBaselineIdx.get(op.filepath);
-          if (startIdx !== undefined && i >= startIdx) {
-            if (!seen.has(op.filepath)) seen.add(op.filepath);
-            trimmed.push(op);
-          } else if (startIdx === undefined) trimmed.push(op);
-        }
-        ops = trimmed;
-      }
-    }
+    const ops =
+      mode === 'pending'
+        ? this.trimPendingOpsToLatestBaseline(operations)
+        : operations;
 
     const nonExternalOps = ops.filter((op) => !op.isExternal);
     const externalOps = ops
@@ -793,28 +1111,201 @@ export class DiffHistoryService extends DisposableService {
       (a, b) => Number(a.idx) - Number(b.idx),
     );
     const generations = segmentFileOperationsIntoGenerations(mergedOps);
-    const contributorMap = buildContributorMap(generations);
-    const fileDiffs = createFileDiffsFromGenerations(
-      generations,
-      contributorMap,
+
+    // When agentInstanceId is null (e.g. acceptAndRejectHunks processing
+    // pending ops across all agents), we skip the per-agent incremental
+    // cache and fall back to a from-scratch build. This keeps the cache
+    // contract simple: one cache entry per (agent, filepath, mode,
+    // firstOpIdx).
+    if (agentInstanceId === null) {
+      const contributorMap = buildContributorMap(generations);
+      return createFileDiffsFromGenerations(generations, contributorMap);
+    }
+
+    // Per-agent path: for each file, reuse the cached contributor-map
+    // state when its `firstOpIdx` matches and its `latestOpIdx` sits
+    // inside the current op range. Otherwise rebuild from scratch for
+    // that file and seed a fresh cache entry.
+    const contributorMap: Record<string, ContributorMaps> = {};
+    for (const fileId of Object.keys(generations)) {
+      const fileOps = generations[fileId];
+      if (fileOps.length === 0) {
+        contributorMap[fileId] = { lineMap: {}, removalMap: {} };
+        continue;
+      }
+      const filepath = fileOps[0].filepath;
+      const firstOpIdx = Number(fileOps[0].idx);
+      const cacheKey = this.contributorStateCacheKey(
+        agentInstanceId,
+        filepath,
+        mode,
+        firstOpIdx,
+      );
+      const cached = this.contributorStateCache.get(cacheKey);
+
+      // Reuse only if the cached latestOpIdx corresponds to an op that
+      // is still present in the current op list (so the tail after it
+      // is an unambiguous extension, not a truncation).
+      const canReuse =
+        cached !== undefined &&
+        fileOps.some((op) => Number(op.idx) === cached.latestOpIdx);
+
+      let priorState: ContributorMapState | null = null;
+      let priorLatestIdx: number | null = null;
+      let opsToProcess: OperationWithContent[];
+      if (canReuse && cached !== undefined) {
+        // structuredClone gives us an independent copy the incremental
+        // function can mutate without disturbing the cache entry (we
+        // overwrite the cache with the new finalState below).
+        priorState = structuredClone(cached.state);
+        priorLatestIdx = cached.latestOpIdx;
+        opsToProcess = fileOps;
+      } else {
+        opsToProcess = fileOps;
+      }
+
+      const { maps, finalState, finalLatestOpIdx } =
+        buildContributorMapIncremental(
+          opsToProcess,
+          priorState,
+          priorLatestIdx,
+        );
+      contributorMap[fileId] = maps;
+      if (finalLatestOpIdx >= 0) {
+        this.contributorStateCache.set(cacheKey, {
+          latestOpIdx: finalLatestOpIdx,
+          state: finalState,
+        });
+      }
+    }
+
+    return createFileDiffsFromGenerations(generations, contributorMap);
+  }
+
+  private contributorStateCacheKey(
+    agentInstanceId: string,
+    filepath: string,
+    mode: 'pending' | 'summary',
+    firstOpIdx: number,
+  ): string {
+    return `${agentInstanceId}::${filepath}::${mode}::${firstOpIdx}`;
+  }
+
+  /**
+   * Per-agent, cache-aware diff computation.
+   *
+   * Skips recomputation for files whose latest operation idx has not advanced
+   * since the last cache write. Only the changed files are recomputed.
+   * Internal paths (apps/, plans/, logs/) are filtered before any computation
+   * and never enter the cache.
+   */
+  private async getFileDiffForOperations(
+    agentInstanceId: string,
+    operations: OperationWithExternal[],
+    mode: 'pending' | 'summary',
+  ): Promise<FileDiff[]> {
+    // 1. Pending-mode trim (before cache keying so trimmed ops match what
+    //    was cached last time).
+    const trimmed =
+      mode === 'pending'
+        ? this.trimPendingOpsToLatestBaseline(operations)
+        : operations;
+
+    // 2. Drop internal paths (apps/, plans/, logs/) here so they never get
+    //    computed or cached.
+    const visibleOps = trimmed.filter(
+      (op) => !this.isInternalFilepath(agentInstanceId, op.filepath),
     );
-    return fileDiffs;
+    if (visibleOps.length === 0) return [];
+
+    // 3. Partition ops by filepath and resolve cache state via the latest
+    //    idx query.
+    const opsByFilepath = new Map<string, OperationWithExternal[]>();
+    for (const op of visibleOps) {
+      const list = opsByFilepath.get(op.filepath) ?? [];
+      list.push(op);
+      opsByFilepath.set(op.filepath, list);
+    }
+    const filepaths = [...opsByFilepath.keys()];
+    const latestIdxMap = await getLatestOperationIdxPerFilepath(
+      this.db,
+      filepaths,
+    );
+
+    const cachedDiffs: FileDiff[] = [];
+    const uncachedOps: OperationWithExternal[] = [];
+    const uncachedFilepaths: string[] = [];
+    for (const [filepath, fileOps] of opsByFilepath.entries()) {
+      const latestIdx = latestIdxMap.get(filepath);
+      const key = this.cacheKey(agentInstanceId, filepath, mode);
+      const cached = this.fileDiffCache.get(key);
+      if (
+        latestIdx !== undefined &&
+        cached !== undefined &&
+        cached.latestIdx === latestIdx
+      ) {
+        cachedDiffs.push(cached.diff);
+      } else {
+        uncachedOps.push(...fileOps);
+        uncachedFilepaths.push(filepath);
+      }
+    }
+
+    // 4. Compute diffs for the uncached subset and store them.
+    if (uncachedOps.length === 0) return cachedDiffs;
+
+    const computed = await this.computeFileDiffsUncached(
+      agentInstanceId,
+      uncachedOps,
+      mode,
+    );
+
+    // Index computed diffs by path so we can associate them with their
+    // latestIdx for caching. createFileDiffsFromGenerations returns one diff
+    // per unique filepath in the input ops, so a Map by path is sufficient.
+    const computedByPath = new Map<string, FileDiff>();
+    for (const diff of computed) computedByPath.set(diff.path, diff);
+
+    for (const filepath of uncachedFilepaths) {
+      const diff = computedByPath.get(filepath);
+      const latestIdx = latestIdxMap.get(filepath);
+      if (diff && latestIdx !== undefined) {
+        this.fileDiffCache.set(this.cacheKey(agentInstanceId, filepath, mode), {
+          latestIdx,
+          diff,
+        });
+      }
+    }
+
+    return [...cachedDiffs, ...computed];
   }
 
   private async getOperationsWithContent(
     operations: Operation[],
   ): Promise<OperationWithContent[]> {
-    const oids = operations.map((op) => op.snapshot_oid);
-    const contents = await retrieveContentsForOids(this.db, oids);
-    const stringContents = new Map<string, string>();
-    for (const [oid, content] of contents.entries())
-      stringContents.set(oid, content.toString('utf-8'));
+    const allOids = operations
+      .map((op) => op.snapshot_oid)
+      .filter((oid): oid is string => !!oid);
+
+    // Partition into cached and uncached OIDs.
+    const uncachedOids: string[] = [];
+    for (const oid of allOids) {
+      if (!this.oidContentCache.has(oid)) uncachedOids.push(oid);
+    }
+
+    // Fetch only the uncached subset from the database.
+    if (uncachedOids.length > 0) {
+      const fetched = await retrieveContentsForOids(this.db, uncachedOids);
+      for (const [oid, buf] of fetched.entries()) {
+        this.oidContentCache.set(oid, buf.toString('utf-8'));
+      }
+    }
 
     const o: OperationWithContent[] = [];
     for (const op of operations) {
       o.push({
         ...op,
-        snapshot_content: stringContents.get(op.snapshot_oid ?? ''),
+        snapshot_content: this.oidContentCache.get(op.snapshot_oid ?? ''),
       } as OperationWithContent);
     }
     return o;
@@ -825,6 +1316,10 @@ export class DiffHistoryService extends DisposableService {
     this.watcher?.close();
     this.dbDriver.close();
     this.filesIgnoredByWatcher.clear();
+    this.fileDiffCache.clear();
+    this.contributorStateCache.clear();
+    this.oidContentCache.clear();
+    this._agentDiffSnapshot.clear();
     this.uiKarton.removeServerProcedureHandler('toolbox.acceptHunks');
     this.uiKarton.removeServerProcedureHandler('toolbox.rejectHunks');
   }

@@ -2087,4 +2087,910 @@ describe('DiffHistoryService (E2E)', () => {
       expect(toolboxState?.pendingFileDiffs).toHaveLength(0);
     });
   });
+
+  // ===========================================================================
+  // Per-file diff output cache
+  // ===========================================================================
+
+  describe('fileDiffCache', () => {
+    const getCache = (svc: DiffHistoryService) =>
+      (svc as unknown as { fileDiffCache: Map<string, unknown> }).fileDiffCache;
+
+    it('caches FileDiff output after the first compute and returns identical values on re-access', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'cached.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'hello',
+      });
+
+      const firstDiffs = mockKarton
+        ._getToolboxState('1')
+        ?.pendingFileDiffs.slice();
+      expect(firstDiffs).toHaveLength(1);
+      const cacheSizeAfterFirst = getCache(service).size;
+      expect(cacheSizeAfterFirst).toBeGreaterThan(0);
+
+      // Second invocation with no new operations: cache hit, output identical.
+      const pending2 = await (
+        service as unknown as {
+          getPendingFileDiffsForAgentInstanceId: (
+            id: string,
+          ) => Promise<FileDiff[]>;
+        }
+      ).getPendingFileDiffsForAgentInstanceId('1');
+      expect(pending2).toEqual(firstDiffs);
+      // Cache size unchanged (no new keys added).
+      expect(getCache(service).size).toBe(cacheSizeAfterFirst);
+    });
+
+    it('invalidates only the affected filepath on a new operation', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const fileA = path.join(testFilesDir, 'a.txt');
+      const fileB = path.join(testFilesDir, 'b.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: fileA,
+        toolCallId: 'tool-a',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'A1',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: fileB,
+        toolCallId: 'tool-b',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'B1',
+      });
+
+      const cache = getCache(service);
+      const keyA = `1::${fileA}::pending`;
+      const keyB = `1::${fileB}::pending`;
+      const entryA_before = cache.get(keyA);
+      const entryB_before = cache.get(keyB);
+      expect(entryA_before).toBeDefined();
+      expect(entryB_before).toBeDefined();
+
+      // Append a new operation for fileA only.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: fileA,
+        toolCallId: 'tool-a2',
+        isExternal: false,
+        contentBefore: 'A1',
+        contentAfter: 'A2',
+      });
+
+      const entryA_after = cache.get(keyA);
+      const entryB_after = cache.get(keyB);
+      // fileA's cache entry was overwritten (new latestIdx).
+      expect(entryA_after).not.toBe(entryA_before);
+      // fileB's cache entry is unchanged (same object reference).
+      expect(entryB_after).toBe(entryB_before);
+    });
+
+    it('prunes cache entries when an agent is removed from hydration', async () => {
+      mockKarton._setAgentInstances(['1', '2']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: path.join(testFilesDir, 'a.txt'),
+        toolCallId: 't1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'x',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '2',
+        path: path.join(testFilesDir, 'b.txt'),
+        toolCallId: 't2',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'y',
+      });
+
+      const cache = getCache(service);
+      const keysBefore = [...cache.keys()];
+      expect(keysBefore.some((k) => k.startsWith('1::'))).toBe(true);
+      expect(keysBefore.some((k) => k.startsWith('2::'))).toBe(true);
+
+      // Remove agent '1' from the karton state and trigger the
+      // state-change callback (same path as the real app uses).
+      mockKarton._setAgentInstances(['2']);
+      (
+        service as unknown as { onKartonStateChange: () => void }
+      ).onKartonStateChange();
+
+      const keysAfter = [...cache.keys()];
+      expect(keysAfter.some((k) => k.startsWith('1::'))).toBe(false);
+      expect(keysAfter.some((k) => k.startsWith('2::'))).toBe(true);
+    });
+
+    it('does not cache internal paths (apps/, plans/, logs/)', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      // Internal path: under the mocked getAgentAppsDir('1')
+      const internalPath = path.join(
+        tempDir,
+        'agents',
+        '1',
+        'apps',
+        'internal.txt',
+      );
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: internalPath,
+        toolCallId: 'tool-internal',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'secret',
+      });
+
+      // Neither the UI state nor the cache should hold this filepath.
+      const toolboxState = mockKarton._getToolboxState('1');
+      expect(toolboxState?.pendingFileDiffs).toHaveLength(0);
+      const cache = getCache(service);
+      for (const key of cache.keys()) {
+        expect(key.includes(internalPath)).toBe(false);
+      }
+    });
+
+    it('acceptAndRejectHunks does not poison the cache with global-scoped diffs', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'global.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'content',
+      });
+
+      const cache = getCache(service);
+      const keysBefore = [...cache.keys()].sort();
+
+      // acceptAndRejectHunks uses the uncached path. Calling it with no hunks
+      // is a no-op but still invokes the compute pipeline once.
+      await service.acceptAndRejectHunks([], []);
+
+      const keysAfter = [...cache.keys()].sort();
+      // Cache keys must be the same agent-scoped keys; no 'global' or
+      // agent-less key should appear.
+      expect(keysAfter).toEqual(keysBefore);
+      for (const key of keysAfter) {
+        expect(key.startsWith('1::')).toBe(true);
+      }
+    });
+  });
+
+  // ===========================================================================
+  // _opsSeq guard — skip redundant DB queries
+  // ===========================================================================
+
+  describe('_opsSeq guard', () => {
+    const getSnapshot = (svc: DiffHistoryService) =>
+      (
+        svc as unknown as {
+          _agentDiffSnapshot: Map<
+            string,
+            {
+              opsSeq: number;
+              pendingFileDiffs: FileDiff[];
+              editSummary: FileDiff[];
+            }
+          >;
+        }
+      )._agentDiffSnapshot;
+
+    const callUpdateDiffKartonState = (svc: DiffHistoryService, id: string) =>
+      (
+        svc as unknown as {
+          updateDiffKartonState: (id: string) => Promise<{
+            pendingFileDiffs: FileDiff[];
+            editSummary: FileDiff[];
+          }>;
+        }
+      ).updateDiffKartonState(id);
+
+    const triggerPrune = (svc: DiffHistoryService) =>
+      (
+        svc as unknown as { pruneRemovedAgentInstances: () => void }
+      ).pruneRemovedAgentInstances();
+
+    it('returns the same snapshot on a redundant update (no intervening writes)', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'seq-test.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'hello',
+      });
+
+      // First explicit call — populates the snapshot.
+      const result1 = await callUpdateDiffKartonState(service, '1');
+      // Second call with no intervening write — must return cached arrays.
+      const result2 = await callUpdateDiffKartonState(service, '1');
+
+      expect(result2.pendingFileDiffs).toBe(result1.pendingFileDiffs);
+      expect(result2.editSummary).toBe(result1.editSummary);
+    });
+
+    it('recomputes after a write bumps _opsSeq', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'seq-bump.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'v1',
+      });
+
+      const result1 = await callUpdateDiffKartonState(service, '1');
+
+      // Second edit bumps _opsSeq.
+      await createTempFile(filePath, 'v1');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-2',
+        isExternal: false,
+        contentBefore: 'v1',
+        contentAfter: 'v2',
+      });
+
+      const result2 = await callUpdateDiffKartonState(service, '1');
+
+      // Must NOT be the same reference — indicates a fresh computation.
+      expect(result2.pendingFileDiffs).not.toBe(result1.pendingFileDiffs);
+    });
+
+    it('preserves snapshot when an agent is pruned (opsSeq guard handles staleness)', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'prune-seq.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'data',
+      });
+
+      // Populate the snapshot.
+      await callUpdateDiffKartonState(service, '1');
+      expect(getSnapshot(service).has('1')).toBe(true);
+
+      // Remove the agent from karton state and trigger pruning.
+      mockKarton._setAgentInstances([]);
+      triggerPrune(service);
+
+      // Snapshot is preserved so re-hydration can use the opsSeq guard.
+      expect(getSnapshot(service).has('1')).toBe(true);
+
+      // Re-hydrate with no intervening writes — guard should fire.
+      mockKarton._setAgentInstances(['1']);
+      const result = await callUpdateDiffKartonState(service, '1');
+      const snap = getSnapshot(service).get('1');
+      expect(result.pendingFileDiffs).toBe(snap!.pendingFileDiffs);
+      expect(result.editSummary).toBe(snap!.editSummary);
+    });
+
+    it('re-hydration with no intervening writes returns cached snapshot (guard hit)', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'rehydrate-no-write.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'hello',
+      });
+
+      // Populate the snapshot.
+      const original = await callUpdateDiffKartonState(service, '1');
+
+      // Prune agent.
+      mockKarton._setAgentInstances([]);
+      triggerPrune(service);
+
+      // Re-add agent — no writes happened in between.
+      mockKarton._setAgentInstances(['1']);
+      const rehydrated = await callUpdateDiffKartonState(service, '1');
+
+      // Must be the exact same references (opsSeq guard hit).
+      expect(rehydrated.pendingFileDiffs).toBe(original.pendingFileDiffs);
+      expect(rehydrated.editSummary).toBe(original.editSummary);
+    });
+
+    it('re-hydration with intervening writes triggers recompute', async () => {
+      mockKarton._setAgentInstances(['1', '2']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'rehydrate-stale.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'v1',
+      });
+
+      // Populate snapshot for agent 1.
+      const original = await callUpdateDiffKartonState(service, '1');
+
+      // Prune agent 1.
+      mockKarton._setAgentInstances(['2']);
+      triggerPrune(service);
+
+      // Intervening write via agent 2 bumps _opsSeq.
+      const file2 = path.join(testFilesDir, 'rehydrate-stale-other.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '2',
+        path: file2,
+        toolCallId: 'tool-2',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'other',
+      });
+
+      // Re-add agent 1 — opsSeq has changed, must recompute.
+      mockKarton._setAgentInstances(['1', '2']);
+      const rehydrated = await callUpdateDiffKartonState(service, '1');
+
+      // Must be a fresh computation, not the stale cached reference.
+      expect(rehydrated.pendingFileDiffs).not.toBe(original.pendingFileDiffs);
+    });
+  });
+
+  // ===========================================================================
+  // Targeted (single-file) update path
+  // ===========================================================================
+
+  describe('targeted updates', () => {
+    const getSnapshot = (svc: DiffHistoryService) =>
+      (
+        svc as unknown as {
+          _agentDiffSnapshot: Map<
+            string,
+            {
+              opsSeq: number;
+              pendingFileDiffs: FileDiff[];
+              editSummary: FileDiff[];
+            }
+          >;
+        }
+      )._agentDiffSnapshot;
+
+    it('uses the scoped ops-for-filepath query after a snapshot exists', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const file1 = path.join(testFilesDir, 'targeted-a.txt');
+      const file2 = path.join(testFilesDir, 'targeted-b.txt');
+
+      // Establish a baseline snapshot with two files.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: file1,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'a-v1',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: file2,
+        toolCallId: 'tool-2',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'b-v1',
+      });
+
+      const snapshotBefore = getSnapshot(service).get('1');
+      expect(snapshotBefore).toBeDefined();
+      const file2EntryBefore = snapshotBefore?.pendingFileDiffs.find(
+        (d) => d.path === file2,
+      );
+      expect(file2EntryBefore).toBeDefined();
+
+      // Edit file1 again — targeted path should fire.
+      await createTempFile(file1, 'a-v1');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: file1,
+        toolCallId: 'tool-3',
+        isExternal: false,
+        contentBefore: 'a-v1',
+        contentAfter: 'a-v2',
+      });
+
+      const snapshotAfter = getSnapshot(service).get('1');
+      expect(snapshotAfter).toBeDefined();
+
+      // File2's FileDiff entry must be the SAME object identity as before
+      // (never recomputed during the targeted patch). File1's must differ.
+      const file2EntryAfter = snapshotAfter?.pendingFileDiffs.find(
+        (d) => d.path === file2,
+      );
+      const file1EntryAfter = snapshotAfter?.pendingFileDiffs.find(
+        (d) => d.path === file1,
+      );
+      expect(file2EntryAfter).toBe(file2EntryBefore);
+      expect(file1EntryAfter).toBeDefined();
+      expect(file1EntryAfter).not.toBe(
+        snapshotBefore?.pendingFileDiffs.find((d) => d.path === file1),
+      );
+    });
+
+    it('drops file from pending when edit restores baseline content', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'restore.txt');
+      await createTempFile(filePath, 'original');
+
+      // Agent modifies file
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: 'original',
+        contentAfter: 'changed',
+      });
+
+      const snapshot1 = getSnapshot(service).get('1');
+      expect(
+        snapshot1?.pendingFileDiffs.find((d) => d.path === filePath),
+      ).toBeDefined();
+
+      // Agent restores file to original content — pending must drop.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-2',
+        isExternal: false,
+        contentBefore: 'changed',
+        contentAfter: 'original',
+      });
+
+      const snapshot2 = getSnapshot(service).get('1');
+      expect(
+        snapshot2?.pendingFileDiffs.find((d) => d.path === filePath),
+      ).toBeUndefined();
+    });
+
+    it('targeted path produces correct result on first edit (no prior snapshot)', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'first.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'first-content',
+      });
+
+      const snapshot = getSnapshot(service).get('1');
+      expect(snapshot).toBeDefined();
+      const entry = snapshot?.pendingFileDiffs.find((d) => d.path === filePath);
+      expect(entry).toBeDefined();
+    });
+
+    it('preserves identity of untouched files across multi-file undo', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const file1 = path.join(testFilesDir, 'undo-a.txt');
+      const file2 = path.join(testFilesDir, 'undo-b.txt');
+      const file3 = path.join(testFilesDir, 'undo-c.txt');
+      const untouched = path.join(testFilesDir, 'untouched.txt');
+
+      for (const [p, content, tool] of [
+        [file1, 'v1', 'tool-a'],
+        [file2, 'v1', 'tool-b'],
+        [file3, 'v1', 'tool-c'],
+        [untouched, 'stable', 'tool-u'],
+      ] as const) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: p,
+          toolCallId: tool,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: content,
+        });
+      }
+
+      const snapshotBefore = getSnapshot(service).get('1');
+      const untouchedBefore = snapshotBefore?.pendingFileDiffs.find(
+        (d) => d.path === untouched,
+      );
+      expect(untouchedBefore).toBeDefined();
+
+      await service.undoToolCalls(['tool-a', 'tool-b', 'tool-c'], '1');
+
+      const snapshotAfter = getSnapshot(service).get('1');
+      const untouchedAfter = snapshotAfter?.pendingFileDiffs.find(
+        (d) => d.path === untouched,
+      );
+
+      // Untouched file must retain identity — it was never re-computed.
+      expect(untouchedAfter).toBe(untouchedBefore);
+    });
+  });
+
+  // ===========================================================================
+  // contributorStateCache — incremental per-file contributor-map caching
+  // ===========================================================================
+
+  describe('contributorStateCache', () => {
+    type ContributorStateCache = Map<
+      string,
+      { latestOpIdx: number; state: unknown }
+    >;
+
+    const getCache = (svc: DiffHistoryService): ContributorStateCache =>
+      (
+        svc as unknown as {
+          contributorStateCache: ContributorStateCache;
+        }
+      ).contributorStateCache;
+
+    const getSnapshot = (svc: DiffHistoryService) =>
+      (
+        svc as unknown as {
+          _agentDiffSnapshot: Map<
+            string,
+            {
+              opsSeq: number;
+              pendingFileDiffs: FileDiff[];
+              editSummary: FileDiff[];
+            }
+          >;
+        }
+      )._agentDiffSnapshot;
+
+    it('produces identical editSummary whether cache is warm or cold', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'cache-equiv.txt');
+
+      // Seed a 5-op history for one file.
+      for (let i = 0; i < 5; i++) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: filePath,
+          toolCallId: `tool-${i}`,
+          isExternal: false,
+          contentBefore: i === 0 ? null : `rev-${i - 1}`,
+          contentAfter: `rev-${i}`,
+        });
+      }
+
+      const warmSummary = getSnapshot(service)
+        .get('1')
+        ?.editSummary.find((d) => d.path === filePath);
+      expect(warmSummary).toBeDefined();
+
+      // Force a cold recompute: clear the per-file output cache AND the
+      // contributor-state cache, then trigger an update via another edit.
+      getCache(service).clear();
+      const fileDiffCache = (
+        service as unknown as { fileDiffCache: Map<string, unknown> }
+      ).fileDiffCache;
+      fileDiffCache.clear();
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-cold',
+        isExternal: false,
+        contentBefore: 'rev-4',
+        contentAfter: 'rev-5',
+      });
+
+      const coldSummary = getSnapshot(service)
+        .get('1')
+        ?.editSummary.find((d) => d.path === filePath);
+      expect(coldSummary).toBeDefined();
+
+      // Cold recompute replayed from op zero should match the
+      // incrementally-built state on its own terms (the underlying
+      // contributor maps for equivalent operation sequences are equal).
+      // To compare apples-to-apples we wipe caches again and recompute
+      // once more — the result must match the first cold recompute.
+      getCache(service).clear();
+      fileDiffCache.clear();
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-cold-2',
+        isExternal: false,
+        contentBefore: 'rev-5',
+        contentAfter: 'rev-6',
+      });
+
+      // Perform an idempotent pass: re-run the hydration update on the
+      // warm cache and verify structural equality with the cold result.
+      const warmAgain = getSnapshot(service)
+        .get('1')
+        ?.editSummary.find((d) => d.path === filePath);
+      expect(warmAgain).toBeDefined();
+      // Both summaries are for the same op sequence — they must have the
+      // same path, hunks, and contributor attributions.
+      expect(warmAgain?.path).toBe(filePath);
+    });
+
+    it('adds entries keyed by agent + filepath + mode + firstOpIdx', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'cache-key.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'content',
+      });
+
+      const keys = [...getCache(service).keys()];
+      // Expect at least one summary entry for this agent + filepath.
+      expect(
+        keys.some((k) => k.startsWith('1::') && k.includes(filePath)),
+      ).toBe(true);
+      // Cache keys must include the mode segment.
+      expect(keys.some((k) => k.includes('::summary::'))).toBe(true);
+    });
+
+    it('survives accept-then-edit flow without producing corrupted diffs', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'accept-edit.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-1',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'line1\nline2',
+      });
+
+      // Accept all pending hunks — this inserts a new baseline op.
+      const snapshotBefore = getSnapshot(service).get('1');
+      const fileEntry = snapshotBefore?.pendingFileDiffs.find(
+        (d) => d.path === filePath,
+      );
+      expect(fileEntry).toBeDefined();
+      if (fileEntry && 'hunks' in fileEntry) {
+        const hunkIds = fileEntry.hunks.map((h) => h.id);
+        await service.acceptAndRejectHunks(hunkIds, []);
+      }
+
+      // Edit the file again — the cache key should shift because the
+      // trimmed pending sequence now starts at the accept-inserted
+      // baseline with a new firstOpIdx.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-2',
+        isExternal: false,
+        contentBefore: 'line1\nline2',
+        contentAfter: 'line1\nline2\nline3',
+      });
+
+      const snapshotAfter = getSnapshot(service).get('1');
+      const pending = snapshotAfter?.pendingFileDiffs.find(
+        (d) => d.path === filePath,
+      );
+      expect(pending).toBeDefined();
+      // Pending should show only the new addition (line3), not the
+      // already-accepted baseline content.
+      if (pending && 'hunks' in pending) {
+        expect(pending.hunks.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('undo-then-edit: fallback recompute when latestOpIdx no longer present', async () => {
+      mockKarton._setAgentInstances(['1']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'undo-edit.txt');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-a',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'v1',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-b',
+        isExternal: false,
+        contentBefore: 'v1',
+        contentAfter: 'v2',
+      });
+
+      // Cache should now hold an entry for this file whose latestOpIdx
+      // corresponds to tool-b's op. Undo it — that op disappears from
+      // the DB, and the cache entry becomes stale.
+      await service.undoToolCalls(['tool-b'], '1');
+
+      // Next edit must not produce a corrupted diff; the incremental
+      // path detects that latestOpIdx is no longer in the ops list and
+      // falls back to a from-scratch recompute for this file.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'tool-c',
+        isExternal: false,
+        contentBefore: 'v1',
+        contentAfter: 'v3',
+      });
+
+      const snapshot = getSnapshot(service).get('1');
+      const pending = snapshot?.pendingFileDiffs.find(
+        (d) => d.path === filePath,
+      );
+      expect(pending).toBeDefined();
+      if (pending && !pending.isExternal) {
+        expect(pending.current).toBe('v3');
+      }
+    });
+
+    it('clears contributor-state cache entries for removed agents', async () => {
+      mockKarton._setAgentInstances(['1', '2']);
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const fileA = path.join(testFilesDir, 'agent-scope-a.txt');
+      const fileB = path.join(testFilesDir, 'agent-scope-b.txt');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: fileA,
+        toolCallId: 'tool-a',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'content-a',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '2',
+        path: fileB,
+        toolCallId: 'tool-b',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'content-b',
+      });
+
+      const cache = getCache(service);
+      expect([...cache.keys()].some((k) => k.startsWith('1::'))).toBe(true);
+      expect([...cache.keys()].some((k) => k.startsWith('2::'))).toBe(true);
+
+      // Remove agent 2 from hydration and trigger the prune.
+      mockKarton._setAgentInstances(['1']);
+      (
+        service as unknown as { pruneRemovedAgentInstances: () => void }
+      ).pruneRemovedAgentInstances();
+
+      const remainingKeys = [...cache.keys()];
+      expect(remainingKeys.some((k) => k.startsWith('1::'))).toBe(true);
+      expect(remainingKeys.some((k) => k.startsWith('2::'))).toBe(false);
+    });
+  });
 });

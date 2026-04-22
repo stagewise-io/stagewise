@@ -9,6 +9,8 @@ import type {
 import {
   segmentFileOperationsIntoGenerations,
   buildContributorMap,
+  buildContributorMapIncremental,
+  type ContributorMapState,
   createFileDiffsFromGenerations,
   acceptAndRejectHunks,
   isTextFileDiff,
@@ -1769,5 +1771,195 @@ describe('diff utilities', () => {
       expect(result.summary[0].path).toBe('/readme.md');
       expect(result.summary[1].path).toBe('/image.png');
     });
+  });
+});
+
+// =============================================================================
+// buildContributorMapIncremental: equivalence with full build across split
+// points. Verifies that caching + replay produces identical ContributorMaps.
+// =============================================================================
+
+describe('buildContributorMapIncremental', () => {
+  beforeEach(() => {
+    operationIdx = 1;
+  });
+
+  /**
+   * Generates a deterministic sequence of operations for one filepath.
+   * Mixes baseline, agent edits, user edits, additions, deletions, and
+   * content restorations.
+   */
+  function buildSequence(): OperationWithContent[] {
+    const fp = '/src/file.ts';
+    const ops: OperationWithContent[] = [];
+    const push = (op: Operation, content: string) =>
+      ops.push(createOpWithContent(op, content));
+
+    // 0: baseline with 5 lines
+    push(
+      createBaselineOp({ filepath: fp, reason: 'init' }),
+      'line1\nline2\nline3\nline4\nline5',
+    );
+    // 1: agent-1 appends line6
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'agent-1',
+        reason: 'tool-a',
+      }),
+      'line1\nline2\nline3\nline4\nline5\nline6',
+    );
+    // 2: agent-2 removes line3
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'agent-2',
+        reason: 'tool-b',
+      }),
+      'line1\nline2\nline4\nline5\nline6',
+    );
+    // 3: user edits line1 -> new content (reject reason ~ user-save analogue)
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'user',
+        reason: 'reject',
+      }),
+      'LINE-ONE\nline2\nline4\nline5\nline6',
+    );
+    // 4: agent-1 inserts line7 at the end
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'agent-1',
+        reason: 'tool-c',
+      }),
+      'LINE-ONE\nline2\nline4\nline5\nline6\nline7',
+    );
+    // 5: agent-1 deletes the entire file (snapshot_oid: null, content '')
+    push(
+      createEditOp({
+        filepath: fp,
+        snapshot_oid: null,
+        contributor: 'agent-1',
+        reason: 'tool-d',
+      }),
+      '',
+    );
+    // 6: agent-2 recreates with single line
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'agent-2',
+        reason: 'tool-e',
+      }),
+      'only-line',
+    );
+    // 7: agent-2 extends to two lines
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'agent-2',
+        reason: 'tool-f',
+      }),
+      'only-line\nsecond-line',
+    );
+    // 8: user modifies second-line
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'user',
+        reason: 'reject',
+      }),
+      'only-line\nSECOND-LINE-EDITED',
+    );
+    // 9: agent-1 adds third-line
+    push(
+      createEditOp({
+        filepath: fp,
+        contributor: 'agent-1',
+        reason: 'tool-g',
+      }),
+      'only-line\nSECOND-LINE-EDITED\nthird-line',
+    );
+
+    return ops;
+  }
+
+  it('matches buildContributorMap when invoked from-scratch (no prior state)', () => {
+    const ops = buildSequence();
+    const fileId = 'file-a';
+    const full = buildContributorMap({ [fileId]: ops });
+    const { maps } = buildContributorMapIncremental(ops, null, null);
+    expect(maps).toEqual(full[fileId]);
+  });
+
+  it('matches full build for every possible split point', () => {
+    const ops = buildSequence();
+    const fileId = 'file-a';
+    const fullMaps = buildContributorMap({ [fileId]: ops })[fileId];
+
+    for (let split = 0; split < ops.length; split++) {
+      const firstHalf = ops.slice(0, split + 1);
+      const secondHalf = ops;
+
+      // First pass: seed cache with ops up to and including `split`.
+      const first = buildContributorMapIncremental(firstHalf, null, null);
+      expect(first.finalLatestOpIdx).toBe(Number(ops[split].idx));
+
+      // Second pass: replay the full sequence on top of the cached state.
+      // The incremental function must skip ops already included in the
+      // priorState and apply only the tail (idx > priorStateLatestOpIdx).
+      const priorClone: ContributorMapState = structuredClone(first.finalState);
+      const second = buildContributorMapIncremental(
+        secondHalf,
+        priorClone,
+        first.finalLatestOpIdx,
+      );
+
+      expect(second.maps).toEqual(fullMaps);
+      expect(second.finalLatestOpIdx).toBe(Number(ops[ops.length - 1].idx));
+    }
+  });
+
+  it('handles deletion (snapshot_oid null -> empty content) correctly', () => {
+    const ops = buildSequence();
+    const fileId = 'file-a';
+    const fullMaps = buildContributorMap({ [fileId]: ops })[fileId];
+
+    // Split right before the deletion op (index 5).
+    const firstHalf = ops.slice(0, 5);
+    const secondHalf = ops;
+
+    const first = buildContributorMapIncremental(firstHalf, null, null);
+    const second = buildContributorMapIncremental(
+      secondHalf,
+      structuredClone(first.finalState),
+      first.finalLatestOpIdx,
+    );
+
+    expect(second.maps).toEqual(fullMaps);
+  });
+
+  it('returns empty maps when given no operations and no prior state', () => {
+    const result = buildContributorMapIncremental([], null, null);
+    expect(result.maps).toEqual({ lineMap: {}, removalMap: {} });
+    expect(result.finalLatestOpIdx).toBe(-1);
+  });
+
+  it('noop when all provided ops are already included in the prior state', () => {
+    const ops = buildSequence();
+    const first = buildContributorMapIncremental(ops.slice(0, 4), null, null);
+    // Re-feed the exact same ops: they should be skipped entirely and the
+    // state should remain unchanged.
+    const second = buildContributorMapIncremental(
+      ops.slice(0, 4),
+      structuredClone(first.finalState),
+      first.finalLatestOpIdx,
+    );
+    expect(second.maps).toEqual(
+      buildContributorMap({ 'file-a': ops.slice(0, 4) })['file-a'],
+    );
+    expect(second.finalLatestOpIdx).toBe(first.finalLatestOpIdx);
   });
 });

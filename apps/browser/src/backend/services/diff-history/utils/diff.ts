@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 /**
  * Generates a deterministic hunk ID based on content and position.
@@ -83,7 +83,15 @@ export function segmentFileOperationsIntoGenerations<
 
   const result: Record<FileId, T[]> = {};
   for (const fileOps of Object.values(opsByFilepath)) {
-    result[randomUUID()] = fileOps;
+    // Deterministic fileId (sha256 of filepath, 16 hex chars) so that cached
+    // FileDiff output can be safely reused across invocations. UI code uses
+    // fileId as a React key (see diff-review/$agentInstanceId.tsx), so
+    // stability across cache hits/misses is required.
+    const fileId = createHash('sha256')
+      .update(fileOps[0].filepath)
+      .digest('hex')
+      .slice(0, 16);
+    result[fileId] = fileOps;
   }
 
   return result;
@@ -97,6 +105,102 @@ export type ContributorMaps = {
   lineMap: { [lineNumber: number]: Contributor };
   removalMap: { [baselineLineNumber: number]: Contributor };
 };
+
+/**
+ * Intermediate state of `buildContributorMap`'s per-operation loop.
+ *
+ * This captures everything the next iteration needs to resume from where
+ * the previous one stopped: the per-line contributor array, the per-line
+ * baseline-origin tracker, the accumulated removal map, and the content
+ * that the next `diffLines()` call will compare against.
+ *
+ * Used by `buildContributorMapIncremental` to cache and replay from a
+ * partial state rather than recomputing from operation zero every time.
+ */
+export type ContributorMapState = {
+  lineContributors: Contributor[];
+  lineBaselineOrigin: (number | null)[];
+  removalMap: { [baselineLineNumber: number]: Contributor };
+  previousContent: string;
+};
+
+/**
+ * Initializes contributor-map state from an operation that starts a file's
+ * history (typically a baseline). Mirrors the startup block previously
+ * inlined at the top of `buildContributorMap`.
+ */
+export function initContributorStateFromBaseline(
+  op: OperationWithContent,
+): ContributorMapState {
+  const previousContent = op.snapshot_content ?? '';
+  const baselineLines = previousContent
+    ? previousContent.split('\n').length
+    : 0;
+  return {
+    lineContributors: Array(baselineLines).fill('user' as Contributor),
+    lineBaselineOrigin: Array.from({ length: baselineLines }, (_, i) => i),
+    removalMap: {},
+    previousContent,
+  };
+}
+
+/**
+ * Applies a single operation to a contributor-map state, mutating the
+ * state in place. Extracted from the inner loop of `buildContributorMap`
+ * so both the from-scratch and the incremental paths can share the
+ * exact same logic.
+ */
+export function applyOperationToContributorState(
+  state: ContributorMapState,
+  op: OperationWithContent,
+): void {
+  const currentContent = op.snapshot_content ?? '';
+
+  const contributor: Contributor =
+    op.operation === 'baseline' ? 'user' : op.contributor;
+
+  const diffResults = diffLines(state.previousContent, currentContent, {
+    oneChangePerToken: true,
+  });
+
+  let lineIndex = 0;
+  for (const diffResult of diffResults) {
+    if (diffResult.added) {
+      const lineCount = diffResult.count ?? diffResult.value.split('\n').length;
+      const contributorsToAdd = Array(lineCount).fill(contributor);
+      const originsToAdd: (number | null)[] = Array(lineCount).fill(null);
+      state.lineContributors.splice(lineIndex, 0, ...contributorsToAdd);
+      state.lineBaselineOrigin.splice(lineIndex, 0, ...originsToAdd);
+      lineIndex += lineCount;
+    } else if (diffResult.removed) {
+      const lineCount = diffResult.count ?? 0;
+      for (let j = 0; j < lineCount; j++) {
+        const origin = state.lineBaselineOrigin[lineIndex + j];
+        if (origin !== null && origin !== undefined) {
+          state.removalMap[origin] = contributor;
+        }
+      }
+      state.lineContributors.splice(lineIndex, lineCount);
+      state.lineBaselineOrigin.splice(lineIndex, lineCount);
+    } else {
+      const lineCount = diffResult.count ?? 0;
+      lineIndex += lineCount;
+    }
+  }
+
+  state.previousContent = currentContent;
+}
+
+/**
+ * Converts a ContributorMapState into the public ContributorMaps shape
+ * (per-line-number contributor lookup + removal map).
+ */
+function contributorStateToMaps(state: ContributorMapState): ContributorMaps {
+  const lineMap: { [lineNumber: number]: Contributor } = {};
+  for (let i = 0; i < state.lineContributors.length; i++)
+    lineMap[i] = state.lineContributors[i];
+  return { lineMap, removalMap: { ...state.removalMap } };
+}
 
 /**
  * Builds a contributor map for each generation, showing which contributor
@@ -128,73 +232,131 @@ export function buildContributorMap(
       continue;
     }
 
-    let lineContributors: Contributor[] = [];
-    let lineBaselineOrigin: (number | null)[] = [];
-    const removalMap: { [baselineLineNumber: number]: Contributor } = {};
-    let previousContent = '';
-
     const firstOp = operations[0];
     const startsWithBaseline = firstOp.operation === 'baseline';
 
-    let startIndex = 0;
+    let state: ContributorMapState;
+    let startIndex: number;
     if (startsWithBaseline) {
-      previousContent = firstOp.snapshot_content ?? '';
-      const baselineLines = previousContent
-        ? previousContent.split('\n').length
-        : 0;
-      lineContributors = Array(baselineLines).fill('user' as Contributor);
-      lineBaselineOrigin = Array.from({ length: baselineLines }, (_, i) => i);
+      state = initContributorStateFromBaseline(firstOp);
       startIndex = 1;
+    } else {
+      state = {
+        lineContributors: [],
+        lineBaselineOrigin: [],
+        removalMap: {},
+        previousContent: '',
+      };
+      startIndex = 0;
     }
 
     for (let i = startIndex; i < operations.length; i++) {
-      const op = operations[i];
-      const currentContent = op.snapshot_content ?? '';
-
-      const contributor: Contributor =
-        op.operation === 'baseline' ? 'user' : op.contributor;
-
-      const diffResults = diffLines(previousContent, currentContent, {
-        oneChangePerToken: true,
-      });
-
-      let lineIndex = 0;
-      for (const diffResult of diffResults) {
-        if (diffResult.added) {
-          const lineCount =
-            diffResult.count ?? diffResult.value.split('\n').length;
-          const contributorsToAdd = Array(lineCount).fill(contributor);
-          const originsToAdd: (number | null)[] = Array(lineCount).fill(null);
-          lineContributors.splice(lineIndex, 0, ...contributorsToAdd);
-          lineBaselineOrigin.splice(lineIndex, 0, ...originsToAdd);
-          lineIndex += lineCount;
-        } else if (diffResult.removed) {
-          const lineCount = diffResult.count ?? 0;
-          for (let j = 0; j < lineCount; j++) {
-            const origin = lineBaselineOrigin[lineIndex + j];
-            if (origin !== null) {
-              removalMap[origin] = contributor;
-            }
-          }
-          lineContributors.splice(lineIndex, lineCount);
-          lineBaselineOrigin.splice(lineIndex, lineCount);
-        } else {
-          const lineCount = diffResult.count ?? 0;
-          lineIndex += lineCount;
-        }
-      }
-
-      previousContent = currentContent;
+      applyOperationToContributorState(state, operations[i]);
     }
 
-    const lineMap: { [lineNumber: number]: Contributor } = {};
-    for (let i = 0; i < lineContributors.length; i++)
-      lineMap[i] = lineContributors[i];
-
-    result[fileId] = { lineMap, removalMap };
+    result[fileId] = contributorStateToMaps(state);
   }
 
   return result;
+}
+
+/**
+ * Incremental single-file variant of {@link buildContributorMap}.
+ *
+ * Callers provide either:
+ *   - `priorState = null` -> build from scratch over `operations`
+ *   - A prior state captured at some `priorStateLatestOpIdx` -> replay only
+ *     the operations whose `idx > priorStateLatestOpIdx` on a clone of that
+ *     state.
+ *
+ * Returns the resulting `ContributorMaps` (input to
+ * `createFileDiffsFromGenerations`) together with the final internal state
+ * and the `idx` of the last op applied, so callers can cache the state
+ * for the next incremental call.
+ *
+ * Operations MUST be sorted by `idx` ascending. In dev builds a mis-sort
+ * throws; in prod builds the function is best-effort (it assumes the
+ * invariant holds).
+ */
+export function buildContributorMapIncremental(
+  operations: OperationWithContent[],
+  priorState: ContributorMapState | null,
+  priorStateLatestOpIdx: number | null,
+): {
+  maps: ContributorMaps;
+  finalState: ContributorMapState;
+  finalLatestOpIdx: number;
+} {
+  // Dev-time sort-order guard.
+  if (process.env.NODE_ENV !== 'production') {
+    for (let i = 1; i < operations.length; i++) {
+      if (Number(operations[i].idx) < Number(operations[i - 1].idx)) {
+        throw new Error(
+          `buildContributorMapIncremental: operations not sorted by idx ascending (idx ${operations[i - 1].idx} followed by ${operations[i].idx})`,
+        );
+      }
+    }
+  }
+
+  let state: ContributorMapState;
+  let startIndex: number;
+
+  if (priorState !== null) {
+    state = priorState;
+    // All ops in `operations` must come after the cached state. We expect
+    // the caller to have filtered already, but verify.
+    startIndex = 0;
+    if (priorStateLatestOpIdx !== null) {
+      while (
+        startIndex < operations.length &&
+        Number(operations[startIndex].idx) <= priorStateLatestOpIdx
+      ) {
+        startIndex++;
+      }
+    }
+  } else if (operations.length === 0) {
+    // No prior state and no operations: return empty maps.
+    return {
+      maps: { lineMap: {}, removalMap: {} },
+      finalState: {
+        lineContributors: [],
+        lineBaselineOrigin: [],
+        removalMap: {},
+        previousContent: '',
+      },
+      finalLatestOpIdx: -1,
+    };
+  } else {
+    const firstOp = operations[0];
+    const startsWithBaseline = firstOp.operation === 'baseline';
+    if (startsWithBaseline) {
+      state = initContributorStateFromBaseline(firstOp);
+      startIndex = 1;
+    } else {
+      state = {
+        lineContributors: [],
+        lineBaselineOrigin: [],
+        removalMap: {},
+        previousContent: '',
+      };
+      startIndex = 0;
+    }
+  }
+
+  for (let i = startIndex; i < operations.length; i++) {
+    applyOperationToContributorState(state, operations[i]);
+  }
+
+  const finalLatestOpIdx =
+    operations.length > 0
+      ? Number(operations[operations.length - 1].idx)
+      : (priorStateLatestOpIdx ?? -1);
+
+  return {
+    maps: contributorStateToMaps(state),
+    finalState: state,
+    finalLatestOpIdx,
+  };
 }
 
 /**
