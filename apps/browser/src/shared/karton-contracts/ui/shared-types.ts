@@ -494,7 +494,7 @@ export const defaultUserPreferences: UserPreferences = {
   sidebar: { showActiveAgents: true },
   agent: {
     workspaceSettings: {},
-    disabledModelIds: ['claude-opus-4.6'],
+    disabledModelIds: ['claude-opus-4.6', 'kimi-k2.5'],
     disabledPluginIds: [],
   },
   providerConfigs: {

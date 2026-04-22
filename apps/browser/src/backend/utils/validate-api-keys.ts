@@ -38,7 +38,7 @@ const providerConfigs: Record<
     createOpenAI({
       apiKey,
       baseURL: baseURL ?? 'https://api.moonshot.ai/v1',
-    })('kimi-k2.5'),
+    })('kimi-k2.6'),
   alibaba: (apiKey, baseURL) =>
     createOpenAI({
       apiKey,

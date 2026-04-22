@@ -341,6 +341,47 @@ export const availableModels = [
   },
   {
     officialProvider: 'moonshotai',
+    modelId: 'kimi-k2.6',
+    modelDisplayName: 'Kimi K2.6',
+    modelDescription:
+      "Kimi's latest flagship with stronger long-horizon coding, improved instruction compliance, and native multimodal input (text, image, video).",
+    modelContext: '256k context',
+    modelContextRaw: 262144,
+    headers: {},
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      moonshotai: {
+        thinking: { type: 'adaptive' },
+        effort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.95,
+      outputPerMillion: 4.0,
+      relativeMultiplier: 0.85,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: true,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GOOGLE_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'moonshotai',
     modelId: 'kimi-k2.5',
     modelDisplayName: 'Kimi K2.5',
     modelDescription:
