@@ -757,16 +757,30 @@ export const executeShellCommandToolInputSchema = z.object({
         .number()
         .int()
         .positive()
+        .max(60_000)
         .optional()
-        .describe('Return after N ms regardless.'),
+        .describe(
+          'Hard timeout (ms). Default 15000 with wait_until, 10000 without. Max 60000 — avoid setting above 30000 unless the command genuinely needs it; raising this does not help commands finish faster. Prefer follow-up calls for longer work.',
+        ),
       exited: z
         .boolean()
         .optional()
-        .describe('Wait for the shell process to exit.'),
+        .describe(
+          'Minor hint that the command is expected to end on its own. Lowers idle threshold from 5s to 3s. Does not imply other parameter overrides — `{ exited: true }` alone is complete.',
+        ),
       output_pattern: z
         .string()
         .optional()
         .describe('Return when output matches this regex.'),
+      idle_ms: z
+        .number()
+        .int()
+        .min(0)
+        .max(30_000)
+        .optional()
+        .describe(
+          'Silence threshold (ms) after first output. Default 5000 (3000 with `exited: true`). **`0` disables idle detection — avoid.** Only correct for commands with proven long silent phases DURING ACTIVE WORK (not while waiting for input). Defensive use on interactive CLIs produces long hangs instead of fast prompt detection.',
+        ),
     })
     .optional()
     .describe('Controls when the tool returns.'),
@@ -778,6 +792,12 @@ export const executeShellCommandToolOutputSchema = z.object({
   exit_code: z.number().nullable(),
   session_exited: z.boolean(),
   timed_out: z.boolean(),
+  resolved_by: z
+    .enum(['exit', 'pattern', 'idle', 'timeout', 'abort', 'session_exited'])
+    .optional()
+    .describe(
+      'Why the tool resolved. Absent only for payloads persisted by earlier versions before this field existed; the backend always produces it.',
+    ),
 });
 
 export type ExecuteShellCommandToolInput = z.infer<
