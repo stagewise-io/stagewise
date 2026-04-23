@@ -805,7 +805,7 @@ function buildReadParamsSuffix(
   if (params.preview) parts.push('pv=1');
   // Version tag — bump when preview output format changes
   // (e.g. AST outline replaces line-based preview for source files).
-  if (params.preview) parts.push('pvv=7');
+  if (params.preview) parts.push('pvv=8');
   if (params.depth !== undefined) parts.push(`d=${params.depth}`);
 
   // Include the runtime content-limit settings so that changing them

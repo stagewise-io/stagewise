@@ -38,7 +38,12 @@ export async function getFileSymbols(
     tree = parser.parse(sourceText);
     if (!tree) return null;
 
-    const symbols = extractSymbols(tree.rootNode, lang.grammarFile, sourceText);
+    const symbols = extractSymbols(
+      tree.rootNode,
+      lang.grammarFile,
+      sourceText,
+      ext,
+    );
     return { language: lang.label, symbols };
   } finally {
     tree?.delete();

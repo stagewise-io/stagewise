@@ -66,20 +66,30 @@ function tsSignature(node: Node, source: string): string {
   return isExported(node) ? `export ${sig}` : sig;
 }
 
-function extractTsSymbols(root: Node, source: string): SymbolInfo[] {
+function extractTsSymbols(
+  root: Node,
+  source: string,
+  opts?: { deepFunctionBodies?: boolean },
+): SymbolInfo[] {
   const symbols: SymbolInfo[] = [];
+  const deep = opts?.deepFunctionBodies === true;
 
   function visitTopLevel(node: Node) {
     switch (node.type) {
-      case 'function_declaration':
+      case 'function_declaration': {
+        const fnChildren = deep
+          ? extractFunctionBodyMembers(node, source)
+          : undefined;
         symbols.push({
           name: nameOf(node, 'name'),
           kind: SymbolKind.Function,
           exported: isExported(node),
           line: node.startPosition.row,
           signature: tsSignature(node, source),
+          children: fnChildren?.length ? fnChildren : undefined,
         });
         break;
+      }
 
       case 'class_declaration': {
         const children = extractClassMembers(node, source);
@@ -158,12 +168,43 @@ function extractTsSymbols(root: Node, source: string): SymbolInfo[] {
             // Prepend const/let from the parent lexical_declaration.
             const keyword = node.children[0]?.text ?? 'const';
             const exportPrefix = isExported(node) ? 'export ' : '';
+            // Deep extraction: if the value is an arrow/function expression
+            // with a block body, extract its inner declarations.
+            // Also handles wrapper calls like memo(), forwardRef(), observer()
+            // by looking for a function argument inside the call_expression.
+            let varChildren: SymbolInfo[] | undefined;
+            if (deep && value) {
+              let fnNode: Node | null = null;
+              const valType = value.type;
+              if (
+                valType === 'arrow_function' ||
+                valType === 'function_expression'
+              ) {
+                fnNode = value;
+              } else if (valType === 'call_expression') {
+                // e.g. memo(function Foo() { ... }) or forwardRef((props) => { ... })
+                const args = value.childForFieldName('arguments');
+                if (args) {
+                  fnNode =
+                    args.namedChildren.find(
+                      (a) =>
+                        a.type === 'arrow_function' ||
+                        a.type === 'function_expression',
+                    ) ?? null;
+                }
+              }
+              if (fnNode) {
+                const inner = extractFunctionBodyMembers(fnNode, source);
+                if (inner.length) varChildren = inner;
+              }
+            }
             symbols.push({
               name: nameOf(decl, 'name'),
               kind: SymbolKind.Variable,
               exported: isExported(node),
               line: decl.startPosition.row,
               signature: `${exportPrefix}${keyword} ${sig}`,
+              children: varChildren,
             });
           }
         }
@@ -210,6 +251,69 @@ function extractClassMembers(classNode: Node, source: string): SymbolInfo[] {
           signature: extractSignature(member, source),
         });
         break;
+    }
+  }
+  return members;
+}
+
+/**
+ * Extract inner declarations from a function body (statement_block).
+ * Used for TSX/JSX components where hooks, callbacks, and helpers
+ * are structurally important but invisible at the top level.
+ */
+function extractFunctionBodyMembers(
+  fnNode: Node,
+  source: string,
+): SymbolInfo[] {
+  const members: SymbolInfo[] = [];
+
+  // statement_block is either a named field 'body' or the first
+  // child of that type (arrow_function vs function_declaration).
+  const body =
+    fnNode.childForFieldName('body') ??
+    fnNode.namedChildren.find((c) => c.type === 'statement_block');
+  if (!body || body.type !== 'statement_block') return members;
+
+  for (const child of body.namedChildren) {
+    switch (child.type) {
+      case 'function_declaration':
+        members.push({
+          name: nameOf(child, 'name'),
+          kind: SymbolKind.Function,
+          exported: false,
+          line: child.startPosition.row,
+          signature: extractSignature(child, source),
+        });
+        break;
+
+      case 'lexical_declaration': {
+        const keyword = child.children[0]?.text ?? 'const';
+        for (const decl of child.namedChildren) {
+          if (decl.type !== 'variable_declarator') continue;
+          const value = decl.childForFieldName('value');
+          let sig: string;
+          if (value) {
+            sig = source
+              .substring(decl.startIndex, value.startIndex)
+              .replace(/\s*\n\s*/g, ' ')
+              .trim()
+              .replace(/\s*=\s*$/, '');
+          } else {
+            sig = source
+              .substring(decl.startIndex, decl.endIndex)
+              .split('\n')[0]
+              .trim();
+          }
+          members.push({
+            name: nameOf(decl, 'name'),
+            kind: SymbolKind.Variable,
+            exported: false,
+            line: decl.startPosition.row,
+            signature: `${keyword} ${sig}`,
+          });
+        }
+        break;
+      }
     }
   }
   return members;
@@ -771,13 +875,36 @@ const EXTRACTORS: Record<string, Extractor> = {
   'tree-sitter-cpp.wasm': extractCppSymbols,
 };
 
+/** Extensions that trigger function-body-level extraction. */
+const DEEP_BODY_EXTS = new Set(['tsx', 'jsx']);
+
 export function extractSymbols(
   rootNode: Node,
   grammarFile: string,
   sourceText: string,
+  ext?: string,
 ): SymbolInfo[] {
   const extractor = EXTRACTORS[grammarFile];
   if (!extractor) return [];
+
+  // Normalize ext: strip leading dot, lowercase. Callers may pass
+  // '.tsx', 'TSX', etc.; DEEP_BODY_EXTS keys are lowercase without dots.
+  const normExt = ext
+    ? (ext.startsWith('.') ? ext.slice(1) : ext).toLowerCase()
+    : undefined;
+
+  // For TSX/JSX, enable deep function-body extraction when the
+  // extractor is the TS handler (which accepts the opts parameter).
+  if (
+    normExt &&
+    DEEP_BODY_EXTS.has(normExt) &&
+    extractor === extractTsSymbols
+  ) {
+    return extractTsSymbols(rootNode, sourceText, {
+      deepFunctionBodies: true,
+    });
+  }
+
   return extractor(rootNode, sourceText);
 }
 
