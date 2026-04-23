@@ -87,3 +87,15 @@ Read rule files as needed:
 - `./rules/maps.md` — Mapbox maps + animation
 - `./rules/silence-detection.md` — adaptive silence detection with FFmpeg
 - `./rules/voiceover.md` — AI voiceover with ElevenLabs
+
+## Important rules
+
+- Default to 30fps
+- Unless explicitly asked for transparency, ALWAYS add bg color to project and composition
+- ALWAYS COPY image/video/audio assets into `public` folder when using them
+- ALWAYS PREFER existing react components from reusable packages, if in monorepo
+- Unless styleguides say different, do these things:
+  - Fast and crisp transitions instead of slow fade-ins
+  - Fade-in and fade-out should ALWAYS include Blurring, Opacity and Translate.
+  - PREFER Word-by-word fade-in over Line-By-Line. Opt-in to typewriter for input demos or special technical cases.
+  - Light text/logos over Light BG must have slight shadow for contrast.

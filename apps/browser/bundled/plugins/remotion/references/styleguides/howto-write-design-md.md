@@ -326,3 +326,9 @@ Reason: role names help agent infer usage fast.
 
 - Extract all standard components if codebase is source. Extract more if user requests.
 - Always use RGB. Convert from OKLCH or HSL to RGB.
+- If extracting from existing website:
+  - Make screenshots and analyze mood, layout, color composition
+  - Extract variables, palette colors, definitions from CSS or element style defs via CDP
+  - Download example imagery, reference gradients, reusable assets, etc. and store in `elements`
+  - Search for downloadable brand kit assets, store in `elements` alongside definitions how to use.
+    - ALWAYS PREFER brand kit assets over manually generating gradients, logos, etc.
