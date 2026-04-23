@@ -146,6 +146,7 @@ describe('sourceCodeTransformer', () => {
   // outline output so regressions are never silently green.
   // -------------------------------------------------------------------
   let astAvailable = false;
+  let tsxAstAvailable = false;
 
   beforeAll(async () => {
     try {
@@ -161,9 +162,31 @@ describe('sourceCodeTransformer', () => {
     } catch {
       astAvailable = false;
     }
+    // Separate probe for TSX: TSX uses a distinct grammar
+    // (tree-sitter-tsx.wasm) from TS (tree-sitter-typescript.wasm).
+    // Either may be present/absent independently.
+    try {
+      const tsxProbeSource = 'export const Probe = () => <div />;\n';
+      const buf = Buffer.from(tsxProbeSource);
+      const ctx = makeCtx({ preview: true });
+      const result = await sourceCodeTransformer(
+        buf,
+        'test/probe.tsx',
+        makeStats(buf),
+        ctx,
+      );
+      tsxAstAvailable = allText(result.parts).includes('<outline>');
+    } catch {
+      tsxAstAvailable = false;
+    }
     if (!astAvailable) {
       console.warn(
         'AST tests will be skipped — web-tree-sitter WASM not available in test env',
+      );
+    }
+    if (!tsxAstAvailable) {
+      console.warn(
+        'TSX AST tests will be skipped — tree-sitter-tsx WASM not available in test env',
       );
     }
   });
@@ -451,6 +474,139 @@ describe('sourceCodeTransformer', () => {
       // Should get the binary file message from text transformer
       expect(text).toContain('Binary file');
       expect(text).toContain('sandbox');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // TSX deep function-body extraction
+  // -------------------------------------------------------------------------
+
+  describe('TSX function-body extraction', () => {
+    // Fixture must exceed promotion thresholds (>150 lines / >6KB) so the
+    // preview path is actually exercised rather than auto-promoted to full.
+    const TSX_COMPONENT = [
+      "import React, { useState, useCallback } from 'react';",
+      '',
+      'interface Props { name: string; }',
+      '',
+      'export function MyComponent(props: Props) {',
+      '  const [count, setCount] = useState(0);',
+      '  const handleClick = useCallback(() => {',
+      '    setCount(c => c + 1);',
+      '  }, []);',
+      '  function renderLabel() {',
+      '    return <span>{props.name}</span>;',
+      '  }',
+      '  return <div onClick={handleClick}>{renderLabel()} {count}</div>;',
+      '}',
+      '',
+      'export const Arrow = ({ title }: { title: string }) => {',
+      '  const [open, setOpen] = useState(false);',
+      '  return <div>{title}</div>;',
+      '};',
+    ].join('\n');
+
+    // Pad to >150 lines so promotion doesn't kick in.
+    const TSX_SOURCE = `${TSX_COMPONENT}\n${Array(160).fill('// padding').join('\n')}`;
+
+    it('extracts function-body members for TSX components', async (ctx) => {
+      if (!tsxAstAvailable) ctx.skip();
+
+      const buf = Buffer.from(TSX_SOURCE);
+      const mCtx = makeCtx({ preview: true });
+      const result = await sourceCodeTransformer(
+        buf,
+        'test/app.tsx',
+        makeStats(buf),
+        mCtx,
+      );
+      const text = allText(result.parts);
+
+      expect(text).toContain('<outline>');
+      expect(result.metadata.format).toBe('source-outline');
+
+      // Top-level symbols
+      expect(text).toContain('export function MyComponent');
+      expect(text).toContain('interface Props');
+      expect(text).toContain('export const Arrow');
+
+      // Function-body children of MyComponent
+      expect(text).toContain('const [count, setCount]');
+      expect(text).toContain('const handleClick');
+      expect(text).toContain('function renderLabel()');
+
+      // Arrow component body children
+      expect(text).toContain('const [open, setOpen]');
+    });
+
+    it('extracts through wrapper calls (memo, forwardRef)', async (ctx) => {
+      if (!tsxAstAvailable) ctx.skip();
+
+      const MEMO_TSX = [
+        "import { memo, forwardRef, useState, useCallback } from 'react';",
+        '',
+        'export const Wrapped = memo(function Wrapped() {',
+        '  const [count, setCount] = useState(0);',
+        '  const increment = useCallback(() => setCount(c => c + 1), []);',
+        '  return <div>{count}</div>;',
+        '});',
+        '',
+        'export const FwdRef = forwardRef((props, ref) => {',
+        '  const [open, setOpen] = useState(false);',
+        '  return <div ref={ref}>{open}</div>;',
+        '});',
+      ].join('\n');
+
+      const MEMO_SOURCE = `${MEMO_TSX}\n${Array(160).fill('// padding').join('\n')}`;
+
+      const buf = Buffer.from(MEMO_SOURCE);
+      const mCtx = makeCtx({ preview: true });
+      const result = await sourceCodeTransformer(
+        buf,
+        'test/wrapped.tsx',
+        makeStats(buf),
+        mCtx,
+      );
+      const text = allText(result.parts);
+
+      expect(text).toContain('<outline>');
+      expect(result.metadata.format).toBe('source-outline');
+
+      // Top-level symbols
+      expect(text).toContain('export const Wrapped');
+      expect(text).toContain('export const FwdRef');
+
+      // Children extracted through memo()
+      expect(text).toContain('const [count, setCount]');
+      expect(text).toContain('const increment');
+
+      // Children extracted through forwardRef()
+      expect(text).toContain('const [open, setOpen]');
+    });
+
+    it('does NOT extract function-body members for plain .ts', async (ctx) => {
+      if (!astAvailable) ctx.skip();
+
+      // Use the same fixture but with .ts extension — should stay shallow.
+      const buf = Buffer.from(TSX_SOURCE);
+      const mCtx = makeCtx({ preview: true });
+      const result = await sourceCodeTransformer(
+        buf,
+        'test/app.ts',
+        makeStats(buf),
+        mCtx,
+      );
+      const text = allText(result.parts);
+
+      expect(text).toContain('<outline>');
+
+      // Top-level symbols present
+      expect(text).toContain('function MyComponent');
+
+      // Function-body members should NOT be present
+      expect(text).not.toContain('const [count, setCount]');
+      expect(text).not.toContain('const handleClick');
+      expect(text).not.toContain('function renderLabel()');
     });
   });
 });
