@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha069 (2026-04-23)
+
+### Bug Fixes
+
+* fix-windows-shell-startup (b2edc3b)
+
 ## 1.0.0-alpha068 (2026-04-23)
 
 ### Features
