@@ -6,7 +6,7 @@ import path from 'node:path';
 import { OscParser, wrapWithSentinel } from './osc-parser';
 import { SessionLogger } from './session-logger';
 import {
-  DEFAULT_TIMEOUT_MS,
+  DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
   DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS,
   DEFAULT_TIMEOUT_STDIN_MS,
   HEAD_LINES,
@@ -16,6 +16,9 @@ import {
   TAIL_LINES,
   DEFAULT_TERMINAL_COLS,
   DEFAULT_TERMINAL_ROWS,
+  DEFAULT_IDLE_MS,
+  AGGRESSIVE_IDLE_MS,
+  MAX_WAIT_UNTIL_TIMEOUT_MS,
   type DetectedShell,
   type PtySession,
   type SessionCommandRequest,
@@ -172,6 +175,10 @@ interface PendingCommand {
   rawOutputCapped: boolean;
   /** Serialized buffer text captured at the moment of a buffer-based pattern match. */
   bufferSnapshot?: string;
+  /** Idle-detection state (see `DEFAULT_IDLE_MS`). */
+  idleTimerHandle: NodeJS.Timeout | null;
+  /** Silence threshold in ms (0 disables idle detection for this command). */
+  idleMs: number;
 }
 
 // ─── SessionManager ──────────────────────────────────────────────
@@ -192,12 +199,22 @@ export class SessionManager {
    */
   onSessionStateChange: ((agentInstanceId: string) => void) | null = null;
 
+  /**
+   * Grace period (ms) to wait for OSC 133 integration detection before
+   * falling back to sentinel mode. Exposed as an override primarily so
+   * tests can shorten the window (default 5s is excessive when the test
+   * shell is known not to emit 133 markers cleanly).
+   */
+  private readonly detectTimeoutMs: number;
+
   constructor(
     shell: DetectedShell,
     getShellLogsDir?: (agentInstanceId: string) => string,
+    detectTimeoutMs: number = SHELL_INTEGRATION_DETECT_MS,
   ) {
     this.shell = shell;
     this.getShellLogsDir = getShellLogsDir ?? null;
+    this.detectTimeoutMs = detectTimeoutMs;
   }
 
   // ─── Session creation ────────────────────────────────────────
@@ -321,7 +338,9 @@ export class SessionManager {
     parser.on('sentinelDone', (id, exitCode) => {
       const pending = this.pendingCommands.get(id);
       if (pending) {
-        this.resolveCommand(id, exitCode);
+        // Sentinel is the fallback equivalent of OSC 133;D — a real
+        // command exit, not a pattern match.
+        this.resolveCommand(id, exitCode, 'exit');
       }
     });
 
@@ -346,7 +365,7 @@ export class SessionManager {
         parser.setMode('sentinel');
       }
       this.markReady(session);
-    }, SHELL_INTEGRATION_DETECT_MS);
+    }, this.detectTimeoutMs);
 
     // Source shell integration script
     this.sourceShellIntegration(session);
@@ -368,6 +387,7 @@ export class SessionManager {
         exitCode: null,
         sessionExited: true,
         timedOut: false,
+        resolvedBy: 'session_exited',
       };
     }
 
@@ -378,6 +398,7 @@ export class SessionManager {
         exitCode: session.exitCode,
         sessionExited: true,
         timedOut: false,
+        resolvedBy: 'session_exited',
       };
     }
 
@@ -392,20 +413,29 @@ export class SessionManager {
         exitCode: session.exitCode,
         sessionExited: true,
         timedOut: false,
+        resolvedBy: 'session_exited',
       };
     }
 
     const commandId = randomUUID().slice(0, 12);
 
-    // If there's already an in-flight command, resolve it early so it
-    // doesn't get orphaned when we overwrite the sessionCommandMap entry.
+    // If there's already an in-flight command, abandon it so it doesn't
+    // get orphaned when we overwrite the sessionCommandMap entry. From the
+    // abandoned command's perspective this counts as an abort — the new
+    // tool call is replacing it, not a time cap elapsing.
     const existingCommandId = this.sessionCommandMap.get(sessionId);
     if (existingCommandId && this.pendingCommands.has(existingCommandId)) {
-      this.resolveCommandWithTimeout(existingCommandId);
+      this.resolveCommandWithTimeout(existingCommandId, 'abort');
     }
 
     return new Promise<SessionCommandResult>((resolve) => {
       const mark = session.logger?.getMarkPosition() ?? 0;
+      const idleMs =
+        request.waitUntil?.idleMs !== undefined
+          ? request.waitUntil.idleMs
+          : request.waitUntil?.exited
+            ? AGGRESSIVE_IDLE_MS
+            : DEFAULT_IDLE_MS;
       const pending: PendingCommand = {
         resolve,
         sessionId,
@@ -416,6 +446,8 @@ export class SessionManager {
         waitUntil: request.waitUntil,
         rawOutput: '',
         rawOutputCapped: false,
+        idleTimerHandle: null,
+        idleMs,
       };
 
       this.pendingCommands.set(commandId, pending);
@@ -426,22 +458,25 @@ export class SessionManager {
       // If waitUntil was omitted entirely, use the shorter 20s default so dumb models
       // that forget the param don't leave the tool hanging for 2 minutes.
       const timeoutMs = request.waitUntil
-        ? (request.waitUntil.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+        ? Math.min(
+            request.waitUntil.timeoutMs ?? DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
+            MAX_WAIT_UNTIL_TIMEOUT_MS,
+          )
         : request.rawInput
           ? DEFAULT_TIMEOUT_STDIN_MS
           : DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS;
       pending.timeoutHandle = setTimeout(() => {
-        this.resolveCommandWithTimeout(commandId);
+        this.resolveCommandWithTimeout(commandId, 'timeout');
       }, timeoutMs);
 
       // Abort signal handling
       if (request.abortSignal) {
         if (request.abortSignal.aborted) {
-          this.resolveCommandWithTimeout(commandId);
+          this.resolveCommandWithTimeout(commandId, 'abort');
           return;
         }
         const onAbort = () => {
-          this.resolveCommandWithTimeout(commandId);
+          this.resolveCommandWithTimeout(commandId, 'abort');
         };
         request.abortSignal.addEventListener('abort', onAbort, { once: true });
         pending.abortHandler = () => {
@@ -522,8 +557,9 @@ export class SessionManager {
 
     const { agentInstanceId } = session;
 
-    // Resolve any pending commands
-    this.resolveAllPendingForSession(sessionId, 'Session killed.');
+    // Resolve any pending commands. A user/agent-initiated kill is
+    // semantically an abort, not a natural session exit.
+    this.resolveAllPendingForSession(sessionId, 'Session killed.', 'abort');
 
     // Kill the PTY process before marking exited (deactivateSession skips kill when exited=true)
     try {
@@ -545,14 +581,18 @@ export class SessionManager {
       (s) => s.agentInstanceId === agentInstanceId,
     );
     for (const s of sessions) {
-      this.resolveAllPendingForSession(s.id, 'Agent destroyed.');
+      this.resolveAllPendingForSession(s.id, 'Agent destroyed.', 'abort');
       this.removeSession(s);
     }
   }
 
   killAll(): void {
     for (const session of [...this.sessions.values()]) {
-      this.resolveAllPendingForSession(session.id, 'All sessions killed.');
+      this.resolveAllPendingForSession(
+        session.id,
+        'All sessions killed.',
+        'abort',
+      );
       this.removeSession(session);
     }
   }
@@ -616,10 +656,15 @@ export class SessionManager {
       exitCode,
       sessionExited: session?.exited ?? true,
       timedOut: false,
+      resolvedBy: 'exit',
     });
   }
 
-  private resolveCommand(commandId: string, exitCode: number | null): void {
+  private resolveCommand(
+    commandId: string,
+    exitCode: number | null,
+    reason: 'pattern' | 'exit' = 'pattern',
+  ): void {
     const pending = this.pendingCommands.get(commandId);
     if (!pending) return;
 
@@ -635,10 +680,14 @@ export class SessionManager {
       exitCode,
       sessionExited: session?.exited ?? true,
       timedOut: false,
+      resolvedBy: reason,
     });
   }
 
-  private resolveCommandWithTimeout(commandId: string): void {
+  private resolveCommandWithTimeout(
+    commandId: string,
+    reason: 'timeout' | 'abort',
+  ): void {
     const pending = this.pendingCommands.get(commandId);
     if (!pending) return;
 
@@ -653,11 +702,36 @@ export class SessionManager {
       output: finalOutput,
       exitCode: null,
       sessionExited: session?.exited ?? true,
-      timedOut: true,
+      timedOut: reason === 'timeout',
+      resolvedBy: reason,
     });
   }
 
-  private resolveAllPendingForSession(sessionId: string, reason: string): void {
+  private resolveCommandIdle(commandId: string): void {
+    const pending = this.pendingCommands.get(commandId);
+    if (!pending) return;
+
+    const finalOutput = this.collectOutput(pending);
+
+    this.cleanupPending(commandId);
+    this.sessionCommandMap.delete(pending.sessionId);
+
+    const session = this.sessions.get(pending.sessionId);
+    pending.resolve({
+      sessionId: pending.sessionId,
+      output: finalOutput,
+      exitCode: null,
+      sessionExited: session?.exited ?? true,
+      timedOut: false,
+      resolvedBy: 'idle',
+    });
+  }
+
+  private resolveAllPendingForSession(
+    sessionId: string,
+    reason: string,
+    resolvedBy: 'session_exited' | 'abort' = 'session_exited',
+  ): void {
     const session = this.sessions.get(sessionId);
     for (const [commandId, pending] of this.pendingCommands) {
       if (pending.sessionId === sessionId) {
@@ -668,6 +742,7 @@ export class SessionManager {
           exitCode: session?.exitCode ?? null,
           sessionExited: true,
           timedOut: false,
+          resolvedBy,
         });
       }
     }
@@ -702,6 +777,9 @@ export class SessionManager {
 
     if (pending.timeoutHandle) {
       clearTimeout(pending.timeoutHandle);
+    }
+    if (pending.idleTimerHandle) {
+      clearTimeout(pending.idleTimerHandle);
     }
     pending.abortHandler?.();
     this.pendingCommands.delete(commandId);
@@ -738,6 +816,25 @@ export class SessionManager {
       pending.rawOutput += data;
       if (Buffer.byteLength(pending.rawOutput, 'utf-8') > MAX_RAW_OUTPUT_BYTES)
         pending.rawOutputCapped = true;
+    }
+
+    // Idle detection: only arm after real command output has been emitted.
+    //
+    // `inUserOutput` is already true only when the parser has either seen
+    // OSC 133;C (marks the start of stdout on shells with integration) or
+    // is operating in sentinel mode (command body is running). Combined
+    // with a non-whitespace check on the data chunk, this is a strict
+    // "real output has been emitted" signal that is independent of prompt
+    // layout — unlike a grid-row count, it works for multi-line prompts,
+    // PowerShell, pasted multi-line commands, and any future prompt
+    // framework that renders differently.
+    //
+    // `idleMs === 0` disables idle detection entirely.
+    if (inUserOutput && pending.idleMs > 0 && /\S/.test(data)) {
+      if (pending.idleTimerHandle) clearTimeout(pending.idleTimerHandle);
+      pending.idleTimerHandle = setTimeout(() => {
+        this.resolveCommandIdle(pending.commandId);
+      }, pending.idleMs);
     }
 
     if (pending.waitUntil?.outputPattern) {

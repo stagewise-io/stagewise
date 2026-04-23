@@ -13,20 +13,68 @@ export interface DetectedShell {
 
 // ─── Output capping constants (unchanged) ─────────────────────────
 
-export const DEFAULT_TIMEOUT_MS = 120_000;
+/**
+ * Default hard-timeout (ms) **when the agent provides `waitUntil`**. In the
+ * snapshot model the tool should always return quickly with whatever the
+ * command has produced so far — the full session output is persisted to
+ * `shells/<id>.shell.log` and can be re-read on subsequent turns. 15s is
+ * enough for any single burst of output, after which the agent should
+ * follow up rather than continue blocking.
+ *
+ * See `DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS` for the default when `waitUntil`
+ * is omitted entirely.
+ */
+export const DEFAULT_WAIT_UNTIL_TIMEOUT_MS = 15_000;
 
 /**
- * Shorter timeout (ms) used when the model omits `waitUntil` entirely.
- * Long enough for ls, git status, pnpm install, most builds —
- * short enough to avoid a 2-minute hang on `pnpm dev`.
+ * Hard-timeout (ms) used when the agent omits `waitUntil` entirely.
+ * "Quick check" mode — must feel responsive.
  */
-export const DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS = 20_000;
+export const DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS = 10_000;
 
 /**
  * Shorter timeout (ms) for raw stdin input without explicit `waitUntil`.
  * Interactive prompts respond quickly; 5s avoids long hangs on menu selections.
  */
 export const DEFAULT_TIMEOUT_STDIN_MS = 5_000;
+
+/**
+ * Ceiling on `waitUntil.timeoutMs` values requested by the agent. Prevents
+ * accidentally reintroducing minute-long hangs when the model picks a
+ * generous timeout. Follow-up tool calls are cheap; a single 60s block is
+ * the worst acceptable outcome.
+ */
+export const MAX_WAIT_UNTIL_TIMEOUT_MS = 60_000;
+
+/**
+ * Default idle threshold (ms). Once the command has produced any output,
+ * N ms of silence resolves the tool call with `resolvedBy: 'idle'`.
+ * 5s is long enough that continuously-emitting tools (pnpm install,
+ * cargo build, spinners) never trigger it, but short enough to catch
+ * interactive prompts (npx create-next-app) within a reasonable window.
+ */
+export const DEFAULT_IDLE_MS = 5_000;
+
+/**
+ * More aggressive idle threshold used when the agent passes
+ * `waitUntil.exited: true`. The agent is explicitly signalling "I expect
+ * this to end on its own" — if it hasn't produced output in 3s we can
+ * safely assume it's stuck waiting for input or otherwise idle.
+ */
+export const AGGRESSIVE_IDLE_MS = 3_000;
+
+/**
+ * Why a command resolved. Used by the agent to decide follow-up actions:
+ * a pattern/exit means the command completed; idle usually means waiting
+ * for input; timeout means still running — re-read the log or retry.
+ */
+export type ResolutionReason =
+  | 'exit'
+  | 'pattern'
+  | 'idle'
+  | 'timeout'
+  | 'abort'
+  | 'session_exited';
 export const HEAD_LINES = 100;
 export const TAIL_LINES = 300;
 
@@ -101,6 +149,12 @@ export interface SessionCommandRequest {
     timeoutMs?: number;
     exited?: boolean;
     outputPattern?: string;
+    /**
+     * Silence threshold (ms) after the first output event. `0` disables
+     * idle detection entirely. Omit to use the default (see
+     * `DEFAULT_IDLE_MS` / `AGGRESSIVE_IDLE_MS`).
+     */
+    idleMs?: number;
   };
   abortSignal?: AbortSignal;
 }
@@ -111,4 +165,5 @@ export interface SessionCommandResult {
   exitCode: number | null;
   sessionExited: boolean;
   timedOut: boolean;
+  resolvedBy: ResolutionReason;
 }

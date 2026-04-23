@@ -157,6 +157,7 @@ export class ShellService extends DisposableService {
         exitCode: null,
         sessionExited: true,
         timedOut: false,
+        resolvedBy: 'session_exited',
       };
     }
 
@@ -208,6 +209,7 @@ export class ShellService extends DisposableService {
           exitCode: null,
           sessionExited: true,
           timedOut: false,
+          resolvedBy: 'session_exited',
         };
       }
     } else {

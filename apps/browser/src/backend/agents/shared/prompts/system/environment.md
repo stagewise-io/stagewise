@@ -150,12 +150,32 @@ return `Saved as ${fileName}`;
 
 Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session.
 
+**Snapshot model.** The tool returns within **15 seconds max**. It does NOT block until a command finishes — you get a snapshot of what the command produced so far. The full session output is persisted to `shells/<session_id>.shell.log` and can be re-read any time.
+
+**Prefer no `wait_until`.** The defaults (10 s hard cap, 5 s idle after first output) handle almost everything correctly — plain commands, installs, builds, git, tests, and interactive prompts. Idle detection fires when output stops, which is exactly how an interactive prompt is detected. Only override when you have a specific reason.
+
+**Common mistake:** Do NOT set `idle_ms: 0` defensively "to prevent premature exit." Idle detection is your primary signal that a command is waiting for input. Disabling it turns every interactive CLI into a long hang followed by `resolved_by: 'timeout'` — exactly the UX this tool is designed to prevent. The same applies to raising `timeout_ms` — longer waits do not help commands finish faster; they just block you.
+
 - **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
 - **Reuse sessions.** Creating a session is expensive (shell init delay). Reuse an existing session (`session_id`) whenever one is available — active sessions are listed in `<shell-sessions>` in the env-snapshot. Only create a new session when no suitable one exists or when you need parallel execution (e.g. long-running dev server in one session, short commands in another).
-- **`command`:** Writes text + Enter to the shell. Registers output capture — the tool waits and returns output.
-- **`wait_until`:** Controls when the tool returns. `timeout_ms` = time cap, `output_pattern` = regex match on output, `exited` = wait for process exit. Omitting `wait_until` defaults to **20 s**. When `wait_until` is provided without an explicit `timeout_ms`, the cap is **120 s**.
-- **Timeout ≠ error.** `timed_out: true` returns partial output; session stays alive. Reuse `session_id` to continue.
-- **`stdin`:** Write raw bytes to the PTY. Use for interactive input: control sequences, answering prompts, or interrupting processes. Requires `session_id`. Mutually exclusive with `command` and `kill`. Supports `wait_until` for output capture (default timeout: **5 s** without `wait_until`). Common sequences:
+- **`command`:** Writes text + Enter to the shell.
+- **`wait_until`:** Optional; controls when the tool returns.
+  - `timeout_ms` — hard cap (max 60 s, default 15 s with `wait_until`, 10 s without). **Leave at default.** Raising this does not make commands finish sooner — follow-up calls are cheap and the full output is preserved in `shells/<session_id>.shell.log`.
+  - `output_pattern` — regex on output; resolves early when matched. Safe to use.
+  - `idle_ms` — silence threshold after the first output event. Default **5 s** (3 s with `exited: true`). **`0` disables idle — avoid.** Only correct when a command has proven long silent phases *during active work* (not while waiting for input), e.g. a dev server that pauses between log lines. For interactive prompts: rely on default idle — it's how you detect the prompt.
+  - `exited` — minor hint that the command is expected to end on its own. Lowers idle threshold from 5 s to 3 s. Does **not** imply other parameter overrides — bare `wait_until: { exited: true }` is complete on its own.
+- **`resolved_by`** (returned) tells you *why* the tool returned:
+  - `exit` — command finished. `exit_code` is set.
+  - `pattern` — `output_pattern` matched. Command still running.
+  - `idle` — no output for N ms. Usually waiting for input.
+  - `timeout` — hard timeout. Command still running.
+  - `abort` — cancelled. `session_exited` — shell itself died.
+- **Follow-up after `idle` / `pattern` / `timeout`** (command still running):
+  - Send stdin to the same `session_id` (e.g. `y\r`, arrow keys) to answer prompts.
+  - `read` `shells/<session_id>.shell.log` to see the latest output.
+  - Call with empty `command` and the `session_id` to poll for more output.
+  - `kill: true` to abort.
+- **`stdin`:** Write raw bytes to the PTY. Use for interactive input: control sequences, answering prompts, or interrupting processes. Requires `session_id`. Mutually exclusive with `command` and `kill`. Default timeout without `wait_until`: **5 s**. Common sequences:
   - `\x03` — Ctrl+C (interrupt running process)
   - `\x1b[A` / `\x1b[B` / `\x1b[C` / `\x1b[D` — Arrow keys (Up/Down/Right/Left)
   - `\x1b` — Escape
@@ -164,20 +184,25 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
   - `y\r` — Type "y" then Enter
 - **Terminate:** `kill: true` with `session_id` to hard-kill a session.
 - Sessions auto-close after 10 min idle or on agent suspension.
-- Result includes `session_id`, `output`, `exit_code` (`null` if still running), `session_exited`, `timed_out`.
 - OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
 
 ```jsonc
-// Start a long-running dev server (new session — needs its own PTY)
-{ "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000 } }
-// Reuse an existing idle session for a quick command (don't create a new one)
+// Default case — most commands need no wait_until at all.
+{ "command": "pnpm install", "cwd": "w1" }
+// Interactive CLI — defaults work. Idle fires at ~5s when the prompt appears.
+// resolved_by will be 'idle'; send stdin to answer.
+{ "command": "npx create-next-app test", "cwd": "w1" }
+{ "session_id": "abc123", "stdin": "\r" }
+// Reuse an existing idle session for a quick command.
 { "session_id": "f8a3b1c2", "command": "curl localhost:3000/health" }
-// Interrupt a running dev server
-{ "session_id": "abc12345", "stdin": "\x03" }
-// Answer "yes" to an interactive prompt
-{ "session_id": "abc12345", "stdin": "y\r" }
-// Select menu option and wait for next prompt
-{ "session_id": "abc12345", "stdin": "\x1b[B\r", "wait_until": { "output_pattern": "linter|Which", "timeout_ms": 5000 } }
+// Poll an already-running command for more output without sending input.
+{ "session_id": "abc123", "command": "" }
+// Interrupt a running process.
+{ "session_id": "abc123", "stdin": "\x03" }
+// Edge case: dev server with genuinely long silent startup phases.
+// output_pattern is the correctness signal; idle_ms=0 because the server
+// legitimately pauses between log lines during startup.
+{ "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000, "idle_ms": 0 } }
 ```
 
 ### 3. Browser Access (CDP)
