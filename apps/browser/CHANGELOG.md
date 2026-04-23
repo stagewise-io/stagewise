@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-alpha070 (2026-04-23)
+
+### Features
+
+* improve responsiveness of shell tool execution (841c086)
+* enhance TSX function-body extraction for read previews (6cd383a)
+* add index on diff ops, add optimistic diff accepting/ rejecting (2037295)
+* add AST-previews to file-read-pipeline for files w/ src code (0f2b246)
+
+### Bug Fixes
+
+* overhaul shell session lifecycle and streaming (ad4fd91)
+
 ## 1.0.0-alpha069 (2026-04-23)
 
 ### Bug Fixes
