@@ -4,7 +4,7 @@ import type { KartonService } from '@/services/karton';
 import { detectShell } from './detect-shell';
 import { resolveShellEnv } from './resolve-shell-env';
 import { sanitizeEnv } from './sanitize-env';
-import { SessionManager, stripAnsi } from './session-manager';
+import { SessionManager } from './session-manager';
 import { getAgentShellLogsDir } from '@/utils/paths';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -26,7 +26,17 @@ export class ShellService extends DisposableService {
   private readonly preDetectedShell: DetectedShell | null;
   private readonly preResolvedEnv: Record<string, string> | null;
 
-  private readonly outputBuffers = new Map<string, string[]>();
+  /**
+   * Per-tool-call streaming bookkeeping. Each entry records which session
+   * the tool call is streaming from and whether new output has arrived
+   * since the last flush. The UI snapshot is computed on-demand by
+   * reading the session's current grid state — we do not accumulate raw
+   * chunks here.
+   */
+  private readonly outputBuffers = new Map<
+    string,
+    { sessionId: string; dirty: boolean }
+  >();
   private readonly outputFlushTimers = new Map<string, NodeJS.Timeout>();
   private readonly outputMaxIntervalTimers = new Map<string, NodeJS.Timeout>();
 
@@ -35,7 +45,15 @@ export class ShellService extends DisposableService {
 
   private static readonly FLUSH_DEBOUNCE_MS = 100;
   private static readonly FLUSH_MAX_INTERVAL_MS = 300;
-  private static readonly MAX_STREAMING_BYTES = 51_200;
+  /**
+   * Per-flush cap for the live UI snapshot. Grid serialization is already
+   * bounded by `STREAMING_MAX_ROWS` (~24KB theoretical max at 120 cols),
+   * but 16KB is a snug safety rail that keeps Karton IPC payloads small
+   * without truncating realistic live previews. The final command output
+   * is unaffected — it uses the head+tail capped capture on a separate
+   * code path.
+   */
+  private static readonly MAX_STREAMING_BYTES = 16_384;
   private static readonly MANIFEST_THROTTLE_MS = 500;
 
   constructor(
@@ -144,14 +162,21 @@ export class ShellService extends DisposableService {
 
     const env = sanitizeEnv(this.resolvedEnv, this.shell.type);
 
-    // Build a streaming callback targeting the current toolCallId
-    const makeOnData = (targetToolCallId: string) => {
-      return (_sid: string, chunk: string) => {
+    // Build a streaming callback targeting the current toolCallId.
+    // We no longer accumulate chunks — we just mark the tool call "dirty"
+    // and let the flush read the current grid snapshot from the session.
+    const makeOnData = (targetToolCallId: string, targetSessionId: string) => {
+      return (_sid: string, _chunk: string) => {
         if (!this.kartonService) return;
-        if (!this.outputBuffers.has(targetToolCallId)) {
-          this.outputBuffers.set(targetToolCallId, []);
+        const entry = this.outputBuffers.get(targetToolCallId);
+        if (entry) {
+          entry.dirty = true;
+        } else {
+          this.outputBuffers.set(targetToolCallId, {
+            sessionId: targetSessionId,
+            dirty: true,
+          });
         }
-        this.outputBuffers.get(targetToolCallId)!.push(stripAnsi(chunk));
         this.scheduleFlush(agentInstanceId, targetToolCallId);
         this.scheduleShellManifestPush(agentInstanceId);
       };
@@ -161,11 +186,17 @@ export class ShellService extends DisposableService {
     let sessionId = request.sessionId;
     if (!sessionId) {
       try {
+        // Create with a no-op onData; wire the real callback immediately
+        // after so we can close over the sessionId for snapshot reads.
         sessionId = this.sessionManager.createSession(
           agentInstanceId,
           request.cwd,
           env,
-          makeOnData(toolCallId),
+          () => {},
+        );
+        this.sessionManager.setOnData(
+          sessionId,
+          makeOnData(toolCallId, sessionId),
         );
       } catch (err) {
         return {
@@ -181,7 +212,10 @@ export class ShellService extends DisposableService {
       }
     } else {
       // Re-target streaming output to the current tool call
-      this.sessionManager.setOnData(sessionId, makeOnData(toolCallId));
+      this.sessionManager.setOnData(
+        sessionId,
+        makeOnData(toolCallId, sessionId),
+      );
     }
 
     // Push updated session manifest to Karton state on new session creation
@@ -360,14 +394,31 @@ export class ShellService extends DisposableService {
       this.outputMaxIntervalTimers.delete(toolCallId);
     }
 
-    const outputs = this.outputBuffers.get(toolCallId);
-    if (!outputs?.length) return;
+    const entry = this.outputBuffers.get(toolCallId);
+    if (!entry?.dirty) return;
 
-    let snapshot: string[];
-    const joined = outputs.join('');
-    if (joined.length > ShellService.MAX_STREAMING_BYTES)
-      snapshot = [joined.slice(-ShellService.MAX_STREAMING_BYTES)];
-    else snapshot = [...outputs];
+    // Read the current grid snapshot from the session. If the command has
+    // already resolved (pattern match, timeout, exit) the snapshot will be
+    // null and we clear any stale Karton entry.
+    const snapshot = this.sessionManager?.getLiveOutputSnapshot(
+      entry.sessionId,
+    );
+
+    if (snapshot == null) {
+      this.kartonService.setState((draft) => {
+        const tb = draft.toolbox[agentId];
+        if (tb?.pendingShellOutputs?.[toolCallId]) {
+          delete tb.pendingShellOutputs[toolCallId];
+        }
+      });
+      entry.dirty = false;
+      return;
+    }
+
+    const capped =
+      snapshot.length > ShellService.MAX_STREAMING_BYTES
+        ? snapshot.slice(-ShellService.MAX_STREAMING_BYTES)
+        : snapshot;
 
     this.kartonService.setState((draft) => {
       if (!draft.toolbox[agentId]) {
@@ -378,13 +429,12 @@ export class ShellService extends DisposableService {
           pendingUserQuestion: null,
         };
       }
-
       if (!draft.toolbox[agentId].pendingShellOutputs) {
         draft.toolbox[agentId].pendingShellOutputs = {};
       }
-
-      draft.toolbox[agentId].pendingShellOutputs![toolCallId] = snapshot;
+      draft.toolbox[agentId].pendingShellOutputs![toolCallId] = [capped];
     });
+    entry.dirty = false;
   }
 
   protected onTeardown(): Promise<void> | void {

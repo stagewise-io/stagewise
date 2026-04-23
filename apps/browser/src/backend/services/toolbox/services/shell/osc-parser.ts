@@ -86,13 +86,25 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
 
   /** Accumulated output between 133;C and 133;D */
   private commandOutputBuf = '';
-  private inCommandOutput = false;
+  private _inCommandOutput = false;
 
   /** Whether at least one OSC 133 sequence has been seen */
   private oscDetected = false;
 
   get currentMode(): ParserMode {
     return this.mode;
+  }
+
+  /**
+   * True when the parser has seen 133;C but not yet 133;D — i.e. the
+   * PTY is currently emitting real command output (not prompt text,
+   * not command echo, not prompt redraws).
+   *
+   * Used by the session manager to gate UI streaming so only actual
+   * command output reaches the user, not prompt/echo artifacts.
+   */
+  get inCommandOutput(): boolean {
+    return this._inCommandOutput;
   }
 
   /**
@@ -192,7 +204,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
           this.emit('promptEnd');
           break;
         case 'C':
-          this.inCommandOutput = true;
+          this._inCommandOutput = true;
           this.commandOutputBuf = '';
           this.emit('commandStart');
           break;
@@ -200,7 +212,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
           const exitCode =
             codeStr != null ? Number.parseInt(codeStr, 10) : null;
           const output = this.commandOutputBuf;
-          this.inCommandOutput = false;
+          this._inCommandOutput = false;
           this.commandOutputBuf = '';
           this.emit('commandDone', {
             output: stripOsc133(output),
@@ -222,7 +234,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
   }
 
   private handleTextOutput(text: string): void {
-    if (this.inCommandOutput) {
+    if (this._inCommandOutput) {
       this.commandOutputBuf += text;
     }
     this.emit('output', text);
@@ -263,7 +275,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     this.escBuffer = '';
     this.sentinelBuffer = '';
     this.commandOutputBuf = '';
-    this.inCommandOutput = false;
+    this._inCommandOutput = false;
     this.removeAllListeners();
   }
 }

@@ -12,7 +12,10 @@ import {
   HEAD_LINES,
   MAX_SESSIONS_PER_AGENT,
   SHELL_INTEGRATION_DETECT_MS,
+  STREAMING_MAX_ROWS,
   TAIL_LINES,
+  DEFAULT_TERMINAL_COLS,
+  DEFAULT_TERMINAL_ROWS,
   type DetectedShell,
   type PtySession,
   type SessionCommandRequest,
@@ -219,8 +222,8 @@ export class SessionManager {
     const spawnArgs = this.getSpawnArgs();
     const ptyProcess = pty.spawn(this.shell.path, spawnArgs, {
       name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
+      cols: DEFAULT_TERMINAL_COLS,
+      rows: DEFAULT_TERMINAL_ROWS,
       cwd,
       env: { ...env, TERM: 'xterm-256color' },
     });
@@ -250,8 +253,6 @@ export class SessionManager {
               this.getShellLogsDir(agentInstanceId),
               `${sessionId}.shell.log`,
             ),
-            80,
-            24,
           )
         : null,
       initScriptPath: null,
@@ -271,13 +272,12 @@ export class SessionManager {
     // sentinelDone) that read the buffer via collectOutput.
     ptyProcess.onData((data: string) => {
       // FIX: always feed the headless xterm emulator + logger so markLine
-      // and serializeFrom stay accurate even during session startup. Only
-      // gate the UI-facing streaming callback (session.onData).
+      // and serializeFrom stay accurate even during session startup.
+      // UI streaming is handled via the parser's `output` event below,
+      // which fires only for text between OSC 133;C and 133;D (i.e. real
+      // command output — no prompt redraws, no command echo).
       session.logger?.appendRaw(Buffer.from(data, 'utf-8'));
       session.logger?.append(stripAnsi(data));
-      if (session.ready) {
-        session.onData?.(sessionId, data);
-      }
       parser.write(data);
     });
 
@@ -288,30 +288,19 @@ export class SessionManager {
 
     // Wire parser events
     parser.on('integrationDetected', () => {
-      // FIX: integrationDetected alone does NOT mean the shell is ready.
-      // The sourcing command (`. /tmp/sw-*.sh`) is still "in flight" from
-      // bash's perspective and will emit its own 133;D right after the
-      // first 133;A. Flagging ready here causes that D to resolve the
-      // first user command with empty output. Mark ready on the first
-      // commandDone instead; keep the detect timer armed as a safety
-      // fallback.
+      // The bash/zsh integration scripts guard `133;D` emission on
+      // `__stagewise_command_executed`, which is 0 at init, so no
+      // "sourcing D" ever arrives. Integration detection means the shell
+      // is at its first prompt — ready to accept user commands.
       session.shellIntegrationActive = true;
+      this.markReady(session);
+      if (session.detectTimerHandle) {
+        clearTimeout(session.detectTimerHandle);
+        session.detectTimerHandle = null;
+      }
     });
 
-    // Swallow the first commandDone after integration — it's the shell
-    // integration script's own completion, not a user command.
-    let sourcingComplete = false;
-
     parser.on('commandDone', (event) => {
-      if (session.shellIntegrationActive && !sourcingComplete) {
-        sourcingComplete = true;
-        this.markReady(session);
-        if (session.detectTimerHandle) {
-          clearTimeout(session.detectTimerHandle);
-          session.detectTimerHandle = null;
-        }
-        return;
-      }
       this.resolveCurrentCommand(sessionId, event.exitCode);
     });
 
@@ -337,6 +326,16 @@ export class SessionManager {
     });
 
     parser.on('output', (data) => {
+      // Stream to UI only when inside a real command's output region.
+      // In OSC mode, this is between 133;C and 133;D. In sentinel mode,
+      // all output is user-command output (prompt/echo aren't framed
+      // but there's nothing else we can do). In detecting mode, suppress.
+      if (
+        session.ready &&
+        (parser.inCommandOutput || parser.currentMode === 'sentinel')
+      ) {
+        session.onData?.(sessionId, data);
+      }
       this.appendToCommandOutput(sessionId, data);
     });
 
@@ -484,6 +483,35 @@ export class SessionManager {
 
       session.lastActivityAt = Date.now();
     });
+  }
+
+  // ─── Live snapshot (UI streaming) ───────────────────────────────
+
+  /**
+   * Returns the currently-rendered grid text for the in-flight command on
+   * the given session, from the command's mark line through the current
+   * cursor. Used by the UI streaming path to ship fully-rendered output
+   * (spinners, redraws, progress bars applied) instead of raw PTY bytes.
+   *
+   * Returns `null` when there is no pending command on the session, the
+   * session is unknown, or the logger is unavailable. In those cases the
+   * caller should clear any stale streaming state for the tool call.
+   *
+   * When a TUI is active (alternate buffer — vim, less, htop), the
+   * alternate-buffer viewport is serialized instead of the normal buffer.
+   */
+  getLiveOutputSnapshot(sessionId: string): string | null {
+    const commandId = this.sessionCommandMap.get(sessionId);
+    if (!commandId) return null;
+    const pending = this.pendingCommands.get(commandId);
+    if (!pending) return null;
+    const session = this.sessions.get(sessionId);
+    const logger = session?.logger;
+    if (!logger) return null;
+    const lines = logger.isAlternateBufferActive()
+      ? logger.serializeAlternate()
+      : logger.serializeTailFrom(pending.markLine, STREAMING_MAX_ROWS);
+    return lines.join('\n');
   }
 
   // ─── Session management ──────────────────────────────────────
@@ -688,16 +716,31 @@ export class SessionManager {
     const pending = this.pendingCommands.get(commandId);
     if (!pending) return;
 
-    // Accumulate raw output for pattern matching only (capped at 1 MB).
-    if (!pending.rawOutputCapped) {
+    const session = this.sessions.get(sessionId);
+
+    // Gate for the no-logger fallback path only: accumulate raw output
+    // (used by the regex matcher when no xterm is attached) exclusively
+    // while inside real command output. This prevents prompt text and
+    // the echoed command line from polluting `pending.rawOutput` and
+    // triggering spurious matches.
+    //
+    // NOTE: we intentionally do NOT gate the logger-based matcher below.
+    // On CI and minimal shells the parser may stay in `detecting` mode
+    // for the entire command (OSC 133 never arrives), and gating there
+    // would make patterns never resolve. The logger-based matcher scopes
+    // to `pending.markLine` and skips the first serialized line (the
+    // prompt + echoed command) to avoid echo-leak matches.
+    const inUserOutput =
+      session?.parser.inCommandOutput ||
+      session?.parser.currentMode === 'sentinel';
+
+    if (inUserOutput && !pending.rawOutputCapped) {
       pending.rawOutput += data;
       if (Buffer.byteLength(pending.rawOutput, 'utf-8') > MAX_RAW_OUTPUT_BYTES)
         pending.rawOutputCapped = true;
     }
 
-    // Check output pattern if configured
     if (pending.waitUntil?.outputPattern) {
-      const session = this.sessions.get(sessionId);
       const logger = session?.logger;
 
       try {
@@ -707,14 +750,22 @@ export class SessionManager {
           // Buffer-based matching: test against visible terminal state.
           // The buffer is already up-to-date (writeSync in appendRaw
           // runs before the parser emits the output event that calls us).
+          //
+          // Skip the first serialized line because it typically contains
+          // the prompt and the echoed command itself — matching against
+          // it would resolve prematurely for patterns like `create` in
+          // `npx create-video@latest`. Command output always starts at
+          // line index 1 of the serialized range.
           const lines = logger.serializeFrom(pending.markLine);
-          const visibleText = lines.join('\n');
-          if (re.test(visibleText)) {
-            pending.bufferSnapshot = visibleText;
+          const matchText = lines.slice(1).join('\n');
+          if (matchText && re.test(matchText)) {
+            pending.bufferSnapshot = lines.join('\n');
             this.resolveCommand(pending.commandId, null);
           }
-        } else if (!pending.rawOutputCapped) {
+        } else if (inUserOutput && !pending.rawOutputCapped) {
           // Fallback: no logger — match against raw ANSI stream.
+          // Gated on inUserOutput because `rawOutput` can only grow
+          // there (see above).
           if (re.test(pending.rawOutput))
             this.resolveCommand(pending.commandId, null);
         }
@@ -830,7 +881,7 @@ export class SessionManager {
         // safe without additional escaping.
         const shellPath = toMsysPath(nativeTempPath);
         session.pty.write(`. '${shellPath}'\r`);
-      } catch {
+      } catch (_err) {
         // Temp file write failed — fall back to eval through the line editor.
         session.pty.write(`eval $'${escapeForShell(script)}'\r`);
       }
