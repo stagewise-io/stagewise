@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { OscParser, wrapWithSentinel } from './osc-parser';
 import { SessionLogger } from './session-logger';
@@ -818,12 +819,17 @@ export class SessionManager {
       // Write to a temp file and dot-source it. This avoids ZLE echoing
       // the entire script char-by-char (which can exceed the detection
       // timeout with rich prompt frameworks like starship/p10k).
-      const tempPath = `/tmp/sw-${session.id}.sh`;
+      const nativeTempPath = path.join(tmpdir(), `sw-${session.id}.sh`);
       try {
-        fs.writeFileSync(tempPath, script, { mode: 0o600 });
-        session.initScriptPath = tempPath;
+        fs.writeFileSync(nativeTempPath, script, { mode: 0o600 });
+        session.initScriptPath = nativeTempPath;
         // Dot-source is POSIX (cannot be aliased). Cleanup handled by deactivateSession.
-        session.pty.write(`. ${tempPath}\r`);
+        // Single-quote to survive paths containing spaces (e.g. Windows
+        // usernames with spaces → `/c/Users/Some Name/...`). Node's
+        // `os.tmpdir()` output never contains single quotes, so wrapping is
+        // safe without additional escaping.
+        const shellPath = toMsysPath(nativeTempPath);
+        session.pty.write(`. '${shellPath}'\r`);
       } catch {
         // Temp file write failed — fall back to eval through the line editor.
         session.pty.write(`eval $'${escapeForShell(script)}'\r`);
@@ -841,6 +847,9 @@ export class SessionManager {
   private getSpawnArgs(): string[] {
     if (this.shell.type === 'powershell') {
       return ['-NoExit', '-Command', POWERSHELL_INTEGRATION];
+    }
+    if (process.platform === 'win32' && this.shell.type === 'bash') {
+      return ['--login', '-i'];
     }
     return [];
   }
@@ -866,4 +875,19 @@ function escapeForShell(s: string): string {
   // must be escaped; \n becomes a real newline inside $'...'.
   // Dollar signs and backticks are literal in $'...' — no escaping needed.
   return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+}
+
+/**
+ * Convert a native Windows path to an MSYS/Git Bash compatible path.
+ * e.g. `C:\Users\X\AppData\Local\Temp` → `/c/Users/X/AppData/Local/Temp`
+ *
+ * On non-Windows platforms, returns the path unchanged.
+ */
+function toMsysPath(nativePath: string): string {
+  if (process.platform !== 'win32') return nativePath;
+  const match = nativePath.match(/^([A-Za-z]):[/\\](.*)/);
+  if (!match) return nativePath;
+  const driveLetter = match[1].toLowerCase();
+  const rest = match[2].replace(/\\/g, '/');
+  return `/${driveLetter}/${rest}`;
 }

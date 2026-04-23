@@ -68,6 +68,43 @@ describe('sanitizeEnv', () => {
     expect(env.SOME_NORMAL_VAR).toBe('hello');
   });
 
+  describe('windows locale overrides', () => {
+    let originalPlatform: NodeJS.Platform;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      // Clear inherited host locale so the whitelist doesn't pass them
+      // through from process.env and mask the Windows-specific logic.
+      delete process.env.LC_ALL;
+      delete process.env.LC_CTYPE;
+      delete process.env.LANG;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('applies C.UTF-8 locale for bash', () => {
+      const env = sanitizeEnv(undefined, 'bash');
+      expect(env.LC_ALL).toBe('C.UTF-8');
+      expect(env.LC_CTYPE).toBe('C.UTF-8');
+      expect(env.LANG).toBe('C.UTF-8');
+    });
+
+    it('skips C.UTF-8 locale for powershell', () => {
+      const env = sanitizeEnv(undefined, 'powershell');
+      expect(env.LC_ALL).toBeUndefined();
+      expect(env.LC_CTYPE).toBeUndefined();
+      expect(env.LANG).toBeUndefined();
+    });
+
+    it('applies C.UTF-8 locale when shell type is unknown (conservative default)', () => {
+      const env = sanitizeEnv();
+      expect(env.LC_ALL).toBe('C.UTF-8');
+    });
+  });
+
   it('uses resolvedEnv as base when provided', () => {
     process.env.FROM_PROCESS = 'process';
 
