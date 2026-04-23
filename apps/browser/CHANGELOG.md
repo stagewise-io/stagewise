@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha068 (2026-04-23)
+
+### Features
+
+* fix diff-history performance issues by caching and batching sqlite queries (85ff9d8)
+
+### Bug Fixes
+
+* instruct agents to reuse open shell sessions (f1aeb93)
+
 ## 1.0.0-alpha067 (2026-04-22)
 
 ### Features
