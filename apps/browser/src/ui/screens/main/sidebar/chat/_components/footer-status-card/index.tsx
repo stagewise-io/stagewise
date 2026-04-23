@@ -1,4 +1,11 @@
-import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
+import {
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import {
   useKartonState,
   useKartonProcedure,
@@ -19,6 +26,7 @@ import {
   type StatusCardSection,
   type FormattedFileDiff,
   StatusCardComponent,
+  getHunkIds,
 } from './shared';
 import { FileDiffSection, formatFileDiff } from './file-diff-section';
 import { MessageQueueSection } from './message-queue-section';
@@ -368,6 +376,37 @@ export function StatusCard() {
     return edits;
   }, [diffSummary]);
 
+  // --- Optimistic accept/reject ---
+  const [optimisticHunkIds, setOptimisticHunkIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  // Filter out diffs whose hunks have all been optimistically acted upon
+  const effectivePendingDiffs = useMemo(() => {
+    if (optimisticHunkIds.size === 0) return formattedPendingDiffs;
+    return formattedPendingDiffs.filter(
+      (diff) => !getHunkIds(diff).every((id) => optimisticHunkIds.has(id)),
+    );
+  }, [formattedPendingDiffs, optimisticHunkIds]);
+
+  // Reconcile: once the server state no longer contains any of our
+  // optimistic IDs, clear them so we stop filtering.
+  useLayoutEffect(() => {
+    if (optimisticHunkIds.size === 0) return;
+    const serverHunkIds = new Set(
+      formattedPendingDiffs.flatMap((d) => getHunkIds(d)),
+    );
+    const allConfirmed = Array.from(optimisticHunkIds).every(
+      (id) => !serverHunkIds.has(id),
+    );
+    if (allConfirmed) setOptimisticHunkIds(new Set());
+  }, [formattedPendingDiffs, optimisticHunkIds]);
+
+  // Clear optimistic state on agent switch
+  useEffect(() => {
+    setOptimisticHunkIds(new Set());
+  }, [openAgentId]);
+
   // Build workspace-md sections — one per mount
   const workspaceMdSections = useMemo(() => {
     const sections: StatusCardSection[] = [];
@@ -599,12 +638,38 @@ export function StatusCard() {
     for (const section of logSections) result.push(section);
 
     const fileDiffSection = FileDiffSection({
-      pendingDiffs: formattedPendingDiffs,
+      pendingDiffs: effectivePendingDiffs,
       diffSummary: formattedDiffSummary,
       resolvedMounts,
       activeMountPaths,
-      onRejectAll: (hunkIds: string[]) => void rejectAllPendingEdits(hunkIds),
-      onAcceptAll: (hunkIds: string[]) => void acceptAllPendingEdits(hunkIds),
+      onRejectAll: (hunkIds: string[]) => {
+        setOptimisticHunkIds((prev) => {
+          const next = new Set(prev);
+          for (const id of hunkIds) next.add(id);
+          return next;
+        });
+        rejectAllPendingEdits(hunkIds).catch(() => {
+          setOptimisticHunkIds((prev) => {
+            const next = new Set(prev);
+            for (const id of hunkIds) next.delete(id);
+            return next;
+          });
+        });
+      },
+      onAcceptAll: (hunkIds: string[]) => {
+        setOptimisticHunkIds((prev) => {
+          const next = new Set(prev);
+          for (const id of hunkIds) next.add(id);
+          return next;
+        });
+        acceptAllPendingEdits(hunkIds).catch(() => {
+          setOptimisticHunkIds((prev) => {
+            const next = new Set(prev);
+            for (const id of hunkIds) next.delete(id);
+            return next;
+          });
+        });
+      },
       onOpenDiffReview: openDiffReviewPage,
     });
     if (fileDiffSection) result.push(fileDiffSection);
@@ -621,7 +686,7 @@ export function StatusCard() {
     messageQueue,
     deleteQueuedMessage,
     flushQueue,
-    formattedPendingDiffs,
+    effectivePendingDiffs,
     formattedDiffSummary,
     resolvedMounts,
     activeMountPaths,
