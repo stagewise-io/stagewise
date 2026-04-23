@@ -491,6 +491,10 @@ export abstract class BaseAgent<
             hour12: true,
           },
         )}`;
+      // Preserve the user's manual-title lock across resumes. Without this
+      // hydration, updateTitle() would later see the flag as unset and
+      // auto-regenerate over a user-set title.
+      draft.titleLockedByUser = initialState?.titleLockedByUser;
       draft.history = initialState?.history ?? [];
       draft.queuedMessages = initialState?.queuedMessages ?? [];
       draft.activeModelId =
@@ -938,6 +942,17 @@ export abstract class BaseAgent<
     return;
   }
 
+  public async setTitle(newTitle: string): Promise<void> {
+    this.logger.debug(
+      `[BaseAgent:${this.instanceId}] User set title: ${newTitle}`,
+    );
+    this.state.set((draft) => {
+      draft.title = newTitle;
+      draft.titleLockedByUser = true;
+    });
+    await this.saveState();
+  }
+
   /**
    * =======================================================
    * EXTENDABLE METHODS (CONFIGURABLE BEHAVIOR BY THE INHERITING CLASS)
@@ -1344,6 +1359,11 @@ export abstract class BaseAgent<
         return;
       }
 
+      // Skip if the user has manually set a title
+      if (this.state.get().titleLockedByUser) {
+        return;
+      }
+
       // We only update whenever the last message is a user message (prevent repeated title updates when the assistant is running in loops)
       const lastMessage =
         this.state.get().history[this.state.get().history.length - 1];
@@ -1367,6 +1387,12 @@ export abstract class BaseAgent<
       );
 
       const newTitle = await this.generateTitle(this.state.get().history);
+
+      // Re-check: user may have manually set a title while generation was in-flight
+      if (this.state.get().titleLockedByUser) {
+        return;
+      }
+
       this.logger.debug(
         `[BaseAgent:${this.instanceId}] New title generated: ${newTitle}`,
       );

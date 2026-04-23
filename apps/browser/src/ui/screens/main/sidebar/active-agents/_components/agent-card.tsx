@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { cn } from '@ui/utils';
 import {
   Tooltip,
@@ -9,6 +9,7 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import { IconSleepingTimeOutline18 } from 'nucleo-ui-outline-18';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
+import { useInlineTitleEdit } from './use-inline-title-edit';
 import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en';
 
@@ -29,6 +30,7 @@ export interface AgentCardProps {
   onClick: (id: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, newTitle: string) => void;
 }
 
 export function AgentCardSkeleton() {
@@ -55,16 +57,35 @@ export const AgentCard = memo(
     onClick,
     onArchive,
     onDelete,
+    onRename,
   }: AgentCardProps) {
     const subtitle = hasError ? 'Error' : activityText;
     const [deleteOpen, setDeleteOpen] = useState(false);
+
+    const handleCommitRename = useCallback(
+      (newTitle: string) => onRename(id, newTitle),
+      [id, onRename],
+    );
+    const {
+      isEditing,
+      titleRef,
+      displayTitle,
+      startEditing,
+      commitEdit,
+      cancelEdit,
+    } = useInlineTitleEdit({ title, onCommit: handleCommitRename });
 
     return (
       <div
         role="button"
         tabIndex={0}
         data-agent-id={id}
+        aria-keyshortcuts="F2"
         onClick={() => onClick(id)}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (!isEditing) startEditing();
+        }}
         onKeyDown={(e) => {
           // Only handle keyboard interaction when the card itself is focused.
           // Otherwise, nested buttons (archive/delete) would also trigger this.
@@ -73,28 +94,76 @@ export const AgentCard = memo(
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onClick(id);
+          } else if (e.key === 'F2' && !isEditing) {
+            // F2 is the standard rename shortcut across Finder/Explorer/VS Code.
+            e.preventDefault();
+            startEditing();
           }
         }}
         className={cn(
-          'group/card relative flex min-w-0 shrink-0 cursor-pointer flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
-          isActive && 'bg-surface-2 ring-2 ring-derived-subtle ring-inset',
+          'group/card relative flex min-w-0 shrink-0 flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
+          isActive
+            ? 'cursor-default bg-surface-2 ring-2 ring-derived-subtle ring-inset'
+            : 'cursor-pointer',
           hasUnseen && 'animate-ring-pulse-primary',
         )}
       >
-        <Tooltip>
-          <TooltipTrigger delay={500}>
-            <button
-              type="button"
-              tabIndex={-1}
-              className="block w-full overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+        {/* Title row */}
+        <div className="flex min-w-0 items-center gap-1">
+          {isEditing ? (
+            <span
+              ref={titleRef}
+              role="textbox"
+              contentEditable
+              suppressContentEditableWarning
+              className="block min-w-0 flex-1 cursor-text overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  // Commit directly rather than via blur() for parity with
+                  // AgentsSelector — keeps both surfaces exiting edit mode
+                  // synchronously regardless of any surrounding focus trap.
+                  commitEdit();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelEdit();
+                }
+              }}
+              onBlur={commitEdit}
+              onPaste={(e) => {
+                e.preventDefault();
+                const text = e.clipboardData.getData('text/plain');
+                document.execCommand('insertText', false, text);
+              }}
             >
-              {title}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <span>{title}</span>
-          </TooltipContent>
-        </Tooltip>
+              {displayTitle}
+            </span>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger delay={500}>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="block min-w-0 flex-1 cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditing();
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {displayTitle}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <span>{displayTitle}</span>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+
         <div className="flex w-full items-baseline gap-2">
           <span
             className={cn(
@@ -167,7 +236,7 @@ export const AgentCard = memo(
       </div>
     );
   },
-  // Skip onClick/onArchive/onDelete in comparison — their behavior is
+  // Skip onClick/onArchive/onDelete/onRename in comparison — their behavior is
   // stable (always call the same RPC with the card's `id`) but identity
   // changes every render due to upstream useKartonProcedure selectors.
   (prev, next) =>

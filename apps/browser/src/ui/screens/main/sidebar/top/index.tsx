@@ -112,6 +112,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
+  const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
   const getAgentsHistoryList = useKartonProcedure(
     (p) => p.agents.getAgentsHistoryList,
   );
@@ -326,6 +327,8 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   // interaction), so refs avoid re-creating callbacks on every state change.
   const deleteAgentRef = useRef(deleteAgent);
   deleteAgentRef.current = deleteAgent;
+  const setAgentTitleRef = useRef(setAgentTitle);
+  setAgentTitleRef.current = setAgentTitle;
   const openAgentRef = useRef(openAgent);
   openAgentRef.current = openAgent;
   const openAgentModelIdRef = useRef(openAgentModelId);
@@ -371,6 +374,40 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     });
     // Functional updater: always sees latest state, safe under rapid successive deletes.
     setAgentsList((prev) => prev.filter((agent) => agent.id !== id));
+  }, []);
+
+  const handleRenameAgent = useCallback((id: string, newTitle: string) => {
+    // Optimistic: update the local list immediately.
+    setAgentsList((prev) =>
+      prev.map((agent) =>
+        agent.id === id ? { ...agent, title: newTitle } : agent,
+      ),
+    );
+    void setAgentTitleRef.current(id, newTitle).catch((e) => {
+      console.error(e);
+      posthog.captureException(e instanceof Error ? e : new Error(String(e)), {
+        source: 'renderer',
+        operation: 'setAgentTitle',
+      });
+      // Recover: refetch the first page to pull fresh server state.
+      // Using a single-source-of-truth refetch (rather than a closure-captured
+      // prev-title rollback) also corrects any partial-success drift.
+      void getAgentsHistoryListRef
+        .current(0, PAGE_SIZE)
+        .then((fresh) => {
+          setAgentsList(fresh);
+          // Reset pagination state to match the refetched first page.
+          // Without this, a user who had already scrolled past page 0
+          // would keep the stale higher offset and subsequent
+          // loadMoreHistory() calls would skip items 200…stale-offset.
+          rawFetchedCountRef.current = fresh.length;
+          setHasMoreHistory(fresh.length >= PAGE_SIZE);
+          isLoadingMoreRef.current = false;
+        })
+        .catch(() => {
+          // Best-effort recovery; swallow secondary failure.
+        });
+    });
   }, []);
 
   // Helper to create a new chat and focus the input.
@@ -475,6 +512,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
               value={openAgent}
               onValueChange={handleAgentSelect}
               onDelete={handleDeleteAgent}
+              onRename={handleRenameAgent}
               onEndReached={loadMoreHistory}
             />
           )}

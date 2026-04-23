@@ -32,6 +32,7 @@ export type AgentRuntimeError =
 
 export type AgentState = {
   title: string; // The title of the agent - may not be necessary
+  titleLockedByUser?: boolean; // Whether the user manually set the title (prevents auto-regeneration)
   isWorking: boolean; // Whether the agent is currently working on a task or if it's idling (either finished or waiting for user input).
   history: AgentMessage[]; // The message history of the agent (visible to user)
   queuedMessages: (AgentMessage & { role: 'user' })[]; // Queued messages that have not yet been sent to the agent.

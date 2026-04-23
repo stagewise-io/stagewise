@@ -30,6 +30,12 @@ import type { ProcessedImageCacheService } from '@/services/processed-image-cach
  */
 
 export class AgentManagerService extends DisposableService {
+  /** Server-side bounds for user-editable agent titles. Slightly more permissive
+   * than the UI's 2–80 range so minor client/server drift never silently drops
+   * a valid title. */
+  private static readonly TITLE_MIN_LENGTH = 1;
+  private static readonly TITLE_MAX_LENGTH = 200;
+
   private activeAgents = new Map<
     string,
     BaseAgent<any, any> | BaseAgent<never, any>
@@ -320,6 +326,42 @@ export class AgentManagerService extends DisposableService {
         modelId: ModelId,
       ) => {
         await this.updateActiveModelId(instanceId, modelId);
+      },
+    );
+    this.karton.registerServerProcedureHandler(
+      'agents.setTitle',
+      async (_callingClientId: string, instanceId: string, title: string) => {
+        const trimmed = title.trim();
+        if (
+          trimmed.length < AgentManagerService.TITLE_MIN_LENGTH ||
+          trimmed.length > AgentManagerService.TITLE_MAX_LENGTH
+        ) {
+          throw new Error(
+            `Invalid title length: ${trimmed.length} (must be ${AgentManagerService.TITLE_MIN_LENGTH}–${AgentManagerService.TITLE_MAX_LENGTH} chars)`,
+          );
+        }
+
+        // Active path: let the agent handle it so Karton state updates and
+        // titleLockedByUser is set via the normal state mutation.
+        const agent = this.activeAgents.get(instanceId);
+        if (agent) {
+          await agent.setTitle(trimmed);
+          return;
+        }
+
+        // Inactive path: update the persisted row directly — no hydration,
+        // no Karton fan-out; the UI's optimistic local update is authoritative
+        // until the next history refetch.
+        if (!this.agentPersistenceDB) {
+          throw new Error('Persistence layer unavailable');
+        }
+        const updated = await this.agentPersistenceDB.updateAgentTitle(
+          instanceId,
+          trimmed,
+        );
+        if (!updated) {
+          throw new Error(`Agent with instance id ${instanceId} not found`);
+        }
       },
     );
     this.karton.registerServerProcedureHandler(
@@ -620,6 +662,7 @@ export class AgentManagerService extends DisposableService {
       undefined,
       {
         title: agent.title,
+        titleLockedByUser: agent.titleLockedByUser ?? undefined,
         history: agent.history,
         queuedMessages: agent.queuedMessages,
         activeModelId: resumedModelValid ? agent.activeModelId : undefined,
@@ -679,6 +722,7 @@ export class AgentManagerService extends DisposableService {
         id: instanceId,
         type: agent.agentType,
         title: agentState.title,
+        titleLockedByUser: agentState.titleLockedByUser,
         activeModelId: agentState.activeModelId,
         createdAt: agentState.history[0].metadata?.createdAt ?? new Date(0), // Fallback should never be reached
         lastMessageAt:

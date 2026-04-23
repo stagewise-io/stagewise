@@ -367,6 +367,30 @@ export class AgentPersistenceDB {
   }
 
   /**
+   * Updates just the title (and titleLockedByUser flag) of a persisted agent
+   * without rehydrating it into memory. Used for renaming inactive history
+   * agents — active ones go through BaseAgent.setTitle so Karton state and
+   * DB stay in sync via the normal saveState() path.
+   *
+   * @returns true if a row was updated, false if no agent with that id exists.
+   */
+  public async updateAgentTitle(id: string, title: string): Promise<boolean> {
+    this._logger.debug(`[AgentPersistenceDB] Updating title for agent: ${id}`);
+    try {
+      const result = await this._db
+        .update(schema.agentInstances)
+        .set({ title, titleLockedByUser: true })
+        .where(eq(schema.agentInstances.id, id));
+      return (result as unknown as { rowsAffected: number }).rowsAffected > 0;
+    } catch (error) {
+      this._logger.error(
+        `[AgentPersistenceDB] Failed to update agent title: ${(error as Error).message}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Deletes an agent instance from the persistence layer.
    *
    * @param id The id of the agent instance to delete
