@@ -51,6 +51,12 @@ export const operations = sqliteTable(
     index('operations_snapshot_oid_index').on(table.snapshot_oid),
     index('operations_reason_index').on(table.reason),
     index('operations_contributor_index').on(table.contributor),
+    index('operations_filepath_op_idx').on(
+      table.filepath,
+      table.operation,
+      table.idx,
+      table.snapshot_oid,
+    ),
   ],
 );
 
