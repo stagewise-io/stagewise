@@ -88,8 +88,12 @@ export const ExecuteShellCommandToolPart = ({
 
   const effectiveOutputText = useMemo(() => {
     if (output?.output) return output.output;
+    // Backend always ships a single-element array containing the current
+    // rendered grid snapshot. The array shape is preserved for the Karton
+    // contract but is effectively scalar — do not re-introduce join-based
+    // accumulation here.
     if (retainedOutputsRef.current?.length)
-      return retainedOutputsRef.current.join('');
+      return retainedOutputsRef.current[0] ?? null;
     return null;
   }, [output?.output, pendingOutputs]);
 

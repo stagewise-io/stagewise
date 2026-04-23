@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import xtermHeadless from '@xterm/headless';
+import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from './types';
 const { Terminal } = xtermHeadless;
 
 /** Debounce interval (ms) for flushing buffered output to disk. */
@@ -44,7 +45,11 @@ export class SessionLogger {
   /** Cached last line, populated on close() so reads remain safe after dispose. */
   private _cachedLastLine: string | null = null;
 
-  constructor(filePath: string, cols = 80, rows = 24) {
+  constructor(
+    filePath: string,
+    cols = DEFAULT_TERMINAL_COLS,
+    rows = DEFAULT_TERMINAL_ROWS,
+  ) {
     this.filePath = filePath;
     mkdirSync(path.dirname(filePath), { recursive: true });
     this._terminal = new Terminal({
@@ -228,6 +233,38 @@ export class SessionLogger {
     if (buf.getLine(startY) === undefined) startY = 0;
 
     // Walk backward if the start lands on a wrapped continuation
+    while (startY > 0 && buf.getLine(startY)?.isWrapped) startY--;
+
+    return this.readLines(buf, startY, endY);
+  }
+
+  /**
+   * Serialize up to `maxRows` rows ending at the current cursor, starting
+   * no earlier than `markLine`. Used by the live UI streaming path where
+   * we only need a tailing window, not the full command scrollback.
+   *
+   * Handles mark eviction, cursor rewinds (interactive prompts), and
+   * wrapped-line continuations the same way as `serializeFrom`.
+   */
+  serializeTailFrom(markLine: number, maxRows: number): string[] {
+    const buf = this._terminal.buffer.normal;
+    const cursorLine = buf.baseY + buf.cursorY;
+
+    // The cursor is always the newest write position — even when an
+    // interactive prompt (e.g. a collapsing multi-line selector) rewinds
+    // it above the command's original mark. The cap must therefore trail
+    // the cursor, not the mark, so live snapshots never drop the current
+    // cursor row.
+    const endY = cursorLine;
+    let startY = Math.min(cursorLine, markLine);
+
+    // Cap the window to `maxRows` rows trailing `endY`.
+    startY = Math.max(startY, endY - maxRows + 1);
+
+    // Eviction fallback: if the capped start has scrolled out, clamp to 0.
+    if (buf.getLine(startY) === undefined) startY = 0;
+
+    // Walk backward if the start lands on a wrapped continuation.
     while (startY > 0 && buf.getLine(startY)?.isWrapped) startY--;
 
     return this.readLines(buf, startY, endY);

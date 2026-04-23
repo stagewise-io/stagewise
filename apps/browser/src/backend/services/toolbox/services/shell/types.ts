@@ -41,6 +41,27 @@ export const MAX_SESSIONS_PER_AGENT = 5;
  */
 export const SHELL_INTEGRATION_DETECT_MS = 5_000;
 
+/**
+ * Terminal grid width (columns) used by the PTY, the headless xterm
+ * emulator that captures screen state, and the serialized rows streamed
+ * to the UI. 120 fits most modern CLI tool output (tables, progress
+ * bars) without hard-wrapping, while being narrow enough to render
+ * cleanly inside the chat panel via CSS soft-wrap.
+ */
+export const DEFAULT_TERMINAL_COLS = 120;
+
+/** Terminal grid height (rows). xterm default; scrollback carries history. */
+export const DEFAULT_TERMINAL_ROWS = 24;
+
+/**
+ * Maximum number of rows serialized per live-streaming flush. The live
+ * UI preview does not need the full command scrollback — only a trailing
+ * window. 200 rows is wider than any practical tool-part viewport while
+ * bounding per-flush serialization cost to O(200) regardless of how
+ * long the command has been running.
+ */
+export const STREAMING_MAX_ROWS = 200;
+
 export interface PtySession {
   id: string;
   agentInstanceId: string;

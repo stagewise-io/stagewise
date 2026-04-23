@@ -5,7 +5,7 @@ import path from 'node:path';
 import { applyHeadTailCap, stripAnsi, SessionManager } from './session-manager';
 import { detectShell } from './detect-shell';
 import { sanitizeEnv } from './sanitize-env';
-import { HEAD_LINES, TAIL_LINES, MAX_SESSIONS_PER_AGENT } from './types';
+import { HEAD_LINES, MAX_SESSIONS_PER_AGENT, TAIL_LINES } from './types';
 import type { DetectedShell } from './types';
 
 // ─── Section A: applyHeadTailCap (pure) ──────────────────────────
