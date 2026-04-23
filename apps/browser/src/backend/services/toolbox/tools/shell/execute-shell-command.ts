@@ -6,6 +6,7 @@ import { tool } from 'ai';
 import { capToolOutput } from '../../utils';
 import type { ShellService } from '@/services/toolbox/services/shell';
 import { homedir } from 'node:os';
+import { join, resolve, sep } from 'node:path';
 
 export const DESCRIPTION = `Execute a shell command in the user's system shell. You **MUST** define a symlinked path (NOT "."!) as initial cwd for the command to run in.`;
 
@@ -51,12 +52,25 @@ function resolveCwd(
   const mounts = getMountedPaths();
 
   if (mountPrefix) {
-    const resolved = mounts.get(mountPrefix);
-    if (resolved) return resolved;
+    // Split "weba9/apps/browser" into prefix "weba9" + rest "apps/browser"
+    const slashIdx = mountPrefix.indexOf('/');
+    const prefix =
+      slashIdx === -1 ? mountPrefix : mountPrefix.slice(0, slashIdx);
+    const rest = slashIdx === -1 ? '' : mountPrefix.slice(slashIdx + 1);
+
+    const mountRoot = mounts.get(prefix);
+    if (mountRoot) {
+      if (!rest) return mountRoot;
+      const full = resolve(join(mountRoot, rest));
+      // Prevent traversal outside the mount root
+      if (full === mountRoot || full.startsWith(`${mountRoot}${sep}`))
+        return full;
+      return mountRoot;
+    }
   }
 
-  for (const [prefix, path] of mounts) {
-    if (prefix !== 'att') return path;
+  for (const [prefix, fsPath] of mounts) {
+    if (prefix !== 'att') return fsPath;
   }
 
   return homedir();
