@@ -62,6 +62,30 @@ export function renderFullEnvironmentContext(
     );
   }
 
+  // Active shell sessions
+  const activeSessions = snapshot.shells.sessions.filter((s) => !s.exited);
+  if (activeSessions.length > 0) {
+    const sessionTags = activeSessions.map((s) => {
+      // Reverse-resolve absolute cwd to mount prefix (longest match wins)
+      let cwd = s.cwd;
+      let bestLen = 0;
+      for (const m of workspace.mounts) {
+        if (
+          (s.cwd === m.path || s.cwd.startsWith(`${m.path}/`)) &&
+          m.path.length > bestLen
+        ) {
+          bestLen = m.path.length;
+          const relative = s.cwd.slice(m.path.length);
+          cwd = relative ? `${m.prefix}${relative}` : m.prefix;
+        }
+      }
+      return `  <session id="${esc(s.id)}" cwd="${esc(cwd)}" />`;
+    });
+    sections.push(
+      `<shell-sessions>\n${sessionTags.join('\n')}\n</shell-sessions>`,
+    );
+  }
+
   // Available skills
   const { enabledSkills } = snapshot;
   if (enabledSkills.paths.length > 0) {

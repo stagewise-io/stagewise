@@ -151,6 +151,7 @@ return `Saved as ${fileName}`;
 Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session.
 
 - **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
+- **Reuse sessions.** Creating a session is expensive (shell init delay). Reuse an existing session (`session_id`) whenever one is available — active sessions are listed in `<shell-sessions>` in the env-snapshot. Only create a new session when no suitable one exists or when you need parallel execution (e.g. long-running dev server in one session, short commands in another).
 - **`command`:** Writes text + Enter to the shell. Registers output capture — the tool waits and returns output.
 - **`wait_until`:** Controls when the tool returns. `timeout_ms` = time cap, `output_pattern` = regex match on output, `exited` = wait for process exit. Omitting `wait_until` defaults to **20 s**. When `wait_until` is provided without an explicit `timeout_ms`, the cap is **120 s**.
 - **Timeout ≠ error.** `timed_out: true` returns partial output; session stays alive. Reuse `session_id` to continue.
@@ -167,9 +168,10 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 - OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
 
 ```jsonc
-// Start dev server (long-running), then health-check in a new session
+// Start a long-running dev server (new session — needs its own PTY)
 { "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000 } }
-{ "command": "curl localhost:3000/health", "cwd": "w1" }
+// Reuse an existing idle session for a quick command (don't create a new one)
+{ "session_id": "f8a3b1c2", "command": "curl localhost:3000/health" }
 // Interrupt a running dev server
 { "session_id": "abc12345", "stdin": "\x03" }
 // Answer "yes" to an interactive prompt
