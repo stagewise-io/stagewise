@@ -19,8 +19,10 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { IconHistoryFill18 } from 'nucleo-ui-fill-18';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
+import { IconPenOutline18 } from 'nucleo-ui-outline-18';
 import { cn } from '@ui/utils';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
+import { useInlineTitleEdit } from '../../active-agents/_components/use-inline-title-edit';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,6 +52,7 @@ export interface AgentsSelectorProps {
   value: string | null;
   onValueChange: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, newTitle: string) => void;
   onEndReached?: () => void;
 }
 
@@ -81,7 +84,234 @@ const minimalFormatter = buildFormatter({
 });
 
 // ============================================================================
-// Component
+// AgentListItem — one row
+// ============================================================================
+
+interface AgentListItemProps {
+  agent: AgentEntry;
+  isSelected: boolean;
+  isEditing: boolean;
+  pendingDeleteId: string | null;
+  onStartEdit: (id: string) => void;
+  onCancelEdit: () => void;
+  onCommitRename: (id: string, newTitle: string) => void;
+  onStartDelete: (id: string) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: (id: string) => void;
+}
+
+function AgentListItemImpl({
+  agent,
+  isSelected,
+  isEditing,
+  pendingDeleteId,
+  onStartEdit,
+  onCancelEdit,
+  onCommitRename,
+  onStartDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: AgentListItemProps) {
+  const hasUnseen = !isSelected && !!agent.unread;
+
+  const handleCommit = useCallback(
+    (newTitle: string) => onCommitRename(agent.id, newTitle),
+    [agent.id, onCommitRename],
+  );
+
+  const {
+    isEditing: editActive,
+    titleRef,
+    displayTitle,
+    startEditing,
+    commitEdit,
+    cancelEdit,
+  } = useInlineTitleEdit({ title: agent.title, onCommit: handleCommit });
+
+  // Keep local hook state in sync with the parent-driven `isEditing` flag.
+  // Parent owns the "only one row editing at a time" invariant.
+  //
+  // All callbacks come from useInlineTitleEdit (which useCallback-wraps them).
+  // `startEditing` is stable; `cancelEdit` re-creates when `title` changes,
+  // which is correct — if the prop title updates mid-edit, we want cancel
+  // to restore the fresh value, not a stale captured one.
+  useEffect(() => {
+    if (isEditing && !editActive) {
+      startEditing();
+    } else if (!isEditing && editActive) {
+      // Parent canceled (e.g. dropdown closed, another row started editing).
+      // Drop any pending changes silently.
+      cancelEdit();
+    }
+  }, [isEditing, editActive, startEditing, cancelEdit]);
+
+  return (
+    <ComboboxItem
+      key={agent.id}
+      value={agent.id}
+      size="xs"
+      className="grid-cols-[0.75rem_1fr_auto]"
+    >
+      <ComboboxItemIndicator />
+      <span className="col-start-2 flex w-full items-center gap-2">
+        {isEditing ? (
+          <span
+            ref={titleRef}
+            role="textbox"
+            contentEditable
+            suppressContentEditableWarning
+            className="min-w-0 flex-1 cursor-text truncate bg-transparent p-0 outline-none"
+            // Capture-phase stop on focus: base-ui's ComboboxPopup has an
+            // onFocus handler that redirects any focus landing inside the
+            // list back to its Input. Stopping propagation here prevents
+            // that handler from ever seeing the event.
+            onFocusCapture={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDownCapture={(e) => {
+              // Capture-phase stop: base-ui's ComboboxList handler would
+              // otherwise steal Arrow/Enter/Escape.
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                // Commit directly instead of going through blur() — base-ui's
+                // ComboboxPopup focus manager otherwise adds a perceptible
+                // handshake delay before onBlur fires.
+                commitEdit();
+                onCancelEdit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEdit();
+                onCancelEdit();
+              }
+            }}
+            onKeyUpCapture={(e) => e.stopPropagation()}
+            onBlur={() => {
+              commitEdit();
+              onCancelEdit();
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const text = e.clipboardData.getData('text/plain');
+              document.execCommand('insertText', false, text);
+            }}
+          >
+            {displayTitle}
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'truncate',
+              agent.isWorking && 'shimmer-text-primary',
+              hasUnseen && 'animate-text-pulse-warning',
+            )}
+          >
+            {displayTitle}
+          </span>
+        )}
+        {!isEditing && (
+          <span className="shrink-0 text-subtle-foreground text-xs">
+            <TimeAgo
+              date={agent.lastMessageAt}
+              formatter={minimalFormatter}
+              live={false}
+            />
+          </span>
+        )}
+      </span>
+      <div className="col-start-3 flex h-5 items-center gap-0.5">
+        {!isEditing && (
+          <button
+            type="button"
+            className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
+            aria-label="Rename agent"
+            onPointerDown={(e) => {
+              // preventDefault prevents the button from stealing focus from
+              // the Combobox's virtual-focus Input. Without this, clicking the
+              // pencil triggers a focus change that base-ui then "restores",
+              // leaving us in a focus tug-of-war with the editable span.
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEdit(agent.id);
+            }}
+          >
+            <IconPenOutline18 className="size-3" />
+          </button>
+        )}
+        <div className="relative">
+          {!isEditing && (
+            <button
+              type="button"
+              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
+              aria-label="Delete agent"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartDelete(agent.id);
+              }}
+            >
+              <IconTrash2Outline24 className="size-3" />
+            </button>
+          )}
+          {pendingDeleteId === agent.id && (
+            <DeleteConfirmPopover
+              open={true}
+              onOpenChange={(open) => {
+                if (!open) onCancelDelete();
+              }}
+              onConfirm={() => {
+                onConfirmDelete(agent.id);
+              }}
+            />
+          )}
+        </div>
+      </div>
+    </ComboboxItem>
+  );
+}
+
+// Custom comparator: the parent rebuilds `agent` objects on every render
+// (the `toEntry` helper in SidebarTopSection returns fresh objects), so the
+// default memo check sees a new reference for every sibling and re-renders
+// the entire list on any state change. That stampede delays the exit from
+// edit mode by hundreds of ms when there are many rows. Compare only the
+// primitive fields the row actually uses; also narrow `pendingDeleteId` to
+// the boolean "is this row's popover open?" so other rows' popover state
+// doesn't invalidate this row. Callback props are treated as stable — they
+// are all wrapped in useCallback at AgentsSelector scope and don't change
+// during a rename.
+const AgentListItem = memo(AgentListItemImpl, (prev, next) => {
+  const pa = prev.agent;
+  const na = next.agent;
+  if (
+    pa.id !== na.id ||
+    pa.title !== na.title ||
+    pa.messageCount !== na.messageCount ||
+    !!pa.isWorking !== !!na.isWorking ||
+    !!pa.unread !== !!na.unread ||
+    pa.lastMessageAt.getTime() !== na.lastMessageAt.getTime()
+  ) {
+    return false;
+  }
+  return (
+    prev.isSelected === next.isSelected &&
+    prev.isEditing === next.isEditing &&
+    // Narrow: we only rerender when THIS row's popover state changes.
+    (prev.pendingDeleteId === pa.id) === (next.pendingDeleteId === na.id)
+  );
+});
+
+// ============================================================================
+// AgentsSelector
 // ============================================================================
 
 /**
@@ -118,10 +348,12 @@ export const AgentsSelector = memo(
     value,
     onValueChange,
     onDelete,
+    onRename,
     onEndReached,
   }: AgentsSelectorProps) {
     const [inputValue, setInputValue] = useState('');
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
@@ -161,25 +393,42 @@ export const AgentsSelector = memo(
 
     const handleValueChange = useCallback(
       (v: string | null) => {
-        if (v) onValueChange(v);
+        if (!v) return;
+        // Don't trigger navigation for the row currently being edited.
+        if (v === editingId) return;
+        onValueChange(v);
       },
-      [onValueChange],
+      [onValueChange, editingId],
     );
 
-    const handleDeleteClick = useCallback(
-      (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
-        const agentId = e.currentTarget.dataset.agentId;
-        if (agentId) setPendingDeleteId(agentId);
+    const handleStartDelete = useCallback((id: string) => {
+      setPendingDeleteId(id);
+    }, []);
+    const handleCancelDelete = useCallback(() => {
+      setPendingDeleteId(null);
+    }, []);
+    const handleConfirmDelete = useCallback(
+      (id: string) => {
+        setPendingDeleteId(null);
+        onDelete(id);
       },
-      [],
+      [onDelete],
     );
+
+    const handleStartEdit = useCallback((id: string) => {
+      setEditingId(id);
+      setPendingDeleteId(null);
+    }, []);
+    const handleCancelEdit = useCallback(() => {
+      setEditingId(null);
+    }, []);
 
     const handleOpenChange = useCallback((open: boolean) => {
       setIsOpen(open);
       if (!open) {
         setInputValue('');
         setPendingDeleteId(null);
+        setEditingId(null);
       }
     }, []);
 
@@ -209,7 +458,7 @@ export const AgentsSelector = memo(
       >
         {/* Custom trigger: unstyled, using base-ui Trigger directly with render */}
         <ComboboxBase.Trigger
-          render={(props) => (
+          render={(props: React.HTMLAttributes<HTMLButtonElement>) => (
             <Tooltip>
               <TooltipTrigger>
                 <Button
@@ -247,61 +496,21 @@ export const AgentsSelector = memo(
                 {filteredGroups.map(({ label, agents }) => (
                   <ComboboxGroup key={label}>
                     <ComboboxGroupLabel>{label}</ComboboxGroupLabel>
-                    {agents.map((agent) => {
-                      const isSelected = agent.id === value;
-                      const hasUnseen = !isSelected && !!agent.unread;
-
-                      return (
-                        <ComboboxItem
-                          key={agent.id}
-                          value={agent.id}
-                          size="xs"
-                          className="grid-cols-[0.75rem_1fr_auto]"
-                        >
-                          <ComboboxItemIndicator />
-                          <span className="col-start-2 flex w-full items-center gap-2">
-                            <span
-                              className={cn(
-                                'truncate',
-                                agent.isWorking && 'shimmer-text-primary',
-                                hasUnseen && 'animate-text-pulse-warning',
-                              )}
-                            >
-                              {agent.title}
-                            </span>
-                            <span className="shrink-0 text-subtle-foreground text-xs">
-                              <TimeAgo
-                                date={agent.lastMessageAt}
-                                formatter={minimalFormatter}
-                                live={false}
-                              />
-                            </span>
-                          </span>
-                          <div className="relative col-start-3">
-                            <button
-                              type="button"
-                              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
-                              data-agent-id={agent.id}
-                              onClick={handleDeleteClick}
-                            >
-                              <IconTrash2Outline24 className="size-3" />
-                            </button>
-                            {pendingDeleteId === agent.id && (
-                              <DeleteConfirmPopover
-                                open={true}
-                                onOpenChange={(open) => {
-                                  if (!open) setPendingDeleteId(null);
-                                }}
-                                onConfirm={() => {
-                                  setPendingDeleteId(null);
-                                  onDelete(agent.id);
-                                }}
-                              />
-                            )}
-                          </div>
-                        </ComboboxItem>
-                      );
-                    })}
+                    {agents.map((agent) => (
+                      <AgentListItem
+                        key={agent.id}
+                        agent={agent}
+                        isSelected={agent.id === value}
+                        isEditing={editingId === agent.id}
+                        pendingDeleteId={pendingDeleteId}
+                        onStartEdit={handleStartEdit}
+                        onCancelEdit={handleCancelEdit}
+                        onCommitRename={onRename}
+                        onStartDelete={handleStartDelete}
+                        onCancelDelete={handleCancelDelete}
+                        onConfirmDelete={handleConfirmDelete}
+                      />
+                    ))}
                   </ComboboxGroup>
                 ))}
               </ComboboxList>
@@ -340,5 +549,6 @@ export const AgentsSelector = memo(
     prevProps.value === nextProps.value &&
     prevProps.onValueChange === nextProps.onValueChange &&
     prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onRename === nextProps.onRename &&
     prevProps.onEndReached === nextProps.onEndReached,
 );

@@ -78,6 +78,7 @@ export const agentInstances = sqliteTable(
     lastMessageAt: integer('last_message_at', { mode: 'timestamp' }).notNull(),
     activeModelId: modelId('active_model_id').notNull(),
     title: text('title').notNull(),
+    titleLockedByUser: _sqliteBoolean('title_locked_by_user'),
     /** @deprecated Kept for rollback safety. Read/write via agentMessages table instead. */
     history: _sqliteJson('history')
       .notNull()

@@ -121,6 +121,7 @@ export function ActiveAgentsGrid() {
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const archiveAgent = useKartonProcedure((p) => p.agents.archive);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
+  const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
 
   const [, emptyAgentIdRef] = useEmptyAgentId();
 
@@ -299,6 +300,13 @@ export function ActiveAgentsGrid() {
     [deleteAgent],
   );
 
+  const handleRename = useCallback(
+    (id: string, newTitle: string) => {
+      void setAgentTitle(id, newTitle);
+    },
+    [setAgentTitle],
+  );
+
   const scrollRef = useRef<OverlayScrollbarRef>(null);
 
   /** Scroll a card into the safe (non-masked) area of the scroll container.
@@ -392,6 +400,7 @@ export function ActiveAgentsGrid() {
               onClick={handleClick}
               onArchive={handleArchive}
               onDelete={handleDelete}
+              onRename={handleRename}
             />
           );
         })}
