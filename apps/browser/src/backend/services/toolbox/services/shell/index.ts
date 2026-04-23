@@ -142,7 +142,7 @@ export class ShellService extends DisposableService {
       };
     }
 
-    const env = sanitizeEnv(this.resolvedEnv);
+    const env = sanitizeEnv(this.resolvedEnv, this.shell.type);
 
     // Build a streaming callback targeting the current toolCallId
     const makeOnData = (targetToolCallId: string) => {

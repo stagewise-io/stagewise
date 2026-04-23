@@ -58,11 +58,14 @@ function whereLookup(binary: string): string | null {
 }
 
 function detectGitBashWindows(): string | null {
-  const commonPaths = [
-    'C:\\Program Files\\Git\\bin\\bash.exe',
-    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-  ];
-  for (const p of commonPaths) {
+  const candidates: string[] = [];
+  const programFiles = process.env.ProgramFiles;
+  const programFilesX86 = process.env['ProgramFiles(x86)'];
+  if (programFiles)
+    candidates.push(path.join(programFiles, 'Git', 'bin', 'bash.exe'));
+  if (programFilesX86)
+    candidates.push(path.join(programFilesX86, 'Git', 'bin', 'bash.exe'));
+  for (const p of candidates) {
     if (fileExists(p)) return p;
   }
 
