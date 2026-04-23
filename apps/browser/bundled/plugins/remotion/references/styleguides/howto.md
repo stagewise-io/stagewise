@@ -1,6 +1,6 @@
 Styleguide tell agent how video must look.
 
-Styleguide MUST be skill.
+Styleguide MUST be skill. ALWAYS store in workspace in `.stagewise/skills/{STYLEGUIDE-SKILL-NAME}`
 
 ## File structure
 
@@ -24,7 +24,7 @@ Meaning:
 
 - `layouts`: reusable scene layouts
 - `storyboard-templates`: reusable video flow patterns
-- `elements`: reusable video parts like logo, mascot, overlays
+- `elements`: reusable video parts like logo, mascot, overlays, gradient images
 - `DESIGN.md`: design system. optional if workspace root already has right one
 - `SKILL.md`: overview skill, tells when to read refs
 
@@ -152,6 +152,7 @@ May:
 
 - describe element inline
 - reference existing component code in workspace
+- include reference images that can be copied into project
 
 Rules:
 

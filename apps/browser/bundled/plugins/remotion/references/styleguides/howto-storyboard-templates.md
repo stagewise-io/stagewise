@@ -1,4 +1,4 @@
-Storyboard template must include:
+Storyboard template MUST include:
 
 - Purpose of storyboard. Main goals, intention. (Educational, quick capturing of attention, fast-paced, slow explainer).
 - Which layouts are used and in which order. For each layout, include
