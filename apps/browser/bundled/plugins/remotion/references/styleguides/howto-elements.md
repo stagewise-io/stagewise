@@ -30,3 +30,8 @@ import{LogoCombo}from"assets";
 - `variant`: `monochrome` or `default`. Use monochrome for small watermarks.
 
 ```
+
+
+## Images
+
+Gradients, reused stock footage etc. can be placed into elements folder and referenced by an markdown file.
