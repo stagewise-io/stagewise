@@ -541,7 +541,11 @@ export const AgentsSelector = memo(
         mo.disconnect();
         list?.removeEventListener('scroll', reposition);
       };
-    }, [hoveredAgentId]);
+      // `isHoveredAgentVisible` in deps so observers re-bind to the fresh
+      // panel node when the hovered agent is filtered out and reappears
+      // with the same id — otherwise the ResizeObserver would be stuck
+      // watching a detached node.
+    }, [hoveredAgentId, isHoveredAgentVisible]);
 
     const handleItemHover = useCallback(
       (agentId: string) => {
