@@ -147,7 +147,7 @@ export const AgentCard = memo(
                 <button
                   type="button"
                   tabIndex={-1}
-                  className="block min-w-0 flex-1 cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+                  className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
                   onClick={(e) => {
                     e.stopPropagation();
                     startEditing();

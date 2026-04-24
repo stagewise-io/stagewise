@@ -166,7 +166,7 @@ export const ChatInput = memo(function ChatInput({
   useEffect(() => {
     shownPlaceholder.current =
       placeholder ??
-      `Ask anything about this page ${focusChatHotkeyText}${hasQueuedMessages ? ', or press ↵ to send now' : ''}`;
+      `Use / to plan and run commands. Use @ for context. ${hasQueuedMessages ? 'Press ↵ to send now' : ''}`;
   }, [placeholder, focusChatHotkeyText, hasQueuedMessages]);
   const staticPlaceholderRef = useRef(() => shownPlaceholder.current);
 
