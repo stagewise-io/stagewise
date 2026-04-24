@@ -30,6 +30,8 @@ import {
 } from './shared';
 import { FileDiffSection, formatFileDiff } from './file-diff-section';
 import { MessageQueueSection } from './message-queue-section';
+import { AttachmentMetadataProvider } from '@ui/hooks/use-attachment-metadata';
+import { MountedPathsProvider } from '@ui/hooks/use-mounted-paths';
 import {
   WorkspaceMdStatusSection,
   type WorkspaceMdStatus,
@@ -738,9 +740,13 @@ export function StatusCard() {
   if (items.length === 0) return null;
 
   return (
-    <StatusCardComponent
-      items={items}
-      ref={cardRef as React.RefObject<HTMLDivElement>}
-    />
+    <MountedPathsProvider value={resolvedMounts}>
+      <AttachmentMetadataProvider messages={agentHistoryRef.current}>
+        <StatusCardComponent
+          items={items}
+          ref={cardRef as React.RefObject<HTMLDivElement>}
+        />
+      </AttachmentMetadataProvider>
+    </MountedPathsProvider>
   );
 }
