@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha072 (2026-04-24)
+
+### Features
+
+* allow renaming agents (fccda0f)
+
+### Bug Fixes
+
+* show file badges properly inside "askUserQuestions" tool ui (b89c8d0)
+
 ## 1.0.0-alpha071 (2026-04-24)
 
 ### Bug Fixes
