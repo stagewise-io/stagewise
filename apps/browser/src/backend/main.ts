@@ -303,6 +303,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     credentialsService,
   );
 
+  // Give DiffHistoryService a way to resolve workspace roots for the
+  // gitignore-aware filter in `registerAgentEdit`. Evaluated lazily per
+  // call, so the (still-async) MountManager initialization inside
+  // ToolboxService does not need to be awaited before wiring.
+  diffHistoryService.setMountPathsResolver(() =>
+    toolboxService.getAllMountedPaths(),
+  );
+
   // Push bundled skill definitions via the toolbox so it can
   // merge them with workspace/plugin skills on mount changes.
   // Display order for builtin slash commands (unlisted ones sort last).

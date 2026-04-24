@@ -3,6 +3,7 @@ import type { Logger } from '@/services/logger';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { LspService } from '../lsp';
 import path from 'node:path';
+import { pickOwningWorkspace } from '@/utils/workspace-resolution';
 import { createHash } from 'node:crypto';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { FilePickerService } from '@/services/file-picker';
@@ -38,6 +39,14 @@ function mountPrefixForPath(workspacePath: string): MountPrefix {
 
 export type MountedClientRuntimes = Map<MountPrefix, ClientRuntimeNode>;
 export type MountedLspServices = Map<MountPrefix, LspService>;
+
+// Re-export the canonical workspace resolver so the existing import
+// path `from '@/services/toolbox/services/mount-manager'` keeps
+// working for code that already uses it (including this file's own
+// tests). The single implementation lives in the shared utility at
+// `@/utils/workspace-resolution` so `DiffHistoryService` can use it
+// too without introducing a toolbox→diff-history import cycle.
+export { pickOwningWorkspace } from '@/utils/workspace-resolution';
 
 export class MountManagerService extends DisposableService {
   private readonly logger: Logger;
@@ -288,23 +297,8 @@ export class MountManagerService extends DisposableService {
     const mounts = this.agentMounts.get(agentInstanceId);
     if (!mounts || !mounts.has(mountPrefix)) return;
 
-    const workspacePath = this.workspacePathsPerMount.get(mountPrefix);
     mounts.delete(mountPrefix);
-
-    if (workspacePath) {
-      const stillInUse = [...this.agentMounts.values()].some((m) =>
-        m.has(mountPrefix),
-      );
-      if (!stillInUse) {
-        this.workspacePathsPerMount.delete(mountPrefix);
-        this.stopWorkspaceWatcher(workspacePath);
-        const lspService = this.lspServicesPerPath.get(workspacePath);
-        if (lspService) void lspService.teardown();
-        this.clientRuntimesPerPath.delete(workspacePath);
-        this.lspServicesPerPath.delete(workspacePath);
-        this.lspReady.delete(workspacePath);
-      }
-    }
+    this.releaseMountIfUnused(mountPrefix);
 
     this.uiKarton.setState((draft) => {
       draft.toolbox[agentInstanceId].workspace.mounts = draft.toolbox[
@@ -316,6 +310,36 @@ export class MountManagerService extends DisposableService {
     this.telemetryService.capture('workspace-unmounted', {
       agent_type: agentType,
     });
+  }
+
+  /**
+   * If `mountPrefix` is no longer referenced by any agent, tears down
+   * all resources keyed on its workspace path: watcher, LSP service,
+   * client runtime, and the `workspacePathsPerMount` entry itself.
+   *
+   * Central helper for both `handleUnmountWorkspace` (explicit unmount)
+   * and `clearAgentMounts` (agent teardown). Without this cleanup in
+   * `clearAgentMounts`, orphaned workspace paths would stick around in
+   * `workspacePathsPerMount` indefinitely, which (a) leaks watchers /
+   * LSP processes across the app session and (b) causes
+   * `getAllMountedPaths()` to return stale roots, making
+   * `DiffHistoryService.findWorkspaceRoot` pick the wrong workspace's
+   * `.gitignore` matcher for later edits.
+   */
+  private releaseMountIfUnused(mountPrefix: string): void {
+    const stillInUse = [...this.agentMounts.values()].some((m) =>
+      m.has(mountPrefix),
+    );
+    if (stillInUse) return;
+    const workspacePath = this.workspacePathsPerMount.get(mountPrefix);
+    if (!workspacePath) return;
+    this.workspacePathsPerMount.delete(mountPrefix);
+    this.stopWorkspaceWatcher(workspacePath);
+    const lspService = this.lspServicesPerPath.get(workspacePath);
+    if (lspService) void lspService.teardown();
+    this.clientRuntimesPerPath.delete(workspacePath);
+    this.lspServicesPerPath.delete(workspacePath);
+    this.lspReady.delete(workspacePath);
   }
 
   public getMountedPathsWithRuntimes(agentInstanceId: string): Array<{
@@ -348,11 +372,12 @@ export class MountManagerService extends DisposableService {
   ): string | undefined {
     const mounts = this.agentMounts.get(agentInstanceId);
     if (!mounts) return undefined;
+    const candidates: string[] = [];
     for (const prefix of mounts.keys()) {
       const wsPath = this.workspacePathsPerMount.get(prefix);
-      if (wsPath && filePath.startsWith(wsPath)) return wsPath;
+      if (wsPath) candidates.push(wsPath);
     }
-    return undefined;
+    return pickOwningWorkspace(filePath, candidates);
   }
 
   public getAllMountedPaths(): Set<string> {
@@ -384,7 +409,14 @@ export class MountManagerService extends DisposableService {
   }
 
   public clearAgentMounts(agentInstanceId: string): void {
+    const mounts = this.agentMounts.get(agentInstanceId);
     this.agentMounts.delete(agentInstanceId);
+    if (!mounts) return;
+    // Release every mount this agent was holding so orphaned
+    // workspace paths (and their watcher / LSP / runtime state) do
+    // not leak when an agent is torn down without going through
+    // `handleUnmountWorkspace` first. See `releaseMountIfUnused`.
+    for (const prefix of mounts.keys()) this.releaseMountIfUnused(prefix);
   }
 
   public setWorkspaceMdContent(

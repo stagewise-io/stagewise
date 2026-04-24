@@ -31,12 +31,20 @@ export function createFileDiffHandler(
   ) => {
     deps.diffHistoryService.ignoreFileForWatcher(absolutePath);
 
+    // Resolve the owning workspace for the gitignore-aware filter in
+    // DiffHistoryService.registerAgentEdit. `findWorkspaceForFile`
+    // returns undefined when the path is outside any mount; map to
+    // null so the downstream walk-up fallback runs.
+    const workspaceRoot =
+      deps.mountManager.findWorkspaceForFile(agentId, absolutePath) ?? null;
+
     try {
       if (isExternal) {
         await deps.diffHistoryService.registerAgentEdit({
           agentInstanceId: agentId,
           path: absolutePath,
           toolCallId,
+          workspaceRoot,
           isExternal: true,
           tempPathToBeforeContent: null,
           tempPathToAfterContent: null,
@@ -77,6 +85,7 @@ export function createFileDiffHandler(
           agentInstanceId: agentId,
           path: absolutePath,
           toolCallId,
+          workspaceRoot,
           isExternal: false,
           contentBefore: before,
           contentAfter: after,
