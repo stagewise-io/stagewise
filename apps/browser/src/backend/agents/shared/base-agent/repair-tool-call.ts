@@ -12,16 +12,24 @@ type StructuralZodIssue = {
 /**
  * Format zod issues into a compact, LLM-facing bullet list. Each line is one
  * issue: `- <dot-path>: <message>`. Root-level issues use `(root)`. The list
- * is capped to keep the resulting error message bounded.
+ * is capped in both the number of issues and per-message length to keep the
+ * resulting error text bounded (zod can emit kilobyte-sized messages for
+ * discriminated-union failures).
  */
+const MAX_ISSUES = 20;
+const MAX_MESSAGE_CHARS = 200;
+
 function formatZodIssues(issues: readonly StructuralZodIssue[]): string {
-  const MAX = 20;
-  const lines = issues.slice(0, MAX).map((issue) => {
+  const lines = issues.slice(0, MAX_ISSUES).map((issue) => {
     const path = issue.path.length ? issue.path.join('.') : '(root)';
-    return `- ${path}: ${issue.message}`;
+    const message =
+      issue.message.length > MAX_MESSAGE_CHARS
+        ? `${issue.message.slice(0, MAX_MESSAGE_CHARS)}…`
+        : issue.message;
+    return `- ${path}: ${message}`;
   });
-  if (issues.length > MAX) {
-    lines.push(`- ...${issues.length - MAX} more issues omitted.`);
+  if (issues.length > MAX_ISSUES) {
+    lines.push(`- ...${issues.length - MAX_ISSUES} more issues omitted.`);
   }
   return lines.join('\n');
 }
@@ -80,11 +88,22 @@ export async function repairToolCall({
     | { safeParse?: (input: unknown) => unknown }
     | undefined;
   if (schema && typeof schema.safeParse === 'function') {
-    const result = schema.safeParse(parsed) as {
-      success: boolean;
-      error?: { issues: readonly StructuralZodIssue[] };
-    };
-    if (!result.success && result.error) {
+    let result:
+      | {
+          success: boolean;
+          error?: { issues: readonly StructuralZodIssue[] };
+        }
+      | undefined;
+    try {
+      result = schema.safeParse(parsed) as typeof result;
+    } catch {
+      // Defensive: a schema with async refinements (or any future
+      // non-synchronous validator) causes zod to throw inside safeParse.
+      // Fall through to the generic fallback so the repair handler itself
+      // never produces an unhandled error inside the AI SDK.
+      result = undefined;
+    }
+    if (result && !result.success && result.error) {
       throw new Error(
         `Schema validation failed for "${toolCall.toolName}":\n${formatZodIssues(
           result.error.issues,
