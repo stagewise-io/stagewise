@@ -10,7 +10,6 @@ import {
   readUIMessageStream,
   tool,
   type DynamicToolUIPart,
-  NoSuchToolError,
 } from 'ai';
 import type {
   AgentMessage,
@@ -33,6 +32,7 @@ import {
   type ContentLimits,
 } from './utils';
 import { generateSimpleTitle } from './title-generation';
+import { repairToolCall } from './repair-tool-call';
 import {
   generateSimpleCompressedHistory,
   estimateMessageTokens,
@@ -1615,38 +1615,7 @@ export abstract class BaseAgent<
         } catch {}
         this.stepAbortController = null;
       },
-      experimental_repairToolCall: async ({ toolCall, error }) => {
-        // Model hallucinated a tool name — unrepairable.
-        if (NoSuchToolError.isInstance(error)) return null;
-
-        // InvalidToolInputError: check whether the input JSON is
-        // truncated (output token limit) vs. a schema mismatch.
-        const inputLen = toolCall.input?.length ?? 0;
-        let jsonValid = false;
-        try {
-          JSON.parse(toolCall.input);
-          jsonValid = true;
-        } catch {
-          // JSON is unparseable
-        }
-
-        if (!jsonValid) {
-          // Distinguish empty/tiny input from genuinely truncated long input
-          if (inputLen < 10) {
-            throw new Error(
-              `Tool call for "${toolCall.toolName}" had empty or near-empty input. The model failed to generate the required parameters.`,
-            );
-          }
-          throw new Error(
-            'Tool call inputs were too long and most likely exceeded maximum token output limits. Create more compact tool calls, i.e. by chunking edits into smaller pieces.',
-          );
-        }
-
-        // JSON is valid but doesn't match the schema
-        throw new Error(
-          `Tool call inputs for "${toolCall.toolName}" did not match the expected schema. Check the tool's parameter requirements and try again.`,
-        );
-      },
+      experimental_repairToolCall: repairToolCall,
       experimental_transform: smoothStream({
         delayInMs: 10,
         chunking: 'word',
