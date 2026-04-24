@@ -1,4 +1,7 @@
-import { execSync } from 'node:child_process';
+import { execFile, execSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Gets the root of the git repository for a given path.
@@ -28,6 +31,36 @@ export function getGitBranch(workspacePath: string): string | null {
     );
   } catch {
     return null;
+  }
+}
+
+/**
+ * Async, single-call git detection that returns both `isGitRepo` and the
+ * current branch (or null for detached HEAD / non-repo).
+ *
+ * Uses `execFile` (non-blocking) and `-C <path>` so a missing directory
+ * returns a clean rejection rather than throwing synchronously.
+ */
+export async function getGitInfo(
+  path: string,
+): Promise<{ isGitRepo: boolean; gitBranch: string | null }> {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['-C', path, 'rev-parse', '--abbrev-ref', 'HEAD'],
+      // 2s timeout to bound the probe; a hung git call on a slow/
+      // disconnected mount (network drive, sleeping disk, etc.) must not
+      // block the entire `getStoredInstance` RPC across all mounts. The
+      // existing catch treats timeout identically to a non-repo result.
+      { encoding: 'utf8', timeout: 2000 },
+    );
+    const branch = stdout.trim();
+    return {
+      isGitRepo: true,
+      gitBranch: branch === 'HEAD' ? null : branch || null,
+    };
+  } catch {
+    return { isGitRepo: false, gitBranch: null };
   }
 }
 

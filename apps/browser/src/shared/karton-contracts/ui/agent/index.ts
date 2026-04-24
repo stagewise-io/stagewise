@@ -1,6 +1,6 @@
 import type { ToolUIPart, UIDataTypes, UIMessage } from 'ai';
 import type { ModelId } from '@shared/available-models';
-import type { UserMessageMetadata } from './metadata';
+import type { MountPermission, UserMessageMetadata } from './metadata';
 import type { UIAgentTools } from './tools/types';
 
 export enum AgentTypes {
@@ -60,4 +60,26 @@ export type AgentHistoryEntry = {
   lastMessageAt: Date; // last message timestamp
   messageCount: number; // number of messages in the agent's history
   parentAgentInstanceId: string | null; // parent agent instance ID
+};
+
+/**
+ * Trimmed preview DTO for a persisted agent instance, returned on-demand by
+ * `agents.getStoredInstance` for the sidebar preview panel. Only includes the
+ * fields the UI consumes today (or is expected to consume imminently) to keep
+ * wire payload small.
+ */
+export type StoredAgentPreview = {
+  id: string;
+  type: AgentTypes;
+  title: string;
+  createdAt: Date;
+  lastMessageAt: Date;
+  activeModelId: ModelId;
+  messageCount: number;
+  mountedWorkspaces: Array<{
+    path: string;
+    permissions: MountPermission[];
+    isGitRepo: boolean;
+    gitBranch: string | null;
+  }> | null;
 };

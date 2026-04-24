@@ -1711,6 +1711,16 @@ export class ToolboxService extends DisposableService {
   }
 
   /**
+   * Return distinct filepaths that an agent has edited.
+   * Lightweight proxy to DiffHistoryService.
+   */
+  public async getEditedFilePathsForAgent(
+    agentInstanceId: string,
+  ): Promise<string[]> {
+    return this.diffHistoryService.getEditedFilePathsForAgent(agentInstanceId);
+  }
+
+  /**
    * Clear tracking data for a specific agent instance.
    * Call this when an agent session ends.
    */

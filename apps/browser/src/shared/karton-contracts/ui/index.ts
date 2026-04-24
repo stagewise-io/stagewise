@@ -41,6 +41,7 @@ import type {
   AgentTypes,
   AgentHistoryEntry,
   AgentMessage,
+  StoredAgentPreview,
 } from './agent';
 
 /** Speed data point for download speed history */
@@ -737,6 +738,12 @@ export type KartonContract = {
         originalFileName: string,
         filePath: string,
       ) => Promise<string>;
+      /** Fetch the full persisted row for a suspended/history agent (on-demand preview). */
+      getStoredInstance: (
+        agentId: string,
+      ) => Promise<StoredAgentPreview | null>;
+      /** Return distinct filepaths edited by an agent (from diff-history). */
+      getTouchedFiles: (agentId: string) => Promise<string[]>;
     };
     toolbox: {
       acceptHunks: (hunkIds: string[]) => Promise<void>;

@@ -21,6 +21,7 @@ import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
 
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import { readWorkspaceMd } from '@/agents/shared/prompts/utils/read-workspace-md';
+import { getGitInfo } from '@/utils/git-tools';
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 
@@ -431,6 +432,41 @@ export class AgentManagerService extends DisposableService {
         if (!mount) throw new Error(`Mount ${mountPrefix} not found`);
 
         await this.generateWorkspaceMdForPath(mount.path);
+      },
+    );
+    this.karton.registerServerProcedureHandler(
+      'agents.getStoredInstance',
+      async (_callingClientId: string, agentId: string) => {
+        const db = await this.dbReadyPromise;
+        if (!db) return null;
+        const row = await db.getStoredAgentInstanceById(agentId);
+        if (!row) return null;
+
+        const mountedWorkspaces = row.mountedWorkspaces
+          ? await Promise.all(
+              row.mountedWorkspaces.map(async (w) => ({
+                ...w,
+                ...(await getGitInfo(w.path)),
+              })),
+            )
+          : null;
+
+        return {
+          id: row.id,
+          type: row.type,
+          title: row.title,
+          createdAt: row.createdAt,
+          lastMessageAt: row.lastMessageAt,
+          activeModelId: row.activeModelId,
+          messageCount: row.history.length,
+          mountedWorkspaces,
+        };
+      },
+    );
+    this.karton.registerServerProcedureHandler(
+      'agents.getTouchedFiles',
+      async (_callingClientId: string, agentId: string) => {
+        return this.toolbox.getEditedFilePathsForAgent(agentId);
       },
     );
   }
