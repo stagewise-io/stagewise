@@ -69,6 +69,22 @@ export type EventProperties = {
   // Edits
   'edits-accepted': { hunk_count: number };
   'edits-rejected': { hunk_count: number };
+  'diff-history-fanout-cap-hit': {
+    tool_call_id: string;
+    agent_instance_id: string;
+    /**
+     * Category bucket of the first dropped path. Derived from path
+     * segments — deliberately coarse so the telemetry event cannot
+     * leak usernames, repo names, or directory structure.
+     */
+    path_category:
+      | 'node_modules'
+      | 'build-output'
+      | 'tooling-cache'
+      | 'dotfile'
+      | 'other';
+    cap: number;
+  };
 
   // Suggestions
   'suggestion-clicked': {

@@ -303,6 +303,16 @@ export class ToolboxService extends DisposableService {
     return path.join(getTempRoot(), 'agent-temp-files');
   }
 
+  /**
+   * Narrow accessor used by `DiffHistoryService` to resolve which
+   * filepaths belong to a mounted workspace (for the gitignore check).
+   * Returns an empty set before the mount manager has finished its
+   * async initialization — callers must tolerate that window.
+   */
+  public getAllMountedPaths(): Set<string> {
+    return this.mountManagerService?.getAllMountedPaths() ?? new Set();
+  }
+
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -444,6 +454,11 @@ export class ToolboxService extends DisposableService {
             agentInstanceId,
             path: absolutePath,
             toolCallId,
+            workspaceRoot:
+              this.mountManagerService?.findWorkspaceForFile(
+                agentInstanceId,
+                absolutePath,
+              ) ?? null,
             ...editContent,
           });
 
@@ -535,6 +550,11 @@ export class ToolboxService extends DisposableService {
               agentInstanceId,
               path: absolutePath,
               toolCallId,
+              workspaceRoot:
+                this.mountManagerService?.findWorkspaceForFile(
+                  agentInstanceId,
+                  absolutePath,
+                ) ?? null,
               ...editContent,
             });
 
@@ -567,6 +587,13 @@ export class ToolboxService extends DisposableService {
 
         // Directory deletion — capture before-state for all files
         const filePaths = await this.collectAllFiles(absolutePath);
+
+        // All children share the same owning workspace — resolve once.
+        const dirWorkspaceRoot =
+          this.mountManagerService?.findWorkspaceForFile(
+            agentInstanceId,
+            absolutePath,
+          ) ?? null;
 
         // Capture before-state for each file and ignore them in watcher
         const beforeStates = new Map<
@@ -611,6 +638,7 @@ export class ToolboxService extends DisposableService {
               agentInstanceId,
               path: filePath,
               toolCallId,
+              workspaceRoot: dirWorkspaceRoot,
               ...editContent,
             });
 
@@ -759,6 +787,19 @@ export class ToolboxService extends DisposableService {
         // Execute the copy/move
         const result = await copyToolExecute(params, mountedRuntimes);
 
+        // All dest files share the dest workspace; all src files share the src
+        // workspace (src and dest may differ across a cross-workspace copy).
+        const destWorkspaceRoot =
+          this.mountManagerService?.findWorkspaceForFile(
+            agentInstanceId,
+            destAbsolute,
+          ) ?? null;
+        const srcWorkspaceRoot =
+          this.mountManagerService?.findWorkspaceForFile(
+            agentInstanceId,
+            srcAbsolute,
+          ) ?? null;
+
         // Register diff-history for destination files (created/overwritten)
         try {
           for (const destFile of destFilePaths) {
@@ -784,6 +825,7 @@ export class ToolboxService extends DisposableService {
               agentInstanceId,
               path: destFile,
               toolCallId,
+              workspaceRoot: destWorkspaceRoot,
               ...editContent,
             });
 
@@ -815,6 +857,7 @@ export class ToolboxService extends DisposableService {
                 agentInstanceId,
                 path: srcFile,
                 toolCallId,
+                workspaceRoot: srcWorkspaceRoot,
                 ...editContent,
               });
 

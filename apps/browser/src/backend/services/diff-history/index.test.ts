@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DiffHistoryService } from '.';
+import { DiffHistoryService, categorizeFanoutPath } from '.';
 import { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import type { TelemetryService } from '@/services/telemetry';
@@ -2992,5 +2992,751 @@ describe('DiffHistoryService (E2E)', () => {
       expect(remainingKeys.some((k) => k.startsWith('1::'))).toBe(true);
       expect(remainingKeys.some((k) => k.startsWith('2::'))).toBe(false);
     });
+  });
+
+  // ===========================================================================
+  // Defensive guards: gitignore filter + per-tool-call fan-out cap
+  // ===========================================================================
+
+  describe('gitignore filtering', () => {
+    it('drops edits under node_modules even without a resolved workspace', async () => {
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(
+        testFilesDir,
+        'node_modules',
+        'some-pkg',
+        'index.js',
+      );
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'nm-tool',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'module.exports = {}',
+      });
+
+      const toolboxState = mockKarton._getToolboxState('1');
+      // No op stored → no pending diff surfaces to the UI.
+      expect(toolboxState?.pendingFileDiffs).toHaveLength(0);
+    });
+
+    it('drops edits matching user .gitignore inside a mounted workspace', async () => {
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      // Create a workspace with a .gitignore that blocks `custom-ignored/`.
+      const workspaceRoot = path.join(tempDir, 'ws-with-gitignore');
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        'custom-ignored/\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const ignoredPath = path.join(workspaceRoot, 'custom-ignored', 'x.ts');
+      const trackedPath = path.join(workspaceRoot, 'src', 'y.ts');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: ignoredPath,
+        toolCallId: 'gi-tool-ignored',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'ignored',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: trackedPath,
+        toolCallId: 'gi-tool-tracked',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'tracked',
+      });
+
+      const toolboxState = mockKarton._getToolboxState('1');
+      expect(toolboxState?.pendingFileDiffs).toHaveLength(1);
+      expect(toolboxState?.pendingFileDiffs[0].path).toBe(trackedPath);
+    });
+
+    it('drops edits when workspaceRoot hint is passed explicitly', async () => {
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-explicit-hint');
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        'secrets/\n',
+        'utf8',
+      );
+      // NOTE: no setMountPathsResolver — the hint on the edit itself is
+      // what unlocks the gitignore check.
+
+      const ignoredPath = path.join(workspaceRoot, 'secrets', 'api-key.ts');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: ignoredPath,
+        toolCallId: 'hint-tool',
+        workspaceRoot,
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'SECRET',
+      });
+
+      expect(mockKarton._getToolboxState('1')?.pendingFileDiffs).toHaveLength(
+        0,
+      );
+    });
+
+    it('tracks edits to regular source files', async () => {
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const filePath = path.join(testFilesDir, 'src', 'app.ts');
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: filePath,
+        toolCallId: 'src-tool',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'export const x = 1;',
+      });
+
+      expect(mockKarton._getToolboxState('1')?.pendingFileDiffs).toHaveLength(
+        1,
+      );
+    });
+
+    it('honors `.gitignore` negation when a workspace resolves', async () => {
+      // Locks in the ordering decision: once a workspace is resolved,
+      // its `.gitignore` (including negations like `!dir/keep.ts`) is
+      // authoritative and no further segment check runs.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-gitignore-negation');
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      // `custom-build/` is NOT in HARDCODED_DENY_SEGMENTS, so the phase-1
+      // segment matcher cannot short-circuit the decision — the test
+      // exercises exactly the phase-2 `.gitignore` path.
+      //
+      // NOTE: `ignore` follows Git's semantics: once a directory is
+      // ignored, files inside cannot be un-ignored. Use file-level
+      // patterns so the negation actually takes effect.
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        'custom-build/**\n!custom-build/keep.ts\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const dropPath = path.join(workspaceRoot, 'custom-build', 'drop.ts');
+      const keepPath = path.join(workspaceRoot, 'custom-build', 'keep.ts');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: dropPath,
+        toolCallId: 'neg-drop',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'drop',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: keepPath,
+        toolCallId: 'neg-keep',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'keep',
+      });
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0].path).toBe(keepPath);
+    });
+
+    it('tracks edits under `.vscode/` when not ignored (segment denylist narrowing)', async () => {
+      // Regression guard: `.vscode` used to be in HARDCODED_DENY_SEGMENTS,
+      // which silently dropped legitimate agent edits to committed
+      // editor configs. The narrowed denylist must NOT match it.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-vscode-committed');
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      // Trivial `.gitignore` that does NOT ignore `.vscode`.
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        '*.log\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const vscodePath = path.join(workspaceRoot, '.vscode', 'settings.json');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: vscodePath,
+        toolCallId: 'vscode-tool',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: '{}',
+      });
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0].path).toBe(vscodePath);
+    });
+
+    it('tracks edits under `dist/` when the project commits it via `.gitignore` negation', async () => {
+      // Regression guard for the PR review feedback that `dist`/`build`/
+      // `out` must NOT be in HARDCODED_DENY_SEGMENTS: projects that
+      // legitimately commit `dist/` (prebuilt assets, generated types,
+      // etc.) would otherwise lose diff history and `!dist/keep.ts`
+      // would be unrecoverable.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-committed-dist');
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      // `ignore` semantics: cannot un-ignore files inside an already
+      // ignored directory, so use the file-level `dist/**` form.
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        'dist/**\n!dist/keep.ts\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const keepPath = path.join(workspaceRoot, 'dist', 'keep.ts');
+      const dropPath = path.join(workspaceRoot, 'dist', 'drop.ts');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: keepPath,
+        toolCallId: 'dist-keep',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'export const kept = true;',
+      });
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: dropPath,
+        toolCallId: 'dist-drop',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'export const dropped = true;',
+      });
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0].path).toBe(keepPath);
+    });
+
+    it('honors nested `.gitignore` that adds rules beyond the root file', async () => {
+      // Regression guard for nested-gitignore support: a rule that
+      // lives only in `packages/foo/.gitignore` must apply to files
+      // under that package and ONLY that package.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-nested-adds');
+      await fs.mkdir(path.join(workspaceRoot, 'packages', 'foo'), {
+        recursive: true,
+      });
+      // Root `.gitignore` intentionally empty (present so the
+      // matcher does not fall back to soft-defaults-only behavior).
+      await fs.writeFile(path.join(workspaceRoot, '.gitignore'), '', 'utf8');
+      await fs.writeFile(
+        path.join(workspaceRoot, 'packages', 'foo', '.gitignore'),
+        'custom-output/**\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const fooDrop = path.join(
+        workspaceRoot,
+        'packages',
+        'foo',
+        'custom-output',
+        'drop.ts',
+      );
+      const fooTrack = path.join(
+        workspaceRoot,
+        'packages',
+        'foo',
+        'src',
+        'app.ts',
+      );
+      const barTrack = path.join(
+        workspaceRoot,
+        'packages',
+        'bar',
+        'custom-output',
+        'also.ts',
+      );
+
+      for (const [p, id, content] of [
+        [fooDrop, 'nested-drop', 'drop'],
+        [fooTrack, 'nested-track', 'ok'],
+        [barTrack, 'sibling-track', 'ok'],
+      ] as const) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: p,
+          toolCallId: id,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: content,
+        });
+      }
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      const paths = diffs.map((d) => d.path).sort();
+      expect(paths).toEqual([barTrack, fooTrack].sort());
+    });
+
+    it('honors nested `.gitignore` negations against a shallow rule', async () => {
+      // Deeper `.gitignore` wins: a `!generated/keep.ts` in
+      // `src/.gitignore` overrides a `generated/**` rule from the
+      // root file, but only within `src/`.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-nested-negate');
+      await fs.mkdir(path.join(workspaceRoot, 'src', 'generated'), {
+        recursive: true,
+      });
+      await fs.mkdir(path.join(workspaceRoot, 'other', 'generated'), {
+        recursive: true,
+      });
+      // Unanchored `**/generated/**` at root so the rule catches
+      // the `src/generated/...` subtree too (a bare `generated/**`
+      // would only match `/ws/generated/*`).
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        '**/generated/**\n',
+        'utf8',
+      );
+      await fs.writeFile(
+        path.join(workspaceRoot, 'src', '.gitignore'),
+        '!generated/keep.ts\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const keep = path.join(workspaceRoot, 'src', 'generated', 'keep.ts');
+      const drop = path.join(workspaceRoot, 'src', 'generated', 'drop.ts');
+      const otherDrop = path.join(
+        workspaceRoot,
+        'other',
+        'generated',
+        'other.ts',
+      );
+
+      for (const [p, id, content] of [
+        [keep, 'neg-keep', 'keep'],
+        [drop, 'neg-drop', 'drop'],
+        [otherDrop, 'neg-other', 'drop'],
+      ] as const) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: p,
+          toolCallId: id,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: content,
+        });
+      }
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      expect(diffs.map((d) => d.path)).toEqual([keep]);
+    });
+
+    it('deeper layer with no opinion does not override shallow rule', async () => {
+      // Verdict-preservation check: a nested `.gitignore` that is
+      // silent on a file must NOT un-ignore it — the shallow rule
+      // from the root `.gitignore` still wins.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-nested-silent');
+      await fs.mkdir(path.join(workspaceRoot, 'packages', 'foo'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(workspaceRoot, '.gitignore'),
+        '*.log\n',
+        'utf8',
+      );
+      // Nested file is non-empty but mentions unrelated patterns so
+      // we can assert `ig.test()` returns `no-opinion` for the file
+      // we care about.
+      await fs.writeFile(
+        path.join(workspaceRoot, 'packages', 'foo', '.gitignore'),
+        '# unrelated rules\nunused-pattern/**\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const logPath = path.join(workspaceRoot, 'packages', 'foo', 'out.log');
+
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: logPath,
+        toolCallId: 'silent-layer',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'log',
+      });
+
+      expect(mockKarton._getToolboxState('1')?.pendingFileDiffs).toHaveLength(
+        0,
+      );
+    });
+
+    it('soft defaults still cover projects without any `.gitignore`', async () => {
+      // Without a root `.gitignore` the matcher synthesizes a
+      // soft-defaults-only shallowest layer so common build output
+      // is still dropped.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-no-gitignore');
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const distPath = path.join(workspaceRoot, 'dist', 'bar.ts');
+      const srcPath = path.join(workspaceRoot, 'src', 'app.ts');
+
+      for (const [p, id] of [
+        [distPath, 'no-ig-dist'],
+        [srcPath, 'no-ig-src'],
+      ] as const) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: p,
+          toolCallId: id,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: 'x',
+        });
+      }
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      expect(diffs.map((d) => d.path)).toEqual([srcPath]);
+    });
+
+    it('nested `.gitignore` scoping is limited to its own subtree', async () => {
+      // A rule inside `packages/foo/.gitignore` must not leak to
+      // `packages/bar/`. This is the sibling-scoping invariant.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const workspaceRoot = path.join(tempDir, 'ws-nested-scoping');
+      await fs.mkdir(path.join(workspaceRoot, 'packages', 'foo'), {
+        recursive: true,
+      });
+      await fs.mkdir(path.join(workspaceRoot, 'packages', 'bar'), {
+        recursive: true,
+      });
+      await fs.writeFile(
+        path.join(workspaceRoot, 'packages', 'foo', '.gitignore'),
+        'custom-output/**\n',
+        'utf8',
+      );
+      service.setMountPathsResolver(() => new Set([workspaceRoot]));
+
+      const fooPath = path.join(
+        workspaceRoot,
+        'packages',
+        'foo',
+        'custom-output',
+        'x.ts',
+      );
+      const barPath = path.join(
+        workspaceRoot,
+        'packages',
+        'bar',
+        'custom-output',
+        'x.ts',
+      );
+
+      for (const [p, id] of [
+        [fooPath, 'scope-foo'],
+        [barPath, 'scope-bar'],
+      ] as const) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: p,
+          toolCallId: id,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: 'x',
+        });
+      }
+
+      const diffs = mockKarton._getToolboxState('1')?.pendingFileDiffs ?? [];
+      expect(diffs.map((d) => d.path)).toEqual([barPath]);
+    });
+  });
+
+  describe('per-tool-call fan-out cap', () => {
+    // Keep this in sync with MAX_EDITS_PER_TOOL_CALL inside the service.
+    const CAP = 50;
+
+    it('stores up to CAP edits for a single tool call and drops the rest', async () => {
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      const toolCallId = 'fanout-tool-1';
+      // `Logger.warn` is a getter that returns a bound winston fn; spying
+      // directly on it replaces the getter and breaks other callers. Stub
+      // the underlying winston instance instead by overriding its `warn`.
+      const innerLogger = (logger as unknown as { logger: { warn: unknown } })
+        .logger;
+      const warnSpy = vi.fn();
+      const originalWarn = innerLogger.warn;
+      innerLogger.warn = warnSpy as unknown as typeof innerLogger.warn;
+
+      try {
+        // CAP edits — all stored.
+        for (let i = 0; i < CAP; i++) {
+          await service.registerAgentEdit({
+            agentInstanceId: '1',
+            path: path.join(testFilesDir, `fan-${i}.ts`),
+            toolCallId,
+            isExternal: false,
+            contentBefore: null,
+            contentAfter: `content ${i}`,
+          });
+        }
+        expect(mockKarton._getToolboxState('1')?.pendingFileDiffs).toHaveLength(
+          CAP,
+        );
+        expect(warnSpy).not.toHaveBeenCalled();
+        expect(
+          (mockTelemetry.capture as ReturnType<typeof vi.fn>).mock.calls.filter(
+            ([event]) => event === 'diff-history-fanout-cap-hit',
+          ),
+        ).toHaveLength(0);
+
+        // CAP+1 — dropped. One warning + one telemetry event.
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: path.join(testFilesDir, `fan-${CAP}.ts`),
+          toolCallId,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: 'over-cap',
+        });
+        expect(mockKarton._getToolboxState('1')?.pendingFileDiffs).toHaveLength(
+          CAP,
+        );
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        const capHits = (
+          mockTelemetry.capture as ReturnType<typeof vi.fn>
+        ).mock.calls.filter(
+          ([event]) => event === 'diff-history-fanout-cap-hit',
+        );
+        expect(capHits).toHaveLength(1);
+        expect(capHits[0][1]).toMatchObject({
+          tool_call_id: toolCallId,
+          agent_instance_id: '1',
+          cap: CAP,
+          // First dropped path was `<testFilesDir>/fan-50.ts` which has
+          // no categorized segments and no leading-dot basename.
+          path_category: 'other',
+        });
+
+        // Further edits on the SAME tool-call — dropped silently (no duplicate
+        // warnings or telemetry).
+        for (let i = 0; i < 10; i++) {
+          await service.registerAgentEdit({
+            agentInstanceId: '1',
+            path: path.join(testFilesDir, `fan-extra-${i}.ts`),
+            toolCallId,
+            isExternal: false,
+            contentBefore: null,
+            contentAfter: `extra ${i}`,
+          });
+        }
+        expect(mockKarton._getToolboxState('1')?.pendingFileDiffs).toHaveLength(
+          CAP,
+        );
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(
+          (mockTelemetry.capture as ReturnType<typeof vi.fn>).mock.calls.filter(
+            ([event]) => event === 'diff-history-fanout-cap-hit',
+          ),
+        ).toHaveLength(1);
+      } finally {
+        // Guarantee the patched warn is restored even if an assertion
+        // above throws; otherwise `afterEach` teardown log calls would
+        // be silently swallowed by the spy.
+        innerLogger.warn = originalWarn;
+      }
+    });
+
+    it('resets the counter per new tool call id', async () => {
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      // First tool call hits the cap.
+      for (let i = 0; i < CAP + 5; i++) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: path.join(testFilesDir, `call-a-${i}.ts`),
+          toolCallId: 'call-a',
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: 'a',
+        });
+      }
+      const afterFirst =
+        mockKarton._getToolboxState('1')?.pendingFileDiffs.length ?? 0;
+      expect(afterFirst).toBe(CAP);
+
+      // New tool call id with one edit — it gets through.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: path.join(testFilesDir, 'call-b-0.ts'),
+        toolCallId: 'call-b',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'b',
+      });
+      expect(
+        mockKarton._getToolboxState('1')?.pendingFileDiffs.length ?? 0,
+      ).toBe(CAP + 1);
+    });
+
+    it('categorizes paths for telemetry without leaking raw values', () => {
+      // Telemetry privacy guard: the `diff-history-fanout-cap-hit`
+      // event must emit only a coarse category, never the raw path.
+      // Covers every branch of `categorizeFanoutPath` so a future
+      // rename / reorder cannot regress the payload shape.
+      const sep = path.sep;
+      expect(
+        categorizeFanoutPath(
+          ['', 'Users', 'alice', 'repo', 'node_modules', 'foo.js'].join(sep),
+        ),
+      ).toBe('node_modules');
+      // `node_modules` outranks `dotfile` for a `.bin`-style path.
+      expect(
+        categorizeFanoutPath(
+          ['', 'repo', 'node_modules', '.bin', 'tsc'].join(sep),
+        ),
+      ).toBe('node_modules');
+      expect(
+        categorizeFanoutPath(['', 'repo', 'dist', 'bundle.js'].join(sep)),
+      ).toBe('build-output');
+      expect(
+        categorizeFanoutPath(
+          ['', 'repo', '.next', 'static', 'index.js'].join(sep),
+        ),
+      ).toBe('build-output');
+      expect(
+        categorizeFanoutPath(['', 'repo', '.turbo', 'daemon.log'].join(sep)),
+      ).toBe('tooling-cache');
+      expect(
+        categorizeFanoutPath(['', 'repo', 'coverage', 'lcov.info'].join(sep)),
+      ).toBe('tooling-cache');
+      expect(categorizeFanoutPath(['', 'repo', '.gitignore'].join(sep))).toBe(
+        'dotfile',
+      );
+      expect(
+        categorizeFanoutPath(['', 'repo', 'src', 'app.ts'].join(sep)),
+      ).toBe('other');
+    });
+
+    it('caps the tracked-tool-call maps to prevent unbounded memory growth', async () => {
+      // Verifies the `MAX_TRACKED_TOOL_CALLS` reset kicks in when the
+      // counter map would otherwise grow indefinitely across a long
+      // session with thousands of short-lived tool calls.
+      service = await DiffHistoryService.create(
+        logger,
+        mockKarton,
+        mockTelemetry,
+      );
+
+      // Matches `DiffHistoryService.MAX_TRACKED_TOOL_CALLS` — keep in sync.
+      const MEMORY_CAP = 10_000;
+      const OVERFLOW = 5;
+
+      // Each iteration is a distinct tool call id with a single
+      // edit. That is enough to grow `_toolCallEditCounts` by one
+      // entry per iteration.
+      for (let i = 0; i < MEMORY_CAP + OVERFLOW; i++) {
+        await service.registerAgentEdit({
+          agentInstanceId: '1',
+          path: path.join(testFilesDir, `mem-cap-${i}.ts`),
+          toolCallId: `mem-tool-${i}`,
+          isExternal: false,
+          contentBefore: null,
+          contentAfter: 'x',
+        });
+      }
+
+      const counts = (
+        service as unknown as { _toolCallEditCounts: Map<string, number> }
+      )._toolCallEditCounts;
+      const warned = (
+        service as unknown as {
+          _toolCallTruncatedWarned: Set<string>;
+        }
+      )._toolCallTruncatedWarned;
+
+      expect(counts.size).toBeLessThanOrEqual(MEMORY_CAP);
+      expect(warned.size).toBeLessThanOrEqual(MEMORY_CAP);
+    }, 120_000); // Creating 10k edits is file-IO heavy; give the test extra room.
   });
 });

@@ -12,6 +12,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { KartonService } from '@/services/karton';
 import {
+  HARDCODED_DENY_SEGMENTS,
+  loadWorkspaceIgnore,
+  type WorkspaceIgnoreMatcher,
+} from '@/utils/load-gitignore';
+import { pickOwningWorkspace } from '@/utils/workspace-resolution';
+import {
   getDiffHistoryDbPath,
   getDiffHistoryBlobsDir,
   getAgentAppsDir,
@@ -62,6 +68,13 @@ type AgentFileEdit = {
   agentInstanceId: string;
   path: string;
   toolCallId: string;
+  /**
+   * Absolute path of the mounted workspace that owns `path`, when the
+   * caller already knows it. Used as the fast-path for the gitignore
+   * check in `registerAgentEdit`. Optional — when omitted, the service
+   * walks up against its known mount set.
+   */
+  workspaceRoot?: string | null;
 } & (
   | {
       isExternal: false;
@@ -74,6 +87,64 @@ type AgentFileEdit = {
       tempPathToAfterContent: string | null;
     }
 );
+
+/**
+ * Coarse category of a filesystem path used as the telemetry-safe
+ * replacement for the raw `first_dropped_path` we used to ship in the
+ * `diff-history-fanout-cap-hit` event. Categories are intentionally
+ * chunky so the payload cannot leak usernames, repo names, or
+ * directory structure while still providing useful analytics signal
+ * (e.g. "90% of cap hits happen under node_modules").
+ */
+export type FanoutPathCategory =
+  | 'node_modules'
+  | 'build-output'
+  | 'tooling-cache'
+  | 'dotfile'
+  | 'other';
+
+const FANOUT_BUILD_OUTPUT_SEGMENTS: ReadonlySet<string> = new Set([
+  'dist',
+  'build',
+  'out',
+  '.output',
+  '.next',
+  '.nuxt',
+  '.svelte-kit',
+  '.astro',
+]);
+
+const FANOUT_TOOLING_CACHE_SEGMENTS: ReadonlySet<string> = new Set([
+  '.turbo',
+  '.cache',
+  '.parcel-cache',
+  '.vite',
+  '.angular',
+  '.gradle',
+  'coverage',
+]);
+
+/**
+ * Maps an absolute filesystem path to a coarse category for telemetry.
+ *
+ * Precedence is top-down: a match in a higher row wins even if lower
+ * rows would also match. `node_modules` deliberately outranks
+ * `dotfile` so that e.g. `node_modules/.bin/foo` still reports as
+ * `node_modules`.
+ *
+ * Never returns the path itself — that is the whole point.
+ */
+export function categorizeFanoutPath(filepath: string): FanoutPathCategory {
+  const segments = filepath.split(path.sep);
+  if (segments.includes('node_modules')) return 'node_modules';
+  for (const seg of segments) {
+    if (FANOUT_BUILD_OUTPUT_SEGMENTS.has(seg)) return 'build-output';
+    if (FANOUT_TOOLING_CACHE_SEGMENTS.has(seg)) return 'tooling-cache';
+  }
+  const basename = segments[segments.length - 1] ?? '';
+  if (basename.startsWith('.')) return 'dotfile';
+  return 'other';
+}
 
 export class DiffHistoryService extends DisposableService {
   private readonly logger: Logger;
@@ -146,6 +217,64 @@ export class DiffHistoryService extends DisposableService {
       editSummary: FileDiff[];
     }
   >();
+
+  /**
+   * Maximum number of file edits a single tool call may register in the
+   * ops table. Edits past this threshold are dropped on the floor — the
+   * tool's on-disk write has already succeeded; we just refuse to track
+   * it so a single rogue tool call cannot flood the diff store with
+   * thousands of entries.
+   *
+   * 50 is comfortably above any realistic hand-authored multi-file edit
+   * and well below the ~hundreds-of-files threshold at which the pending
+   * diff computation becomes UI-blocking.
+   */
+  private readonly MAX_EDITS_PER_TOOL_CALL = 50;
+
+  /**
+   * Memory-safety cap on `_toolCallEditCounts` / `_toolCallTruncatedWarned`
+   * size. These maps are keyed by `toolCallId` and have no natural
+   * expiry (a tool call completes in seconds but we never know when
+   * its last edit arrived). Rather than wire GC plumbing for what are
+   * tiny integer entries, we reset both maps when the count map
+   * crosses this threshold. Worst case: a previously-capped tool call
+   * could register 50 more edits after a reset — acceptable, and
+   * exceedingly unlikely in practice because tool calls are short-lived.
+   */
+  private static readonly MAX_TRACKED_TOOL_CALLS = 10_000;
+
+  /** Per-tool-call running count of registered edits. */
+  private _toolCallEditCounts = new Map<string, number>();
+
+  /**
+   * Tool-call IDs for which we have already emitted the one-shot
+   * "exceeded fan-out cap" warning. Prevents log/telemetry spam.
+   */
+  private _toolCallTruncatedWarned = new Set<string>();
+
+  /**
+   * Cache of `WorkspaceIgnoreMatcher` instances keyed by absolute
+   * workspace root. The matcher holds one `Ignore` instance per
+   * `.gitignore` file found under the workspace so the check honors
+   * git's nested-`.gitignore` semantics. Entries expire after
+   * `IGNORE_TTL_MS` so edits to any `.gitignore` in the tree are
+   * eventually picked up without the complexity of a dedicated
+   * per-file watcher.
+   */
+  private _ignoreCache = new Map<
+    string,
+    { matcher: WorkspaceIgnoreMatcher; expiresAt: number }
+  >();
+  private static readonly IGNORE_TTL_MS = 30_000;
+
+  /**
+   * Injected via `setMountPathsResolver` after construction (to avoid
+   * a circular dep with ToolboxService / MountManagerService at
+   * DiffHistoryService.create() time). Returns the current set of
+   * absolute workspace root paths. Used to resolve the owning workspace
+   * of a filepath when the caller did not provide it explicitly.
+   */
+  private _mountPathsResolver: (() => Set<string>) | null = null;
 
   private cacheKey(
     agentId: string,
@@ -247,6 +376,14 @@ export class DiffHistoryService extends DisposableService {
       })
       .on('change', async (path) => {
         if (this.filesIgnoredByWatcher.has(path)) return;
+        // NOTE: we deliberately do NOT re-run `shouldTrackFilepath`
+        // here. Every path in the watch set was approved by the
+        // gitignore guard at `registerAgentEdit` time, so a change
+        // to `.gitignore` after the fact (or a newly added nested
+        // mount) must not silently suppress the user-save op for a
+        // file that still has pending ops — doing so would leave
+        // a stale current snapshot that never self-heals and could
+        // clobber user changes on Accept.
         try {
           await storeFileAndAddOperation(path, {
             operation: 'edit',
@@ -262,6 +399,10 @@ export class DiffHistoryService extends DisposableService {
         await this.updateAgentsAffectedByFilepath(path);
       })
       .on('unlink', async (path) => {
+        // Same rationale as the `change` handler above: re-running
+        // the gitignore filter here would cause silent data loss
+        // for files that were legitimately tracked but later fell
+        // into an ignored path.
         if (this.filesIgnoredByWatcher.has(path)) return;
         await insertOperation(this.db, path, null, {
           operation: 'edit',
@@ -324,6 +465,117 @@ export class DiffHistoryService extends DisposableService {
   }
 
   /**
+   * Injects the resolver used to discover which absolute paths are
+   * currently mounted as agent workspaces. Called once from `main.ts`
+   * after both `DiffHistoryService` and `ToolboxService` (which owns
+   * the `MountManagerService`) have been constructed.
+   *
+   * Without a resolver the service still functions, but
+   * `shouldTrackFilepath` falls back to segment-only denylist matching
+   * for edits whose `workspaceRoot` was not explicitly passed in.
+   */
+  public setMountPathsResolver(fn: () => Set<string>): void {
+    this._mountPathsResolver = fn;
+  }
+
+  /**
+   * Longest-prefix match of `filepath` against the currently mounted
+   * workspace roots. Returns `null` when the resolver has not been
+   * wired, when no mount is registered, or when the path lies outside
+   * every mount. Longest match wins so nested mounts resolve to the
+   * innermost workspace (whose `.gitignore` is the relevant one).
+   */
+  private findWorkspaceRoot(filepath: string): string | null {
+    const mounts = this._mountPathsResolver?.();
+    if (!mounts || mounts.size === 0) return null;
+    // Single source of truth shared with `MountManagerService` so the
+    // two callers can't drift on path-boundary / longest-prefix /
+    // filesystem-root semantics.
+    return pickOwningWorkspace(filepath, mounts) ?? null;
+  }
+
+  /**
+   * TTL-cached `WorkspaceIgnoreMatcher` for a workspace root. The
+   * matcher scans every `.gitignore` file under the workspace once
+   * per TTL and answers git-accurate ignore queries for any file
+   * beneath the root. The cache TTL is low (30s) so `.gitignore`
+   * edits are eventually honored without the complexity of a
+   * dedicated watcher on every ignore file.
+   */
+  private async getCachedIgnore(
+    workspaceRoot: string,
+  ): Promise<WorkspaceIgnoreMatcher> {
+    const now = Date.now();
+    const hit = this._ignoreCache.get(workspaceRoot);
+    if (hit && hit.expiresAt > now) return hit.matcher;
+    const matcher = await loadWorkspaceIgnore(workspaceRoot);
+    this._ignoreCache.set(workspaceRoot, {
+      matcher,
+      expiresAt: now + DiffHistoryService.IGNORE_TTL_MS,
+    });
+    return matcher;
+  }
+
+  /**
+   * Decides whether a filepath should be tracked by diff-history.
+   *
+   * Three-phase check, cheapest-first:
+   *   1. Synchronous walk-up against `HARDCODED_DENY_SEGMENTS`. This
+   *      catches the pathological cases (`node_modules`, build dirs,
+   *      tooling caches) in microseconds with zero allocations, which
+   *      matters when a runaway tool fans out across thousands of
+   *      ignored paths. Segments in this list represent universally
+   *      non-committed output — no real project keeps them under
+   *      version control — so applying them unconditionally is safe.
+   *   2. Resolve the owning workspace (caller-provided hint, else
+   *      walk-up against the mounted set) and, if found, consult the
+   *      workspace's `.gitignore` (TTL-cached). When a workspace
+   *      resolves, its `.gitignore` is **authoritative**: negations
+   *      like `!dist/keep.ts` are honored and no further segment
+   *      check is applied after it.
+   *   3. Outside any mounted workspace with the segment check already
+   *      clean: allow the edit.
+   *
+   * Never throws — returns `true` on any unexpected error so we fail
+   * open (prefer tracking over silently dropping).
+   */
+  private async shouldTrackFilepath(
+    filepath: string,
+    workspaceRoot?: string | null,
+  ): Promise<boolean> {
+    try {
+      // Phase 1: synchronous segment denylist. Hot path for runaway
+      // node_modules fan-out; rejects in microseconds.
+      const segments = filepath.split(path.sep);
+      for (const seg of segments) {
+        if (HARDCODED_DENY_SEGMENTS.has(seg)) return false;
+      }
+
+      // Phase 2: authoritative per-workspace `.gitignore`, honoring
+      // nested `.gitignore` files at every level from the root down
+      // to the file's parent. The matcher internally walks layers
+      // and takes the deepest definitive verdict, so we do NOT fall
+      // through to any further segment check after this.
+      const root = workspaceRoot ?? this.findWorkspaceRoot(filepath);
+      if (root) {
+        const matcher = await this.getCachedIgnore(root);
+        return !matcher.ignores(filepath);
+      }
+
+      // Phase 3: no workspace found, segment check already passed.
+      return true;
+    } catch (error) {
+      // Never let an ignore-check failure block a real edit. Log and
+      // fall open so the edit is tracked as it would have been before.
+      this.logError(
+        `shouldTrackFilepath failed for ${filepath} — failing open`,
+        error,
+      );
+      return true;
+    }
+  }
+
+  /**
    * Registers an agent edit in the diff-db and updates the diff karton state.
    * **The caller is responsible for detecting binaries/ blobs and providing before/ after content accordingly.**
    * Binary content will be provided as temporary paths to files - the caller is responsible for cleaning up the temporary
@@ -338,10 +590,58 @@ export class DiffHistoryService extends DisposableService {
    * **For regular file edits:**
    * - set 'before*' to content and 'after*' to content
    *
+   * Two defensive guards apply before any DB write:
+   *   1. `shouldTrackFilepath` drops edits in gitignored / denylisted paths.
+   *   2. A per-`toolCallId` counter caps fan-out at `MAX_EDITS_PER_TOOL_CALL`.
+   * Both are silent no-ops from the caller's perspective — the tool's
+   * on-disk write has already succeeded; we just refuse to store
+   * untrackable / runaway entries in the ops table.
+   *
    * @param edit - The edit to register
    * @returns void
    */
   public async registerAgentEdit(edit: AgentFileEdit) {
+    // Guard 1: gitignore / hardcoded-denylist filter.
+    if (!(await this.shouldTrackFilepath(edit.path, edit.workspaceRoot))) {
+      this.logDebug(`Skipping ignored path: ${edit.path}`);
+      return;
+    }
+
+    // Guard 2: per-tool-call fan-out cap. Single runaway tool call can
+    // otherwise flood the ops table with thousands of entries.
+    const prev = this._toolCallEditCounts.get(edit.toolCallId) ?? 0;
+    // Memory-safety reset: if we are about to track a brand-new tool
+    // call and the map has grown past the hard cap, drop both maps.
+    // See `MAX_TRACKED_TOOL_CALLS` JSDoc for the trade-off.
+    if (
+      prev === 0 &&
+      this._toolCallEditCounts.size >= DiffHistoryService.MAX_TRACKED_TOOL_CALLS
+    ) {
+      this._toolCallEditCounts.clear();
+      this._toolCallTruncatedWarned.clear();
+    }
+    const next = prev + 1;
+    this._toolCallEditCounts.set(edit.toolCallId, next);
+    if (next > this.MAX_EDITS_PER_TOOL_CALL) {
+      if (!this._toolCallTruncatedWarned.has(edit.toolCallId)) {
+        this._toolCallTruncatedWarned.add(edit.toolCallId);
+        this.logger.warn(
+          `[DiffHistory] Tool call ${edit.toolCallId} exceeded fan-out cap ` +
+            `(${this.MAX_EDITS_PER_TOOL_CALL} edits). Further edits in ` +
+            `this call are dropped from diff history; on-disk writes are unaffected.`,
+        );
+        this.telemetryService.capture('diff-history-fanout-cap-hit', {
+          tool_call_id: edit.toolCallId,
+          agent_instance_id: edit.agentInstanceId,
+          // Intentionally NOT `edit.path` — raw paths leak usernames
+          // and repo names into analytics. See `FanoutPathCategory`.
+          path_category: categorizeFanoutPath(edit.path),
+          cap: this.MAX_EDITS_PER_TOOL_CALL,
+        });
+      }
+      return;
+    }
+
     // If path is null, it's a newly created blob
     const hasPendingEdits = edit.path
       ? await hasPendingEditsForFilepath(this.db, edit.path)
@@ -1320,6 +1620,10 @@ export class DiffHistoryService extends DisposableService {
     this.contributorStateCache.clear();
     this.oidContentCache.clear();
     this._agentDiffSnapshot.clear();
+    this._toolCallEditCounts.clear();
+    this._toolCallTruncatedWarned.clear();
+    this._ignoreCache.clear();
+    this._mountPathsResolver = null;
     this.uiKarton.removeServerProcedureHandler('toolbox.acceptHunks');
     this.uiKarton.removeServerProcedureHandler('toolbox.rejectHunks');
   }
