@@ -16,7 +16,7 @@
     "@stagewise/stage-ui": "workspace:*",
     "@stagewise/tailwindcss-color-modifiers": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
-    "better-auth": "^1.5.3",
+    "better-auth": "^1.6.9",
     "framer-motion": "^12.23.3",
     "geist": "^1.4.2",
     "gray-matter": "^4.0.3",

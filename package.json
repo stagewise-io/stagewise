@@ -94,14 +94,14 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^4.0.77",
-    "@ai-sdk/azure": "^3.0.42",
-    "@ai-sdk/google-vertex": "^4.0.80",
-    "@ai-sdk/openai-compatible": "^2.0.35",
-    "@better-auth/electron": "^1.5.3",
+    "@ai-sdk/amazon-bedrock": "^4.0.96",
+    "@ai-sdk/azure": "^3.0.54",
+    "@ai-sdk/google-vertex": "^4.0.112",
+    "@ai-sdk/openai-compatible": "^2.0.41",
+    "@better-auth/electron": "^1.6.9",
     "@streamdown/math": "^1.0.2",
     "@xterm/headless": "^6.0.0",
-    "better-auth": "^1.5.3",
+    "better-auth": "^1.6.9",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
     "tsx": "^4.20.3"
