@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-alpha071 (2026-04-24)
+
+### Bug Fixes
+
+* harden tool repair handler and fix shell description example (78e8a16)
+* simplify executeShellCommand schema and description to reduce LLM schema errors (afebb64)
+* surface zod issues from tool repair handler (7166e05)
+
 ## 1.0.0-alpha070 (2026-04-23)
 
 ### Features
