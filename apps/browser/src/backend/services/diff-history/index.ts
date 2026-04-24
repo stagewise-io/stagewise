@@ -31,6 +31,7 @@ import {
 import {
   getAllOperationsForAgentInstanceId,
   getAllOperationsForAgentInstanceIdAndFilepath,
+  getEditedFilePathsForAgentInstanceId,
   getAllPendingOperations,
   getPendingOperationsForAgentInstanceId,
   getPendingOperationsForAgentInstanceIdAndFilepath,
@@ -949,6 +950,22 @@ export class DiffHistoryService extends DisposableService {
       this.watcher?.unwatch(path);
       this.currentlyWatchedFiles.delete(path);
     });
+  }
+
+  /**
+   * Return distinct filepaths that an agent has edited, excluding internal
+   * paths (apps/, plans/, logs/) to stay consistent with the rest of the
+   * diff UI (see `computeFileDiffs` / targeted-patch path).
+   * Lightweight query — does not load operations or snapshots.
+   */
+  public async getEditedFilePathsForAgent(
+    agentInstanceId: string,
+  ): Promise<string[]> {
+    const all = await getEditedFilePathsForAgentInstanceId(
+      this.db,
+      agentInstanceId,
+    );
+    return all.filter((p) => !this.isInternalFilepath(agentInstanceId, p));
   }
 
   /**

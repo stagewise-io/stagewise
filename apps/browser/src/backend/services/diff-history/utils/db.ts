@@ -562,6 +562,29 @@ export async function getAllOperationsForAgentInstanceId(
 }
 
 /**
+ * Return the distinct filepaths that an agent has edited.
+ * This is a lightweight query that avoids loading full operations or snapshots.
+ *
+ * @param db - Database connection
+ * @param agentInstanceId - The agent instance ID
+ * @returns Array of distinct filepaths touched by the agent
+ */
+export async function getEditedFilePathsForAgentInstanceId(
+  db: SnapshotDb,
+  agentInstanceId: AgentInstanceId,
+): Promise<string[]> {
+  const contributor = `agent-${agentInstanceId}` as `agent-${AgentInstanceId}`;
+
+  const rows = await db
+    .selectDistinct({ filepath: schema.operations.filepath })
+    .from(schema.operations)
+    .where(eq(schema.operations.contributor, contributor))
+    .all();
+
+  return rows.map((r) => r.filepath);
+}
+
+/**
  * Like `getAllOperationsForAgentInstanceId` but scoped to a single filepath.
  * Returns session-filtered operations where the agent contributed at least
  * one edit. Used by the targeted-update path when a specific file changed.

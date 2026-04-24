@@ -1,7 +1,6 @@
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
 import {
   Combobox,
-  ComboboxContent,
   ComboboxEmpty,
   ComboboxGroup,
   ComboboxGroupLabel,
@@ -25,9 +24,18 @@ import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { useInlineTitleEdit } from '../../active-agents/_components/use-inline-title-edit';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import type React from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import TimeAgo from 'react-timeago';
 import buildFormatter from 'react-timeago/lib/formatters/buildFormatter';
+import { AgentPreviewPanel, type CachedPreview } from './agent-preview-panel';
 
 // ============================================================================
 // Types
@@ -84,6 +92,13 @@ const minimalFormatter = buildFormatter({
 });
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** The "Active agents" group label used by the parent to identify live agents. */
+const ACTIVE_GROUP_LABEL = 'Active agents';
+
+// ============================================================================
 // AgentListItem — one row
 // ============================================================================
 
@@ -98,6 +113,7 @@ interface AgentListItemProps {
   onStartDelete: (id: string) => void;
   onCancelDelete: () => void;
   onConfirmDelete: (id: string) => void;
+  onHighlight: (agentId: string) => void;
 }
 
 function AgentListItemImpl({
@@ -111,8 +127,10 @@ function AgentListItemImpl({
   onStartDelete,
   onCancelDelete,
   onConfirmDelete,
+  onHighlight,
 }: AgentListItemProps) {
   const hasUnseen = !isSelected && !!agent.unread;
+  const itemRef = useRef<HTMLDivElement>(null);
 
   const handleCommit = useCallback(
     (newTitle: string) => onCommitRename(agent.id, newTitle),
@@ -145,8 +163,32 @@ function AgentListItemImpl({
     }
   }, [isEditing, editActive, startEditing, cancelEdit]);
 
+  // Observe the Combobox's `data-highlighted` attribute on this row. Base-ui
+  // sets that when a row becomes the active keyboard-highlighted item; we
+  // forward the event so the parent can position the agent preview side panel.
+  useEffect(() => {
+    const el = itemRef.current;
+    if (!el) return;
+
+    // Seed in case Base UI rendered this row already-highlighted on mount;
+    // MutationObserver only fires on subsequent attribute changes.
+    if (el.hasAttribute('data-highlighted')) onHighlight(agent.id);
+
+    const observer = new MutationObserver(() => {
+      if (el.hasAttribute('data-highlighted')) onHighlight(agent.id);
+    });
+
+    observer.observe(el, {
+      attributes: true,
+      attributeFilter: ['data-highlighted'],
+    });
+
+    return () => observer.disconnect();
+  }, [agent.id, onHighlight]);
+
   return (
     <ComboboxItem
+      ref={itemRef}
       key={agent.id}
       value={agent.id}
       size="xs"
@@ -373,6 +415,19 @@ export const AgentsSelector = memo(
 
     const hasResults = filteredGroups.some((g) => g.agents.length > 0);
 
+    // Build a set of active agent IDs for the preview panel.
+    const activeAgentIdSet = useMemo(() => {
+      const set = new Set<string>();
+      for (const group of groups) {
+        if (group.label === ACTIVE_GROUP_LABEL) {
+          for (const agent of group.agents) {
+            set.add(agent.id);
+          }
+        }
+      }
+      return set;
+    }, [groups]);
+
     // Infinite scroll: observe sentinel near bottom of list
     const onEndReachedRef = useRef(onEndReached);
     onEndReachedRef.current = onEndReached;
@@ -390,6 +445,111 @@ export const AgentsSelector = memo(
       observer.observe(sentinel);
       return () => observer.disconnect();
     }, [hasResults, isOpen, !!onEndReached]);
+
+    // Side-panel hover state (vertical-center align with the highlighted row).
+    const containerRef = useRef<HTMLDivElement>(null);
+    const sidePanelRef = useRef<HTMLDivElement>(null);
+    const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
+    const [sidePanelOffset, setSidePanelOffset] = useState(0);
+
+    // The side-panel should only render while its target agent is actually
+    // present in the visible list — e.g. if the user filters it out, deletes
+    // it, or the infinite-scroll window moves past it, we hide the panel
+    // instead of showing a stale preview next to unrelated rows.
+    const isHoveredAgentVisible = useMemo(() => {
+      if (!hoveredAgentId) return false;
+      return filteredGroups.some((g) =>
+        g.agents.some((a) => a.id === hoveredAgentId),
+      );
+    }, [filteredGroups, hoveredAgentId]);
+
+    // Preview cache: owned by the selector so it survives panel unmount
+    // between hovers. Cleared when the dropdown closes to avoid serving
+    // stale touched-files / workspace data across unrelated sessions.
+    const previewCacheRef = useRef<Map<string, CachedPreview>>(new Map());
+
+    // Delayed-clear so the cursor can traverse the gap between the popup
+    // and the floating side panel without the panel closing.
+    const clearTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined,
+    );
+    const cancelPendingClear = useCallback(() => {
+      if (clearTimerRef.current !== undefined) {
+        clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = undefined;
+      }
+    }, []);
+    const scheduleClear = useCallback(() => {
+      cancelPendingClear();
+      clearTimerRef.current = setTimeout(() => {
+        setHoveredAgentId(null);
+        clearTimerRef.current = undefined;
+      }, 150);
+    }, [cancelPendingClear]);
+    useEffect(() => cancelPendingClear, [cancelPendingClear]);
+
+    useLayoutEffect(() => {
+      const panel = sidePanelRef.current;
+      const container = containerRef.current;
+      const list = listRef.current;
+      if (!hoveredAgentId || !panel || !container) return;
+
+      // Measure the currently highlighted row live on every call so we never
+      // rely on a stale captured center. The row can move relative to the
+      // container when the list is resorted, filtered, or scrolled without
+      // the highlight changing.
+      const reposition = () => {
+        const highlighted =
+          container.querySelector<HTMLElement>('[data-highlighted]');
+        if (!highlighted) return;
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = highlighted.getBoundingClientRect();
+        const itemCenterY =
+          itemRect.top + itemRect.height / 2 - containerRect.top;
+
+        const panelHeight = panel.offsetHeight;
+        const containerHeight = container.offsetHeight;
+        // If the panel is taller than the container, `containerHeight -
+        // panelHeight` is negative; floor `maxOffset` at 0 so the panel
+        // stays top-aligned instead of being pushed above the container.
+        const maxOffset = Math.max(0, containerHeight - panelHeight);
+        const desired = itemCenterY - panelHeight / 2;
+        setSidePanelOffset(Math.max(0, Math.min(desired, maxOffset)));
+      };
+
+      reposition();
+
+      // Re-measure on async height changes (skeleton → content swap, search
+      // filter shrinking the popup list, etc.).
+      const ro = new ResizeObserver(reposition);
+      ro.observe(panel);
+      ro.observe(container);
+
+      // Re-measure when the list DOM changes under the highlighted row
+      // without a size change (row inserted above, list resorted, etc.).
+      const mo = new MutationObserver(reposition);
+      if (list) {
+        mo.observe(list, { childList: true, subtree: true });
+      }
+
+      // Re-measure on scroll so the row stays anchored as the list scrolls
+      // under the (stationary) cursor. Passive so it never blocks scroll.
+      list?.addEventListener('scroll', reposition, { passive: true });
+
+      return () => {
+        ro.disconnect();
+        mo.disconnect();
+        list?.removeEventListener('scroll', reposition);
+      };
+    }, [hoveredAgentId]);
+
+    const handleItemHover = useCallback(
+      (agentId: string) => {
+        cancelPendingClear();
+        setHoveredAgentId(agentId);
+      },
+      [cancelPendingClear],
+    );
 
     const handleValueChange = useCallback(
       (v: string | null) => {
@@ -423,14 +583,20 @@ export const AgentsSelector = memo(
       setEditingId(null);
     }, []);
 
-    const handleOpenChange = useCallback((open: boolean) => {
-      setIsOpen(open);
-      if (!open) {
-        setInputValue('');
-        setPendingDeleteId(null);
-        setEditingId(null);
-      }
-    }, []);
+    const handleOpenChange = useCallback(
+      (open: boolean) => {
+        setIsOpen(open);
+        if (!open) {
+          setInputValue('');
+          setPendingDeleteId(null);
+          setEditingId(null);
+          cancelPendingClear();
+          setHoveredAgentId(null);
+          previewCacheRef.current.clear();
+        }
+      },
+      [cancelPendingClear],
+    );
 
     const showActiveAgents = useKartonState(
       (s) => s.preferences.sidebar?.showActiveAgents ?? true,
@@ -478,68 +644,115 @@ export const AgentsSelector = memo(
         />
 
         {isOpen && (
-          <ComboboxContent
-            side="bottom"
-            sideOffset={8}
-            size="xs"
-            className="min-w-56 max-w-72"
-          >
-            <div className="mb-1">
-              <ComboboxInput size="xs" placeholder="Search chats…" />
-            </div>
-
-            <div
-              ref={listRef}
-              className="scrollbar-hover-only max-h-48 overflow-y-auto"
+          <ComboboxBase.Portal>
+            <ComboboxBase.Backdrop className="fixed inset-0 z-50" />
+            <ComboboxBase.Positioner
+              side="bottom"
+              sideOffset={8}
+              align="start"
+              className="z-50"
             >
-              <ComboboxList>
-                {filteredGroups.map(({ label, agents }) => (
-                  <ComboboxGroup key={label}>
-                    <ComboboxGroupLabel>{label}</ComboboxGroupLabel>
-                    {agents.map((agent) => (
-                      <AgentListItem
-                        key={agent.id}
-                        agent={agent}
-                        isSelected={agent.id === value}
-                        isEditing={editingId === agent.id}
-                        pendingDeleteId={pendingDeleteId}
-                        onStartEdit={handleStartEdit}
-                        onCancelEdit={handleCancelEdit}
-                        onCommitRename={onRename}
-                        onStartDelete={handleStartDelete}
-                        onCancelDelete={handleCancelDelete}
-                        onConfirmDelete={handleConfirmDelete}
-                      />
-                    ))}
-                  </ComboboxGroup>
-                ))}
-              </ComboboxList>
-              {onEndReached && (
-                <div
-                  ref={sentinelRef}
-                  aria-hidden="true"
-                  className="h-px shrink-0"
-                />
-              )}
-            </div>
-
-            {!hasResults && <ComboboxEmpty />}
-
-            <div className="flex items-center justify-between border-border-subtle border-t pt-2 pr-1.5 pb-1 pl-2.5">
-              <label
-                htmlFor="show-active-agents"
-                className="cursor-pointer text-muted-foreground text-xs"
+              <div
+                ref={containerRef}
+                className="relative flex flex-row items-start gap-1"
+                onMouseLeave={scheduleClear}
+                onMouseEnter={cancelPendingClear}
               >
-                Show active in sidebar
-              </label>
-              <Switch
-                size="xs"
-                id="show-active-agents"
-                checked={showActiveAgents}
-                onCheckedChange={handleToggleActiveAgents}
-              />
-            </div>
-          </ComboboxContent>
+                <ComboboxBase.Popup
+                  className={cn(
+                    'flex min-w-56 max-w-72 origin-(--transform-origin) flex-col items-stretch gap-0.5 text-xs',
+                    'rounded-lg border border-border-subtle bg-background p-1 shadow-lg',
+                    'transition-[transform,scale,opacity] duration-150 ease-out',
+                    'data-ending-style:scale-90 data-ending-style:opacity-0',
+                    'data-starting-style:scale-90 data-starting-style:opacity-0',
+                  )}
+                >
+                  <div className="mb-1">
+                    <ComboboxInput size="xs" placeholder="Search chats…" />
+                  </div>
+
+                  <div
+                    ref={listRef}
+                    className="scrollbar-hover-only max-h-48 overflow-y-auto"
+                  >
+                    <ComboboxList>
+                      {filteredGroups.map(({ label, agents }) => (
+                        <ComboboxGroup key={label}>
+                          <ComboboxGroupLabel>{label}</ComboboxGroupLabel>
+                          {agents.map((agent) => (
+                            <AgentListItem
+                              key={agent.id}
+                              agent={agent}
+                              isSelected={agent.id === value}
+                              isEditing={editingId === agent.id}
+                              pendingDeleteId={pendingDeleteId}
+                              onStartEdit={handleStartEdit}
+                              onCancelEdit={handleCancelEdit}
+                              onCommitRename={onRename}
+                              onStartDelete={handleStartDelete}
+                              onCancelDelete={handleCancelDelete}
+                              onConfirmDelete={handleConfirmDelete}
+                              onHighlight={handleItemHover}
+                            />
+                          ))}
+                        </ComboboxGroup>
+                      ))}
+                    </ComboboxList>
+                    {onEndReached && (
+                      <div
+                        ref={sentinelRef}
+                        aria-hidden="true"
+                        className="h-px shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  {!hasResults && <ComboboxEmpty />}
+
+                  <div className="flex items-center justify-between border-border-subtle border-t pt-2 pr-1.5 pb-1 pl-2.5">
+                    <label
+                      htmlFor="show-active-agents"
+                      className="cursor-pointer text-muted-foreground text-xs"
+                    >
+                      Show active in sidebar
+                    </label>
+                    <Switch
+                      size="xs"
+                      id="show-active-agents"
+                      checked={showActiveAgents}
+                      onCheckedChange={handleToggleActiveAgents}
+                    />
+                  </div>
+                </ComboboxBase.Popup>
+
+                {/* Animated side panel for agent preview. Appears next to the
+                    highlighted row and follows its vertical position. */}
+                {hoveredAgentId && isHoveredAgentVisible && (
+                  <div
+                    ref={sidePanelRef}
+                    onMouseEnter={cancelPendingClear}
+                    onMouseLeave={scheduleClear}
+                    className={cn(
+                      'absolute left-full ml-1 flex flex-col gap-1 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
+                      'fade-in-0 slide-in-from-left-1 animate-in duration-150',
+                    )}
+                    style={{ top: sidePanelOffset }}
+                  >
+                    <AgentPreviewPanel
+                      // Force a fresh component instance on every agentId
+                      // change so state initializers re-run and no stale
+                      // preview from the previous agent can flash. The
+                      // parent-owned cache still serves instant re-hovers.
+                      key={hoveredAgentId}
+                      agentId={hoveredAgentId}
+                      isActive={activeAgentIdSet.has(hoveredAgentId)}
+                      cache={previewCacheRef.current}
+                    />
+                  </div>
+                )}
+              </div>
+            </ComboboxBase.Positioner>
+          </ComboboxBase.Portal>
         )}
       </Combobox>
     );
