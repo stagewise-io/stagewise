@@ -176,10 +176,53 @@ export const availableModels = [
   },
   {
     officialProvider: 'openai',
+    modelId: 'gpt-5.5',
+    modelDisplayName: 'GPT-5.5',
+    modelDescription:
+      "OpenAI's smartest and most intuitive model yet, excelling at agentic coding, computer use, and long-horizon knowledge work.",
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
+    headers: openaiHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: {
+        reasoningEffort: 'medium',
+        reasoningSummary: 'auto',
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 5.0,
+      outputPerMillion: 30.0,
+      relativeMultiplier: 5.9,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'openai',
     modelId: 'gpt-5.4',
     modelDisplayName: 'GPT-5.4',
     modelDescription:
-      "OpenAI's latest model with the most advanced capabilities.",
+      "OpenAI's previous-generation frontier model. Strong reasoning and multimodal capabilities.",
     modelContext: '1.1m context',
     modelContextRaw: 1100000,
     headers: openaiHeaders,
