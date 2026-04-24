@@ -8,7 +8,7 @@ import type { ShellService } from '@/services/toolbox/services/shell';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
-export const DESCRIPTION = `Execute a shell command in the user's system shell. Initial \`cwd\` MUST be a mount prefix (e.g. "w5132" or "w5132/apps/browser"), never ".".
+export const DESCRIPTION = `Execute a shell command in the user's system shell. Initial \`cwd\` MUST be a mount prefix from the environment snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".
 
 ## Required parameters on every call
 
