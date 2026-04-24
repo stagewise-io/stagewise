@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-alpha073 (2026-04-24)
+
+### Features
+
+* implement agent preview panel with workspace and touched files information (842ebf7)
+* implement agent preview panel with workspace and touched files information (9d0a032)
+
+### Bug Fixes
+
+* update agent card button styling and improve chat input placeholder text (1c571e7)
+* implement gitignore-aware filtering and workspace root resolution for agent edits (6b7d5b7)
+
 ## 1.0.0-alpha072 (2026-04-24)
 
 ### Features
