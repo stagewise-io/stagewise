@@ -22,6 +22,7 @@ import { IconPenOutline18 } from 'nucleo-ui-outline-18';
 import { cn } from '@ui/utils';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { useInlineTitleEdit } from '../../active-agents/_components/use-inline-title-edit';
+import { useAgentIdContextMenu } from '../../_components/use-agent-id-context-menu';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import type React from 'react';
 import {
@@ -131,6 +132,7 @@ function AgentListItemImpl({
 }: AgentListItemProps) {
   const hasUnseen = !isSelected && !!agent.unread;
   const itemRef = useRef<HTMLDivElement>(null);
+  const { onCtrlClick, menuPortal } = useAgentIdContextMenu(agent.id);
 
   const handleCommit = useCallback(
     (newTitle: string) => onCommitRename(agent.id, newTitle),
@@ -187,137 +189,150 @@ function AgentListItemImpl({
   }, [agent.id, onHighlight]);
 
   return (
-    <ComboboxItem
-      ref={itemRef}
-      key={agent.id}
-      value={agent.id}
-      size="xs"
-      className="grid-cols-[0.75rem_1fr_auto]"
-    >
-      <ComboboxItemIndicator />
-      <span className="col-start-2 flex w-full items-center gap-2">
-        {isEditing ? (
-          <span
-            ref={titleRef}
-            role="textbox"
-            contentEditable
-            suppressContentEditableWarning
-            className="min-w-0 flex-1 cursor-text truncate bg-transparent p-0 outline-none"
-            // Capture-phase stop on focus: base-ui's ComboboxPopup has an
-            // onFocus handler that redirects any focus landing inside the
-            // list back to its Input. Stopping propagation here prevents
-            // that handler from ever seeing the event.
-            onFocusCapture={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDownCapture={(e) => {
-              // Capture-phase stop: base-ui's ComboboxList handler would
-              // otherwise steal Arrow/Enter/Escape.
+    <>
+      <ComboboxItem
+        ref={itemRef}
+        key={agent.id}
+        value={agent.id}
+        size="xs"
+        className="grid-cols-[0.75rem_1fr_auto]"
+      >
+        <div
+          className="contents"
+          onClick={(e) => {
+            if (e.ctrlKey) {
               e.stopPropagation();
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                // Commit directly instead of going through blur() — base-ui's
-                // ComboboxPopup focus manager otherwise adds a perceptible
-                // handshake delay before onBlur fires.
-                commitEdit();
-                onCancelEdit();
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                cancelEdit();
-                onCancelEdit();
-              }
-            }}
-            onKeyUpCapture={(e) => e.stopPropagation()}
-            onBlur={() => {
-              commitEdit();
-              onCancelEdit();
-            }}
-            onPaste={(e) => {
-              e.preventDefault();
-              const text = e.clipboardData.getData('text/plain');
-              document.execCommand('insertText', false, text);
-            }}
-          >
-            {displayTitle}
-          </span>
-        ) : (
-          <span
-            className={cn(
-              'truncate',
-              agent.isWorking && 'shimmer-text-primary',
-              hasUnseen && 'animate-text-pulse-warning',
+              onCtrlClick(e);
+            }
+          }}
+        >
+          <ComboboxItemIndicator />
+          <span className="col-start-2 flex w-full items-center gap-2">
+            {isEditing ? (
+              <span
+                ref={titleRef}
+                role="textbox"
+                contentEditable
+                suppressContentEditableWarning
+                className="min-w-0 flex-1 cursor-text truncate bg-transparent p-0 outline-none"
+                // Capture-phase stop on focus: base-ui's ComboboxPopup has an
+                // onFocus handler that redirects any focus landing inside the
+                // list back to its Input. Stopping propagation here prevents
+                // that handler from ever seeing the event.
+                onFocusCapture={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDownCapture={(e) => {
+                  // Capture-phase stop: base-ui's ComboboxList handler would
+                  // otherwise steal Arrow/Enter/Escape.
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Commit directly instead of going through blur() — base-ui's
+                    // ComboboxPopup focus manager otherwise adds a perceptible
+                    // handshake delay before onBlur fires.
+                    commitEdit();
+                    onCancelEdit();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEdit();
+                    onCancelEdit();
+                  }
+                }}
+                onKeyUpCapture={(e) => e.stopPropagation()}
+                onBlur={() => {
+                  commitEdit();
+                  onCancelEdit();
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData('text/plain');
+                  document.execCommand('insertText', false, text);
+                }}
+              >
+                {displayTitle}
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  'truncate',
+                  agent.isWorking && 'shimmer-text-primary',
+                  hasUnseen && 'animate-text-pulse-warning',
+                )}
+              >
+                {displayTitle}
+              </span>
             )}
-          >
-            {displayTitle}
+            {!isEditing && (
+              <span className="shrink-0 text-subtle-foreground text-xs">
+                <TimeAgo
+                  date={agent.lastMessageAt}
+                  formatter={minimalFormatter}
+                  live={false}
+                />
+              </span>
+            )}
           </span>
-        )}
-        {!isEditing && (
-          <span className="shrink-0 text-subtle-foreground text-xs">
-            <TimeAgo
-              date={agent.lastMessageAt}
-              formatter={minimalFormatter}
-              live={false}
-            />
-          </span>
-        )}
-      </span>
-      <div className="col-start-3 flex h-5 items-center gap-0.5">
-        {!isEditing && (
-          <button
-            type="button"
-            className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
-            aria-label="Rename agent"
-            onPointerDown={(e) => {
-              // preventDefault prevents the button from stealing focus from
-              // the Combobox's virtual-focus Input. Without this, clicking the
-              // pencil triggers a focus change that base-ui then "restores",
-              // leaving us in a focus tug-of-war with the editable span.
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartEdit(agent.id);
-            }}
-          >
-            <IconPenOutline18 className="size-3" />
-          </button>
-        )}
-        <div className="relative">
-          {!isEditing && (
-            <button
-              type="button"
-              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
-              aria-label="Delete agent"
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onStartDelete(agent.id);
-              }}
-            >
-              <IconTrash2Outline24 className="size-3" />
-            </button>
-          )}
-          {pendingDeleteId === agent.id && (
-            <DeleteConfirmPopover
-              open={true}
-              onOpenChange={(open) => {
-                if (!open) onCancelDelete();
-              }}
-              onConfirm={() => {
-                onConfirmDelete(agent.id);
-              }}
-            />
-          )}
+          <div className="col-start-3 flex h-5 items-center gap-0.5">
+            {!isEditing && (
+              <button
+                type="button"
+                className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
+                aria-label="Rename agent"
+                onPointerDown={(e) => {
+                  // preventDefault prevents the button from stealing focus from
+                  // the Combobox's virtual-focus Input. Without this, clicking the
+                  // pencil triggers a focus change that base-ui then "restores",
+                  // leaving us in a focus tug-of-war with the editable span.
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartEdit(agent.id);
+                }}
+              >
+                <IconPenOutline18 className="size-3" />
+              </button>
+            )}
+            <div className="relative">
+              {!isEditing && (
+                <button
+                  type="button"
+                  className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
+                  aria-label="Delete agent"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStartDelete(agent.id);
+                  }}
+                >
+                  <IconTrash2Outline24 className="size-3" />
+                </button>
+              )}
+              {pendingDeleteId === agent.id && (
+                <DeleteConfirmPopover
+                  open={true}
+                  onOpenChange={(open) => {
+                    if (!open) onCancelDelete();
+                  }}
+                  onConfirm={() => {
+                    onConfirmDelete(agent.id);
+                  }}
+                />
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </ComboboxItem>
+      </ComboboxItem>
+      {menuPortal}
+    </>
   );
 }
 

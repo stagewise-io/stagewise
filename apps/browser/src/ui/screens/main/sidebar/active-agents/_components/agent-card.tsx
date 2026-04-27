@@ -1,5 +1,6 @@
 import { memo, useCallback, useState } from 'react';
 import { cn } from '@ui/utils';
+import { useAgentIdContextMenu } from '../../_components/use-agent-id-context-menu';
 import {
   Tooltip,
   TooltipContent,
@@ -61,6 +62,7 @@ export const AgentCard = memo(
   }: AgentCardProps) {
     const subtitle = hasError ? 'Error' : activityText;
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const { onCtrlClick, menuPortal } = useAgentIdContextMenu(id);
 
     const handleCommitRename = useCallback(
       (newTitle: string) => onRename(id, newTitle),
@@ -81,7 +83,13 @@ export const AgentCard = memo(
         tabIndex={0}
         data-agent-id={id}
         aria-keyshortcuts="F2"
-        onClick={() => onClick(id)}
+        onClick={(e) => {
+          if (e.ctrlKey) {
+            onCtrlClick(e);
+            return;
+          }
+          onClick(id);
+        }}
         onDoubleClick={(e) => {
           e.stopPropagation();
           if (!isEditing) startEditing();
@@ -233,6 +241,7 @@ export const AgentCard = memo(
             }}
           />
         </div>
+        {menuPortal}
       </div>
     );
   },
