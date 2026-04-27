@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha074 (2026-04-27)
+
+### Features
+
+* built-in video creation plugin (0b8ecd5)
+
 ## 1.0.0-alpha073 (2026-04-27)
 
 ### Features
