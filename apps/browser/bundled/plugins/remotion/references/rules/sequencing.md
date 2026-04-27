@@ -2,7 +2,7 @@ Use `<Sequence>` to delay when element appears in timeline.
 
 ```tsx
 import{Sequence}from"remotion";const{fps}=useVideoConfig();
-<Sequence from={1*fps} durationInFrames={2*fps} premountFor={1*fps;}> <Title/></Sequence><Sequence from={2*fps} durationInFrames={2*fps} premountFor={1*fps;}><Subtitle/></Sequence>;
+<Sequence from={1*fps} durationInFrames={2*fps} premountFor={1*fps}><Title/></Sequence><Sequence from={2*fps} durationInFrames={2*fps} premountFor={1*fps}><Subtitle/></Sequence>;
 ```
 
 Default wraps child in absolute fill element.  

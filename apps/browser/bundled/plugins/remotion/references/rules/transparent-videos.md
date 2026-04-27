@@ -46,6 +46,6 @@ import{Config}from"@remotion/cli/config";Config.setVideoImageFormat("png");Confi
 
 ```tsx
 import{CalculateMetadataFunction}from"remotion";
-const calculateMetadata:CalculateMetadataFunction<Props>=async({props})=>{return{defaultCodec:"vp8",defaultVideoImageFormat:"png",defaultPixelFormat:"yuva420p"};};
+const calculateMetadata:CalculateMetadataFunction<Props>=async({props})=>{return{defaultCodec:"vp9",defaultVideoImageFormat:"png",defaultPixelFormat:"yuva420p"};};
 <Composition id="my-video" component={MyVideo} durationInFrames={150} fps={30} width={1920} height={1080} calculateMetadata={calculateMetadata}/>;
 ```

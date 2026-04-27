@@ -137,7 +137,7 @@ style: none
 - Build for channels user wants.
 - If many channels share settings, reuse shared setup.
 - If channel settings conflict, create multiple composition variants.
-- Read channel guidelines for best practices (resolution. format, etc.)
+- Read channel guidelines for best practices (resolution, format, etc.)
        - [YouTube](./references/channels/youtube.md)
        - [YouTube Shorts](./references/channels/youtube-shorts.md)
        - [Facebook](./references/channels/facebook.md)

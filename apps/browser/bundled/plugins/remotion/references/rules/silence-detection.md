@@ -50,5 +50,5 @@ Apply trim points with `trimBefore` + `trimAfter`. Values are frames.
 
 ```tsx
 import{Video}from"@remotion/media";import{staticFile,useVideoConfig}from"remotion";const{fps}=useVideoConfig();
-<Video src={staticFile("video.mov")} trimBefore={Math.floor(leadingEnd*fps)} trimAfter={Math.ceil(trailingStart*fps);}/>;
+<Video src={staticFile("video.mov")} trimBefore={Math.floor(leadingEnd*fps)} trimAfter={Math.ceil(trailingStart*fps)}/>;
 ```
