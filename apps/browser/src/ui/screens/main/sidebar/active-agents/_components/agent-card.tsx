@@ -83,6 +83,7 @@ export const AgentCard = memo(
         aria-keyshortcuts="F2"
         onClick={() => onClick(id)}
         onDoubleClick={(e) => {
+          if (!isActive) return;
           e.stopPropagation();
           if (!isEditing) startEditing();
         }}
@@ -94,8 +95,9 @@ export const AgentCard = memo(
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onClick(id);
-          } else if (e.key === 'F2' && !isEditing) {
+          } else if (e.key === 'F2' && !isEditing && isActive) {
             // F2 is the standard rename shortcut across Finder/Explorer/VS Code.
+            // Only allow rename on the active agent — consistent with click/double-click.
             e.preventDefault();
             startEditing();
           }
@@ -149,10 +151,14 @@ export const AgentCard = memo(
                   tabIndex={-1}
                   className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
                   onClick={(e) => {
+                    if (!isActive) return;
                     e.stopPropagation();
                     startEditing();
                   }}
-                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => {
+                    if (!isActive) return;
+                    e.stopPropagation();
+                  }}
                 >
                   {displayTitle}
                 </button>
