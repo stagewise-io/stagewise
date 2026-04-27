@@ -158,12 +158,23 @@ style: none
 - If fitting, ask user if bg music is wanted.
 - Suggest royalty-free music from internet, or Suno for music generation.
 
+## Copywriting
+
+Adhere to following rules when generating text for header, titles, hero slides etc:
+
+- Vary sentence lengths. Mix 3-word punchy sentences with long ones.
+- Use industry slang, "dirty" verbs, and specific nouns. AVOID Buzzwords like "Robust", "seamless", "tapestry", "delve", "pivotal" unless styleguide or user asks for them.
+- Use natural pivots or just jump to the next point. Minimize use of standard transitions like: "But here's the kicker,..." or "Why does this matter? ..."
+- Avoid unnecessary "Summary loops" starting with "Ultimately" or "In essence."
+- Do not use antithesis, “not X but Y” constructions, or dramatic contrast framing. Avoid phrases like “This is not just…,” and “Not only… but also…”.
+
 ## Thumbnails
 
 - Some channels need thumbnails.
 - Sometimes need multiple thumbnails for A/B tests.
 - Channel decides format.
 - Use Remotion static composition for thumbnails.
+- Put the thumbnail compositions into the same root project as the source video itself.
 
 Two paths:
 
@@ -281,8 +292,20 @@ Read rule files as needed:
 - Unless explicitly asked for transparency, ALWAYS add bg color to project and composition
 - ALWAYS COPY image/video/audio assets into `public` folder when using them
 - ALWAYS PREFER existing react components from reusable packages, if in monorepo
+- ALWAYS PREFER downloading/reusing assets from websites and brand kits instead of re-creating
+  - NEVER recreate Logos manually (unless it's only text in a known font). Copy/Download logo instead.
+  - NEVER recreate example gradient images. Copy/Download instead.
 - Unless styleguides say different, do these things:
   - Fast and crisp transitions instead of slow fade-ins
-  - Fade-in and fade-out should ALWAYS include Blurring, Opacity and Translate.
-  - PREFER Word-by-word fade-in over Line-By-Line. Opt-in to typewriter for input demos or special technical cases.
-  - Light text/logos over Light BG must have slight shadow for contrast.
+  - Fade-in and fade-out should always include Blurring, Opacity and Translate
+  - PREFER Word-by-word fade-in over Line-By-Line. Opt-in to typewriter for input demos or special technical cases
+  - Light text/logos over Light BG must have slight shadow for contrast
+  - NEVER use button-style CTA text formatting
+    - Minimize use of button-style formatting of text unless it's in a "demo"-section of the video
+  - Dynamic scene durations:
+    - More text or diagrams must lead to longer scenes
+    - Short outro scenes unless requested differently for social media channel
+    - If voiceover exist, match it's length for scenes
+    - If with bg music (only), cut on beat (ask user for BPM of song)
+  - Create scene transitions with continuity (i.e. keep elements and move them instead of fading everything out)
+    - Avoid presentation-like feeling of a video. Instead it must feel like a continuous story.
