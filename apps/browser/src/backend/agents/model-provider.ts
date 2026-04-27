@@ -158,7 +158,9 @@ export class ModelProviderService {
       endpointId === 'openai' ||
       endpointId === 'google' ||
       endpointId === 'moonshotai' ||
-      endpointId === 'alibaba'
+      endpointId === 'alibaba' ||
+      endpointId === 'deepseek' ||
+      endpointId === 'z-ai'
     ) {
       const { apiKey, baseURL } = this.resolveProviderEndpoint(endpointId);
       const apiSpecMap: Record<ModelProvider, ApiSpec> = {
@@ -167,6 +169,8 @@ export class ModelProviderService {
         google: 'google',
         moonshotai: 'openai-chat-completions',
         alibaba: 'openai-chat-completions',
+        deepseek: 'openai-chat-completions',
+        'z-ai': 'openai-chat-completions',
       };
       return { apiKey, baseURL, apiSpec: apiSpecMap[endpointId] };
     }
@@ -422,7 +426,9 @@ export class ModelProviderService {
         });
         return {
           model: this.telemetryService.withTracing(
-            p(modelId as any),
+            // Moonshot's native API speaks Chat Completions, not Responses.
+            // `createOpenAI()(id)` defaults to Responses — must use `.chat()`.
+            p.chat(modelId as any),
             posthogConfig,
           ),
           headers,
@@ -440,7 +446,44 @@ export class ModelProviderService {
         });
         return {
           model: this.telemetryService.withTracing(
-            p(modelId as any),
+            // Alibaba's DashScope speaks Chat Completions — use `.chat()`.
+            p.chat(modelId as any),
+            posthogConfig,
+          ),
+          headers,
+          providerOptions: providerOptions as Parameters<
+            typeof streamText
+          >[0]['providerOptions'],
+          contextWindowSize,
+        };
+      }
+      case 'deepseek': {
+        const p = createOpenAI({
+          apiKey,
+          baseURL: baseURL ?? 'https://api.deepseek.com/v1',
+        });
+        return {
+          model: this.telemetryService.withTracing(
+            // DeepSeek's native API speaks Chat Completions — use `.chat()`.
+            p.chat(modelId as any),
+            posthogConfig,
+          ),
+          headers,
+          providerOptions: providerOptions as Parameters<
+            typeof streamText
+          >[0]['providerOptions'],
+          contextWindowSize,
+        };
+      }
+      case 'z-ai': {
+        const p = createOpenAI({
+          apiKey,
+          baseURL: baseURL ?? 'https://api.z.ai/api/paas/v4',
+        });
+        return {
+          model: this.telemetryService.withTracing(
+            // Z.AI's OpenAI-compatible endpoint speaks Chat Completions.
+            p.chat(modelId as any),
             posthogConfig,
           ),
           headers,

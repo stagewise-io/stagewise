@@ -15,6 +15,8 @@ export const modelProviderSchema = z.enum([
   'google',
   'moonshotai',
   'alibaba',
+  'deepseek',
+  'z-ai',
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
@@ -46,6 +48,8 @@ export const providerConfigsSchema = z.object({
   google: providerConfigSchema.default({ mode: 'stagewise' }),
   moonshotai: providerConfigSchema.default({ mode: 'stagewise' }),
   alibaba: providerConfigSchema.default({ mode: 'stagewise' }),
+  deepseek: providerConfigSchema.default({ mode: 'stagewise' }),
+  'z-ai': providerConfigSchema.default({ mode: 'stagewise' }),
 });
 export type ProviderConfigs = z.infer<typeof providerConfigsSchema>;
 
@@ -193,6 +197,8 @@ export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> = {
   google: 'https://generativelanguage.googleapis.com/v1beta',
   moonshotai: 'https://api.moonshot.ai/v1',
   alibaba: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+  deepseek: 'https://api.deepseek.com/v1',
+  'z-ai': 'https://api.z.ai/api/paas/v4',
 };
 
 /** Display info for each provider (for UI) */
@@ -220,6 +226,14 @@ export const PROVIDER_DISPLAY_INFO: Record<
     name: 'Alibaba Cloud',
     description: 'Qwen models',
   },
+  deepseek: {
+    name: 'DeepSeek',
+    description: 'DeepSeek V-series models',
+  },
+  'z-ai': {
+    name: 'Z.ai',
+    description: 'GLM models',
+  },
 };
 
 export type StagewiseProviderOptions = {
@@ -229,6 +243,25 @@ export type StagewiseProviderOptions = {
   };
   cache_control?: {
     type: 'ephemeral' | 'persistent';
+  };
+  /**
+   * OpenRouter provider routing preferences (forwarded verbatim).
+   * See https://openrouter.ai/docs/provider-routing.
+   *
+   * Note: the ai-proxy's `applyStickyRouting` overlays its own `order`
+   * and `allow_fallbacks: false` when the model's prefix is listed in
+   * `BYOK_ORDER`. Existing keys set here are preserved via spread, but
+   * `order` / `allow_fallbacks` will be overwritten by the platform.
+   * `require_parameters` typically becomes redundant once the platform
+   * pins routing to a single BYOK upstream.
+   */
+  provider?: {
+    /** Only route to endpoints that support every parameter in the request (e.g. tools). */
+    require_parameters?: boolean;
+    /** Restrict routing to an allow-list of upstream providers (lower-case slugs). */
+    only?: string[];
+    /** Preferred ordering of upstream providers. */
+    order?: string[];
   };
 };
 
@@ -411,6 +444,8 @@ export const userPreferencesSchema = z.object({
     google: { mode: 'stagewise' },
     moonshotai: { mode: 'stagewise' },
     alibaba: { mode: 'stagewise' },
+    deepseek: { mode: 'stagewise' },
+    'z-ai': { mode: 'stagewise' },
   }),
   /** User-defined API endpoints */
   customEndpoints: z.array(customEndpointSchema).default([]),
@@ -503,6 +538,8 @@ export const defaultUserPreferences: UserPreferences = {
     google: { mode: 'stagewise' },
     moonshotai: { mode: 'stagewise' },
     alibaba: { mode: 'stagewise' },
+    deepseek: { mode: 'stagewise' },
+    'z-ai': { mode: 'stagewise' },
   },
   customEndpoints: [],
   customModels: [],

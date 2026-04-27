@@ -807,12 +807,16 @@ export type KartonContract = {
         google?: string;
         moonshotai?: string;
         alibaba?: string;
+        deepseek?: string;
+        'z-ai'?: string;
       }) => Promise<{
         anthropic: ApiKeyValidationResult;
         openai: ApiKeyValidationResult;
         google: ApiKeyValidationResult;
         moonshotai: ApiKeyValidationResult;
         alibaba: ApiKeyValidationResult;
+        deepseek: ApiKeyValidationResult;
+        'z-ai': ApiKeyValidationResult;
       }>;
     };
     userExperience: {
