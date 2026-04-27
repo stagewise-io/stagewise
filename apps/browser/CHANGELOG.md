@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-alpha073 (2026-04-27)
+
+### Features
+
+* add gpt-5-5 (f5419d9)
+* implement agent preview panel with workspace and touched files information (9d0a032)
+
+### Bug Fixes
+
+* update agent card button styling and improve chat input placeholder text (129b361)
+* fix flicker of preview-card on empty chat (1babbba)
+* implement gitignore-aware filtering and workspace root resolution for agent edits (6b7d5b7)
+
 ## 1.0.0-alpha072 (2026-04-24)
 
 ### Features
