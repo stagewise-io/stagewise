@@ -132,6 +132,8 @@ export class PreferencesService extends DisposableService {
       'google',
       'moonshotai',
       'alibaba',
+      'deepseek',
+      'z-ai',
     ] as const;
     let needsSave = false;
 

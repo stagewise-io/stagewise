@@ -76,6 +76,8 @@ const PROVIDERS: ModelProvider[] = [
   'google',
   'moonshotai',
   'alibaba',
+  'deepseek',
+  'z-ai',
 ];
 
 function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
@@ -325,11 +327,29 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
 }
 
 function ModelProvidersSection() {
+  const [showAll, setShowAll] = useState(false);
+  const primary = PROVIDERS.slice(0, 3);
+  const secondary = PROVIDERS.slice(3);
   return (
     <div className="space-y-3">
-      {PROVIDERS.map((provider) => (
+      {primary.map((provider) => (
         <ProviderConfigCard key={provider} provider={provider} />
       ))}
+      {showAll &&
+        secondary.map((provider) => (
+          <ProviderConfigCard key={provider} provider={provider} />
+        ))}
+      {secondary.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setShowAll((v) => !v)}
+          >
+            {showAll ? 'Show less' : `Show ${secondary.length} more providers`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -446,6 +466,8 @@ function CustomModelDialog({
       { value: 'google', label: 'Google', group: 'Built-in' },
       { value: 'moonshotai', label: 'Moonshot AI', group: 'Built-in' },
       { value: 'alibaba', label: 'Alibaba Cloud', group: 'Built-in' },
+      { value: 'deepseek', label: 'DeepSeek', group: 'Built-in' },
+      { value: 'z-ai', label: 'Z.ai', group: 'Built-in' },
     ];
     const custom = customEndpoints.map((ep) => ({
       value: ep.id,
@@ -911,6 +933,8 @@ function CustomModelsSection() {
       if (endpointId === 'google') return 'Google';
       if (endpointId === 'moonshotai') return 'Moonshot AI';
       if (endpointId === 'alibaba') return 'Alibaba Cloud';
+      if (endpointId === 'deepseek') return 'DeepSeek';
+      if (endpointId === 'z-ai') return 'Z.ai';
       return (
         customEndpoints.find((ep) => ep.id === endpointId)?.name ?? 'Unknown'
       );

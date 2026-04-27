@@ -8,7 +8,9 @@ export type ApiKeyProvider =
   | 'openai'
   | 'google'
   | 'moonshotai'
-  | 'alibaba';
+  | 'alibaba'
+  | 'deepseek'
+  | 'z-ai';
 
 export type ApiKeyValidationResult =
   | null
@@ -34,17 +36,32 @@ const providerConfigs: Record<
   openai: (apiKey, baseURL) => createOpenAI({ apiKey, baseURL })('gpt-5-nano'),
   google: (apiKey, baseURL) =>
     createGoogleGenerativeAI({ apiKey, baseURL })('gemini-2.5-flash-lite'),
+  // OpenAI-compatible providers below must use `.chat(...)` rather than the
+  // default `(id)` shorthand: `createOpenAI()(id)` targets the Responses API
+  // (only OpenAI itself implements it), whereas these upstreams speak Chat
+  // Completions. Without `.chat(...)`, the probe hits a non-existent endpoint
+  // and valid keys get rejected.
   moonshotai: (apiKey, baseURL) =>
     createOpenAI({
       apiKey,
       baseURL: baseURL ?? 'https://api.moonshot.ai/v1',
-    })('kimi-k2.6'),
+    }).chat('kimi-k2.6'),
   alibaba: (apiKey, baseURL) =>
     createOpenAI({
       apiKey,
       baseURL:
         baseURL ?? 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-    })('qwen-turbo'),
+    }).chat('qwen-turbo'),
+  deepseek: (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://api.deepseek.com/v1',
+    }).chat('deepseek-v4-flash'),
+  'z-ai': (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://api.z.ai/api/paas/v4',
+    }).chat('glm-4.5-flash'),
 };
 
 /**
@@ -64,6 +81,8 @@ export async function validateApiKeys(
     google: null,
     moonshotai: null,
     alibaba: null,
+    deepseek: null,
+    'z-ai': null,
   };
 
   const promises: Promise<void>[] = [];
