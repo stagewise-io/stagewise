@@ -127,7 +127,7 @@
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
-    "electron": "40.6.1",
+    "electron": "40.9.2",
     "electron-context-menu": "^4.1.1",
     "electron-devtools-installer": "^4.0.0",
     "ignore": "^6.0.2",
