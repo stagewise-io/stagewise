@@ -132,7 +132,7 @@ function AgentListItemImpl({
 }: AgentListItemProps) {
   const hasUnseen = !isSelected && !!agent.unread;
   const itemRef = useRef<HTMLDivElement>(null);
-  const { onCtrlClick, menuPortal } = useAgentIdContextMenu(agent.id);
+  const { onContextMenu, menuPortal } = useAgentIdContextMenu(agent.id);
 
   const handleCommit = useCallback(
     (newTitle: string) => onCommitRename(agent.id, newTitle),
@@ -197,15 +197,7 @@ function AgentListItemImpl({
         size="xs"
         className="grid-cols-[0.75rem_1fr_auto]"
       >
-        <div
-          className="contents"
-          onClick={(e) => {
-            if (e.ctrlKey) {
-              e.stopPropagation();
-              onCtrlClick(e);
-            }
-          }}
-        >
+        <div className="contents" onContextMenu={onContextMenu}>
           <ComboboxItemIndicator />
           <span className="col-start-2 flex w-full items-center gap-2">
             {isEditing ? (

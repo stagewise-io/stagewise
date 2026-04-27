@@ -62,7 +62,7 @@ export const AgentCard = memo(
   }: AgentCardProps) {
     const subtitle = hasError ? 'Error' : activityText;
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const { onCtrlClick, menuPortal } = useAgentIdContextMenu(id);
+    const { onContextMenu, menuPortal } = useAgentIdContextMenu(id);
 
     const handleCommitRename = useCallback(
       (newTitle: string) => onRename(id, newTitle),
@@ -83,13 +83,8 @@ export const AgentCard = memo(
         tabIndex={0}
         data-agent-id={id}
         aria-keyshortcuts="F2"
-        onClick={(e) => {
-          if (e.ctrlKey) {
-            onCtrlClick(e);
-            return;
-          }
-          onClick(id);
-        }}
+        onClick={() => onClick(id)}
+        onContextMenu={onContextMenu}
         onDoubleClick={(e) => {
           e.stopPropagation();
           if (!isEditing) startEditing();
