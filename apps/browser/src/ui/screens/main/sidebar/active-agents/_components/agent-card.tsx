@@ -78,172 +78,174 @@ export const AgentCard = memo(
     } = useInlineTitleEdit({ title, onCommit: handleCommitRename });
 
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        data-agent-id={id}
-        aria-keyshortcuts="F2"
-        onClick={(e) => {
-          if (e.ctrlKey || e.metaKey) {
-            onContextMenu(e);
-            return;
-          }
-          onClick(id);
-        }}
-        onContextMenu={onContextMenu}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          if (!isEditing) startEditing();
-        }}
-        onKeyDown={(e) => {
-          // Only handle keyboard interaction when the card itself is focused.
-          // Otherwise, nested buttons (archive/delete) would also trigger this.
-          if (e.currentTarget !== e.target) return;
-
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
+      <>
+        <div
+          role="button"
+          tabIndex={0}
+          data-agent-id={id}
+          aria-keyshortcuts="F2"
+          onClick={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              onContextMenu(e);
+              return;
+            }
             onClick(id);
-          } else if (e.key === 'F2' && !isEditing) {
-            // F2 is the standard rename shortcut across Finder/Explorer/VS Code.
-            e.preventDefault();
-            startEditing();
-          }
-        }}
-        className={cn(
-          'group/card relative flex min-w-0 shrink-0 flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
-          isActive
-            ? 'cursor-default bg-surface-2 ring-2 ring-derived-subtle ring-inset'
-            : 'cursor-pointer',
-          hasUnseen && 'animate-ring-pulse-primary',
-        )}
-      >
-        {/* Title row */}
-        <div className="flex min-w-0 items-center gap-1">
-          {isEditing ? (
+          }}
+          onContextMenu={onContextMenu}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (!isEditing) startEditing();
+          }}
+          onKeyDown={(e) => {
+            // Only handle keyboard interaction when the card itself is focused.
+            // Otherwise, nested buttons (archive/delete) would also trigger this.
+            if (e.currentTarget !== e.target) return;
+
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onClick(id);
+            } else if (e.key === 'F2' && !isEditing) {
+              // F2 is the standard rename shortcut across Finder/Explorer/VS Code.
+              e.preventDefault();
+              startEditing();
+            }
+          }}
+          className={cn(
+            'group/card relative flex min-w-0 shrink-0 flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
+            isActive
+              ? 'cursor-default bg-surface-2 ring-2 ring-derived-subtle ring-inset'
+              : 'cursor-pointer',
+            hasUnseen && 'animate-ring-pulse-primary',
+          )}
+        >
+          {/* Title row */}
+          <div className="flex min-w-0 items-center gap-1">
+            {isEditing ? (
+              <span
+                ref={titleRef}
+                role="textbox"
+                contentEditable
+                suppressContentEditableWarning
+                className="block min-w-0 flex-1 cursor-text overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Commit directly rather than via blur() for parity with
+                    // AgentsSelector — keeps both surfaces exiting edit mode
+                    // synchronously regardless of any surrounding focus trap.
+                    commitEdit();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelEdit();
+                  }
+                }}
+                onBlur={commitEdit}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData('text/plain');
+                  document.execCommand('insertText', false, text);
+                }}
+              >
+                {displayTitle}
+              </span>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger delay={500}>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startEditing();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    {displayTitle}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <span>{displayTitle}</span>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          <div className="flex w-full items-baseline gap-2">
             <span
-              ref={titleRef}
-              role="textbox"
-              contentEditable
-              suppressContentEditableWarning
-              className="block min-w-0 flex-1 cursor-text overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  // Commit directly rather than via blur() for parity with
-                  // AgentsSelector — keeps both surfaces exiting edit mode
-                  // synchronously regardless of any surrounding focus trap.
-                  commitEdit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  cancelEdit();
-                }
-              }}
-              onBlur={commitEdit}
-              onPaste={(e) => {
-                e.preventDefault();
-                const text = e.clipboardData.getData('text/plain');
-                document.execCommand('insertText', false, text);
-              }}
+              className={cn(
+                'min-w-0 flex-1 overflow-x-clip text-ellipsis whitespace-nowrap text-muted-foreground text-xs leading-normal',
+                isWorking &&
+                  !isWaitingForUser &&
+                  'shimmer-text-primary font-medium',
+                hasError && 'text-error-foreground',
+                activityIsUserInput && 'italic',
+              )}
             >
-              {displayTitle}
+              {subtitle || '\u00A0'}
             </span>
-          ) : (
+            {lastMessageAt > 0 && (
+              <span className="shrink-0 whitespace-nowrap text-subtle-foreground text-xs leading-normal">
+                {timeAgo.format(lastMessageAt)}
+              </span>
+            )}
+          </div>
+
+          <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
             <Tooltip>
               <TooltipTrigger delay={500}>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="archive-btn text-muted-foreground hover:text-foreground"
+                  aria-label="Suspend agent"
                   onClick={(e) => {
                     e.stopPropagation();
-                    startEditing();
+                    onArchive(id);
                   }}
-                  onPointerDown={(e) => e.stopPropagation()}
                 >
-                  {displayTitle}
-                </button>
+                  <IconSleepingTimeOutline18 className="size-4 cursor-pointer" />
+                </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <span>{displayTitle}</span>
+                <span>Suspend agent (can be recovered)</span>
               </TooltipContent>
             </Tooltip>
-          )}
-        </div>
 
-        <div className="flex w-full items-baseline gap-2">
-          <span
-            className={cn(
-              'min-w-0 flex-1 overflow-x-clip text-ellipsis whitespace-nowrap text-muted-foreground text-xs leading-normal',
-              isWorking &&
-                !isWaitingForUser &&
-                'shimmer-text-primary font-medium',
-              hasError && 'text-error-foreground',
-              activityIsUserInput && 'italic',
-            )}
-          >
-            {subtitle || '\u00A0'}
-          </span>
-          {lastMessageAt > 0 && (
-            <span className="shrink-0 whitespace-nowrap text-subtle-foreground text-xs leading-normal">
-              {timeAgo.format(lastMessageAt)}
-            </span>
-          )}
-        </div>
-
-        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
-          <Tooltip>
-            <TooltipTrigger delay={500}>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="archive-btn text-muted-foreground hover:text-foreground"
-                aria-label="Suspend agent"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onArchive(id);
-                }}
-              >
-                <IconSleepingTimeOutline18 className="size-4 cursor-pointer" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span>Suspend agent (can be recovered)</span>
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger delay={500}>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="delete-btn text-muted-foreground hover:text-foreground"
-                aria-label="Delete agent permanently"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteOpen(true);
-                }}
-              >
-                <IconTrash2Outline24 className="size-4 cursor-pointer" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span>Delete agent permanently</span>
-            </TooltipContent>
-          </Tooltip>
-          <DeleteConfirmPopover
-            open={deleteOpen}
-            onOpenChange={setDeleteOpen}
-            onConfirm={() => {
-              setDeleteOpen(false);
-              onDelete(id);
-            }}
-          />
+            <Tooltip>
+              <TooltipTrigger delay={500}>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="delete-btn text-muted-foreground hover:text-foreground"
+                  aria-label="Delete agent permanently"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteOpen(true);
+                  }}
+                >
+                  <IconTrash2Outline24 className="size-4 cursor-pointer" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <span>Delete agent permanently</span>
+              </TooltipContent>
+            </Tooltip>
+            <DeleteConfirmPopover
+              open={deleteOpen}
+              onOpenChange={setDeleteOpen}
+              onConfirm={() => {
+                setDeleteOpen(false);
+                onDelete(id);
+              }}
+            />
+          </div>
         </div>
         {menuPortal}
-      </div>
+      </>
     );
   },
   // Skip onClick/onArchive/onDelete/onRename in comparison — their behavior is
