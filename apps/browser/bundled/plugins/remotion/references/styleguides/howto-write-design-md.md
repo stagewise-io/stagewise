@@ -68,6 +68,7 @@ Explain color roles.
 ## Typography
 
 Explain hierarchy. Include links to remote or in-repo location of font.
+Explain where to use which font in dual-font setups. Explain where to use which font-weight, tracking, line-height combination.
 
 ## Layout
 

@@ -153,6 +153,7 @@ May:
 - describe element inline
 - reference existing component code in workspace
 - include reference images that can be copied into project
+- contain Logo of brand
 
 Rules:
 
