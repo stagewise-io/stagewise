@@ -28,6 +28,8 @@ For upload or drag-drop, use `BlobSource`.
 
 ```tsx
 import{Input,ALL_FORMATS,BlobSource}from"mediabunny";
-export const canDecodeBlob=async(blob:Blob)=>{const input=new Input({formats:ALL_FORMATS,source:new BlobSource(blob)});// Same validation logic as above
+export const canDecodeBlob=async(blob:Blob)=>{
+    const input=new Input({formats:ALL_FORMATS,source:new BlobSource(blob)})
+    // Then: Same validation logic as above
 };
 ```

@@ -27,7 +27,7 @@ Transitions and overlays can coexist in same `<TransitionSeries>`, but overlay c
 
 ```tsx
 import{TransitionSeries,linearTiming}from"@remotion/transitions";import{fade}from"@remotion/transitions/fade";import{LightLeak}from"@remotion/light-leaks";
-<TransitionSeries><TransitionSeries.Sequence durationInFrames={60}><SceneA/></TransitionSeries.Sequence><TransitionSeries.Overlay durationInFrames={30}><LightLeak/></TransitionSeries.Overlay><TransitionSeries.Sequence durationInFrames={60}><SceneB/></TransitionSeries.Sequence><TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames:15});}/> <TransitionSeries.Sequence durationInFrames={60}><SceneC/></TransitionSeries.Sequence></TransitionSeries>;
+<TransitionSeries><TransitionSeries.Sequence durationInFrames={60}><SceneA/></TransitionSeries.Sequence><TransitionSeries.Overlay durationInFrames={30}><LightLeak/></TransitionSeries.Overlay><TransitionSeries.Sequence durationInFrames={60}><SceneB/></TransitionSeries.Sequence><TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames:15})}/><TransitionSeries.Sequence durationInFrames={60}><SceneC/></TransitionSeries.Sequence></TransitionSeries>;
 ```
 
 ## Transition props
@@ -48,7 +48,7 @@ import{TransitionSeries,linearTiming}from"@remotion/transitions";import{fade}fro
 
 Import from their modules: ```import{fade}from"@remotion/transitions/fade";import{slide}from"@remotion/transitions/slide";import{wipe}from"@remotion/transitions/wipe";import{flip}from"@remotion/transitions/flip";import{clockWipe}from"@remotion/transitions/clock-wipe";```
 
-Slide transition with direction: ```import{slide}from"@remotion/transitions/slide";<TransitionSeries.Transition presentation={slide({direction:"from-left"})} timing={linearTiming({durationInFrames:20});}/>;```
+Slide transition with direction: ```import{slide}from"@remotion/transitions/slide";<TransitionSeries.Transition presentation={slide({direction:"from-left"})} timing={linearTiming({durationInFrames:20})}/>;```
 
 Directions: `from-left`,`from-right`,`from-top`,`from-bottom`
 

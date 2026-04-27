@@ -17,7 +17,7 @@ import{fitText}from"@remotion/layout-utils";const{fontSize}=fitText({text:"Hello
 ## Checking text overflow with `fillTextBox()`
 
 ```tsx
-import{fillTextBox}from"@remotion/layout-utils";const box=fillTextBox({maxBoxWidth:400,maxLines:3});const words=["Hello","World","This","is","a","test"];for(const wordof words){const{exceedsBox}=box.add({text:word+" ",fontFamily:"Arial",fontSize:24});if(exceedsBox){break}}
+import{fillTextBox}from"@remotion/layout-utils";const box=fillTextBox({maxBoxWidth:400,maxLines:3});const words=["Hello","World","This","is","a","test"];for(const word of words){const{exceedsBox}=box.add({text:word+" ",fontFamily:"Arial",fontSize:24});if(exceedsBox){break}}
 ```
 
 ## Best practices

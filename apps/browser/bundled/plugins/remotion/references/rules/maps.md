@@ -1,10 +1,10 @@
 Add maps to Remotion with Mapbox. See <https://docs.mapbox.com/mapbox-gl-js/api/> for API.
 
-Need Mapbox(`mapgbox-gl`) + `@turf/turf` JS packages.
+Need Mapbox(`mapbox-gl`) + `@turf/turf` JS packages.
 
 User must create free Mapbox account and token: <https://console.mapbox.com/account/access-tokens/>
 
-Put token in `.env`: ```REMOTION_MAPBOX_TOKEN==pk.your-mapbox-access-token```
+Put token in `.env`: ```REMOTION_MAPBOX_TOKEN=pk.your-mapbox-access-token```
 
 ## Adding a map
 
