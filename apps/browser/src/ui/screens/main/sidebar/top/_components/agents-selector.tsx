@@ -197,7 +197,16 @@ function AgentListItemImpl({
         size="xs"
         className="grid-cols-[0.75rem_1fr_auto]"
       >
-        <div className="contents" onContextMenu={onContextMenu}>
+        <div
+          className="contents"
+          onClick={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.stopPropagation();
+              onContextMenu(e);
+            }
+          }}
+          onContextMenu={onContextMenu}
+        >
           <ComboboxItemIndicator />
           <span className="col-start-2 flex w-full items-center gap-2">
             {isEditing ? (

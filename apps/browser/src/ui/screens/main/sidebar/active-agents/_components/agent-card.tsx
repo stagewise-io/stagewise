@@ -83,7 +83,13 @@ export const AgentCard = memo(
         tabIndex={0}
         data-agent-id={id}
         aria-keyshortcuts="F2"
-        onClick={() => onClick(id)}
+        onClick={(e) => {
+          if (e.ctrlKey || e.metaKey) {
+            onContextMenu(e);
+            return;
+          }
+          onClick(id);
+        }}
         onContextMenu={onContextMenu}
         onDoubleClick={(e) => {
           e.stopPropagation();
