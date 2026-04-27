@@ -726,16 +726,17 @@ export const AgentsSelector = memo(
                 </ComboboxBase.Popup>
 
                 {/* Animated side panel for agent preview. Appears next to the
-                    highlighted row and follows its vertical position. */}
+                    highlighted row and follows its vertical position. The
+                    outer wrapper is invisible — visible card styling lives
+                    inside `AgentPreviewPanel` so it can render `null` when
+                    there is nothing to show (e.g. empty/new agents), without
+                    leaving an empty bordered box here. */}
                 {hoveredAgentId && isHoveredAgentVisible && (
                   <div
                     ref={sidePanelRef}
                     onMouseEnter={cancelPendingClear}
                     onMouseLeave={scheduleClear}
-                    className={cn(
-                      'absolute left-full ml-1 flex flex-col gap-1 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
-                      'fade-in-0 slide-in-from-left-1 animate-in duration-150',
-                    )}
+                    className="absolute left-full ml-1 transition-[top] duration-100 ease-out"
                     style={{ top: sidePanelOffset }}
                   >
                     <AgentPreviewPanel

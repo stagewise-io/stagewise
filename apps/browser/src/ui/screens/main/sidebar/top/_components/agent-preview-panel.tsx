@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useComparingSelector,
   useKartonProcedure,
@@ -14,10 +14,6 @@ import {
   IconFolder5Outline18,
 } from 'nucleo-ui-outline-18';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /** Resolved preview data displayed in the side panel. */
 export type PreviewData = {
   title: string;
@@ -32,10 +28,15 @@ export type PreviewData = {
   touchedFiles: string[];
 };
 
-/** Cached fetched preview. Cache is owned by the parent (`AgentsSelector`)
- * so it survives panel unmount between hovers. */
+/** Cached fetched preview. Cache is owned by the parent surface
+ * (`AgentsSelector` or `ActiveAgentsGrid`) so it survives panel unmount
+ * between hovers.
+ *
+ * `data: null` means "we fetched and the agent has no persisted record" —
+ * caching the null result prevents infinite refetch loops when the effect
+ * re-runs due to unstable Karton procedure refs. */
 export type CachedPreview = {
-  data: PreviewData;
+  data: PreviewData | null;
   fetchedAt: number;
 };
 
@@ -47,10 +48,6 @@ type ActiveOverlay = {
   messageCount: number;
   workspaces: PreviewData['workspaces'];
 };
-
-// ============================================================================
-// Comparators
-// ============================================================================
 
 function workspacesEqual(
   a: PreviewData['workspaces'],
@@ -83,10 +80,6 @@ function activeOverlayEqual(
     workspacesEqual(a.workspaces, b.workspaces)
   );
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export const AgentPreviewPanel = memo(function AgentPreviewPanel({
   agentId,
@@ -121,10 +114,19 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
 
   // Unified fetch path. Both active and history agents call the same RPCs.
   // Diff-history is the source of truth for touched files for both kinds.
+  //
+  // Karton procedures are *not* referentially stable across state updates;
+  // putting them directly in the effect's dep array would cause spurious
+  // re-runs every time Karton state changes. Mirror them into refs so the
+  // effect only fires on `agentId` / `cache` / `isActive` changes.
   const getStoredInstance = useKartonProcedure(
     (p) => p.agents.getStoredInstance,
   );
   const getTouchedFiles = useKartonProcedure((p) => p.agents.getTouchedFiles);
+  const getStoredInstanceRef = useRef(getStoredInstance);
+  getStoredInstanceRef.current = getStoredInstance;
+  const getTouchedFilesRef = useRef(getTouchedFiles);
+  getTouchedFilesRef.current = getTouchedFiles;
 
   const [fetchedPreview, setFetchedPreview] = useState<PreviewData | null>(
     () => cache.get(agentId)?.data ?? null,
@@ -134,6 +136,8 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
   useEffect(() => {
     const cached = cache.get(agentId);
     if (cached) {
+      // `cached.data` may be null ("confirmed empty") — passing it through
+      // lets the render short-circuit to `return null;` without refetching.
       setFetchedPreview(cached.data);
       setIsLoading(false);
       return;
@@ -148,8 +152,8 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
     // we could otherwise render from the stored instance. Stored instance
     // failure is still fatal — without it there is nothing meaningful to show.
     Promise.allSettled([
-      getStoredInstance(agentId),
-      getTouchedFiles(agentId),
+      getStoredInstanceRef.current(agentId),
+      getTouchedFilesRef.current(agentId),
     ]).then(([storedResult, filesResult]) => {
       if (cancelled) return;
 
@@ -164,6 +168,16 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
 
       const stored = storedResult.value;
       if (!stored) {
+        // Only cache the empty result for inactive (history) agents. Active
+        // agents may legitimately have no persisted row yet (agent hasn't
+        // been flushed to disk), and caching `null` would leave the panel
+        // permanently blank for the rest of the session even after the
+        // agent starts producing messages and gets persisted. For active
+        // agents we rely on the stable refs above to prevent the refetch
+        // loop the null-cache was originally guarding against.
+        if (!isActive) {
+          cache.set(agentId, { data: null, fetchedAt: Date.now() });
+        }
         setIsLoading(false);
         return;
       }
@@ -197,7 +211,11 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [agentId, cache, getStoredInstance, getTouchedFiles]);
+    // Dep-array omits `getStoredInstance` / `getTouchedFiles` deliberately
+    // — they're read via refs above, so reference changes should not trigger
+    // a refetch. `isActive` is included so an active→inactive transition can
+    // retry the fetch (and cache the empty result) correctly.
+  }, [agentId, cache, isActive]);
 
   // Overlay live fields on top of the cached fetch when the agent is active.
   const preview = useMemo<PreviewData | null>(() => {
@@ -212,19 +230,39 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
   }, [fetchedPreview, activeOverlay]);
 
   if (isLoading) {
-    return <PreviewSkeleton />;
+    return (
+      <PreviewCard>
+        <PreviewSkeleton />
+      </PreviewCard>
+    );
   }
 
+  // When there is nothing to show (e.g. newly-created empty agent that has
+  // no persisted row yet and no live overlay), render nothing at all — the
+  // parent's positioning wrapper stays but has no visible styling.
   if (!preview) {
     return null;
   }
 
-  return <PreviewContent preview={preview} />;
+  return (
+    <PreviewCard>
+      <PreviewContent preview={preview} />
+    </PreviewCard>
+  );
 });
 
-// ============================================================================
-// Preview Content
-// ============================================================================
+function PreviewCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-1 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg',
+        'fade-in-0 slide-in-from-left-1 animate-in duration-150',
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 function PreviewContent({ preview }: { preview: PreviewData }) {
   return (
@@ -262,10 +300,6 @@ function PreviewContent({ preview }: { preview: PreviewData }) {
   );
 }
 
-// ============================================================================
-// Edited Files Section (scrollable + fade mask)
-// ============================================================================
-
 function EditedFilesSection({ files }: { files: string[] }) {
   const [viewport, setViewport] = useState<HTMLElement | null>(null);
   const viewportRef = useMemo(
@@ -299,10 +333,6 @@ function EditedFilesSection({ files }: { files: string[] }) {
   );
 }
 
-// ============================================================================
-// Workspace Badge (read-only, visual only)
-// ============================================================================
-
 function WorkspacePathBadge({
   path,
   isGitRepo,
@@ -333,10 +363,6 @@ function WorkspacePathBadge({
   );
 }
 
-// ============================================================================
-// File Path Row (mirrors FileDiffFileItem visual)
-// ============================================================================
-
 function FilePathRow({ path }: { path: string }) {
   const fileName = getBaseName(path);
   const dir = getParentPath(path);
@@ -361,10 +387,6 @@ function FilePathRow({ path }: { path: string }) {
     </div>
   );
 }
-
-// ============================================================================
-// Skeleton
-// ============================================================================
 
 function PreviewSkeleton() {
   return (
