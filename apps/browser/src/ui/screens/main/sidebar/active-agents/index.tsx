@@ -15,7 +15,9 @@ import {
 import { IconPlusFill18 } from 'nucleo-ui-fill-18';
 import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
-import { AgentCard, AgentCardSkeleton } from './_components/agent-card';
+import { AgentCardSkeleton } from './_components/agent-card';
+import { AgentCardWithPreview } from './_components/agent-card-with-preview';
+import type { CachedPreview } from '@ui/screens/main/sidebar/top/_components/agent-preview-panel';
 import { getToolActivityLabel } from './_utils/tool-label';
 
 type ActiveAgentCardData = {
@@ -124,6 +126,12 @@ export function ActiveAgentsGrid() {
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
 
   const [, emptyAgentIdRef] = useEmptyAgentId();
+
+  // Per-surface preview cache. Survives the ActiveAgents mount lifetime so
+  // re-hovering the same card is instant. Not shared with the selector's
+  // cache on purpose — the selector clears on dropdown close and we don't
+  // want that side-effect to hit cards.
+  const previewCacheRef = useRef<Map<string, CachedPreview>>(new Map());
 
   const openAgentModelId = useKartonState((s) =>
     openAgent
@@ -385,7 +393,7 @@ export function ActiveAgentsGrid() {
           const hasUnseen = !isOpen && agent.unread;
 
           return (
-            <AgentCard
+            <AgentCardWithPreview
               key={agent.id}
               id={agent.id}
               title={agent.title}
@@ -401,6 +409,7 @@ export function ActiveAgentsGrid() {
               onArchive={handleArchive}
               onDelete={handleDelete}
               onRename={handleRename}
+              cache={previewCacheRef.current}
             />
           );
         })}

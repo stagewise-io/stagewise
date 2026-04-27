@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { forwardRef, memo, useCallback, useState } from 'react';
 import { cn } from '@ui/utils';
 import {
   Tooltip,
@@ -31,6 +31,12 @@ export interface AgentCardProps {
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
+  /** Optional hover/pointer callbacks — used by `AgentCardWithPreview` to
+   *  drive the hover-preview without introducing a wrapping element that
+   *  would disrupt the parent grid layout. */
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  onMouseDown?: () => void;
 }
 
 export function AgentCardSkeleton() {
@@ -43,22 +49,28 @@ export function AgentCardSkeleton() {
 }
 
 export const AgentCard = memo(
-  function AgentCard({
-    id,
-    title,
-    isActive,
-    isWorking,
-    isWaitingForUser,
-    hasError,
-    hasUnseen,
-    activityText,
-    activityIsUserInput,
-    lastMessageAt,
-    onClick,
-    onArchive,
-    onDelete,
-    onRename,
-  }: AgentCardProps) {
+  forwardRef<HTMLDivElement, AgentCardProps>(function AgentCard(
+    {
+      id,
+      title,
+      isActive,
+      isWorking,
+      isWaitingForUser,
+      hasError,
+      hasUnseen,
+      activityText,
+      activityIsUserInput,
+      lastMessageAt,
+      onClick,
+      onArchive,
+      onDelete,
+      onRename,
+      onMouseEnter,
+      onMouseLeave,
+      onMouseDown,
+    },
+    ref,
+  ) {
     const subtitle = hasError ? 'Error' : activityText;
     const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -77,11 +89,15 @@ export const AgentCard = memo(
 
     return (
       <div
+        ref={ref}
         role="button"
         tabIndex={0}
         data-agent-id={id}
         aria-keyshortcuts="F2"
         onClick={() => onClick(id)}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
         onDoubleClick={(e) => {
           if (!isActive) return;
           e.stopPropagation();
@@ -144,29 +160,22 @@ export const AgentCard = memo(
               {displayTitle}
             </span>
           ) : (
-            <Tooltip>
-              <TooltipTrigger delay={500}>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
-                  onClick={(e) => {
-                    if (!isActive) return;
-                    e.stopPropagation();
-                    startEditing();
-                  }}
-                  onPointerDown={(e) => {
-                    if (!isActive) return;
-                    e.stopPropagation();
-                  }}
-                >
-                  {displayTitle}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <span>{displayTitle}</span>
-              </TooltipContent>
-            </Tooltip>
+            <button
+              type="button"
+              tabIndex={-1}
+              className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+              onClick={(e) => {
+                if (!isActive) return;
+                e.stopPropagation();
+                startEditing();
+              }}
+              onPointerDown={(e) => {
+                if (!isActive) return;
+                e.stopPropagation();
+              }}
+            >
+              {displayTitle}
+            </button>
           )}
         </div>
 
@@ -241,10 +250,19 @@ export const AgentCard = memo(
         </div>
       </div>
     );
-  },
-  // Skip onClick/onArchive/onDelete/onRename in comparison — their behavior is
-  // stable (always call the same RPC with the card's `id`) but identity
-  // changes every render due to upstream useKartonProcedure selectors.
+  }),
+  // Skip `onClick` / `onArchive` / `onDelete` / `onRename` in comparison —
+  // their behavior is stable (always call the same RPC with the card's
+  // `id`) but identity changes every render due to upstream
+  // `useKartonProcedure` selectors.
+  //
+  // Hover handlers (`onMouseEnter` / `onMouseLeave` / `onMouseDown`) ARE
+  // compared strictly: `AgentCardWithPreview` wraps them in `useCallback`
+  // with stable deps and mirrors any closed-over state through a ref, so
+  // their identity is stable across renders in the common case. Including
+  // them here gives us a correctness safety net — if a future change makes
+  // a handler legitimately change identity (e.g. a new dep is added), the
+  // DOM binding updates instead of silently using a stale reference.
   (prev, next) =>
     prev.id === next.id &&
     prev.title === next.title &&
@@ -255,5 +273,8 @@ export const AgentCard = memo(
     prev.hasUnseen === next.hasUnseen &&
     prev.activityText === next.activityText &&
     prev.activityIsUserInput === next.activityIsUserInput &&
-    prev.lastMessageAt === next.lastMessageAt,
+    prev.lastMessageAt === next.lastMessageAt &&
+    prev.onMouseEnter === next.onMouseEnter &&
+    prev.onMouseLeave === next.onMouseLeave &&
+    prev.onMouseDown === next.onMouseDown,
 );
