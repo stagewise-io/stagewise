@@ -6,6 +6,7 @@ import {
 } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { getBaseName, getParentPath } from '@shared/path-utils';
+import type { StoredAgentPreview } from '@shared/karton-contracts/ui/agent';
 import { FileIcon } from '@ui/components/file-icon';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
@@ -39,6 +40,79 @@ export type CachedPreview = {
   data: PreviewData | null;
   fetchedAt: number;
 };
+
+type GetStoredInstance = (
+  agentId: string,
+) => Promise<StoredAgentPreview | null | undefined>;
+type GetTouchedFiles = (agentId: string) => Promise<string[]>;
+
+/** Map a resolved `getStoredInstance` row + touched files into `PreviewData`.
+ *  Factored out so the hover-preview wrapper can pre-warm the cache without
+ *  duplicating the shape logic. */
+function shapeStoredInstance(
+  stored: StoredAgentPreview,
+): Omit<PreviewData, 'touchedFiles'> {
+  return {
+    title: stored.title,
+    messageCount: stored.messageCount,
+    createdAt: stored.createdAt,
+    lastMessageAt: stored.lastMessageAt,
+    workspaces: (stored.mountedWorkspaces ?? []).map((w) => ({
+      path: w.path,
+      isGitRepo: w.isGitRepo,
+      gitBranch: w.gitBranch,
+    })),
+  };
+}
+
+/** Fetch `{stored, touchedFiles}` into the shared cache if not already
+ *  present. Returns the cache entry (existing or newly written). Callers can
+ *  use this to avoid rendering the preview until data is ready — e.g. the
+ *  hover-preview wrapper uses the hover delay to pre-warm the cache, so the
+ *  panel mounts with content and no skeleton-to-content jitter. */
+export async function prefetchAgentPreview(
+  agentId: string,
+  cache: Map<string, CachedPreview>,
+  getStoredInstance: GetStoredInstance,
+  getTouchedFiles: GetTouchedFiles,
+  isActive: boolean,
+): Promise<CachedPreview | null> {
+  const existing = cache.get(agentId);
+  if (existing) return existing;
+
+  const [storedResult, filesResult] = await Promise.allSettled([
+    getStoredInstance(agentId),
+    getTouchedFiles(agentId),
+  ]);
+
+  if (storedResult.status === 'rejected') {
+    // Do not cache on stored-fetch failure; the panel's own fetch can retry.
+    return null;
+  }
+
+  const stored = storedResult.value;
+  if (!stored) {
+    // Mirror the guard in `AgentPreviewPanel`'s own fetch path: only cache
+    // the empty result for inactive (history) agents. Active agents may
+    // simply not have been flushed to disk yet; caching `null` here would
+    // permanently suppress the preview for the rest of the session even
+    // after the agent produces messages and gets persisted.
+    if (!isActive) {
+      const entry: CachedPreview = { data: null, fetchedAt: Date.now() };
+      cache.set(agentId, entry);
+      return entry;
+    }
+    return null;
+  }
+
+  const files = filesResult.status === 'fulfilled' ? filesResult.value : [];
+  const entry: CachedPreview = {
+    data: { ...shapeStoredInstance(stored), touchedFiles: files },
+    fetchedAt: Date.now(),
+  };
+  cache.set(agentId, entry);
+  return entry;
+}
 
 /** Live overlay fields read from Karton state for active agents. These drift
  * over the agent's lifetime and should override the (potentially stale) cached
@@ -191,15 +265,7 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
       const files = filesResult.status === 'fulfilled' ? filesResult.value : [];
 
       const data: PreviewData = {
-        title: stored.title,
-        messageCount: stored.messageCount,
-        createdAt: stored.createdAt,
-        lastMessageAt: stored.lastMessageAt,
-        workspaces: (stored.mountedWorkspaces ?? []).map((w) => ({
-          path: w.path,
-          isGitRepo: w.isGitRepo,
-          gitBranch: w.gitBranch,
-        })),
+        ...shapeStoredInstance(stored),
         touchedFiles: files,
       };
 
