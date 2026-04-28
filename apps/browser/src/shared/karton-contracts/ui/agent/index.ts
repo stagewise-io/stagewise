@@ -28,6 +28,16 @@ export type AgentRuntimeError =
       message: string;
       plan?: string;
       exceededWindows: ExceededWindow[];
+    }
+  | {
+      kind: 'upstream-overload';
+      message: string;
+      providerName?: string;
+      statusCode?: number;
+      /** Snapshot of the model that was active when the error occurred.
+       *  Captured so the UI can name the failed model even if the user
+       *  switches models while the error card is still visible. */
+      modelId?: string;
     };
 
 export type AgentState = {

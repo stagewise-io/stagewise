@@ -110,6 +110,13 @@ export type EventProperties = {
     used_percent: number;
     resets_at: string;
   };
+  'upstream-overload': {
+    agent_type: string;
+    model_id: string;
+    provider_mode: string;
+    provider_name?: string;
+    status_code?: number;
+  };
 
   // UI (routed via karton RPC)
   'ui-interaction': { action: string; target: string; detail?: string };
