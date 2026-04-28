@@ -872,6 +872,7 @@ export const ChatHistory = () => {
                   agentInstanceId={openAgent}
                   error={curError}
                   canRetry={curCanRetry}
+                  isWorking={curIsWorking}
                   onRetry={() => void retryLastUserMessage(openAgent)}
                 />
               )}
@@ -899,6 +900,7 @@ export const ChatHistory = () => {
                     agentInstanceId={openAgent}
                     error={curError}
                     canRetry={curCanRetry}
+                    isWorking={curIsWorking}
                     onRetry={() => void retryLastUserMessage(openAgent)}
                   />
                 )}
@@ -938,6 +940,7 @@ export const ChatHistory = () => {
                 agentInstanceId={openAgent}
                 error={curError}
                 canRetry={curCanRetry}
+                isWorking={curIsWorking}
                 onRetry={() => void retryLastUserMessage(openAgent)}
               />
             )}
