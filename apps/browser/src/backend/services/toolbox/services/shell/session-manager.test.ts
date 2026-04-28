@@ -2,10 +2,29 @@ import { describe, it, expect, afterEach } from 'vitest';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { applyHeadTailCap, stripAnsi, SessionManager } from './session-manager';
+import {
+  applyHeadTailCap,
+  stripAnsi,
+  SessionManager,
+  getCommandIdleMs,
+  getCommandTimeoutMs,
+} from './session-manager';
 import { detectShell } from './detect-shell';
 import { sanitizeEnv } from './sanitize-env';
-import { HEAD_LINES, MAX_SESSIONS_PER_AGENT, TAIL_LINES } from './types';
+import {
+  DEFAULT_EXITED_IDLE_MS,
+  DEFAULT_EXITED_WAIT_UNTIL_TIMEOUT_MS,
+  DEFAULT_IDLE_MS,
+  DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS,
+  DEFAULT_TIMEOUT_STDIN_MS,
+  DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
+  HEAD_LINES,
+  MAX_EXITED_WAIT_UNTIL_TIMEOUT_MS,
+  MAX_SESSIONS_PER_AGENT,
+  MAX_WAIT_UNTIL_TIMEOUT_MS,
+  SHELL_RESPONSE_TAIL_MAX_CHARS,
+  TAIL_LINES,
+} from './types';
 import type { DetectedShell } from './types';
 
 // ─── Section A: applyHeadTailCap (pure) ──────────────────────────
@@ -92,7 +111,68 @@ describe('stripAnsi', () => {
   });
 });
 
-// ─── Section C: Integration tests (real PTY sessions) ────────────
+// ─── Section C: timeout/idle selection (pure) ────────────────────
+
+describe('command timeout/idle selection', () => {
+  it('uses quick timeout when waitUntil is omitted', () => {
+    expect(getCommandTimeoutMs({ command: 'echo hi' })).toBe(
+      DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS,
+    );
+  });
+
+  it('uses stdin timeout for raw input without waitUntil', () => {
+    expect(getCommandTimeoutMs({ command: '\r', rawInput: true })).toBe(
+      DEFAULT_TIMEOUT_STDIN_MS,
+    );
+  });
+
+  it('uses normal waitUntil default and cap without exited', () => {
+    expect(getCommandTimeoutMs({ command: 'sleep 1', waitUntil: {} })).toBe(
+      DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
+    );
+    expect(
+      getCommandTimeoutMs({
+        command: 'sleep 1',
+        waitUntil: { timeoutMs: 300_000 },
+      }),
+    ).toBe(MAX_WAIT_UNTIL_TIMEOUT_MS);
+  });
+
+  it('uses extended default and cap with exited=true', () => {
+    expect(
+      getCommandTimeoutMs({
+        command: 'pnpm typecheck',
+        waitUntil: { exited: true },
+      }),
+    ).toBe(DEFAULT_EXITED_WAIT_UNTIL_TIMEOUT_MS);
+    expect(
+      getCommandTimeoutMs({
+        command: 'pnpm typecheck',
+        waitUntil: { exited: true, timeoutMs: 999_999 },
+      }),
+    ).toBe(MAX_EXITED_WAIT_UNTIL_TIMEOUT_MS);
+  });
+
+  it('uses 15s default idle with exited=true and preserves explicit idle', () => {
+    expect(getCommandIdleMs({ command: 'echo hi', waitUntil: {} })).toBe(
+      DEFAULT_IDLE_MS,
+    );
+    expect(
+      getCommandIdleMs({
+        command: 'pnpm typecheck',
+        waitUntil: { exited: true },
+      }),
+    ).toBe(DEFAULT_EXITED_IDLE_MS);
+    expect(
+      getCommandIdleMs({
+        command: 'pnpm typecheck',
+        waitUntil: { exited: true, idleMs: 0 },
+      }),
+    ).toBe(0);
+  });
+});
+
+// ─── Section D: Integration tests (real PTY sessions) ────────────
 
 const shell = detectShell();
 
@@ -373,6 +453,45 @@ describeIfShell('SessionManager (integration)', () => {
     expect(r.timedOut).toBe(false);
     // Should resolve well before the 10s timeout or 30s sleep
     expect(elapsed).toBeLessThan(8000);
+  });
+
+  // Dedicated because the basic-command and idle tests construct the
+  // SessionManager without a log directory, so `logger` is null and
+  // `getTail` returns ''. This test spins up a temporary logs directory
+  // specifically to exercise the tail path end-to-end.
+  it('populates recentOutput from the session log tail', async () => {
+    const logsDir = fs.mkdtempSync(path.join(cwd, 'sm-tail-'));
+    try {
+      sm = new SessionManager(
+        shell as DetectedShell,
+        () => logsDir,
+        TEST_DETECT_TIMEOUT_MS,
+      );
+      const sid = sm.createSession('agent-test', cwd, env);
+      await waitForReady(sm, sid);
+
+      // Mirror the known-good `matches outputPattern` test: keep the
+      // command alive with a sleep and resolve via pattern match. A bare
+      // `echo` can race the OSC 133 exit marker on slower CI runners,
+      // leaving the terminal buffer unstable when `serializeFrom` reads.
+      const r = await sm.executeCommand(sid, {
+        command: 'echo RECENT_TAIL_MARKER; sleep 30',
+        waitUntil: {
+          outputPattern: 'RECENT_TAIL_MARKER',
+          timeoutMs: 10000,
+        },
+      });
+
+      expect(r.output).toContain('RECENT_TAIL_MARKER');
+      expect(r.recentOutput).toContain('RECENT_TAIL_MARKER');
+      expect(r.recentOutput?.length ?? 0).toBeLessThanOrEqual(
+        SHELL_RESPONSE_TAIL_MAX_CHARS,
+      );
+    } finally {
+      sm?.killAll();
+      await new Promise((r) => setTimeout(r, 300));
+      fs.rmSync(logsDir, { recursive: true, force: true });
+    }
   });
 
   it('matches outputPattern against terminal buffer when logger exists', async () => {

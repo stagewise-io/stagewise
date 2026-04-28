@@ -27,6 +27,20 @@ export interface DetectedShell {
 export const DEFAULT_WAIT_UNTIL_TIMEOUT_MS = 15_000;
 
 /**
+ * Default hard-timeout (ms) when the agent passes
+ * `waitUntil.exited: true`. This mode is for self-terminating commands
+ * such as typechecks, builds, installs, and tests. They may legitimately
+ * run longer than the normal snapshot cap, but still need a finite ceiling.
+ */
+export const DEFAULT_EXITED_WAIT_UNTIL_TIMEOUT_MS = 300_000;
+
+/**
+ * Hard-timeout ceiling (ms) for `waitUntil.exited: true` commands.
+ * Explicit timeout requests in exited mode are clamped to this value.
+ */
+export const MAX_EXITED_WAIT_UNTIL_TIMEOUT_MS = 300_000;
+
+/**
  * Hard-timeout (ms) used when the agent omits `waitUntil` entirely.
  * "Quick check" mode — must feel responsive.
  */
@@ -47,6 +61,13 @@ export const DEFAULT_TIMEOUT_STDIN_MS = 5_000;
 export const MAX_WAIT_UNTIL_TIMEOUT_MS = 60_000;
 
 /**
+ * Maximum characters included in `recentOutput` / `recent_output` shell
+ * responses. This gives the agent recent session context without making
+ * token cost depend on the full shell log size.
+ */
+export const SHELL_RESPONSE_TAIL_MAX_CHARS = 12_000;
+
+/**
  * Default idle threshold (ms). Once the command has produced any output,
  * N ms of silence resolves the tool call with `resolvedBy: 'idle'`.
  * 5s is long enough that continuously-emitting tools (pnpm install,
@@ -56,12 +77,12 @@ export const MAX_WAIT_UNTIL_TIMEOUT_MS = 60_000;
 export const DEFAULT_IDLE_MS = 5_000;
 
 /**
- * More aggressive idle threshold used when the agent passes
- * `waitUntil.exited: true`. The agent is explicitly signalling "I expect
- * this to end on its own" — if it hasn't produced output in 3s we can
- * safely assume it's stuck waiting for input or otherwise idle.
+ * Default idle threshold used when the agent passes
+ * `waitUntil.exited: true`. The command gets a longer hard cap to finish
+ * on its own, but 15s of silence after output still returns the snapshot
+ * promptly if the process stalls or waits for input.
  */
-export const AGGRESSIVE_IDLE_MS = 3_000;
+export const DEFAULT_EXITED_IDLE_MS = 15_000;
 
 /**
  * Why a command resolved. Used by the agent to decide follow-up actions:
@@ -152,7 +173,7 @@ export interface SessionCommandRequest {
     /**
      * Silence threshold (ms) after the first output event. `0` disables
      * idle detection entirely. Omit to use the default (see
-     * `DEFAULT_IDLE_MS` / `AGGRESSIVE_IDLE_MS`).
+     * `DEFAULT_IDLE_MS` / `DEFAULT_EXITED_IDLE_MS`).
      */
     idleMs?: number;
   };
@@ -162,6 +183,8 @@ export interface SessionCommandRequest {
 export interface SessionCommandResult {
   sessionId: string;
   output: string;
+  /** Character-capped tail of the full session log for recent context. */
+  recentOutput?: string;
   exitCode: number | null;
   sessionExited: boolean;
   timedOut: boolean;
