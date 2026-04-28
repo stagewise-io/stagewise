@@ -150,3 +150,121 @@ describe('SessionLogger', () => {
     logger.close();
   });
 });
+
+describe('SessionLogger.getRawSinceCursor', () => {
+  it('returns empty data when cursor matches the current total', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    logger.appendRaw(Buffer.from('hello'));
+
+    const total = logger.getTotalRawBytes();
+    const result = logger.getRawSinceCursor(total);
+
+    expect(result.data.length).toBe(0);
+    expect(result.cursor).toBe(total);
+    expect(result.truncated).toBe(false);
+    logger.close();
+  });
+
+  it('returns empty data when cursor is ahead of total (e.g. stale)', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    logger.appendRaw(Buffer.from('hi'));
+
+    const result = logger.getRawSinceCursor(9999);
+
+    expect(result.data.length).toBe(0);
+    expect(result.cursor).toBe(logger.getTotalRawBytes());
+    expect(result.truncated).toBe(false);
+    logger.close();
+  });
+
+  it('cursor=0 returns the full retained buffer (no truncation flag)', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    logger.appendRaw(Buffer.from('one'));
+    logger.appendRaw(Buffer.from('two'));
+
+    const result = logger.getRawSinceCursor(0);
+
+    expect(result.data.toString('utf-8')).toBe('onetwo');
+    expect(result.cursor).toBe(6);
+    expect(result.truncated).toBe(false);
+    logger.close();
+  });
+
+  it('returns only bytes appended since cursor (mid-stream slice)', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    logger.appendRaw(Buffer.from('aaa'));
+    const cursor = logger.getTotalRawBytes();
+    logger.appendRaw(Buffer.from('bbb'));
+    logger.appendRaw(Buffer.from('ccc'));
+
+    const result = logger.getRawSinceCursor(cursor);
+
+    expect(result.data.toString('utf-8')).toBe('bbbccc');
+    expect(result.cursor).toBe(9);
+    expect(result.truncated).toBe(false);
+    logger.close();
+  });
+
+  it('handles cursors that fall in the middle of a chunk', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    logger.appendRaw(Buffer.from('helloworld')); // single 10-byte chunk
+
+    // Cursor lands inside the chunk — implementation must subarray it.
+    const result = logger.getRawSinceCursor(5);
+
+    expect(result.data.toString('utf-8')).toBe('world');
+    expect(result.cursor).toBe(10);
+    expect(result.truncated).toBe(false);
+    logger.close();
+  });
+
+  it('skips entirely-consumed chunks before slicing', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    logger.appendRaw(Buffer.from('AAA')); // 0..3
+    logger.appendRaw(Buffer.from('BBB')); // 3..6
+    logger.appendRaw(Buffer.from('CCC')); // 6..9
+
+    // Cursor=4 → mid-chunk in BBB, should yield "BB" + "CCC"
+    const result = logger.getRawSinceCursor(4);
+
+    expect(result.data.toString('utf-8')).toBe('BBCCC');
+    expect(result.cursor).toBe(9);
+    expect(result.truncated).toBe(false);
+    logger.close();
+  });
+
+  it('flags truncated when cursor predates the retained ring buffer', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    // Force ring eviction by writing past 100 KiB cap.
+    const filler = Buffer.alloc(50 * 1024, 0x41); // 50 KiB of 'A'
+    logger.appendRaw(filler);
+    logger.appendRaw(filler);
+    logger.appendRaw(filler); // now 150 KiB written, ring trims oldest
+
+    const total = logger.getTotalRawBytes();
+    expect(total).toBe(150 * 1024);
+
+    // Stale cursor of 1 byte should be reported as truncated.
+    const result = logger.getRawSinceCursor(1);
+
+    expect(result.truncated).toBe(true);
+    expect(result.cursor).toBe(total);
+    // Returned data is the retained ring buffer (after eviction).
+    expect(result.data.length).toBeLessThanOrEqual(150 * 1024);
+    expect(result.data.length).toBeGreaterThan(0);
+    logger.close();
+  });
+
+  it('getTotalRawBytes is monotonic across eviction', () => {
+    const logger = new SessionLogger(makeTmpLogPath());
+    const filler = Buffer.alloc(60 * 1024, 0x42);
+
+    logger.appendRaw(filler);
+    expect(logger.getTotalRawBytes()).toBe(60 * 1024);
+
+    logger.appendRaw(filler);
+    // Past the 100 KiB cap — eviction has happened, but total never resets.
+    expect(logger.getTotalRawBytes()).toBe(120 * 1024);
+    logger.close();
+  });
+});

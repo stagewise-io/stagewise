@@ -21,6 +21,7 @@ import { Route as InternalAppAgentSettingsRouteImport } from './routes/_internal
 import { Route as InternalAppAccountRouteImport } from './routes/_internal-app/account'
 import { Route as InternalAppAboutRouteImport } from './routes/_internal-app/about'
 import { Route as InternalAppBrowsingSettingsIndexRouteImport } from './routes/_internal-app/browsing-settings.index'
+import { Route as TerminalAgentInstanceIdSessionIdRouteImport } from './routes/terminal/$agentInstanceId.$sessionId'
 import { Route as InternalAppBrowsingSettingsWebsitePermissionsRouteImport } from './routes/_internal-app/browsing-settings.website-permissions'
 import { Route as InternalAppAgentSettingsSkillsContextRouteImport } from './routes/_internal-app/agent-settings.skills-context'
 import { Route as InternalAppAgentSettingsPluginsRouteImport } from './routes/_internal-app/agent-settings.plugins'
@@ -92,6 +93,12 @@ const InternalAppBrowsingSettingsIndexRoute =
     path: '/',
     getParentRoute: () => InternalAppBrowsingSettingsRoute,
   } as any)
+const TerminalAgentInstanceIdSessionIdRoute =
+  TerminalAgentInstanceIdSessionIdRouteImport.update({
+    id: '/terminal/$agentInstanceId/$sessionId',
+    path: '/terminal/$agentInstanceId/$sessionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InternalAppBrowsingSettingsWebsitePermissionsRoute =
   InternalAppBrowsingSettingsWebsitePermissionsRouteImport.update({
     id: '/website-permissions',
@@ -153,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/agent-settings/plugins': typeof InternalAppAgentSettingsPluginsRoute
   '/agent-settings/skills-context': typeof InternalAppAgentSettingsSkillsContextRoute
   '/browsing-settings/website-permissions': typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  '/terminal/$agentInstanceId/$sessionId': typeof TerminalAgentInstanceIdSessionIdRoute
   '/browsing-settings/': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -172,6 +180,7 @@ export interface FileRoutesByTo {
   '/agent-settings/plugins': typeof InternalAppAgentSettingsPluginsRoute
   '/agent-settings/skills-context': typeof InternalAppAgentSettingsSkillsContextRoute
   '/browsing-settings/website-permissions': typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  '/terminal/$agentInstanceId/$sessionId': typeof TerminalAgentInstanceIdSessionIdRoute
   '/browsing-settings': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -194,6 +203,7 @@ export interface FileRoutesById {
   '/_internal-app/agent-settings/plugins': typeof InternalAppAgentSettingsPluginsRoute
   '/_internal-app/agent-settings/skills-context': typeof InternalAppAgentSettingsSkillsContextRoute
   '/_internal-app/browsing-settings/website-permissions': typeof InternalAppBrowsingSettingsWebsitePermissionsRoute
+  '/terminal/$agentInstanceId/$sessionId': typeof TerminalAgentInstanceIdSessionIdRoute
   '/_internal-app/browsing-settings/': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/agent-settings/plugins'
     | '/agent-settings/skills-context'
     | '/browsing-settings/website-permissions'
+    | '/terminal/$agentInstanceId/$sessionId'
     | '/browsing-settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/agent-settings/plugins'
     | '/agent-settings/skills-context'
     | '/browsing-settings/website-permissions'
+    | '/terminal/$agentInstanceId/$sessionId'
     | '/browsing-settings'
   id:
     | '__root__'
@@ -256,6 +268,7 @@ export interface FileRouteTypes {
     | '/_internal-app/agent-settings/plugins'
     | '/_internal-app/agent-settings/skills-context'
     | '/_internal-app/browsing-settings/website-permissions'
+    | '/terminal/$agentInstanceId/$sessionId'
     | '/_internal-app/browsing-settings/'
   fileRoutesById: FileRoutesById
 }
@@ -265,6 +278,7 @@ export interface RootRouteChildren {
   DiffReviewAgentInstanceIdRoute: typeof DiffReviewAgentInstanceIdRoute
   PlanFilenameRoute: typeof PlanFilenameRoute
   ErrorPagesErrorPageLoadFailedRoute: typeof ErrorPagesErrorPageLoadFailedRoute
+  TerminalAgentInstanceIdSessionIdRoute: typeof TerminalAgentInstanceIdSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -352,6 +366,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/browsing-settings/'
       preLoaderRoute: typeof InternalAppBrowsingSettingsIndexRouteImport
       parentRoute: typeof InternalAppBrowsingSettingsRoute
+    }
+    '/terminal/$agentInstanceId/$sessionId': {
+      id: '/terminal/$agentInstanceId/$sessionId'
+      path: '/terminal/$agentInstanceId/$sessionId'
+      fullPath: '/terminal/$agentInstanceId/$sessionId'
+      preLoaderRoute: typeof TerminalAgentInstanceIdSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_internal-app/browsing-settings/website-permissions': {
       id: '/_internal-app/browsing-settings/website-permissions'
@@ -478,6 +499,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiffReviewAgentInstanceIdRoute: DiffReviewAgentInstanceIdRoute,
   PlanFilenameRoute: PlanFilenameRoute,
   ErrorPagesErrorPageLoadFailedRoute: ErrorPagesErrorPageLoadFailedRoute,
+  TerminalAgentInstanceIdSessionIdRoute: TerminalAgentInstanceIdSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

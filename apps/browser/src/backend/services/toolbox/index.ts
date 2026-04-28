@@ -17,6 +17,7 @@ import {
   type MountDescriptor,
 } from '../sandbox/ipc';
 import type { WorkspaceAgentSettings } from '@shared/karton-contracts/ui/shared-types';
+import type { CreateUserShellSessionResult } from '@shared/karton-contracts/ui';
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
 import type { GlobalConfigService } from '@/services/global-config';
@@ -1137,8 +1138,77 @@ export class ToolboxService extends DisposableService {
     return this.shellService?.getShellInfo() ?? null;
   }
 
-  public killShellSession(sessionId: string): void {
-    this.shellService?.killSession(sessionId);
+  /**
+   * Kill a shell session. Pass `expectedOwner` from IPC to reject
+   * cross-owner kills — protects against one client acting on another
+   * client's session by guessing the id.
+   */
+  public killShellSession(sessionId: string, expectedOwner?: string): void {
+    this.shellService?.killSession(sessionId, expectedOwner);
+  }
+
+  public removeShellSession(sessionId: string, expectedOwner?: string): void {
+    this.shellService?.removeSession(sessionId, expectedOwner);
+  }
+
+  public readShellTail(
+    agentInstanceId: string,
+    sessionId: string,
+    cursor: number,
+  ) {
+    return (
+      this.shellService?.readShellTail(agentInstanceId, sessionId, cursor) ??
+      null
+    );
+  }
+
+  public getShellSessionInfo(agentInstanceId: string, sessionId: string) {
+    return (
+      this.shellService?.getShellSessionInfo(agentInstanceId, sessionId) ?? null
+    );
+  }
+
+  public writeShellStdin(
+    agentInstanceId: string,
+    sessionId: string,
+    bytes: string,
+  ) {
+    return (
+      this.shellService?.writeShellStdin(agentInstanceId, sessionId, bytes) ??
+      'session_not_found'
+    );
+  }
+
+  public resizeShellSession(
+    agentInstanceId: string,
+    sessionId: string,
+    cols: number,
+    rows: number,
+  ): boolean {
+    return (
+      this.shellService?.resizeShellSession(
+        agentInstanceId,
+        sessionId,
+        cols,
+        rows,
+      ) ?? false
+    );
+  }
+
+  public createUserShellSession(
+    requestedCwd: string | null,
+  ): CreateUserShellSessionResult {
+    return (
+      this.shellService?.createUserShellSession(requestedCwd) ?? {
+        ok: false,
+        reason: 'unavailable',
+        message: 'Shell service is not initialized.',
+      }
+    );
+  }
+
+  public listUserShellSessions() {
+    return this.shellService?.listUserShellSessions() ?? [];
   }
 
   public getBrowserSnapshot(): BrowserSnapshot {
@@ -1950,10 +2020,31 @@ export class ToolboxService extends DisposableService {
       'toolbox.killShellSession',
       async (
         _callingClientId: string,
-        _agentInstanceId: string,
+        agentInstanceId: string,
         sessionId: string,
       ) => {
-        this.killShellSession(sessionId);
+        this.killShellSession(sessionId, agentInstanceId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.removeShellSession',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+      ) => {
+        this.removeShellSession(sessionId, agentInstanceId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.createUserShellSession',
+      async (
+        _callingClientId: string,
+        requestedCwd: string | null,
+      ): Promise<CreateUserShellSessionResult> => {
+        return this.createUserShellSession(requestedCwd);
       },
     );
 

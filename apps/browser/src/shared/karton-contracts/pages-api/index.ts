@@ -273,8 +273,82 @@ export type PagesApiContract = {
       /** Quit the app and install the downloaded update */
       quitAndInstall: () => Promise<void>;
     };
+    /**
+     * Read+write stream for the terminal page. Session create/list
+     * lives on the UI karton (`toolbox.createUserShellSession` and
+     * the `shells` manifest), not here.
+     */
+    shell: {
+      /**
+       * Tail read, base64-encoded. Pass 0 on first call to get the full
+       * retained buffer + new cursor; pass the returned cursor next time.
+       * Returns `null` when the session is unknown for that owner.
+       */
+      readTail: (
+        agentInstanceId: string,
+        sessionId: string,
+        cursor: number,
+      ) => Promise<ShellTailReadResult | null>;
+      /** Header metadata (cwd, shell type, created/exited state). */
+      getInfo: (
+        agentInstanceId: string,
+        sessionId: string,
+      ) => Promise<ShellSessionInfo | null>;
+      /**
+       * Stdin write. Returns `'agent_busy'` while the agent owns the
+       * PTY — the result tells you whether the bytes actually landed.
+       */
+      writeStdin: (
+        agentInstanceId: string,
+        sessionId: string,
+        bytes: string,
+      ) => Promise<ShellWriteResult>;
+      /** Resize the PTY. Allowed even while the agent is busy. */
+      resize: (
+        agentInstanceId: string,
+        sessionId: string,
+        cols: number,
+        rows: number,
+      ) => Promise<boolean>;
+    };
   };
 };
+
+export interface ShellTailReadResult {
+  /** Base64-encoded PTY bytes since the previous cursor. */
+  data: string;
+  /** Pass this back on the next call. */
+  cursor: number;
+  /** True when the cursor predates the retained ring — clear xterm and replay `data`. */
+  truncated: boolean;
+  exited: boolean;
+  exitCode: number | null;
+  /** Agent is mid-command. Renderer flips UI and stops sending keystrokes. */
+  agentBusy: boolean;
+}
+
+export type ShellWriteResult =
+  | 'ok'
+  | 'agent_busy'
+  | 'session_not_found'
+  | 'session_exited';
+
+/**
+ * Re-exported here for convenience. The canonical definition lives in
+ * `./types` so backend code can import the sentinel without pulling in
+ * the Vite globals referenced lower in this file.
+ */
+export { USER_OWNER_ID } from './types';
+
+export interface ShellSessionInfo {
+  id: string;
+  cwd: string;
+  shellType: 'bash' | 'zsh' | 'sh' | 'powershell';
+  shellPath: string;
+  createdAt: number;
+  exited: boolean;
+  exitCode: number | null;
+}
 
 export const defaultState: PagesApiState = {
   activeDownloads: {},

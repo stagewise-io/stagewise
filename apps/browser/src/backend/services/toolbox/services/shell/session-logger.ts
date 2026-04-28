@@ -36,9 +36,13 @@ export class SessionLogger {
   private _buffer = '';
   private _flushTimer: NodeJS.Timeout | null = null;
 
-  // Raw circular buffer for future xterm replay (unstripped PTY bytes).
+  // Raw circular buffer for xterm replay (unstripped PTY bytes).
   private _rawChunks: Buffer[] = [];
   private _rawBytes = 0;
+  // Monotonic byte count, never reset on eviction. Acts as the cursor
+  // for tail reads — `cursor < _totalRawBytes - _rawBytes` means the
+  // ring already evicted past the caller and we must signal truncation.
+  private _totalRawBytes = 0;
 
   // Headless terminal emulator for accurate screen-state reads.
   private _terminal: InstanceType<typeof Terminal>;
@@ -148,6 +152,7 @@ export class SessionLogger {
     (this._terminal as any)._core.writeSync(data);
     this._rawChunks.push(data);
     this._rawBytes += data.byteLength;
+    this._totalRawBytes += data.byteLength;
     // Evict oldest chunks until we are within the cap.
     while (
       this._rawBytes > MAX_RAW_BUFFER_BYTES &&
@@ -164,6 +169,58 @@ export class SessionLogger {
    */
   getRawBuffer(): Buffer {
     return Buffer.concat(this._rawChunks);
+  }
+
+  /** Monotonic count of raw bytes appended since session start. */
+  getTotalRawBytes(): number {
+    return this._totalRawBytes;
+  }
+
+  /**
+   * Tail read since `cursor`. `cursor === 0` returns the full retained
+   * buffer (initial frame). If the cursor predates the ring, `truncated`
+   * is set and `data` is the whole retained buffer — caller should
+   * clear xterm and replay from scratch.
+   */
+  getRawSinceCursor(cursor: number): {
+    data: Buffer;
+    cursor: number;
+    truncated: boolean;
+  } {
+    const newCursor = this._totalRawBytes;
+
+    if (cursor >= newCursor) {
+      return { data: Buffer.alloc(0), cursor: newCursor, truncated: false };
+    }
+
+    const firstAvailable = newCursor - this._rawBytes;
+
+    if (cursor === 0 || cursor < firstAvailable) {
+      return {
+        data: Buffer.concat(this._rawChunks),
+        cursor: newCursor,
+        truncated: cursor !== 0 && cursor < firstAvailable,
+      };
+    }
+
+    // Cursor lands inside the retained ring — skip past consumed
+    // chunks, then slice into the partial one.
+    const skip = cursor - firstAvailable;
+    let remaining = skip;
+    const out: Buffer[] = [];
+    for (const chunk of this._rawChunks) {
+      if (remaining >= chunk.byteLength) {
+        remaining -= chunk.byteLength;
+        continue;
+      }
+      if (remaining > 0) {
+        out.push(chunk.subarray(remaining));
+        remaining = 0;
+      } else {
+        out.push(chunk);
+      }
+    }
+    return { data: Buffer.concat(out), cursor: newCursor, truncated: false };
   }
 
   /**

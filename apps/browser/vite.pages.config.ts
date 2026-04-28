@@ -29,8 +29,9 @@ export default defineConfig({
       autoCodeSplitting: true,
       routesDirectory: 'routes',
       generatedRouteTree: 'routeTree.gen.ts',
-      // Ignore files inside _components directories and their subdirectories (not routes)
-      routeFileIgnorePattern: '_components|external-file-preview',
+      // Ignore files inside _components / _hooks directories and their
+      // subdirectories (not routes).
+      routeFileIgnorePattern: '_components|_hooks|external-file-preview',
     }),
     react(),
     tailwindcss(),

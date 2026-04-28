@@ -1,4 +1,12 @@
 import type { FileDiff } from '../ui/shared-types';
+
+/**
+ * Owner-id sentinel for user-created terminal sessions. Lives here
+ * (not in `pages-api/index.ts`) so backend modules can import it
+ * without pulling in Vite globals.
+ */
+export const USER_OWNER_ID = '__user__';
+
 // Enum for how the user arrived at the page (matches Chrome's internal integers)
 // Core transition types are stored in the lower 8 bits
 export enum PageTransition {

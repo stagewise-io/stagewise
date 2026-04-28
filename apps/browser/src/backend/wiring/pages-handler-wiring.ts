@@ -80,6 +80,20 @@ export function wirePagesHandlers(deps: {
     getUsageHistory: (params) => authService.getUsageHistory(params.days),
   });
 
+  // --- Terminal page: read+write stream ---
+  // Session create/list goes through the UI karton instead — see
+  // `toolbox.createUserShellSession` and the `shells` manifest.
+  pagesService.setShellHandlers({
+    readTail: (agentInstanceId, sessionId, cursor) =>
+      toolboxService.readShellTail(agentInstanceId, sessionId, cursor),
+    getInfo: (agentInstanceId, sessionId) =>
+      toolboxService.getShellSessionInfo(agentInstanceId, sessionId),
+    writeStdin: (agentInstanceId, sessionId, bytes) =>
+      toolboxService.writeShellStdin(agentInstanceId, sessionId, bytes),
+    resize: (agentInstanceId, sessionId, cols, rows) =>
+      toolboxService.resizeShellSession(agentInstanceId, sessionId, cols, rows),
+  });
+
   // --- Home page services bidirectional wiring ---
   userExperienceService.setPagesService(pagesService);
   pagesService.setUserExperienceService(userExperienceService);
