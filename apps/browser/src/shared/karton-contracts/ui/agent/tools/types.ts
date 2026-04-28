@@ -757,30 +757,51 @@ export const executeShellCommandToolInputSchema = z.object({
         .number()
         .int()
         .positive()
-        .max(60_000)
+        .max(300_000)
         .optional()
         .describe(
-          'Hard timeout in ms (max 60000, default 15000 with wait_until / 10000 without).',
+          'Hard timeout in ms. Shape: any positive integer up to 300000. Enforcement: backend clamps to 60000 without `exited: true`, 300000 with `exited: true`. Defaults: 10000 without wait_until, 15000 with wait_until (non-exited), 300000 with `exited: true`. Omit this field unless you specifically need to change the default.',
         ),
       exited: z
         .boolean()
         .optional()
         .describe(
-          'Hint that the command is expected to exit on its own. Lowers idle threshold from 5000ms to 3000ms.',
+          'Strong signal that the command will terminate on its own (builds, typechecks, tests, installs, git). Raises hard cap to 5 min (300000ms) and idle threshold to 15000ms. Use this for any long self-exiting command instead of a custom timeout_ms.',
         ),
       output_pattern: z
         .string()
         .optional()
-        .describe('Return early when stdout/stderr matches this regex.'),
+        .describe(
+          'Return early when stdout/stderr matches this regex. Use for dev servers and watchers that never exit.',
+        ),
       idle_ms: z
         .number()
         .int()
         .min(0)
-        .max(30_000)
+        .max(60_000)
         .optional()
         .describe(
-          'Silence threshold in ms after first output (0–30000, default 5000; 3000 with exited=true). 0 disables idle detection.',
+          'Silence threshold in ms after first output (max 60000). Defaults: 5000 normally, 15000 with `exited: true`. 0 disables idle detection — avoid unless the command has proven long silent phases during active work; prefer `output_pattern` instead.',
         ),
+    })
+    // Cross-field rule the `.max()` alone cannot express: `timeout_ms`
+    // above 60000 is only legal when `exited: true` is set. Without this
+    // refinement the backend would silently clamp such values, leading to
+    // confusing "why did my typecheck time out at 60s" reports. The schema
+    // rejects it up-front so the agent gets a clear, actionable error.
+    .superRefine((val, ctx) => {
+      if (
+        val.timeout_ms !== undefined &&
+        val.timeout_ms > 60_000 &&
+        !val.exited
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['timeout_ms'],
+          message:
+            'timeout_ms > 60000 requires `exited: true`. Either set `exited: true` for a long self-exiting command, or use a smaller timeout_ms.',
+        });
+      }
     })
     .optional()
     .describe('Controls when the tool returns.'),
@@ -789,6 +810,10 @@ export const executeShellCommandToolInputSchema = z.object({
 export const executeShellCommandToolOutputSchema = z.object({
   session_id: z.string().nullable(),
   output: z.string(),
+  recent_output: z
+    .string()
+    .optional()
+    .describe('Recent character-capped tail of the full session log.'),
   exit_code: z.number().nullable(),
   session_exited: z.boolean(),
   timed_out: z.boolean(),

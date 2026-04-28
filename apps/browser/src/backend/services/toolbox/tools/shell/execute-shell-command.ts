@@ -90,6 +90,24 @@ function expandCEscapes(s: string): string {
 
 type MountedPathsGetter = () => Map<string, string>;
 
+/**
+ * Returns `recent` only when it carries information not already present in
+ * `output`. Most short commands have `output` that already includes all
+ * session history the tail would add, so duplicating it in a dedicated
+ * field would double tokens for no gain. Longer-running sessions where the
+ * tail extends beyond the per-call snapshot remain intact.
+ */
+function pickRecentOutput(
+  output: string,
+  recent: string | undefined,
+): string | undefined {
+  if (!recent) return undefined;
+  const o = output.trimEnd();
+  const r = recent.trimEnd();
+  if (r.length === 0 || o === r || o.endsWith(r)) return undefined;
+  return recent;
+}
+
 function resolveCwd(
   mountPrefix: string | undefined,
   getMountedPaths: MountedPathsGetter,
@@ -136,6 +154,10 @@ export const executeShellCommand = (
       { toolCallId, abortSignal },
     ) => {
       try {
+        // Early-return branches below (stdin/kill validation errors) omit
+        // `recent_output` deliberately: those responses are synthetic
+        // tool-layer strings, not captured session output, so there is
+        // nothing meaningful to attach.
         // Stdin mode — write raw bytes, capture output
         if (params.stdin !== undefined) {
           if (params.command || params.kill) {
@@ -183,6 +205,7 @@ export const executeShellCommand = (
           return {
             session_id: result.sessionId,
             output: capped.result,
+            recent_output: pickRecentOutput(capped.result, result.recentOutput),
             exit_code: result.exitCode,
             session_exited: result.sessionExited,
             timed_out: result.timedOut,
@@ -235,9 +258,11 @@ export const executeShellCommand = (
           },
         );
 
+        const capped = capToolOutput(result.output);
         return {
           session_id: result.sessionId,
-          output: capToolOutput(result.output).result,
+          output: capped.result,
+          recent_output: pickRecentOutput(capped.result, result.recentOutput),
           exit_code: result.exitCode,
           session_exited: result.sessionExited,
           timed_out: result.timedOut,

@@ -7,6 +7,7 @@ import { OscParser, wrapWithSentinel } from './osc-parser';
 import { SessionLogger } from './session-logger';
 import {
   DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
+  DEFAULT_EXITED_WAIT_UNTIL_TIMEOUT_MS,
   DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS,
   DEFAULT_TIMEOUT_STDIN_MS,
   HEAD_LINES,
@@ -17,8 +18,10 @@ import {
   DEFAULT_TERMINAL_COLS,
   DEFAULT_TERMINAL_ROWS,
   DEFAULT_IDLE_MS,
-  AGGRESSIVE_IDLE_MS,
+  DEFAULT_EXITED_IDLE_MS,
   MAX_WAIT_UNTIL_TIMEOUT_MS,
+  MAX_EXITED_WAIT_UNTIL_TIMEOUT_MS,
+  SHELL_RESPONSE_TAIL_MAX_CHARS,
   type DetectedShell,
   type PtySession,
   type SessionCommandRequest,
@@ -27,6 +30,37 @@ import {
 
 /** Cap for rawOutput accumulator used only for pattern matching. */
 const MAX_RAW_OUTPUT_BYTES = 1_024 * 1_024;
+
+// ─── Command timeout/idle policy ────────────────────────────────
+// Exported so tests can exercise the selection logic as pure helpers.
+// Kept here (not inlined in `executeCommand`) so the policy is easy to
+// audit and to keep parity with the agent-facing schema describe text.
+
+export function getCommandIdleMs(request: SessionCommandRequest): number {
+  if (request.waitUntil?.idleMs !== undefined) return request.waitUntil.idleMs;
+  if (request.waitUntil?.exited) return DEFAULT_EXITED_IDLE_MS;
+  return DEFAULT_IDLE_MS;
+}
+
+export function getCommandTimeoutMs(request: SessionCommandRequest): number {
+  if (!request.waitUntil) {
+    return request.rawInput
+      ? DEFAULT_TIMEOUT_STDIN_MS
+      : DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS;
+  }
+
+  if (request.waitUntil.exited) {
+    return Math.min(
+      request.waitUntil.timeoutMs ?? DEFAULT_EXITED_WAIT_UNTIL_TIMEOUT_MS,
+      MAX_EXITED_WAIT_UNTIL_TIMEOUT_MS,
+    );
+  }
+
+  return Math.min(
+    request.waitUntil.timeoutMs ?? DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
+    MAX_WAIT_UNTIL_TIMEOUT_MS,
+  );
+}
 
 // ─── ANSI stripping ──────────────────────────────────────────────
 // Strips ANSI/VT escape sequences from PTY output for clean text.
@@ -430,12 +464,7 @@ export class SessionManager {
 
     return new Promise<SessionCommandResult>((resolve) => {
       const mark = session.logger?.getMarkPosition() ?? 0;
-      const idleMs =
-        request.waitUntil?.idleMs !== undefined
-          ? request.waitUntil.idleMs
-          : request.waitUntil?.exited
-            ? AGGRESSIVE_IDLE_MS
-            : DEFAULT_IDLE_MS;
+      const idleMs = getCommandIdleMs(request);
       const pending: PendingCommand = {
         resolve,
         sessionId,
@@ -454,17 +483,10 @@ export class SessionManager {
       this.sessionCommandMap.set(sessionId, commandId);
 
       // Timeout handling
-      // If the model explicitly provided waitUntil, honour its timeoutMs (or the full default).
-      // If waitUntil was omitted entirely, use the shorter 20s default so dumb models
-      // that forget the param don't leave the tool hanging for 2 minutes.
-      const timeoutMs = request.waitUntil
-        ? Math.min(
-            request.waitUntil.timeoutMs ?? DEFAULT_WAIT_UNTIL_TIMEOUT_MS,
-            MAX_WAIT_UNTIL_TIMEOUT_MS,
-          )
-        : request.rawInput
-          ? DEFAULT_TIMEOUT_STDIN_MS
-          : DEFAULT_TIMEOUT_NO_WAIT_UNTIL_MS;
+      // Self-terminating commands (`exited: true`) get a longer ceiling;
+      // other shell calls keep the short snapshot cap so interactive hangs
+      // return quickly for follow-up/polling.
+      const timeoutMs = getCommandTimeoutMs(request);
       pending.timeoutHandle = setTimeout(() => {
         this.resolveCommandWithTimeout(commandId, 'timeout');
       }, timeoutMs);
@@ -653,6 +675,7 @@ export class SessionManager {
     pending.resolve({
       sessionId,
       output: finalOutput,
+      recentOutput: this.collectRecentOutput(sessionId),
       exitCode,
       sessionExited: session?.exited ?? true,
       timedOut: false,
@@ -677,6 +700,7 @@ export class SessionManager {
     pending.resolve({
       sessionId: pending.sessionId,
       output: finalOutput,
+      recentOutput: this.collectRecentOutput(pending.sessionId),
       exitCode,
       sessionExited: session?.exited ?? true,
       timedOut: false,
@@ -700,6 +724,7 @@ export class SessionManager {
     pending.resolve({
       sessionId: pending.sessionId,
       output: finalOutput,
+      recentOutput: this.collectRecentOutput(pending.sessionId),
       exitCode: null,
       sessionExited: session?.exited ?? true,
       timedOut: reason === 'timeout',
@@ -720,6 +745,7 @@ export class SessionManager {
     pending.resolve({
       sessionId: pending.sessionId,
       output: finalOutput,
+      recentOutput: this.collectRecentOutput(pending.sessionId),
       exitCode: null,
       sessionExited: session?.exited ?? true,
       timedOut: false,
@@ -739,6 +765,7 @@ export class SessionManager {
         pending.resolve({
           sessionId,
           output: this.collectOutput(pending) || reason,
+          recentOutput: this.collectRecentOutput(sessionId),
           exitCode: session?.exitCode ?? null,
           sessionExited: true,
           timedOut: false,
@@ -747,6 +774,11 @@ export class SessionManager {
       }
     }
     this.sessionCommandMap.delete(sessionId);
+  }
+
+  private collectRecentOutput(sessionId: string): string {
+    const session = this.sessions.get(sessionId);
+    return session?.logger?.getTail(SHELL_RESPONSE_TAIL_MAX_CHARS) ?? '';
   }
 
   private collectOutput(pending: PendingCommand): string {
