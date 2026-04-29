@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-alpha075 (2026-04-29)
+
+### Features
+
+* enhance command timeout and idle management with recent output tracking (d9016f3)
+* add support for DeepSeek and Z.ai providers (91203aa)
+* enhance error handling for upstream overloads and improve telemetry reporting (5854db2)
+* add agent-preview panels to agent-cards (449c7f8)
+
+### Bug Fixes
+
+* prevent editing agent title when agent is inactive (05572ed)
+
 ## 1.0.0-alpha074 (2026-04-27)
 
 ### Features
