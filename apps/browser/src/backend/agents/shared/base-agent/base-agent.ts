@@ -1765,6 +1765,23 @@ export abstract class BaseAgent<
    */
   private static readonly KEPT_BUDGET_FRACTION = 0.2;
 
+  /**
+   * Absolute maximum (in tokens) for the compression trigger threshold.
+   * Used via `Math.min(fraction * contextWindowSize, HARD_CAP)` so
+   * large-context models (e.g. 1M) compress at the same absolute token
+   * count as the 200k-model sweet spot. Calibrated to `0.5 × 200_000`
+   * matching the chat agent's `historyCompressionThreshold = 0.5`.
+   */
+  private static readonly HISTORY_COMPRESSION_HARD_CAP_TOKENS = 100_000;
+
+  /**
+   * Absolute maximum (in tokens) for the kept-uncompressed budget after
+   * compression. Calibrated to `0.2 × 200_000` so the "recent messages"
+   * budget after compression stays bounded regardless of model context
+   * size. Keeps the invariant: kept budget < compression trigger.
+   */
+  private static readonly KEPT_BUDGET_HARD_CAP_TOKENS = 40_000;
+
   private async compressHistoryInternal(): Promise<void> {
     // Prevent concurrent compression runs — a second trigger while
     // compression is in-flight would see stale history and produce
@@ -1791,8 +1808,9 @@ export abstract class BaseAgent<
         // Model may have been deleted — fall back to a conservative size
         contextWindowSize = 100_000;
       }
-      const keptBudget = Math.floor(
-        contextWindowSize * BaseAgent.KEPT_BUDGET_FRACTION,
+      const keptBudget = Math.min(
+        Math.floor(contextWindowSize * BaseAgent.KEPT_BUDGET_FRACTION),
+        BaseAgent.KEPT_BUDGET_HARD_CAP_TOKENS,
       );
       const preferredFloor = Math.max(
         5,
@@ -2061,17 +2079,23 @@ export abstract class BaseAgent<
     this.emitToolCallEvents(result);
 
     // Check the current token usage. If necessary, summarize the chat history.
-    // We always check the token usage in relation to the currently selected model.
+    // Compress when used tokens exceed MIN(fraction * contextWindow, hardCap)
+    // — the hard cap prevents large-context models (1M+) from accumulating
+    // far more tokens than the fractional sweet-spot tuned for 200k models.
     const compactionThreshold = this.config.historyCompressionThreshold ?? 0.65;
     try {
+      const contextWindowSize = this.modelProviderService.getModelWithOptions(
+        this.state.get().activeModelId,
+        '',
+      ).contextWindowSize;
+      const fractionalTriggerTokens = compactionThreshold * contextWindowSize;
+      const effectiveTriggerTokens = Math.min(
+        fractionalTriggerTokens,
+        BaseAgent.HISTORY_COMPRESSION_HARD_CAP_TOKENS,
+      );
       if (
         compactionThreshold >= 0 &&
-        this.state.get().usedTokens /
-          this.modelProviderService.getModelWithOptions(
-            this.state.get().activeModelId,
-            '',
-          ).contextWindowSize >
-          compactionThreshold
+        this.state.get().usedTokens > effectiveTriggerTokens
       ) {
         void this.compressHistoryInternal();
       }
