@@ -19,7 +19,7 @@ import type {
   Mount,
   ShellSessionSnapshot,
 } from '@shared/karton-contracts/ui/agent/metadata';
-import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import { EMPTY_MOUNTS, USER_OWNER_ID } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import {
@@ -48,6 +48,8 @@ import {
 import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
 import { ShellSessionsSection } from './shell-sessions-section';
+import { UserTerminalsSection } from './user-terminals-section';
+import { useUserShellSessions } from '@ui/hooks/use-user-shell-sessions';
 
 // Stable empty arrays/sets to avoid infinite loop with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -215,6 +217,17 @@ export function StatusCard() {
     (p) => p.toolbox.killShellSession,
   );
 
+  const removeShellSession = useKartonProcedure(
+    (p) => p.toolbox.removeShellSession,
+  );
+
+  // Hook hides the USER_OWNER_ID lookup + equality logic.
+  const userShellSessions = useUserShellSessions();
+
+  const createUserShellSession = useKartonProcedure(
+    (p) => p.toolbox.createUserShellSession,
+  );
+
   // All workspace-md agent instances with their workspace paths
   const workspaceMdAgents = useKartonState(
     useComparingSelector((s): WorkspaceMdAgentEntry[] => {
@@ -338,9 +351,58 @@ export function StatusCard() {
     (p) => p.toolbox.goBackUserQuestion,
   );
 
-  const openShellTerminalPage = useCallback((_sessionId: string) => {
-    // No-op for now — terminal UI not yet available in this release.
-  }, []);
+  const openShellTerminalPage = useCallback(
+    (sessionId: string) => {
+      if (!openAgentId) return;
+      const url = `stagewise://internal/terminal/${openAgentId}/${sessionId}`;
+
+      const existingTab = Object.values(tabs).find((tab) => tab.url === url);
+      if (existingTab) {
+        void switchTab(existingTab.id);
+        return;
+      }
+      void createTab(url, true);
+    },
+    [openAgentId, tabs, switchTab, createTab],
+  );
+
+  const openUserShellTerminalPage = useCallback(
+    (sessionId: string) => {
+      const url = `stagewise://internal/terminal/${USER_OWNER_ID}/${sessionId}`;
+      const existingTab = Object.values(tabs).find((tab) => tab.url === url);
+      if (existingTab) {
+        void switchTab(existingTab.id);
+        return;
+      }
+      void createTab(url, true);
+    },
+    [tabs, switchTab, createTab],
+  );
+
+  // Last create-terminal error (cap reached, no shell, …). Rendered in
+  // the section; cleared on dismiss or next successful spawn.
+  const [userTerminalError, setUserTerminalError] = useState<string | null>(
+    null,
+  );
+
+  const handleCreateUserTerminal = useCallback(() => {
+    // Default cwd is the first mount of the open agent, else null →
+    // backend falls back to home.
+    const cwd = resolvedMounts[0]?.path ?? null;
+    void createUserShellSession(cwd).then((result) => {
+      if (result.ok) {
+        setUserTerminalError(null);
+        openUserShellTerminalPage(result.sessionId);
+      } else {
+        setUserTerminalError(result.message);
+      }
+    });
+  }, [createUserShellSession, openUserShellTerminalPage, resolvedMounts]);
+
+  const handleDismissUserTerminalError = useCallback(
+    () => setUserTerminalError(null),
+    [],
+  );
 
   const openDiffReviewPage = useCallback(
     (fileId: string) => {
@@ -594,6 +656,24 @@ export function StatusCard() {
     });
     if (shellSection) result.push(shellSection);
 
+    // Always rendered so "+ New terminal" stays reachable, and exited
+    // rows hang around so a crashed dev server can be inspected.
+    result.push(
+      UserTerminalsSection({
+        sessions: userShellSessions,
+        onKill: (sessionId) => {
+          void killShellSession(USER_OWNER_ID, sessionId);
+        },
+        onRemove: (sessionId) => {
+          void removeShellSession(USER_OWNER_ID, sessionId);
+        },
+        onOpenTerminal: openUserShellTerminalPage,
+        onCreateTerminal: handleCreateUserTerminal,
+        error: userTerminalError,
+        onDismissError: handleDismissUserTerminalError,
+      }),
+    );
+
     const userQuestionSection = UserQuestionSection({
       pendingQuestion: pendingUserQuestion,
       onSubmitStep: async (questionId, answers) => {
@@ -701,7 +781,13 @@ export function StatusCard() {
     goBackUserQuestion,
     shellSessions,
     killShellSession,
+    removeShellSession,
     openShellTerminalPage,
+    userShellSessions,
+    openUserShellTerminalPage,
+    handleCreateUserTerminal,
+    userTerminalError,
+    handleDismissUserTerminalError,
   ]);
 
   // Sync card height with CSS variable for ChatHistory padding

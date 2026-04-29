@@ -779,6 +779,24 @@ export type KartonContract = {
         agentInstanceId: string,
         sessionId: string,
       ) => Promise<void>;
+      /**
+       * Drop a session row from the sidebar. `killShellSession` keeps
+       * the row visible (so the user sees the exit code); this clears
+       * it.
+       */
+      removeShellSession: (
+        agentInstanceId: string,
+        sessionId: string,
+      ) => Promise<void>;
+      /**
+       * Spawn a user-owned PTY. `requestedCwd` is a hint; falls back
+       * to home if it's not a real dir. Tagged result so the sidebar
+       * can surface "cap reached" vs "no shell" instead of no-oping.
+       * Sessions appear at `state.toolbox['__user__'].shells.sessions`.
+       */
+      createUserShellSession: (
+        requestedCwd: string | null,
+      ) => Promise<CreateUserShellSessionResult>;
       searchMentionFiles: (
         agentInstanceId: string,
         query: string,
@@ -1084,6 +1102,18 @@ export type KartonContract = {
     getOmniboxSuggestions: (input: string) => Promise<OmniboxSuggestions>;
   };
 };
+
+/** Re-exported so the sidebar's `state.toolbox[USER_OWNER_ID]` lookup stays in sync with the backend. */
+export { USER_OWNER_ID } from '../pages-api';
+
+/** Tagged result so callers can tell apart "cap reached" / "no shell" / "spawn failed". */
+export type CreateUserShellSessionResult =
+  | { ok: true; sessionId: string }
+  | {
+      ok: false;
+      reason: 'unavailable' | 'cap_reached' | 'spawn_failed';
+      message: string;
+    };
 
 export const defaultState: KartonContract['state'] = {
   internalData: {

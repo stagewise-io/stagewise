@@ -84,6 +84,13 @@ export const TAIL_LINES = 300;
 export const MAX_SESSIONS_PER_AGENT = 5;
 
 /**
+ * Owner-id sentinel for user-created sessions. Re-exported from the
+ * side-effect-free `pages-api/types` module so vitest specs don't
+ * transitively pull Vite globals in via `pages-api/index.ts`.
+ */
+export { USER_OWNER_ID } from '@shared/karton-contracts/pages-api/types';
+
+/**
  * Grace period (ms) to wait for OSC 133 shell integration detection
  * before falling back to sentinel mode.
  */
@@ -137,6 +144,25 @@ export interface PtySession {
   cwd: string;
   /** Path to the temp init script file, for cleanup. */
   initScriptPath: string | null;
+  /**
+   * Total raw bytes appended at the moment shell integration completed
+   * (or the detection grace period elapsed in sentinel mode). The
+   * user-facing terminal page uses this as a floor when reading from
+   * cursor 0, hiding the bootstrap dot-source command and integration
+   * script noise from the visible scrollback. `null` until ready.
+   */
+  userVisibleStartCursor: number | null;
+  /**
+   * True for shells (bash/zsh) where we sourced our integration script
+   * and therefore expect to see the boot sentinel emitted at its end.
+   * While true, `markReady` defers cursor capture to the sentinel
+   * handler — capturing on the first OSC 133;A would land too early on
+   * users whose own `.zshrc` already emits 133;A from another
+   * shell-integration framework. The detect-timeout and exit handlers
+   * flip this back to false before calling `markReady` so a failed /
+   * never-arrived sentinel still gets a sensible cursor fallback.
+   */
+  expectingBootSentinel: boolean;
 }
 
 export interface SessionCommandRequest {

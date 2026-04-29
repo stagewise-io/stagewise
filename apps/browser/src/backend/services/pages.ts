@@ -15,6 +15,9 @@ import {
   type PagesApiContract,
   defaultState,
   type WorkspaceMountInfo,
+  type ShellTailReadResult,
+  type ShellSessionInfo,
+  type ShellWriteResult,
 } from '@shared/karton-contracts/pages-api';
 import type { PlanEntry } from '@shared/karton-contracts/ui';
 import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
@@ -130,6 +133,27 @@ export class PagesService extends DisposableService {
   // Auto-update handlers (delegated to AutoUpdateService via wiring)
   private autoUpdateCheckHandler?: () => void;
   private autoUpdateQuitAndInstallHandler?: () => void;
+  // Terminal-page shell handlers (wired to ToolboxService).
+  private shellReadTailHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+    cursor: number,
+  ) => ShellTailReadResult | null;
+  private shellGetInfoHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+  ) => ShellSessionInfo | null;
+  private shellWriteStdinHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+    bytes: string,
+  ) => ShellWriteResult;
+  private shellResizeHandler?: (
+    agentInstanceId: string,
+    sessionId: string,
+    cols: number,
+    rows: number,
+  ) => boolean;
 
   private readonly telemetryService: TelemetryService;
 
@@ -1920,6 +1944,91 @@ export class PagesService extends DisposableService {
   }
 
   /**
+   * Register the read+write stream handlers for the terminal page.
+   * User-session create/list lives on the UI karton instead — see
+   * `toolbox.createUserShellSession` and the `shells` manifest.
+   */
+  public setShellHandlers(handlers: {
+    readTail: (
+      agentInstanceId: string,
+      sessionId: string,
+      cursor: number,
+    ) => ShellTailReadResult | null;
+    getInfo: (
+      agentInstanceId: string,
+      sessionId: string,
+    ) => ShellSessionInfo | null;
+    writeStdin: (
+      agentInstanceId: string,
+      sessionId: string,
+      bytes: string,
+    ) => ShellWriteResult;
+    resize: (
+      agentInstanceId: string,
+      sessionId: string,
+      cols: number,
+      rows: number,
+    ) => boolean;
+  }): void {
+    this.shellReadTailHandler = handlers.readTail;
+    this.shellGetInfoHandler = handlers.getInfo;
+    this.shellWriteStdinHandler = handlers.writeStdin;
+    this.shellResizeHandler = handlers.resize;
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shell.readTail',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+        cursor: number,
+      ): Promise<ShellTailReadResult | null> => {
+        if (!this.shellReadTailHandler) return null;
+        return this.shellReadTailHandler(agentInstanceId, sessionId, cursor);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shell.getInfo',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+      ): Promise<ShellSessionInfo | null> => {
+        if (!this.shellGetInfoHandler) return null;
+        return this.shellGetInfoHandler(agentInstanceId, sessionId);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shell.writeStdin',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+        bytes: string,
+      ): Promise<ShellWriteResult> => {
+        if (!this.shellWriteStdinHandler) return 'session_not_found';
+        return this.shellWriteStdinHandler(agentInstanceId, sessionId, bytes);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'shell.resize',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        sessionId: string,
+        cols: number,
+        rows: number,
+      ): Promise<boolean> => {
+        if (!this.shellResizeHandler) return false;
+        return this.shellResizeHandler(agentInstanceId, sessionId, cols, rows);
+      },
+    );
+  }
+
+  /**
    * Set auto-update action handlers.
    * Called by pages-handler-wiring to wire up to AutoUpdateService.
    */
@@ -2007,6 +2116,10 @@ export class PagesService extends DisposableService {
       'autoUpdate.checkForUpdates',
     );
     this.kartonServer.removeServerProcedureHandler('autoUpdate.quitAndInstall');
+    this.kartonServer.removeServerProcedureHandler('shell.readTail');
+    this.kartonServer.removeServerProcedureHandler('shell.getInfo');
+    this.kartonServer.removeServerProcedureHandler('shell.writeStdin');
+    this.kartonServer.removeServerProcedureHandler('shell.resize');
 
     // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');

@@ -19,6 +19,7 @@ import {
   DEFAULT_IDLE_MS,
   AGGRESSIVE_IDLE_MS,
   MAX_WAIT_UNTIL_TIMEOUT_MS,
+  USER_OWNER_ID,
   type DetectedShell,
   type PtySession,
   type SessionCommandRequest,
@@ -58,6 +59,23 @@ export function applyHeadTailCap(lines: string[]): string {
 // These are sourced inside the PTY to enable OSC 133 markers.
 // Inlined to avoid build-pipeline / path-resolution complexity.
 
+// Boot sentinel: a private OSC sequence emitted at the END of our
+// integration script (after OSC 133 hooks are wired). The session
+// manager scans incoming PTY chunks for this exact byte sequence and
+// uses its position as the boundary between bootstrap noise (dot-source
+// echo + integration setup) and content the user expects to see.
+//
+// Using a unique private OSC (7777, payload `sw-boot`) instead of
+// reusing OSC 133;A keeps us robust against users whose `.zshrc` /
+// `.bashrc` already emits `133;A` from another shell-integration
+// framework (Powerlevel10k, iTerm2, VSCode, Starship, …) — those would
+// otherwise fire BEFORE our dot-source ran and we'd capture the cursor
+// too early, leaving the dot-source echo visible.
+//
+// The sentinel is stripped from the byte stream before it reaches the
+// raw buffer or xterm, so it never renders.
+export const BOOT_SENTINEL = '\x1b]7777;sw-boot\x07';
+
 const BASH_INTEGRATION = `
 if [ -n "$__STAGEWISE_SHELL_INTEGRATION" ]; then return 0 2>/dev/null || true; fi
 export __STAGEWISE_SHELL_INTEGRATION=1
@@ -83,6 +101,7 @@ else
   PROMPT_COMMAND="__stagewise_prompt_command;\${PROMPT_COMMAND}"
 fi
 printf '\\033]133;A\\007'
+printf '\\033]7777;sw-boot\\007'
 `.trim();
 
 const ZSH_INTEGRATION = `
@@ -112,6 +131,7 @@ else
   preexec_functions+=(__stagewise_preexec)
 fi
 printf '\\033]133;A\\007'
+printf '\\033]7777;sw-boot\\007'
 `.trim();
 
 const POWERSHELL_INTEGRATION = `
@@ -225,11 +245,14 @@ export class SessionManager {
     env: Record<string, string>,
     onData?: (sessionId: string, data: string) => void,
   ): string {
-    // Enforce max sessions per agent
+    // Each owner (every agent + the user pool) gets its own session
+    // budget. Wording adapts so the user-facing message reads naturally.
     const agentSessionCount = this.getSessionCountForAgent(agentInstanceId);
     if (agentSessionCount >= MAX_SESSIONS_PER_AGENT) {
+      const scope =
+        agentInstanceId === USER_OWNER_ID ? 'open at once' : 'per agent';
       throw new Error(
-        `Maximum ${MAX_SESSIONS_PER_AGENT} concurrent sessions per agent. ` +
+        `Maximum ${MAX_SESSIONS_PER_AGENT} concurrent sessions ${scope}. ` +
           'Kill an existing session first.',
       );
     }
@@ -273,6 +296,8 @@ export class SessionManager {
           )
         : null,
       initScriptPath: null,
+      userVisibleStartCursor: null,
+      expectingBootSentinel: false,
     };
 
     // Wire ready promise
@@ -288,14 +313,49 @@ export class SessionManager {
     // before the parser fires synchronous resolution events (commandDone,
     // sentinelDone) that read the buffer via collectOutput.
     ptyProcess.onData((data: string) => {
+      // 1. Detect our private boot sentinel (`OSC 7777;sw-boot`) BEFORE
+      //    the chunk is appended anywhere. The sentinel is the very last
+      //    thing our integration script emits, so its position marks the
+      //    boundary between bootstrap noise (the dot-source echo and
+      //    integration setup) and the first user-visible prompt.
+      // 2. Strip the sentinel from the chunk so it never reaches the raw
+      //    buffer, the headless xterm, or the user-facing terminal —
+      //    the renderer would otherwise see an unhandled OSC sequence
+      //    in its byte stream and the parser's `output` event would
+      //    leak the literal bytes into command-output flushes.
+      // 3. Capture the user-visible cursor at the position where the
+      //    sentinel WAS, in the *cleaned* stream — that's where the
+      //    next byte the user should see lives.
+      let cleanedData = data;
+      const sentinelIdx = data.indexOf(BOOT_SENTINEL);
+      if (sentinelIdx !== -1) {
+        cleanedData =
+          data.slice(0, sentinelIdx) +
+          data.slice(sentinelIdx + BOOT_SENTINEL.length);
+        if (
+          session.userVisibleStartCursor === null &&
+          session.logger !== null
+        ) {
+          const cursorBefore = session.logger.getTotalRawBytes();
+          // The bootstrap occupies bytes [0, sentinelIdx) in `data`. After
+          // stripping, those same bootstrap bytes occupy
+          // [cursorBefore, cursorBefore + sentinelIdx) in the cleaned
+          // stream — so the user-visible cursor is exactly that endpoint.
+          const bootstrapBytes = Buffer.byteLength(
+            data.slice(0, sentinelIdx),
+            'utf-8',
+          );
+          session.userVisibleStartCursor = cursorBefore + bootstrapBytes;
+        }
+      }
       // FIX: always feed the headless xterm emulator + logger so markLine
       // and serializeFrom stay accurate even during session startup.
       // UI streaming is handled via the parser's `output` event below,
       // which fires only for text between OSC 133;C and 133;D (i.e. real
       // command output — no prompt redraws, no command echo).
-      session.logger?.appendRaw(Buffer.from(data, 'utf-8'));
-      session.logger?.append(stripAnsi(data));
-      parser.write(data);
+      session.logger?.appendRaw(Buffer.from(cleanedData, 'utf-8'));
+      session.logger?.append(stripAnsi(cleanedData));
+      parser.write(cleanedData);
     });
 
     // Wire PTY exit
@@ -364,6 +424,13 @@ export class SessionManager {
       if (!session.shellIntegrationActive) {
         parser.setMode('sentinel');
       }
+      // If we were waiting on the boot sentinel and the timeout elapsed
+      // without it arriving, the integration script clearly failed (or
+      // the chunk that contained the sentinel was lost). Drop the flag
+      // so `markReady` falls through to capturing the cursor at "now",
+      // giving the user a usable terminal even when integration didn't
+      // load cleanly.
+      session.expectingBootSentinel = false;
       this.markReady(session);
     }, this.detectTimeoutMs);
 
@@ -551,9 +618,19 @@ export class SessionManager {
 
   // ─── Session management ──────────────────────────────────────
 
-  killSession(sessionId: string): boolean {
+  /**
+   * Kill a session. Pass `expectedOwner` from the IPC layer to reject
+   * cross-owner kills; omit it for trusted internal callers.
+   */
+  killSession(sessionId: string, expectedOwner?: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
+    if (
+      expectedOwner !== undefined &&
+      session.agentInstanceId !== expectedOwner
+    ) {
+      return false;
+    }
 
     const { agentInstanceId } = session;
 
@@ -577,13 +654,45 @@ export class SessionManager {
   }
 
   destroyAgent(agentInstanceId: string): void {
+    // Refuse to wipe the shared user pool. A regression that ever
+    // passed the sentinel here would close every user terminal at once.
+    if (agentInstanceId === USER_OWNER_ID) return;
     const sessions = [...this.sessions.values()].filter(
       (s) => s.agentInstanceId === agentInstanceId,
     );
     for (const s of sessions) {
       this.resolveAllPendingForSession(s.id, 'Agent destroyed.', 'abort');
-      this.removeSession(s);
+      this.removeSessionInternal(s);
     }
+  }
+
+  /**
+   * Drop a session from the map. Kills it first if it's still running,
+   * but the typical path is "user dismissed an already-exited row".
+   */
+  removeSession(sessionId: string, expectedOwner?: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    if (
+      expectedOwner !== undefined &&
+      session.agentInstanceId !== expectedOwner
+    ) {
+      return false;
+    }
+    const { agentInstanceId } = session;
+    if (!session.exited) {
+      this.resolveAllPendingForSession(sessionId, 'Session removed.', 'abort');
+      try {
+        session.pty.kill();
+      } catch {
+        // already dead
+      }
+      session.exited = true;
+      session.exitCode ??= null;
+    }
+    this.removeSessionInternal(session);
+    this.onSessionStateChange?.(agentInstanceId);
+    return true;
   }
 
   killAll(): void {
@@ -593,7 +702,7 @@ export class SessionManager {
         'All sessions killed.',
         'abort',
       );
-      this.removeSession(session);
+      this.removeSessionInternal(session);
     }
   }
 
@@ -603,6 +712,83 @@ export class SessionManager {
     session.pty.resize(cols, rows);
     session.logger?.resize(cols, rows);
     return true;
+  }
+
+  /**
+   * True while the agent owns this PTY. The terminal page checks this
+   * to refuse user keystrokes — mixing them in would corrupt the
+   * agent's pattern/idle/exit-code parsing.
+   */
+  hasPendingCommand(sessionId: string): boolean {
+    return this.sessionCommandMap.has(sessionId);
+  }
+
+  /**
+   * Write raw bytes to the PTY for the user-facing terminal. Does NOT
+   * enforce the agent-busy soft-lock — the caller (ShellService) checks
+   * `hasPendingCommand` first.
+   */
+  writeUserStdin(
+    sessionId: string,
+    bytes: string,
+  ): 'ok' | 'session_not_found' | 'session_exited' {
+    const session = this.sessions.get(sessionId);
+    if (!session) return 'session_not_found';
+    if (session.exited || session.deactivated) return 'session_exited';
+    session.pty.write(bytes);
+    session.lastActivityAt = Date.now();
+    return 'ok';
+  }
+
+  /**
+   * Tail read for the terminal page. Returns `null` for unknown
+   * sessions; exited sessions stay readable until they're removed.
+   */
+  readRawSinceCursor(
+    sessionId: string,
+    cursor: number,
+  ): {
+    data: Buffer;
+    cursor: number;
+    truncated: boolean;
+    exited: boolean;
+    exitCode: number | null;
+  } | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    const logger = session.logger;
+    if (!logger) {
+      return {
+        data: Buffer.alloc(0),
+        cursor,
+        truncated: false,
+        exited: session.exited,
+        exitCode: session.exitCode,
+      };
+    }
+    // First-frame reads (cursor === 0) jump past the bootstrap noise
+    // (dot-source echo, integration setup). A caller mid-stream
+    // (cursor > 0) is honoured verbatim — clamping there would skip
+    // bytes the user already saw. While still bootstrapping we hide
+    // the frame entirely; the next poll fills it in.
+    let effectiveCursor = cursor;
+    if (cursor === 0 && session.userVisibleStartCursor !== null) {
+      effectiveCursor = session.userVisibleStartCursor;
+    } else if (cursor === 0 && !session.ready) {
+      effectiveCursor = logger.getTotalRawBytes();
+    }
+    const {
+      data,
+      cursor: newCursor,
+      truncated,
+    } = logger.getRawSinceCursor(effectiveCursor);
+    return {
+      data,
+      cursor: newCursor,
+      truncated,
+      exited: session.exited,
+      exitCode: session.exitCode,
+    };
   }
 
   getSession(sessionId: string): PtySession | undefined {
@@ -882,7 +1068,12 @@ export class SessionManager {
     session.exitCode = exitCode;
     this.onSessionStateChange?.(session.agentInstanceId);
 
-    // Unblock anyone waiting on readyPromise (e.g. shell crashed during detection)
+    // Unblock anyone waiting on readyPromise (e.g. shell crashed during
+    // detection). Drop the boot-sentinel-pending flag so `markReady`
+    // captures a fallback cursor — the integration script never reached
+    // its sentinel emission, but the user still needs SOME cursor to
+    // bound their visible scrollback.
+    session.expectingBootSentinel = false;
     this.markReady(session);
 
     // Clear detection timer — no longer needed
@@ -933,7 +1124,7 @@ export class SessionManager {
     }
   }
 
-  private removeSession(session: PtySession): void {
+  private removeSessionInternal(session: PtySession): void {
     this.deactivateSession(session);
     this.sessions.delete(session.id);
   }
@@ -943,10 +1134,14 @@ export class SessionManager {
 
     switch (this.shell.type) {
       case 'bash':
-        script = BASH_INTEGRATION;
-        break;
       case 'zsh':
-        script = ZSH_INTEGRATION;
+        script =
+          this.shell.type === 'bash' ? BASH_INTEGRATION : ZSH_INTEGRATION;
+        // Defer cursor capture to the boot-sentinel path. The user's own
+        // `.zshrc` (or `.bashrc`) may already emit OSC 133;A from a
+        // different framework — capturing on that fire would land
+        // BEFORE our dot-source command echoed.
+        session.expectingBootSentinel = true;
         break;
       case 'sh':
         // sh doesn't support the required hooks — use sentinel mode
@@ -989,6 +1184,23 @@ export class SessionManager {
     if (!session.ready) {
       session.ready = true;
       session.readyResolve();
+    }
+    // Snapshot the byte cursor the first time we declare the session
+    // ready — this is the boundary between bootstrap noise (dot-source
+    // echo, integration script output) and content the user expects to
+    // see. Set once: re-entering markReady on session crash must not
+    // shift the cursor past content the user has already observed.
+    //
+    // While `expectingBootSentinel` is true, defer to the sentinel
+    // handler in `onData` — it knows the precise byte position at which
+    // bootstrap ends, while `markReady` would fire too early on the
+    // first OSC 133;A (potentially emitted by the user's own `.zshrc`).
+    if (
+      session.userVisibleStartCursor === null &&
+      session.logger !== null &&
+      !session.expectingBootSentinel
+    ) {
+      session.userVisibleStartCursor = session.logger.getTotalRawBytes();
     }
   }
 

@@ -562,4 +562,166 @@ describeIfShell('SessionManager (integration)', () => {
     expect(sm.getSessionsForAgent('agent-y')).toHaveLength(1);
     expect(sm.getSessionsForAgent('agent-z')).toHaveLength(0);
   });
+
+  // ─── User-facing terminal: read+write stream + soft-lock ─────
+
+  it('readRawSinceCursor returns null for unknown session', () => {
+    sm = createSM();
+    expect(sm.readRawSinceCursor('nonexistent', 0)).toBeNull();
+  });
+
+  it('readRawSinceCursor advances cursor as PTY emits bytes', async () => {
+    // Logger is required — the user-facing read path only operates when a
+    // SessionLogger is wired (i.e. getShellLogsDir was provided to the SM).
+    const logsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-shells-'));
+    try {
+      const localSM = new SessionManager(
+        shell as DetectedShell,
+        () => logsDir,
+        TEST_DETECT_TIMEOUT_MS,
+      );
+      try {
+        const sid = localSM.createSession('agent-rs', cwd, env);
+        await waitForReady(localSM, sid);
+
+        // Run a command that produces a known marker, then read since cursor 0.
+        await localSM.executeCommand(sid, { command: 'echo READMARK' });
+
+        const first = localSM.readRawSinceCursor(sid, 0);
+        expect(first).not.toBeNull();
+        expect(first!.cursor).toBeGreaterThan(0);
+        // The visible-start cursor floor strips bootstrap noise — content
+        // beyond the floor includes the actual command output.
+        expect(first!.data.toString('utf-8')).toContain('READMARK');
+
+        // Re-reading from the latest cursor should yield no new bytes.
+        const empty = localSM.readRawSinceCursor(sid, first!.cursor);
+        expect(empty!.data.length).toBe(0);
+        expect(empty!.cursor).toBe(first!.cursor);
+      } finally {
+        localSM.killAll();
+      }
+    } finally {
+      await new Promise((r) => setTimeout(r, 200));
+      fs.rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it('hasPendingCommand reflects in-flight tool calls', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-pending', cwd, env);
+    await waitForReady(sm, sid);
+
+    expect(sm.hasPendingCommand(sid)).toBe(false);
+
+    // Long-running command — capture the promise without awaiting yet.
+    const cmd = sm.executeCommand(sid, {
+      command: 'sleep 30',
+      waitUntil: { timeoutMs: 800, idleMs: 0 },
+    });
+
+    // Give the executor a microtask + a few ms to register the pending entry.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sm.hasPendingCommand(sid)).toBe(true);
+
+    const r = await cmd;
+    expect(r.timedOut).toBe(true);
+    expect(sm.hasPendingCommand(sid)).toBe(false);
+  });
+
+  it('writeUserStdin writes bytes verbatim and surfaces session state', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-stdin', cwd, env);
+    await waitForReady(sm, sid);
+
+    expect(sm.writeUserStdin(sid, 'echo USERSTDIN\r')).toBe('ok');
+
+    // Drain output via executeCommand with an empty command — it just waits.
+    const r = await sm.executeCommand(sid, {
+      command: '',
+      waitUntil: { outputPattern: 'USERSTDIN', timeoutMs: 5000 },
+    });
+    expect(r.output).toContain('USERSTDIN');
+
+    // Unknown session
+    expect(sm.writeUserStdin('nonexistent', 'x')).toBe('session_not_found');
+
+    // After kill, the session reports as exited
+    sm.killSession(sid);
+    expect(sm.writeUserStdin(sid, 'x')).toBe('session_exited');
+  });
+
+  it('removeSession drops an exited session row from the map', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-remove', cwd, env);
+    await waitForReady(sm, sid);
+
+    // Kill it first (row stays for UI visibility).
+    sm.killSession(sid);
+    expect(sm.getSession(sid)).toBeDefined();
+
+    expect(sm.removeSession(sid)).toBe(true);
+    expect(sm.getSession(sid)).toBeUndefined();
+    // Removing again is a no-op.
+    expect(sm.removeSession(sid)).toBe(false);
+  });
+
+  it('removeSession kills an active session before dropping it', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-remove-live', cwd, env);
+    await waitForReady(sm, sid);
+
+    expect(sm.removeSession(sid)).toBe(true);
+    expect(sm.getSession(sid)).toBeUndefined();
+  });
+
+  it('resizeSession returns false for unknown / deactivated sessions', async () => {
+    sm = createSM();
+    expect(sm.resizeSession('nonexistent', 80, 24)).toBe(false);
+
+    const sid = sm.createSession('agent-resize', cwd, env);
+    await waitForReady(sm, sid);
+
+    expect(sm.resizeSession(sid, 100, 30)).toBe(true);
+
+    sm.killSession(sid);
+    // After kill the session is deactivated; resize must not throw.
+    expect(sm.resizeSession(sid, 80, 24)).toBe(false);
+  });
+
+  // ─── User-owned sessions (USER_OWNER_ID sentinel) ────────────
+
+  it('user-owned sessions coexist with agent sessions and are not killed by destroyAgent', async () => {
+    sm = createSM();
+
+    // Two agent sessions + one user-owned session.
+    const agentA = sm.createSession('agent-A', cwd, env);
+    const userS = sm.createSession('__user__', cwd, env);
+    await waitForReady(sm, agentA);
+    await waitForReady(sm, userS);
+
+    expect(sm.getSessionsForAgent('agent-A')).toHaveLength(1);
+    expect(sm.getSessionsForAgent('__user__')).toHaveLength(1);
+
+    // destroyAgent for one agent must leave user sessions intact.
+    sm.destroyAgent('agent-A');
+    expect(sm.getSession(agentA)).toBeUndefined();
+
+    const userSession = sm.getSession(userS);
+    expect(userSession).toBeDefined();
+    expect(userSession?.exited).toBe(false);
+  });
+
+  it('per-agent session cap is independent for user sessions', () => {
+    sm = createSM();
+
+    // Hit the cap for an agent; the sentinel pool should still have headroom.
+    for (let i = 0; i < MAX_SESSIONS_PER_AGENT; i++) {
+      sm.createSession('agent-full', cwd, env);
+    }
+    expect(() => sm.createSession('agent-full', cwd, env)).toThrow(/Maximum/);
+
+    // User pool unaffected.
+    expect(() => sm.createSession('__user__', cwd, env)).not.toThrow();
+  });
 });
