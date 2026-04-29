@@ -365,6 +365,10 @@ export type WorkspaceAgentSettings = z.infer<
   typeof workspaceAgentSettingsSchema
 >;
 
+/** Controls whether tool calls (shell, sandbox) require user approval */
+export const toolApprovalModeSchema = z.enum(['alwaysAsk', 'alwaysAllow']);
+export type ToolApprovalMode = z.infer<typeof toolApprovalModeSchema>;
+
 /** Update channel for prerelease builds ('alpha' or 'beta') */
 export const updateChannelSchema = z.enum(['alpha', 'beta']);
 export type UpdateChannel = z.infer<typeof updateChannelSchema>;

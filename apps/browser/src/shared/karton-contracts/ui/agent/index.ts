@@ -1,5 +1,6 @@
 import type { ToolUIPart, UIDataTypes, UIMessage } from 'ai';
 import type { ModelId } from '@shared/available-models';
+import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import type { MountPermission, UserMessageMetadata } from './metadata';
 import type { UIAgentTools } from './tools/types';
 
@@ -47,6 +48,12 @@ export type AgentState = {
   history: AgentMessage[]; // The message history of the agent (visible to user)
   queuedMessages: (AgentMessage & { role: 'user' })[]; // Queued messages that have not yet been sent to the agent.
   activeModelId: ModelId; // The model ID that the agent last used
+  /**
+   * Per-agent tool-call approval policy. Controls whether tools with
+   * `needsApproval` require explicit user confirmation before execution.
+   * Defaults to 'alwaysAsk' for new agents (safe behaviour).
+   */
+  toolApprovalMode: ToolApprovalMode;
   inputState: string; // Serialized input state - may be simple text or some stringified object if our input field needs that.
   usedTokens: number;
   error?: AgentRuntimeError; // Current error state (not persisted, only available during runtime for UI display)

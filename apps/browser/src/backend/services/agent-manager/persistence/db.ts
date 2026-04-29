@@ -21,6 +21,7 @@ import {
   type AgentHistoryEntry,
   type AgentMessage,
 } from '@shared/karton-contracts/ui/agent';
+import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import { getAgentDbPath } from '@/utils/paths';
 
 export class AgentPersistenceDB {
@@ -385,6 +386,34 @@ export class AgentPersistenceDB {
     } catch (error) {
       this._logger.error(
         `[AgentPersistenceDB] Failed to update agent title: ${(error as Error).message}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Updates just the tool approval mode of a persisted agent without
+   * going through the full `storeAgentInstance` path. Avoids touching
+   * history/message persistence, so it is safe to call on empty agents.
+   *
+   * @returns true if a row was updated, false if no agent with that id exists.
+   */
+  public async updateToolApprovalMode(
+    id: string,
+    mode: ToolApprovalMode,
+  ): Promise<boolean> {
+    this._logger.debug(
+      `[AgentPersistenceDB] Updating tool approval mode for agent: ${id}`,
+    );
+    try {
+      const result = await this._db
+        .update(schema.agentInstances)
+        .set({ toolApprovalMode: mode })
+        .where(eq(schema.agentInstances.id, id));
+      return (result as unknown as { rowsAffected: number }).rowsAffected > 0;
+    } catch (error) {
+      this._logger.error(
+        `[AgentPersistenceDB] Failed to update tool approval mode: ${(error as Error).message}`,
       );
       throw error;
     }

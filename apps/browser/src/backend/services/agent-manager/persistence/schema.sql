@@ -1,4 +1,4 @@
--- VERSION: 8
+-- VERSION: 9
 
 CREATE TABLE IF NOT EXISTS meta(
   key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY,
@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS agentInstances(
   queued_messages TEXT NOT NULL,
   input_state TEXT NOT NULL,
   used_tokens INTEGER NOT NULL,
-  mounted_workspaces TEXT
+  mounted_workspaces TEXT,
+  tool_approval_mode TEXT NOT NULL DEFAULT 'alwaysAsk'
 );
 
 CREATE INDEX IF NOT EXISTS agentInstances_created_at_index ON agentInstances(created_at);

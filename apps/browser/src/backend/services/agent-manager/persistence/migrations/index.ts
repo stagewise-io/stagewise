@@ -6,6 +6,7 @@ import { up as v005Up } from './v005-backfill-file-attachment-filename';
 import { up as v006Up } from './v006-rename-readfile-to-read';
 import { up as v007Up } from './v007-normalize-history';
 import { up as v008Up } from './v008-add-title-locked-by-user';
+import { up as v009Up } from './v009-add-tool-approval-mode';
 
 const registry: MigrationScript[] = [
   { version: 2, name: 'add-mounted-workspaces', up: v002Up },
@@ -15,7 +16,8 @@ const registry: MigrationScript[] = [
   { version: 6, name: 'rename-file-tools', up: v006Up },
   { version: 7, name: 'normalize-history', up: v007Up },
   { version: 8, name: 'add-title-locked-by-user', up: v008Up },
+  { version: 9, name: 'add-tool-approval-mode', up: v009Up },
 ];
-const schemaVersion = 8;
+const schemaVersion = 9;
 
 export { registry, schemaVersion };

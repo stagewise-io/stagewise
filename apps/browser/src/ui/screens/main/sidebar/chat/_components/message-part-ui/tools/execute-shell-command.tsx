@@ -33,6 +33,9 @@ export const ExecuteShellCommandToolPart = ({
   const killShellSession = useKartonProcedure(
     (p) => p.toolbox.killShellSession,
   );
+  const setToolApprovalMode = useKartonProcedure(
+    (p) => p.agents.setToolApprovalMode,
+  );
 
   const finished = useMemo(
     () =>
@@ -131,6 +134,27 @@ export const ExecuteShellCommandToolPart = ({
       return;
     sendApproval(openAgentId, part.approval.id, false, 'User denied');
   }, [openAgentId, part.state, part.approval, sendApproval]);
+
+  const handleAlwaysAllow = useCallback(async () => {
+    if (
+      !openAgentId ||
+      part.state !== 'approval-requested' ||
+      !part.approval?.id
+    )
+      return;
+    try {
+      await setToolApprovalMode(openAgentId, 'alwaysAllow');
+    } catch (error) {
+      console.warn('[ExecuteShellCommand] Failed to set approval mode', error);
+    }
+    sendApproval(openAgentId, part.approval.id, true);
+  }, [
+    openAgentId,
+    part.state,
+    part.approval,
+    sendApproval,
+    setToolApprovalMode,
+  ]);
 
   const trigger = useMemo(() => {
     if (state === 'approval' || state === 'approval-responded') {
@@ -336,6 +360,31 @@ export const ExecuteShellCommandToolPart = ({
           >
             Skip
           </Button>
+          <Tooltip>
+            <TooltipTrigger delay={250}>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={handleAlwaysAllow}
+                disabled={state === 'approval-responded'}
+                className="group/always-allow min-w-0"
+              >
+                <span className="shrink-0 whitespace-nowrap">Always allow</span>
+                <span className="min-w-0 truncate text-subtle-foreground group-hover/always-allow:text-muted-foreground group-focus-visible/always-allow:text-muted-foreground">
+                  (dangerous)
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end">
+              <div className="flex max-w-64 flex-col gap-1 py-1">
+                <div className="font-medium">Skip future approvals</div>
+                <div className="text-muted-foreground">
+                  This agent will run every shell command without asking. Only
+                  enable this if you trust what this agent is about to do.
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
           <Button
             variant="primary"
             size="xs"
@@ -350,7 +399,7 @@ export const ExecuteShellCommandToolPart = ({
         </div>
       );
     return undefined;
-  }, [state, handleApprove, handleDeny]);
+  }, [state, handleApprove, handleDeny, handleAlwaysAllow]);
 
   return (
     <ToolPartUI

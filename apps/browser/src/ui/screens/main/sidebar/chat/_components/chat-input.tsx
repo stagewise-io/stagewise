@@ -2,6 +2,7 @@ import { useEditor, EditorContent, type Content } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { ModelSelect } from './model-select';
+import { ToolApprovalSelect } from './tool-approval-select';
 import { WorkspaceSelect } from './workspace-select';
 import { ContextUsageRing } from './context-usage-ring';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -66,6 +67,10 @@ export interface ChatInputProps {
   // Workspace selector
   showWorkspaceSelect?: boolean;
   onWorkspaceChange?: () => void;
+
+  // Tool approval selector
+  showToolApprovalSelect?: boolean;
+  onToolApprovalChange?: () => void;
 
   // Context usage ring
   showContextUsageRing?: boolean;
@@ -137,6 +142,9 @@ export const ChatInput = memo(function ChatInput({
 
   showWorkspaceSelect = true,
   onWorkspaceChange,
+
+  showToolApprovalSelect = true,
+  onToolApprovalChange,
 
   showContextUsageRing = false,
   contextUsedPercentage = 0,
@@ -532,6 +540,8 @@ export const ChatInput = memo(function ChatInput({
   onModelChangeRef.current = onModelChange;
   const onWorkspaceChangeRef = useRef(onWorkspaceChange);
   onWorkspaceChangeRef.current = onWorkspaceChange;
+  const onToolApprovalChangeRef = useRef(onToolApprovalChange);
+  onToolApprovalChangeRef.current = onToolApprovalChange;
 
   const handleModelSelectChange = useCallback(() => {
     requestAnimationFrame(() => {
@@ -547,6 +557,15 @@ export const ChatInput = memo(function ChatInput({
       requestAnimationFrame(() => {
         editorRef.current?.commands.focus('end');
         onWorkspaceChangeRef.current?.();
+      });
+    });
+  }, []);
+
+  const handleToolApprovalChange = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        editorRef.current?.commands.focus('end');
+        onToolApprovalChangeRef.current?.();
       });
     });
   }, []);
@@ -616,10 +635,11 @@ export const ChatInput = memo(function ChatInput({
       {!disabled &&
         (showWorkspaceSelect ||
           showModelSelect ||
+          showToolApprovalSelect ||
           (showContextUsageRing && contextUsedPercentage > 0)) && (
           <div
             className={cn(
-              'flex shrink-0 flex-row flex-wrap items-center justify-start gap-2 *:shrink-0',
+              'flex shrink-0 flex-row flex-wrap items-center justify-start gap-2 pr-2 *:shrink-0',
               !showWorkspaceSelect && 'pl-1',
             )}
           >
@@ -635,6 +655,22 @@ export const ChatInput = memo(function ChatInput({
                 usedKb={contextUsedKb}
                 maxKb={contextMaxKb}
               />
+            )}
+            {showToolApprovalSelect && (
+              <>
+                {/*
+                  Invisible flex spacer that eats remaining horizontal space on
+                  the line containing `ToolApprovalSelect`, pushing the select
+                  to the right edge. `!shrink` overrides the parent's
+                  `*:shrink-0` so the spacer can collapse to 0 when the row
+                  wraps — otherwise it would prevent natural wrap behavior and
+                  force `ToolApprovalSelect` onto its own line prematurely.
+                */}
+                <div className="!shrink min-w-0 grow" aria-hidden />
+                <ToolApprovalSelect
+                  onToolApprovalChange={handleToolApprovalChange}
+                />
+              </>
             )}
           </div>
         )}
