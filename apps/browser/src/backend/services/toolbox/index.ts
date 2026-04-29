@@ -16,7 +16,10 @@ import {
   READ_ONLY_PERMISSIONS,
   type MountDescriptor,
 } from '../sandbox/ipc';
-import type { WorkspaceAgentSettings } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  WorkspaceAgentSettings,
+  ToolApprovalMode,
+} from '@shared/karton-contracts/ui/shared-types';
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
 import type { GlobalConfigService } from '@/services/global-config';
@@ -927,6 +930,10 @@ export class ToolboxService extends DisposableService {
       this.mountManagerService?.getMountedLspServices(agentInstanceId);
     if (!mountedLspServices) return null;
 
+    const getToolApprovalMode = (): ToolApprovalMode =>
+      this.uiKarton.state.agents.instances[agentInstanceId]?.state
+        .toolApprovalMode ?? 'alwaysAsk';
+
     switch (tool) {
       case 'write':
         if (mountedRuntimes.size === 0) return null;
@@ -985,8 +992,11 @@ export class ToolboxService extends DisposableService {
         return askUserQuestionsTool(this.uiKarton, agentInstanceId);
       case 'executeShellCommand':
         if (!this.shellService?.isAvailable()) return null;
-        return executeShellCommandTool(this.shellService, agentInstanceId, () =>
-          this.getMountedPathsForAgent(agentInstanceId),
+        return executeShellCommandTool(
+          this.shellService,
+          agentInstanceId,
+          () => this.getMountedPathsForAgent(agentInstanceId),
+          getToolApprovalMode,
         );
       default:
         this.logger.error('[ToolboxService] Tool not found', { tool });

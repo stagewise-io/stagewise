@@ -13,6 +13,10 @@ import type { Logger } from '../logger';
 import type { ToolboxService } from '../toolbox';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { ModelId } from '@shared/available-models';
+import {
+  toolApprovalModeSchema,
+  type ToolApprovalMode,
+} from '@shared/karton-contracts/ui/shared-types';
 import type { z } from 'zod';
 import { AgentPersistenceDB } from './persistence/db';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
@@ -233,6 +237,17 @@ export class AgentManagerService extends DisposableService {
           approved,
           reason,
         );
+      },
+    );
+    this.karton.registerServerProcedureHandler(
+      'agents.setToolApprovalMode',
+      async (
+        _callingClientId: string,
+        instanceId: string,
+        mode: ToolApprovalMode,
+      ) => {
+        const parsedMode = toolApprovalModeSchema.parse(mode);
+        await this.setToolApprovalMode(instanceId, parsedMode);
       },
     );
     this.karton.registerServerProcedureHandler(
@@ -555,6 +570,7 @@ export class AgentManagerService extends DisposableService {
       history: [],
       queuedMessages: [],
       activeModelId: 'claude-sonnet-4.6',
+      toolApprovalMode: 'alwaysAsk',
       inputState: initialInputState ?? '',
       usedTokens: 0,
     };
@@ -702,6 +718,7 @@ export class AgentManagerService extends DisposableService {
         history: agent.history,
         queuedMessages: agent.queuedMessages,
         activeModelId: resumedModelValid ? agent.activeModelId : undefined,
+        toolApprovalMode: agent.toolApprovalMode ?? 'alwaysAsk',
         inputState: agent.inputState,
         usedTokens: agent.usedTokens,
         isWorking: false,
@@ -760,6 +777,7 @@ export class AgentManagerService extends DisposableService {
         title: agentState.title,
         titleLockedByUser: agentState.titleLockedByUser,
         activeModelId: agentState.activeModelId,
+        toolApprovalMode: agentState.toolApprovalMode,
         createdAt: agentState.history[0].metadata?.createdAt ?? new Date(0), // Fallback should never be reached
         lastMessageAt:
           agentState.history[agentState.history.length - 1].metadata
@@ -922,6 +940,30 @@ export class AgentManagerService extends DisposableService {
       approved: approved,
       reason: reason,
     });
+  }
+
+  /**
+   * Update the per-agent tool approval policy. Persists immediately so the
+   * change survives agent resume. Safe to call on empty agents (no
+   * history) because it uses a narrow DB update that bypasses the full
+   * `persistAgentState` path.
+   */
+  public async setToolApprovalMode(instanceId: string, mode: ToolApprovalMode) {
+    const agent = this.activeAgents.get(instanceId);
+
+    if (!agent) {
+      throw new Error(`Agent with instance id ${instanceId} not found`);
+    }
+
+    const currentMode =
+      this.karton.state.agents.instances[instanceId]?.state.toolApprovalMode;
+    if (currentMode === mode) return;
+
+    this.karton.setState((draft) => {
+      draft.agents.instances[instanceId].state.toolApprovalMode = mode;
+    });
+
+    await this.agentPersistenceDB?.updateToolApprovalMode(instanceId, mode);
   }
 
   /**

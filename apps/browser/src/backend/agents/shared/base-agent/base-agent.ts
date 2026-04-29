@@ -499,6 +499,11 @@ export abstract class BaseAgent<
       draft.queuedMessages = initialState?.queuedMessages ?? [];
       draft.activeModelId =
         initialState?.activeModelId ?? this.config.defaultModelId;
+      // `draft.toolApprovalMode` is always seeded by `defaultState` in
+      // AgentManager.createAgent before this constructor runs, so this
+      // fallback never yields undefined at runtime.
+      draft.toolApprovalMode =
+        initialState?.toolApprovalMode ?? draft.toolApprovalMode;
       draft.inputState = initialState?.inputState ?? draft.inputState;
       draft.usedTokens = initialState?.usedTokens ?? 0;
     });

@@ -12,6 +12,10 @@ import type { ModelId } from '@shared/available-models';
 import { relations } from 'drizzle-orm';
 import type { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { MountPermission } from '@shared/karton-contracts/ui/agent/metadata';
+import {
+  toolApprovalModeSchema,
+  type ToolApprovalMode,
+} from '@shared/karton-contracts/ui/shared-types';
 import superjson from 'superjson';
 
 const _sqliteBoolean = customType<{ data: boolean; driverData: number }>({
@@ -50,6 +54,25 @@ const modelId = customType<{ data: ModelId; driverData: string }>({
   },
   fromDriver(value) {
     return value as ModelId;
+  },
+});
+
+const toolApprovalMode = customType<{
+  data: ToolApprovalMode;
+  driverData: string;
+}>({
+  dataType() {
+    return 'text';
+  },
+  toDriver(value) {
+    return value;
+  },
+  fromDriver(value) {
+    // Fail-closed: any value that doesn't match the schema falls back to
+    // 'alwaysAsk' so a corrupted or unexpected DB entry cannot bypass tool
+    // approvals downstream.
+    const parsed = toolApprovalModeSchema.safeParse(value);
+    return parsed.success ? parsed.data : 'alwaysAsk';
   },
 });
 
@@ -93,6 +116,9 @@ export const agentInstances = sqliteTable(
       _sqliteJson('mounted_workspaces').$type<
         Array<{ path: string; permissions: MountPermission[] }>
       >(),
+    toolApprovalMode: toolApprovalMode('tool_approval_mode')
+      .notNull()
+      .$defaultFn(() => 'alwaysAsk'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),

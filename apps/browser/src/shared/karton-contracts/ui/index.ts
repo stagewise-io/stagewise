@@ -29,6 +29,7 @@ import type {
   HostPermissionOverrides,
   WidgetId,
   DevToolbarOriginSettings,
+  ToolApprovalMode,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -705,6 +706,10 @@ export type KartonContract = {
         approvalId: string,
         approved: boolean,
         reason?: string,
+      ) => Promise<void>;
+      setToolApprovalMode: (
+        instanceId: string,
+        mode: ToolApprovalMode,
       ) => Promise<void>;
       stop: (agentId: string) => Promise<void>;
       flushQueue: (agentId: string) => Promise<void>;
