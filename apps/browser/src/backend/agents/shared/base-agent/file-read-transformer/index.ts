@@ -388,6 +388,52 @@ export async function fileReadTransformer(
     );
   }
 
+  // Fast-path: probe cache with the expected hash before touching disk.
+  // When the file hasn't changed on disk, `currentHash === expectedHash`
+  // and the downstream cache lookup will hit under the same key we can
+  // build right now from `expectedHash` alone. Probing upfront lets us
+  // skip `fs.stat`, `blobReader`, and `hashBuffer` entirely on hits.
+  //
+  // Directory detection without stat: we can't reliably know if the path
+  // is a directory. Dirs typically have no extension, so
+  // `nodePath.extname()` returns ''. Any key mismatch misses the fast
+  // path and falls through to the existing slow-path.
+  //
+  // Preview-promotion: if the caller requests `{preview: true}` but a
+  // prior slow-path run wrote the cache under a promoted (full-read)
+  // key, the fast-path probe misses and we fall through. The slow path
+  // then rediscovers the promoted entry. One-time cost per file; not
+  // worth an extra probe here.
+  const fastPathNameForExt = originalFileName ?? mountedPath;
+  const fastPathExt = nodePath.extname(fastPathNameForExt).toLowerCase();
+  const fastPathSuffix = buildReadParamsSuffix(
+    effectiveReadParams,
+    maxReadChars,
+    maxPreviewLines,
+  );
+  const fastPathKey = FileReadCacheService.buildCacheKey(
+    expectedHash,
+    fastPathExt,
+    fastPathSuffix,
+  );
+  try {
+    const fastCached = await cache.get(fastPathKey);
+    if (fastCached) {
+      const fastDeserialized = deserializeTransformResult(fastCached.content);
+      if (fastDeserialized) {
+        logger.debug(
+          `[fileReadTransformer] Fast-path cache hit for ${mountedPath}`,
+        );
+        return wrapResult(mountedPath, fastDeserialized, effectiveReadParams);
+      }
+    }
+  } catch (e: unknown) {
+    logger.warn(
+      `[fileReadTransformer] Fast-path cache probe failed for ${mountedPath}, falling through`,
+      e,
+    );
+  }
+
   let stat: Awaited<ReturnType<typeof fs.stat>>;
   try {
     stat = await fs.stat(absolutePath);
