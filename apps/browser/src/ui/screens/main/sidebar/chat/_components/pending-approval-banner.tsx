@@ -71,15 +71,19 @@ export function PendingApprovalBanner() {
   );
 
   const handleRespond = useCallback(
-    (approvalId: string, approved: boolean) => {
+    async (approvalId: string, approved: boolean) => {
       if (!openAgentId || respondingIds.includes(approvalId)) return;
       setRespondingIds((prev) => [...prev, approvalId]);
-      sendApproval(
-        openAgentId,
-        approvalId,
-        approved,
-        approved ? undefined : 'User denied',
-      );
+      try {
+        await sendApproval(
+          openAgentId,
+          approvalId,
+          approved,
+          approved ? undefined : 'User denied',
+        );
+      } catch {
+        setRespondingIds((prev) => prev.filter((id) => id !== approvalId));
+      }
     },
     [openAgentId, sendApproval, respondingIds],
   );
