@@ -782,6 +782,179 @@ export const availableModels = [
       toolCalling: true,
     },
   },
+  {
+    officialProvider: 'deepseek',
+    modelId: 'deepseek-v4-pro',
+    modelDisplayName: 'DeepSeek V4 Pro',
+    modelDescription:
+      "DeepSeek's flagship 1.6T-parameter Mixture-of-Experts model with 49B activated. Strong reasoning and coding at a low price point.",
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Skip OpenRouter upstreams that don't accept `tools`/`tool_choice`
+        // (SiliconFlow, GMICloud). Without this, requests silently route to
+        // endpoints that reject tool definitions.
+        provider: { require_parameters: true },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.435,
+      outputPerMillion: 0.87,
+      relativeMultiplier: 0.22,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'deepseek',
+    modelId: 'deepseek-v4-flash',
+    modelDisplayName: 'DeepSeek V4 Flash',
+    modelDescription:
+      "DeepSeek's efficiency-optimized 284B-parameter MoE with 13B activated. Fast and cheap for high-volume workflows.",
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Defensive: all current V4 Flash upstreams support tools, but this
+        // guards against future upstream additions that don't.
+        provider: { require_parameters: true },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.14,
+      outputPerMillion: 0.28,
+      relativeMultiplier: 0.07,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'z-ai',
+    modelId: 'glm-5.1',
+    modelDisplayName: 'GLM 5.1',
+    modelDescription:
+      "Z.ai's newest flagship. Major leap in long-horizon coding and agentic workflows.",
+    modelContext: '200k context',
+    modelContextRaw: 202_752,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Only ~6 of 15 GLM 5.1 upstreams support tools. Filter to those.
+        provider: { require_parameters: true },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.4,
+      outputPerMillion: 4.4,
+      relativeMultiplier: 0.97,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'z-ai',
+    modelId: 'glm-5v-turbo',
+    modelDisplayName: 'GLM 5V-Turbo',
+    modelDescription:
+      "Z.ai's native multimodal agent model. Handles image, video, and text input for vision-based coding and agent tasks.",
+    modelContext: '200k context',
+    modelContextRaw: 202_752,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Only Z.AI serves GLM 5V-Turbo today. No-op for now, but guards
+        // against future upstream additions that lack tool support.
+        provider: { require_parameters: true },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.2,
+      outputPerMillion: 4.0,
+      relativeMultiplier: 0.87,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: true,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      // Reused from Google's constraint set as a sane multimodal default
+      // for image + video limits. Z.AI upstream limits may differ; refine
+      // if we observe rejections on larger inline payloads.
+      // `file` is omitted so the constraints stay consistent with
+      // `inputModalities.file = false` (no PDF ingestion).
+      inputConstraints: {
+        ...GOOGLE_INPUT_CONSTRAINTS,
+        file: undefined,
+      },
+      toolCalling: true,
+    },
+  },
 ] as const satisfies ModelSettings[];
 
 export type BuiltInModelId = (typeof availableModels)[number]['modelId'];
@@ -830,7 +1003,11 @@ export function findModelsAcceptingMime(
   return availableModels
     .filter((m) => {
       if (m.modelId === excludeModelId) return false;
-      const c = m.capabilities.inputConstraints;
+      // `inputConstraints` is optional on the zod schema (text-only
+      // models omit it). The `as const satisfies` narrowing removes the
+      // key from the union for those entries — cast to the schema shape.
+      const c = (m.capabilities as { inputConstraints?: InputConstraints })
+        .inputConstraints;
       if (!c) return false;
       for (const constraint of [c.image, c.file, c.video, c.audio])
         if (constraint?.mimeTypes.includes(lowerMime)) return true;

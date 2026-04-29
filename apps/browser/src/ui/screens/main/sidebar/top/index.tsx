@@ -1,6 +1,6 @@
 import posthog from 'posthog-js';
 import { cn } from '@ui/utils';
-import { IconDotsFill18, IconPlusFill18 } from 'nucleo-ui-fill-18';
+import { IconPlusFill18 } from 'nucleo-ui-fill-18';
 import { IconGear2Outline24 } from 'nucleo-core-outline-24';
 import { IconSidebarLeftHideOutline18 } from 'nucleo-ui-outline-18';
 import {
@@ -9,13 +9,11 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { Select, type SelectItem } from '@stagewise/stage-ui/components/select';
 import {
   useComparingSelector,
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
@@ -30,40 +28,6 @@ import {
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { AgentsSelector, type AgentGroup } from './_components/agents-selector';
-
-// Static menu items — no component state captured, safe at module scope.
-const menuItems: SelectItem[] = [
-  {
-    value: 'settings',
-    label: (
-      <span className="flex items-center gap-1.5">
-        <IconGear2Outline24 className="size-3.5 text-muted-foreground" />
-        <span>Settings</span>
-      </span>
-    ),
-  },
-];
-
-// Static trigger renderer — takes triggerProps as argument, captures nothing.
-const menuTrigger = (
-  triggerProps: React.ComponentPropsWithoutRef<'button'>,
-) => (
-  <Tooltip>
-    <TooltipTrigger>
-      <Button
-        {...triggerProps}
-        variant="ghost"
-        size="icon-xs"
-        className="app-no-drag shrink-0"
-      >
-        <IconDotsFill18 className="size-4" />
-      </Button>
-    </TooltipTrigger>
-    <TooltipContent side="bottom">
-      <span>More options</span>
-    </TooltipContent>
-  </Tooltip>
-);
 
 /** Shape returned by the activeAgentsList selector. */
 type ActiveAgentSummary = {
@@ -467,13 +431,9 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     [setOpenAgent],
   );
 
-  // Handle menu selection
-  const handleMenuSelect = useCallback(
-    (value: string | null) => {
-      if (value === 'settings') createTab(SETTINGS_PAGE_URL, true);
-    },
-    [createTab],
-  );
+  const handleOpenSettings = useCallback(() => {
+    createTab(SETTINGS_PAGE_URL, true);
+  }, [createTab]);
 
   return (
     <div
@@ -516,17 +476,21 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
               onEndReached={loadMoreHistory}
             />
           )}
-          <Select
-            items={menuItems}
-            value={null}
-            onValueChange={handleMenuSelect}
-            side="bottom"
-            sideOffset={8}
-            popupClassName="max-w-64"
-            size="xs"
-            showItemIndicator={false}
-            customTrigger={menuTrigger}
-          />
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="app-no-drag shrink-0"
+                onClick={handleOpenSettings}
+              >
+                <IconGear2Outline24 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <span>Settings</span>
+            </TooltipContent>
+          </Tooltip>
           <div className="mx-0.5 h-3.5 w-px shrink-0 bg-border-subtle" />
           <Tooltip>
             <TooltipTrigger>

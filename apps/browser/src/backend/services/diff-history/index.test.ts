@@ -3702,6 +3702,12 @@ describe('DiffHistoryService (E2E)', () => {
       // Verifies the `MAX_TRACKED_TOOL_CALLS` reset kicks in when the
       // counter map would otherwise grow indefinitely across a long
       // session with thousands of short-lived tool calls.
+      //
+      // NOTE: We only need one REAL `registerAgentEdit` call to exercise
+      // the reset branch — pre-seeding the internal map avoids 10k
+      // file-IO + SQLite round-trips that make this test flake on
+      // Windows CI runners (NTFS + AV overhead pushes each iteration
+      // from sub-ms to tens of ms, blowing past the 2-min timeout).
       service = await DiffHistoryService.create(
         logger,
         mockKarton,
@@ -3710,33 +3716,43 @@ describe('DiffHistoryService (E2E)', () => {
 
       // Matches `DiffHistoryService.MAX_TRACKED_TOOL_CALLS` — keep in sync.
       const MEMORY_CAP = 10_000;
-      const OVERFLOW = 5;
 
-      // Each iteration is a distinct tool call id with a single
-      // edit. That is enough to grow `_toolCallEditCounts` by one
-      // entry per iteration.
-      for (let i = 0; i < MEMORY_CAP + OVERFLOW; i++) {
-        await service.registerAgentEdit({
-          agentInstanceId: '1',
-          path: path.join(testFilesDir, `mem-cap-${i}.ts`),
-          toolCallId: `mem-tool-${i}`,
-          isExternal: false,
-          contentBefore: null,
-          contentAfter: 'x',
-        });
+      const internals = service as unknown as {
+        _toolCallEditCounts: Map<string, number>;
+        _toolCallTruncatedWarned: Set<string>;
+      };
+
+      // Pre-seed both maps right up to the cap so that the next
+      // brand-new tool call triggers the `prev === 0 && size >= MAX`
+      // reset branch in `registerAgentEdit`.
+      for (let i = 0; i < MEMORY_CAP; i++) {
+        internals._toolCallEditCounts.set(`seed-tool-${i}`, 1);
+        internals._toolCallTruncatedWarned.add(`seed-tool-${i}`);
       }
+      expect(internals._toolCallEditCounts.size).toBe(MEMORY_CAP);
+      expect(internals._toolCallTruncatedWarned.size).toBe(MEMORY_CAP);
 
-      const counts = (
-        service as unknown as { _toolCallEditCounts: Map<string, number> }
-      )._toolCallEditCounts;
-      const warned = (
-        service as unknown as {
-          _toolCallTruncatedWarned: Set<string>;
-        }
-      )._toolCallTruncatedWarned;
+      // Single real edit with a fresh toolCallId — this is the trigger.
+      await service.registerAgentEdit({
+        agentInstanceId: '1',
+        path: path.join(testFilesDir, 'mem-cap-trigger.ts'),
+        toolCallId: 'mem-tool-trigger',
+        isExternal: false,
+        contentBefore: null,
+        contentAfter: 'x',
+      });
 
-      expect(counts.size).toBeLessThanOrEqual(MEMORY_CAP);
-      expect(warned.size).toBeLessThanOrEqual(MEMORY_CAP);
-    }, 120_000); // Creating 10k edits is file-IO heavy; give the test extra room.
+      // After reset + the one new edit, the counts map should hold
+      // exactly the new entry and the warned set should be empty.
+      expect(internals._toolCallEditCounts.size).toBeLessThanOrEqual(
+        MEMORY_CAP,
+      );
+      expect(internals._toolCallEditCounts.size).toBe(1);
+      expect(internals._toolCallEditCounts.get('mem-tool-trigger')).toBe(1);
+      expect(internals._toolCallTruncatedWarned.size).toBeLessThanOrEqual(
+        MEMORY_CAP,
+      );
+      expect(internals._toolCallTruncatedWarned.size).toBe(0);
+    });
   });
 });

@@ -64,12 +64,26 @@ export function MessageRuntimeError({
   error,
   onRetry,
   canRetry,
+  isWorking = false,
 }: {
   agentInstanceId: string;
   error: AgentRuntimeError;
   onRetry: () => void;
   canRetry: boolean;
+  /** Whether the agent is currently streaming. Used to suppress Retry in UIs
+   *  that bypass the `canRetry` last-message gate (e.g. upstream-overload). */
+  isWorking?: boolean;
 }) {
+  if (error.kind === 'upstream-overload') {
+    return (
+      <UpstreamOverloadError
+        error={error}
+        isWorking={isWorking}
+        onRetry={onRetry}
+      />
+    );
+  }
+
   if (error.kind === 'plan-limit-exceeded') {
     return (
       <PlanLimitExceededError
@@ -154,6 +168,58 @@ function PlanLimitExceededError({
           <ArrowUpRightIcon className="size-3" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Shows a formal, non-alarming card for upstream-provider overload errors
+ * (429/502/503/529, Anthropic `overloaded_error`).
+ *
+ * Retry is shown whenever the agent is not currently streaming. We
+ * intentionally bypass the shared `canRetry` gate (which requires the tail
+ * of history to be a user message) because `onError` often fires after an
+ * empty assistant message has been appended, yet the backend's
+ * `retryLastUserMessage` walks history backward to find the last user
+ * message and works regardless.
+ */
+function UpstreamOverloadError({
+  error,
+  isWorking,
+  onRetry,
+}: {
+  error: Extract<AgentRuntimeError, { kind: 'upstream-overload' }>;
+  isWorking: boolean;
+  onRetry: () => void;
+}) {
+  const description =
+    'The upstream AI provider is temporarily at capacity. Please switch to another model or try again.';
+
+  // Read the name from the error snapshot (not live state) so that switching
+  // the active model while the card is visible does not mislabel the heading.
+  const modelName = useMemo(() => {
+    if (!error.modelId) return null;
+    const m = availableModels.find((m) => m.modelId === error.modelId);
+    return m?.modelDisplayName ?? null;
+  }, [error.modelId]);
+  const heading = modelName
+    ? `${modelName} is temporarily unavailable`
+    : 'Model is temporarily unavailable';
+
+  return (
+    <div className="mt-6 flex w-full flex-col gap-2 rounded-lg border border-derived bg-surface-1 p-3 text-sm">
+      <span className="font-medium text-foreground">{heading}</span>
+
+      <span className="text-muted-foreground text-xs">{description}</span>
+
+      {!isWorking && (
+        <div className="flex flex-row items-center justify-end gap-2 pt-2">
+          <Button variant="primary" size="xs" onClick={onRetry}>
+            <RefreshCcwIcon className="size-3" />
+            Retry
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

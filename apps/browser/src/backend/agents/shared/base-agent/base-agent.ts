@@ -1436,6 +1436,12 @@ export abstract class BaseAgent<
       }
     });
 
+    // Snapshot the model id used for THIS step. `updateActiveModelId` accepts
+    // writes even while a step is running, so any later read of
+    // `state.activeModelId` from async callbacks (telemetry, onError) could
+    // attribute the outcome to a model the user switched to mid-flight.
+    const stepModelId = this.state.get().activeModelId;
+
     // Get the current model — wrapped in try-catch so a deleted custom model
     // or endpoint doesn't wedge the agent with isWorking=true and no error.
     let modelWithOptions: ReturnType<
@@ -1443,7 +1449,7 @@ export abstract class BaseAgent<
     >;
     try {
       modelWithOptions = this.modelProviderService.getModelWithOptions(
-        this.state.get().activeModelId,
+        stepModelId,
         this.instanceId,
         {
           $ai_span_name: `${this.agentType}-history`,
@@ -1454,7 +1460,7 @@ export abstract class BaseAgent<
     } catch (error) {
       const err = error as Error;
       this.logger.error(
-        `[BaseAgent:${this.instanceId}] Failed to resolve model "${this.state.get().activeModelId}": ${err.message}`,
+        `[BaseAgent:${this.instanceId}] Failed to resolve model "${stepModelId}": ${err.message}`,
       );
       this.report(err, 'resolveModel');
       this.state.set((draft) => {
@@ -1609,29 +1615,52 @@ export abstract class BaseAgent<
         );
         this.report(error, 'streamText');
 
-        const parsedError = this.parsePlanLimitError(error);
-        if (parsedError?.kind === 'plan-limit-exceeded') {
-          const sortedWindows = [...parsedError.exceededWindows].sort(
+        const parsedPlanLimit = this.parsePlanLimitError(error);
+        if (parsedPlanLimit?.kind === 'plan-limit-exceeded') {
+          const sortedWindows = [...parsedPlanLimit.exceededWindows].sort(
             (a, b) =>
               new Date(a.resetsAt).getTime() - new Date(b.resetsAt).getTime(),
           );
           this.telemetryService.capture('usage-limit-reached', {
             agent_type: this.agentType,
-            model_id: this.state.get().activeModelId,
+            model_id: stepModelId,
             provider_mode: this._stepProviderMode,
-            plan: parsedError.plan ?? 'unknown',
+            plan: parsedPlanLimit.plan ?? 'unknown',
             window_types: sortedWindows.map((w) => w.type),
             first_window_resets_at: sortedWindows[0]?.resetsAt ?? '',
             exceeded_window_count: sortedWindows.length,
           });
         }
+        const parsedOverloadBase = parsedPlanLimit
+          ? null
+          : this.parseUpstreamOverloadError(error);
+        const parsedOverload: Extract<
+          AgentRuntimeError,
+          { kind: 'upstream-overload' }
+        > | null =
+          parsedOverloadBase?.kind === 'upstream-overload'
+            ? {
+                ...parsedOverloadBase,
+                modelId: stepModelId,
+              }
+            : null;
+        if (parsedOverload?.kind === 'upstream-overload') {
+          this.telemetryService.capture('upstream-overload', {
+            agent_type: this.agentType,
+            model_id: stepModelId,
+            provider_mode: this._stepProviderMode,
+            provider_name: parsedOverload.providerName,
+            status_code: parsedOverload.statusCode,
+          });
+        }
         this.state.set((draft) => {
           draft.isWorking = false;
           draft.unread = true;
-          draft.error = parsedError ?? {
-            message: `LLM provider error: ${error.message}`,
-            stack: error.stack,
-          };
+          draft.error = parsedPlanLimit ??
+            parsedOverload ?? {
+              message: `LLM provider error: ${error.message}`,
+              stack: error.stack,
+            };
         });
         this.logger.debug(
           `[BaseAgent:${this.instanceId}] Wrote error to public state`,
@@ -2578,15 +2607,68 @@ export abstract class BaseAgent<
     return messages;
   }
 
+  /**
+   * Max depth to unwrap nested `lastError` chains. Today the AI SDK wraps at
+   * most once (RetryError -> APICallError), so 3 is defensive against future
+   * wrapping layers (e.g. a retry-of-retry) while guaranteeing termination.
+   */
+  private static readonly MAX_ERROR_UNWRAP_DEPTH = 3;
+
+  /**
+   * HTTP status codes treated as "upstream overloaded / rate-limited".
+   * 429: rate-limited.  502/503: provider down or no available provider.
+   * 529: Anthropic's overload status (non-standard, vendor-specific).
+   * See https://openrouter.ai/docs/api/reference/errors-and-debugging.mdx
+   */
+  private static readonly UPSTREAM_OVERLOAD_CODES: ReadonlySet<number> =
+    new Set([429, 502, 503, 529]);
+
+  /**
+   * Walks the error chain (outer -> `lastError` -> ...) and returns the frame
+   * carrying the fullest API context. The AI SDK wraps retried failures in
+   * AI_RetryError whose own fields do NOT carry statusCode/responseBody; the
+   * inner APICallError is exposed on `lastError`. Descend whenever EITHER
+   * field is missing so partial wrappers (one field on the outer, the other
+   * on the inner) still surface full context. The depth cap bounds iteration.
+   */
+  private static unwrapApiErrorFrame(error: Error): Record<string, unknown> {
+    let current: Record<string, unknown> = error as unknown as Record<
+      string,
+      unknown
+    >;
+    for (let i = 0; i < BaseAgent.MAX_ERROR_UNWRAP_DEPTH; i++) {
+      const missingStatus = current.statusCode === undefined;
+      const missingBody = typeof current.responseBody !== 'string';
+      if (
+        (missingStatus || missingBody) &&
+        current.lastError instanceof Error
+      ) {
+        current = current.lastError as unknown as Record<string, unknown>;
+        continue;
+      }
+      break;
+    }
+    return current;
+  }
+
+  /**
+   * Extract API error context for logging / telemetry. The responseBody is
+   * truncated to bound payload size — do NOT use this for JSON-parsing
+   * classifiers (large bodies would be sliced mid-JSON and fail to parse).
+   * Classifiers should call `unwrapApiErrorFrame` directly and read the raw
+   * `responseBody` off the returned frame.
+   */
   private static extractApiErrorContext(error: Error): Record<string, unknown> {
-    const errAny = error as unknown as Record<string, unknown>;
+    const current = BaseAgent.unwrapApiErrorFrame(error);
     const ctx: Record<string, unknown> = {};
-    if (errAny.statusCode !== undefined) ctx.statusCode = errAny.statusCode;
-    if (errAny.url !== undefined) ctx.url = errAny.url;
-    if (errAny.isRetryable !== undefined) ctx.isRetryable = errAny.isRetryable;
-    if (typeof errAny.responseBody === 'string')
-      ctx.responseBody = errAny.responseBody.slice(0, 4000);
-    if (errAny.cause instanceof Error) ctx.causeMessage = errAny.cause.message;
+    if (current.statusCode !== undefined) ctx.statusCode = current.statusCode;
+    if (current.url !== undefined) ctx.url = current.url;
+    if (current.isRetryable !== undefined)
+      ctx.isRetryable = current.isRetryable;
+    if (typeof current.responseBody === 'string')
+      ctx.responseBody = current.responseBody.slice(0, 4000);
+    if (current.cause instanceof Error)
+      ctx.causeMessage = current.cause.message;
     return ctx;
   }
 
@@ -2602,10 +2684,14 @@ export abstract class BaseAgent<
   }
 
   private parsePlanLimitError(error: Error): AgentRuntimeError | null {
-    const ctx = BaseAgent.extractApiErrorContext(error);
-    if (typeof ctx.responseBody !== 'string') return null;
+    // Read the RAW (untruncated) responseBody — classifiers must parse the
+    // full JSON. `extractApiErrorContext` truncates for logging, which can
+    // corrupt large bodies mid-JSON.
+    const frame = BaseAgent.unwrapApiErrorFrame(error);
+    const rawBody = frame.responseBody;
+    if (typeof rawBody !== 'string') return null;
     try {
-      const body = JSON.parse(ctx.responseBody);
+      const body = JSON.parse(rawBody);
       if (body?.error !== 'PLAN_LIMIT_EXCEEDED') return null;
       const exceededWindows =
         body.details?.exceededWindows
@@ -2628,6 +2714,72 @@ export abstract class BaseAgent<
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Detect upstream-overload errors (429 rate-limits, 502/503 provider-down,
+   * Anthropic `overloaded_error`). Permissive on purpose: any HTTP status in
+   * {429, 502, 503, 529} or a body with matching shape is treated as
+   * temporary unavailability. See docs:
+   * https://openrouter.ai/docs/api/reference/errors-and-debugging.mdx
+   */
+  private parseUpstreamOverloadError(error: Error): AgentRuntimeError | null {
+    // Read the RAW (untruncated) responseBody directly off the unwrapped
+    // frame. `extractApiErrorContext` truncates to 4 KB for logging, which
+    // can corrupt large JSON bodies mid-object and silently skip matching.
+    const frame = BaseAgent.unwrapApiErrorFrame(error);
+    const statusCode =
+      typeof frame.statusCode === 'number' ? frame.statusCode : undefined;
+
+    let body: Record<string, unknown> | null = null;
+    if (typeof frame.responseBody === 'string') {
+      try {
+        body = JSON.parse(frame.responseBody);
+      } catch {
+        body = null;
+      }
+    }
+
+    const isOverloadStatus =
+      statusCode !== undefined &&
+      BaseAgent.UPSTREAM_OVERLOAD_CODES.has(statusCode);
+
+    const errInBody = (body?.error ?? undefined) as
+      | Record<string, unknown>
+      | undefined;
+    const isAnthropicOverload = errInBody?.type === 'overloaded_error';
+    const bodyCode =
+      typeof errInBody?.code === 'number' ? errInBody.code : undefined;
+    const isOpenRouterOverloadBody =
+      bodyCode !== undefined && BaseAgent.UPSTREAM_OVERLOAD_CODES.has(bodyCode);
+
+    if (
+      !isOverloadStatus &&
+      !isAnthropicOverload &&
+      !isOpenRouterOverloadBody
+    ) {
+      return null;
+    }
+
+    const metadata = errInBody?.metadata as Record<string, unknown> | undefined;
+    const providerName =
+      typeof metadata?.provider_name === 'string'
+        ? (metadata.provider_name as string)
+        : isAnthropicOverload
+          ? 'Anthropic'
+          : undefined;
+
+    const bodyMessage =
+      typeof errInBody?.message === 'string'
+        ? (errInBody.message as string)
+        : undefined;
+
+    return {
+      kind: 'upstream-overload',
+      message: bodyMessage ?? error.message,
+      providerName,
+      statusCode: statusCode ?? bodyCode,
+    };
   }
 
   private updateUsageWarning(result: StepResult<StagewiseToolSet>): void {

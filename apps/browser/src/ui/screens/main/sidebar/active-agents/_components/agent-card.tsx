@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { forwardRef, memo, useCallback, useState } from 'react';
 import { cn } from '@ui/utils';
 import { useAgentIdContextMenu } from '../../_components/use-agent-id-context-menu';
 import {
@@ -32,6 +32,12 @@ export interface AgentCardProps {
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
+  /** Optional hover/pointer callbacks — used by `AgentCardWithPreview` to
+   *  drive the hover-preview without introducing a wrapping element that
+   *  would disrupt the parent grid layout. */
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  onMouseDown?: () => void;
 }
 
 export function AgentCardSkeleton() {
@@ -44,22 +50,28 @@ export function AgentCardSkeleton() {
 }
 
 export const AgentCard = memo(
-  function AgentCard({
-    id,
-    title,
-    isActive,
-    isWorking,
-    isWaitingForUser,
-    hasError,
-    hasUnseen,
-    activityText,
-    activityIsUserInput,
-    lastMessageAt,
-    onClick,
-    onArchive,
-    onDelete,
-    onRename,
-  }: AgentCardProps) {
+  forwardRef<HTMLDivElement, AgentCardProps>(function AgentCard(
+    {
+      id,
+      title,
+      isActive,
+      isWorking,
+      isWaitingForUser,
+      hasError,
+      hasUnseen,
+      activityText,
+      activityIsUserInput,
+      lastMessageAt,
+      onClick,
+      onArchive,
+      onDelete,
+      onRename,
+      onMouseEnter,
+      onMouseLeave,
+      onMouseDown,
+    },
+    ref,
+  ) {
     const subtitle = hasError ? 'Error' : activityText;
     const [deleteOpen, setDeleteOpen] = useState(false);
     const { onContextMenu, menuPortal } = useAgentIdContextMenu(id);
@@ -144,6 +156,64 @@ export const AgentCard = memo(
                 }}
                 onBlur={commitEdit}
                 onPaste={(e) => {
+      <div
+        ref={ref}
+        role="button"
+        tabIndex={0}
+        data-agent-id={id}
+        aria-keyshortcuts="F2"
+        onClick={() => onClick(id)}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onMouseDown={onMouseDown}
+        onDoubleClick={(e) => {
+          if (!isActive) return;
+          e.stopPropagation();
+          if (!isEditing) startEditing();
+        }}
+        onKeyDown={(e) => {
+          // Only handle keyboard interaction when the card itself is focused.
+          // Otherwise, nested buttons (archive/delete) would also trigger this.
+          if (e.currentTarget !== e.target) return;
+
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick(id);
+          } else if (e.key === 'F2' && !isEditing && isActive) {
+            // F2 is the standard rename shortcut across Finder/Explorer/VS Code.
+            // Only allow rename on the active agent — consistent with click/double-click.
+            e.preventDefault();
+            startEditing();
+          }
+        }}
+        className={cn(
+          'group/card relative flex min-w-0 shrink-0 flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
+          isActive
+            ? 'cursor-default bg-surface-2 ring-2 ring-derived-subtle ring-inset'
+            : 'cursor-pointer',
+          hasUnseen && 'animate-ring-pulse-primary',
+        )}
+      >
+        {/* Title row */}
+        <div className="flex min-w-0 items-center gap-1">
+          {isEditing ? (
+            <span
+              ref={titleRef}
+              role="textbox"
+              contentEditable
+              suppressContentEditableWarning
+              className="block min-w-0 flex-1 cursor-text overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  // Commit directly rather than via blur() for parity with
+                  // AgentsSelector — keeps both surfaces exiting edit mode
+                  // synchronously regardless of any surrounding focus trap.
+                  commitEdit();
+                } else if (e.key === 'Escape') {
                   e.preventDefault();
                   const text = e.clipboardData.getData('text/plain');
                   document.execCommand('insertText', false, text);
@@ -214,6 +284,25 @@ export const AgentCard = memo(
                 <span>Suspend agent (can be recovered)</span>
               </TooltipContent>
             </Tooltip>
+          ) : (
+            <button
+              type="button"
+              tabIndex={-1}
+              className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+              onClick={(e) => {
+                if (!isActive) return;
+                e.stopPropagation();
+                startEditing();
+              }}
+              onPointerDown={(e) => {
+                if (!isActive) return;
+                e.stopPropagation();
+              }}
+            >
+              {displayTitle}
+            </button>
+          )}
+        </div>
 
             <Tooltip>
               <TooltipTrigger delay={500}>
@@ -247,10 +336,19 @@ export const AgentCard = memo(
         {menuPortal}
       </>
     );
-  },
-  // Skip onClick/onArchive/onDelete/onRename in comparison — their behavior is
-  // stable (always call the same RPC with the card's `id`) but identity
-  // changes every render due to upstream useKartonProcedure selectors.
+  }),
+  // Skip `onClick` / `onArchive` / `onDelete` / `onRename` in comparison —
+  // their behavior is stable (always call the same RPC with the card's
+  // `id`) but identity changes every render due to upstream
+  // `useKartonProcedure` selectors.
+  //
+  // Hover handlers (`onMouseEnter` / `onMouseLeave` / `onMouseDown`) ARE
+  // compared strictly: `AgentCardWithPreview` wraps them in `useCallback`
+  // with stable deps and mirrors any closed-over state through a ref, so
+  // their identity is stable across renders in the common case. Including
+  // them here gives us a correctness safety net — if a future change makes
+  // a handler legitimately change identity (e.g. a new dep is added), the
+  // DOM binding updates instead of silently using a stale reference.
   (prev, next) =>
     prev.id === next.id &&
     prev.title === next.title &&
@@ -261,5 +359,8 @@ export const AgentCard = memo(
     prev.hasUnseen === next.hasUnseen &&
     prev.activityText === next.activityText &&
     prev.activityIsUserInput === next.activityIsUserInput &&
-    prev.lastMessageAt === next.lastMessageAt,
+    prev.lastMessageAt === next.lastMessageAt &&
+    prev.onMouseEnter === next.onMouseEnter &&
+    prev.onMouseLeave === next.onMouseLeave &&
+    prev.onMouseDown === next.onMouseDown,
 );
