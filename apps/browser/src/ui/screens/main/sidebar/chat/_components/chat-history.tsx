@@ -251,11 +251,17 @@ export const ChatHistory = () => {
   }, [removedSuggestionIds, shuffledSuggestions]);
 
   const handleRemoveSuggestion = (id: string) => {
-    track('suggestion-dismissed', {
-      suggestion_id: id,
-      context: 'empty-chat',
-    });
+    // State update first — telemetry is fire-and-forget and must never be
+    // able to block the UI reacting to the user's click.
     setRemovedSuggestionIds((prev) => new Set([...Array.from(prev), id]));
+    try {
+      track('suggestion-dismissed', {
+        suggestion_id: id,
+        context: 'empty-chat',
+      });
+    } catch {
+      // best-effort
+    }
   };
 
   // All messages after filtering and merging consecutive assistant messages.

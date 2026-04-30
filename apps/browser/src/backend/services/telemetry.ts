@@ -276,6 +276,7 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'suggestion-clicked',
   'suggestion-dismissed',
   'tabs-cleaned',
+  'tool-approval-always-allowed',
   'workspace-connect-aborted',
   'workspace-connect-failed',
   'workspace-connect-finished',
@@ -323,6 +324,11 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'tabs-cleaned': z.object({
     closed_count: z.number(),
+  }),
+  'tool-approval-always-allowed': z.object({
+    tool_name: z.string(),
+    agent_instance_id: z.string(),
+    tool_call_id: z.string(),
   }),
   'workspace-connect-aborted': z.object({
     reason: z.enum(['picker-closed', 'suggestions-dismissed']),
@@ -595,7 +601,16 @@ export class TelemetryService extends DisposableService {
     this.logger.debug('[TelemetryService] Tearing down...');
     if (this.posthogClient) {
       try {
-        await this.pendingAppLaunchedCapture;
+        // Let the launch capture finish if it was about to, but never wait
+        // more than 250 ms. The launch snapshot itself already has a 1.5 s
+        // timeout, so an unbounded await here can push shutdown past the
+        // Electron close budget and prevent PostHog from flushing.
+        if (this.pendingAppLaunchedCapture) {
+          await Promise.race([
+            this.pendingAppLaunchedCapture,
+            new Promise<void>((resolve) => setTimeout(resolve, 250)),
+          ]);
+        }
 
         // Use a short timeout on close — we would rather lose the snapshot
         // than add up to 1.5 s to window-close latency.
