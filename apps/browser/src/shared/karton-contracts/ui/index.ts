@@ -749,6 +749,15 @@ export type KartonContract = {
       ) => Promise<StoredAgentPreview | null>;
       /** Return distinct filepaths edited by an agent (from diff-history). */
       getTouchedFiles: (agentId: string) => Promise<string[]>;
+      /**
+       * Reveal the agent's per-instance data directory inside user-data
+       * (e.g. `<userData>/stagewise/agents/<id>/`) in the system file
+       * manager. Used by the dev context-menu option — not the user's
+       * mounted project workspace.
+       */
+      revealWorkingDirectory: (
+        agentId: string,
+      ) => Promise<{ success: boolean; error?: string }>;
     };
     toolbox: {
       acceptHunks: (hunkIds: string[]) => Promise<void>;

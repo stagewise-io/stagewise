@@ -21,6 +21,9 @@ import type { z } from 'zod';
 import { AgentPersistenceDB } from './persistence/db';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
 import { writeBlob, deleteAgentBlobs } from '@/utils/attachment-blobs';
+import { shell } from 'electron';
+import { existsSync } from 'node:fs';
+import { getAgentDir } from '@/utils/paths';
 import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
 
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
@@ -482,6 +485,38 @@ export class AgentManagerService extends DisposableService {
       'agents.getTouchedFiles',
       async (_callingClientId: string, agentId: string) => {
         return this.toolbox.getEditedFilePathsForAgent(agentId);
+      },
+    );
+    this.karton.registerServerProcedureHandler(
+      'agents.revealWorkingDirectory',
+      async (_callingClientId: string, agentId: string) => {
+        try {
+          // Agent's own per-instance data directory inside user-data — not
+          // the mounted user project. This is the dev-option "working dir"
+          // exposed via the context menu: where the agent's attachments,
+          // shell logs, apps, etc. live on disk.
+          const dir = getAgentDir(agentId);
+          if (!existsSync(dir)) {
+            return {
+              success: false,
+              error: `Agent directory does not exist: ${dir}`,
+            };
+          }
+          const errorMessage = await shell.openPath(dir);
+          if (errorMessage) {
+            return { success: false, error: errorMessage };
+          }
+          return { success: true };
+        } catch (error) {
+          this.report(
+            error instanceof Error ? error : new Error(String(error)),
+            'revealWorkingDirectory',
+          );
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
+        }
       },
     );
   }
