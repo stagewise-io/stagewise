@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha076 (2026-04-30)
+
+### Features
+
+* implement fast-path cache probing to optimize file read performance (08a3365)
+* introduce tool approval modes (alwaysAllow and alwaysAsk) (765fabd)
+
+### Bug Fixes
+
+* add hard cap constants for history compression thresholds to optimize token usage (6257f00)
+
 ## 1.0.0-alpha075 (2026-04-29)
 
 ### Features
