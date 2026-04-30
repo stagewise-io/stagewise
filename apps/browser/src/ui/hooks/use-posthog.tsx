@@ -92,7 +92,20 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
       (!posthog._isIdentified() ||
         posthog.get_distinct_id() !== userAccount.user.id)
     ) {
-      if (posthog._isIdentified()) posthog.reset();
+      if (posthog._isIdentified()) {
+        // reset() clears super-properties too; invalidate the registration
+        // cache so the init effect re-registers them on the next run.
+        registeredSuperPropsInitKey = null;
+        posthog.reset();
+        posthog.register({
+          product: 'stagewise-browser',
+          app_name: __APP_NAME__,
+          app_version: __APP_VERSION__,
+          app_release_channel: __APP_RELEASE_CHANNEL__,
+          app_platform: __APP_PLATFORM__,
+          app_arch: __APP_ARCH__,
+        });
+      }
 
       posthog.identify(userAccount.user.id, {
         telemetryLevel: globalConfig.telemetryLevel,

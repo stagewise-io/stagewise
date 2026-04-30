@@ -170,13 +170,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const selectionModeActive = useKartonState(
     (s) => s.browser.contextSelectionMode,
   );
-  const selectionTelemetryActiveRef = useRef(false);
-
-  useEffect(() => {
-    if (!selectionModeActive) {
-      selectionTelemetryActiveRef.current = false;
-    }
-  }, [selectionModeActive]);
 
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
@@ -284,27 +277,32 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   );
   selectedElementsStateRef.current = selectedElementsState ?? [];
 
-  // Element selector helper functions
-  const startContextSelector = useCallback(() => {
-    // Only report a telemetry start when we actually transition OFF -> ON.
-    // These helpers are called from multiple sites (hotkey, button, auto-start
-    // on sidebar open); without this guard we would double-count.
-    if (!selectionTelemetryActiveRef.current && !selectionModeActive) {
-      selectionTelemetryActiveRef.current = true;
+  // Drive element-selection telemetry off the Karton state itself so every
+  // transition is captured — including ESC-driven cancels in selector-canvas,
+  // sidebar auto-close, and any other site that flips the state directly.
+  // Wrapping the setters would miss those paths.
+  const prevSelectionModeActiveRef = useRef(selectionModeActive);
+  useEffect(() => {
+    const prev = prevSelectionModeActiveRef.current;
+    prevSelectionModeActiveRef.current = selectionModeActive;
+    if (prev === selectionModeActive) return;
+    if (selectionModeActive) {
       track('element-selection-started');
-    }
-    setContextSelectionActive(true);
-  }, [selectionModeActive, setContextSelectionActive, track]);
-
-  const stopContextSelector = useCallback(() => {
-    if (selectionTelemetryActiveRef.current) {
-      selectionTelemetryActiveRef.current = false;
+    } else {
       track('element-selection-stopped', {
         element_selected: selectedElementsStateRef.current.length > 0,
       });
     }
+  }, [selectionModeActive, track]);
+
+  // Element selector helper functions
+  const startContextSelector = useCallback(() => {
+    setContextSelectionActive(true);
+  }, [setContextSelectionActive]);
+
+  const stopContextSelector = useCallback(() => {
     setContextSelectionActive(false);
-  }, [setContextSelectionActive, track]);
+  }, [setContextSelectionActive]);
 
   // Pending early-abort revert: deferred until isWorking becomes false
   // so the stream is fully done and won't re-add the assistant message.
