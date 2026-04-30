@@ -16,9 +16,10 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
-import { IconHistoryFill18 } from 'nucleo-ui-fill-18';
-import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
-import { IconPenOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconBoxArchiveOutline18,
+  IconPenOutline18,
+} from 'nucleo-ui-outline-18';
 import { cn } from '@ui/utils';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import {
@@ -67,9 +68,8 @@ export interface AgentsSelectorProps {
   onValueChange: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
-  /** Wake a suspended/history agent. Required for the row context menu. */
-  onResume: (id: string) => void;
-  /** Put an active agent to sleep. Required for the row context menu. */
+  /** Archive a live agent. Required for the row context menu and the
+   *  inline archive button on live rows. */
   onArchive: (id: string) => void;
   onEndReached?: () => void;
 }
@@ -118,13 +118,11 @@ interface AgentListItemProps {
   isLive: boolean;
   isSelected: boolean;
   isEditing: boolean;
-  pendingDeleteId: string | null;
   onStartEdit: (id: string) => void;
   onCancelEdit: () => void;
   onCommitRename: (id: string, newTitle: string) => void;
-  onStartDelete: (id: string) => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: (id: string) => void;
+  /** Archive a live agent — only wired for `isLive` rows. */
+  onArchive: (id: string) => void;
   /** Shared context-menu controller — one host for the whole list. */
   contextMenuState: SharedAgentContextMenuState;
   onHighlight: (agentId: string) => void;
@@ -135,13 +133,10 @@ function AgentListItemImpl({
   isLive,
   isSelected,
   isEditing,
-  pendingDeleteId,
   onStartEdit,
   onCancelEdit,
   onCommitRename,
-  onStartDelete,
-  onCancelDelete,
-  onConfirmDelete,
+  onArchive,
   contextMenuState,
   onHighlight,
 }: AgentListItemProps) {
@@ -310,34 +305,21 @@ function AgentListItemImpl({
             <IconPenOutline18 className="size-3" />
           </button>
         )}
-        <div className="relative">
-          {!isEditing && (
-            <button
-              type="button"
-              className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
-              aria-label="Delete agent"
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onStartDelete(agent.id);
-              }}
-            >
-              <IconTrash2Outline24 className="size-3" />
-            </button>
-          )}
-          {pendingDeleteId === agent.id && (
-            <DeleteConfirmPopover
-              open={true}
-              onOpenChange={(open) => {
-                if (!open) onCancelDelete();
-              }}
-              onConfirm={() => {
-                onConfirmDelete(agent.id);
-              }}
-            />
-          )}
-        </div>
+        {!isEditing && isLive && (
+          <button
+            type="button"
+            className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover/item:opacity-100"
+            aria-label="Archive agent"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive(agent.id);
+            }}
+          >
+            <IconBoxArchiveOutline18 className="size-3" />
+          </button>
+        )}
       </div>
     </ComboboxItem>
   );
@@ -348,11 +330,9 @@ function AgentListItemImpl({
 // default memo check sees a new reference for every sibling and re-renders
 // the entire list on any state change. That stampede delays the exit from
 // edit mode by hundreds of ms when there are many rows. Compare only the
-// primitive fields the row actually uses; also narrow `pendingDeleteId` to
-// the boolean "is this row's popover open?" so other rows' popover state
-// doesn't invalidate this row. Callback props are treated as stable — they
-// are all wrapped in useCallback at AgentsSelector scope and don't change
-// during a rename.
+// primitive fields the row actually uses. Callback props are treated as
+// stable — they are all wrapped in useCallback at AgentsSelector scope
+// and don't change during a rename.
 const AgentListItem = memo(AgentListItemImpl, (prev, next) => {
   const pa = prev.agent;
   const na = next.agent;
@@ -369,9 +349,7 @@ const AgentListItem = memo(AgentListItemImpl, (prev, next) => {
   return (
     prev.isSelected === next.isSelected &&
     prev.isEditing === next.isEditing &&
-    prev.isLive === next.isLive &&
-    // Narrow: we only rerender when THIS row's popover state changes.
-    (prev.pendingDeleteId === pa.id) === (next.pendingDeleteId === na.id)
+    prev.isLive === next.isLive
   );
 });
 
@@ -414,12 +392,10 @@ export const AgentsSelector = memo(
     onValueChange,
     onDelete,
     onRename,
-    onResume,
     onArchive,
     onEndReached,
   }: AgentsSelectorProps) {
     const [inputValue, setInputValue] = useState('');
-    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
@@ -614,23 +590,8 @@ export const AgentsSelector = memo(
       [onValueChange, editingId],
     );
 
-    const handleStartDelete = useCallback((id: string) => {
-      setPendingDeleteId(id);
-    }, []);
-    const handleCancelDelete = useCallback(() => {
-      setPendingDeleteId(null);
-    }, []);
-    const handleConfirmDelete = useCallback(
-      (id: string) => {
-        setPendingDeleteId(null);
-        onDelete(id);
-      },
-      [onDelete],
-    );
-
     const handleStartEdit = useCallback((id: string) => {
       setEditingId(id);
-      setPendingDeleteId(null);
     }, []);
     const handleCancelEdit = useCallback(() => {
       setEditingId(null);
@@ -641,7 +602,6 @@ export const AgentsSelector = memo(
         setIsOpen(open);
         if (!open) {
           setInputValue('');
-          setPendingDeleteId(null);
           setEditingId(null);
           cancelPendingClear();
           setHoveredAgentId(null);
@@ -687,7 +647,7 @@ export const AgentsSelector = memo(
                     size="icon-xs"
                     className="app-no-drag shrink-0"
                   >
-                    <IconHistoryFill18 className="size-4" />
+                    <IconBoxArchiveOutline18 className="size-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -722,7 +682,10 @@ export const AgentsSelector = memo(
                     )}
                   >
                     <div className="mb-1">
-                      <ComboboxInput size="xs" placeholder="Search chats…" />
+                      <ComboboxInput
+                        size="xs"
+                        placeholder="Search for agent…"
+                      />
                     </div>
 
                     <div
@@ -742,13 +705,10 @@ export const AgentsSelector = memo(
                                   isLive={groupIsLive}
                                   isSelected={agent.id === value}
                                   isEditing={editingId === agent.id}
-                                  pendingDeleteId={pendingDeleteId}
                                   onStartEdit={handleStartEdit}
                                   onCancelEdit={handleCancelEdit}
                                   onCommitRename={onRename}
-                                  onStartDelete={handleStartDelete}
-                                  onCancelDelete={handleCancelDelete}
-                                  onConfirmDelete={handleConfirmDelete}
+                                  onArchive={onArchive}
                                   contextMenuState={ctxMenuState}
                                   onHighlight={handleItemHover}
                                 />
@@ -818,20 +778,17 @@ export const AgentsSelector = memo(
         <SharedAgentContextMenuHost
           target={ctxMenuTarget}
           onClose={handleCtxMenuClose}
-          onResume={onResume}
           onArchive={onArchive}
           onDeleteRequest={handleCtxDeleteRequest}
         />
-        {ctxDeleteId !== null && (
-          <DeleteConfirmPopover
-            open={true}
-            isolated
-            onOpenChange={(open) => {
-              if (!open) handleCtxDeleteCancel();
-            }}
-            onConfirm={handleCtxDeleteConfirm}
-          />
-        )}
+        <DeleteConfirmPopover
+          open={ctxDeleteId !== null}
+          isolated
+          onOpenChange={(open) => {
+            if (!open) handleCtxDeleteCancel();
+          }}
+          onConfirm={handleCtxDeleteConfirm}
+        />
       </>
     );
   },
@@ -841,7 +798,6 @@ export const AgentsSelector = memo(
     prevProps.onValueChange === nextProps.onValueChange &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onRename === nextProps.onRename &&
-    prevProps.onResume === nextProps.onResume &&
     prevProps.onArchive === nextProps.onArchive &&
     prevProps.onEndReached === nextProps.onEndReached,
 );
