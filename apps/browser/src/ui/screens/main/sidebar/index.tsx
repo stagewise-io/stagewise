@@ -9,6 +9,7 @@ import { useRef, useCallback, useState } from 'react';
 import { useEventListener } from '@ui/hooks/use-event-listener';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import { OpenAgentProvider } from '@ui/hooks/use-open-chat';
+import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
 
 export function Sidebar() {
   const panelRef = useRef<ImperativePanelHandle>(null);
@@ -82,12 +83,14 @@ export function Sidebar() {
       className="@container group overflow-visible! flex h-full flex-col items-stretch justify-between rounded-lg bg-background p-1 ring-1 ring-derived-strong data-[collapsed=false]:min-w-64 data-[collapsed=true]:max-w-0 data-[collapsed=true]:p-0 data-[collapsed=true]:ring-transparent"
     >
       <OpenAgentProvider>
-        <ChatDraftProvider>
-          <SidebarTopSection isCollapsed={isCollapsed} />
-          <ActiveAgentsGrid />
-          {/* Chat area */}
-          <SidebarChatSection />
-        </ChatDraftProvider>
+        <PendingRemovalsProvider>
+          <ChatDraftProvider>
+            <SidebarTopSection isCollapsed={isCollapsed} />
+            <ActiveAgentsGrid />
+            {/* Chat area */}
+            <SidebarChatSection />
+          </ChatDraftProvider>
+        </PendingRemovalsProvider>
       </OpenAgentProvider>
     </ResizablePanel>
   );

@@ -22,9 +22,6 @@ export function ChatPanel() {
 
   // Narrow selectors: only extract primitive/stable values so streaming
   // chunks on unrelated agents don't trigger a re-render.
-  const firstAgentId = useKartonState(
-    (s) => Object.keys(s.agents.instances)[0] ?? null,
-  );
   const openAgentExists = useKartonState((s) =>
     openAgent ? !!s.agents.instances[openAgent] : false,
   );
@@ -39,11 +36,8 @@ export function ChatPanel() {
       : 0,
   );
 
-  useEffect(() => {
-    if (openAgent === null && firstAgentId) {
-      setOpenAgent(firstAgentId);
-    }
-  }, [firstAgentId, openAgent, setOpenAgent]);
+  // Auto-selecting the first agent when openAgent is null is handled
+  // centrally by SidebarTopSection — no need to duplicate it here.
 
   // Track whether the status card is visible to align horizontal margins
   const [statusCardVisible, setStatusCardVisible] = useState(false);

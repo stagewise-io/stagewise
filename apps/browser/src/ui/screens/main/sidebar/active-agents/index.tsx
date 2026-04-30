@@ -15,6 +15,7 @@ import {
 import { IconPlusFill18 } from 'nucleo-ui-fill-18';
 import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
+import { useTrack } from '@ui/hooks/use-track';
 import { AgentCardSkeleton } from './_components/agent-card';
 import { AgentCardWithPreview } from './_components/agent-card-with-preview';
 import type { CachedPreview } from '@ui/screens/main/sidebar/top/_components/agent-preview-panel';
@@ -24,6 +25,7 @@ import {
   SharedAgentContextMenuHost,
 } from '../_components/shared-agent-context-menu';
 import { DeleteConfirmPopover } from '../_components/delete-confirm-popover';
+import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 
 type ActiveAgentCardData = {
   id: string;
@@ -123,7 +125,7 @@ export function ActiveAgentsGrid() {
   const showActiveAgents = useKartonState(
     (s) => s.preferences.sidebar?.showActiveAgents ?? true,
   );
-  const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
+  const [openAgent, setOpenAgent] = useOpenAgent();
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const archiveAgent = useKartonProcedure((p) => p.agents.archive);
@@ -204,43 +206,17 @@ export function ActiveAgentsGrid() {
     ),
   );
 
-  // Hide skeleton as soon as agents list grows (same render cycle), rather
-  // than waiting for the promise callback which lags 1-2 frames behind.
-  const showCreateSkeleton =
-    pendingCreate && agents.length <= agentCountAtCreateRef.current;
-
   // Optimistic removal: cards are hidden immediately while the backend processes.
   // Used for both "Delete" (permanent) and "Suspend" (archived).
-  const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(
-    () => new Set(),
-  );
+  // Shared via context so SidebarTopSection's auto-select effect doesn't
+  // ping-pong openAgent back onto a being-removed id.
+  const {
+    pending: pendingRemovals,
+    add: addPendingRemoval,
+    remove: removePendingRemoval,
+  } = usePendingRemovals();
   const pendingRemovalsRef = useRef(pendingRemovals);
   pendingRemovalsRef.current = pendingRemovals;
-
-  const handleCreateAgent = useCallback(() => {
-    // Reuse an existing empty agent instead of creating a new one.
-    // Uses refs so this callback isn't recreated when pendingRemovals changes.
-    const existingEmpty = emptyAgentIdRef.current;
-    if (existingEmpty && !pendingRemovalsRef.current.has(existingEmpty)) {
-      setOpenAgent(existingEmpty);
-      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-      return;
-    }
-
-    agentCountAtCreateRef.current = agents.length;
-    setPendingCreate(true);
-    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-    const currentModelId = openAgentModelIdRef.current ?? undefined;
-    const paths = currentMountPathsRef.current;
-    void createAgent(
-      undefined,
-      currentModelId,
-      paths.length > 0 ? paths : undefined,
-    ).then((id) => {
-      setOpenAgent(id);
-      setPendingCreate(false);
-    });
-  }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent]);
 
   // Stable ordering: agents keep their position in the list. New agents
   // (created or resumed) are appended at the end. Removed agents are pruned.
@@ -271,21 +247,44 @@ export function ActiveAgentsGrid() {
   useEffect(() => {
     if (pendingRemovals.size === 0) return;
     const currentIds = new Set(agents.map((a) => a.id));
-    const pendingArr = Array.from(pendingRemovals);
-    if (pendingArr.some((id) => !currentIds.has(id))) {
-      setPendingRemovals(
-        new Set(pendingArr.filter((id) => currentIds.has(id))),
-      );
-    }
-  }, [agents, pendingRemovals]);
+    pendingRemovals.forEach((id) => {
+      if (!currentIds.has(id)) removePendingRemoval(id);
+    });
+  }, [agents, pendingRemovals, removePendingRemoval]);
 
-  // When the open agent is optimistically removed, pop it from the history
-  // stack so we fall back to the previously viewed agent.
-  useEffect(() => {
-    if (openAgent && pendingRemovals.has(openAgent)) {
-      removeFromHistory(openAgent);
+  // Hide skeleton as soon as agents list grows (same render cycle), rather
+  // than waiting for the promise callback which lags 1-2 frames behind.
+  const showCreateSkeleton =
+    pendingCreate && agents.length <= agentCountAtCreateRef.current;
+
+  const track = useTrack();
+
+  const handleCreateAgent = useCallback(() => {
+    void track('chat-new-agent-clicked', { source: 'sidebar-active-agents' });
+
+    // Reuse an existing empty agent instead of creating a new one.
+    // Uses refs so this callback isn't recreated when pendingRemovals changes.
+    const existingEmpty = emptyAgentIdRef.current;
+    if (existingEmpty && !pendingRemovalsRef.current.has(existingEmpty)) {
+      setOpenAgent(existingEmpty);
+      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+      return;
     }
-  }, [openAgent, pendingRemovals, removeFromHistory]);
+
+    agentCountAtCreateRef.current = agents.length;
+    setPendingCreate(true);
+    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+    const currentModelId = openAgentModelIdRef.current ?? undefined;
+    const paths = currentMountPathsRef.current;
+    void createAgent(
+      undefined,
+      currentModelId,
+      paths.length > 0 ? paths : undefined,
+    ).then((id) => {
+      setOpenAgent(id);
+      setPendingCreate(false);
+    });
+  }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent, track]);
 
   const handleClick = useCallback(
     (id: string) => {
@@ -299,18 +298,18 @@ export function ActiveAgentsGrid() {
 
   const handleArchive = useCallback(
     (id: string) => {
-      setPendingRemovals((prev) => new Set(prev).add(id));
+      addPendingRemoval(id);
       void archiveAgent(id);
     },
-    [archiveAgent],
+    [addPendingRemoval, archiveAgent],
   );
 
   const handleDelete = useCallback(
     (id: string) => {
-      setPendingRemovals((prev) => new Set(prev).add(id));
+      addPendingRemoval(id);
       void deleteAgent(id);
     },
-    [deleteAgent],
+    [addPendingRemoval, deleteAgent],
   );
 
   const handleRename = useCallback(
@@ -388,9 +387,7 @@ export function ActiveAgentsGrid() {
     if (id) handleDelete(id);
   }, [ctxDeleteId, handleDelete]);
 
-  // Only show when enabled and 2+ visible CHAT agents (or 1 agent + pending create)
-  const visibleCount = orderedAgents.length + (showCreateSkeleton ? 1 : 0);
-  if (!showActiveAgents || visibleCount < 2) return null;
+  if (!showActiveAgents) return null;
 
   return (
     <div className="flex shrink-0 flex-col overflow-x-visible border-border-subtle border-b px-1 pt-2 group-data-[collapsed=true]:hidden">
@@ -408,57 +405,59 @@ export function ActiveAgentsGrid() {
           <IconPlusFill18 className="size-3" />
         </Button>
       </div>
-      <OverlayScrollbar
-        ref={scrollRef}
-        className="max-h-[15vh] min-h-5"
-        contentClassName="grid auto-rows-max @[400px]:grid-cols-2 grid-cols-1 gap-2 pt-2 pb-3.5"
-        options={{ overflow: { x: 'visible' } }}
-      >
-        {orderedAgents.map((agent) => {
-          const isOpen = agent.id === openAgent;
-          const hasUnseen = !isOpen && agent.unread;
+      {orderedAgents.length === 0 && !showCreateSkeleton ? (
+        <div className="flex items-center justify-center px-2 py-6 text-center text-muted-foreground text-xs">
+          Get started by clicking &ldquo;New agent +&rdquo;
+        </div>
+      ) : (
+        <OverlayScrollbar
+          ref={scrollRef}
+          className="max-h-[15vh] min-h-5"
+          contentClassName="grid auto-rows-max @[400px]:grid-cols-2 grid-cols-1 gap-2 pt-2 pb-3.5"
+          options={{ overflow: { x: 'visible' } }}
+        >
+          {orderedAgents.map((agent) => {
+            const isOpen = agent.id === openAgent;
+            const hasUnseen = !isOpen && agent.unread;
 
-          return (
-            <AgentCardWithPreview
-              key={agent.id}
-              id={agent.id}
-              title={agent.title}
-              isActive={isOpen}
-              isWorking={agent.isWorking}
-              isWaitingForUser={agent.isWaitingForUser}
-              hasError={agent.hasError}
-              hasUnseen={hasUnseen}
-              activityText={agent.activityText}
-              activityIsUserInput={agent.activityIsUserInput}
-              lastMessageAt={agent.lastMessageAt}
-              contextMenuState={ctxMenuState}
-              onClick={handleClick}
-              onArchive={handleArchive}
-              onDelete={handleDelete}
-              onRename={handleRename}
-              cache={previewCacheRef.current}
-            />
-          );
-        })}
-        {showCreateSkeleton && <AgentCardSkeleton />}
-      </OverlayScrollbar>
+            return (
+              <AgentCardWithPreview
+                key={agent.id}
+                id={agent.id}
+                title={agent.title}
+                isActive={isOpen}
+                isWorking={agent.isWorking}
+                isWaitingForUser={agent.isWaitingForUser}
+                hasError={agent.hasError}
+                hasUnseen={hasUnseen}
+                activityText={agent.activityText}
+                activityIsUserInput={agent.activityIsUserInput}
+                lastMessageAt={agent.lastMessageAt}
+                contextMenuState={ctxMenuState}
+                onClick={handleClick}
+                onArchive={handleArchive}
+                onRename={handleRename}
+                cache={previewCacheRef.current}
+              />
+            );
+          })}
+          {showCreateSkeleton && <AgentCardSkeleton />}
+        </OverlayScrollbar>
+      )}
       <SharedAgentContextMenuHost
         target={ctxMenuTarget}
         onClose={handleCtxMenuClose}
         onArchive={handleArchive}
-        onResume={handleClick}
         onDeleteRequest={handleCtxDeleteRequest}
       />
-      {ctxDeleteId !== null && (
-        <DeleteConfirmPopover
-          open={true}
-          isolated
-          onOpenChange={(open) => {
-            if (!open) setCtxDeleteId(null);
-          }}
-          onConfirm={handleCtxDeleteConfirm}
-        />
-      )}
+      <DeleteConfirmPopover
+        open={ctxDeleteId !== null}
+        isolated
+        onOpenChange={(open) => {
+          if (!open) setCtxDeleteId(null);
+        }}
+        onConfirm={handleCtxDeleteConfirm}
+      />
     </div>
   );
 }

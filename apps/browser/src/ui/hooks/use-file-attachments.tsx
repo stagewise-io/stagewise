@@ -19,6 +19,11 @@ import posthog from 'posthog-js';
 
 const MAX_BASE64_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
+// Stable empty reference so the karton selector can return the same snapshot
+// when no agent is open. Returning a fresh `[]` on every render would break
+// useSyncExternalStore caching and trigger an infinite update loop.
+const EMPTY_MOUNTS: readonly Mount[] = Object.freeze([]);
+
 /**
  * Resolve the absolute filesystem path for a File object.
  * Uses Electron's webUtils.getPathForFile() exposed via the preload bridge.
@@ -108,8 +113,10 @@ export function useFileAttachments(
   );
   const [openAgentId] = useOpenAgent();
   const mounts = useKartonState((s) =>
-    openAgentId ? (s.toolbox[openAgentId]?.workspace?.mounts ?? []) : [],
-  );
+    openAgentId
+      ? (s.toolbox[openAgentId]?.workspace?.mounts ?? EMPTY_MOUNTS)
+      : EMPTY_MOUNTS,
+  ) as Mount[];
 
   const addFileAttachment = useCallback(
     async (file: File): Promise<AttachmentMetadata> => {

@@ -1,4 +1,4 @@
-import { forwardRef, memo, useCallback, useState } from 'react';
+import { forwardRef, memo, useCallback } from 'react';
 import { cn } from '@ui/utils';
 import {
   Tooltip,
@@ -6,9 +6,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
-import { IconSleepingTimeOutline18 } from 'nucleo-ui-outline-18';
-import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
+import { IconBoxArchiveOutline18 } from 'nucleo-ui-outline-18';
 import {
   type SharedAgentContextMenuState,
   buildAgentContextMenuHandler,
@@ -35,7 +33,6 @@ export interface AgentCardProps {
   contextMenuState: SharedAgentContextMenuState;
   onClick: (id: string) => void;
   onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   /** Optional hover/pointer callbacks — used by `AgentCardWithPreview` to
    *  drive the hover-preview without introducing a wrapping element that
@@ -70,7 +67,6 @@ export const AgentCard = memo(
       contextMenuState,
       onClick,
       onArchive,
-      onDelete,
       onRename,
       onMouseEnter,
       onMouseLeave,
@@ -79,7 +75,6 @@ export const AgentCard = memo(
     ref,
   ) {
     const subtitle = hasError ? 'Error' : activityText;
-    const [deleteOpen, setDeleteOpen] = useState(false);
 
     const handleCommitRename = useCallback(
       (newTitle: string) => onRename(id, newTitle),
@@ -219,47 +214,19 @@ export const AgentCard = memo(
                 variant="ghost"
                 size="icon-xs"
                 className="archive-btn text-muted-foreground hover:text-foreground"
-                aria-label="Suspend agent"
+                aria-label="Archive agent"
                 onClick={(e) => {
                   e.stopPropagation();
                   onArchive(id);
                 }}
               >
-                <IconSleepingTimeOutline18 className="size-4 cursor-pointer" />
+                <IconBoxArchiveOutline18 className="size-4 cursor-pointer" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <span>Suspend agent (can be recovered)</span>
+              <span>Archive agent (can be resumed)</span>
             </TooltipContent>
           </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger delay={500}>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="delete-btn text-muted-foreground hover:text-foreground"
-                aria-label="Delete agent permanently"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteOpen(true);
-                }}
-              >
-                <IconTrash2Outline24 className="size-4 cursor-pointer" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span>Delete agent permanently</span>
-            </TooltipContent>
-          </Tooltip>
-          <DeleteConfirmPopover
-            open={deleteOpen}
-            onOpenChange={setDeleteOpen}
-            onConfirm={() => {
-              setDeleteOpen(false);
-              onDelete(id);
-            }}
-          />
         </div>
       </div>
     );

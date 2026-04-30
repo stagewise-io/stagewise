@@ -1,6 +1,5 @@
 import posthog from 'posthog-js';
 import { cn } from '@ui/utils';
-import { IconPlusFill18 } from 'nucleo-ui-fill-18';
 import { IconGear2Outline24 } from 'nucleo-core-outline-24';
 import { IconSidebarLeftHideOutline18 } from 'nucleo-ui-outline-18';
 import {
@@ -17,7 +16,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
-import { HotkeyComboText } from '@ui/components/hotkey-combo-text';
 import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -27,6 +25,7 @@ import {
 } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
+import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { AgentsSelector, type AgentGroup } from './_components/agents-selector';
 
 /** Shape returned by the activeAgentsList selector. */
@@ -83,9 +82,6 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   );
   const platform = useKartonState((s) => s.appInfo.platform);
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
-  const showActiveAgentsPref = useKartonState(
-    (s) => s.preferences.sidebar?.showActiveAgents ?? true,
-  );
   const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
 
   // Narrow selector: only re-renders when the open agent's model changes.
@@ -131,7 +127,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   // n = active CHAT agents (typically 1-5) so this is < 0.1 ms.  The comparator
   // short-circuits on the first mismatch, so the common "no change" path is a
   // fast element-by-element scan that avoids triggering React re-renders.
-  const activeAgentsList = useKartonState(
+  const activeAgentsListRaw = useKartonState(
     useComparingSelector(
       (s): ActiveAgentSummary[] =>
         Object.entries(s.agents.instances)
@@ -168,12 +164,31 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
 
   const PAGE_SIZE = 200;
 
-  const activeAgentIds = useKartonState(
+  const activeAgentIdsRaw = useKartonState(
     useComparingSelector((s) => Object.keys(s.agents.instances)),
+  );
+  // Filter out ids that are being optimistically removed (Archive/Delete).
+  // Including them in auto-select would ping-pong openAgent back onto an
+  // id the grid is trying to evict, looping infinitely until the backend
+  // catches up.
+  const { pending: pendingRemovals } = usePendingRemovals();
+  const activeAgentIds = useMemo(
+    () =>
+      pendingRemovals.size === 0
+        ? activeAgentIdsRaw
+        : activeAgentIdsRaw.filter((id) => !pendingRemovals.has(id)),
+    [activeAgentIdsRaw, pendingRemovals],
   );
   const activeAgentIdSet = useMemo(
     () => new Set(activeAgentIds),
     [activeAgentIds],
+  );
+  const activeAgentsList = useMemo(
+    () =>
+      pendingRemovals.size === 0
+        ? activeAgentsListRaw
+        : activeAgentsListRaw.filter((a) => !pendingRemovals.has(a.id)),
+    [activeAgentsListRaw, pendingRemovals],
   );
 
   useEffect(() => {
@@ -226,13 +241,6 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     if (openAgent && openAgentUnread) void markAsRead(openAgent);
   }, [openAgent, openAgentUnread, markAsRead]);
 
-  const showChatListButton = agentsList.length > 0 || activeAgentIdSet.size > 1;
-  // Hide the new-chat button when the ActiveAgentsGrid is visible
-  // (preference on AND 2+ CHAT agents), since it has its own "New agent" button.
-  const showNewChatButton =
-    openAgent !== null &&
-    (!showActiveAgentsPref || activeAgentsList.length < 2);
-
   // Sort history separately — O(n log n) only recomputes when data actually changes,
   // NOT on every timeTick (which only affects grouping labels).
   const sortedHistory = useMemo(() => {
@@ -277,12 +285,7 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     ];
   }, [sortedHistory, activeAgentsList, timeTick]);
 
-  const [emptyAgentId, emptyAgentIdRef] = useEmptyAgentId();
-
-  // The button is only enabled when creating/switching would actually do
-  // something: disabled when the open agent is already the empty agent
-  // (clicking would be a no-op since createAgentAndFocus just refocuses it).
-  const canCreateAgent = openAgent !== null && emptyAgentId !== openAgent;
+  const [, emptyAgentIdRef] = useEmptyAgentId();
 
   // Get draft getter from context (provided by panel-footer)
   const { getDraft } = useChatDraft();
@@ -405,10 +408,6 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
   }, [createAgent, getDraft, getAgentsHistoryList]);
 
-  const handleCreateAgent = useCallback(() => {
-    void createAgentAndFocus();
-  }, [createAgentAndFocus]);
-
   // Hotkey: CTRL+N to create new agent chat (works regardless of which section
   // shows the "Add agent" button — top section or active agents grid).
   // Disabled when the open agent is already empty (nothing to create).
@@ -422,21 +421,10 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const archiveAgentRef = useRef(archiveAgent);
   archiveAgentRef.current = archiveAgent;
 
-  // Context-menu "Resume": wake a suspended history agent and focus it.
-  // Same shape as clicking the row, but we go through a dedicated handler so
-  // AgentsSelector's memo on `onResume` stays stable.
-  const handleResumeAgent = useCallback(
-    (id: string) => {
-      if (id === openAgentRef.current) return;
-      void resumeAgentRef.current(id).then(() => {
-        setOpenAgent(id);
-      });
-    },
-    [setOpenAgent],
-  );
+  // Context-menu / inline button "Archive": suspend an active agent.
+  // Optimistically prune it from the local history list so it disappears
+  // immediately.
 
-  // Context-menu "Sleep": suspend an active agent. Optimistically prune it
-  // from the local history list so it disappears immediately.
   const handleArchiveAgent = useCallback((id: string) => {
     void archiveAgentRef.current(id).catch((e) => {
       console.error(e);
@@ -474,39 +462,15 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
       <div className="flex-1 shrink-0 group-data-[collapsed=true]:hidden" />
       {!isCollapsed && (
         <div className="@[240px]:flex hidden shrink-0 flex-row items-center">
-          {showNewChatButton && (
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="shrink-0"
-                  disabled={!canCreateAgent}
-                  onClick={handleCreateAgent}
-                >
-                  <IconPlusFill18 className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <span>
-                  Create new agent (
-                  <HotkeyComboText action={HotkeyActions.NEW_CHAT} />)
-                </span>
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {showChatListButton && (
-            <AgentsSelector
-              groups={agentGroups}
-              value={openAgent}
-              onValueChange={handleAgentSelect}
-              onDelete={handleDeleteAgent}
-              onRename={handleRenameAgent}
-              onResume={handleResumeAgent}
-              onArchive={handleArchiveAgent}
-              onEndReached={loadMoreHistory}
-            />
-          )}
+          <AgentsSelector
+            groups={agentGroups}
+            value={openAgent}
+            onValueChange={handleAgentSelect}
+            onDelete={handleDeleteAgent}
+            onRename={handleRenameAgent}
+            onArchive={handleArchiveAgent}
+            onEndReached={loadMoreHistory}
+          />
           <Tooltip>
             <TooltipTrigger>
               <Button

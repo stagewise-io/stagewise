@@ -1,14 +1,13 @@
 import { Menu as MenuBase } from '@base-ui/react/menu';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import {
-  IconCirclePlayOutline18,
+  IconBoxArchiveOutline18,
   IconCopyIdOutline18,
   IconFolderOpenOutline18,
   IconPen2Outline18,
-  IconSleepingTimeOutline18,
 } from 'nucleo-ui-outline-18';
 import { useFloatingIsolation } from './use-floating-isolation';
 
@@ -24,7 +23,11 @@ import { useFloatingIsolation } from './use-floating-isolation';
 
 export interface AgentContextMenuTarget {
   agentId: string;
-  /** Live agent instance (shows Sleep) vs suspended (shows Resume). */
+  /**
+   * Whether the agent is a live instance. Active agents show an
+   * "Archive" action; suspended history agents omit it (you resume by
+   * clicking the row).
+   */
   isActive: boolean;
   /** Viewport coords of the right-click — used as virtual menu anchor. */
   x: number;
@@ -91,9 +94,7 @@ export function buildAgentContextMenuHandler(
 export interface SharedAgentContextMenuHostProps {
   target: AgentContextMenuTarget | null;
   onClose: () => void;
-  /** Wake a suspended agent (used when `target.isActive` is false). */
-  onResume: (id: string) => void;
-  /** Put an active agent to sleep (used when `target.isActive` is true). */
+  /** Archive an active agent (only shown when `target.isActive` is true). */
   onArchive: (id: string) => void;
   /** User picked "Permanently delete" — caller is expected to show a confirm dialog. */
   onDeleteRequest: (id: string) => void;
@@ -103,7 +104,6 @@ export const SharedAgentContextMenuHost = memo(
   function SharedAgentContextMenuHost({
     target,
     onClose,
-    onResume,
     onArchive,
     onDeleteRequest,
   }: SharedAgentContextMenuHostProps) {
@@ -112,30 +112,56 @@ export const SharedAgentContextMenuHost = memo(
     );
 
     const popupRef = useRef<HTMLDivElement>(null);
-    useFloatingIsolation(popupRef, target !== null);
+    const open = target !== null;
+    useFloatingIsolation(popupRef, open);
+
+    // Preserve the last target while base-ui runs its exit animation so
+    // the popup content keeps rendering with stable props until the close
+    // transition settles. Unmounting abruptly while `MenuBase.Root`'s
+    // `open` flips to `false` causes its internal positioner store to
+    // receive ref cleanup callbacks mid-teardown, producing a runaway
+    // `forceStoreRerender` loop (see stack: forkRef.cleanup → _Store.set).
+    const lastTargetRef = useRef<AgentContextMenuTarget | null>(null);
+    if (target) lastTargetRef.current = target;
+    const activeTarget = target ?? lastTargetRef.current;
+
+    // Release the retained target shortly after the close animation
+    // finishes so stale closures (e.g. `rename` from an archived row) do
+    // not linger longer than necessary.
+    useEffect(() => {
+      if (open) return;
+      const t = setTimeout(() => {
+        lastTargetRef.current = null;
+      }, 300);
+      return () => clearTimeout(t);
+    }, [open]);
 
     // Virtual anchor: base-ui only needs `getBoundingClientRect()`.
-    const anchor = useMemo(() => {
-      if (!target) return null;
-      const { x, y } = target;
-      return {
+    // Keyed on the coords only — the anchor is stable for a given open
+    // position, even across the exit animation frame where `target`
+    // transiently becomes null.
+    const anchorX = activeTarget?.x ?? 0;
+    const anchorY = activeTarget?.y ?? 0;
+    const anchor = useMemo(
+      () => ({
         getBoundingClientRect: () =>
-          DOMRect.fromRect({ x, y, width: 0, height: 0 }),
-      };
-    }, [target]);
+          DOMRect.fromRect({ x: anchorX, y: anchorY, width: 0, height: 0 }),
+      }),
+      [anchorX, anchorY],
+    );
 
     const handleOpenChange = useCallback(
-      (open: boolean) => {
-        if (!open) onClose();
+      (next: boolean) => {
+        if (!next) onClose();
       },
       [onClose],
     );
 
-    if (!target) return null;
-    const { agentId, isActive, showDev, rename } = target;
+    if (!activeTarget) return null;
+    const { agentId, isActive, showDev, rename } = activeTarget;
 
     return (
-      <MenuBase.Root open onOpenChange={handleOpenChange}>
+      <MenuBase.Root open={open} onOpenChange={handleOpenChange}>
         <MenuBase.Portal>
           <MenuBase.Positioner
             anchor={anchor}
@@ -155,20 +181,17 @@ export const SharedAgentContextMenuHost = memo(
                 'data-ending-style:opacity-0 data-starting-style:opacity-0',
               )}
             >
-              <AgentMenuItem
-                onClick={() => {
-                  if (isActive) onArchive(agentId);
-                  else onResume(agentId);
-                  onClose();
-                }}
-              >
-                {isActive ? (
-                  <IconSleepingTimeOutline18 className="size-3.5 shrink-0" />
-                ) : (
-                  <IconCirclePlayOutline18 className="size-3.5 shrink-0" />
-                )}
-                <span>{isActive ? 'Sleep' : 'Resume'}</span>
-              </AgentMenuItem>
+              {isActive && (
+                <AgentMenuItem
+                  onClick={() => {
+                    onArchive(agentId);
+                    onClose();
+                  }}
+                >
+                  <IconBoxArchiveOutline18 className="size-3.5 shrink-0" />
+                  <span>Archive</span>
+                </AgentMenuItem>
+              )}
               <AgentMenuItem
                 onClick={() => {
                   onClose();
