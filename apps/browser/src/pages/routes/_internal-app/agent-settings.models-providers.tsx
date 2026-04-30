@@ -19,6 +19,7 @@ import {
 } from '@shared/karton-contracts/ui/shared-types';
 import { availableModels } from '@shared/available-models';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@pages/utils';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
@@ -382,6 +383,12 @@ function CustomModelDialog({
   existingModelIds: Set<string>;
   customEndpoints: CustomEndpoint[];
 }) {
+  const track = useTrack();
+  const isAddMode = !model;
+  // Set to true when onSave() fires; distinguishes a save-initiated close
+  // from a cancel/dismiss close inside the shared `handleDialogOpenChange`.
+  const savedRef = useRef(false);
+
   const [modelId, setModelId] = useState(model?.modelId ?? '');
   const [displayName, setDisplayName] = useState(model?.displayName ?? '');
   const [description, setDescription] = useState(model?.description ?? '');
@@ -456,8 +463,54 @@ function CustomModelDialog({
       );
       setShowAdvanced(false);
       setJsonError(null);
+      savedRef.current = false;
+      if (isAddMode) {
+        void track('custom-model-add-started');
+      }
     }
-  }, [open, model]);
+  }, [open, model, isAddMode, track]);
+
+  const isDuplicate =
+    modelId.trim().length > 0 &&
+    (BUILT_IN_MODEL_IDS.has(modelId.trim()) ||
+      (existingModelIds.has(modelId.trim()) &&
+        modelId.trim() !== model?.modelId));
+
+  const canSave =
+    modelId.trim().length > 0 &&
+    displayName.trim().length > 0 &&
+    !isDuplicate &&
+    !jsonError;
+
+  // "Touched" = the user changed anything from the initial field values.
+  // Derived from current state so we don't need per-input bookkeeping.
+  const anyFieldTouched =
+    modelId !== (model?.modelId ?? '') ||
+    displayName !== (model?.displayName ?? '') ||
+    description !== (model?.description ?? '') ||
+    contextWindowSize !== (model?.contextWindowSize ?? 128000) ||
+    endpointId !== (model?.endpointId ?? 'openai') ||
+    thinkingEnabled !== (model?.thinkingEnabled ?? false) ||
+    providerOptionsJson !==
+      (model?.providerOptions && Object.keys(model.providerOptions).length > 0
+        ? JSON.stringify(model.providerOptions, null, 2)
+        : '') ||
+    headersJson !==
+      (model?.headers && Object.keys(model.headers).length > 0
+        ? JSON.stringify(model.headers, null, 2)
+        : '') ||
+    JSON.stringify(capabilities) !==
+      JSON.stringify(model?.capabilities ?? defaultCaps);
+
+  const handleDialogOpenChange = (next: boolean) => {
+    if (!next && open && isAddMode && !savedRef.current) {
+      void track('custom-model-add-aborted', {
+        had_validation_errors: !canSave,
+        any_field_touched: anyFieldTouched,
+      });
+    }
+    onOpenChange(next);
+  };
 
   const endpointOptions = useMemo(() => {
     const builtIn = [
@@ -476,18 +529,6 @@ function CustomModelDialog({
     }));
     return [...builtIn, ...custom];
   }, [customEndpoints]);
-
-  const isDuplicate =
-    modelId.trim().length > 0 &&
-    (BUILT_IN_MODEL_IDS.has(modelId.trim()) ||
-      (existingModelIds.has(modelId.trim()) &&
-        modelId.trim() !== model?.modelId));
-
-  const canSave =
-    modelId.trim().length > 0 &&
-    displayName.trim().length > 0 &&
-    !isDuplicate &&
-    !jsonError;
 
   const handleSave = () => {
     let providerOptions: Record<string, unknown> = {};
@@ -521,11 +562,15 @@ function CustomModelDialog({
       providerOptions,
       headers,
     });
+    if (isAddMode) {
+      void track('custom-model-add-finished');
+    }
+    savedRef.current = true;
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-h-[85vh] sm:max-w-md">
         <DialogClose />
         <DialogHeader>
@@ -767,7 +812,11 @@ function CustomModelDialog({
           >
             {model ? 'Save Changes' : 'Add Model'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDialogOpenChange(false)}
+          >
             Cancel
           </Button>
         </DialogFooter>

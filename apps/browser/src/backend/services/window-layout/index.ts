@@ -871,6 +871,7 @@ export class WindowLayoutService extends DisposableService {
         void this.handleCreateTab(resolvedUrl, setActive, id);
       },
       this.thumbnailService ?? undefined,
+      this.telemetryService ?? undefined,
     );
 
     // Subscribe to state updates
@@ -933,6 +934,14 @@ export class WindowLayoutService extends DisposableService {
 
     tab.on('contentFullscreenChanged', (isFullscreen: boolean) => {
       this.handleContentFullscreenChanged(id, isFullscreen);
+    });
+
+    tab.on('devtoolsOpened', (tabId: string) => {
+      this.telemetryService?.capture('devtools-opened', { tab_id: tabId });
+    });
+
+    tab.on('devtoolsClosed', (tabId: string) => {
+      this.telemetryService?.capture('devtools-closed', { tab_id: tabId });
     });
 
     // Listen for webContents destroyed event to handle external tab closure
@@ -1005,6 +1014,10 @@ export class WindowLayoutService extends DisposableService {
     tab.setVisible(false);
     this.baseWindow!.contentView.addChildView(tab.getViewContainer());
 
+    this.telemetryService?.capture('tab-created', {
+      tab_count_after: Object.keys(this.tabs).length,
+    });
+
     // Reinforce z-order after adding new tab view to ensure UI webcontent stays on top
     // (or tab content if isWebContentInteractive is true)
     this.updateZOrder();
@@ -1043,6 +1056,10 @@ export class WindowLayoutService extends DisposableService {
       // Clean up Karton state
       this.uiKarton.setState((draft) => {
         delete draft.browser.tabs[tabId];
+      });
+
+      this.telemetryService?.capture('tab-destroyed', {
+        tab_count_after: Object.keys(this.tabs).length,
       });
 
       if (isActiveTab) {

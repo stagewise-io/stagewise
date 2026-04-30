@@ -33,6 +33,7 @@ import {
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
 import type { ThumbnailService } from '../thumbnail';
+import type { TelemetryService } from '../telemetry';
 import {
   canBrowserHandleUrl,
   openFolderFirstFileInIde,
@@ -147,6 +148,8 @@ export interface TabControllerEventMap {
     },
   ];
   contentFullscreenChanged: [isFullscreen: boolean];
+  devtoolsOpened: [tabId: string];
+  devtoolsClosed: [tabId: string];
 }
 
 export class TabController extends EventEmitter<TabControllerEventMap> {
@@ -157,6 +160,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private historyService: HistoryService;
   private faviconService: FaviconService;
   private thumbnailService: ThumbnailService | null = null;
+  private readonly telemetryService: TelemetryService | null;
   private kartonServer: KartonServer<TabKartonContract>;
   private kartonTransport: ElectronServerTransport;
   private selectedElementTracker: SelectedElementTracker;
@@ -275,6 +279,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       sourceTabId?: string,
     ) => void,
     thumbnailService?: ThumbnailService,
+    telemetryService?: TelemetryService,
   ) {
     super();
     this.id = id;
@@ -285,6 +290,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.searchUtilsConfig = searchUtilsConfig;
     this.onCreateTab = onCreateTab;
     this.thumbnailService = thumbnailService ?? null;
+    this.telemetryService = telemetryService ?? null;
 
     this.webContentsView = new WebContentsView({
       webPreferences: {
@@ -301,25 +307,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.kartonTransport = new ElectronServerTransport();
 
     // Forward keydown events when dev tools are opened
-    this.webContentsView.webContents.addListener('devtools-opened', () => {
-      this.webContentsView.webContents.devToolsWebContents?.addListener(
-        'input-event',
-        (_e, input) => {
-          const domEvent = electronInputToDomKeyboardEvent(input as Input);
-          if (input.type === 'keyDown' || input.type === 'rawKeyDown') {
-            const hotkeyDef = getHotkeyDefinitionForEvent(domEvent);
-            if (hotkeyDef?.captureDominantly)
-              this.emit('handleKeyDown', domEvent);
-          }
-        },
-      );
-      this.webContentsView.webContents.devToolsWebContents?.addListener(
-        'focus',
-        () => {
-          this.emit('tabFocused', this.id);
-        },
-      );
-    });
 
     this.kartonServer = createKartonServer<TabKartonContract>({
       initialState: defaultState,
@@ -777,13 +764,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     return Math.round(factor * 100);
   }
 
-  public async setColorScheme(scheme: ColorScheme) {
+  public async setColorScheme(scheme: ColorScheme): Promise<boolean> {
     const wc = this.webContentsView.webContents;
 
     // Debugger already attached by SelectedElementTracker
     if (!wc.debugger.isAttached()) {
       this.logger.error('Debugger not attached for color scheme');
-      return;
+      return false;
     }
 
     try {
@@ -802,8 +789,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       });
 
       this.updateState({ colorScheme: scheme });
+      return true;
     } catch (err) {
       this.logger.error(`Failed to set color scheme: ${err}`);
+      return false;
     }
   }
 
@@ -811,7 +800,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     const schemes: ColorScheme[] = ['system', 'dark', 'light'];
     const currentIndex = schemes.indexOf(this.currentState.colorScheme);
     const nextScheme = schemes[(currentIndex + 1) % schemes.length];
-    await this.setColorScheme(nextScheme);
+    const didSetColorScheme = await this.setColorScheme(nextScheme);
+
+    if (didSetColorScheme) {
+      this.telemetryService?.capture('tab-color-scheme-changed', {
+        new_value: nextScheme,
+      });
+    }
   }
 
   public focus() {
@@ -1478,6 +1473,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.on('devtools-closed', async () => {
+      this.emit('devtoolsClosed', this.id);
       this.updateState({
         devTools: { open: this.currentState.devTools.open, chromeOpen: false },
       });
@@ -1494,8 +1490,20 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.on('devtools-opened', () => {
+      this.emit('devtoolsOpened', this.id);
       this.updateState({
         devTools: { open: this.currentState.devTools.open, chromeOpen: true },
+      });
+      wc.devToolsWebContents?.addListener('input-event', (_e, input) => {
+        const domEvent = electronInputToDomKeyboardEvent(input as Input);
+        if (input.type === 'keyDown' || input.type === 'rawKeyDown') {
+          const hotkeyDef = getHotkeyDefinitionForEvent(domEvent);
+          if (hotkeyDef?.captureDominantly)
+            this.emit('handleKeyDown', domEvent);
+        }
+      });
+      wc.devToolsWebContents?.addListener('focus', () => {
+        this.emit('tabFocused', this.id);
       });
       // Attach debugger after a short delay to ensure devToolsWebContents is ready
       setTimeout(() => {

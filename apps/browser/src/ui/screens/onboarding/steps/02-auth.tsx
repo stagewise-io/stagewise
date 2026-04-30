@@ -63,6 +63,10 @@ export function StepAuth({
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // The anonymous telemetry toggle has been removed from onboarding.
+  // Basic (anonymous) telemetry is enabled by default and is only opt-out
+  // from the settings page. This state only governs the identifiable /
+  // "full" telemetry upgrade checkbox shown below.
   const [telemetry, setTelemetry] = useState<TelemetryLevel>('anonymous');
   const emailRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
@@ -298,37 +302,8 @@ export function StepAuth({
         <div className="app-no-drag mt-2 flex items-center gap-2">
           <Checkbox
             size="xs"
-            id="telemetry-anonymous-checkbox"
-            checked={telemetry === 'anonymous' || telemetry === 'full'}
-            onCheckedChange={(checked: boolean) => {
-              setTelemetry(checked ? 'anonymous' : 'off');
-              void preferencesUpdate([
-                {
-                  op: 'replace',
-                  path: ['privacy', 'telemetryLevel'],
-                  value: checked ? 'anonymous' : 'off',
-                },
-              ]);
-            }}
-          />
-          <label
-            htmlFor="telemetry-anonymous-checkbox"
-            className="text-muted-foreground text-xs"
-          >
-            Help improve stagewise by sharing anonymized events.
-          </label>
-        </div>
-        <div
-          className={cn(
-            'app-no-drag flex items-center gap-2',
-            telemetry === 'off' && 'pointer-events-none opacity-50',
-          )}
-        >
-          <Checkbox
-            size="xs"
             id="telemetry-full-checkbox"
             checked={telemetry === 'full'}
-            disabled={telemetry === 'off'}
             onCheckedChange={(checked: boolean) => {
               setTelemetry(checked ? 'full' : 'anonymous');
               void preferencesUpdate([
@@ -347,6 +322,10 @@ export function StepAuth({
             Share identifiable chat and usage data with stagewise.
           </label>
         </div>
+        <p className="mt-1 max-w-sm text-center text-[11px] text-muted-foreground/80">
+          Basic telemetry is enabled by default and can be configured in
+          settings.
+        </p>
       </div>
     );
   }

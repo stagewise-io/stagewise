@@ -28,9 +28,31 @@ import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
 
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import { readWorkspaceMd } from '@/agents/shared/prompts/utils/read-workspace-md';
+import {
+  extractSlashIdsFromText,
+  redactSlashIdsForTelemetry,
+} from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
 import { getGitInfo } from '@/utils/git-tools';
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
+
+function toFiniteTimestamp(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (value instanceof Date) {
+    const timestamp = value.getTime();
+    return Number.isFinite(timestamp) ? timestamp : undefined;
+  }
+
+  if (typeof value === 'string') {
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? timestamp : undefined;
+  }
+
+  return undefined;
+}
 
 /**
  * @note Due to the complex type inference for all this stuff, we sometimes explicitly define types here to avoid errors.
@@ -674,6 +696,7 @@ export class AgentManagerService extends DisposableService {
 
     this.telemetryService.capture('agent-created', {
       agent_type: type,
+      agent_instance_id: agentInstanceId,
       model_id:
         this.karton.state.agents.instances[agentInstanceId]?.state
           .activeModelId ?? 'unknown',
@@ -780,6 +803,7 @@ export class AgentManagerService extends DisposableService {
 
     this.telemetryService.capture('agent-resumed', {
       agent_type: agent.type,
+      agent_instance_id: instanceId,
     });
 
     return createdAgent;
@@ -866,6 +890,7 @@ export class AgentManagerService extends DisposableService {
 
     this.telemetryService.capture('agent-deleted', {
       agent_type: agentType,
+      agent_instance_id: instanceId,
     });
   }
 
@@ -921,6 +946,11 @@ export class AgentManagerService extends DisposableService {
       delete draft.agents.instances[instanceId];
       delete draft.toolbox[instanceId];
     });
+
+    this.telemetryService.capture('agent-archived', {
+      agent_type: agent.agentType,
+      agent_instance_id: instanceId,
+    });
   }
 
   /**
@@ -944,11 +974,39 @@ export class AgentManagerService extends DisposableService {
 
     const instance = this.karton.state.agents.instances[instanceId];
     const attachmentParts = message.parts.filter((p) => p.type === 'file');
+    const slashCommandIds = extractSlashIdsFromText(
+      message.parts as ReadonlyArray<{ type: string; text?: string }>,
+    );
+    // Redact before sending to telemetry: workspace/global skill IDs are
+    // user-controlled (filesystem-derived) and can leak project/branch/
+    // personal names. Only builtin/plugin IDs pass through as plaintext.
+    const slashCommandIdsForTelemetry = redactSlashIdsForTelemetry(
+      slashCommandIds,
+      this.karton.state.skills ?? [],
+    );
+    const connectedWorkspaceCount =
+      this.karton.state.toolbox[instanceId]?.workspace?.mounts?.length ?? 0;
+
+    // Measure chat age / last-message gap *before* the message is dispatched
+    // so the numbers reflect the state the user saw when sending.
+    const historyBefore = instance?.state.history ?? [];
+    const hasPriorUserMessage = historyBefore.some((m) => m.role === 'user');
+    const lastMessage = historyBefore[historyBefore.length - 1];
+    const lastMessageTs = toFiniteTimestamp(lastMessage?.metadata?.createdAt);
+    const msSinceLastMessage =
+      lastMessageTs !== undefined ? Date.now() - lastMessageTs : undefined;
+
     this.telemetryService.capture('agent-message-sent', {
       agent_type: instance?.type ?? 'unknown',
+      agent_instance_id: instanceId,
       model_id: instance?.state.activeModelId ?? 'unknown',
       has_attachments: attachmentParts.length > 0,
       attachment_count: attachmentParts.length,
+      slash_command_ids: slashCommandIdsForTelemetry,
+      slash_command_count: slashCommandIds.length,
+      connected_workspace_count: connectedWorkspaceCount,
+      is_new_chat: !hasPriorUserMessage,
+      ms_since_last_message: msSinceLastMessage,
     });
 
     await agent.sendUserMessage(message);
@@ -1019,10 +1077,33 @@ export class AgentManagerService extends DisposableService {
       await this.stopAgent(childAgentInstanceId);
     }
 
+    const history =
+      this.karton.state.agents.instances[instanceId]?.state.history ?? [];
+    const now = Date.now();
+    let lastUserTs: number | undefined;
+    let lastAgentTs: number | undefined;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const m = history[i];
+      const createdAt = m.metadata?.createdAt;
+      if (createdAt === undefined) continue;
+
+      const ts = toFiniteTimestamp(createdAt);
+      if (ts === undefined) continue;
+
+      if (lastUserTs === undefined && m.role === 'user') lastUserTs = ts;
+      if (lastAgentTs === undefined && m.role === 'assistant') lastAgentTs = ts;
+      if (lastUserTs !== undefined && lastAgentTs !== undefined) break;
+    }
+
     await agent.stop();
 
     this.telemetryService.capture('agent-stopped', {
       agent_type: agent.agentType,
+      agent_instance_id: instanceId,
+      ms_since_last_user_message:
+        lastUserTs !== undefined ? now - lastUserTs : undefined,
+      ms_since_last_agent_message:
+        lastAgentTs !== undefined ? now - lastAgentTs : undefined,
     });
   }
 
@@ -1144,6 +1225,7 @@ export class AgentManagerService extends DisposableService {
     await agent.updateActiveModelId(modelId);
     this.telemetryService.capture('agent-model-changed', {
       agent_type: agent.agentType,
+      agent_instance_id: instanceId,
       from_model: fromModel,
       to_model: modelId,
     });

@@ -555,11 +555,23 @@ export abstract class BaseAgent<
 
     // If the agent is running, we queue the message
     if (this.state.get().isWorking) {
+      let queuedModelId = 'unknown';
+      let queueLengthAfter = 0;
+
       this.state.set((draft) => {
         draft.queuedMessages.push(msg);
+        queuedModelId = draft.activeModelId ?? 'unknown';
+        queueLengthAfter = draft.queuedMessages.length;
       });
 
       this.logger.debug(`[BaseAgent:${this.instanceId}] Queued message`);
+
+      this.telemetryService.capture('agent-message-queued', {
+        agent_type: this.agentType,
+        agent_instance_id: this.instanceId,
+        model_id: queuedModelId,
+        queue_length_after: queueLengthAfter,
+      });
 
       return message.id;
     }
@@ -708,11 +720,15 @@ export abstract class BaseAgent<
       }
     }
     if (approved) {
-      this.telemetryService.capture('tool-approved', { tool_name: toolName });
+      this.telemetryService.capture('tool-approved', {
+        tool_name: toolName,
+        agent_instance_id: this.instanceId,
+      });
     } else {
       this.telemetryService.capture('tool-denied', {
         tool_name: toolName,
         reason,
+        agent_instance_id: this.instanceId,
       });
     }
 
@@ -757,6 +773,8 @@ export abstract class BaseAgent<
    * @note DO NOT OVERRIDE
    */
   public async flushQueue(): Promise<void> {
+    const flushedCount = this.state.get().queuedMessages.length;
+
     await this.internalStop('user-flushed-queue');
 
     // Send all queued messages into the chat
@@ -764,6 +782,14 @@ export abstract class BaseAgent<
       draft.history.push(...draft.queuedMessages);
       draft.queuedMessages = [];
     });
+
+    if (flushedCount > 0) {
+      this.telemetryService.capture('agent-queue-flushed', {
+        agent_type: this.agentType,
+        agent_instance_id: this.instanceId,
+        flushed_message_count: flushedCount,
+      });
+    }
 
     this.runStep();
 
@@ -2143,6 +2169,7 @@ export abstract class BaseAgent<
 
     this.telemetryService.capture('agent-step-completed', {
       agent_type: this.agentType,
+      agent_instance_id: this.instanceId,
       model_id: this.state.get().activeModelId,
       provider_mode: this._stepProviderMode,
       input_tokens: result.usage.inputTokens ?? 0,
@@ -3072,6 +3099,7 @@ export abstract class BaseAgent<
         this.telemetryService.capture('tool-call-executed', {
           tool_name: part.toolName,
           agent_type: this.agentType,
+          agent_instance_id: this.instanceId,
           model_id: modelId,
           success: true,
           input_keys: inputKeys,
@@ -3082,6 +3110,7 @@ export abstract class BaseAgent<
         this.telemetryService.capture('tool-call-executed', {
           tool_name: part.toolName,
           agent_type: this.agentType,
+          agent_instance_id: this.instanceId,
           model_id: modelId,
           success: false,
           error_message: String(part.error).slice(0, 500),

@@ -22,6 +22,7 @@ import { CheckIcon, XIcon, Loader2Icon } from 'lucide-react';
 
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+import { useTrack } from '@ui/hooks/use-track';
 import { IdeLogo } from '@ui/components/ide-logo';
 import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
@@ -730,10 +731,42 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   const unmountWorkspace = useKartonProcedure(
     (p) => p.toolbox.unmountWorkspace,
   );
+  const track = useTrack();
   const allMounts = useKartonState((s) =>
     openAgent
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
       : EMPTY_MOUNTS,
+  );
+  const mountedPaths = useMemo(
+    () => new Set(allMounts.map((mount) => mount.path)),
+    [allMounts],
+  );
+
+  // Live ref of the mount count. We assign it during render so callbacks can
+  // read the latest count after mountWorkspace() resolves without stale state.
+  const allMountsCountRef = useRef(allMounts.length);
+  allMountsCountRef.current = allMounts.length;
+
+  const trackMountOutcome = useCallback(
+    async (promise: Promise<void>, source: 'picker' | 'recent-workspace') => {
+      const before = allMountsCountRef.current;
+      try {
+        await promise;
+      } catch {
+        track('workspace-connect-failed', { source });
+        return;
+      }
+      // A mount is considered successful if the count grew. If it stayed the
+      // same and the user went through the picker, they closed it without
+      // selecting. The recent-workspace path cannot be aborted the same way,
+      // so we only track an abort for the picker case.
+      if (allMountsCountRef.current > before) {
+        track('workspace-connect-finished');
+      } else if (source === 'picker') {
+        track('workspace-connect-aborted', { reason: 'picker-closed' });
+      }
+    },
+    [track],
   );
 
   const hasMounts = allMounts.length > 0;
@@ -768,7 +801,6 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   const menuItems = useMemo((): SelectItem[] => {
     const items: SelectItem[] = [];
 
-    const mountedPaths = new Set(allMounts.map((m) => m.path));
     const sortedWorkspaces = [...recentlyOpenedWorkspaces]
       .filter((w) => !mountedPaths.has(w.path))
       .sort((a, b) => b.openedAt - a.openedAt)
@@ -810,7 +842,7 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
     });
 
     return items;
-  }, [allMounts, recentlyOpenedWorkspaces, minimalFormatter]);
+  }, [mountedPaths, recentlyOpenedWorkspaces, minimalFormatter]);
 
   const hasRecentItems = menuItems.length > 1;
 
@@ -820,21 +852,36 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
 
       if (value.startsWith('workspace:')) {
         const path = value.replace('workspace:', '');
-        void mountWorkspace(openAgent, path);
+        if (mountedPaths.has(path)) return;
+
+        track('workspace-connect-started');
+        void trackMountOutcome(
+          mountWorkspace(openAgent, path),
+          'recent-workspace',
+        );
         onWorkspaceChange?.();
       } else if (value === 'open-folder') {
-        void mountWorkspace(openAgent, undefined);
+        track('workspace-connect-started');
+        void trackMountOutcome(mountWorkspace(openAgent, undefined), 'picker');
         onWorkspaceChange?.();
       }
     },
-    [openAgent, mountWorkspace, onWorkspaceChange],
+    [
+      mountedPaths,
+      openAgent,
+      mountWorkspace,
+      onWorkspaceChange,
+      track,
+      trackMountOutcome,
+    ],
   );
 
   const openFilePicker = useCallback(() => {
     if (!openAgent) return;
-    void mountWorkspace(openAgent, undefined);
+    track('workspace-connect-started');
+    void trackMountOutcome(mountWorkspace(openAgent, undefined), 'picker');
     onWorkspaceChange?.();
-  }, [openAgent, mountWorkspace, onWorkspaceChange]);
+  }, [openAgent, mountWorkspace, onWorkspaceChange, track, trackMountOutcome]);
 
   const renderItem = useCallback((item: SelectItem) => {
     const isRecent = String(item.value).startsWith('workspace:');

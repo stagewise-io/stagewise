@@ -24,6 +24,7 @@ import {
 } from '@ui/hooks/use-karton';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useEventListener } from '@ui/hooks/use-event-listener';
+import { useTrack } from '@ui/hooks/use-track';
 import {
   ChatInput,
   ChatInputActions,
@@ -169,6 +170,13 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const selectionModeActive = useKartonState(
     (s) => s.browser.contextSelectionMode,
   );
+  const selectionTelemetryActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (!selectionModeActive) {
+      selectionTelemetryActiveRef.current = false;
+    }
+  }, [selectionModeActive]);
 
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
@@ -266,14 +274,37 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     clearSelectedElementsProc();
   }, [clearFileAttachments, clearSelectedElementsProc]);
 
+  const track = useTrack();
+
+  // Live ref for the set of selected elements so telemetry on stop can
+  // read the latest value without adding the list to the callback deps.
+  const selectedElementsStateRef = useRef<readonly unknown[]>([]);
+  const selectedElementsState = useKartonState(
+    (s) => s.browser.selectedElements,
+  );
+  selectedElementsStateRef.current = selectedElementsState ?? [];
+
   // Element selector helper functions
   const startContextSelector = useCallback(() => {
+    // Only report a telemetry start when we actually transition OFF -> ON.
+    // These helpers are called from multiple sites (hotkey, button, auto-start
+    // on sidebar open); without this guard we would double-count.
+    if (!selectionTelemetryActiveRef.current && !selectionModeActive) {
+      selectionTelemetryActiveRef.current = true;
+      track('element-selection-started');
+    }
     setContextSelectionActive(true);
-  }, [setContextSelectionActive]);
+  }, [selectionModeActive, setContextSelectionActive, track]);
 
   const stopContextSelector = useCallback(() => {
+    if (selectionTelemetryActiveRef.current) {
+      selectionTelemetryActiveRef.current = false;
+      track('element-selection-stopped', {
+        element_selected: selectedElementsStateRef.current.length > 0,
+      });
+    }
     setContextSelectionActive(false);
-  }, [setContextSelectionActive]);
+  }, [setContextSelectionActive, track]);
 
   // Pending early-abort revert: deferred until isWorking becomes false
   // so the stream is fully done and won't re-add the assistant message.

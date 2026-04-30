@@ -26,6 +26,7 @@ import {
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
+import { useTrack } from '@ui/hooks/use-track';
 import { AgentsSelector, type AgentGroup } from './_components/agents-selector';
 
 /** Shape returned by the activeAgentsList selector. */
@@ -378,42 +379,50 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
     });
   }, []);
 
+  const track = useTrack();
+
   // Helper to create a new chat and focus the input.
   // openAgentModelId is read via ref — it's only needed at invocation time
   // and should NOT cause this callback to be recreated on model changes.
-  const createAgentAndFocus = useCallback(async () => {
-    // Reuse an existing empty agent instead of creating a new one.
-    const existingEmpty = emptyAgentIdRef.current;
-    if (existingEmpty) {
-      setOpenAgent(existingEmpty);
-      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-      return;
-    }
+  const createAgentAndFocus = useCallback(
+    async (source: 'sidebar-top' | 'hotkey') => {
+      void track('chat-new-agent-clicked', { source });
 
-    // Only forward the draft input if the current agent has history;
-    // an agent with no history means the user never sent a message, so
-    // the new agent should start clean.
-    const currentInputState = openAgentHasHistoryRef.current
-      ? getDraft()
-      : undefined;
-    const currentModelId = openAgentModelIdRef.current ?? undefined;
-    const paths = currentMountPathsRef.current;
-    const newAgent = await createAgent(
-      currentInputState || undefined,
-      currentModelId,
-      paths.length > 0 ? paths : undefined,
-    );
-    setOpenAgent(newAgent);
-    void getAgentsHistoryList(0, PAGE_SIZE).then(setAgentsList);
-    window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-  }, [createAgent, getDraft, getAgentsHistoryList]);
+      // Reuse an existing empty agent instead of creating a new one.
+      const existingEmpty = emptyAgentIdRef.current;
+      if (existingEmpty) {
+        setOpenAgent(existingEmpty);
+        window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+        return;
+      }
+
+      // Only forward the draft input if the current agent has history;
+      // an agent with no history means the user never sent a message, so
+      // the new agent should start clean.
+      const currentInputState = openAgentHasHistoryRef.current
+        ? getDraft()
+        : undefined;
+      const currentModelId = openAgentModelIdRef.current ?? undefined;
+      const paths = currentMountPathsRef.current;
+      const newAgent = await createAgent(
+        currentInputState || undefined,
+        currentModelId,
+        paths.length > 0 ? paths : undefined,
+      );
+      setOpenAgent(newAgent);
+      void getAgentsHistoryList(0, PAGE_SIZE).then(setAgentsList);
+      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+    },
+    [createAgent, getDraft, getAgentsHistoryList, track],
+  );
 
   // Hotkey: CTRL+N to create new agent chat (works regardless of which section
   // shows the "Add agent" button — top section or active agents grid).
   // Disabled when the open agent is already empty (nothing to create).
   useHotKeyListener(() => {
-    if (openAgent !== null && emptyAgentIdRef.current !== openAgent)
-      void createAgentAndFocus();
+    if (openAgent !== null && emptyAgentIdRef.current !== openAgent) {
+      void createAgentAndFocus('hotkey');
+    }
   }, HotkeyActions.NEW_CHAT);
 
   const resumeAgentRef = useRef(resumeAgent);
@@ -449,8 +458,9 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   );
 
   const handleOpenSettings = useCallback(() => {
+    track('settings-opened');
     createTab(SETTINGS_PAGE_URL, true);
-  }, [createTab]);
+  }, [createTab, track]);
 
   return (
     <div
