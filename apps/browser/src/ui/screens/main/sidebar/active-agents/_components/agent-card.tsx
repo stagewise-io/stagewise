@@ -9,6 +9,10 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import { IconSleepingTimeOutline18 } from 'nucleo-ui-outline-18';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
+import {
+  type SharedAgentContextMenuState,
+  buildAgentContextMenuHandler,
+} from '../../_components/shared-agent-context-menu';
 import { useInlineTitleEdit } from './use-inline-title-edit';
 import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en';
@@ -27,6 +31,8 @@ export interface AgentCardProps {
   activityText: string;
   activityIsUserInput: boolean;
   lastMessageAt: number;
+  /** Shared context-menu controller owned by the enclosing grid. */
+  contextMenuState: SharedAgentContextMenuState;
   onClick: (id: string) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
@@ -61,6 +67,7 @@ export const AgentCard = memo(
       activityText,
       activityIsUserInput,
       lastMessageAt,
+      contextMenuState,
       onClick,
       onArchive,
       onDelete,
@@ -94,6 +101,12 @@ export const AgentCard = memo(
         tabIndex={0}
         data-agent-id={id}
         aria-keyshortcuts="F2"
+        onContextMenu={buildAgentContextMenuHandler(
+          contextMenuState,
+          id,
+          true,
+          startEditing,
+        )}
         onClick={() => onClick(id)}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}

@@ -19,6 +19,11 @@ import { AgentCardSkeleton } from './_components/agent-card';
 import { AgentCardWithPreview } from './_components/agent-card-with-preview';
 import type { CachedPreview } from '@ui/screens/main/sidebar/top/_components/agent-preview-panel';
 import { getToolActivityLabel } from './_utils/tool-label';
+import {
+  useSharedAgentContextMenu,
+  SharedAgentContextMenuHost,
+} from '../_components/shared-agent-context-menu';
+import { DeleteConfirmPopover } from '../_components/delete-confirm-popover';
 
 type ActiveAgentCardData = {
   id: string;
@@ -362,6 +367,27 @@ export function ActiveAgentsGrid() {
     prevWorkingRef.current = nowWorking;
   }, [agents, scrollCardIntoView]);
 
+  // Shared context-menu state for all cards — avoids per-card menu roots.
+  const [ctxMenuState, ctxMenuTarget, setCtxMenuTarget] =
+    useSharedAgentContextMenu();
+  const handleCtxMenuClose = useCallback(
+    () => setCtxMenuTarget(null),
+    [setCtxMenuTarget],
+  );
+
+  // Delete confirmation triggered from the context menu. Hoisted out of
+  // AgentCard so the popover can survive the card losing hover / the menu
+  // closing without tearing down the confirmation UI.
+  const [ctxDeleteId, setCtxDeleteId] = useState<string | null>(null);
+  const handleCtxDeleteRequest = useCallback((id: string) => {
+    setCtxDeleteId(id);
+  }, []);
+  const handleCtxDeleteConfirm = useCallback(() => {
+    const id = ctxDeleteId;
+    setCtxDeleteId(null);
+    if (id) handleDelete(id);
+  }, [ctxDeleteId, handleDelete]);
+
   // Only show when enabled and 2+ visible CHAT agents (or 1 agent + pending create)
   const visibleCount = orderedAgents.length + (showCreateSkeleton ? 1 : 0);
   if (!showActiveAgents || visibleCount < 2) return null;
@@ -405,6 +431,7 @@ export function ActiveAgentsGrid() {
               activityText={agent.activityText}
               activityIsUserInput={agent.activityIsUserInput}
               lastMessageAt={agent.lastMessageAt}
+              contextMenuState={ctxMenuState}
               onClick={handleClick}
               onArchive={handleArchive}
               onDelete={handleDelete}
@@ -415,6 +442,23 @@ export function ActiveAgentsGrid() {
         })}
         {showCreateSkeleton && <AgentCardSkeleton />}
       </OverlayScrollbar>
+      <SharedAgentContextMenuHost
+        target={ctxMenuTarget}
+        onClose={handleCtxMenuClose}
+        onArchive={handleArchive}
+        onResume={handleClick}
+        onDeleteRequest={handleCtxDeleteRequest}
+      />
+      {ctxDeleteId !== null && (
+        <DeleteConfirmPopover
+          open={true}
+          isolated
+          onOpenChange={(open) => {
+            if (!open) setCtxDeleteId(null);
+          }}
+          onConfirm={handleCtxDeleteConfirm}
+        />
+      )}
     </div>
   );
 }

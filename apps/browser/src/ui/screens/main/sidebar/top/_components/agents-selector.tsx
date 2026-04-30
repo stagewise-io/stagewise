@@ -21,6 +21,12 @@ import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import { IconPenOutline18 } from 'nucleo-ui-outline-18';
 import { cn } from '@ui/utils';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
+import {
+  useSharedAgentContextMenu,
+  SharedAgentContextMenuHost,
+  buildAgentContextMenuHandler,
+  type SharedAgentContextMenuState,
+} from '../../_components/shared-agent-context-menu';
 import { useInlineTitleEdit } from '../../active-agents/_components/use-inline-title-edit';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import type React from 'react';
@@ -61,6 +67,10 @@ export interface AgentsSelectorProps {
   onValueChange: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
+  /** Wake a suspended/history agent. Required for the row context menu. */
+  onResume: (id: string) => void;
+  /** Put an active agent to sleep. Required for the row context menu. */
+  onArchive: (id: string) => void;
   onEndReached?: () => void;
 }
 
@@ -104,6 +114,8 @@ const ACTIVE_GROUP_LABEL = 'Active agents';
 
 interface AgentListItemProps {
   agent: AgentEntry;
+  /** True when this row belongs to the "Active agents" group (live instance). */
+  isLive: boolean;
   isSelected: boolean;
   isEditing: boolean;
   pendingDeleteId: string | null;
@@ -113,11 +125,14 @@ interface AgentListItemProps {
   onStartDelete: (id: string) => void;
   onCancelDelete: () => void;
   onConfirmDelete: (id: string) => void;
+  /** Shared context-menu controller — one host for the whole list. */
+  contextMenuState: SharedAgentContextMenuState;
   onHighlight: (agentId: string) => void;
 }
 
 function AgentListItemImpl({
   agent,
+  isLive,
   isSelected,
   isEditing,
   pendingDeleteId,
@@ -127,6 +142,7 @@ function AgentListItemImpl({
   onStartDelete,
   onCancelDelete,
   onConfirmDelete,
+  contextMenuState,
   onHighlight,
 }: AgentListItemProps) {
   const hasUnseen = !isSelected && !!agent.unread;
@@ -193,6 +209,12 @@ function AgentListItemImpl({
       value={agent.id}
       size="xs"
       className="grid-cols-[0.75rem_1fr_auto]"
+      onContextMenu={buildAgentContextMenuHandler(
+        contextMenuState,
+        agent.id,
+        isLive,
+        () => onStartEdit(agent.id),
+      )}
     >
       <ComboboxItemIndicator />
       <span className="col-start-2 flex w-full items-center gap-2">
@@ -347,6 +369,7 @@ const AgentListItem = memo(AgentListItemImpl, (prev, next) => {
   return (
     prev.isSelected === next.isSelected &&
     prev.isEditing === next.isEditing &&
+    prev.isLive === next.isLive &&
     // Narrow: we only rerender when THIS row's popover state changes.
     (prev.pendingDeleteId === pa.id) === (next.pendingDeleteId === na.id)
   );
@@ -391,6 +414,8 @@ export const AgentsSelector = memo(
     onValueChange,
     onDelete,
     onRename,
+    onResume,
+    onArchive,
     onEndReached,
   }: AgentsSelectorProps) {
     const [inputValue, setInputValue] = useState('');
@@ -399,6 +424,34 @@ export const AgentsSelector = memo(
     const [isOpen, setIsOpen] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
+
+    // Single shared context-menu host for all rows. Avoids instantiating
+    // base-ui ContextMenu.Root (with its context providers + refs) per row
+    // — critical when the history can be several hundred entries.
+    const [ctxMenuState, ctxMenuTarget, setCtxMenuTarget] =
+      useSharedAgentContextMenu();
+    const handleCtxMenuClose = useCallback(
+      () => setCtxMenuTarget(null),
+      [setCtxMenuTarget],
+    );
+
+    // Delete-confirm popover triggered from the shared context menu. Lives
+    // at the selector level (not inside a row) so it survives both the
+    // menu closing and the combobox closing — the menu's dismissal would
+    // otherwise propagate to the combobox and reset the row-local
+    // `pendingDeleteId` before the popover ever mounts.
+    const [ctxDeleteId, setCtxDeleteId] = useState<string | null>(null);
+    const handleCtxDeleteRequest = useCallback((id: string) => {
+      setCtxDeleteId(id);
+    }, []);
+    const handleCtxDeleteCancel = useCallback(() => {
+      setCtxDeleteId(null);
+    }, []);
+    const handleCtxDeleteConfirm = useCallback(() => {
+      const id = ctxDeleteId;
+      setCtxDeleteId(null);
+      if (id) onDelete(id);
+    }, [ctxDeleteId, onDelete]);
 
     // Filter groups by search input — skip entirely when closed
     const filteredGroups = useMemo(() => {
@@ -616,146 +669,170 @@ export const AgentsSelector = memo(
     );
 
     return (
-      <Combobox
-        value={value}
-        onValueChange={handleValueChange}
-        onInputValueChange={setInputValue}
-        onOpenChange={handleOpenChange}
-      >
-        {/* Custom trigger: unstyled, using base-ui Trigger directly with render */}
-        <ComboboxBase.Trigger
-          render={(props: React.HTMLAttributes<HTMLButtonElement>) => (
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  {...props}
-                  variant="ghost"
-                  size="icon-xs"
-                  className="app-no-drag shrink-0"
-                >
-                  <IconHistoryFill18 className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <span>Show recent chats</span>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        />
-
-        {isOpen && (
-          <ComboboxBase.Portal>
-            <ComboboxBase.Backdrop className="fixed inset-0 z-50" />
-            <ComboboxBase.Positioner
-              side="bottom"
-              sideOffset={8}
-              align="start"
-              className="z-50"
-            >
-              <div
-                ref={containerRef}
-                className="relative flex flex-row items-start gap-1"
-                onMouseLeave={scheduleClear}
-                onMouseEnter={cancelPendingClear}
-              >
-                <ComboboxBase.Popup
-                  className={cn(
-                    'flex min-w-56 max-w-72 origin-(--transform-origin) flex-col items-stretch gap-0.5 text-xs',
-                    'rounded-lg border border-border-subtle bg-background p-1 shadow-lg',
-                    'transition-[transform,scale,opacity] duration-150 ease-out',
-                    'data-ending-style:scale-90 data-ending-style:opacity-0',
-                    'data-starting-style:scale-90 data-starting-style:opacity-0',
-                  )}
-                >
-                  <div className="mb-1">
-                    <ComboboxInput size="xs" placeholder="Search chats…" />
-                  </div>
-
-                  <div
-                    ref={listRef}
-                    className="scrollbar-hover-only max-h-48 overflow-y-auto"
+      <>
+        <Combobox
+          value={value}
+          onValueChange={handleValueChange}
+          onInputValueChange={setInputValue}
+          onOpenChange={handleOpenChange}
+        >
+          {/* Custom trigger: unstyled, using base-ui Trigger directly with render */}
+          <ComboboxBase.Trigger
+            render={(props: React.HTMLAttributes<HTMLButtonElement>) => (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    size="icon-xs"
+                    className="app-no-drag shrink-0"
                   >
-                    <ComboboxList>
-                      {filteredGroups.map(({ label, agents }) => (
-                        <ComboboxGroup key={label}>
-                          <ComboboxGroupLabel>{label}</ComboboxGroupLabel>
-                          {agents.map((agent) => (
-                            <AgentListItem
-                              key={agent.id}
-                              agent={agent}
-                              isSelected={agent.id === value}
-                              isEditing={editingId === agent.id}
-                              pendingDeleteId={pendingDeleteId}
-                              onStartEdit={handleStartEdit}
-                              onCancelEdit={handleCancelEdit}
-                              onCommitRename={onRename}
-                              onStartDelete={handleStartDelete}
-                              onCancelDelete={handleCancelDelete}
-                              onConfirmDelete={handleConfirmDelete}
-                              onHighlight={handleItemHover}
-                            />
-                          ))}
-                        </ComboboxGroup>
-                      ))}
-                    </ComboboxList>
-                    {onEndReached && (
-                      <div
-                        ref={sentinelRef}
-                        aria-hidden="true"
-                        className="h-px shrink-0"
-                      />
+                    <IconHistoryFill18 className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <span>Show recent chats</span>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          />
+
+          {isOpen && (
+            <ComboboxBase.Portal>
+              <ComboboxBase.Backdrop className="fixed inset-0 z-50" />
+              <ComboboxBase.Positioner
+                side="bottom"
+                sideOffset={8}
+                align="start"
+                className="z-50"
+              >
+                <div
+                  ref={containerRef}
+                  className="relative flex flex-row items-start gap-1"
+                  onMouseLeave={scheduleClear}
+                  onMouseEnter={cancelPendingClear}
+                >
+                  <ComboboxBase.Popup
+                    className={cn(
+                      'flex min-w-56 max-w-72 origin-(--transform-origin) flex-col items-stretch gap-0.5 text-xs',
+                      'rounded-lg border border-border-subtle bg-background p-1 shadow-lg',
+                      'transition-[transform,scale,opacity] duration-150 ease-out',
+                      'data-ending-style:scale-90 data-ending-style:opacity-0',
+                      'data-starting-style:scale-90 data-starting-style:opacity-0',
                     )}
-                  </div>
+                  >
+                    <div className="mb-1">
+                      <ComboboxInput size="xs" placeholder="Search chats…" />
+                    </div>
 
-                  {!hasResults && <ComboboxEmpty />}
-
-                  <div className="flex items-center justify-between border-border-subtle border-t pt-2 pr-1.5 pb-1 pl-2.5">
-                    <label
-                      htmlFor="show-active-agents"
-                      className="cursor-pointer text-muted-foreground text-xs"
+                    <div
+                      ref={listRef}
+                      className="scrollbar-hover-only max-h-48 overflow-y-auto"
                     >
-                      Show active in sidebar
-                    </label>
-                    <Switch
-                      size="xs"
-                      id="show-active-agents"
-                      checked={showActiveAgents}
-                      onCheckedChange={handleToggleActiveAgents}
-                    />
-                  </div>
-                </ComboboxBase.Popup>
+                      <ComboboxList>
+                        {filteredGroups.map(({ label, agents }) => {
+                          const groupIsLive = label === ACTIVE_GROUP_LABEL;
+                          return (
+                            <ComboboxGroup key={label}>
+                              <ComboboxGroupLabel>{label}</ComboboxGroupLabel>
+                              {agents.map((agent) => (
+                                <AgentListItem
+                                  key={agent.id}
+                                  agent={agent}
+                                  isLive={groupIsLive}
+                                  isSelected={agent.id === value}
+                                  isEditing={editingId === agent.id}
+                                  pendingDeleteId={pendingDeleteId}
+                                  onStartEdit={handleStartEdit}
+                                  onCancelEdit={handleCancelEdit}
+                                  onCommitRename={onRename}
+                                  onStartDelete={handleStartDelete}
+                                  onCancelDelete={handleCancelDelete}
+                                  onConfirmDelete={handleConfirmDelete}
+                                  contextMenuState={ctxMenuState}
+                                  onHighlight={handleItemHover}
+                                />
+                              ))}
+                            </ComboboxGroup>
+                          );
+                        })}
+                      </ComboboxList>
+                      {onEndReached && (
+                        <div
+                          ref={sentinelRef}
+                          aria-hidden="true"
+                          className="h-px shrink-0"
+                        />
+                      )}
+                    </div>
 
-                {/* Animated side panel for agent preview. Appears next to the
+                    {!hasResults && <ComboboxEmpty />}
+
+                    <div className="flex items-center justify-between border-border-subtle border-t pt-2 pr-1.5 pb-1 pl-2.5">
+                      <label
+                        htmlFor="show-active-agents"
+                        className="cursor-pointer text-muted-foreground text-xs"
+                      >
+                        Show active in sidebar
+                      </label>
+                      <Switch
+                        size="xs"
+                        id="show-active-agents"
+                        checked={showActiveAgents}
+                        onCheckedChange={handleToggleActiveAgents}
+                      />
+                    </div>
+                  </ComboboxBase.Popup>
+
+                  {/* Animated side panel for agent preview. Appears next to the
                     highlighted row and follows its vertical position. The
                     outer wrapper is invisible — visible card styling lives
                     inside `AgentPreviewPanel` so it can render `null` when
                     there is nothing to show (e.g. empty/new agents), without
                     leaving an empty bordered box here. */}
-                {hoveredAgentId && isHoveredAgentVisible && (
-                  <div
-                    ref={sidePanelRef}
-                    onMouseEnter={cancelPendingClear}
-                    onMouseLeave={scheduleClear}
-                    className="absolute left-full ml-1 transition-[top] duration-100 ease-out"
-                    style={{ top: sidePanelOffset }}
-                  >
-                    <AgentPreviewPanel
-                      // Force a fresh component instance on every agentId
-                      // change so state initializers re-run and no stale
-                      // preview from the previous agent can flash. The
-                      // parent-owned cache still serves instant re-hovers.
-                      key={hoveredAgentId}
-                      agentId={hoveredAgentId}
-                      isActive={activeAgentIdSet.has(hoveredAgentId)}
-                      cache={previewCacheRef.current}
-                    />
-                  </div>
-                )}
-              </div>
-            </ComboboxBase.Positioner>
-          </ComboboxBase.Portal>
+                  {hoveredAgentId && isHoveredAgentVisible && (
+                    <div
+                      ref={sidePanelRef}
+                      onMouseEnter={cancelPendingClear}
+                      onMouseLeave={scheduleClear}
+                      className="absolute left-full ml-1 transition-[top] duration-100 ease-out"
+                      style={{ top: sidePanelOffset }}
+                    >
+                      <AgentPreviewPanel
+                        // Force a fresh component instance on every agentId
+                        // change so state initializers re-run and no stale
+                        // preview from the previous agent can flash. The
+                        // parent-owned cache still serves instant re-hovers.
+                        key={hoveredAgentId}
+                        agentId={hoveredAgentId}
+                        isActive={activeAgentIdSet.has(hoveredAgentId)}
+                        cache={previewCacheRef.current}
+                      />
+                    </div>
+                  )}
+                </div>
+              </ComboboxBase.Positioner>
+            </ComboboxBase.Portal>
+          )}
+        </Combobox>
+        <SharedAgentContextMenuHost
+          target={ctxMenuTarget}
+          onClose={handleCtxMenuClose}
+          onResume={onResume}
+          onArchive={onArchive}
+          onDeleteRequest={handleCtxDeleteRequest}
+        />
+        {ctxDeleteId !== null && (
+          <DeleteConfirmPopover
+            open={true}
+            isolated
+            onOpenChange={(open) => {
+              if (!open) handleCtxDeleteCancel();
+            }}
+            onConfirm={handleCtxDeleteConfirm}
+          />
         )}
-      </Combobox>
+      </>
     );
   },
   (prevProps, nextProps) =>
@@ -764,5 +841,7 @@ export const AgentsSelector = memo(
     prevProps.onValueChange === nextProps.onValueChange &&
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onRename === nextProps.onRename &&
+    prevProps.onResume === nextProps.onResume &&
+    prevProps.onArchive === nextProps.onArchive &&
     prevProps.onEndReached === nextProps.onEndReached,
 );

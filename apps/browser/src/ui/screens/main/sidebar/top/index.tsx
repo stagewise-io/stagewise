@@ -75,6 +75,7 @@ function activeAgentListEqual(
 export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
+  const archiveAgent = useKartonProcedure((p) => p.agents.archive);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
   const getAgentsHistoryList = useKartonProcedure(
@@ -418,6 +419,34 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
 
   const resumeAgentRef = useRef(resumeAgent);
   resumeAgentRef.current = resumeAgent;
+  const archiveAgentRef = useRef(archiveAgent);
+  archiveAgentRef.current = archiveAgent;
+
+  // Context-menu "Resume": wake a suspended history agent and focus it.
+  // Same shape as clicking the row, but we go through a dedicated handler so
+  // AgentsSelector's memo on `onResume` stays stable.
+  const handleResumeAgent = useCallback(
+    (id: string) => {
+      if (id === openAgentRef.current) return;
+      void resumeAgentRef.current(id).then(() => {
+        setOpenAgent(id);
+      });
+    },
+    [setOpenAgent],
+  );
+
+  // Context-menu "Sleep": suspend an active agent. Optimistically prune it
+  // from the local history list so it disappears immediately.
+  const handleArchiveAgent = useCallback((id: string) => {
+    void archiveAgentRef.current(id).catch((e) => {
+      console.error(e);
+      posthog.captureException(e instanceof Error ? e : new Error(String(e)), {
+        source: 'renderer',
+        operation: 'archiveAgent',
+      });
+    });
+    setAgentsList((prev) => prev.filter((agent) => agent.id !== id));
+  }, []);
 
   const handleAgentSelect = useCallback(
     (value: string | null) => {
@@ -473,6 +502,8 @@ export function SidebarTopSection({ isCollapsed }: { isCollapsed: boolean }) {
               onValueChange={handleAgentSelect}
               onDelete={handleDeleteAgent}
               onRename={handleRenameAgent}
+              onResume={handleResumeAgent}
+              onArchive={handleArchiveAgent}
               onEndReached={loadMoreHistory}
             />
           )}
