@@ -191,6 +191,10 @@ export type EventProperties = {
     suggestion_id: string;
     context: 'onboarding' | 'empty-chat';
   };
+  'suggestion-dismissed': {
+    suggestion_id: string;
+    context: 'onboarding' | 'empty-chat';
+  };
 
   // Usage limits
   'usage-limit-reached': {
@@ -270,6 +274,7 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'onboarding-demo-slide-clicked',
   'settings-opened',
   'suggestion-clicked',
+  'suggestion-dismissed',
   'tabs-cleaned',
   'workspace-connect-aborted',
   'workspace-connect-failed',
@@ -309,6 +314,10 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'settings-opened': z.undefined().optional(),
   'suggestion-clicked': z.object({
+    suggestion_id: z.string(),
+    context: z.enum(['onboarding', 'empty-chat']),
+  }),
+  'suggestion-dismissed': z.object({
     suggestion_id: z.string(),
     context: z.enum(['onboarding', 'empty-chat']),
   }),
