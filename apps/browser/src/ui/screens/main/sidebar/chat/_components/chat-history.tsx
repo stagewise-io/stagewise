@@ -251,6 +251,10 @@ export const ChatHistory = () => {
   }, [removedSuggestionIds, shuffledSuggestions]);
 
   const handleRemoveSuggestion = (id: string) => {
+    track('suggestion-dismissed', {
+      suggestion_id: id,
+      context: 'empty-chat',
+    });
     setRemovedSuggestionIds((prev) => new Set([...Array.from(prev), id]));
   };
 
