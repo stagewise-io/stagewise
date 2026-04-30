@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useTrack } from '@ui/hooks/use-track';
 import type {
   ApiSpec,
   CustomEndpoint,
@@ -301,6 +302,12 @@ function CustomEndpointDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (data: EndpointSaveData) => void;
 }) {
+  const track = useTrack();
+  const isAddMode = !endpoint;
+  // Set to true when onSave() fires; distinguishes a save-initiated close
+  // from a cancel/dismiss close inside the shared `handleDialogOpenChange`.
+  const savedRef = useRef(false);
+
   const [name, setName] = useState(endpoint?.name ?? '');
   const [apiSpec, setApiSpec] = useState<ApiSpec>(
     endpoint?.apiSpec ?? 'openai-chat-completions',
@@ -343,13 +350,49 @@ function CustomEndpointDialog({
       setProjectId(endpoint?.projectId ?? '');
       setLocation(endpoint?.location ?? '');
       setGoogleCredentials('');
+      savedRef.current = false;
+      if (isAddMode) {
+        void track('custom-provider-add-started');
+      }
     }
-  }, [open, endpoint]);
+  }, [open, endpoint, isAddMode, track]);
 
   const canSave = name.trim().length > 0 && !mappingError;
 
+  // "Touched" = the user changed anything from the initial field values.
+  // Derived from current state so we don't need per-input bookkeeping.
+  // Secret-ish fields (apiKey, secretKey, googleCredentials) start empty in
+  // edit-mode by design; any non-empty value is a touch.
+  const anyFieldTouched =
+    name !== (endpoint?.name ?? '') ||
+    apiSpec !== (endpoint?.apiSpec ?? 'openai-chat-completions') ||
+    baseUrl !== (endpoint?.baseUrl ?? '') ||
+    apiKey !== '' ||
+    modelIdMappingJson !==
+      (endpoint?.modelIdMapping &&
+      Object.keys(endpoint.modelIdMapping).length > 0
+        ? JSON.stringify(endpoint.modelIdMapping, null, 2)
+        : '') ||
+    resourceName !== (endpoint?.resourceName ?? '') ||
+    apiVersion !== (endpoint?.apiVersion ?? '') ||
+    region !== (endpoint?.region ?? '') ||
+    secretKey !== '' ||
+    projectId !== (endpoint?.projectId ?? '') ||
+    location !== (endpoint?.location ?? '') ||
+    googleCredentials !== '';
+
+  const handleDialogOpenChange = (next: boolean) => {
+    if (!next && open && isAddMode && !savedRef.current) {
+      void track('custom-provider-add-aborted', {
+        had_validation_errors: !canSave,
+        any_field_touched: anyFieldTouched,
+      });
+    }
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogClose />
         <DialogHeader>
@@ -462,12 +505,20 @@ function CustomEndpointDialog({
                 location: location || undefined,
                 googleCredentials: googleCredentials || undefined,
               });
+              if (isAddMode) {
+                void track('custom-provider-add-finished');
+              }
+              savedRef.current = true;
               onOpenChange(false);
             }}
           >
             {endpoint ? 'Save Changes' : 'Add Provider'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDialogOpenChange(false)}
+          >
             Cancel
           </Button>
         </DialogFooter>

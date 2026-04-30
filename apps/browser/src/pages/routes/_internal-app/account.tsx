@@ -32,6 +32,17 @@ function Page() {
   const sendOtp = useKartonProcedure((p) => p.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.verifyOtp);
   const logout = useKartonProcedure((p) => p.logout);
+  const track = useKartonProcedure((p) => p.telemetry.capture);
+
+  // Fire once per mounted route instance. The ref guard prevents React
+  // StrictMode's development double-invocation; intentional route remounts
+  // should still emit a fresh page-view event.
+  const didTrackViewRef = useRef(false);
+  useEffect(() => {
+    if (didTrackViewRef.current) return;
+    didTrackViewRef.current = true;
+    void track('account-page-viewed');
+  }, [track]);
 
   return (
     <div className="flex h-full w-full flex-col">

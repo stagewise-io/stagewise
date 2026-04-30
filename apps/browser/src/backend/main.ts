@@ -11,7 +11,11 @@ import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
 import { IdentifierService } from './services/identifier';
 import { Logger } from './services/logger';
-import { TelemetryService } from './services/telemetry';
+import {
+  isUIEventName,
+  parseUIEventProperties,
+  TelemetryService,
+} from './services/telemetry';
 import { GlobalConfigService } from './services/global-config';
 import { PreferencesService } from './services/preferences';
 import { NotificationService } from './services/notification';
@@ -73,7 +77,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
   );
 
-  telemetryService.capture('app-launched', { cold_start: true });
+  // Start launch telemetry without blocking startup. TelemetryService keeps
+  // track of the pending capture so shutdown can wait for it before emitting
+  // app-closed.
+  telemetryService.captureAppLaunched();
 
   // Global safety net: capture any unhandled errors/rejections to telemetry
   process.on('uncaughtException', (error) => {
@@ -252,10 +259,20 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       eventName: string,
       properties?: Record<string, unknown>,
     ) => {
-      telemetryService.capture(
-        eventName as keyof import('./services/telemetry').EventProperties,
-        properties as any,
-      );
+      if (!isUIEventName(eventName)) {
+        logger.warn(`[Main] Ignoring unknown UI telemetry event: ${eventName}`);
+        return;
+      }
+
+      const parsedProperties = parseUIEventProperties(eventName, properties);
+      if (parsedProperties === null) {
+        logger.warn(
+          `[Main] Ignoring invalid UI telemetry payload for event: ${eventName}`,
+        );
+        return;
+      }
+
+      telemetryService.capture(eventName, parsedProperties);
     },
   );
 
@@ -430,18 +447,57 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   handleCommandLineUrls(process.argv, windowLayoutService, logger);
 
   // Set up graceful shutdown to clean up database connections
-  const shutdown = () => {
-    logger.debug('[Main] Shutting down services...');
-    localPortsScannerService.teardown();
-    webDataService.teardown();
-    historyService.teardown();
-    faviconService.teardown();
-    thumbnailService.teardown();
-    diffHistoryService.teardown();
-    assetCacheService.teardown();
-    processedImageCacheService?.teardown();
-    autoUpdateService.teardown();
-    logger.debug('[Main] Services shut down');
+  let isShuttingDown = false;
+  const shutdown = (event: Electron.Event) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    event.preventDefault();
+
+    const runTeardown = (name: string, teardown: () => void) => {
+      try {
+        teardown();
+      } catch (error) {
+        logger.warn(`[Main] Failed to teardown ${name}`, error);
+      }
+    };
+
+    const exitApp = () => {
+      logger.debug('[Main] Services shut down');
+      app.exit(0);
+    };
+
+    try {
+      logger.debug('[Main] Shutting down services...');
+      runTeardown('localPortsScannerService', () =>
+        localPortsScannerService.teardown(),
+      );
+      runTeardown('webDataService', () => webDataService.teardown());
+      runTeardown('historyService', () => historyService.teardown());
+      runTeardown('faviconService', () => faviconService.teardown());
+      runTeardown('thumbnailService', () => thumbnailService.teardown());
+      runTeardown('diffHistoryService', () => diffHistoryService.teardown());
+      runTeardown('assetCacheService', () => assetCacheService.teardown());
+      runTeardown('processedImageCacheService', () =>
+        processedImageCacheService?.teardown(),
+      );
+      runTeardown('autoUpdateService', () => autoUpdateService.teardown());
+
+      const telemetryTeardown = Promise.resolve()
+        .then(() => telemetryService.teardown())
+        .catch((error) => {
+          logger.warn('[Main] Failed to teardown telemetryService', error);
+        });
+
+      void Promise.race([
+        telemetryTeardown,
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 500);
+        }),
+      ]).finally(exitApp);
+    } catch (error) {
+      logger.error(`[Main] Shutdown failed: ${String(error)}`);
+      exitApp();
+    }
   };
 
   app.on('will-quit', shutdown);

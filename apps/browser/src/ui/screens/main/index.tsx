@@ -7,31 +7,52 @@ import {
 import { Sidebar } from './sidebar';
 import { MainSection } from './content';
 import { cn } from '@ui/utils';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useEventListener } from '@ui/hooks/use-event-listener';
+import { useTrack } from '@ui/hooks/use-track';
 
 const layoutStorageKey = 'stagewise-panel-layout';
 
 export function DefaultLayout({ show }: { show: boolean }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const track = useTrack();
+  // Mirror the collapsed state so the listeners can detect real transitions
+  // without depending on React's async state.
+  const collapsedRef = useRef(false);
+  const hasInitializedRef = useRef(false);
+
+  const applyCollapsed = useCallback(
+    (next: boolean) => {
+      const isInitial = !hasInitializedRef.current;
+      hasInitializedRef.current = true;
+      if (collapsedRef.current === next) return;
+      collapsedRef.current = next;
+      setIsSidebarCollapsed(next);
+      if (isInitial) return;
+      track('chat-sidebar-toggled', {
+        new_value: next ? 'closed' : 'open',
+      });
+    },
+    [track],
+  );
+
   useEventListener('sidebar-chat-panel-closed', () => {
-    setIsSidebarCollapsed(true);
+    applyCollapsed(true);
   });
   useEventListener('sidebar-chat-panel-opened', () => {
-    setIsSidebarCollapsed(false);
+    applyCollapsed(false);
   });
 
   const openSidebarChatPanel = useCallback(() => {
     window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
   }, []);
 
-  const layoutChangeHandler = useCallback((layout: number[]) => {
-    if (layout[0] === 0) {
-      setIsSidebarCollapsed(true);
-    } else {
-      setIsSidebarCollapsed(false);
-    }
-  }, []);
+  const layoutChangeHandler = useCallback(
+    (layout: number[]) => {
+      applyCollapsed(layout[0] === 0);
+    },
+    [applyCollapsed],
+  );
 
   return (
     <div

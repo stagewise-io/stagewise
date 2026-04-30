@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import matter from 'gray-matter';
-import type { SkillDefinition } from '@shared/skills';
+import type { SkillDefinition, SkillDefinitionUI } from '@shared/skills';
 import xml from 'xml';
 import specialTokens from '../special-tokens';
 
@@ -29,6 +30,37 @@ export function extractSlashIdsFromText(
   }
 
   return ids;
+}
+
+/**
+ * Sources whose skill IDs are bundled with the app binary and therefore
+ * safe to ship to telemetry as plaintext. `workspace` and `global` skill
+ * IDs are user-controlled (derived from filesystem paths) and can leak
+ * project/branch/personal names — those get hashed instead.
+ */
+const SAFE_SLASH_ID_SOURCES = new Set(['builtin', 'plugin']);
+
+/**
+ * Redact slash command IDs for telemetry. Builtin/plugin IDs pass through
+ * as plaintext; workspace/global (and any unknown) IDs are replaced with
+ * a stable `user:<hash>` token so aggregate analytics still work without
+ * leaking user-controlled strings.
+ *
+ * Unknown IDs (not present in `skills`) fail safe — hashed, not dropped,
+ * so we can still count them.
+ */
+export function redactSlashIdsForTelemetry(
+  ids: ReadonlyArray<string>,
+  skills: ReadonlyArray<Pick<SkillDefinitionUI, 'id' | 'source'>>,
+): string[] {
+  if (ids.length === 0) return [];
+  const sourceById = new Map(skills.map((s) => [s.id, s.source]));
+  return ids.map((id) => {
+    const source = sourceById.get(id);
+    if (source && SAFE_SLASH_ID_SOURCES.has(source)) return id;
+    const hash = createHash('sha256').update(id).digest('hex').slice(0, 12);
+    return `user:${hash}`;
+  });
 }
 
 /**

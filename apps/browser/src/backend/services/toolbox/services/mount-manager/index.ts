@@ -285,6 +285,7 @@ export class MountManagerService extends DisposableService {
       this.uiKarton.state.agents.instances[agentInstanceId]?.type ?? 'unknown';
     this.telemetryService.capture('workspace-mounted', {
       agent_type: agentType,
+      agent_instance_id: agentInstanceId,
     });
   }
 
@@ -309,6 +310,7 @@ export class MountManagerService extends DisposableService {
     this.onMountsChanged?.(agentInstanceId);
     this.telemetryService.capture('workspace-unmounted', {
       agent_type: agentType,
+      agent_instance_id: agentInstanceId,
     });
   }
 

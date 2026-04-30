@@ -8,6 +8,7 @@ import {
   DND_DROP_ANIMATION_DURATION,
 } from './_components/tabs-container';
 import { useEventListener } from '@ui/hooks/use-event-listener';
+import { useTrack } from '@ui/hooks/use-track';
 import { BackgroundWithCutout } from './_components/background-with-cutout';
 import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
 import {
@@ -31,6 +32,7 @@ export function MainSection({
   );
 
   const { setTabUiState } = useTabUIState();
+  const track = useTrack();
 
   // Track interpolated border radius during tab drag (for smooth corner transition)
   const [dragBorderRadius, setDragBorderRadius] = useState<number | null>(null);
@@ -104,10 +106,22 @@ export function MainSection({
   }, [createTab, activeTabId]);
 
   const handleCleanAllTabs = useCallback(() => {
-    Object.values(tabs).forEach((tab) => {
-      if (tab.id !== activeTabId) closeTab(tab.id);
-    });
-  }, [tabs, activeTabId, closeTab]);
+    const tabIdsToClose = Object.keys(tabs).filter(
+      (tabId) => tabId !== activeTabId,
+    );
+
+    void Promise.allSettled(tabIdsToClose.map((tabId) => closeTab(tabId))).then(
+      (results) => {
+        const closedCount = results.filter(
+          (result) => result.status === 'fulfilled',
+        ).length;
+
+        if (closedCount > 0) {
+          track('tabs-cleaned', { closed_count: closedCount });
+        }
+      },
+    );
+  }, [tabs, activeTabId, closeTab, track]);
 
   const handleFocusUrlBar = useCallback(() => {
     if (activeTabId) {

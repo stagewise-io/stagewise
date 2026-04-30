@@ -1,6 +1,7 @@
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { IconSunFill18, IconMoonFill18 } from 'nucleo-ui-fill-18';
 import { cn } from '@stagewise/stage-ui/lib/utils';
+import { useCallback } from 'react';
 import { ToggleButton } from '../primitives';
 import type { WidgetProps } from './types';
 
@@ -10,6 +11,10 @@ export function ColorSchemeWidget({ tab, sortableProps }: WidgetProps) {
     (p) => p.browser.cycleColorScheme,
   );
   const nativeColorScheme = useKartonState((s) => s.systemTheme);
+
+  const handleClick = useCallback(() => {
+    void cycleColorScheme(tab.id);
+  }, [cycleColorScheme, tab.id]);
 
   return (
     <ToggleButton
@@ -54,7 +59,7 @@ export function ColorSchemeWidget({ tab, sortableProps }: WidgetProps) {
           />
         </div>
       }
-      onClick={() => cycleColorScheme(tab.id)}
+      onClick={handleClick}
       active={tab.colorScheme !== 'system'}
       dragHandleProps={dragHandleProps}
       isDragging={isDragging}

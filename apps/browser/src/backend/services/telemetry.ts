@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { PostHog } from 'posthog-node';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { withTracing } from '@posthog/ai';
@@ -6,11 +7,18 @@ import type { PreferencesService } from './preferences';
 import type { TelemetryLevel } from '@shared/karton-contracts/ui/shared-types';
 import type { Logger } from './logger';
 import { DisposableService } from './disposable';
+import { captureProcessSnapshot } from './telemetry/process-snapshot';
 
 export type EventProperties = {
   // Lifecycle
-  'app-launched': { cold_start: boolean };
-  'app-closed': undefined;
+  'app-launched': {
+    matched_process_counts: Record<string, number>;
+    total_matched_processes: number;
+  };
+  'app-closed': {
+    matched_process_counts: Record<string, number>;
+    total_matched_processes: number;
+  };
   'telemetry-level-changed': { from: TelemetryLevel; to: TelemetryLevel };
   'onboarding-completed': {
     skipped: boolean;
@@ -22,19 +30,50 @@ export type EventProperties = {
   };
 
   // Workspace
-  'workspace-mounted': { agent_type: string };
-  'workspace-unmounted': { agent_type: string };
+  'workspace-mounted': { agent_type: string; agent_instance_id: string };
+  'workspace-unmounted': { agent_type: string; agent_instance_id: string };
 
   // Agent
-  'agent-created': { agent_type: string; model_id: string };
+  'agent-created': {
+    agent_type: string;
+    agent_instance_id: string;
+    model_id: string;
+  };
   'agent-message-sent': {
     agent_type: string;
+    agent_instance_id: string;
     model_id: string;
     has_attachments: boolean;
     attachment_count: number;
+    slash_command_ids: string[];
+    slash_command_count: number;
+    connected_workspace_count: number;
+    /**
+     * True if this is the first user message in the chat (no prior user
+     * messages existed before this one was sent).
+     */
+    is_new_chat: boolean;
+    /**
+     * Milliseconds since the most recent message (user or agent) in history,
+     * measured at the moment this message is dispatched. Undefined when this
+     * is the first message in the chat.
+     */
+    ms_since_last_message?: number;
+  };
+  'agent-message-queued': {
+    agent_type: string;
+    agent_instance_id: string;
+    model_id: string;
+    queue_length_after: number;
+  };
+  'agent-queue-flushed': {
+    agent_type: string;
+    agent_instance_id: string;
+    flushed_message_count: number;
   };
   'agent-step-completed': {
     agent_type: string;
+    agent_instance_id: string;
     model_id: string;
     provider_mode: string;
     input_tokens: number;
@@ -43,21 +82,33 @@ export type EventProperties = {
     finish_reason: string;
     duration_ms: number;
   };
-  'agent-stopped': { agent_type: string };
-  'agent-resumed': { agent_type: string };
-  'agent-deleted': { agent_type: string };
+  'agent-stopped': {
+    agent_type: string;
+    agent_instance_id: string;
+    ms_since_last_user_message?: number;
+    ms_since_last_agent_message?: number;
+  };
+  'agent-resumed': { agent_type: string; agent_instance_id: string };
+  'agent-archived': { agent_type: string; agent_instance_id: string };
+  'agent-deleted': { agent_type: string; agent_instance_id: string };
   'agent-model-changed': {
     agent_type: string;
+    agent_instance_id: string;
     from_model: string;
     to_model: string;
   };
 
   // Tools
-  'tool-approved': { tool_name: string };
-  'tool-denied': { tool_name: string; reason?: string };
+  'tool-approved': { tool_name: string; agent_instance_id: string };
+  'tool-denied': {
+    tool_name: string;
+    reason?: string;
+    agent_instance_id: string;
+  };
   'tool-call-executed': {
     tool_name: string;
     agent_type: string;
+    agent_instance_id: string;
     model_id: string;
     success: boolean;
     error_message?: string;
@@ -118,9 +169,126 @@ export type EventProperties = {
     status_code?: number;
   };
 
-  // UI (routed via karton RPC)
-  'ui-interaction': { action: string; target: string; detail?: string };
+  // UI actions (routed via karton RPC from the renderer)
+  'devtools-opened': { tab_id?: string };
+  'devtools-closed': { tab_id?: string };
+  'tab-created': { tab_count_after: number };
+  'tab-destroyed': { tab_count_after: number };
+  'tabs-cleaned': { closed_count: number };
+  'tab-color-scheme-changed': { new_value: 'system' | 'light' | 'dark' };
+  'settings-opened': undefined;
+  'account-page-viewed': undefined;
+  'chat-sidebar-toggled': { new_value: 'open' | 'closed' };
+  'chat-new-agent-clicked': {
+    source: 'sidebar-top' | 'sidebar-active-agents' | 'hotkey';
+  };
+  'element-selection-started': undefined;
+  'element-selection-stopped': { element_selected: boolean };
+  'custom-model-add-started': undefined;
+  'custom-model-add-finished': undefined;
+  'custom-model-add-aborted': {
+    had_validation_errors: boolean;
+    any_field_touched: boolean;
+  };
+  'custom-provider-add-started': undefined;
+  'custom-provider-add-finished': undefined;
+  'custom-provider-add-aborted': {
+    had_validation_errors: boolean;
+    any_field_touched: boolean;
+  };
+  'workspace-connect-started': undefined;
+  'workspace-connect-finished': undefined;
+  'workspace-connect-aborted': {
+    reason: 'picker-closed' | 'suggestions-dismissed';
+  };
+  'workspace-connect-failed': {
+    source: 'picker' | 'recent-workspace';
+  };
 };
+
+export const UI_TELEMETRY_EVENT_NAMES = [
+  'account-page-viewed',
+  'chat-new-agent-clicked',
+  'chat-sidebar-toggled',
+  'custom-model-add-aborted',
+  'custom-model-add-finished',
+  'custom-model-add-started',
+  'custom-provider-add-aborted',
+  'custom-provider-add-finished',
+  'custom-provider-add-started',
+  'element-selection-started',
+  'element-selection-stopped',
+  'onboarding-demo-slide-clicked',
+  'settings-opened',
+  'suggestion-clicked',
+  'tabs-cleaned',
+  'workspace-connect-aborted',
+  'workspace-connect-failed',
+  'workspace-connect-finished',
+  'workspace-connect-started',
+] as const satisfies ReadonlyArray<keyof EventProperties>;
+
+export type UIEventName = (typeof UI_TELEMETRY_EVENT_NAMES)[number];
+export type UIEventProperties = Pick<EventProperties, UIEventName>;
+
+const UI_TELEMETRY_EVENT_SCHEMAS = {
+  'account-page-viewed': z.undefined().optional(),
+  'chat-new-agent-clicked': z.object({
+    source: z.enum(['sidebar-top', 'sidebar-active-agents', 'hotkey']),
+  }),
+  'chat-sidebar-toggled': z.object({
+    new_value: z.enum(['open', 'closed']),
+  }),
+  'custom-model-add-aborted': z.object({
+    had_validation_errors: z.boolean(),
+    any_field_touched: z.boolean(),
+  }),
+  'custom-model-add-finished': z.undefined().optional(),
+  'custom-model-add-started': z.undefined().optional(),
+  'custom-provider-add-aborted': z.object({
+    had_validation_errors: z.boolean(),
+    any_field_touched: z.boolean(),
+  }),
+  'custom-provider-add-finished': z.undefined().optional(),
+  'custom-provider-add-started': z.undefined().optional(),
+  'element-selection-started': z.undefined().optional(),
+  'element-selection-stopped': z.object({
+    element_selected: z.boolean(),
+  }),
+  'onboarding-demo-slide-clicked': z.object({
+    slide_name: z.string(),
+  }),
+  'settings-opened': z.undefined().optional(),
+  'suggestion-clicked': z.object({
+    suggestion_id: z.string(),
+    context: z.enum(['onboarding', 'empty-chat']),
+  }),
+  'tabs-cleaned': z.object({
+    closed_count: z.number(),
+  }),
+  'workspace-connect-aborted': z.object({
+    reason: z.enum(['picker-closed', 'suggestions-dismissed']),
+  }),
+  'workspace-connect-failed': z.object({
+    source: z.enum(['picker', 'recent-workspace']),
+  }),
+  'workspace-connect-finished': z.undefined().optional(),
+  'workspace-connect-started': z.undefined().optional(),
+} satisfies {
+  [K in UIEventName]: z.ZodType<UIEventProperties[K]>;
+};
+
+export function isUIEventName(eventName: string): eventName is UIEventName {
+  return (UI_TELEMETRY_EVENT_NAMES as readonly string[]).includes(eventName);
+}
+
+export function parseUIEventProperties<T extends UIEventName>(
+  eventName: T,
+  properties: unknown,
+): UIEventProperties[T] | null {
+  const result = UI_TELEMETRY_EVENT_SCHEMAS[eventName].safeParse(properties);
+  return result.success ? (result.data as UIEventProperties[T]) : null;
+}
 
 export interface UserProperties {
   user_id?: string;
@@ -136,6 +304,7 @@ export class TelemetryService extends DisposableService {
   private readonly preferencesService: PreferencesService;
   private readonly logger: Logger;
   private userProperties: UserProperties = {};
+  private pendingAppLaunchedCapture: Promise<void> | null = null;
   public posthogClient: PostHog;
 
   public constructor(
@@ -252,14 +421,39 @@ export class TelemetryService extends DisposableService {
     return wrappedModel;
   }
 
+  public captureAppLaunched(): void {
+    this.pendingAppLaunchedCapture = captureProcessSnapshot()
+      .then((launchProcessSnapshot) => {
+        this.captureSync('app-launched', {
+          matched_process_counts: launchProcessSnapshot.matched_process_counts,
+          total_matched_processes: launchProcessSnapshot.total_matched,
+        });
+      })
+      .finally(() => {
+        this.pendingAppLaunchedCapture = null;
+      });
+  }
+
   public capture<T extends keyof EventProperties>(
     eventName: T,
     properties?: EventProperties[T],
   ): void {
+    this.captureSync(eventName, properties);
+  }
+
+  private captureSync<T extends keyof EventProperties>(
+    eventName: T,
+    properties?: EventProperties[T],
+  ): void {
     try {
-      this.logger.debug(
-        `[TelemetryService] Capturing event: ${eventName} with properties: ${JSON.stringify(properties)}`,
-      );
+      // Guard the stringify — `capture` runs on every tracked event
+      // (including high-volume ones like tool-call-executed) and
+      // JSON.stringify is not free. Skip it when debug is disabled.
+      if (this.logger.isDebugEnabled) {
+        this.logger.debug(
+          `[TelemetryService] Capturing event: ${eventName} with properties: ${JSON.stringify(properties)}`,
+        );
+      }
       const telemetryLevel = this.getTelemetryLevel();
 
       // Always allow critical lifecycle events through so we can measure
@@ -301,6 +495,13 @@ export class TelemetryService extends DisposableService {
     error: Error,
     properties?: ExceptionProperties,
   ): void {
+    this.captureExceptionSync(error, properties);
+  }
+
+  private captureExceptionSync(
+    error: Error,
+    properties?: ExceptionProperties,
+  ): void {
     try {
       const telemetryLevel = this.getTelemetryLevel();
       if (telemetryLevel === 'off') return;
@@ -336,7 +537,19 @@ export class TelemetryService extends DisposableService {
     this.logger.debug('[TelemetryService] Tearing down...');
     if (this.posthogClient) {
       try {
-        this.capture('app-closed', undefined);
+        await this.pendingAppLaunchedCapture;
+
+        // Use a short timeout on close — we would rather lose the snapshot
+        // than add up to 1.5 s to window-close latency.
+        const snapshot = await captureProcessSnapshot(500);
+        // Bypass the microtask hop used by `capture()` so the event is
+        // enqueued into the PostHog client BEFORE `shutdown()` starts
+        // draining. Going through `queueMicrotask` here races shutdown and
+        // can drop `app-closed` entirely.
+        this.captureSync('app-closed', {
+          matched_process_counts: snapshot.matched_process_counts,
+          total_matched_processes: snapshot.total_matched,
+        });
         await this.posthogClient.shutdown();
       } catch (error) {
         this.logger.debug(`Failed to shutdown PostHog: ${error}`);
