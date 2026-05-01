@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha077 (2026-05-01)
+
+### Bug Fixes
+
+* resolve race in pathReferences population (801d6a0)
+
+### Other Changes
+
+* bump posthog to fix 500ms+ flush call post agent step (035ad89)
+
 ## 1.0.0-alpha076 (2026-04-30)
 
 ### Features
