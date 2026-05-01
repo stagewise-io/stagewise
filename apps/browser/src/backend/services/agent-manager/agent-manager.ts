@@ -14,6 +14,7 @@ import type { ToolboxService } from '../toolbox';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { ModelId } from '@shared/available-models';
 import {
+  DEFAULT_TOOL_APPROVAL_MODE,
   toolApprovalModeSchema,
   type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
@@ -651,7 +652,8 @@ export class AgentManagerService extends DisposableService {
       history: [],
       queuedMessages: [],
       activeModelId: 'claude-sonnet-4.6',
-      toolApprovalMode: 'alwaysAsk',
+      toolApprovalMode: DEFAULT_TOOL_APPROVAL_MODE,
+      pendingApprovals: {},
       inputState: initialInputState ?? '',
       usedTokens: 0,
     };
@@ -800,7 +802,7 @@ export class AgentManagerService extends DisposableService {
         history: agent.history,
         queuedMessages: agent.queuedMessages,
         activeModelId: resumedModelValid ? agent.activeModelId : undefined,
-        toolApprovalMode: agent.toolApprovalMode ?? 'alwaysAsk',
+        toolApprovalMode: agent.toolApprovalMode ?? DEFAULT_TOOL_APPROVAL_MODE,
         inputState: agent.inputState,
         usedTokens: agent.usedTokens,
         isWorking: false,

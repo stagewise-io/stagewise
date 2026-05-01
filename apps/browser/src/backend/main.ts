@@ -373,6 +373,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     preferencesService,
   );
 
+  // Wire the model-provider into the toolbox so the shell tool can run the
+  // smart-approval classifier on demand. Done here because
+  // `ModelProviderService` depends on `preferencesService`, which is
+  // constructed after the toolbox itself.
+  toolboxService.setModelProviderService(modelProviderService);
+
   const assetCacheService = await AssetCacheService.create(
     () => authService.accessToken,
     logger,

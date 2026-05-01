@@ -13,6 +13,7 @@ import { relations } from 'drizzle-orm';
 import type { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { MountPermission } from '@shared/karton-contracts/ui/agent/metadata';
 import {
+  DEFAULT_TOOL_APPROVAL_MODE,
   toolApprovalModeSchema,
   type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
@@ -69,10 +70,10 @@ const toolApprovalMode = customType<{
   },
   fromDriver(value) {
     // Fail-closed: any value that doesn't match the schema falls back to
-    // 'alwaysAsk' so a corrupted or unexpected DB entry cannot bypass tool
-    // approvals downstream.
+    // `DEFAULT_TOOL_APPROVAL_MODE` so a corrupted or unexpected DB entry
+    // cannot bypass tool approvals downstream.
     const parsed = toolApprovalModeSchema.safeParse(value);
-    return parsed.success ? parsed.data : 'alwaysAsk';
+    return parsed.success ? parsed.data : DEFAULT_TOOL_APPROVAL_MODE;
   },
 });
 
@@ -118,7 +119,7 @@ export const agentInstances = sqliteTable(
       >(),
     toolApprovalMode: toolApprovalMode('tool_approval_mode')
       .notNull()
-      .$defaultFn(() => 'alwaysAsk'),
+      .$defaultFn(() => DEFAULT_TOOL_APPROVAL_MODE),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),

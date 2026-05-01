@@ -16,9 +16,10 @@ import {
   READ_ONLY_PERMISSIONS,
   type MountDescriptor,
 } from '../sandbox/ipc';
-import type {
-  WorkspaceAgentSettings,
-  ToolApprovalMode,
+import {
+  DEFAULT_TOOL_APPROVAL_MODE,
+  type WorkspaceAgentSettings,
+  type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
@@ -29,6 +30,8 @@ import type { WindowLayoutService } from '@/services/window-layout';
 import { getBrowserSessionId } from '@/services/window-layout/browser-session';
 import type { AuthService } from '@/services/auth';
 import type { TelemetryService } from '@/services/telemetry';
+import type { ModelProviderService } from '@/agents/model-provider';
+import type { SmartApprovalDeps } from './tools/shell/execute-shell-command';
 import type { CredentialsService } from '@/services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
@@ -163,6 +166,13 @@ export class ToolboxService extends DisposableService {
 
   private sandboxService: SandboxService | null = null;
   private shellService: ShellService | null = null;
+  /**
+   * Injected lazily via `setModelProviderService` because `ModelProviderService`
+   * is constructed later in `main.ts` (after `preferencesService`) and has a
+   * forward dependency on the toolbox via the agent manager. Used only by
+   * smart-approval classification, which degrades gracefully if unset.
+   */
+  private modelProviderService: ModelProviderService | null = null;
   private pluginsRuntime: ClientRuntimeNode | null = null;
   private globalSkillsRuntimes = new Map<string, ClientRuntimeNode>();
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
@@ -314,6 +324,14 @@ export class ToolboxService extends DisposableService {
    */
   public getAllMountedPaths(): Set<string> {
     return this.mountManagerService?.getAllMountedPaths() ?? new Set();
+  }
+
+  /**
+   * Wire the model-provider service after construction. Needed because the
+   * service is built after `ToolboxService` in `main.ts`. Safe to call once.
+   */
+  public setModelProviderService(service: ModelProviderService): void {
+    this.modelProviderService = service;
   }
 
   private constructor(
@@ -932,7 +950,7 @@ export class ToolboxService extends DisposableService {
 
     const getToolApprovalMode = (): ToolApprovalMode =>
       this.uiKarton.state.agents.instances[agentInstanceId]?.state
-        .toolApprovalMode ?? 'alwaysAsk';
+        .toolApprovalMode ?? DEFAULT_TOOL_APPROVAL_MODE;
 
     switch (tool) {
       case 'write':
@@ -990,14 +1008,43 @@ export class ToolboxService extends DisposableService {
         return readConsoleLogsTool(this.windowLayoutService);
       case 'askUserQuestions':
         return askUserQuestionsTool(this.uiKarton, agentInstanceId);
-      case 'executeShellCommand':
+      case 'executeShellCommand': {
         if (!this.shellService?.isAvailable()) return null;
+        const smartApproval: SmartApprovalDeps = {
+          // Use a thin forwarding shim so a late `setModelProviderService`
+          // call is still honored (closure captures `this`, not the
+          // possibly-null field at case-match time).
+          modelProviderService: {
+            getModelWithOptions: (modelId, traceId, props) => {
+              if (!this.modelProviderService) {
+                throw new Error(
+                  'ModelProviderService not yet initialized; smart-approval classification unavailable.',
+                );
+              }
+              return this.modelProviderService.getModelWithOptions(
+                modelId,
+                traceId,
+                props,
+              );
+            },
+          },
+          telemetryService: this.telemetryService,
+          recordPendingApproval: (toolCallId, explanation) => {
+            this.uiKarton.setState((draft) => {
+              const instance = draft.agents.instances[agentInstanceId];
+              if (!instance) return;
+              instance.state.pendingApprovals[toolCallId] = { explanation };
+            });
+          },
+        };
         return executeShellCommandTool(
           this.shellService,
           agentInstanceId,
           () => this.getMountedPathsForAgent(agentInstanceId),
           getToolApprovalMode,
+          smartApproval,
         );
+      }
       default:
         this.logger.error('[ToolboxService] Tool not found', { tool });
         return null;

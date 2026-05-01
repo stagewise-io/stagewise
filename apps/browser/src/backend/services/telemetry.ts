@@ -4,7 +4,10 @@ import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { withTracing } from '@posthog/ai';
 import type { IdentifierService } from './identifier';
 import type { PreferencesService } from './preferences';
-import type { TelemetryLevel } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  TelemetryLevel,
+  ToolApprovalMode,
+} from '@shared/karton-contracts/ui/shared-types';
 import type { Logger } from './logger';
 import { DisposableService } from './disposable';
 import { captureProcessSnapshot } from './telemetry/process-snapshot';
@@ -62,9 +65,10 @@ export type EventProperties = {
     /**
      * Tool approval mode configured on the agent at the moment this message
      * is sent. `'alwaysAsk'` = prompt user for each tool call,
-     * `'alwaysAllow'` = auto-approve every tool call.
+     * `'alwaysAllow'` = auto-approve every tool call, `'smart'` = defer to
+     * the classifier per call.
      */
-    tool_approval_mode: 'alwaysAsk' | 'alwaysAllow';
+    tool_approval_mode: ToolApprovalMode;
   };
   'agent-message-queued': {
     agent_type: string;
@@ -168,8 +172,8 @@ export type EventProperties = {
    */
   'tool-approval-mode-changed': {
     agent_instance_id: string;
-    previous_mode: 'alwaysAsk' | 'alwaysAllow';
-    new_mode: 'alwaysAsk' | 'alwaysAllow';
+    previous_mode: ToolApprovalMode;
+    new_mode: ToolApprovalMode;
     source: 'panel-combobox' | 'inline-approval-button' | 'unknown';
     /**
      * When `source === 'inline-approval-button'`, the approval ID of the
@@ -313,6 +317,20 @@ export type EventProperties = {
   };
   'workspace-connect-failed': {
     source: 'picker' | 'recent-workspace';
+  };
+
+  // Smart approval
+  'smart-approval-classified': {
+    needs_approval: boolean;
+    latency_ms: number;
+    /** Model id that produced the decision, or `'failed'` when all models errored. */
+    model_id: string;
+    /** 0–2 for primary/fallback models; N for all-fail. */
+    fallback_index: number;
+    /** Mount prefix only (e.g. `'weba9'`) — never a full path. */
+    cwd_prefix: string;
+    /** Truncated error message when `model_id === 'failed'`. */
+    error?: string;
   };
 };
 

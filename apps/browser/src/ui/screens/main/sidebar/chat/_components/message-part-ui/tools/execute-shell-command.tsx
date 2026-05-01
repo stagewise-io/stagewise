@@ -1,6 +1,7 @@
 import {
   IconLoader6Outline18,
   IconTerminalOutline18,
+  IconTriangleWarningOutline18,
   IconXmarkOutline18,
 } from 'nucleo-ui-outline-18';
 import { useCallback, useMemo, useRef } from 'react';
@@ -135,7 +136,7 @@ export const ExecuteShellCommandToolPart = ({
     sendApproval(openAgentId, part.approval.id, false, 'User denied');
   }, [openAgentId, part.state, part.approval, sendApproval]);
 
-  const handleAlwaysAllow = useCallback(async () => {
+  const handleSmartAllow = useCallback(async () => {
     if (
       !openAgentId ||
       part.state !== 'approval-requested' ||
@@ -152,13 +153,17 @@ export const ExecuteShellCommandToolPart = ({
       // `tool_name`/`tool_call_id` for this path — that's OK, analytics
       // can join on the adjacent `tool-approved` event via
       // `agent_instance_id` + timestamp if needed.
-      await setToolApprovalMode(
-        openAgentId,
-        'alwaysAllow',
-        'inline-approval-button',
-      );
+      await setToolApprovalMode(openAgentId, 'smart', 'inline-approval-button');
     } catch (error) {
-      console.warn('[ExecuteShellCommand] Failed to set approval mode', error);
+      // Abort the whole action: the user asked for "switch to smart AND
+      // approve this one". If the mode flip failed, approving silently
+      // would contradict that intent. The regular "Allow" button remains
+      // available.
+      console.error(
+        '[ExecuteShellCommand] Failed to switch to smart approval; not approving the current call',
+        error,
+      );
+      return;
     }
     sendApproval(openAgentId, part.approval.id, true);
   }, [
@@ -169,29 +174,43 @@ export const ExecuteShellCommandToolPart = ({
     setToolApprovalMode,
   ]);
 
+  const classifierExplanation = useKartonState((s) =>
+    openAgentId
+      ? s.agents.instances[openAgentId]?.state.pendingApprovals?.[
+          part.toolCallId
+        ]?.explanation
+      : undefined,
+  );
+
+  const currentApprovalMode = useKartonState((s) =>
+    openAgentId
+      ? s.agents.instances[openAgentId]?.state.toolApprovalMode
+      : undefined,
+  );
+
   const trigger = useMemo(() => {
     if (state === 'approval' || state === 'approval-responded') {
       return (
-        <div className="flex flex-row items-center justify-start gap-1">
+        <div className="flex min-w-0 flex-1 flex-row items-center justify-start gap-1">
           <IconTerminalOutline18 className="size-3 shrink-0 text-warning" />
-          <span className="flex min-w-0 gap-1 text-xs">
-            <span className="shrink-0 font-medium">
-              {explanation || 'Run command'}
-            </span>
-          </span>
+          <TruncatedCommandText
+            text={explanation || 'Run command'}
+            className="text-xs"
+          />
         </div>
       );
     }
 
     if (state === 'denied') {
       return (
-        <div className="flex flex-row items-center justify-start gap-1">
+        <div className="flex min-w-0 flex-1 flex-row items-center justify-start gap-1">
           <IconTerminalOutline18 className="size-3 shrink-0" />
-          <span className="flex min-w-0 gap-1 text-xs">
-            <span className="shrink-0 font-medium">
-              {explanation || 'Skipped command'}
-            </span>
-            <span className="text-subtle-foreground">(skipped)</span>
+          <TruncatedCommandText
+            text={explanation || 'Skipped command'}
+            className="text-xs"
+          />
+          <span className="shrink-0 text-subtle-foreground text-xs">
+            (skipped)
           </span>
         </div>
       );
@@ -199,7 +218,7 @@ export const ExecuteShellCommandToolPart = ({
 
     if (state === 'error') {
       return (
-        <div className="flex flex-row items-center justify-start gap-1">
+        <div className="flex min-w-0 flex-1 flex-row items-center justify-start gap-1">
           <IconXmarkOutline18 className="size-3 shrink-0" />
           <TruncatedCommandText
             text={part.errorText ?? `Error running: ${command}`}
@@ -249,30 +268,24 @@ export const ExecuteShellCommandToolPart = ({
 
     if (!timedOut) {
       return (
-        <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
+        <div className="pointer-events-none flex min-w-0 flex-1 flex-row items-center justify-start gap-1">
           <IconTerminalOutline18 className="size-3 shrink-0" />
-          <span className="flex min-w-0 gap-1 text-xs">
-            {exitCode === 0 || exitCode == null ? (
-              <span className="shrink-0 font-medium">
-                {explanation ||
-                  (isStdin
-                    ? 'Sent input'
-                    : isKill
-                      ? 'Killed session'
-                      : 'Ran command')}
-              </span>
-            ) : (
-              <span className="shrink-0 font-medium">
-                {explanation ||
-                  (isStdin
-                    ? 'Sent input'
-                    : isKill
-                      ? 'Killed session'
-                      : 'Ran command')}{' '}
-                ({exitCode})
-              </span>
-            )}
-          </span>
+          <TruncatedCommandText
+            text={
+              explanation ||
+              (isStdin
+                ? 'Sent input'
+                : isKill
+                  ? 'Killed session'
+                  : 'Ran command')
+            }
+            className="text-xs"
+          />
+          {exitCode !== 0 && exitCode != null && (
+            <span className="shrink-0 text-subtle-foreground text-xs">
+              ({exitCode})
+            </span>
+          )}
         </div>
       );
     }
@@ -364,55 +377,73 @@ export const ExecuteShellCommandToolPart = ({
       part.state !== 'input-streaming'
     )
       return (
-        <div className="flex w-full flex-row items-center justify-end gap-1.5">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleDeny}
-            disabled={state === 'approval-responded'}
-          >
-            Skip
-          </Button>
-          <Tooltip>
-            <TooltipTrigger delay={250}>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={handleAlwaysAllow}
-                disabled={state === 'approval-responded'}
-                className="group/always-allow min-w-0"
-              >
-                <span className="shrink-0 whitespace-nowrap">Always allow</span>
-                <span className="min-w-0 truncate text-subtle-foreground group-hover/always-allow:text-muted-foreground group-focus-visible/always-allow:text-muted-foreground">
-                  (dangerous)
-                </span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" align="end">
-              <div className="flex max-w-64 flex-col gap-1 py-1">
-                <div className="font-medium">Skip future approvals</div>
-                <div className="text-muted-foreground">
-                  This agent will run every shell command without asking. Only
-                  enable this if you trust what this agent is about to do.
-                </div>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-          <Button
-            variant="primary"
-            size="xs"
-            onClick={handleApprove}
-            disabled={state === 'approval-responded'}
-          >
-            {state === 'approval-responded' && (
-              <IconLoader6Outline18 className="size-3 shrink-0 animate-spin" />
+        <div className="flex w-full flex-col gap-2.5">
+          {classifierExplanation && (
+            // <div className="mx-2 flex flex-row items-start gap-1.5 rounded-md border border-derived px-2 py-1.5 text-foreground text-xs leading-snug">
+            <div className="mx-2 flex flex-row items-start gap-1.5 rounded-md px-1 py-0 text-warning-foreground text-xs leading-snug">
+              <IconTriangleWarningOutline18 className="mt-[2px] size-3 shrink-0" />
+              <div className="min-w-0 flex-1">{classifierExplanation}</div>
+            </div>
+          )}
+          <div className="flex w-full flex-row items-center justify-end gap-1.5">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={handleDeny}
+              disabled={state === 'approval-responded'}
+            >
+              Skip
+            </Button>
+            {currentApprovalMode !== 'smart' && (
+              <Tooltip>
+                <TooltipTrigger delay={250}>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleSmartAllow}
+                    disabled={state === 'approval-responded'}
+                  >
+                    Smart allow
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="end">
+                  <div className="flex max-w-64 flex-col gap-1 py-1">
+                    <div className="font-medium">
+                      Ask only for risky commands
+                    </div>
+                    <div className="text-muted-foreground">
+                      Switches this agent to smart approval. A fast classifier
+                      decides per command — destructive or system-level commands
+                      still require your approval.
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
-            Allow
-          </Button>
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={handleApprove}
+              disabled={state === 'approval-responded'}
+            >
+              {state === 'approval-responded' && (
+                <IconLoader6Outline18 className="size-3 shrink-0 animate-spin" />
+              )}
+              Allow
+            </Button>
+          </div>
         </div>
       );
     return undefined;
-  }, [state, handleApprove, handleDeny, handleAlwaysAllow]);
+  }, [
+    state,
+    handleApprove,
+    handleDeny,
+    handleSmartAllow,
+    currentApprovalMode,
+    classifierExplanation,
+    part.state,
+  ]);
 
   return (
     <ToolPartUI
@@ -425,7 +456,10 @@ export const ExecuteShellCommandToolPart = ({
       trigger={trigger}
       content={content}
       contentFooter={contentFooter}
-      contentFooterClassName="px-1 h-8 border-none"
+      contentFooterStatic={!!classifierExplanation}
+      contentFooterClassName={cn(
+        classifierExplanation ? 'px-2 py-1' : 'h-8 border-none px-1',
+      )}
       contentClassName={cn(
         state === 'approval' || state === 'approval-responded'
           ? 'max-h-32 pb-0'

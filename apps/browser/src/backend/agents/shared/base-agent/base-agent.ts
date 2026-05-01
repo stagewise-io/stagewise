@@ -56,6 +56,7 @@ import { extractReadFilePathsFromAssistantMessage } from './file-read-transforme
 import { resolveMountedPath } from './file-read-transformer/resolve-path';
 import { hashPath } from './file-read-transformer/hash';
 import { deriveMaxReadChars } from './file-read-transformer/format-utils';
+import { clearPendingApproval } from './pending-approvals-cleanup';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
@@ -529,6 +530,7 @@ export abstract class BaseAgent<
       // fallback never yields undefined at runtime.
       draft.toolApprovalMode =
         initialState?.toolApprovalMode ?? draft.toolApprovalMode;
+      draft.pendingApprovals = initialState?.pendingApprovals ?? {};
       draft.inputState = initialState?.inputState ?? draft.inputState;
       draft.usedTokens = initialState?.usedTokens ?? 0;
     });
@@ -606,6 +608,10 @@ export abstract class BaseAgent<
           const toolPart = p as AgentToolUIPart | DynamicToolUIPart;
           if (terminalStates.has(toolPart.state)) continue;
 
+          // Keep `pendingApprovals` free of stale entries regardless of
+          // which terminal state we transition to.
+          clearPendingApproval(draft, toolPart);
+
           if (toolPart.state === 'approval-requested') {
             const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
               ...toolPart,
@@ -677,21 +683,19 @@ export abstract class BaseAgent<
                 approvalId,
           );
           if (toolPartIndex !== -1) {
-            if (
-              (msg.parts[toolPartIndex] as AgentToolUIPart | DynamicToolUIPart)
-                .state === 'approval-requested'
-            ) {
+            const part = msg.parts[toolPartIndex] as
+              | AgentToolUIPart
+              | DynamicToolUIPart;
+            // Always clear any stashed classifier explanation for this
+            // tool call, regardless of whether the state still requires a
+            // transition. Keeps `pendingApprovals` free of stale entries.
+            clearPendingApproval(draft, part);
+            if (part.state === 'approval-requested') {
               const updatedToolPart = {
-                ...(msg.parts[toolPartIndex] as
-                  | AgentToolUIPart
-                  | DynamicToolUIPart),
+                ...part,
                 state: 'approval-responded',
                 approval: {
-                  ...(
-                    msg.parts[toolPartIndex] as
-                      | AgentToolUIPart
-                      | DynamicToolUIPart
-                  ).approval,
+                  ...part.approval,
                   approved: approved,
                   reason: reason,
                 },
@@ -2685,6 +2689,8 @@ export abstract class BaseAgent<
           const toolPart = p as AgentToolUIPart | DynamicToolUIPart;
           if (toolPart.state === 'approval-requested') {
             // All tool call approvals should be rejected with the configured reason for abort.
+            // Keep `pendingApprovals` free of stale entries.
+            clearPendingApproval(draft, toolPart);
             const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
               ...toolPart,
               state: 'output-denied',

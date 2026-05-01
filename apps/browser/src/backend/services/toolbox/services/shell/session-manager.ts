@@ -640,6 +640,16 @@ export class SessionManager {
     return this.sessions.get(sessionId);
   }
 
+  /**
+   * Returns the tail of the session's captured output for use as context in
+   * downstream classifiers (e.g. smart approval). Internally delegates to
+   * `collectRecentOutput`; kept as a separate public method so the private
+   * helper is not exposed more broadly than needed.
+   */
+  public getRecentOutput(sessionId: string): string | undefined {
+    return this.collectRecentOutput(sessionId);
+  }
+
   getSessionsForAgent(agentInstanceId: string): PtySession[] {
     return [...this.sessions.values()].filter(
       (s) => s.agentInstanceId === agentInstanceId,
