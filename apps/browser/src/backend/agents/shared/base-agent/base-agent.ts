@@ -385,6 +385,23 @@ export abstract class BaseAgent<
   private _stepProviderMode = '';
   private _toolCallDurations = new Map<string, number>();
 
+  /**
+   * Set by `onFinish` once `handlePostStep` has decided whether another
+   * step should run. Consumed in the tail of `runStep` (after
+   * `populatePathReferencesOnAssistantMessage` + `saveState` have
+   * finished). This indirection exists to close two races introduced
+   * by the UI-stream restructuring:
+   *   1. Scheduling the next step via `setTimeout` inside `onFinish`
+   *      could fire before fs-hashing in populate finished, causing
+   *      the next step to read history without pathReferences.
+   *   2. Calling `onIdle()` inside `onFinish` on the terminal branch
+   *      flipped the UI to idle before populate finished, creating
+   *      the same window for user-initiated follow-up runSteps.
+   * `null` means `onFinish` has not set a decision (e.g. error path,
+   * aborted, or step superseded by a newer one) — the tail then no-ops.
+   */
+  private _pendingContinue: boolean | null = null;
+
   // Handler that get's called when the agent wants to spawn a child agent.
   private readonly spawnChildAgentHandler: <
     TAgentType extends keyof AgentTypeMap,
@@ -1425,6 +1442,9 @@ export abstract class BaseAgent<
     // ignored. Capture it in a local const for the closures below.
     const stepGen = ++this._stepGeneration;
     this._stepStartTime = Date.now();
+    // Reset continuation flag at the start of every step so a leftover
+    // value from a prior aborted step cannot leak into the tail.
+    this._pendingContinue = null;
 
     let queueFlushIndex = -1;
     this.state.set((draft) => {
@@ -1566,18 +1586,12 @@ export abstract class BaseAgent<
           if (this._stepGeneration !== stepGen) return;
           this.stepAbortController = null;
 
-          if (shouldContinue) {
-            // We use setTimeout to ensure the step is executed with a clean call stack to support infinite recursion.
-            setTimeout(() => void this.runStep(), 0);
-          } else {
-            this.state.set((draft) => {
-              draft.isWorking = false;
-              if (draft.history.some((m) => m.role === 'assistant')) {
-                draft.unread = true;
-              }
-            });
-            this.onIdle();
-          }
+          // Defer both scheduling the next step and flipping to idle
+          // until `runStep`'s tail — AFTER populatePathReferences +
+          // saveState — so the next step (or any user-initiated
+          // follow-up) cannot read a half-populated history.
+          // See `_pendingContinue` for the full rationale.
+          this._pendingContinue = shouldContinue;
         } catch (err) {
           const error = err as Error;
           this.logger.error(
@@ -1670,6 +1684,10 @@ export abstract class BaseAgent<
         this.logger.debug(
           `[BaseAgent:${this.instanceId}] Wrote error to public state`,
         );
+        // Drop any deferred continuation decision from a previous
+        // successful step so the error cannot be followed by a stale
+        // next-step scheduling in runStep's tail.
+        this._pendingContinue = null;
         try {
           this.stepAbortController?.abort();
         } catch {}
@@ -1724,6 +1742,52 @@ export abstract class BaseAgent<
         ),
         stream.consumeStream(),
       ]);
+
+      // ─── Populate pathReferences on the assistant message ───────────
+      // MUST run AFTER Promise.all resolves so the UI stream has fully
+      // drained and every tool part has reached its terminal state
+      // (output-available / output-error / output-denied). Running this
+      // earlier (e.g. inside onFinish/handlePostStep) hits a race where
+      // tool parts are still in "input-streaming", causing
+      // extractReadFilePathsFromAssistantMessage() to return no paths
+      // and silently skipping the file-content injection on the next
+      // step — which makes the LLM receive an orphaned tool-result and
+      // return an empty "stop" response.
+      await this.populatePathReferencesOnAssistantMessage();
+
+      // Re-persist so the DB row carries the just-populated references.
+      // The initial saveState() in handlePostStep ran before the refs
+      // were known, so this second save is required for crash safety.
+      await this.saveState();
+
+      // ─── Tail: consume the deferred continuation decision ──────────
+      // `onFinish` set `_pendingContinue` before returning; now that
+      // populate + saveState have settled we can either schedule the
+      // next step or transition to idle. Guard against a stepGen
+      // mismatch in case `internalStop` bumped the generation while we
+      // were awaiting fs I/O above.
+      if (this._stepGeneration === stepGen) {
+        const pending = this._pendingContinue;
+        this._pendingContinue = null;
+        if (pending === true) {
+          // setTimeout to keep the call stack clean (unbounded recursion).
+          setTimeout(() => void this.runStep(), 0);
+        } else if (pending === false) {
+          this.state.set((draft) => {
+            draft.isWorking = false;
+            if (draft.history.some((m) => m.role === 'assistant')) {
+              draft.unread = true;
+            }
+          });
+          this.onIdle();
+        }
+        // pending === null → onFinish never set a decision (error path,
+        // aborted, or superseded step). Nothing to do; the onError /
+        // onAbort / catch handlers own state cleanup.
+      } else {
+        // Superseded — just clear the flag so nothing leaks.
+        this._pendingContinue = null;
+      }
     } catch (err) {
       const raw = err;
       const error =
@@ -1743,6 +1807,9 @@ export abstract class BaseAgent<
       // Invalidate step generation so any pending onFinish callback won't
       // start a new step after this error.
       this._stepGeneration++;
+      // Drop any deferred continuation decision — we must not schedule
+      // the next step or fire onIdle after an error here.
+      this._pendingContinue = null;
       try {
         this.stepAbortController?.abort();
       } catch {}
@@ -2061,9 +2128,18 @@ export abstract class BaseAgent<
       });
     }
 
-    // ─── Populate pathReferences on the assistant message ───────────
-    // Extract paths from completed readFile tool calls and hash them.
-    await this.populatePathReferencesOnAssistantMessage();
+    // NOTE: populatePathReferencesOnAssistantMessage() is intentionally
+    // NOT called here. It used to live in this spot, but handlePostStep
+    // runs inside the SDK's onFinish callback, which fires BEFORE the
+    // teed UI stream has finished draining tool-state transitions
+    // (input-streaming → input-available → output-available). At this
+    // point read tool parts are still in input-streaming, so
+    // extractReadFilePathsFromAssistantMessage() returns [] and no
+    // pathReferences are written — which in turn blocks the synthetic
+    // user-message injection on the next step and leaves the LLM to
+    // return an empty "stop" response. The call has been moved to
+    // runStep(), AFTER Promise.all([handleUiStream, consumeStream])
+    // resolves — see base-agent.ts runStep().
 
     this.telemetryService.capture('agent-step-completed', {
       agent_type: this.agentType,
@@ -2513,6 +2589,10 @@ export abstract class BaseAgent<
     // Invalidate pending callbacks BEFORE firing abort — onAbort fires
     // synchronously and must see the new generation to be ignored.
     this._stepGeneration++;
+    // Discard any deferred continuation so runStep's tail cannot
+    // schedule another step or flip to idle after we've already
+    // intervened.
+    this._pendingContinue = null;
     try {
       this.stepAbortController?.abort();
     } catch {}
