@@ -140,6 +140,15 @@ export function sanitizeEnv(
     }
   }
 
+  // Defense-in-depth: disable persistent shell history for agent PTYs.
+  // The integration scripts also do this (and override anything rc files
+  // set), but env-level values cover the `sh` branch and the rare fallback
+  // where integration sourcing fails. User rc files that unconditionally
+  // export HISTFILE will beat this — that case is handled by the scripts.
+  env.HISTFILE = '/dev/null';
+  env.HISTSIZE = '0';
+  env.SAVEHIST = '0';
+
   env.STAGEWISE_SHELL = '1';
 
   return env;

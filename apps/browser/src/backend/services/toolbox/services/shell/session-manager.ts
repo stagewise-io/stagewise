@@ -95,6 +95,10 @@ export function applyHeadTailCap(lines: string[]): string {
 const BASH_INTEGRATION = `
 if [ -n "$__STAGEWISE_SHELL_INTEGRATION" ]; then return 0 2>/dev/null || true; fi
 export __STAGEWISE_SHELL_INTEGRATION=1
+{ unset HISTFILE; } 2>/dev/null
+HISTSIZE=0 2>/dev/null
+HISTFILESIZE=0 2>/dev/null
+set +o history 2>/dev/null
 __stagewise_command_executed=0
 __stagewise_prompt_command() {
   local exit_code=$?
@@ -122,6 +126,10 @@ printf '\\033]133;A\\007'
 const ZSH_INTEGRATION = `
 if [[ -n "$__STAGEWISE_SHELL_INTEGRATION" ]]; then return 0 2>/dev/null || true; fi
 export __STAGEWISE_SHELL_INTEGRATION=1
+{ unset HISTFILE; } 2>/dev/null
+HISTSIZE=0 2>/dev/null
+SAVEHIST=0 2>/dev/null
+unsetopt SHARE_HISTORY INC_APPEND_HISTORY APPEND_HISTORY 2>/dev/null
 PROMPT_EOL_MARK=''
 __stagewise_command_executed=0
 autoload -Uz add-zsh-hook 2>/dev/null
@@ -182,6 +190,7 @@ function Global:Prompt() {
 }
 $Global:__StagewiseState.HasPSReadLine = $false
 if (Get-Module -Name PSReadLine) {
+  Set-PSReadLineOption -HistorySaveStyle SaveNothing
   $Global:__StagewiseState.HasPSReadLine = $true
   $Global:__StagewiseState.OriginalPSConsoleHostReadLine = $function:PSConsoleHostReadLine
   function Global:PSConsoleHostReadLine {
