@@ -635,6 +635,20 @@ export class MountManagerService extends DisposableService {
           }
         }
       });
+
+      // Skills inside this workspace may have changed (added/removed/edited)
+      // — notify every agent that mounts this workspace so the unified
+      // slash-command list (`draft.skills`) gets rebuilt. Without this,
+      // workspace skill additions only become visible after a
+      // mount/unmount or preference change.
+      for (const [agentId, mounts] of this.agentMounts) {
+        for (const prefix of mounts.keys()) {
+          if (this.workspacePathsPerMount.get(prefix) === wsPath) {
+            this.onMountsChanged?.(agentId);
+            break;
+          }
+        }
+      }
     } catch (error) {
       this.logger.debug('[MountManager] Failed to refresh workspace info', {
         error,
