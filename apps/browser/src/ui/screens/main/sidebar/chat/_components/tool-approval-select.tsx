@@ -5,12 +5,16 @@ import {
   ComboboxItemIndicator,
   ComboboxList,
 } from '@stagewise/stage-ui/components/combobox';
-import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
+import {
+  DEFAULT_TOOL_APPROVAL_MODE,
+  type ToolApprovalMode,
+} from '@shared/karton-contracts/ui/shared-types';
 import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
-import { IconTriangleWarningOutline18 } from 'nucleo-ui-outline-18';
+import { IconSparkleOutline18 } from 'nucleo-ui-outline-18';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
+  type ComponentType,
   memo,
   useCallback,
   useEffect,
@@ -26,6 +30,13 @@ interface ToolApprovalOption {
   label: string;
   title: string;
   description: string;
+  /** Optional leading icon shown in the dropdown item and in the trigger
+   * when this option is the active mode. */
+  icon?: ComponentType<{ className?: string }>;
+  /** Optional trailing icon shown at the end of the dropdown item only.
+   * Never shown in the trigger. Useful for decorative hints like sparkles
+   * next to "Smart approval". */
+  trailingIcon?: ComponentType<{ className?: string }>;
 }
 
 const OPTIONS: ToolApprovalOption[] = [
@@ -35,6 +46,14 @@ const OPTIONS: ToolApprovalOption[] = [
     title: 'Ask before shell commands',
     description:
       'This agent will pause and ask for your approval before running any shell command.',
+  },
+  {
+    value: 'smart',
+    label: 'Smart approval',
+    trailingIcon: IconSparkleOutline18,
+    title: 'Only ask for risky commands',
+    description:
+      'A fast classifier decides per command. Read-only and workspace-scoped commands run automatically; destructive or system-level commands still ask for approval.',
   },
   {
     value: 'alwaysAllow',
@@ -55,17 +74,20 @@ export const ToolApprovalSelect = memo(function ToolApprovalSelect({
   const [openAgent] = useOpenAgent();
   const currentMode = useKartonState((s) =>
     openAgent
-      ? (s.agents.instances[openAgent]?.state.toolApprovalMode ?? 'alwaysAsk')
+      ? (s.agents.instances[openAgent]?.state.toolApprovalMode ??
+        DEFAULT_TOOL_APPROVAL_MODE)
       : null,
   );
   const setToolApprovalMode = useKartonProcedure(
     (p) => p.agents.setToolApprovalMode,
   );
 
-  const currentLabel = useMemo(() => {
-    if (!currentMode) return 'Always ask';
-    return OPTIONS.find((o) => o.value === currentMode)?.label ?? currentMode;
-  }, [currentMode]);
+  const currentOption = useMemo(
+    () => OPTIONS.find((o) => o.value === currentMode),
+    [currentMode],
+  );
+  const currentLabel = currentOption?.label ?? 'Always ask';
+  const CurrentIcon = currentOption?.icon;
 
   // Side-panel hover state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -153,9 +175,7 @@ export const ToolApprovalSelect = memo(function ToolApprovalSelect({
         )}
         disabled={!openAgent}
       >
-        {currentMode === 'alwaysAllow' && (
-          <IconTriangleWarningOutline18 className="size-3 shrink-0" />
-        )}
+        {CurrentIcon && <CurrentIcon className="size-3 shrink-0" />}
         <span className="truncate">{currentLabel}</span>
         <ComboboxBase.Icon className="shrink-0">
           <IconChevronDownFill18 className="size-3" />
@@ -242,10 +262,23 @@ const ToolApprovalItem = memo(function ToolApprovalItem({
     return () => observer.disconnect();
   }, [option, onHighlight]);
 
+  const Icon = option.icon;
+  const TrailingIcon = option.trailingIcon;
+
   return (
     <ComboboxItem ref={itemRef} value={option.value} size="xs">
       <ComboboxItemIndicator />
-      <span className="col-start-2 truncate">{option.label}</span>
+      <span className="col-start-2 flex min-w-0 flex-row items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-row items-center gap-1">
+          {Icon && <Icon className="size-3 shrink-0" />}
+          <span className="truncate">{option.label}</span>
+        </div>
+        {TrailingIcon && (
+          <div className="flex size-4 shrink-0 items-center justify-center">
+            <TrailingIcon className="size-3 text-muted-foreground" />
+          </div>
+        )}
+      </span>
     </ComboboxItem>
   );
 });

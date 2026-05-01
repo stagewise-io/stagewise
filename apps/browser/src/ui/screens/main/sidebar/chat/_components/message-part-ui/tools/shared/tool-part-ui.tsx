@@ -16,6 +16,14 @@ type ToolPartUIProps = {
   contentClassName?: string;
   contentFooter?: React.ReactNode;
   contentFooterClassName?: string;
+  /**
+   * When true, the footer flows in the normal block layout (no absolute
+   * positioning, no fixed height). Use this when the footer needs to
+   * grow vertically with its content — e.g. a classifier-explanation
+   * banner stacked above action buttons. Default: false (absolute footer
+   * pinned to the bottom with a fixed 24px height).
+   */
+  contentFooterStatic?: boolean;
   expanded?: boolean;
   setExpanded?: (expanded: boolean) => void;
   showBorder?: boolean;
@@ -53,6 +61,7 @@ const ToolPartUIWithContent = ({
   contentClassName,
   contentFooter,
   contentFooterClassName,
+  contentFooterStatic = false,
   expanded: controlledExpanded,
   setExpanded: controlledSetExpanded,
   showBorder = false,
@@ -154,7 +163,7 @@ const ToolPartUIWithContent = ({
             className={cn(
               'mask-alpha',
               showBorder ? 'max-h-64' : 'max-h-none',
-              contentFooter && 'mb-6',
+              contentFooter && !contentFooterStatic && 'mb-6',
             )}
             style={maskStyle}
           >
@@ -171,7 +180,14 @@ const ToolPartUIWithContent = ({
           {contentFooter && (
             <div
               className={cn(
-                'absolute right-0 bottom-0 left-0 flex h-6 flex-row items-center justify-start gap-1 rounded-b-lg border-border/30 border-t bg-background px-2 py-1 text-muted-foreground dark:border-border/70 dark:bg-surface-1',
+                // Base: shared typography + container chrome
+                'flex flex-row items-center justify-start gap-1 rounded-b-lg bg-background px-2 py-1 text-muted-foreground dark:bg-surface-1',
+                // Default (absolute) mode: pin to bottom and add separator
+                !contentFooterStatic &&
+                  'absolute right-0 bottom-0 left-0 h-6 border-border/30 border-t dark:border-border/70',
+                // Static mode: negate CollapsibleContent's outer px-2 so the
+                // footer spans the full card width, matching the absolute variant.
+                contentFooterStatic && '-mx-2',
                 contentFooterClassName,
               )}
             >

@@ -51,9 +51,18 @@ export type AgentState = {
   /**
    * Per-agent tool-call approval policy. Controls whether tools with
    * `needsApproval` require explicit user confirmation before execution.
-   * Defaults to 'alwaysAsk' for new agents (safe behaviour).
+   * Defaults to `DEFAULT_TOOL_APPROVAL_MODE` ('alwaysAsk') for new agents
+   * (safe behaviour).
    */
   toolApprovalMode: ToolApprovalMode;
+  /**
+   * Classifier-attached context for tool parts currently in
+   * `approval-requested` state. Keys are the tool call IDs. Populated by
+   * `smart` mode when the classifier flags a command; consumed by the UI
+   * to render the rationale above the approve/skip buttons. Cleared as
+   * soon as the user responds to the approval request.
+   */
+  pendingApprovals: Record<string, { explanation: string }>;
   inputState: string; // Serialized input state - may be simple text or some stringified object if our input field needs that.
   usedTokens: number;
   error?: AgentRuntimeError; // Current error state (not persisted, only available during runtime for UI display)

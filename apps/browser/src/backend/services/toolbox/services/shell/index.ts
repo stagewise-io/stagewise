@@ -247,6 +247,25 @@ export class ShellService extends DisposableService {
     return this.sessionManager.executeCommand(sessionId, request);
   }
 
+  /**
+   * Returns the tail of the session's captured output (at most `maxLines`
+   * lines). Intended for downstream classifiers that need a glimpse of the
+   * current shell state to reason about whether a proposed next command is
+   * safe (e.g. detecting interactive prompts). Returns `undefined` for
+   * unknown sessions.
+   */
+  public getRecentOutputForClassifier(
+    sessionId: string,
+    maxLines: number,
+  ): string | undefined {
+    if (!this.sessionManager) return undefined;
+    const raw = this.sessionManager.getRecentOutput(sessionId);
+    if (!raw) return undefined;
+    const lines = raw.split('\n');
+    if (lines.length <= maxLines) return raw;
+    return lines.slice(-maxLines).join('\n');
+  }
+
   clearPendingOutputs(agentId: string, toolCallId: string): void {
     this.outputBuffers.delete(toolCallId);
 

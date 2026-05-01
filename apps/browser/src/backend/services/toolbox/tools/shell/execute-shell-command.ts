@@ -5,9 +5,31 @@ import {
 import { tool } from 'ai';
 import { capToolOutput } from '../../utils';
 import type { ShellService } from '@/services/toolbox/services/shell';
+import type { ModelProviderService } from '@/agents/model-provider';
+import type { TelemetryService } from '@/services/telemetry';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
+import { classifyShellCommand } from './smart-approval';
+
+/** Max lines of recent shell output fed to the smart-approval classifier. */
+const SMART_APPROVAL_TAIL_LINES = 30;
+
+/**
+ * Dependencies the shell tool needs to run the smart-approval classifier
+ * on demand. Injected at tool-factory build time so the tool itself
+ * stays free of service lifecycle concerns.
+ */
+export interface SmartApprovalDeps {
+  modelProviderService: Pick<ModelProviderService, 'getModelWithOptions'>;
+  telemetryService: TelemetryService;
+  /**
+   * Invoked when the classifier flags a command. Lets the toolbox stash
+   * the classifier's explanation in Karton state so the UI can render it
+   * above the approve/skip buttons.
+   */
+  recordPendingApproval: (toolCallId: string, explanation: string) => void;
+}
 
 export const DESCRIPTION = `Execute a shell command in the user's system shell. Initial \`cwd\` MUST be a mount prefix from the environment snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".
 
@@ -145,13 +167,61 @@ export const executeShellCommand = (
   agentInstanceId: string,
   getMountedPaths: MountedPathsGetter,
   getToolApprovalMode: () => ToolApprovalMode,
+  smartApproval: SmartApprovalDeps,
 ) => {
   return tool({
     description: DESCRIPTION,
     inputSchema: executeShellCommandToolInputSchema,
     strict: false,
-    needsApproval: async () => {
-      return getToolApprovalMode() === 'alwaysAsk';
+    needsApproval: async (
+      input: ExecuteShellCommandToolInput,
+      { toolCallId },
+    ) => {
+      const mode = getToolApprovalMode();
+      if (mode === 'alwaysAllow') return false;
+      if (mode === 'alwaysAsk') return true;
+
+      // 'smart' mode — classify the call before deciding. We deliberately
+      // do NOT resolve the absolute cwd here: the classifier runs on a
+      // remote LLM and the short mount prefix (e.g. `w1e07/apps/browser`)
+      // is both sufficient for classification and privacy-preserving.
+
+      // Short-circuit read-only session operations. `kill` terminates a
+      // shell session we ourselves spawned, and an empty-command poll on
+      // an existing session only drains pending output. Neither has any
+      // side effect outside the agent's own process tree, so invoking the
+      // classifier here would waste up to 5s × 3 fallback models for a
+      // call that can never be unsafe. Non-empty `stdin` (e.g. `y\r`)
+      // still falls through to the classifier so interactive prompts
+      // remain covered.
+      const classifierCommand = input.command ?? input.stdin ?? '';
+      if (input.kill || (classifierCommand === '' && input.session_id)) {
+        return false;
+      }
+
+      const shellTail = input.session_id
+        ? (shellService.getRecentOutputForClassifier(
+            input.session_id,
+            SMART_APPROVAL_TAIL_LINES,
+          ) ?? '')
+        : '';
+
+      const result = await classifyShellCommand(
+        {
+          command: classifierCommand,
+          cwdPrefix: input.cwd ?? '',
+          agentExplanation: input.explanation ?? '',
+          shellTail,
+        },
+        smartApproval.modelProviderService,
+        agentInstanceId,
+        smartApproval.telemetryService,
+      );
+
+      if (result.needsApproval)
+        smartApproval.recordPendingApproval(toolCallId, result.explanation);
+
+      return result.needsApproval;
     },
     execute: async (
       params: ExecuteShellCommandToolInput,
