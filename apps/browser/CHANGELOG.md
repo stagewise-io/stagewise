@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha078 (2026-05-01)
+
+### Bug Fixes
+
+* notify agents of workspace skill changes (37fd6e0)
+* prevent shell-history leakage for shell tool-calls (e0ad606)
+
 ## 1.0.0-alpha077 (2026-05-01)
 
 ### Bug Fixes
