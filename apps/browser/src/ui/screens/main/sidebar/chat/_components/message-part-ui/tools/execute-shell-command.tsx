@@ -143,7 +143,20 @@ export const ExecuteShellCommandToolPart = ({
     )
       return;
     try {
-      await setToolApprovalMode(openAgentId, 'alwaysAllow');
+      // Pass source + approval-context so the backend
+      // `tool-approval-mode-changed` event can distinguish this
+      // inline/impulsive path from the panel-combobox path and correlate
+      // it with the specific approval request the user was answering.
+      // The contract signature takes `source` as the 3rd arg; we can't
+      // pass tool metadata through the RPC, so the backend won't know
+      // `tool_name`/`tool_call_id` for this path — that's OK, analytics
+      // can join on the adjacent `tool-approved` event via
+      // `agent_instance_id` + timestamp if needed.
+      await setToolApprovalMode(
+        openAgentId,
+        'alwaysAllow',
+        'inline-approval-button',
+      );
     } catch (error) {
       console.warn('[ExecuteShellCommand] Failed to set approval mode', error);
     }

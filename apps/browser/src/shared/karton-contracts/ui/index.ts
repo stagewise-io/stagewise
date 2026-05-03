@@ -710,6 +710,13 @@ export type KartonContract = {
       setToolApprovalMode: (
         instanceId: string,
         mode: ToolApprovalMode,
+        /**
+         * Optional UI surface that triggered the change. Forwarded to the
+         * `tool-approval-mode-changed` telemetry event so analytics can
+         * distinguish deliberate panel-combobox changes from inline
+         * "Always allow" clicks made during an approval request.
+         */
+        source?: 'panel-combobox' | 'inline-approval-button',
       ) => Promise<void>;
       stop: (agentId: string) => Promise<void>;
       flushQueue: (agentId: string) => Promise<void>;

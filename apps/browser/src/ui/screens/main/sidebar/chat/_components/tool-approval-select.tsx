@@ -115,11 +115,16 @@ export const ToolApprovalSelect = memo(function ToolApprovalSelect({
   const handleValueChange = useCallback(
     (value: string | null) => {
       if (!openAgent || !value) return;
-      void setToolApprovalMode(openAgent, value as ToolApprovalMode).catch(
-        (error) => {
-          console.warn('[ToolApprovalSelect] Failed to set mode', error);
-        },
-      );
+      // `'panel-combobox'` tags this as a deliberate, pre-emptive change
+      // in the backend telemetry event — distinguishes it from inline
+      // "Always allow" clicks during an approval request.
+      void setToolApprovalMode(
+        openAgent,
+        value as ToolApprovalMode,
+        'panel-combobox',
+      ).catch((error) => {
+        console.warn('[ToolApprovalSelect] Failed to set mode', error);
+      });
       onToolApprovalChange?.();
     },
     [openAgent, setToolApprovalMode, onToolApprovalChange],
