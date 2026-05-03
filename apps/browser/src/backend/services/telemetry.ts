@@ -281,10 +281,7 @@ export type EventProperties = {
     had_validation_errors: boolean;
     any_field_touched: boolean;
   };
-  'custom-provider-add-started': {
-    /** Selected API spec (e.g. `openai-chat-completions`, `azure`). */
-    api_spec: string;
-  };
+  'custom-provider-add-started': undefined;
   'custom-provider-add-finished': {
     api_spec: string;
     /**
@@ -371,9 +368,7 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
     is_local: z.boolean().optional(),
     base_url: z.string().optional(),
   }),
-  'custom-provider-add-started': z.object({
-    api_spec: z.string(),
-  }),
+  'custom-provider-add-started': z.undefined().optional(),
   'element-selection-started': z.undefined().optional(),
   'element-selection-stopped': z.object({
     element_selected: z.boolean(),
