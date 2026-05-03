@@ -97,6 +97,32 @@ export type EventProperties = {
   'agent-resumed': { agent_type: string; agent_instance_id: string };
   'agent-archived': { agent_type: string; agent_instance_id: string };
   'agent-deleted': { agent_type: string; agent_instance_id: string };
+  /**
+   * Fires when a user manually renames an agent via the `agents.setTitle`
+   * RPC. Does NOT fire for auto-generated titles (those go through a
+   * separate path in `BaseAgent._performTitleGeneration` and don't touch
+   * this handler).
+   *
+   * `was_active` distinguishes renaming a currently loaded / open chat
+   * (live agent path) from renaming one in history (direct DB update).
+   * `new_title_length` lets us understand naming habits without
+   * transmitting the title itself.
+   *
+   * `agent_type` is only present on the active path — the inactive path
+   * doesn't hydrate the agent and so can't cheaply look up the type
+   * without an extra DB query.
+   *
+   * `new_title` is only attached when the user has opted into `full`
+   * telemetry. Length is always present so `basic` sessions still
+   * contribute a useful non-PII signal.
+   */
+  'agent-renamed': {
+    agent_instance_id: string;
+    was_active: boolean;
+    new_title_length: number;
+    agent_type?: string;
+    new_title?: string;
+  };
   'agent-model-changed': {
     agent_type: string;
     agent_instance_id: string;

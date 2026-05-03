@@ -385,9 +385,26 @@ export class AgentManagerService extends DisposableService {
 
         // Active path: let the agent handle it so Karton state updates and
         // titleLockedByUser is set via the normal state mutation.
+        // The raw title is only transmitted at `full` telemetry. Titles
+        // frequently contain project names, snippets, or other identifying
+        // strings — `basic` should stay content-free.
+        const isFullTelemetry = this.telemetryService.telemetryLevel === 'full';
+
         const agent = this.activeAgents.get(instanceId);
         if (agent) {
           await agent.setTitle(trimmed);
+          // Read the type from Karton state rather than `agent.agentType`
+          // to stay consistent with other emit sites in this file and
+          // avoid coupling telemetry to a specific BaseAgent subclass shape.
+          const agentType =
+            this.karton.state.agents.instances[instanceId]?.type;
+          this.telemetryService.capture('agent-renamed', {
+            agent_instance_id: instanceId,
+            was_active: true,
+            new_title_length: trimmed.length,
+            ...(agentType && { agent_type: agentType }),
+            ...(isFullTelemetry && { new_title: trimmed }),
+          });
           return;
         }
 
@@ -404,6 +421,12 @@ export class AgentManagerService extends DisposableService {
         if (!updated) {
           throw new Error(`Agent with instance id ${instanceId} not found`);
         }
+        this.telemetryService.capture('agent-renamed', {
+          agent_instance_id: instanceId,
+          was_active: false,
+          new_title_length: trimmed.length,
+          ...(isFullTelemetry && { new_title: trimmed }),
+        });
       },
     );
     this.karton.registerServerProcedureHandler(
