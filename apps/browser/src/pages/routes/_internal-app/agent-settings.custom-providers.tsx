@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useTrack } from '@pages/hooks/use-track';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useTrack } from '@ui/hooks/use-track';
+
 import type {
   ApiSpec,
   CustomEndpoint,
@@ -302,7 +303,17 @@ function CustomEndpointDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (data: EndpointSaveData) => void;
 }) {
+  // Pages run under a different preload than the sidebar UI, so we cannot
+  // import `@ui/hooks/use-track` here (it reaches for `window.electron`).
+  // `useTrack` from the pages hooks routes through the pages-API
+  // `captureTelemetry` bridge and swallows RPC errors so a failed capture
+  // can never crash the page.
   const track = useTrack();
+  // `telemetryLevel` gates whether the raw `baseUrl` is forwarded. At
+  // `full` the user has consented to detailed analytics; at `basic` we
+  // keep the event but redact the URL; at `off` the backend drops the
+  // event entirely and this check is moot.
+  const telemetryLevel = useKartonState((s) => s.globalConfig.telemetryLevel);
   const isAddMode = !endpoint;
   // Set to true when onSave() fires; distinguishes a save-initiated close
   // from a cancel/dismiss close inside the shared `handleDialogOpenChange`.
@@ -352,7 +363,13 @@ function CustomEndpointDialog({
       setGoogleCredentials('');
       savedRef.current = false;
       if (isAddMode) {
-        void track('custom-provider-add-started');
+        // Fires on dialog open in add mode — report the *initial* spec so
+        // the started event is emitted before the user changes anything.
+        // We can't read `apiSpec` state here because `setApiSpec` above
+        // is not yet flushed.
+        track('custom-provider-add-started', {
+          api_spec: 'openai-chat-completions',
+        });
       }
     }
   }, [open, endpoint, isAddMode, track]);
@@ -381,11 +398,50 @@ function CustomEndpointDialog({
     location !== (endpoint?.location ?? '') ||
     googleCredentials !== '';
 
+  // A pristine, unmodified form is NOT an error — an empty required
+  // `name` field at initial state means "not filled in yet", not
+  // "validation failed". `had_validation_errors` should only be true when
+  // the user entered input that triggered a concrete validation rule
+  // (currently: invalid JSON in the model-id mapping).
+  const hadValidationErrors = mappingError !== null;
+
+  /**
+   * Build the provider-URL-related telemetry properties for the current
+   * form state. Keeps the three add-* events consistent:
+   *
+   * - `api_spec` always present — coarse selector useful for funnel splits.
+   * - `is_local` present only when a `baseUrl` was entered (so absence
+   *   distinguishes "empty field" from "non-local URL").
+   * - `base_url` present only when telemetry is set to `full` AND the
+   *   field is non-empty; we do not transmit URLs on `basic`.
+   */
+  const buildUrlProps = (): {
+    api_spec: string;
+    is_local?: boolean;
+    base_url?: string;
+  } => {
+    const trimmed = baseUrl.trim();
+    if (!trimmed) return { api_spec: apiSpec };
+    let isLocal: boolean | undefined;
+    try {
+      const host = new URL(trimmed).hostname;
+      isLocal = host === 'localhost' || host === '127.0.0.1';
+    } catch {
+      isLocal = undefined;
+    }
+    return {
+      api_spec: apiSpec,
+      ...(isLocal !== undefined && { is_local: isLocal }),
+      ...(telemetryLevel === 'full' && { base_url: trimmed }),
+    };
+  };
+
   const handleDialogOpenChange = (next: boolean) => {
     if (!next && open && isAddMode && !savedRef.current) {
-      void track('custom-provider-add-aborted', {
-        had_validation_errors: !canSave,
+      track('custom-provider-add-aborted', {
+        had_validation_errors: hadValidationErrors,
         any_field_touched: anyFieldTouched,
+        ...buildUrlProps(),
       });
     }
     onOpenChange(next);
@@ -506,7 +562,7 @@ function CustomEndpointDialog({
                 googleCredentials: googleCredentials || undefined,
               });
               if (isAddMode) {
-                void track('custom-provider-add-finished');
+                track('custom-provider-add-finished', buildUrlProps());
               }
               savedRef.current = true;
               onOpenChange(false);

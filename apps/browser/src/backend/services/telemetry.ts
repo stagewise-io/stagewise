@@ -223,8 +223,20 @@ export type EventProperties = {
   };
 
   // UI actions (routed via karton RPC from the renderer)
-  'devtools-opened': { tab_id?: string };
-  'devtools-closed': { tab_id?: string };
+  'devtools-opened': {
+    tab_id?: string;
+    /** True when the tab's hostname is `localhost` or `127.0.0.1`. */
+    is_local?: boolean;
+    /** True when the tab's URL uses the `https:` protocol. */
+    is_https?: boolean;
+  };
+  'devtools-closed': {
+    tab_id?: string;
+    /** True when the tab's hostname is `localhost` or `127.0.0.1`. */
+    is_local?: boolean;
+    /** True when the tab's URL uses the `https:` protocol. */
+    is_https?: boolean;
+  };
   'tab-created': { tab_count_after: number };
   'tab-destroyed': { tab_count_after: number };
   'tabs-cleaned': { closed_count: number };
@@ -243,11 +255,33 @@ export type EventProperties = {
     had_validation_errors: boolean;
     any_field_touched: boolean;
   };
-  'custom-provider-add-started': undefined;
-  'custom-provider-add-finished': undefined;
+  'custom-provider-add-started': {
+    /** Selected API spec (e.g. `openai-chat-completions`, `azure`). */
+    api_spec: string;
+  };
+  'custom-provider-add-finished': {
+    api_spec: string;
+    /**
+     * True when the configured `baseUrl` hostname is `localhost` or
+     * `127.0.0.1`. Absent when the spec does not use a base URL
+     * (e.g. `amazon-bedrock`) or the field is empty.
+     */
+    is_local?: boolean;
+    /**
+     * Raw `baseUrl` as entered by the user. Only forwarded when the
+     * user has opted into `full` telemetry; omitted for `basic` and
+     * dropped entirely for `off`.
+     */
+    base_url?: string;
+  };
   'custom-provider-add-aborted': {
     had_validation_errors: boolean;
     any_field_touched: boolean;
+    api_spec: string;
+    /** See `custom-provider-add-finished` — same semantics. */
+    is_local?: boolean;
+    /** See `custom-provider-add-finished` — same semantics. */
+    base_url?: string;
   };
   'workspace-connect-started': undefined;
   'workspace-connect-finished': undefined;
@@ -303,9 +337,18 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'custom-provider-add-aborted': z.object({
     had_validation_errors: z.boolean(),
     any_field_touched: z.boolean(),
+    api_spec: z.string(),
+    is_local: z.boolean().optional(),
+    base_url: z.string().optional(),
   }),
-  'custom-provider-add-finished': z.undefined().optional(),
-  'custom-provider-add-started': z.undefined().optional(),
+  'custom-provider-add-finished': z.object({
+    api_spec: z.string(),
+    is_local: z.boolean().optional(),
+    base_url: z.string().optional(),
+  }),
+  'custom-provider-add-started': z.object({
+    api_spec: z.string(),
+  }),
   'element-selection-started': z.undefined().optional(),
   'element-selection-stopped': z.object({
     element_selected: z.boolean(),

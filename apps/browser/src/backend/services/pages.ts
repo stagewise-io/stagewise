@@ -54,6 +54,7 @@ import type {
 } from '@shared/karton-contracts/pages-api/types';
 import { DisposableService } from './disposable';
 import type { TelemetryService } from './telemetry';
+import { isUIEventName, parseUIEventProperties } from './telemetry';
 import { discoverPlugins } from '@/utils/discover-plugins';
 import { getPluginsPath, getPlansDir } from '@/utils/paths';
 
@@ -781,6 +782,34 @@ export class PagesService extends DisposableService {
           return;
         }
         await this.openTabHandler(url, setActive);
+      },
+    );
+
+    // Bridge pages-renderer telemetry into the backend TelemetryService.
+    // Mirrors the `telemetry.capture` handler on the UI karton so internal
+    // pages (settings, account, etc.) can emit events through the same
+    // validation pipeline.
+    this.kartonServer.registerServerProcedureHandler(
+      'captureTelemetry',
+      async (
+        _callingClientId: string,
+        eventName: string,
+        properties?: Record<string, unknown>,
+      ): Promise<void> => {
+        if (!isUIEventName(eventName)) {
+          this.logger.warn(
+            `[PagesService] Ignoring unknown UI telemetry event: ${eventName}`,
+          );
+          return;
+        }
+        const parsedProperties = parseUIEventProperties(eventName, properties);
+        if (parsedProperties === null) {
+          this.logger.warn(
+            `[PagesService] Ignoring invalid UI telemetry payload for event: ${eventName}`,
+          );
+          return;
+        }
+        this.telemetryService.capture(eventName, parsedProperties);
       },
     );
 
@@ -1967,6 +1996,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('getHistory');
     this.kartonServer.removeServerProcedureHandler('getFaviconBitmaps');
     this.kartonServer.removeServerProcedureHandler('openTab');
+    this.kartonServer.removeServerProcedureHandler('captureTelemetry');
     this.kartonServer.removeServerProcedureHandler('clearBrowsingData');
     this.kartonServer.removeServerProcedureHandler('getPendingEdits');
     this.kartonServer.removeServerProcedureHandler('acceptAllPendingEdits');
