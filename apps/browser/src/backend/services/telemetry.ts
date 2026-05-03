@@ -59,6 +59,12 @@ export type EventProperties = {
      * is the first message in the chat.
      */
     ms_since_last_message?: number;
+    /**
+     * Tool approval mode configured on the agent at the moment this message
+     * is sent. `'alwaysAsk'` = prompt user for each tool call,
+     * `'alwaysAllow'` = auto-approve every tool call.
+     */
+    tool_approval_mode: 'alwaysAsk' | 'alwaysAllow';
   };
   'agent-message-queued': {
     agent_type: string;
@@ -99,11 +105,54 @@ export type EventProperties = {
   };
 
   // Tools
-  'tool-approved': { tool_name: string; agent_instance_id: string };
+  //
+  // All three lifecycle events carry `tool_call_id` (the approval's unique
+  // identifier, equal to the tool-call id) so the request, response, and
+  // any "always allow" shortcut can be linked downstream.
+  'tool-approval-requested': {
+    tool_name: string;
+    agent_instance_id: string;
+    tool_call_id: string;
+  };
+  'tool-approved': {
+    tool_name: string;
+    agent_instance_id: string;
+    tool_call_id: string;
+  };
   'tool-denied': {
     tool_name: string;
     reason?: string;
     agent_instance_id: string;
+    tool_call_id: string;
+  };
+  /**
+   * Fires whenever an agent's tool-approval mode actually changes.
+   * Emitted from the backend (`AgentManager.setToolApprovalMode`) so the
+   * single source of truth covers every UI surface. Skipped when the new
+   * mode equals the current mode (no-op calls are not logged).
+   *
+   * `source` identifies the UI entry point:
+   *   - `panel-combobox`: the persistent mode selector in the chat panel
+   *     (`ToolApprovalSelect`). Deliberate, typically preemptive.
+   *   - `inline-approval-button`: the "Always allow" button shown on an
+   *     active approval request card. Impulsive, reactive to a specific
+   *     tool call.
+   * `unknown` is used when a caller didn't specify a source (e.g.
+   *  programmatic agent-side updates, future call sites).
+   */
+  'tool-approval-mode-changed': {
+    agent_instance_id: string;
+    previous_mode: 'alwaysAsk' | 'alwaysAllow';
+    new_mode: 'alwaysAsk' | 'alwaysAllow';
+    source: 'panel-combobox' | 'inline-approval-button' | 'unknown';
+    /**
+     * When `source === 'inline-approval-button'`, the approval ID of the
+     * request the user was responding to. Lets us correlate the mode
+     * change with a specific `tool-approval-requested` event.
+     */
+    tool_call_id?: string;
+    /** Tool name for `inline-approval-button`; absent otherwise. */
+    tool_name?: string;
   };
   'tool-call-executed': {
     tool_name: string;

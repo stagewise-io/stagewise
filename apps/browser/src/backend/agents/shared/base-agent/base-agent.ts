@@ -402,6 +402,14 @@ export abstract class BaseAgent<
    */
   private _pendingContinue: boolean | null = null;
 
+  /**
+   * Tracks approval IDs for which we have already emitted a
+   * `tool-approval-requested` telemetry event. The stream merge loop runs
+   * per chunk, so the same `approval-requested` state is observed many
+   * times — without this dedupe we would over-count requests by 10×+.
+   */
+  private _seenApprovalRequestIds = new Set<string>();
+
   // Handler that get's called when the agent wants to spawn a child agent.
   private readonly spawnChildAgentHandler: <
     TAgentType extends keyof AgentTypeMap,
@@ -723,12 +731,14 @@ export abstract class BaseAgent<
       this.telemetryService.capture('tool-approved', {
         tool_name: toolName,
         agent_instance_id: this.instanceId,
+        tool_call_id: approvalId,
       });
     } else {
       this.telemetryService.capture('tool-denied', {
         tool_name: toolName,
         reason,
         agent_instance_id: this.instanceId,
+        tool_call_id: approvalId,
       });
     }
 
@@ -2602,6 +2612,29 @@ export abstract class BaseAgent<
               if (part.state === 'done') {
                 existingMessage.metadata!.partsMetadata[index].endedAt ??=
                   new Date();
+              }
+            }
+
+            // Emit `tool-approval-requested` exactly once per approval id.
+            // The stream replays the approval-requested state many times as
+            // the SDK merges chunks, so dedupe via `_seenApprovalRequestIds`.
+            if (
+              (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) &&
+              (part as AgentToolUIPart | DynamicToolUIPart).state ===
+                'approval-requested'
+            ) {
+              const toolPart = part as AgentToolUIPart | DynamicToolUIPart;
+              const approvalId = toolPart.approval?.id;
+              if (approvalId && !this._seenApprovalRequestIds.has(approvalId)) {
+                this._seenApprovalRequestIds.add(approvalId);
+                this.telemetryService.capture('tool-approval-requested', {
+                  tool_name:
+                    toolPart.type === 'dynamic-tool'
+                      ? 'dynamic-tool'
+                      : toolPart.type.replace('tool-', ''),
+                  agent_instance_id: this.instanceId,
+                  tool_call_id: approvalId,
+                });
               }
             }
           },

@@ -270,9 +270,10 @@ export class AgentManagerService extends DisposableService {
         _callingClientId: string,
         instanceId: string,
         mode: ToolApprovalMode,
+        source?: 'panel-combobox' | 'inline-approval-button',
       ) => {
         const parsedMode = toolApprovalModeSchema.parse(mode);
-        await this.setToolApprovalMode(instanceId, parsedMode);
+        await this.setToolApprovalMode(instanceId, parsedMode, { source });
       },
     );
     this.karton.registerServerProcedureHandler(
@@ -1007,6 +1008,7 @@ export class AgentManagerService extends DisposableService {
       connected_workspace_count: connectedWorkspaceCount,
       is_new_chat: !hasPriorUserMessage,
       ms_since_last_message: msSinceLastMessage,
+      tool_approval_mode: instance?.state.toolApprovalMode ?? 'alwaysAsk',
     });
 
     await agent.sendUserMessage(message);
@@ -1041,7 +1043,22 @@ export class AgentManagerService extends DisposableService {
    * history) because it uses a narrow DB update that bypasses the full
    * `persistAgentState` path.
    */
-  public async setToolApprovalMode(instanceId: string, mode: ToolApprovalMode) {
+  public async setToolApprovalMode(
+    instanceId: string,
+    mode: ToolApprovalMode,
+    telemetry?: {
+      /** Which UI surface triggered the change; threaded from the RPC. */
+      source?: 'panel-combobox' | 'inline-approval-button';
+      /**
+       * Only meaningful when `source === 'inline-approval-button'`:
+       * the approval ID the user was responding to. Lets analytics
+       * correlate the mode change with a specific approval request.
+       */
+      toolCallId?: string;
+      /** Tool name for `inline-approval-button`; optional otherwise. */
+      toolName?: string;
+    },
+  ) {
     const agent = this.activeAgents.get(instanceId);
 
     if (!agent) {
@@ -1049,7 +1066,10 @@ export class AgentManagerService extends DisposableService {
     }
 
     const currentMode =
-      this.karton.state.agents.instances[instanceId]?.state.toolApprovalMode;
+      this.karton.state.agents.instances[instanceId]?.state.toolApprovalMode ??
+      'alwaysAsk';
+    // No-op calls aren't logged — otherwise the combobox's onValueChange
+    // firing on a reselection would emit spurious events.
     if (currentMode === mode) return;
 
     this.karton.setState((draft) => {
@@ -1057,6 +1077,15 @@ export class AgentManagerService extends DisposableService {
     });
 
     await this.agentPersistenceDB?.updateToolApprovalMode(instanceId, mode);
+
+    this.telemetryService.capture('tool-approval-mode-changed', {
+      agent_instance_id: instanceId,
+      previous_mode: currentMode,
+      new_mode: mode,
+      source: telemetry?.source ?? 'unknown',
+      ...(telemetry?.toolCallId && { tool_call_id: telemetry.toolCallId }),
+      ...(telemetry?.toolName && { tool_name: telemetry.toolName }),
+    });
   }
 
   /**
