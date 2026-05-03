@@ -6,6 +6,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useTrack } from '@pages/hooks/use-track';
 import type {
   CustomEndpoint,
   CustomModel,
@@ -19,7 +20,7 @@ import {
 } from '@shared/karton-contracts/ui/shared-types';
 import { availableModels } from '@shared/available-models';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useTrack } from '@ui/hooks/use-track';
+
 import { cn } from '@pages/utils';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
@@ -383,6 +384,11 @@ function CustomModelDialog({
   existingModelIds: Set<string>;
   customEndpoints: CustomEndpoint[];
 }) {
+  // Pages run under a different preload than the sidebar UI, so we cannot
+  // import `@ui/hooks/use-track` here (it reaches for `window.electron`).
+  // `useTrack` from the pages hooks routes through the pages-API
+  // `captureTelemetry` bridge and swallows RPC errors so a failed capture
+  // can never crash the page.
   const track = useTrack();
   const isAddMode = !model;
   // Set to true when onSave() fires; distinguishes a save-initiated close
@@ -465,7 +471,7 @@ function CustomModelDialog({
       setJsonError(null);
       savedRef.current = false;
       if (isAddMode) {
-        void track('custom-model-add-started');
+        track('custom-model-add-started');
       }
     }
   }, [open, model, isAddMode, track]);
@@ -502,10 +508,17 @@ function CustomModelDialog({
     JSON.stringify(capabilities) !==
       JSON.stringify(model?.capabilities ?? defaultCaps);
 
+  // A pristine, unmodified form is NOT an error — empty required fields
+  // at initial state mean "not filled in yet", not "validation failed".
+  // `had_validation_errors` should only be true when the user entered
+  // input that triggered a concrete validation rule (duplicate ID, invalid
+  // JSON in provider options / headers).
+  const hadValidationErrors = isDuplicate || jsonError !== null;
+
   const handleDialogOpenChange = (next: boolean) => {
     if (!next && open && isAddMode && !savedRef.current) {
-      void track('custom-model-add-aborted', {
-        had_validation_errors: !canSave,
+      track('custom-model-add-aborted', {
+        had_validation_errors: hadValidationErrors,
         any_field_touched: anyFieldTouched,
       });
     }
@@ -563,7 +576,7 @@ function CustomModelDialog({
       headers,
     });
     if (isAddMode) {
-      void track('custom-model-add-finished');
+      track('custom-model-add-finished');
     }
     savedRef.current = true;
     onOpenChange(false);

@@ -273,6 +273,16 @@ export type PagesApiContract = {
       /** Quit the app and install the downloaded update */
       quitAndInstall: () => Promise<void>;
     };
+    /**
+     * Forward a UI telemetry event to the backend TelemetryService. The
+     * backend validates the event name against `UI_TELEMETRY_EVENT_NAMES`
+     * and the payload against a per-event Zod schema — unknown names or
+     * invalid shapes are silently dropped.
+     */
+    captureTelemetry: (
+      eventName: string,
+      properties?: Record<string, unknown>,
+    ) => Promise<void>;
   };
 };
 

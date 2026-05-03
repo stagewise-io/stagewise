@@ -4,6 +4,7 @@ import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useTrack } from '@pages/hooks/use-track';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@pages/utils';
@@ -32,7 +33,9 @@ function Page() {
   const sendOtp = useKartonProcedure((p) => p.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.verifyOtp);
   const logout = useKartonProcedure((p) => p.logout);
-  const track = useKartonProcedure((p) => p.telemetry.capture);
+  // `useTrack` swallows RPC errors so a failed telemetry capture (e.g.
+  // backend karton server unavailable) cannot crash the page.
+  const track = useTrack();
 
   // Fire once per mounted route instance. The ref guard prevents React
   // StrictMode's development double-invocation; intentional route remounts
@@ -41,7 +44,7 @@ function Page() {
   useEffect(() => {
     if (didTrackViewRef.current) return;
     didTrackViewRef.current = true;
-    void track('account-page-viewed');
+    track('account-page-viewed');
   }, [track]);
 
   return (
