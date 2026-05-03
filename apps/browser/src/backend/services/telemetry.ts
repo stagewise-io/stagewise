@@ -310,7 +310,6 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'suggestion-clicked',
   'suggestion-dismissed',
   'tabs-cleaned',
-  'tool-approval-always-allowed',
   'workspace-connect-aborted',
   'workspace-connect-failed',
   'workspace-connect-finished',
@@ -367,11 +366,6 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'tabs-cleaned': z.object({
     closed_count: z.number(),
-  }),
-  'tool-approval-always-allowed': z.object({
-    tool_name: z.string(),
-    agent_instance_id: z.string(),
-    tool_call_id: z.string(),
   }),
   'workspace-connect-aborted': z.object({
     reason: z.enum(['picker-closed', 'suggestions-dismissed']),
