@@ -448,33 +448,38 @@ function CustomModelDialog({
     fadeDistance: 24,
   });
 
+  // Depend ONLY on `open` so the effect runs exactly on the open/close
+  // transitions. Reading `model`/`isAddMode`/`track` without listing them
+  // as deps is intentional — we want their values at the moment the
+  // dialog opened, not whenever parent re-renders push new references.
+  // Without this scoping, normal parent re-renders would silently reset
+  // the user's in-progress form input and re-emit `*-add-started`.
   useEffect(() => {
-    if (open) {
-      setModelId(model?.modelId ?? '');
-      setDisplayName(model?.displayName ?? '');
-      setDescription(model?.description ?? '');
-      setContextWindowSize(model?.contextWindowSize ?? 128000);
-      setEndpointId(model?.endpointId ?? 'openai');
-      setThinkingEnabled(model?.thinkingEnabled ?? false);
-      setCapabilities(model?.capabilities ?? defaultCaps);
-      setProviderOptionsJson(
-        model?.providerOptions && Object.keys(model.providerOptions).length > 0
-          ? JSON.stringify(model.providerOptions, null, 2)
-          : '',
-      );
-      setHeadersJson(
-        model?.headers && Object.keys(model.headers).length > 0
-          ? JSON.stringify(model.headers, null, 2)
-          : '',
-      );
-      setShowAdvanced(false);
-      setJsonError(null);
-      savedRef.current = false;
-      if (isAddMode) {
-        track('custom-model-add-started');
-      }
+    if (!open) return;
+    setModelId(model?.modelId ?? '');
+    setDisplayName(model?.displayName ?? '');
+    setDescription(model?.description ?? '');
+    setContextWindowSize(model?.contextWindowSize ?? 128000);
+    setEndpointId(model?.endpointId ?? 'openai');
+    setThinkingEnabled(model?.thinkingEnabled ?? false);
+    setCapabilities(model?.capabilities ?? defaultCaps);
+    setProviderOptionsJson(
+      model?.providerOptions && Object.keys(model.providerOptions).length > 0
+        ? JSON.stringify(model.providerOptions, null, 2)
+        : '',
+    );
+    setHeadersJson(
+      model?.headers && Object.keys(model.headers).length > 0
+        ? JSON.stringify(model.headers, null, 2)
+        : '',
+    );
+    setShowAdvanced(false);
+    setJsonError(null);
+    savedRef.current = false;
+    if (isAddMode) {
+      track('custom-model-add-started');
     }
-  }, [open, model, isAddMode, track]);
+  }, [open]);
 
   const isDuplicate =
     modelId.trim().length > 0 &&

@@ -341,38 +341,43 @@ function CustomEndpointDialog({
   const [location, setLocation] = useState(endpoint?.location ?? '');
   const [googleCredentials, setGoogleCredentials] = useState('');
 
+  // Depend ONLY on `open` so the effect runs exactly on the open/close
+  // transitions. Reading `endpoint`/`isAddMode`/`track` without listing
+  // them as deps is intentional — we want their values at the moment
+  // the dialog opened, not whenever parent re-renders push new
+  // references. Without this scoping, normal parent re-renders (e.g.
+  // Karton state sync pushing a new `endpoint` array identity) would
+  // silently reset the user's in-progress form input and re-emit the
+  // `*-add-started` event.
   useEffect(() => {
-    if (open) {
-      setName(endpoint?.name ?? '');
-      setApiSpec(endpoint?.apiSpec ?? 'openai-chat-completions');
-      setBaseUrl(endpoint?.baseUrl ?? '');
-      setApiKey('');
-      setModelIdMappingJson(
-        endpoint?.modelIdMapping &&
-          Object.keys(endpoint.modelIdMapping).length > 0
-          ? JSON.stringify(endpoint.modelIdMapping, null, 2)
-          : '',
-      );
-      setMappingError(null);
-      setResourceName(endpoint?.resourceName ?? '');
-      setApiVersion(endpoint?.apiVersion ?? '');
-      setRegion(endpoint?.region ?? '');
-      setSecretKey('');
-      setProjectId(endpoint?.projectId ?? '');
-      setLocation(endpoint?.location ?? '');
-      setGoogleCredentials('');
-      savedRef.current = false;
-      if (isAddMode) {
-        // Fires on dialog open in add mode — report the *initial* spec so
-        // the started event is emitted before the user changes anything.
-        // We can't read `apiSpec` state here because `setApiSpec` above
-        // is not yet flushed.
-        track('custom-provider-add-started', {
-          api_spec: 'openai-chat-completions',
-        });
-      }
+    if (!open) return;
+    setName(endpoint?.name ?? '');
+    setApiSpec(endpoint?.apiSpec ?? 'openai-chat-completions');
+    setBaseUrl(endpoint?.baseUrl ?? '');
+    setApiKey('');
+    setModelIdMappingJson(
+      endpoint?.modelIdMapping &&
+        Object.keys(endpoint.modelIdMapping).length > 0
+        ? JSON.stringify(endpoint.modelIdMapping, null, 2)
+        : '',
+    );
+    setMappingError(null);
+    setResourceName(endpoint?.resourceName ?? '');
+    setApiVersion(endpoint?.apiVersion ?? '');
+    setRegion(endpoint?.region ?? '');
+    setSecretKey('');
+    setProjectId(endpoint?.projectId ?? '');
+    setLocation(endpoint?.location ?? '');
+    setGoogleCredentials('');
+    savedRef.current = false;
+    if (isAddMode) {
+      // No payload on `started` — `api_spec` at this point is always the
+      // default and carries no signal. It's only meaningful on `finished`
+      // (and `aborted`, to understand what spec the user was partway
+      // through configuring).
+      track('custom-provider-add-started');
     }
-  }, [open, endpoint, isAddMode, track]);
+  }, [open]);
 
   const canSave = name.trim().length > 0 && !mappingError;
 
