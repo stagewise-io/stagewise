@@ -10,7 +10,8 @@ export type ApiKeyProvider =
   | 'moonshotai'
   | 'alibaba'
   | 'deepseek'
-  | 'z-ai';
+  | 'z-ai'
+  | 'minimax';
 
 export type ApiKeyValidationResult =
   | null
@@ -62,6 +63,11 @@ const providerConfigs: Record<
       apiKey,
       baseURL: baseURL ?? 'https://api.z.ai/api/paas/v4',
     }).chat('glm-4.5-flash'),
+  minimax: (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://api.minimax.io/v1',
+    }).chat('MiniMax-M2'),
 };
 
 /**
@@ -83,6 +89,7 @@ export async function validateApiKeys(
     alibaba: null,
     deepseek: null,
     'z-ai': null,
+    minimax: null,
   };
 
   const promises: Promise<void>[] = [];

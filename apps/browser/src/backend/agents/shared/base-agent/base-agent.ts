@@ -611,8 +611,9 @@ export abstract class BaseAgent<
 
           // Keep `pendingApprovals` free of stale entries regardless of
           // which terminal state we transition to.
-          // @ts-expect-error - We know that the tool part is a ToolUIPart
-          clearPendingApproval(draft, toolPart);
+          // Narrowed literal avoids a TS2589 union-expansion in the
+          // `AgentToolUIPart | DynamicToolUIPart` argument position.
+          clearPendingApproval(draft.pendingApprovals, toolPart.toolCallId);
 
           if (toolPart.state === 'approval-requested') {
             const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
@@ -691,7 +692,7 @@ export abstract class BaseAgent<
             // Always clear any stashed classifier explanation for this
             // tool call, regardless of whether the state still requires a
             // transition. Keeps `pendingApprovals` free of stale entries.
-            clearPendingApproval(draft, part);
+            clearPendingApproval(draft.pendingApprovals, part.toolCallId);
             if (part.state === 'approval-requested') {
               const updatedToolPart = {
                 ...part,
@@ -2695,7 +2696,7 @@ export abstract class BaseAgent<
           if (toolPart.state === 'approval-requested') {
             // All tool call approvals should be rejected with the configured reason for abort.
             // Keep `pendingApprovals` free of stale entries.
-            clearPendingApproval(draft, toolPart);
+            clearPendingApproval(draft.pendingApprovals, toolPart.toolCallId);
             const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
               ...toolPart,
               state: 'output-denied',

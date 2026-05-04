@@ -1,6 +1,5 @@
 import { produce } from 'immer';
 import { describe, it, expect } from 'vitest';
-import type { AgentState } from '@shared/karton-contracts/ui/agent';
 import { clearPendingApproval } from './pending-approvals-cleanup';
 
 /**
@@ -15,10 +14,16 @@ import { clearPendingApproval } from './pending-approvals-cleanup';
  * full BaseAgent + karton state store.
  */
 
-function makeState(pendingApprovals: Record<string, string>): AgentState {
-  return {
-    pendingApprovals,
-  } as unknown as AgentState;
+type Approvals = Record<string, { explanation: string }>;
+
+function makeState(entries: Record<string, string>): {
+  pendingApprovals: Approvals;
+} {
+  const pendingApprovals: Approvals = {};
+  for (const [key, explanation] of Object.entries(entries)) {
+    pendingApprovals[key] = { explanation };
+  }
+  return { pendingApprovals };
 }
 
 describe('clearPendingApproval', () => {
@@ -28,27 +33,33 @@ describe('clearPendingApproval', () => {
       'call-b': 'reasoning B',
     });
     const next = produce(base, (draft) => {
-      clearPendingApproval(draft, { toolCallId: 'call-a' });
+      clearPendingApproval(draft.pendingApprovals, 'call-a');
     });
-    expect(next.pendingApprovals).toEqual({ 'call-b': 'reasoning B' });
+    expect(next.pendingApprovals).toEqual({
+      'call-b': { explanation: 'reasoning B' },
+    });
   });
 
   it('is a no-op when toolCallId is missing / falsy', () => {
     const base = makeState({ 'call-a': 'reasoning A' });
     const next = produce(base, (draft) => {
-      clearPendingApproval(draft, { toolCallId: '' });
+      clearPendingApproval(draft.pendingApprovals, '');
     });
     // Immer returns the same reference when nothing is mutated.
     expect(next).toBe(base);
-    expect(next.pendingApprovals).toEqual({ 'call-a': 'reasoning A' });
+    expect(next.pendingApprovals).toEqual({
+      'call-a': { explanation: 'reasoning A' },
+    });
   });
 
   it('is a no-op when the key is not present', () => {
     const base = makeState({ 'call-a': 'reasoning A' });
     const next = produce(base, (draft) => {
-      clearPendingApproval(draft, { toolCallId: 'call-missing' });
+      clearPendingApproval(draft.pendingApprovals, 'call-missing');
     });
-    expect(next.pendingApprovals).toEqual({ 'call-a': 'reasoning A' });
+    expect(next.pendingApprovals).toEqual({
+      'call-a': { explanation: 'reasoning A' },
+    });
   });
 
   it('does not touch unrelated keys', () => {
@@ -58,11 +69,11 @@ describe('clearPendingApproval', () => {
       'call-c': 'reasoning C',
     });
     const next = produce(base, (draft) => {
-      clearPendingApproval(draft, { toolCallId: 'call-b' });
+      clearPendingApproval(draft.pendingApprovals, 'call-b');
     });
     expect(next.pendingApprovals).toEqual({
-      'call-a': 'reasoning A',
-      'call-c': 'reasoning C',
+      'call-a': { explanation: 'reasoning A' },
+      'call-c': { explanation: 'reasoning C' },
     });
   });
 });

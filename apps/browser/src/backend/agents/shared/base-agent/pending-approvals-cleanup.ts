@@ -1,6 +1,3 @@
-import type { Draft } from 'immer';
-import type { AgentState } from '@shared/karton-contracts/ui/agent';
-
 /**
  * Remove the stashed classifier explanation for a tool call, if any.
  * Safe to call unconditionally — a missing/empty `toolCallId` is a no-op,
@@ -12,15 +9,20 @@ import type { AgentState } from '@shared/karton-contracts/ui/agent';
  * non-terminal tool states. Centralizing the delete here keeps
  * `pendingApprovals` free of stale entries across all termination paths.
  *
- * Takes a plain object (not a tool-part union) so TypeScript doesn't have
- * to re-instantiate the deep `AgentToolUIPart | DynamicToolUIPart` union
- * at every call site.
+ * The signature takes the `pendingApprovals` record directly — NOT the
+ * full `Draft<AgentState>`. Passing `Draft<AgentState>` here was the
+ * direct trigger for a TS2589 "Type instantiation is excessively deep"
+ * error inside `state.set(draft => …)` blocks once the Karton contract
+ * grew large enough: Immer's `Draft<…>` mapped type combined with the
+ * deep `AgentState` union caused the compiler to exceed its recursion
+ * limit at the call site. Narrowing the parameter to the single map
+ * we mutate breaks that inference cycle with zero behavior change.
  */
 export function clearPendingApproval(
-  draft: Draft<AgentState>,
-  toolPart: { toolCallId?: string },
+  pendingApprovals: Record<string, { explanation: string }>,
+  toolCallId: string | undefined,
 ): void {
-  if (toolPart.toolCallId) {
-    delete draft.pendingApprovals[toolPart.toolCallId];
+  if (toolCallId) {
+    delete pendingApprovals[toolCallId];
   }
 }

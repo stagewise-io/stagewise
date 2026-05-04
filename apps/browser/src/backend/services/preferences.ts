@@ -19,6 +19,12 @@ import {
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import { DisposableService } from './disposable';
 import { safeStorage } from 'electron';
+import {
+  CODING_PLANS,
+  isCodingPlanId,
+  type CodingPlanId,
+} from '@shared/coding-plans';
+import { validateApiKeys } from '../utils/validate-api-keys';
 
 // Enable Immer patches support
 enablePatches();
@@ -134,6 +140,7 @@ export class PreferencesService extends DisposableService {
       'alibaba',
       'deepseek',
       'z-ai',
+      'minimax',
     ] as const;
     let needsSave = false;
 
@@ -322,6 +329,7 @@ export class PreferencesService extends DisposableService {
         this.setCustomEndpointSecretKey(endpointId, secretKey),
       (endpointId, credentials) =>
         this.setCustomEndpointGoogleCredentials(endpointId, credentials),
+      (planId, apiKey) => this.connectCodingPlan(planId, apiKey),
     );
   }
 
@@ -735,6 +743,64 @@ export class PreferencesService extends DisposableService {
     this.logger.debug(
       `[PreferencesService] Cleared API key for provider: ${provider}`,
     );
+  }
+
+  /**
+   * Connect a Tier-A coding plan in one shot:
+   *   1. validate the key against the plan's provider,
+   *   2. encrypt+store it,
+   *   3. flip providerConfigs[provider].mode to 'official'.
+   *
+   * Returns without mutating state if validation fails.
+   */
+  public async connectCodingPlan(
+    planId: CodingPlanId,
+    apiKey: string,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    this.assertNotDisposed();
+
+    if (!isCodingPlanId(planId)) {
+      return { success: false, error: `Unknown coding plan: ${planId}` };
+    }
+    const plan = CODING_PLANS[planId];
+
+    if (!apiKey) {
+      return { success: false, error: 'API key is required' };
+    }
+
+    // 1. Validate the key against the plan's provider.
+    const results = await validateApiKeys({ [plan.provider]: apiKey });
+    const result = results[plan.provider];
+    if (!result) {
+      return { success: false, error: 'Validation was skipped' };
+    }
+    if (result.success === false) {
+      return result;
+    }
+
+    // 2 + 3. Encrypt+store key and flip mode in one patch batch.
+    const encryptedBase64 = safeStorage
+      .encryptString(apiKey)
+      .toString('base64');
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerConfigs', plan.provider, 'encryptedApiKey'],
+        value: encryptedBase64,
+      },
+      {
+        op: 'replace',
+        path: ['providerConfigs', plan.provider, 'mode'],
+        value: 'official',
+      },
+    ];
+    await this.update(patches);
+
+    this.logger.debug(
+      `[PreferencesService] Connected coding plan ${planId} ` +
+        `(provider=${plan.provider})`,
+    );
+    return { success: true };
   }
 
   // ===========================================================================
