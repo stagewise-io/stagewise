@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha080 (2026-05-04)
+
+### Features
+
+* add smart-approval mode (72c5551)
+
 ## 1.0.0-alpha079 (2026-05-04)
 
 ### Features
