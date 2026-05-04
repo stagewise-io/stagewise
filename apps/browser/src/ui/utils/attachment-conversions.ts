@@ -1,7 +1,7 @@
 import type { SelectedElement } from '@shared/selected-elements';
 import { generateId } from '@ui/utils';
 import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
-import type { AttachmentAttributes } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
+import type { AttachmentAttributes } from '@ui/screens/main/agent-chat/chat/_components/rich-text/attachments';
 
 /**
  * Convert an Attachment to AttachmentAttributes for TipTap editor insertion.

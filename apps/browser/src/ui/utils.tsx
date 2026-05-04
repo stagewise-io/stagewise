@@ -1,7 +1,7 @@
 import posthog from 'posthog-js';
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui';
 
-import { extractMentionsFromTiptapContent } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
+import { extractMentionsFromTiptapContent } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions';
 
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';

@@ -1,97 +1,67 @@
-import { SidebarChatSection } from './chat';
 import {
   ResizablePanel,
   type ImperativePanelHandle,
 } from '@stagewise/stage-ui/components/resizable';
-import { SidebarTopSection } from './top';
-import { ActiveAgentsGrid } from './active-agents';
-import { useRef, useCallback, useState } from 'react';
-import { useEventListener } from '@ui/hooks/use-event-listener';
-import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
-import { OpenAgentProvider } from '@ui/hooks/use-open-chat';
-import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
+import { useRef, useCallback } from 'react';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { IconGear2Outline18 } from 'nucleo-ui-outline-18';
+import { AgentsList } from './agents-list';
+import {
+  Tooltip,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
+import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
+import { useTrack } from '@ui/hooks/use-track';
+import { useKartonProcedure } from '@ui/hooks/use-karton';
 
 export function Sidebar() {
   const panelRef = useRef<ImperativePanelHandle>(null);
-  const previousSizeRef = useRef<number | null>(null);
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const track = useTrack();
+  const createTab = useKartonProcedure((p) => p.browser.createTab);
 
-  const handleCollapseChange = useCallback((isCollapsed: boolean) => {
-    if (isCollapsed) {
-      window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
-    } else {
-      window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-    }
-  }, []);
-
-  useEventListener('sidebar-chat-panel-focused', () => {
-    if (panelRef.current) {
-      panelRef.current.expand();
-      // Restore previous size if available, otherwise use defaultSize
-      if (previousSizeRef.current !== null)
-        panelRef.current.resize(previousSizeRef.current);
-    }
-  });
-
-  useEventListener('sidebar-chat-panel-opened', () => {
-    setIsCollapsed(false);
-    if (panelRef.current) {
-      panelRef.current.expand();
-      // Restore previous size if available, otherwise use defaultSize
-      if (previousSizeRef.current !== null)
-        panelRef.current.resize(previousSizeRef.current);
-    }
-  });
-
-  useEventListener('sidebar-chat-panel-closed', () => {
-    setIsCollapsed(true);
-  });
+  const handleOpenSettings = useCallback(() => {
+    track('settings-opened');
+    createTab(SETTINGS_PAGE_URL, true);
+  }, [createTab, track]);
 
   return (
     <ResizablePanel
       ref={panelRef}
-      id="sidebar-panel"
-      order={1}
-      defaultSize={25}
-      minSize={15}
-      maxSize={50}
-      collapsible
-      collapsedSize={0}
-      onCollapse={() => {
-        setIsCollapsed(true);
-        handleCollapseChange(true);
-      }}
-      onExpand={() => {
-        setIsCollapsed(false);
-        handleCollapseChange(false);
-        // Restore previous size when expanding
-        if (panelRef.current && previousSizeRef.current !== null) {
-          // Use requestAnimationFrame to ensure the panel is expanded before resizing
-          requestAnimationFrame(() => {
-            if (panelRef.current && previousSizeRef.current !== null)
-              panelRef.current.resize(previousSizeRef.current);
-          });
-        }
-      }}
-      onResize={(size) => {
-        // Track size changes to store the latest non-collapsed size
-        // Only store if size is greater than 0 (not collapsed) and we're not currently collapsing
-        if (size > 0 && !isCollapsed) previousSizeRef.current = size;
-      }}
-      data-collapsed={isCollapsed}
-      className="@container group overflow-visible! flex h-full flex-col items-stretch justify-between rounded-lg bg-background p-1 ring-1 ring-derived-strong data-[collapsed=false]:min-w-64 data-[collapsed=true]:max-w-0 data-[collapsed=true]:p-0 data-[collapsed=true]:ring-transparent"
+      id="new-sidebar-panel"
+      order={0}
+      defaultSize={35}
+      minSize={20}
+      maxSize={30}
+      className="@container group overflow-visible! flex h-full min-w-64 max-w-96 flex-col items-stretch p-2"
     >
-      <OpenAgentProvider>
-        <PendingRemovalsProvider>
-          <ChatDraftProvider>
-            <SidebarTopSection isCollapsed={isCollapsed} />
-            <ActiveAgentsGrid />
-            {/* Chat area */}
-            <SidebarChatSection />
-          </ChatDraftProvider>
-        </PendingRemovalsProvider>
-      </OpenAgentProvider>
+      <div className="app-drag flex h-8 w-full flex-row items-center justify-end" />
+      <AgentsList />
+      <div className="flex flex-row items-center justify-between gap-4">
+        <div className="flex flex-row items-center justify-center gap-1.5 pb-0.5 pl-1">
+          <div className="size-8 rounded-full bg-surface-3" />
+          <div className="flex flex-col gap-px">
+            <span className="font-medium text-foreground text-sm">
+              John Doe
+            </span>
+            <span className="text-muted-foreground text-xs">
+              john.doe@example.com
+            </span>
+          </div>
+        </div>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="app-no-drag shrink-0"
+              onClick={handleOpenSettings}
+            >
+              <IconGear2Outline18 className="size-4" />
+            </Button>
+          </TooltipTrigger>
+        </Tooltip>
+      </div>
     </ResizablePanel>
   );
 }

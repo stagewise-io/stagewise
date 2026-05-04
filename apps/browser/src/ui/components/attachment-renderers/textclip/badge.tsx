@@ -17,7 +17,7 @@ import type { BadgeProps } from '../types';
 import {
   InlineBadge,
   InlineBadgeWrapper,
-} from '@ui/screens/main/sidebar/chat/_components/rich-text/shared';
+} from '@ui/screens/main/agent-chat/chat/_components/rich-text/shared';
 
 /** Maximum character count that allows inline expansion */
 const EXPAND_THRESHOLD = 10_000;

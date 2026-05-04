@@ -266,7 +266,7 @@ export const Omnibox = ({
             // Explicitly calling focus() bypasses this platform-specific behavior.
             onMouseDown={() => inputRef.current?.focus()}
             className={cn(
-              'h-8 w-full flex-1 select-text rounded-full pr-5 pl-3 text-muted-foreground text-sm ring-1 ring-transparent hover:ring-derived-subtle focus:bg-surface-1 focus:text-foreground focus:outline-none focus:ring-derived-strong focus-visible:outline-none',
+              'h-7.5 w-full flex-1 select-text pr-5 pl-3 text-muted-foreground text-sm focus:bg-surface-1 focus:text-foreground focus:outline-none focus:ring-derived-strong focus-visible:outline-none',
               // Only apply transitions for mouse interactions, instant for keyboard
               isKeyboardInteraction
                 ? 'transition-none'
@@ -287,7 +287,7 @@ export const Omnibox = ({
           >
             <Autocomplete.Popup
               className={cn(
-                'w-[calc(var(--anchor-width)-0.5rem)] max-w-[calc(var(--anchor-width)-0.5rem)] rounded-xl bg-surface-1 p-1 text-foreground shadow-lg ring-1 ring-derived-subtle',
+                'w-[calc(var(--anchor-width)-0.5rem)] max-w-[calc(var(--anchor-width)-0.5rem)] rounded-md bg-surface-1 p-0.5 text-foreground shadow-lg ring-1 ring-derived-strong',
                 // Only apply transitions and animation styles for mouse interactions
                 isKeyboardInteraction
                   ? 'transition-none'
@@ -297,7 +297,7 @@ export const Omnibox = ({
             >
               {suggestionGroups.filter((g) => g.items.length > 0).length ===
                 0 && (
-                <Autocomplete.Empty className="p-3.5 text-muted-foreground text-sm empty:m-0 empty:p-0">
+                <Autocomplete.Empty className="p-3 text-muted-foreground text-sm empty:m-0 empty:p-0">
                   {inputValue && inputValue.trim() !== ''
                     ? 'No suggestions found.'
                     : 'No browsing history yet.'}
@@ -309,10 +309,10 @@ export const Omnibox = ({
                   .map((group, _gIdx) => (
                     <Autocomplete.Group
                       key={group.key}
-                      className="py-2 first:pt-0 last:pb-0"
+                      className="py-1 first:pt-0 last:pb-0"
                     >
                       {group.label && (
-                        <Autocomplete.GroupLabel className="mt-0.5 mb-1 pl-2 font-medium text-muted-foreground text-xs">
+                        <Autocomplete.GroupLabel className="mt-0.5 mb-1 pl-1.5 font-medium text-muted-foreground text-xs">
                           {group.label}
                         </Autocomplete.GroupLabel>
                       )}
@@ -320,14 +320,14 @@ export const Omnibox = ({
                         <Autocomplete.Item
                           key={`${item.type}-${item.value}-${i}`}
                           className={cn(
-                            'flex flex-row items-center gap-3 rounded-lg px-3 py-2 text-sm',
+                            'flex flex-row items-center gap-2 rounded-md px-2 py-1 text-sm',
                             !item.unselectable &&
                               'data-highlighted:bg-surface-2',
                           )}
                           value={item.value}
                           disabled={item.unselectable}
                         >
-                          <div className="flex flex-row items-center gap-3">
+                          <div className="flex flex-row items-center gap-2">
                             <div className="shrink-0">
                               {item.suggestionIcon}
                             </div>

@@ -30,9 +30,9 @@ import {
   ChatInputActions,
   type ChatInputHandle,
 } from './chat-input';
-import type { AttachmentType } from '@ui/screens/main/sidebar/chat/_components/rich-text/attachments';
-import type { MentionContext } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions';
-import type { FileMentionItem } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/types';
+import type { AttachmentType } from '@ui/screens/main/agent-chat/chat/_components/rich-text/attachments';
+import type { MentionContext } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions';
+import type { FileMentionItem } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions/types';
 import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';

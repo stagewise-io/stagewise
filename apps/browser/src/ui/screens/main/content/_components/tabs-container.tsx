@@ -4,18 +4,11 @@ import { IconPlus } from 'nucleo-micro-bold';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { AgentPreviewBadge } from './agent-preview-badge';
 import {
   useComparingSelector,
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import { IconBrush2Outline18 } from 'nucleo-ui-outline-18';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@stagewise/stage-ui/components/tooltip';
 import {
   DndContext,
   DragOverlay,
@@ -77,24 +70,16 @@ function DragOverlayContent({
 export const DND_DROP_ANIMATION_DURATION = 250;
 
 export function TabsContainer({
-  openSidebarChatPanel,
-  isSidebarCollapsed,
   onAddTab,
-  onCleanAllTabs,
   onDragBorderRadiusChange,
   onActiveTabDragAtPositionZero,
 }: {
-  openSidebarChatPanel: () => void;
-  isSidebarCollapsed: boolean;
   onAddTab: () => void;
-  onCleanAllTabs: () => void;
   onDragBorderRadiusChange?: (radius: number | null) => void;
   onActiveTabDragAtPositionZero?: (isAtPositionZero: boolean) => void;
 }) {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
-  const platform = useKartonState((s) => s.appInfo.platform);
-  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { maskStyle } = useScrollFadeMask(scrollContainerRef, {
     axis: 'horizontal',
@@ -168,14 +153,6 @@ export function TabsContainer({
         return;
       }
 
-      // When sidebar is collapsed, we always show the S-curve at full radius
-      // because there's space on the left for the agent preview badge
-      if (isSidebarCollapsed) {
-        setDragBorderRadius(DEFAULT_BORDER_RADIUS);
-        onDragBorderRadiusChange?.(DEFAULT_BORDER_RADIUS);
-        return;
-      }
-
       // Get the container's left edge position
       const containerLeft = container.getBoundingClientRect().left;
 
@@ -196,7 +173,7 @@ export function TabsContainer({
       setDragBorderRadius(interpolatedRadius);
       onDragBorderRadiusChange?.(interpolatedRadius);
     },
-    [activeTabId, isSidebarCollapsed, onDragBorderRadiusChange],
+    [activeTabId, onDragBorderRadiusChange],
   );
 
   // Handle drag over to track projected position
@@ -213,7 +190,7 @@ export function TabsContainer({
       const isDraggingActiveTab = active.id === activeTabId;
       const firstTabId = optimisticTabIds[0];
 
-      if (isDraggingActiveTab && !isSidebarCollapsed) {
+      if (isDraggingActiveTab) {
         // Projected position is 0 if:
         // - We're over the first tab (and will swap with it)
         // - OR we're the first tab and not over anything else
@@ -225,12 +202,7 @@ export function TabsContainer({
         onActiveTabDragAtPositionZero?.(false);
       }
     },
-    [
-      activeTabId,
-      isSidebarCollapsed,
-      optimisticTabIds,
-      onActiveTabDragAtPositionZero,
-    ],
+    [activeTabId, optimisticTabIds, onActiveTabDragAtPositionZero],
   );
 
   // Handle drag end to reorder tabs with optimistic update
@@ -256,7 +228,7 @@ export function TabsContainer({
       const activeTabWillBeFirst =
         active.id === activeTabId && newTabIds[0] === activeTabId;
 
-      if (activeTabWillBeFirst && !isSidebarCollapsed) {
+      if (activeTabWillBeFirst) {
         // Disable the drop animation when landing at position 0 to avoid
         // the S-curve being visible during the snap animation.
         // The dnd-kit DragOverlay doesn't re-render during its CSS animation,
@@ -285,7 +257,6 @@ export function TabsContainer({
     },
     [
       activeTabId,
-      isSidebarCollapsed,
       optimisticTabIds,
       reorderTabs,
       onDragBorderRadiusChange,
@@ -302,11 +273,8 @@ export function TabsContainer({
   }, [optimisticTabIds, tabs]);
 
   const activateBottomLeftCornerRadius = useMemo(() => {
-    return (
-      optimisticTabIds.findIndex((id) => id === activeTabId) !== 0 ||
-      isSidebarCollapsed
-    );
-  }, [activeTabId, isSidebarCollapsed, optimisticTabIds]);
+    return optimisticTabIds.findIndex((id) => id === activeTabId) !== 0;
+  }, [activeTabId, optimisticTabIds]);
 
   return (
     <DndContext
@@ -318,24 +286,11 @@ export function TabsContainer({
       onDragEnd={handleDragEnd}
       modifiers={[restrictToHorizontalAxis, restrictToFirstScrollableAncestor]}
     >
-      <div
-        className={cn(
-          'flex shrink-0 flex-row items-start',
-          isSidebarCollapsed && platform === 'darwin' && !isFullScreen
-            ? 'pl-18'
-            : '',
-        )}
-      >
-        {isSidebarCollapsed && (
-          <div className="flex h-7 flex-row items-center gap-2 pr-2">
-            <AgentPreviewBadge onClick={openSidebarChatPanel} />
-          </div>
-        )}
+      <div className={cn('flex shrink-0 flex-row items-start bg-background')}>
         <div
           ref={scrollContainerRef}
           className={cn(
-            'mask-alpha scrollbar-none flex flex-row items-start gap-0.75 overflow-x-auto pr-2',
-            isSidebarCollapsed ? '-ml-2 pl-2' : '',
+            'mask-alpha scrollbar-none flex flex-row items-start divide-x divide-surface-2 overflow-x-auto',
           )}
           style={maskStyle}
         >
@@ -349,9 +304,6 @@ export function TabsContainer({
                 <SortableTab
                   key={tab.id}
                   tabState={tab}
-                  activateBottomLeftCornerRadius={
-                    activateBottomLeftCornerRadius
-                  }
                   isActive={tab?.id === activeTabId}
                 />
               );
@@ -360,8 +312,8 @@ export function TabsContainer({
         </div>
         <Button
           variant="ghost"
-          size="xs"
-          className="group -ml-1.25 h-7.25 shrink-0 self-start rounded-[8.5px] rounded-bl-md text-muted-foreground transition-all duration-150 ease-out hover:bg-base-200 focus-visible:bg-base-200 dark:focus-visible:bg-base-850 dark:hover:bg-base-850"
+          size="sm"
+          className="group h-full shrink-0 self-start rounded-none text-muted-foreground ring-1 ring-transparent transition-all duration-150 ease-out hover:bg-surface-1 hover:ring-derived-subtle focus-visible:bg-surface-1"
           onClick={onAddTab}
         >
           <IconPlus className="size-3" />
@@ -369,31 +321,7 @@ export function TabsContainer({
             <span className="ml-1 text-muted-foreground text-xs">⌘ T</span>
           </div>
         </Button>
-        <div className="app-drag h-full min-w-2! grow" />
-        {orderedTabs.length > 1 && (
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                variant="ghost"
-                size="xs"
-                className={cn(
-                  'group h-7.25 shrink-0 self-start rounded-[8.5px] text-muted-foreground transition-all duration-150 ease-out',
-                  platform !== 'darwin' ? 'mr-32' : 'mr-0',
-                  'hover:bg-base-200 focus-visible:bg-base-200 dark:focus-visible:bg-base-850 dark:hover:bg-base-850',
-                )}
-                onClick={onCleanAllTabs}
-              >
-                <span className="mr-1 text-muted-foreground text-xs opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
-                  ⌘ ↑ W
-                </span>
-                <IconBrush2Outline18 className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span>Close all other tabs</span>
-            </TooltipContent>
-          </Tooltip>
-        )}
+        <div className="app-drag h-full min-w-2!" />
       </div>
       <DragOverlay dropAnimation={disableDropAnimation ? null : undefined}>
         {activeTab ? (

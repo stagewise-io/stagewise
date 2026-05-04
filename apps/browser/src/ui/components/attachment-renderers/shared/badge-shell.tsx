@@ -4,7 +4,7 @@ import {
   truncateLabel,
   InlineBadge,
   InlineBadgeWrapper,
-} from '@ui/screens/main/sidebar/chat/_components/rich-text/shared';
+} from '@ui/screens/main/agent-chat/chat/_components/rich-text/shared';
 
 interface BadgeShellProps extends BadgeProps {
   icon: ReactNode;

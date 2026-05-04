@@ -3,7 +3,7 @@ import { ChatPanel } from './_components/index';
 import { NotSignedIn } from './_components/not-signed-in';
 import { cn } from '@ui/utils';
 
-export function SidebarChatSection() {
+export function Chat() {
   const signedIn = useKartonState(
     (s) =>
       s.userAccount?.status === 'authenticated' ||

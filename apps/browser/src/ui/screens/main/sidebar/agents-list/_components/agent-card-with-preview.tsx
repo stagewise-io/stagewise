@@ -12,7 +12,7 @@ import {
   AgentPreviewPanel,
   prefetchAgentPreview,
   type CachedPreview,
-} from '@ui/screens/main/sidebar/top/_components/agent-preview-panel';
+} from '../../../_components/agent-preview-panel';
 
 const SHOW_DELAY_MS = 500;
 const EXIT_DURATION_MS = 150;

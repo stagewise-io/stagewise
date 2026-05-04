@@ -5,18 +5,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { Button } from '@stagewise/stage-ui/components/button';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { IconBoxArchiveOutline18 } from 'nucleo-ui-outline-18';
 import {
   type SharedAgentContextMenuState,
   buildAgentContextMenuHandler,
-} from '../../_components/shared-agent-context-menu';
+} from '../../../_components/shared-agent-context-menu';
 import { useInlineTitleEdit } from './use-inline-title-edit';
 import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en';
+import { Logo } from '@ui/components/ui/logo';
 
 TimeAgo.addLocale(en);
-const timeAgo = new TimeAgo('en-US');
+const _timeAgo = new TimeAgo('en-US');
 
 export interface AgentCardProps {
   id: string;
@@ -44,8 +45,12 @@ export interface AgentCardProps {
 
 export function AgentCardSkeleton() {
   return (
-    <div className="flex min-w-0 shrink-0 flex-col gap-0.5 rounded-md bg-surface-2 px-2 py-1.5 ring-2 ring-derived-subtle ring-inset">
-      <div className="h-4 w-3/5 animate-pulse rounded bg-surface-3" />
+    <div
+      className={cn(
+        buttonVariants({ variant: 'ghost', size: 'md' }),
+        'justify-start pl-1.5 text-muted-foreground hover:bg-base-500/10',
+      )}
+    >
       <div className="h-4 w-2/5 animate-pulse rounded bg-surface-3" />
     </div>
   );
@@ -61,9 +66,6 @@ export const AgentCard = memo(
       isWaitingForUser,
       hasError,
       hasUnseen,
-      activityText,
-      activityIsUserInput,
-      lastMessageAt,
       contextMenuState,
       onClick,
       onArchive,
@@ -74,8 +76,6 @@ export const AgentCard = memo(
     },
     ref,
   ) {
-    const subtitle = hasError ? 'Error' : activityText;
-
     const handleCommitRename = useCallback(
       (newTitle: string) => onRename(id, newTitle),
       [id, onRename],
@@ -91,8 +91,8 @@ export const AgentCard = memo(
 
     return (
       <div
-        ref={ref}
         role="button"
+        ref={ref}
         tabIndex={0}
         data-agent-id={id}
         aria-keyshortcuts="F2"
@@ -127,22 +127,46 @@ export const AgentCard = memo(
           }
         }}
         className={cn(
-          'group/card relative flex min-w-0 shrink-0 flex-col gap-0.5 rounded-md bg-surface-1 px-2 py-1.5 text-left transition-colors hover:bg-surface-2',
-          isActive
-            ? 'cursor-default bg-surface-2 ring-2 ring-derived-subtle ring-inset'
-            : 'cursor-pointer',
-          hasUnseen && 'animate-ring-pulse-primary',
+          buttonVariants({ variant: 'ghost', size: 'md' }),
+          'group/card relative justify-start pl-1.5 text-muted-foreground hover:bg-base-500/10',
+          isActive && 'bg-base-500/5 text-foreground',
         )}
       >
-        {/* Title row */}
-        <div className="flex min-w-0 items-center gap-1">
+        {!isWorking && !isWaitingForUser && !hasError && !hasUnseen && (
+          <Logo className="size-3 shrink-0" color="current" />
+        )}
+        {hasError && (
+          <div className="flex size-3 items-center justify-center">
+            <div className="size-2 shrink-0 rounded-full bg-error-solid" />
+            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-error-solid" />
+          </div>
+        )}
+        {isWorking && !isWaitingForUser && (
+          <div className="flex size-3 items-center justify-center">
+            <div className="size-2 shrink-0 rounded-full bg-primary-solid" />
+            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-primary-solid" />
+          </div>
+        )}
+        {!isWorking && !isWaitingForUser && hasUnseen && (
+          <div className="flex size-3 items-center justify-center">
+            <div className="size-2 shrink-0 rounded-full bg-success-solid" />
+            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-success-solid" />
+          </div>
+        )}
+        {isWaitingForUser && (
+          <div className="flex size-3 items-center justify-center">
+            <div className="size-2 shrink-0 rounded-full bg-warning-solid" />
+            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-warning-solid" />
+          </div>
+        )}
+        <div className="mask-alpha mask-r-from-black mask-r-to-black group-hover/card:mask-r-to-transparent mark-r-from-80% mask-r-to-90%">
           {isEditing ? (
             <span
               ref={titleRef}
               role="textbox"
               contentEditable
               suppressContentEditableWarning
-              className="block min-w-0 flex-1 cursor-text overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+              className="block min-w-0 flex-1 cursor-text overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-sm leading-normal outline-none"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
@@ -171,7 +195,7 @@ export const AgentCard = memo(
             <button
               type="button"
               tabIndex={-1}
-              className="block min-w-0 max-w-full cursor-pointer overflow-x-clip text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-foreground text-xs leading-normal outline-none"
+              className="block min-w-0 max-w-full shrink cursor-pointer overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-smleading-normal outline-none"
               onClick={(e) => {
                 if (!isActive) return;
                 e.stopPropagation();
@@ -187,27 +211,7 @@ export const AgentCard = memo(
           )}
         </div>
 
-        <div className="flex w-full items-baseline gap-2">
-          <span
-            className={cn(
-              'min-w-0 flex-1 overflow-x-clip text-ellipsis whitespace-nowrap text-muted-foreground text-xs leading-normal',
-              isWorking &&
-                !isWaitingForUser &&
-                'shimmer-text-primary font-medium',
-              hasError && 'text-error-foreground',
-              activityIsUserInput && 'italic',
-            )}
-          >
-            {subtitle || '\u00A0'}
-          </span>
-          {lastMessageAt > 0 && (
-            <span className="shrink-0 whitespace-nowrap text-subtle-foreground text-xs leading-normal">
-              {timeAgo.format(lastMessageAt)}
-            </span>
-          )}
-        </div>
-
-        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 rounded-r-[calc(var(--radius-md)-2px)] bg-linear-to-r from-transparent to-[20px] to-surface-2 pr-2 pl-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
+        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 pr-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
           <Tooltip>
             <TooltipTrigger delay={500}>
               <Button

@@ -243,9 +243,11 @@ export class WindowLayoutService extends DisposableService {
             },
           }
         : {}),
-      trafficLightPosition: { x: 14, y: 14 },
+      trafficLightPosition: { x: 14, y: 16 },
+      vibrancy: 'sidebar',
       backgroundMaterial: 'mica',
-      backgroundColor: initialTheme.background,
+      backgroundColor:
+        process.platform !== 'darwin' ? initialTheme.background : undefined,
       transparent: process.platform === 'darwin', // Only make transparent on macOS since we get graphic bugs without that
       roundedCorners: true,
       closable: true,
@@ -1171,7 +1173,7 @@ export class WindowLayoutService extends DisposableService {
     // Hide previous tab after new tab is visible
     if (previousTabId && this.tabs[previousTabId]) {
       this.tabs[previousTabId]!.setVisible(false);
-      this.tabs[previousTabId]!.setBorderRadiusForFullscreen(4);
+      this.tabs[previousTabId]!.setBorderRadiusForFullscreen(0);
     }
 
     this.updateZOrder();
@@ -1337,7 +1339,7 @@ export class WindowLayoutService extends DisposableService {
         this.contentFullscreenTabId = null;
 
         // Restore border radius
-        tab.setBorderRadiusForFullscreen(4);
+        tab.setBorderRadiusForFullscreen(0);
 
         // Restore to current UI bounds (not the bounds from when fullscreen started,
         // since the UI may have changed during fullscreen, e.g., sidebar toggle)
@@ -2023,10 +2025,10 @@ export class WindowLayoutService extends DisposableService {
     const isDark = nativeTheme.shouldUseDarkColors;
     const theme = isDark ? THEME_COLORS.dark : THEME_COLORS.light;
 
-    this.baseWindow.setBackgroundColor(theme.background);
-
-    // titleBarOverlay is only used on non-macOS platforms
     if (process.platform !== 'darwin') {
+      this.baseWindow.setBackgroundColor(theme.background);
+
+      // titleBarOverlay is only used on non-macOS platforms
       this.baseWindow.setTitleBarOverlay({
         color: theme.titleBarOverlay.color,
         symbolColor: theme.titleBarOverlay.symbolColor,
@@ -2064,10 +2066,10 @@ export class WindowLayoutService extends DisposableService {
       return;
     }
 
-    this.baseWindow.setBackgroundColor(colors.theme.background);
-
-    // titleBarOverlay is only used on non-macOS platforms
     if (process.platform !== 'darwin') {
+      this.baseWindow.setBackgroundColor(colors.theme.background);
+
+      // titleBarOverlay is only used on non-macOS platforms
       this.baseWindow.setTitleBarOverlay({
         color: colors.theme.titleBarOverlay.color,
         symbolColor: colors.theme.titleBarOverlay.symbolColor,
