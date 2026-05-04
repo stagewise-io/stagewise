@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha081 (2026-05-04)
+
+### Bug Fixes
+
+* increase maximum timeout for approval classification (9009c66)
+
 ## 1.0.0-alpha080 (2026-05-04)
 
 ### Features
