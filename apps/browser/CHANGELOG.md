@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha079 (2026-05-04)
+
+### Features
+
+* add context menu for agents (9909229)
+
 ## 1.0.0-alpha078 (2026-05-01)
 
 ### Bug Fixes
