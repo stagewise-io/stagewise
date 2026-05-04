@@ -955,6 +955,44 @@ export const availableModels = [
       toolCalling: true,
     },
   },
+  {
+    officialProvider: 'minimax',
+    modelId: 'MiniMax-M2',
+    modelDisplayName: 'MiniMax M2',
+    modelDescription:
+      "MiniMax's flagship model tuned for coding and agentic reasoning.",
+    modelContext: '200k context',
+    modelContextRaw: 204_800,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.2,
+      outputPerMillion: 8.0,
+      relativeMultiplier: 1,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
 ] as const satisfies ModelSettings[];
 
 export type BuiltInModelId = (typeof availableModels)[number]['modelId'];

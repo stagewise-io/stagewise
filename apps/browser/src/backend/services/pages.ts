@@ -26,6 +26,7 @@ import type {
 } from '@shared/karton-contracts/ui/shared-types';
 import { validateApiKeys } from '../utils/validate-api-keys';
 import { listAwsProfiles } from '../utils/aws-profiles';
+import type { CodingPlanId } from '@shared/coding-plans';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { ThumbnailService } from './thumbnail';
@@ -786,6 +787,28 @@ export class PagesService extends DisposableService {
       },
     );
 
+    this.kartonServer.registerServerProcedureHandler(
+      'openExternalUrl',
+      async (_callingClientId: string, url: string): Promise<void> => {
+        let parsed: URL;
+        try {
+          parsed = new URL(url);
+        } catch {
+          this.logger.warn(
+            `[PagesService] Rejected openExternalUrl (unparseable): ${url}`,
+          );
+          return;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          this.logger.warn(
+            `[PagesService] Rejected openExternalUrl (bad scheme ${parsed.protocol}): ${url}`,
+          );
+          return;
+        }
+        await shell.openExternal(url);
+      },
+    );
+
     // Bridge pages-renderer telemetry into the backend TelemetryService.
     // Mirrors the `telemetry.capture` handler on the UI karton so internal
     // pages (settings, account, etc.) can emit events through the same
@@ -1465,6 +1488,10 @@ export class PagesService extends DisposableService {
       endpointId: string,
       credentials: string,
     ) => Promise<void>,
+    connectCodingPlanHandler: (
+      planId: CodingPlanId,
+      apiKey: string,
+    ) => Promise<{ success: true } | { success: false; error: string }>,
   ): void {
     this.getPreferencesHandler = getHandler;
     this.updatePreferencesHandler = updateHandler;
@@ -1564,6 +1591,17 @@ export class PagesService extends DisposableService {
       ) => {
         const results = await validateApiKeys({ [provider]: apiKey }, baseUrl);
         return results[provider];
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'connectCodingPlan',
+      async (
+        _callingClientId: string,
+        planId: CodingPlanId,
+        apiKey: string,
+      ) => {
+        return connectCodingPlanHandler(planId, apiKey);
       },
     );
 
@@ -2004,6 +2042,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('getHistory');
     this.kartonServer.removeServerProcedureHandler('getFaviconBitmaps');
     this.kartonServer.removeServerProcedureHandler('openTab');
+    this.kartonServer.removeServerProcedureHandler('openExternalUrl');
     this.kartonServer.removeServerProcedureHandler('captureTelemetry');
     this.kartonServer.removeServerProcedureHandler('clearBrowsingData');
     this.kartonServer.removeServerProcedureHandler('getPendingEdits');
@@ -2035,6 +2074,7 @@ export class PagesService extends DisposableService {
     );
     this.kartonServer.removeServerProcedureHandler('listAwsProfiles');
     this.kartonServer.removeServerProcedureHandler('validateProviderApiKey');
+    this.kartonServer.removeServerProcedureHandler('connectCodingPlan');
     this.kartonServer.removeServerProcedureHandler('sendOtp');
     this.kartonServer.removeServerProcedureHandler('verifyOtp');
     this.kartonServer.removeServerProcedureHandler('logout');

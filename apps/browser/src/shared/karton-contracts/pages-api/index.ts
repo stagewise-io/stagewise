@@ -33,6 +33,7 @@ import type { ApiKeyValidationResult, AuthStatus, PlanEntry } from '../ui';
 import type { FileDiff } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
 import type { PluginDefinition } from '../../plugins';
+import type { CodingPlanId } from '../../coding-plans';
 
 export type WorkspaceMountInfo = {
   prefix: string;
@@ -138,6 +139,12 @@ export type PagesApiContract = {
       faviconUrls: string[],
     ) => Promise<Record<string, FaviconBitmapResult>>;
     openTab: (url: string, setActive?: boolean) => Promise<void>;
+    /**
+     * Open a URL in the user's system default browser. Only `http:` and
+     * `https:` schemes are accepted — other schemes are silently rejected
+     * to prevent arbitrary protocol handling via a renderer procedure.
+     */
+    openExternalUrl: (url: string) => Promise<void>;
     clearBrowsingData: (
       options: ClearBrowsingDataOptions,
     ) => Promise<ClearBrowsingDataResult>;
@@ -244,6 +251,15 @@ export type PagesApiContract = {
       apiKey: string,
       baseUrl?: string,
     ) => Promise<ApiKeyValidationResult>;
+    /**
+     * Connect a Tier-A coding plan in one shot: validate the user-supplied
+     * key against the plan's provider, encrypt+store it, and flip the
+     * provider's endpoint mode to `'official'`. No state change on failure.
+     */
+    connectCodingPlan: (
+      planId: CodingPlanId,
+      apiKey: string,
+    ) => Promise<{ success: true } | { success: false; error: string }>;
     /** Send an OTP code to the given email for sign-in */
     sendOtp: (
       email: string,

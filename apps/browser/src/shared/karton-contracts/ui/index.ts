@@ -830,6 +830,7 @@ export type KartonContract = {
         alibaba?: string;
         deepseek?: string;
         'z-ai'?: string;
+        minimax?: string;
       }) => Promise<{
         anthropic: ApiKeyValidationResult;
         openai: ApiKeyValidationResult;
@@ -838,6 +839,7 @@ export type KartonContract = {
         alibaba: ApiKeyValidationResult;
         deepseek: ApiKeyValidationResult;
         'z-ai': ApiKeyValidationResult;
+        minimax: ApiKeyValidationResult;
       }>;
     };
     userExperience: {

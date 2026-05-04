@@ -17,6 +17,7 @@ export const modelProviderSchema = z.enum([
   'alibaba',
   'deepseek',
   'z-ai',
+  'minimax',
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
@@ -50,6 +51,7 @@ export const providerConfigsSchema = z.object({
   alibaba: providerConfigSchema.default({ mode: 'stagewise' }),
   deepseek: providerConfigSchema.default({ mode: 'stagewise' }),
   'z-ai': providerConfigSchema.default({ mode: 'stagewise' }),
+  minimax: providerConfigSchema.default({ mode: 'stagewise' }),
 });
 export type ProviderConfigs = z.infer<typeof providerConfigsSchema>;
 
@@ -209,6 +211,7 @@ export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> = {
   alibaba: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
   deepseek: 'https://api.deepseek.com/v1',
   'z-ai': 'https://api.z.ai/api/paas/v4',
+  minimax: 'https://api.minimax.io/v1',
 };
 
 /** Display info for each provider (for UI) */
@@ -243,6 +246,10 @@ export const PROVIDER_DISPLAY_INFO: Record<
   'z-ai': {
     name: 'Z.ai',
     description: 'GLM models',
+  },
+  minimax: {
+    name: 'MiniMax',
+    description: 'MiniMax M-series models',
   },
 };
 
@@ -475,6 +482,7 @@ export const userPreferencesSchema = z.object({
     alibaba: { mode: 'stagewise' },
     deepseek: { mode: 'stagewise' },
     'z-ai': { mode: 'stagewise' },
+    minimax: { mode: 'stagewise' },
   }),
   /** User-defined API endpoints */
   customEndpoints: z.array(customEndpointSchema).default([]),
@@ -569,6 +577,7 @@ export const defaultUserPreferences: UserPreferences = {
     alibaba: { mode: 'stagewise' },
     deepseek: { mode: 'stagewise' },
     'z-ai': { mode: 'stagewise' },
+    minimax: { mode: 'stagewise' },
   },
   customEndpoints: [],
   customModels: [],
