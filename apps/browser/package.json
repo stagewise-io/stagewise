@@ -56,6 +56,8 @@
   "devDependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",
     "@ai-sdk/anthropic": "3.0.58",
+    "@aws-sdk/credential-providers": "^3.908.0",
+    "@smithy/shared-ini-file-loader": "^4.4.9",
     "@ai-sdk/azure": "^3.0.42",
     "@ai-sdk/google": "3.0.43",
     "@ai-sdk/google-vertex": "^4.0.80",
