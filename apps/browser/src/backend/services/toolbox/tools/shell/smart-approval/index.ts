@@ -21,8 +21,8 @@ export const SMART_APPROVAL_MODELS: readonly ModelId[] = [
   'claude-haiku-4.5',
 ];
 
-/** Maximum time (ms) allowed for a single classification attempt. */
-const SMART_APPROVAL_TIMEOUT_MS = 5_000;
+/**  Maximum time (ms) allowed for a single classification attempt. */
+const SMART_APPROVAL_TIMEOUT_MS = 8_000;
 
 export const smartApprovalSchema = z.object({
   needsApproval: z
