@@ -76,6 +76,10 @@ interface ModelSelectProps {
   onModelChange?: () => void;
 }
 
+// Sentinel value for the "Open model settings" row. Picked to be
+// impossible to collide with any real `ModelId` (leading `@@` + spaces).
+const OPEN_MODEL_SETTINGS_VALUE = '@@open model settings@@';
+
 export const ModelSelect = memo(function ModelSelect({
   onModelChange,
 }: ModelSelectProps) {
@@ -221,7 +225,15 @@ export const ModelSelect = memo(function ModelSelect({
 
   const handleValueChange = useCallback(
     (value: string | null) => {
-      if (!openAgent || !value) return;
+      if (!value) return;
+      if (value === OPEN_MODEL_SETTINGS_VALUE) {
+        // Navigate via the in-app deep link; matches the pattern used by
+        // `not-signed-in.tsx` and `message-runtime-error.tsx`.
+        window.location.href =
+          'stagewise://internal/agent-settings/models-providers';
+        return;
+      }
+      if (!openAgent) return;
       setSelectedModel(openAgent, value as ModelId);
       onModelChange?.();
     },
@@ -288,12 +300,12 @@ export const ModelSelect = memo(function ModelSelect({
                 />
               </div>
 
-              <div
-                ref={listScrollRef}
-                className="mask-alpha scrollbar-subtle max-h-48 overflow-y-auto"
-                style={listMaskStyle}
-              >
-                <ComboboxList>
+              <ComboboxList>
+                <div
+                  ref={listScrollRef}
+                  className="mask-alpha scrollbar-subtle max-h-48 overflow-y-auto"
+                  style={listMaskStyle}
+                >
                   {filteredGroupedModels.map(({ label, models }) =>
                     label ? (
                       <ComboboxGroup key={label}>
@@ -316,14 +328,19 @@ export const ModelSelect = memo(function ModelSelect({
                       ))
                     ),
                   )}
-                </ComboboxList>
-              </div>
-
-              {!hasFilteredResults && (
-                <div className="px-2 py-1.5 text-muted-foreground text-xs">
-                  No results
                 </div>
-              )}
+
+                {!hasFilteredResults && (
+                  <div className="px-2 py-1.5 text-muted-foreground text-xs">
+                    No results
+                  </div>
+                )}
+
+                <ComboboxItem value={OPEN_MODEL_SETTINGS_VALUE} size="xs">
+                  <ComboboxItemIndicator />
+                  <span className="col-start-2 truncate">Model settings</span>
+                </ComboboxItem>
+              </ComboboxList>
             </ComboboxBase.Popup>
 
             {/* Animated side panel for model details */}

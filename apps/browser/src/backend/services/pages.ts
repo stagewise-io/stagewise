@@ -25,6 +25,7 @@ import type {
   ModelProvider,
 } from '@shared/karton-contracts/ui/shared-types';
 import { validateApiKeys } from '../utils/validate-api-keys';
+import { listAwsProfiles } from '../utils/aws-profiles';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { ThumbnailService } from './thumbnail';
@@ -1547,6 +1548,13 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
+      'listAwsProfiles',
+      async (_callingClientId: string) => {
+        return listAwsProfiles();
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
       'validateProviderApiKey',
       async (
         _callingClientId: string,
@@ -2019,6 +2027,13 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('clearProviderApiKey');
     this.kartonServer.removeServerProcedureHandler('setCustomEndpointApiKey');
     this.kartonServer.removeServerProcedureHandler('clearCustomEndpointApiKey');
+    this.kartonServer.removeServerProcedureHandler(
+      'setCustomEndpointSecretKey',
+    );
+    this.kartonServer.removeServerProcedureHandler(
+      'setCustomEndpointGoogleCredentials',
+    );
+    this.kartonServer.removeServerProcedureHandler('listAwsProfiles');
     this.kartonServer.removeServerProcedureHandler('validateProviderApiKey');
     this.kartonServer.removeServerProcedureHandler('sendOtp');
     this.kartonServer.removeServerProcedureHandler('verifyOtp');

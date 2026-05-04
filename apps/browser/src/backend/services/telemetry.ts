@@ -300,6 +300,14 @@ export type EventProperties = {
      * dropped entirely for `off`.
      */
     base_url?: string;
+    /**
+     * Coarse AWS auth mode for Bedrock endpoints. Emitted regardless of
+     * telemetry level so we can track feature adoption. The profile
+     * *name* is deliberately NEVER reported — it can reveal internal
+     * account structure (e.g. `my-company-prod`) and is treated as
+     * PII-adjacent.
+     */
+    aws_auth_mode?: 'access-keys' | 'profile' | 'default-chain';
   };
   'custom-provider-add-aborted': {
     had_validation_errors: boolean;
@@ -309,6 +317,8 @@ export type EventProperties = {
     is_local?: boolean;
     /** See `custom-provider-add-finished` — same semantics. */
     base_url?: string;
+    /** See `custom-provider-add-finished` — same semantics. */
+    aws_auth_mode?: 'access-keys' | 'profile' | 'default-chain';
   };
   'workspace-connect-started': undefined;
   'workspace-connect-finished': undefined;
@@ -380,11 +390,17 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
     api_spec: z.string(),
     is_local: z.boolean().optional(),
     base_url: z.string().optional(),
+    aws_auth_mode: z
+      .enum(['access-keys', 'profile', 'default-chain'])
+      .optional(),
   }),
   'custom-provider-add-finished': z.object({
     api_spec: z.string(),
     is_local: z.boolean().optional(),
     base_url: z.string().optional(),
+    aws_auth_mode: z
+      .enum(['access-keys', 'profile', 'default-chain'])
+      .optional(),
   }),
   'custom-provider-add-started': z.undefined().optional(),
   'element-selection-started': z.undefined().optional(),

@@ -13,6 +13,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAzure } from '@ai-sdk/azure';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { fromIni, fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { createVertex } from '@ai-sdk/google-vertex';
 import { createStagewise } from './stagewise-provider';
 import type { AuthService } from '@/services/auth';
@@ -51,6 +52,14 @@ export type ModelWithOptions = {
   headers: Record<string, string>;
   contextWindowSize: number;
   providerMode: ProviderMode;
+  /**
+   * When true, the agent must strip the `strict` field from every tool
+   * definition before passing them to `streamText`. Required for providers
+   * whose backend rejects unknown fields on the tool payload — notably
+   * Bedrock-on-Anthropic, where `strict` surfaces as
+   * `tools.0.custom.strict: Extra inputs are not permitted`.
+   */
+  stripStrictFromTools?: boolean;
 };
 
 /**
@@ -188,6 +197,66 @@ export class ModelProviderService {
       apiSpec: endpoint.apiSpec,
       endpoint,
     };
+  }
+
+  /**
+   * Build an Amazon Bedrock provider for a custom endpoint based on its
+   * configured auth mode:
+   *
+   * - `access-keys` (default, back-compat): static access key + secret.
+   * - `profile`: named profile from `~/.aws/config` / `~/.aws/credentials`.
+   *   Handles static, session-token, assume-role, and SSO profiles via the
+   *   AWS SDK's standard refresh machinery. SSO profiles whose token has
+   *   expired will surface an error at signing time — users must re-run
+   *   `aws sso login --profile <name>`.
+   * - `default-chain`: Node provider chain (env vars, shared credentials,
+   *   EC2/ECS instance roles, IMDS).
+   *
+   * Region resolution: UI-entered `region` always wins. When empty:
+   *   - `access-keys` falls back to `us-east-1` (preserves pre-feature
+   *     behaviour for static-credential setups with no other region
+   *     source).
+   *   - `profile` and `default-chain` pass `undefined`, letting the AWS
+   *     SDK resolve the region from the profile's `region` entry or the
+   *     `AWS_REGION` / `AWS_DEFAULT_REGION` env vars.
+   */
+  private buildBedrockProvider(endpoint: CustomEndpoint, apiKey: string) {
+    const mode = endpoint.awsAuthMode ?? 'access-keys';
+    const overrideRegion = endpoint.region?.trim() || undefined;
+
+    if (mode === 'profile') {
+      if (!endpoint.awsProfileName) {
+        throw new Error(
+          'AWS profile name is required when awsAuthMode is "profile".',
+        );
+      }
+      return createAmazonBedrock({
+        // `region` intentionally undefined when the user did not override
+        // it — `createAmazonBedrock` + the AWS SDK will resolve from the
+        // profile's `region` entry or the `AWS_REGION` env var.
+        region: overrideRegion,
+        credentialProvider: fromIni({ profile: endpoint.awsProfileName }),
+      });
+    }
+
+    if (mode === 'default-chain') {
+      return createAmazonBedrock({
+        region: overrideRegion,
+        credentialProvider: fromNodeProviderChain(),
+      });
+    }
+
+    // access-keys: no profile / env to fall back on, so keep the
+    // historical `us-east-1` default to preserve behaviour for existing
+    // setups.
+    const secretAccessKey = this.preferencesService.decryptProviderApiKey(
+      endpoint.encryptedSecretKey,
+    );
+    return createAmazonBedrock({
+      region: overrideRegion ?? 'us-east-1',
+      accessKeyId: apiKey,
+      secretAccessKey,
+    });
   }
 
   /**
@@ -592,14 +661,7 @@ export class ModelProviderService {
       }
 
       case 'amazon-bedrock': {
-        const secretAccessKey = this.preferencesService.decryptProviderApiKey(
-          endpoint.encryptedSecretKey,
-        );
-        const bedrockProvider = createAmazonBedrock({
-          region: endpoint.region ?? 'us-east-1',
-          accessKeyId: apiKey,
-          secretAccessKey,
-        });
+        const bedrockProvider = this.buildBedrockProvider(endpoint, apiKey);
         return {
           model: this.telemetryService.withTracing(
             bedrockProvider(modelId as any),
@@ -608,6 +670,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          stripStrictFromTools: true,
         };
       }
 
@@ -771,14 +834,7 @@ export class ModelProviderService {
 
       case 'amazon-bedrock': {
         const ep = endpoint ?? ({} as CustomEndpoint);
-        const secretAccessKey = this.preferencesService.decryptProviderApiKey(
-          ep.encryptedSecretKey,
-        );
-        const bedrockProvider = createAmazonBedrock({
-          region: ep.region ?? 'us-east-1',
-          accessKeyId: apiKey,
-          secretAccessKey,
-        });
+        const bedrockProvider = this.buildBedrockProvider(ep, apiKey);
         return {
           model: this.telemetryService.withTracing(
             bedrockProvider(customModel.modelId as any),
@@ -787,6 +843,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          stripStrictFromTools: true,
         };
       }
 

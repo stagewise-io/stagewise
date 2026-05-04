@@ -157,6 +157,10 @@ export class PreferencesService extends DisposableService {
           apiSpec: apiSpecMap[provider] as any,
           baseUrl: config.customBaseUrl,
           encryptedApiKey: config.encryptedApiKey,
+          // Default value mirrors the Zod schema — only Bedrock reads it,
+          // and the migration path only hits providers without Bedrock,
+          // but the type makes the field required.
+          awsAuthMode: 'access-keys',
         });
 
         config.customProviderId = id;

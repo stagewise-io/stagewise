@@ -92,6 +92,16 @@ export const customEndpointSchema = z.object({
   // Amazon Bedrock-specific fields
   region: z.string().optional(),
   encryptedSecretKey: z.string().optional(),
+  /**
+   * Amazon Bedrock auth mode. Defaults to 'access-keys' for backward
+   * compatibility with endpoints created before this field existed
+   * (they all used static access keys).
+   */
+  awsAuthMode: z
+    .enum(['access-keys', 'profile', 'default-chain'])
+    .default('access-keys'),
+  /** Named AWS profile to use when awsAuthMode === 'profile'. */
+  awsProfileName: z.string().optional(),
   // Google Vertex-specific fields
   projectId: z.string().optional(),
   location: z.string().optional(),

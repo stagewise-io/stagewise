@@ -217,6 +217,27 @@ export type PagesApiContract = {
       endpointId: string,
       credentials: string,
     ) => Promise<void>;
+    /**
+     * Enumerate AWS profiles declared in `~/.aws/config` and
+     * `~/.aws/credentials`. Each entry carries the profile's declared
+     * region (and `sso_region`, if set) so the UI can pick the
+     * correct Bedrock cross-region inference profile prefix without
+     * a second round-trip. Returns an empty list (with an error
+     * message) when the ini files cannot be read.
+     *
+     * `envRegion` mirrors `AWS_REGION` / `AWS_DEFAULT_REGION` from
+     * the Electron main process env — mainly useful as a fallback
+     * for `default-chain` mode where the profile files don't apply.
+     */
+    listAwsProfiles: () => Promise<{
+      profiles: Array<{
+        name: string;
+        region?: string;
+        ssoRegion?: string;
+      }>;
+      envRegion?: string;
+      error?: string;
+    }>;
     /** Validate a provider API key by making a lightweight test request */
     validateProviderApiKey: (
       provider: ModelProvider,

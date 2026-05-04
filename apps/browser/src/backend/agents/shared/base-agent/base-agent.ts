@@ -58,6 +58,7 @@ import { hashPath } from './file-read-transformer/hash';
 import { deriveMaxReadChars } from './file-read-transformer/format-utils';
 import { clearPendingApproval } from './pending-approvals-cleanup';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
+import { stripStrictFromToolSet } from './strip-strict-from-tools';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
 
@@ -610,6 +611,7 @@ export abstract class BaseAgent<
 
           // Keep `pendingApprovals` free of stale entries regardless of
           // which terminal state we transition to.
+          // @ts-expect-error - We know that the tool part is a ToolUIPart
           clearPendingApproval(draft, toolPart);
 
           if (toolPart.state === 'approval-requested') {
@@ -1551,6 +1553,9 @@ export abstract class BaseAgent<
       this._toolCallDurations.clear();
       tools = this.wrapToolsWithTiming(tools);
       tools = this.wrapToolsWithOutputBudget(tools);
+      if (modelWithOptions.stripStrictFromTools) {
+        tools = this.stripStrictFromTools(tools);
+      }
       resolvedConfig = {
         ...this.config,
         ...(await this.getModelSettings(this.messages)),
@@ -3016,6 +3021,26 @@ export abstract class BaseAgent<
       ...BaseAgent.extractApiErrorContext(error),
       ...extra,
     });
+  }
+
+  /**
+   * Removes the `strict` field from each tool definition.
+   *
+   * Rationale: tool factories pass `strict: false` (OpenAI-specific; ignored
+   * by most other providers) so that Zod schemas with `z.any()` / unions are
+   * not forced through OpenAI's strict JSON-Schema subset. However, the
+   * Bedrock → Anthropic path serialises the field into the Anthropic
+   * tool payload, which rejects unknown keys with
+   * `tools.0.custom.strict: Extra inputs are not permitted`.
+   *
+   * For providers that flag `stripStrictFromTools`, we delete `strict`
+   * here as the very last step before `streamText`, leaving the existing
+   * `strict: false` defaults untouched for every other provider.
+   */
+  private stripStrictFromTools(
+    tools: Partial<StagewiseToolSet>,
+  ): Partial<StagewiseToolSet> {
+    return stripStrictFromToolSet(tools);
   }
 
   private wrapToolsWithTiming(
