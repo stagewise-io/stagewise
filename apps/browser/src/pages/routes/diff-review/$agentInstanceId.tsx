@@ -20,13 +20,13 @@ import {
   useKartonConnected,
   useKartonState,
 } from '@pages/hooks/use-karton';
-import { DiffPreview } from '@ui/screens/main/sidebar/chat/_components/message-part-ui/tools/shared/diff-preview';
+import { DiffPreview } from '@ui/screens/main/agent-chat/chat/_components/message-part-ui/tools/shared/diff-preview';
 import { FileIcon } from '@ui/components/file-icon';
 import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
 import {
   type FormattedFileDiff,
   getLineStats,
-} from '@ui/screens/main/sidebar/chat/_components/footer-status-card/shared';
+} from '@ui/screens/main/agent-chat/chat/_components/footer-status-card/shared';
 import { ExternalFilePreview } from './_components/external-file-preview';
 import { getBaseName } from '@shared/path-utils';
 import {

@@ -18,14 +18,15 @@ import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { useTrack } from '@ui/hooks/use-track';
 import { AgentCardSkeleton } from './_components/agent-card';
 import { AgentCardWithPreview } from './_components/agent-card-with-preview';
-import type { CachedPreview } from '@ui/screens/main/sidebar/top/_components/agent-preview-panel';
+import type { CachedPreview } from '../../_components/agent-preview-panel';
 import { getToolActivityLabel } from './_utils/tool-label';
 import {
   useSharedAgentContextMenu,
   SharedAgentContextMenuHost,
-} from '../_components/shared-agent-context-menu';
-import { DeleteConfirmPopover } from '../_components/delete-confirm-popover';
+} from '../../_components/shared-agent-context-menu';
+import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
+import { AgentsSelector } from './_components/agents-selector';
 
 type ActiveAgentCardData = {
   id: string;
@@ -121,7 +122,7 @@ function deriveActivityText(
   return { text: '', isUserInput: false };
 }
 
-export function ActiveAgentsGrid() {
+export function AgentsList() {
   const showActiveAgents = useKartonState(
     (s) => s.preferences.sidebar?.showActiveAgents ?? true,
   );
@@ -390,60 +391,55 @@ export function ActiveAgentsGrid() {
   if (!showActiveAgents) return null;
 
   return (
-    <div className="flex shrink-0 flex-col overflow-x-visible border-border-subtle border-b px-1 pt-2 group-data-[collapsed=true]:hidden">
-      <div className="flex items-center justify-between">
-        <span className="px-0.5 font-medium text-muted-foreground text-sm">
-          Active agents
+    <div className="flex h-full flex-col overflow-x-hidden px-0.5 pt-2 group-data-[collapsed=true]:hidden">
+      <div className="flex items-center justify-between gap-1">
+        <span className="flex-1 px-0.5 font-medium text-muted-foreground text-sm">
+          Agents
         </span>
+        <AgentsSelector />
+      </div>
+      <OverlayScrollbar
+        ref={scrollRef}
+        className="min-h-5"
+        contentClassName="pt-2 pb-3.5"
+        options={{ overflow: { x: 'visible' } }}
+      >
         <Button
           variant="ghost"
-          size="xs"
-          className="-mr-1.5 shrink-0"
+          size="md"
+          className="w-full justify-start pl-1.5 font-medium hover:bg-base-500/10"
           onClick={handleCreateAgent}
         >
-          <span>New agent</span>
-          <IconPlusFill18 className="size-3" />
+          <IconPlusFill18 className="size-4" />
+          Create new agent
         </Button>
-      </div>
-      {orderedAgents.length === 0 && !showCreateSkeleton ? (
-        <div className="flex items-center justify-center px-2 py-6 text-center text-muted-foreground text-xs">
-          Get started by clicking &ldquo;New agent +&rdquo;
-        </div>
-      ) : (
-        <OverlayScrollbar
-          ref={scrollRef}
-          className="max-h-[15vh] min-h-5"
-          contentClassName="grid auto-rows-max @[400px]:grid-cols-2 grid-cols-1 gap-2 pt-2 pb-3.5"
-          options={{ overflow: { x: 'visible' } }}
-        >
-          {orderedAgents.map((agent) => {
-            const isOpen = agent.id === openAgent;
-            const hasUnseen = !isOpen && agent.unread;
+        {orderedAgents.map((agent) => {
+          const isOpen = agent.id === openAgent;
+          const hasUnseen = !isOpen && agent.unread;
 
-            return (
-              <AgentCardWithPreview
-                key={agent.id}
-                id={agent.id}
-                title={agent.title}
-                isActive={isOpen}
-                isWorking={agent.isWorking}
-                isWaitingForUser={agent.isWaitingForUser}
-                hasError={agent.hasError}
-                hasUnseen={hasUnseen}
-                activityText={agent.activityText}
-                activityIsUserInput={agent.activityIsUserInput}
-                lastMessageAt={agent.lastMessageAt}
-                contextMenuState={ctxMenuState}
-                onClick={handleClick}
-                onArchive={handleArchive}
-                onRename={handleRename}
-                cache={previewCacheRef.current}
-              />
-            );
-          })}
-          {showCreateSkeleton && <AgentCardSkeleton />}
-        </OverlayScrollbar>
-      )}
+          return (
+            <AgentCardWithPreview
+              key={agent.id}
+              id={agent.id}
+              title={agent.title}
+              isActive={isOpen}
+              isWorking={agent.isWorking}
+              isWaitingForUser={agent.isWaitingForUser}
+              hasError={agent.hasError}
+              hasUnseen={hasUnseen}
+              activityText={agent.activityText}
+              activityIsUserInput={agent.activityIsUserInput}
+              lastMessageAt={agent.lastMessageAt}
+              contextMenuState={ctxMenuState}
+              onClick={handleClick}
+              onArchive={handleArchive}
+              onRename={handleRename}
+              cache={previewCacheRef.current}
+            />
+          );
+        })}
+        {showCreateSkeleton && <AgentCardSkeleton />}
+      </OverlayScrollbar>
       <SharedAgentContextMenuHost
         target={ctxMenuTarget}
         onClose={handleCtxMenuClose}

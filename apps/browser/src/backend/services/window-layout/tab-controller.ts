@@ -302,7 +302,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
         partition: 'persist:browser-content',
       },
     });
-    this.webContentsView.setBorderRadius(4);
 
     this.kartonTransport = new ElectronServerTransport();
 

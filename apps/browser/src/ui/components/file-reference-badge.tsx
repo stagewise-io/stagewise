@@ -9,7 +9,7 @@ import {
   truncateLabel,
   InlineBadge,
   InlineBadgeWrapper,
-} from '@ui/screens/main/sidebar/chat/_components/rich-text/shared';
+} from '@ui/screens/main/agent-chat/chat/_components/rich-text/shared';
 import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';

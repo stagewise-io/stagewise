@@ -21,8 +21,8 @@ import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 
-import { TabMentionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/tab-mention-badge';
-import { ShellSessionBadge } from '@ui/screens/main/sidebar/chat/_components/rich-text/mentions/shell-session-badge';
+import { TabMentionBadge } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions/tab-mention-badge';
+import { ShellSessionBadge } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions/shell-session-badge';
 import {
   getRenderer,
   resolveAttachmentBlobUrl,

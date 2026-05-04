@@ -5,11 +5,9 @@ import { Tab } from './tab';
 
 export function SortableTab({
   tabState,
-  activateBottomLeftCornerRadius,
   isActive,
 }: {
   tabState: TabState;
-  activateBottomLeftCornerRadius: boolean;
   isActive: boolean;
 }) {
   const {
@@ -27,9 +25,9 @@ export function SortableTab({
     opacity: isDragging ? 0.4 : 1,
     overflow: 'visible',
     // Width constraints: start at 13rem (w-52), shrink to min 6rem (min-w-24)
-    width: '13rem',
-    minWidth: '6rem',
-    flexShrink: 1,
+    width: '8rem',
+    minWidth: '5rem',
+    flexShrink: 0,
   };
 
   return (
@@ -37,14 +35,11 @@ export function SortableTab({
       ref={setNodeRef}
       style={style}
       data-state={isActive ? 'active' : 'inactive'}
+      className="data-[state=active]:bg-surface-1 data-[state=inactive]:bg-transparent"
       {...attributes}
       {...listeners}
     >
-      <Tab
-        tabState={tabState}
-        activateBottomLeftCornerRadius={activateBottomLeftCornerRadius}
-        isDragging={isDragging}
-      />
+      <Tab tabState={tabState} isDragging={isDragging} />
     </div>
   );
 }

@@ -1,12 +1,9 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import {
-  TabsContainer,
-  DND_DROP_ANIMATION_DURATION,
-} from './_components/tabs-container';
+import { TabsContainer } from './_components/tabs-container';
 import { useEventListener } from '@ui/hooks/use-event-listener';
 import { useTrack } from '@ui/hooks/use-track';
 import { BackgroundWithCutout } from './_components/background-with-cutout';
@@ -16,13 +13,7 @@ import {
   type PerTabContentRef,
 } from './_components/per-tab-content';
 
-export function MainSection({
-  isSidebarCollapsed,
-  openSidebarChatPanel,
-}: {
-  isSidebarCollapsed: boolean;
-  openSidebarChatPanel: () => void;
-}) {
+export function MainSection() {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
@@ -36,9 +27,6 @@ export function MainSection({
 
   // Track interpolated border radius during tab drag (for smooth corner transition)
   const [dragBorderRadius, setDragBorderRadius] = useState<number | null>(null);
-  // Track if the active tab is being dragged to position 0
-  const [isActiveTabDragAtPositionZero, setIsActiveTabDragAtPositionZero] =
-    useState(false);
 
   // Store refs for each tab's PerTabContent
   const tabContentRefs = useRef<Record<string, PerTabContentRef | null>>({});
@@ -51,17 +39,6 @@ export function MainSection({
   const handleDragBorderRadiusChange = useCallback((radius: number | null) => {
     setDragBorderRadius(radius);
   }, []);
-
-  const handleActiveTabDragAtPositionZero = useCallback(
-    (isAtPositionZero: boolean) => {
-      if (isAtPositionZero)
-        setTimeout(() => {
-          setIsActiveTabDragAtPositionZero(true);
-        }, DND_DROP_ANIMATION_DURATION - 100);
-      else setIsActiveTabDragAtPositionZero(false);
-    },
-    [],
-  );
 
   // Effect to focus omnibox when a new tab is created and ready
   useEffect(() => {
@@ -135,10 +112,6 @@ export function MainSection({
     }
   }, [activeTabId]);
 
-  const activeTabIndex = useMemo(() => {
-    return Object.keys(tabs).findIndex((_id) => _id === activeTabId) ?? 0;
-  }, [activeTabId, tabs]);
-
   const handleTabFocused = useCallback(
     (event: CustomEvent<string>) => {
       setTabUiState(event.detail, {
@@ -167,10 +140,6 @@ export function MainSection({
     window,
   );
 
-  const showTopLeftCornerRadius = useMemo(() => {
-    return activeTabIndex !== 0 || isSidebarCollapsed;
-  }, [activeTabIndex, isSidebarCollapsed]);
-
   return (
     <ResizablePanel
       id="opened-content-panel"
@@ -186,39 +155,23 @@ export function MainSection({
       />
       <div className="flex h-full w-full flex-col">
         <TabsContainer
-          openSidebarChatPanel={openSidebarChatPanel}
-          isSidebarCollapsed={isSidebarCollapsed}
           onAddTab={handleCreateTab}
-          onCleanAllTabs={handleCleanAllTabs}
           onDragBorderRadiusChange={handleDragBorderRadiusChange}
-          onActiveTabDragAtPositionZero={handleActiveTabDragAtPositionZero}
         />
         {/* Content area with per-tab UI */}
         <div
-          className={cn(
-            'relative flex size-full flex-col rounded-b-lg rounded-tr-lg',
-            // Only apply the static rounded-tl-lg class when not during a drag with interpolated radius
-            dragBorderRadius === null && showTopLeftCornerRadius
-              ? 'rounded-tl-lg'
-              : '',
-          )}
+          className={cn('relative flex size-full flex-col')}
           style={
             dragBorderRadius !== null
               ? { borderTopLeftRadius: `${dragBorderRadius}px` }
               : undefined
           }
         >
-          {/* Background layer that can extend beyond rounded corners
-              Only show when actively dragging the active tab to position 0 */}
-          {dragBorderRadius !== null && isActiveTabDragAtPositionZero && (
-            <div className="-z-30 absolute inset-0 rounded-lg rounded-tl-none bg-background/40" />
-          )}
           {/* Inner container with overflow clipping */}
-          <div className="flex size-full flex-col overflow-hidden rounded-[inherit]">
+          <div className="flex size-full flex-col overflow-hidden">
             {/* Background with mask for the web-content */}
             <BackgroundWithCutout
               className={cn(`z-0`)}
-              borderRadius={4}
               targetElementId={
                 activeTabId
                   ? `dev-app-preview-container-${activeTabId}`

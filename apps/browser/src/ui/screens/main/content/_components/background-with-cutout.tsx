@@ -4,11 +4,9 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 export function BackgroundWithCutout({
   targetElementId = 'dev-app-preview-container',
   className = '',
-  borderRadius = 8,
 }: {
   targetElementId?: string;
   className?: string;
-  borderRadius?: number;
 }) {
   const maskId = `cutout-mask-${useId()}`;
   const parentRef = useRef<HTMLDivElement>(null);
@@ -114,7 +112,7 @@ export function BackgroundWithCutout({
       mutationObserver.disconnect();
       window.removeEventListener('resize', recalculateBounds);
     };
-  }, [targetElementId, maskId, borderRadius]);
+  }, [targetElementId, maskId]);
 
   return (
     <div ref={parentRef} className={cn('absolute inset-0', className)}>
@@ -134,12 +132,7 @@ export function BackgroundWithCutout({
             y={0}
           >
             <rect ref={whiteRectRef} x="0" y="0" fill="white" />
-            <rect
-              ref={blackRectRef}
-              fill="black"
-              rx={borderRadius}
-              ry={borderRadius}
-            />
+            <rect ref={blackRectRef} fill="black" />
           </mask>
         </defs>
       </svg>

@@ -10,7 +10,7 @@ import type {
   AttachmentMetadata,
   Mount,
 } from '@shared/karton-contracts/ui/agent/metadata';
-import type { ChatInputHandle } from '@ui/screens/main/sidebar/chat/_components/chat-input';
+import type { ChatInputHandle } from '@ui/screens/main/agent-chat/chat/_components/chat-input';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { mimeToDefaultName } from '@shared/utils/mime-to-default-name';

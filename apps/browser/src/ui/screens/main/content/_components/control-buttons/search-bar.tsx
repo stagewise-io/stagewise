@@ -187,7 +187,7 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
     <Collapsible open={shouldShow}>
       <CollapsibleContent
         className={cn(
-          'h-8 w-[calc-size(auto,size)] justify-center rounded-full bg-zinc-500/5 pr-1.5 pl-2.5 text-base opacity-100 blur-none focus-within:bg-zinc-500/10',
+          'h-7 w-[calc-size(auto,size)] justify-center rounded-full bg-zinc-500/5 pr-1.5 pl-2.5 text-base opacity-100 blur-none focus-within:bg-zinc-500/10',
           // Only apply transitions for mouse interactions, instant for keyboard
           isKeyboardInteraction
             ? 'transition-none'
