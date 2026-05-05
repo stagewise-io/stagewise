@@ -473,7 +473,11 @@ export class TelemetryService extends DisposableService {
     this.preferencesService = preferencesService;
     this.logger = logger;
     const apiKey = process.env.POSTHOG_API_KEY ?? '';
-    this.posthogClient = new PostHog(apiKey, {
+    // posthog-node asserts a non-empty key in its constructor before honoring
+    // `disabled: true`. For self-hosted/dev builds without a key, pass a
+    // placeholder so the client still constructs, then rely on `disabled` to
+    // make every call a no-op.
+    this.posthogClient = new PostHog(apiKey || 'phc_disabled_placeholder', {
       host: process.env.POSTHOG_HOST || 'https://eu.i.posthog.com',
       flushAt: 1,
       flushInterval: 0,
