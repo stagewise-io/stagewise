@@ -75,7 +75,7 @@ export const ChatHistory = () => {
   const spacerHeightRef = useRef(0);
 
   const paddingRight = useMemo(() => {
-    return scrollbarWidth === 0 ? 18 : 5;
+    return scrollbarWidth === 0 ? 27 : 8;
   }, [scrollbarWidth]);
 
   // Element refs for direct measurement in useLayoutEffect
@@ -871,10 +871,9 @@ export const ChatHistory = () => {
         return (
           <div
             ref={lastAssistantMessageRef}
-            className="flex flex-col pb-[calc(64px+var(--status-card-height,0px))] pl-4"
-            style={{ paddingRight }}
+            className="mx-auto w-full max-w-3xl px-1.5 pb-[calc(96px+var(--status-card-height,0px))]"
           >
-            <div className="mx-auto w-full max-w-3xl">
+            <div className="pl-6" style={{ paddingRight }}>
               {messageComponent}
               {curShowWorking && <MessageLoading />}
               {curError && isLastMessage && openAgent && (
@@ -895,10 +894,12 @@ export const ChatHistory = () => {
       if (isLastUserMessage && isLastMessage) {
         return (
           <div
-            className={cn('flex flex-col pl-4', index === 0 && 'pt-2.5')}
-            style={{ paddingRight }}
+            className={cn(
+              'mx-auto w-full max-w-3xl px-1.5',
+              index === 0 && 'pt-[15px]',
+            )}
           >
-            <div className="mx-auto w-full max-w-3xl">
+            <div className="pl-6" style={{ paddingRight }}>
               <div ref={lastUserMessageRef}>{messageComponent}</div>
               {/* Spacer element receives minHeight to fill viewport below user message.
                   Error card and loading indicator live INSIDE the spacer (same pattern
@@ -924,10 +925,12 @@ export const ChatHistory = () => {
       if (isLastUserMessage) {
         const el = (
           <div
-            className={cn('flex flex-col pl-4', index === 0 && 'pt-2.5')}
-            style={{ paddingRight }}
+            className={cn(
+              'mx-auto w-full max-w-3xl px-1.5',
+              index === 0 && 'pt-[15px]',
+            )}
           >
-            <div className="mx-auto w-full max-w-3xl">
+            <div className="pl-6" style={{ paddingRight }}>
               <div ref={lastUserMessageRef}>{messageComponent}</div>
             </div>
           </div>
@@ -940,10 +943,12 @@ export const ChatHistory = () => {
 
       const el = (
         <div
-          className={cn('pl-4', index === 0 && 'pt-2.5')}
-          style={{ paddingRight }}
+          className={cn(
+            'mx-auto w-full max-w-3xl px-1.5',
+            index === 0 && 'pt-[15px]',
+          )}
         >
-          <div className="mx-auto w-full max-w-3xl">
+          <div className="pl-6" style={{ paddingRight }}>
             {messageComponent}
             {curError && isLastMessage && openAgent && (
               <MessageRuntimeError
@@ -981,7 +986,7 @@ export const ChatHistory = () => {
   // Empty state component for suggestions
   const EmptyPlaceholder = useCallback(() => {
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center gap-1 px-4 pb-[calc(8px+var(--status-card-height,0px))] text-sm">
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center gap-1 px-6 pb-[calc(12px+var(--status-card-height,0px))] text-sm">
         {visibleSuggestions.map((suggestion) => (
           <ChatSuggestion
             key={suggestion.id}
@@ -1019,7 +1024,7 @@ export const ChatHistory = () => {
           <section
             aria-label="Agent message display"
             className={cn(
-              'pointer-events-auto mb-1 block h-max min-h-[inherit] text-foreground text-sm focus-within:outline-none focus:outline-none',
+              'pointer-events-auto block h-max min-h-[inherit] text-foreground text-sm focus-within:outline-none focus:outline-none',
             )}
           >
             {EmptyPlaceholder()}

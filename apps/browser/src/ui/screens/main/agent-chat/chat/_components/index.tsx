@@ -148,7 +148,7 @@ export function ChatPanel() {
             statusCardVisible ? 'mx-3' : 'mx-1',
           )}
           style={{
-            marginBottom: 'calc(var(--status-card-height, 0px) + 0.5rem)',
+            marginBottom: 'var(--status-card-height, 0px)',
           }}
         >
           <InternalAppFrame />

@@ -14,7 +14,6 @@ import {
 import { useInlineTitleEdit } from './use-inline-title-edit';
 import TimeAgo from 'javascript-time-ago';
 import en from 'javascript-time-ago/locale/en';
-import { Logo } from '@ui/components/ui/logo';
 
 TimeAgo.addLocale(en);
 const _timeAgo = new TimeAgo('en-US');
@@ -128,38 +127,40 @@ export const AgentCard = memo(
         }}
         className={cn(
           buttonVariants({ variant: 'ghost', size: 'md' }),
-          'group/card relative justify-start pl-1.5 text-muted-foreground hover:bg-base-500/10',
-          isActive && 'bg-base-500/5 text-foreground',
+          'group/card relative justify-start pl-1.5 text-start text-muted-foreground hover:bg-foreground/8',
+          isActive && 'bg-foreground/5 text-foreground',
         )}
       >
-        {!isWorking && !isWaitingForUser && !hasError && !hasUnseen && (
-          <Logo className="size-3 shrink-0" color="current" />
-        )}
-        {hasError && (
-          <div className="flex size-3 items-center justify-center">
-            <div className="size-2 shrink-0 rounded-full bg-error-solid" />
-            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-error-solid" />
-          </div>
-        )}
-        {isWorking && !isWaitingForUser && (
-          <div className="flex size-3 items-center justify-center">
-            <div className="size-2 shrink-0 rounded-full bg-primary-solid" />
-            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-primary-solid" />
-          </div>
-        )}
-        {!isWorking && !isWaitingForUser && hasUnseen && (
-          <div className="flex size-3 items-center justify-center">
-            <div className="size-2 shrink-0 rounded-full bg-success-solid" />
-            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-success-solid" />
-          </div>
-        )}
-        {isWaitingForUser && (
-          <div className="flex size-3 items-center justify-center">
-            <div className="size-2 shrink-0 rounded-full bg-warning-solid" />
-            <div className="absolute size-2 shrink-0 animate-ping rounded-full bg-warning-solid" />
-          </div>
-        )}
-        <div className="mask-alpha mask-r-from-black mask-r-to-black group-hover/card:mask-r-to-transparent mark-r-from-80% mask-r-to-90%">
+        {(() => {
+          // Priority: error > waitingForUser > working > unseen > idle
+          const dotColor = hasError
+            ? 'bg-error-solid'
+            : isWaitingForUser
+              ? 'bg-warning-solid'
+              : isWorking
+                ? 'bg-primary-solid'
+                : hasUnseen
+                  ? 'bg-success-solid'
+                  : null;
+          return (
+            <div className="flex size-4 shrink-0 items-center justify-center">
+              {dotColor ? (
+                <>
+                  <div
+                    className={cn('size-2 shrink-0 rounded-full', dotColor)}
+                  />
+                  <div
+                    className={cn(
+                      'absolute size-2 shrink-0 animate-ping rounded-full',
+                      dotColor,
+                    )}
+                  />
+                </>
+              ) : null}
+            </div>
+          );
+        })()}
+        <div className="mask-alpha mask-r-from-black mask-r-to-black group-hover/card:mask-r-to-transparent mask-r-from-80% mask-r-to-90% min-w-0 flex-1">
           {isEditing ? (
             <span
               ref={titleRef}

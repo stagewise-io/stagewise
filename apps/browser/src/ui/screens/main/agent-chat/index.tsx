@@ -23,7 +23,7 @@ export function AgentChat() {
         // Only store if size is greater than 0 (not collapsed) and we're not currently collapsing
         if (size > 0) previousSizeRef.current = size;
       }}
-      className="@container group overflow-visible! z-10 flex h-full flex-col items-stretch justify-between bg-background p-1 ring-1 ring-derived-strong"
+      className="@container group overflow-visible! z-10 flex h-full flex-col items-stretch justify-between bg-background p-1"
     >
       <PendingRemovalsProvider>
         <Chat />

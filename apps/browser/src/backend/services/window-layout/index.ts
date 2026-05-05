@@ -123,7 +123,6 @@ export class WindowLayoutService extends DisposableService {
           isDark: boolean;
           theme: {
             background: string;
-            titleBarOverlay: { color: string; symbolColor: string };
           };
         },
       ) => void)
@@ -223,7 +222,7 @@ export class WindowLayoutService extends DisposableService {
       x: this.lastNonMaximizedBounds.x,
       y: this.lastNonMaximizedBounds.y,
       title: __APP_NAME__,
-      titleBarStyle: 'hidden',
+      titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
       show: false, // Don't show until UI is ready to prevent visual glitches
       // fullscreenable: false,
       ...(process.platform === 'linux'
@@ -232,15 +231,6 @@ export class WindowLayoutService extends DisposableService {
               process.resourcesPath,
               `assets/icons/${__APP_RELEASE_CHANNEL__}/icon.png`,
             ),
-          }
-        : {}),
-      ...(process.platform !== 'darwin'
-        ? {
-            titleBarOverlay: {
-              color: initialTheme.titleBarOverlay.color,
-              symbolColor: initialTheme.titleBarOverlay.symbolColor,
-              height: 40,
-            },
           }
         : {}),
       trafficLightPosition: { x: 14, y: 16 },
@@ -2027,12 +2017,6 @@ export class WindowLayoutService extends DisposableService {
 
     if (process.platform !== 'darwin') {
       this.baseWindow.setBackgroundColor(theme.background);
-
-      // titleBarOverlay is only used on non-macOS platforms
-      this.baseWindow.setTitleBarOverlay({
-        color: theme.titleBarOverlay.color,
-        symbolColor: theme.titleBarOverlay.symbolColor,
-      });
     }
 
     // Note: Tab webcontents backgrounds stay white regardless of theme
@@ -2052,7 +2036,6 @@ export class WindowLayoutService extends DisposableService {
     isDark: boolean;
     theme: {
       background: string;
-      titleBarOverlay: { color: string; symbolColor: string };
     };
   }) {
     if (!this.baseWindow || this.baseWindow.isDestroyed()) return;
@@ -2068,12 +2051,6 @@ export class WindowLayoutService extends DisposableService {
 
     if (process.platform !== 'darwin') {
       this.baseWindow.setBackgroundColor(colors.theme.background);
-
-      // titleBarOverlay is only used on non-macOS platforms
-      this.baseWindow.setTitleBarOverlay({
-        color: colors.theme.titleBarOverlay.color,
-        symbolColor: colors.theme.titleBarOverlay.symbolColor,
-      });
     }
 
     this.logger.debug(
