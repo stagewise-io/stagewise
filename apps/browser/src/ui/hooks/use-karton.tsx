@@ -17,10 +17,6 @@ declare global {
         isDark: boolean;
         theme: {
           background: string;
-          titleBarOverlay: {
-            color: string;
-            symbolColor: string;
-          };
         };
       }) => void;
     };

@@ -14,11 +14,6 @@ import {
 } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
-import {
-  Collapsible,
-  CollapsibleContent,
-} from '@stagewise/stage-ui/components/collapsible';
-import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 
@@ -39,7 +34,7 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
   // Track whether the current interaction was triggered by keyboard
   // This is used to disable animations for keyboard interactions (instant feel)
   // while keeping animations for mouse interactions
-  const [isKeyboardInteraction, setIsKeyboardInteraction] = useState(false);
+  const [_isKeyboardInteraction, setIsKeyboardInteraction] = useState(false);
 
   const isSearchBarActive = useKartonState(
     (s) => s.browser.tabs[tabId]?.isSearchBarActive ?? false,
@@ -111,7 +106,7 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
     }
   }, [pendingKeyboardFocus, shouldShow]);
 
-  const handleMouseEnter = useCallback(() => {
+  const _handleMouseEnter = useCallback(() => {
     // Mouse interaction should always use transitions
     setIsKeyboardInteraction(false);
   }, []);
@@ -183,87 +178,75 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
     updateSearch,
   ]);
 
+  if (!shouldShow) return null;
+
   return (
-    <Collapsible open={shouldShow}>
-      <CollapsibleContent
-        className={cn(
-          'h-7 w-[calc-size(auto,size)] justify-center rounded-full bg-zinc-500/5 pr-1.5 pl-2.5 text-base opacity-100 blur-none focus-within:bg-zinc-500/10',
-          // Only apply transitions for mouse interactions, instant for keyboard
-          isKeyboardInteraction
-            ? 'transition-none'
-            : 'transition-all duration-150 ease-out data-ending-style:h-8! data-starting-style:h-8! data-ending-style:w-0 data-starting-style:w-0 data-ending-style:overflow-hidden data-starting-style:overflow-hidden data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:blur-sm data-starting-style:blur-sm',
-        )}
-        onMouseEnter={handleMouseEnter}
-      >
-        <div className="flex h-full min-w-48 basis-1/4 flex-row items-center justify-between gap-2">
-          <IconMagnifierOutline18 className="size-4 text-muted-foreground opacity-50" />
-          <input
-            ref={inputRef}
-            placeholder="Search in tab..."
-            type="text"
-            value={searchString}
-            onChange={(e) => setSearchString(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                if (tabSearch && tabSearch.resultsCount > 0) {
-                  if (e.shiftKey) {
-                    // Shift+Enter: Previous result
-                    previousSearchResult(tabId);
-                  } else {
-                    // Enter: Next result
-                    nextSearchResult(tabId);
-                  }
-                }
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                e.stopPropagation(); // Prevent React event from bubbling
-                e.nativeEvent.stopImmediatePropagation(); // Prevent native event from reaching window listeners
-                // Mark as keyboard interaction for instant close (no animation)
-                // Set both states synchronously so they're batched in the same render
-                setIsKeyboardInteraction(true);
-                setShouldShow(false);
-                deactivateSearchBar();
+    <div className="flex h-full min-w-48 basis-1/4 flex-row items-center justify-between gap-2 pr-0.5 pl-1.5">
+      <IconMagnifierOutline18 className="size-4 text-muted-foreground opacity-50" />
+      <input
+        ref={inputRef}
+        placeholder="Search in tab..."
+        type="text"
+        value={searchString}
+        onChange={(e) => setSearchString(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            if (tabSearch && tabSearch.resultsCount > 0) {
+              if (e.shiftKey) {
+                // Shift+Enter: Previous result
+                previousSearchResult(tabId);
+              } else {
+                // Enter: Next result
+                nextSearchResult(tabId);
               }
-            }}
-            className="w-full flex-1 truncate text-foreground text-sm outline-none"
-          />
-          {searchString.length > 0 && (
-            <div className="flex flex-row items-center gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                disabled={!tabSearch || tabSearch.resultsCount === 0}
-                onClick={() => previousSearchResult(tabId)}
-              >
-                <IconChevronLeft className="size-3" />
-              </Button>
-              <span className="text-muted-foreground text-xs">
-                {tabSearch?.activeMatchIndex ?? 0} /{' '}
-                {tabSearch?.resultsCount ?? 0}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                disabled={!tabSearch || tabSearch.resultsCount === 0}
-                onClick={() => nextSearchResult(tabId)}
-              >
-                <IconChevronRight className="size-3" />
-              </Button>
-            </div>
-          )}
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation(); // Prevent React event from bubbling
+            e.nativeEvent.stopImmediatePropagation(); // Prevent native event from reaching window listeners
+            // Mark as keyboard interaction for instant close (no animation)
+            // Set both states synchronously so they're batched in the same render
+            setIsKeyboardInteraction(true);
+            setShouldShow(false);
+            deactivateSearchBar();
+          }
+        }}
+        className="w-full flex-1 truncate text-foreground text-sm outline-none"
+      />
+      {searchString.length > 0 && (
+        <div className="flex flex-row items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={() => {
-              setShouldShow(false);
-              deactivateSearchBar();
-            }}
+            disabled={!tabSearch || tabSearch.resultsCount === 0}
+            onClick={() => previousSearchResult(tabId)}
           >
-            <IconXmark className="size-3" />
+            <IconChevronLeft className="size-3" />
+          </Button>
+          <span className="text-muted-foreground text-xs">
+            {tabSearch?.activeMatchIndex ?? 0} / {tabSearch?.resultsCount ?? 0}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            disabled={!tabSearch || tabSearch.resultsCount === 0}
+            onClick={() => nextSearchResult(tabId)}
+          >
+            <IconChevronRight className="size-3" />
           </Button>
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+      )}
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        onClick={() => {
+          setShouldShow(false);
+          deactivateSearchBar();
+        }}
+      >
+        <IconXmark className="size-3" />
+      </Button>
+    </div>
   );
 }

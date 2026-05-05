@@ -3,11 +3,13 @@
 import {
   ResizablePanelGroup,
   ResizableHandle,
+  ResizablePanel,
 } from '@stagewise/stage-ui/components/resizable';
 import { AgentChat } from './agent-chat';
 import { MainSection } from './content';
 import { cn } from '@ui/utils';
 import { Sidebar } from './sidebar';
+import { useKartonState } from '@ui/hooks/use-karton';
 import { OpenAgentProvider } from '@ui/hooks/use-open-chat';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 
@@ -15,6 +17,9 @@ const rootLayoutStorageKey = 'stagewise-panel-layout-root';
 const layoutStorageKey = 'stagewise-panel-layout';
 
 export function DefaultLayout({ show }: { show: boolean }) {
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
+  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
+
   return (
     <OpenAgentProvider>
       <ChatDraftProvider>
@@ -24,7 +29,10 @@ export function DefaultLayout({ show }: { show: boolean }) {
             !show && 'pointer-events-none opacity-0 blur-lg',
           )}
         >
-          <div className="app-drag fixed top-0 right-0 left-0 h-2" />
+          {/* Thin draggable strip at the very top for macOS hidden-titlebar windows */}
+          {isMacOs && !isFullScreen && (
+            <div className="app-drag fixed top-0 right-0 left-0 h-2" />
+          )}
           <ResizablePanelGroup
             direction="horizontal"
             autoSaveId={rootLayoutStorageKey}
@@ -34,17 +42,24 @@ export function DefaultLayout({ show }: { show: boolean }) {
 
             <ResizableHandle />
 
-            <ResizablePanelGroup
-              direction="horizontal"
-              autoSaveId={layoutStorageKey}
+            <ResizablePanel
+              id="content-panel"
+              order={1}
+              defaultSize={65}
               className="h-full overflow-hidden rounded-l-lg ring-1 ring-derived-subtle"
             >
-              <AgentChat />
+              <ResizablePanelGroup
+                direction="horizontal"
+                autoSaveId={layoutStorageKey}
+                className="h-full divide-x divide-surface-1"
+              >
+                <AgentChat />
 
-              <ResizableHandle />
+                <ResizableHandle />
 
-              <MainSection />
-            </ResizablePanelGroup>
+                <MainSection />
+              </ResizablePanelGroup>
+            </ResizablePanel>
           </ResizablePanelGroup>
         </div>
       </ChatDraftProvider>

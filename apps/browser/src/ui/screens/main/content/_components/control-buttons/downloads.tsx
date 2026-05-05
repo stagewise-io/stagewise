@@ -6,7 +6,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { IconCloudDownloadFill18 } from 'nucleo-ui-fill-18';
+import { IconCloudDownloadOutline18 } from 'nucleo-ui-outline-18';
 import {
   Popover,
   PopoverTrigger,
@@ -393,7 +393,7 @@ export function DownloadsControlButton({ isActive }: { isActive: boolean }) {
                   {unseenFinishedCount}
                 </div>
               )}
-              <IconCloudDownloadFill18 className="size-4.5" />
+              <IconCloudDownloadOutline18 className="size-4" />
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>

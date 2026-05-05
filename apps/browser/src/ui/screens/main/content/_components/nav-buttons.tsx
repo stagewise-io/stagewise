@@ -24,7 +24,7 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
   const canGoForward = tab?.navigationHistory.canGoForward ?? false;
 
   return (
-    <>
+    <div className="flex flex-row items-center gap-0.5">
       <Button
         variant="ghost"
         size="icon-sm"
@@ -66,6 +66,6 @@ export function NavButtons({ tabId, tab }: NavButtonsProps) {
           <IconArrowRotateAnticlockwise className="size-4" />
         </Button>
       )}
-    </>
+    </div>
   );
 }

@@ -94,10 +94,6 @@ export function syncThemeColorsToMain(): void {
 
   const theme = {
     background: getComputedThemeColor('--color-app-background'),
-    titleBarOverlay: {
-      color: getComputedThemeColor('--color-app-background'),
-      symbolColor: getComputedThemeColor('--color-foreground'),
-    },
   };
 
   console.log(

@@ -68,26 +68,26 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
         {/* Control Bar */}
         <div
           className={cn(
-            'flex w-full shrink-0 items-center gap-0.5 border-derived-subtle border-t px-1 py-0',
+            'flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived-subtle border-t px-1 py-0',
           )}
         >
           <NavButtons tabId={tabId} tab={tab} />
-          <div className="-mr-0.5 h-full w-px bg-surface-2" />
           <Omnibox
             ref={omniboxRef}
             tabId={tabId}
             tab={tab}
             isActive={isActive}
           />
-          <div className="-ml-0.5 h-full w-px bg-surface-2" />
           <ZoomBar tabId={tabId} />
           <SearchBar tabId={tabId} ref={searchBarRef} />
-          <ResourceRequestsControlButton tabId={tabId} isActive={isActive} />
-          <DownloadsControlButton isActive={isActive} />
+          <div className="flex flex-row items-center gap-0.5">
+            <ResourceRequestsControlButton tabId={tabId} isActive={isActive} />
+            <DownloadsControlButton isActive={isActive} />
 
-          {tab && <ColorSchemeWidget tab={tab} />}
+            {tab && <ColorSchemeWidget tab={tab} />}
 
-          {tab && <ChromeDevToolsWidget tab={tab} />}
+            {tab && <ChromeDevToolsWidget tab={tab} />}
+          </div>
         </div>
         {/* Content area - wrapped with WebContentsOverlayProvider for overlay access */}
         <WebContentsOverlayProvider>

@@ -16,5 +16,23 @@ export {
   type SelectTriggerVariant,
 } from './select';
 
+export {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  type TabsProps,
+  type TabsListProps,
+  type TabsTriggerProps,
+  type TabsContentProps,
+} from './tabs';
+export {
+  SortableTabs,
+  SortableTabsList,
+  type SortableTabsProps,
+  type SortableTabsListProps,
+  type SortableTabItem,
+} from './sortable-tabs';
+
 // Re-export utilities
 export { cn } from '../lib/utils';

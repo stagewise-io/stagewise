@@ -671,6 +671,8 @@ export function AgentsSelector() {
   setAgentTitleRef.current = setAgentTitle;
   const openAgentRef = useRef(openAgent);
   openAgentRef.current = openAgent;
+  const activeAgentIdSetRef = useRef(activeAgentIdSet);
+  activeAgentIdSetRef.current = activeAgentIdSet;
   const openAgentModelIdRef = useRef(openAgentModelId);
   openAgentModelIdRef.current = openAgentModelId;
   const currentMountPathsRef = useRef(currentMounts.map((m) => m.path));
@@ -819,8 +821,19 @@ export function AgentsSelector() {
   const handleAgentSelect = useCallback(
     (value: string | null) => {
       if (!value) return;
-      if (value !== openAgentRef.current) {
-        resumeAgentRef.current(value).then(() => {
+      if (value === openAgentRef.current) return;
+      if (activeAgentIdSetRef.current.has(value)) {
+        // Agent is already active — navigate immediately; resume is a no-op
+        // for active agents but an async IPC round-trip that would otherwise
+        // defer setOpenAgent and leave the unread indicator visible until the
+        // RPC settles.
+        setOpenAgent(value);
+      } else {
+        // History/archived agent — must wait for resume before navigating.
+        // Calling setOpenAgent immediately would trigger the auto-eviction
+        // effect (openAgent not in activeAgentIdSet → removeFromHistory)
+        // before the agent is live, overriding the selection.
+        void resumeAgentRef.current(value).then(() => {
           setOpenAgent(value);
         });
       }

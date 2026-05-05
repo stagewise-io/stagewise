@@ -170,6 +170,19 @@ export function AgentsList() {
             const history = agent.state.history;
             const lastMsg = history[history.length - 1]!;
             const hasPendingQuestion = !!s.toolbox[id]?.pendingUserQuestion;
+            // Detect any open tool-approval requests in the last assistant message.
+            const hasPendingToolApproval = (() => {
+              const h = agent.state.history;
+              for (let i = h.length - 1; i >= 0; i--) {
+                const msg = h[i]!;
+                if (msg.role !== 'assistant') continue;
+                return msg.parts.some(
+                  (p: { type: string; state?: string }) =>
+                    p.state === 'approval-requested',
+                );
+              }
+              return false;
+            })();
             const isWorking = agent.state.isWorking;
             const rawActivity = hasPendingQuestion
               ? { text: 'Waiting for response...', isUserInput: false }
@@ -190,7 +203,7 @@ export function AgentsList() {
               id,
               title: agent.state.title,
               isWorking: agent.state.isWorking,
-              isWaitingForUser: hasPendingQuestion,
+              isWaitingForUser: hasPendingQuestion || hasPendingToolApproval,
               activityText: activity.text,
               activityIsUserInput: activity.isUserInput,
               hasError:
@@ -407,7 +420,7 @@ export function AgentsList() {
         <Button
           variant="ghost"
           size="md"
-          className="w-full justify-start pl-1.5 font-medium hover:bg-base-500/10"
+          className="w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
           onClick={handleCreateAgent}
         >
           <IconPlusFill18 className="size-4" />

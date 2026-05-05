@@ -1,9 +1,19 @@
 import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
-import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useComparingSelector,
+  useKartonProcedure,
+  useKartonState,
+} from '@ui/hooks/use-karton';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { TabsContainer } from './_components/tabs-container';
 import { useEventListener } from '@ui/hooks/use-event-listener';
 import { useTrack } from '@ui/hooks/use-track';
 import { BackgroundWithCutout } from './_components/background-with-cutout';
@@ -12,62 +22,162 @@ import {
   PerTabContent,
   type PerTabContentRef,
 } from './_components/per-tab-content';
+import { TabFavicon } from './_components/tab-favicon';
+import { WithTabPreviewCard } from './_components/with-tab-preview-card';
+import {
+  SortableTabs,
+  SortableTabsList,
+  type SortableTabItem,
+} from '@stagewise/stage-ui/components/sortable-tabs';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
+import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
+
+// ---------------------------------------------------------------------------
+// Local sub-component: audio mute toggle shown as an `actions` slot on tabs
+// that are playing or muted. Rendered outside Tabs.Tab to avoid nested buttons.
+// ---------------------------------------------------------------------------
+function AudioMuteButton({ tab }: { tab: TabState }) {
+  const toggleAudioMuted = useKartonProcedure(
+    (p) => p.browser.toggleAudioMuted,
+  );
+  return (
+    <Button
+      variant="ghost"
+      size="icon-2xs"
+      // Prevent dnd-kit PointerSensor from activating when clicking the mute btn
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => toggleAudioMuted(tab.id)}
+      className={cn(
+        'shrink-0',
+        tab.isMuted
+          ? 'text-error hover:text-error-foreground'
+          : 'text-muted-foreground hover:text-foreground',
+      )}
+      tabIndex={-1}
+    >
+      {tab.isMuted ? (
+        <IconVolumeXmarkFill18 className="size-3" />
+      ) : (
+        <IconVolumeUpFill18 className="size-3" />
+      )}
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MainSection
+// ---------------------------------------------------------------------------
 
 export function MainSection() {
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
+  const switchTab = useKartonProcedure((p) => p.browser.switchTab);
+  const reorderTabs = useKartonProcedure((p) => p.browser.reorderTabs);
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
 
-  const { setTabUiState } = useTabUIState();
+  const { setTabUiState, removeTabUiState } = useTabUIState();
   const track = useTrack();
 
-  // Track interpolated border radius during tab drag (for smooth corner transition)
-  const [dragBorderRadius, setDragBorderRadius] = useState<number | null>(null);
+  // ---------------------------------------------------------------------------
+  // Optimistic tab order
+  // useComparingSelector prevents a new array reference on every tab property
+  // mutation (title / URL / loading state) — only the set/order of IDs matters.
+  // ---------------------------------------------------------------------------
+  const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
+    (s) => Object.keys(s.browser.tabs),
+    (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
+  );
+  const serverTabIds = useKartonState(tabIdsSelector);
+  const [optimisticTabIds, setOptimisticTabIds] =
+    useState<string[]>(serverTabIds);
 
-  // Store refs for each tab's PerTabContent
+  // Sync when the server adds/removes tabs
+  useEffect(() => {
+    setOptimisticTabIds(serverTabIds);
+  }, [serverTabIds]);
+
+  const handleReorder = useCallback(
+    (newItems: SortableTabItem[]) => {
+      const newIds = newItems.map((t) => t.id);
+      setOptimisticTabIds(newIds);
+      reorderTabs(newIds);
+    },
+    [reorderTabs],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Build SortableTabItem[] from optimistic order + Karton tab state
+  // ---------------------------------------------------------------------------
+  const tabItems = useMemo<SortableTabItem[]>(() => {
+    const isOnlyTab = Object.keys(tabs).length === 1;
+    return optimisticTabIds
+      .map((id): SortableTabItem | null => {
+        const tab = tabs[id];
+        if (!tab) return null;
+        const isInternalPage =
+          tab.url?.startsWith('stagewise://internal/') ?? false;
+        const hideClose = isOnlyTab && isInternalPage;
+        return {
+          id,
+          label: tab.title,
+          icon: <TabFavicon tabState={tab} />,
+          closeable: !hideClose,
+          onClose: hideClose
+            ? undefined
+            : () => {
+                void closeTab(id);
+                removeTabUiState(id);
+              },
+          onAuxClick: hideClose
+            ? undefined
+            : (e: React.MouseEvent) => {
+                if (e.button !== 1) return;
+                e.preventDefault();
+                void closeTab(id);
+                removeTabUiState(id);
+              },
+          actions:
+            tab.isPlayingAudio || tab.isMuted ? (
+              <AudioMuteButton tab={tab} />
+            ) : undefined,
+          wrapTrigger: (inner: ReactElement) => (
+            <WithTabPreviewCard tabState={tab} activeTabId={activeTabId}>
+              {inner}
+            </WithTabPreviewCard>
+          ),
+        };
+      })
+      .filter((item): item is SortableTabItem => item !== null);
+  }, [optimisticTabIds, tabs, activeTabId, closeTab, removeTabUiState]);
+
+  // ---------------------------------------------------------------------------
+  // Omnibox focus plumbing (unchanged)
+  // ---------------------------------------------------------------------------
   const tabContentRefs = useRef<Record<string, PerTabContentRef | null>>({});
-
-  // Track pending omnibox focus request for newly created tabs
-  // Stores the activeTabId at the time createTab was called, so we know to focus
-  // when activeTabId changes to a different (new) value
   const pendingOmniboxFocusFromTabIdRef = useRef<string | null>(null);
 
-  const handleDragBorderRadiusChange = useCallback((radius: number | null) => {
-    setDragBorderRadius(radius);
-  }, []);
-
-  // Effect to focus omnibox when a new tab is created and ready
   useEffect(() => {
     const pendingFromTabId = pendingOmniboxFocusFromTabIdRef.current;
-    // Only focus if we have a pending request AND activeTabId has changed to a NEW tab
     if (
       pendingFromTabId !== null &&
       activeTabId &&
       activeTabId !== pendingFromTabId
     ) {
-      // Try to focus the omnibox - the ref might not be ready yet on the first render
       const tryFocus = () => {
         const ref = tabContentRefs.current[activeTabId];
         if (!ref) return false;
-
-        // FIX: On Win32, the new tab's webContents auto-focuses ~30-50ms after
-        // handleSwitchTab completes (Electron fires wc.on('focus') on page load).
-        // By the time this useEffect runs (~1-2s later), native HWND focus is on
-        // the tab, not the UI. Reclaim it before focusing the omnibox input.
-        // This mirrors what Ctrl+L does: togglePanelKeyboardFocus first, then focus.
         void togglePanelKeyboardFocus('stagewise-ui');
         ref.focusOmnibox();
         pendingOmniboxFocusFromTabIdRef.current = null;
         return true;
       };
 
-      // Try immediately (in case ref is already set)
       if (!tryFocus()) {
-        // Retry after a short delay to allow the component to mount and set the ref
         const timeoutId = setTimeout(() => {
           tryFocus();
         }, 50);
@@ -77,7 +187,6 @@ export function MainSection() {
   }, [activeTabId, tabs, togglePanelKeyboardFocus]);
 
   const handleCreateTab = useCallback(() => {
-    // Store the current activeTabId - we'll focus when it changes to a new tab
     pendingOmniboxFocusFromTabIdRef.current = activeTabId;
     createTab();
   }, [createTab, activeTabId]);
@@ -86,13 +195,11 @@ export function MainSection() {
     const tabIdsToClose = Object.keys(tabs).filter(
       (tabId) => tabId !== activeTabId,
     );
-
     void Promise.allSettled(tabIdsToClose.map((tabId) => closeTab(tabId))).then(
       (results) => {
         const closedCount = results.filter(
           (result) => result.status === 'fulfilled',
         ).length;
-
         if (closedCount > 0) {
           track('tabs-cleaned', { closed_count: closedCount });
         }
@@ -132,7 +239,6 @@ export function MainSection() {
   );
 
   useEventListener('focus', handleUIFocused, undefined, window);
-
   useEventListener(
     'stagewise-tab-focused',
     handleTabFocused,
@@ -154,31 +260,37 @@ export function MainSection() {
         onCleanAllTabs={handleCleanAllTabs}
       />
       <div className="flex h-full w-full flex-col">
-        <TabsContainer
-          onAddTab={handleCreateTab}
-          onDragBorderRadiusChange={handleDragBorderRadiusChange}
-        />
+        {/* Tab bar */}
+        <div className="flex shrink-0 flex-row items-start bg-background">
+          <SortableTabs
+            value={activeTabId ?? ''}
+            onValueChange={(id) => {
+              if (id) void switchTab(id);
+            }}
+          >
+            <SortableTabsList
+              variant="bar"
+              items={tabItems}
+              onReorder={handleReorder}
+              activeValue={activeTabId ?? ''}
+              onAddItem={handleCreateTab}
+            />
+          </SortableTabs>
+          <div className="app-drag h-full min-w-2!" />
+        </div>
         {/* Content area with per-tab UI */}
-        <div
-          className={cn('relative flex size-full flex-col')}
-          style={
-            dragBorderRadius !== null
-              ? { borderTopLeftRadius: `${dragBorderRadius}px` }
-              : undefined
-          }
-        >
+        <div className="relative flex size-full flex-col">
           {/* Inner container with overflow clipping */}
           <div className="flex size-full flex-col overflow-hidden">
             {/* Background with mask for the web-content */}
             <BackgroundWithCutout
-              className={cn(`z-0`)}
+              className="z-0"
               targetElementId={
                 activeTabId
                   ? `dev-app-preview-container-${activeTabId}`
                   : undefined
               }
             />
-
             {/* Per-tab content instances */}
             {Object.keys(tabs).map((tabId) => (
               <PerTabContent
