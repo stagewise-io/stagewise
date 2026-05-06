@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha082 (2026-05-06)
+
+### Features
+
+* integrate AWS profiles into model provider (9df0455)
+
+### Bug Fixes
+
+* harden ownership rules for plan-TODOs (0754148)
+
 ## 1.0.0-alpha081 (2026-05-04)
 
 ### Bug Fixes
