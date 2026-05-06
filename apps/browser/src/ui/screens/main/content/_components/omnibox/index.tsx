@@ -327,11 +327,13 @@ export const Omnibox = ({
                           value={item.value}
                           disabled={item.unselectable}
                         >
-                          <div className="flex flex-row items-center gap-2">
+                          <div className="flex min-w-0 flex-row items-center gap-2">
                             <div className="shrink-0">
                               {item.suggestionIcon}
                             </div>
-                            {item.suggestionLabel ?? item.value}
+                            <span className="truncate">
+                              {item.suggestionLabel ?? item.value}
+                            </span>
                           </div>
                         </Autocomplete.Item>
                       ))}

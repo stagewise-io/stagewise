@@ -1,6 +1,5 @@
 import { useMessageEditState } from '@ui/hooks/use-message-edit-state';
 import {
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -38,24 +37,6 @@ export function ChatPanel() {
 
   // Auto-selecting the first agent when openAgent is null is handled
   // centrally by SidebarTopSection — no need to duplicate it here.
-
-  // Track whether the status card is visible to align horizontal margins
-  const [statusCardVisible, setStatusCardVisible] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      const val = getComputedStyle(document.documentElement)
-        .getPropertyValue('--status-card-height')
-        .trim();
-      setStatusCardVisible(val !== '' && val !== '0px');
-    };
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['style'],
-    });
-    return () => observer.disconnect();
-  }, []);
 
   // Track drag-over state for visual feedback
   const [isDragOver, setIsDragOver] = useState(false);
@@ -143,12 +124,9 @@ export function ChatPanel() {
       </OpenAgentContext.Provider>
       <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
         <div
-          className={cn(
-            'flex flex-col gap-2',
-            statusCardVisible ? 'mx-3' : 'mx-1',
-          )}
+          className="mx-2 flex flex-col gap-2"
           style={{
-            marginBottom: 'var(--status-card-height, 0px)',
+            marginBottom: 'calc(var(--status-card-height, 0px) + 0.5rem)',
           }}
         >
           <InternalAppFrame />

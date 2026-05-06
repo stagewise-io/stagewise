@@ -82,8 +82,8 @@ export function Sidebar() {
                 {avatarChar}
               </div>
               {/* Plan + email */}
-              <div className="flex min-w-0 flex-col items-start gap-px">
-                <span className="font-medium text-foreground text-sm leading-tight">
+              <div className="flex w-full min-w-0 flex-col items-start gap-px overflow-hidden">
+                <span className="truncate font-medium text-foreground text-sm leading-tight">
                   {getPlanLabel(plan)}
                 </span>
                 <span className="truncate text-muted-foreground text-xs leading-tight">

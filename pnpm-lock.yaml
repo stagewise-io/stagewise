@@ -32,7 +32,7 @@ importers:
         version: 3.1041.0
       '@better-auth/electron':
         specifier: ^1.5.3
-        version: 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-auth@1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)))(better-call@1.3.2(zod@4.3.6))(electron@40.6.1)
+        version: 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-auth@1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)))(better-call@1.3.2(zod@4.3.6))(electron@40.9.3)
       '@smithy/shared-ini-file-loader':
         specifier: ^4.4.9
         version: 4.4.9
@@ -44,7 +44,7 @@ importers:
         version: 6.0.0
       better-auth:
         specifier: ^1.5.3
-        version: 1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
+        version: 1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -280,32 +280,32 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.3)
       '@electron-forge/cli':
-        specifier: ^7.10.2
-        version: 7.10.2(encoding@0.1.13)(esbuild@0.25.9)
+        specifier: 7.11.1
+        version: 7.11.1(encoding@0.1.13)(esbuild@0.25.9)
       '@electron-forge/maker-deb':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron-forge/maker-dmg':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron-forge/maker-rpm':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron-forge/maker-squirrel':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron-forge/maker-zip':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron-forge/plugin-auto-unpack-natives':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron-forge/plugin-fuses':
-        specifier: ^7.10.2
-        version: 7.10.2(@electron/fuses@1.8.0)
+        specifier: 7.11.1
+        version: 7.11.1(@electron/fuses@1.8.0)
       '@electron-forge/plugin-vite':
-        specifier: ^7.10.2
-        version: 7.10.2
+        specifier: 7.11.1
+        version: 7.11.1
       '@electron/fuses':
         specifier: ^1.8.0
         version: 1.8.0
@@ -466,8 +466,8 @@ importers:
         specifier: ^0.45.1
         version: 0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1)
       electron:
-        specifier: 40.6.1
-        version: 40.6.1
+        specifier: 40.9.3
+        version: 40.9.3
       electron-context-menu:
         specifier: ^4.1.1
         version: 4.1.1
@@ -527,7 +527,7 @@ importers:
         version: 19.2.3
       react-devtools-electron:
         specifier: ^4.7.0
-        version: 4.7.0(electron@40.6.1)
+        version: 4.7.0(electron@40.9.3)
       react-dom:
         specifier: ^19.1.0
         version: 19.2.3(react@19.2.3)
@@ -654,7 +654,7 @@ importers:
         version: 0.5.19(tailwindcss@4.1.18)
       better-auth:
         specifier: ^1.5.3
-        version: 1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
+        version: 1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
       framer-motion:
         specifier: ^12.23.3
         version: 12.24.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -1634,91 +1634,91 @@ packages:
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
 
-  '@electron-forge/cli@7.10.2':
-    resolution: {integrity: sha512-X1RtS5IqNgzGDS2rr1q0Y74wU/m3DbU4vSgllNun1ZQv1BfMpDcKLhnKi3aeetoA0huLTpMVU9eWJ7bziI9fxA==}
+  '@electron-forge/cli@7.11.1':
+    resolution: {integrity: sha512-pk8AoLsr7t7LBAt0cFD06XFA6uxtPdvtLx06xeal7O9o7GHGCbj29WGwFoJ8Br/ENM0Ho868S3PrAn1PtBXt5g==}
     engines: {node: '>= 16.4.0'}
     hasBin: true
 
-  '@electron-forge/core-utils@7.10.2':
-    resolution: {integrity: sha512-JXrk2hWR4q8KgZFABpojjuqql3tYeVIH6qmtbkNEkZEQq7YIxajJBCct7J7bWfNQTmHotsQ3k5KLknhyhTaBMw==}
+  '@electron-forge/core-utils@7.11.1':
+    resolution: {integrity: sha512-9UxRWVsfcziBsbAA2MS0Oz4yYovQCO2BhnGIfsbKNTBtMc/RcVSxAS0NMyymce44i43p1ZC/FqWhnt1XqYw3bQ==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/core@7.10.2':
-    resolution: {integrity: sha512-HAIuOtpOfGjA0cd55tbEV2gAv+A7tSZg9bonmVDYFEe6dBgbLk8a3+/1fJUdWW8fyFkg1wa8zK7pjP751bAXsA==}
+  '@electron-forge/core@7.11.1':
+    resolution: {integrity: sha512-YtuPLzggPKPabFAD2rOZFE0s7f4KaUTpGRduhSMbZUqpqD1TIPyfoDBpYiZvao3Ht8pyZeOJjbzcC0LpFs9gIQ==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/maker-base@7.10.2':
-    resolution: {integrity: sha512-1QN4qnPVTjo+qWYG+s0kYv7XcuIowsPVvbl718FgJUcvkxyRjUA6kWHjFxRvdV6g7Sa2PzZBF+/Mrjpws1lehQ==}
+  '@electron-forge/maker-base@7.11.1':
+    resolution: {integrity: sha512-yhZrCGoN6bDeiB5DHFaueZ1h84AReElEj+f0hl2Ph4UbZnO0cnLpbx+Bs+XfMLAiA+beC8muB5UDK5ysfuT9BQ==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/maker-deb@7.10.2':
-    resolution: {integrity: sha512-4MPr9NW5UbEUbf9geZn5R/0O/QVIiy2EgUXOYOeKkA7oR8U6I1I3+BytYFHYcxbY6+PGhi1H1VTLJLITbHGVWw==}
+  '@electron-forge/maker-deb@7.11.1':
+    resolution: {integrity: sha512-QTYiryQLYPDkq6pIfBmx0GQ6D8QatUkowH7rTlW5MnCUa0uumX0Xu7yGIjesuwW37fxT3Lv4xi+FSXMCm2eC1w==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/maker-dmg@7.10.2':
-    resolution: {integrity: sha512-ksSX6/Ioxa3h3rEGIg26qfDcJgB3aFGivitRdSkEnzUCLWJSUoThEwLToA7CAq4J/4ZREK0PDJ7FPsB+F8CYfQ==}
+  '@electron-forge/maker-dmg@7.11.1':
+    resolution: {integrity: sha512-7zs5/Ewz1PcOl4N1102stFgBiFGWxU18+UPFUSd/fgf9MErBl4HBWuVNMIHyeJ/56rdfkcmTxTqE+9TBEYrZcg==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/maker-rpm@7.10.2':
-    resolution: {integrity: sha512-LQoeYzbY/z1yuBBA+bNutCJmhCA4NcXUbFO4OTqsIX8B6y1zNTYZT4JEuhoK7eBsP4/Rz6u/JnNp0XOyjftOUQ==}
+  '@electron-forge/maker-rpm@7.11.1':
+    resolution: {integrity: sha512-iEfJPRQQyaTqk2EbUfZgulChNWvxGXeYUH0xBX/r5cj1pL4vcJXt3jLMQBVn3mk/0Ytv9UWRs8R/XuNWX6sf2w==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/maker-squirrel@7.10.2':
-    resolution: {integrity: sha512-Y5EhNSBXf4a7qcq+BK/x5qVDlQ1Gez5V+arUpDvVxf1zwvsB1aSyAjmoBrOKGYD9A5pJzjkMWMDw95MStl1W4A==}
+  '@electron-forge/maker-squirrel@7.11.1':
+    resolution: {integrity: sha512-oSg7fgad6l+X0DjtRkSpMzB0AjzyDO4mb2gzM4kTodkP1ADeiMi08bxy0ZeCESqLm5+fG72cAPmEr3BAPvI1yw==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/maker-zip@7.10.2':
-    resolution: {integrity: sha512-APRqVPM+O1rj4O7sk5f8tqJpS5UgxcUJEsCnXN4JRpdRvsOlMopzYZdazlCLH9l7S+r4ZKirjtMluIGeYq8YOg==}
+  '@electron-forge/maker-zip@7.11.1':
+    resolution: {integrity: sha512-30rcp0AbJLfkFBX2hmO14LKXx7z9V61LffTVbTCFMh5vUB2kZvcA5xAhsBk2oUJWfGVxe1DuSEU0rDR9bUMHUg==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/plugin-auto-unpack-natives@7.10.2':
-    resolution: {integrity: sha512-uQnahm1DECwqI8hBC7PKccyfovY/YqHNz8de3OxyjQDmwsqQfCA8Ucyh1E9n4NMEpw6Co8KLn+qF2BuIOsftLA==}
+  '@electron-forge/plugin-auto-unpack-natives@7.11.1':
+    resolution: {integrity: sha512-5uRM3WNv7jIeDt8pLP3V4U2puWHPGJ/3qRuSE47RKgTp5qxpZidWHSYcEJJxjoqOL/7KFwSqKSQ/a36GoZV4Fg==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/plugin-base@7.10.2':
-    resolution: {integrity: sha512-+4YLmkLZxvS6JFXYNI4dHt8Il8iIvwk2o6lCJGwNysOUq2KOZ3Wu1He4Ko8HhKcO1VWbFvslbh57oQn963Aryw==}
+  '@electron-forge/plugin-base@7.11.1':
+    resolution: {integrity: sha512-lKpSOV1GA3FoYiD9k05i6v4KaQVmojnRgCr7d6VL1bFp13QOtXSaAWhFI9mtSY7rGElOacX6Zt7P7rPoB8T9eQ==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/plugin-fuses@7.10.2':
-    resolution: {integrity: sha512-X8FaBL5pVvKCTBNaa9EjbH6vuaeIU7UcPSmP9501XF4zcKPCfTbQKz49LTMl7gd5YzUm82IlqRjte12LLpcSDQ==}
+  '@electron-forge/plugin-fuses@7.11.1':
+    resolution: {integrity: sha512-Td517mHf+RjQAayFDM2kKb7NaGdRXrZfPbc7KOHlGbXthp5YTkFu2cCZGWokiqt1y1wsFaAodULhqBIg7vbbbw==}
     engines: {node: '>= 16.4.0'}
     peerDependencies:
       '@electron/fuses': ^1.0.0
 
-  '@electron-forge/plugin-vite@7.10.2':
-    resolution: {integrity: sha512-aHotwaVlbSwVDb+Z+JdU6cMYhestt8ncmXKv4Uwm7of/gWAdvS7o/ohQVWkjXhzSidriCTwFMRz4jELJbnkNeg==}
+  '@electron-forge/plugin-vite@7.11.1':
+    resolution: {integrity: sha512-kc/WQs/0+9VC9Q4oSSocMa02YxKDvAYxhWtNcL+qlswZMJlxe8gX7vl/yXq9AjPQxw7f3jzf7nruUPKQ+vyLLg==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/publisher-base@7.10.2':
-    resolution: {integrity: sha512-2k2VOY0wOoAgQoQXn/u3EJ2Ka2v363+wC/+zUMTWGeRHW8pRwX84WX2SpsTttRzbsqAEMJYw5FAzgMBEQUTfpg==}
+  '@electron-forge/publisher-base@7.11.1':
+    resolution: {integrity: sha512-rXE9oMFGMtdQrixnumWYH5TTGsp99iPHZb3jI74YWq518ctCh6DlIgWlhf6ok2X0+lhWovcIb45KJucUFAQ13w==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/shared-types@7.10.2':
-    resolution: {integrity: sha512-e2pd9RsdbKwsNf6UtKoolmJGy92Nc0/XO4SI91doV8cM954hM2XSYz3VHoqXebMFAF1JDfXoEUt6UCRbEDgMgw==}
+  '@electron-forge/shared-types@7.11.1':
+    resolution: {integrity: sha512-vvBWdAEh53UJlDGUevpaJk1+sqDMQibfrbHR+0IPA4MPyQex7/Uhv3vYH9oGHujBVAChQahjAuJt0fG6IJBLZg==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/template-base@7.10.2':
-    resolution: {integrity: sha512-D9DbEx3rtikIhUyn4tcz2pJqHNU/+FXKNnzSvmrJoJ9LusR3C42OU9GtbU8oT3nawpnCGgPFIOGXrzexFPp6DA==}
+  '@electron-forge/template-base@7.11.1':
+    resolution: {integrity: sha512-XpTaEf+EfQw+0BlSAtSpZKYIKYvKu4raNzSGHZZoSYHp+HDC7R+MlpFQmSJiGdYQzQ14C+uxO42tVjgM0DMbpw==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/template-vite-typescript@7.10.2':
-    resolution: {integrity: sha512-df7rpxxIOIyZn0RfQ1GIlLW7dXhxkerc9uZ3ozO4C7zfvip3z0Mg+wS1synktPfr4WISaPktIdnj3mVu6Uu7Mw==}
+  '@electron-forge/template-vite-typescript@7.11.1':
+    resolution: {integrity: sha512-Us4AHXFb+4z+gXgZImSqMBS63oKnsQWLOhqRg321xiDzu2UcQPlwgWNb4rAEKNVC1e7LXrUNDHuBiTrQkvWXbg==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/template-vite@7.10.2':
-    resolution: {integrity: sha512-hR9HBOM902yq7zhFl8bO3w5ufMgitdd5ZwDzAdKITFh2ttZemHy9ha5S0K+R+4GoXHz8t7hUTHk8+iPy09qrpA==}
+  '@electron-forge/template-vite@7.11.1':
+    resolution: {integrity: sha512-Or8Lxf4awoeUZoMTKJEw5KQDIhqOFs24WhVka3yZXxc6VgVWN79KmYKYM6uM/YMQttmafhsBhY2t1Lxo1WR/ug==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/template-webpack-typescript@7.10.2':
-    resolution: {integrity: sha512-JtrLUAFbxxWJ1kU7b8MNyL5SO9/rY5UeNz1b9hvMvilW8GxyMWUen58dafgdnx3OpKLNZnhOOhgRagNppEzJOA==}
+  '@electron-forge/template-webpack-typescript@7.11.1':
+    resolution: {integrity: sha512-6ExfFnFkHBz8rvRFTFg5HVGTC12uJpbVk4q8DVg0R8rhhxhqiVNh8lF2UPtZ2yT2UtGWjXNVlyP3Y3T6q6E3GQ==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/template-webpack@7.10.2':
-    resolution: {integrity: sha512-VIUXA+XHM5SLjg7fIpOOmBsgi0LstkjrEz4gUzVL0AaITM7e+BCziIHld1ceXLbQ1FnKtrUGnQ9X/cHYxYvhHg==}
+  '@electron-forge/template-webpack@7.11.1':
+    resolution: {integrity: sha512-15lbXxi+er461MPk6sbwAOyjofAHwmQjTvxNCiNpaU2naEwbj3t0SlLq/BMr5HxnVOaMmA7+lKV9afkIom+d4Q==}
     engines: {node: '>= 16.4.0'}
 
-  '@electron-forge/tracer@7.10.2':
-    resolution: {integrity: sha512-jhLLQbttfZViSOYn/3SJc8HML+jNZAytPVJwgGGd3coUiFysWJ2Xald99iqOiouPAhIigBfNPxQb/q/EbcDu4g==}
+  '@electron-forge/tracer@7.11.1':
+    resolution: {integrity: sha512-tiB6cglVQFcSw9N8GRwVwZUeB9u0DOx2Mj7aFXBUsFLUYQapvVGv51tUSy/UAW5lvmubGscYIILuVko+II3+NA==}
     engines: {node: '>= 14.17.5'}
 
   '@electron/asar@3.4.1':
@@ -5035,6 +5035,7 @@ packages:
   '@xmldom/xmldom@0.8.11':
     resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xterm/headless@6.0.0':
     resolution: {integrity: sha512-5Yj1QINYCyzrZtf8OFIHi47iQtI+0qYFPHmouEfG8dHNxbZ9Tb9YGSuLcsEwj9Z+OL75GJqPyJbyoFer80a2Hw==}
@@ -6509,8 +6510,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@40.6.1:
-    resolution: {integrity: sha512-u9YfoixttdauciHV9Ut9Zf3YipJoU093kR1GSYTTXTAXqhiXI0G1A0NnL/f0O2m2UULCXaXMf2W71PloR6V9pQ==}
+  electron@40.9.3:
+    resolution: {integrity: sha512-rDcJOT6BBE689Ada+4jD3rVr05pMv9MZOgT0x/rIMVDF9c4ttx4RTb6lVARTyxZC7uqpirttCtcli1eg1DX5qg==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -12108,22 +12109,22 @@ snapshots:
       '@better-auth/utils': 0.3.1
       '@better-fetch/fetch': 1.1.21
       '@standard-schema/spec': 1.1.0
-      better-call: 1.3.2(zod@4.3.6)
+      better-call: 1.3.2(zod@4.3.5)
       jose: 6.1.3
       kysely: 0.28.11
       nanostores: 1.1.1
       zod: 4.3.6
 
-  '@better-auth/electron@1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-auth@1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)))(better-call@1.3.2(zod@4.3.6))(electron@40.6.1)':
+  '@better-auth/electron@1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-auth@1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)))(better-call@1.3.2(zod@4.3.6))(electron@40.9.3)':
     dependencies:
       '@better-auth/core': 1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1)
       '@better-auth/utils': 0.3.1
       '@better-fetch/fetch': 1.1.21
-      better-auth: 1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
+      better-auth: 1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
       better-call: 1.3.2(zod@4.3.6)
       zod: 4.3.6
     optionalDependencies:
-      electron: 40.6.1
+      electron: 40.9.3
 
   '@better-auth/kysely-adapter@1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(kysely@0.28.11)':
     dependencies:
@@ -12407,11 +12408,11 @@ snapshots:
 
   '@drizzle-team/brocli@0.10.2': {}
 
-  '@electron-forge/cli@7.10.2(encoding@0.1.13)(esbuild@0.25.9)':
+  '@electron-forge/cli@7.11.1(encoding@0.1.13)(esbuild@0.25.9)':
     dependencies:
-      '@electron-forge/core': 7.10.2(encoding@0.1.13)(esbuild@0.25.9)
-      '@electron-forge/core-utils': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/core': 7.11.1(encoding@0.1.13)(esbuild@0.25.9)
+      '@electron-forge/core-utils': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       '@electron/get': 3.1.0
       '@inquirer/prompts': 6.0.1
       '@listr2/prompt-adapter-inquirer': 2.0.22(@inquirer/prompts@6.0.1)
@@ -12421,7 +12422,7 @@ snapshots:
       fs-extra: 10.1.0
       listr2: 7.0.2
       log-symbols: 4.1.0
-      semver: 7.7.3
+      semver: 7.7.4
     transitivePeerDependencies:
       - '@swc/core'
       - bluebird
@@ -12431,9 +12432,9 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@electron-forge/core-utils@7.10.2':
+  '@electron-forge/core-utils@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
       '@electron/rebuild': 3.7.2
       '@malept/cross-spawn-promise': 2.0.0
       chalk: 4.1.2
@@ -12442,24 +12443,24 @@ snapshots:
       fs-extra: 10.1.0
       log-symbols: 4.1.0
       parse-author: 2.0.0
-      semver: 7.7.3
+      semver: 7.7.4
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/core@7.10.2(encoding@0.1.13)(esbuild@0.25.9)':
+  '@electron-forge/core@7.11.1(encoding@0.1.13)(esbuild@0.25.9)':
     dependencies:
-      '@electron-forge/core-utils': 7.10.2
-      '@electron-forge/maker-base': 7.10.2
-      '@electron-forge/plugin-base': 7.10.2
-      '@electron-forge/publisher-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
-      '@electron-forge/template-base': 7.10.2
-      '@electron-forge/template-vite': 7.10.2
-      '@electron-forge/template-vite-typescript': 7.10.2
-      '@electron-forge/template-webpack': 7.10.2
-      '@electron-forge/template-webpack-typescript': 7.10.2(esbuild@0.25.9)
-      '@electron-forge/tracer': 7.10.2
+      '@electron-forge/core-utils': 7.11.1
+      '@electron-forge/maker-base': 7.11.1
+      '@electron-forge/plugin-base': 7.11.1
+      '@electron-forge/publisher-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
+      '@electron-forge/template-base': 7.11.1
+      '@electron-forge/template-vite': 7.11.1
+      '@electron-forge/template-vite-typescript': 7.11.1
+      '@electron-forge/template-webpack': 7.11.1
+      '@electron-forge/template-webpack-typescript': 7.11.1(esbuild@0.25.9)
+      '@electron-forge/tracer': 7.11.1
       '@electron/get': 3.1.0
       '@electron/packager': 18.4.4
       '@electron/rebuild': 3.7.2
@@ -12480,7 +12481,7 @@ snapshots:
       log-symbols: 4.1.0
       node-fetch: 2.7.0(encoding@0.1.13)
       rechoir: 0.8.0
-      semver: 7.7.3
+      semver: 7.7.4
       source-map-support: 0.5.21
       username: 5.1.0
     transitivePeerDependencies:
@@ -12492,29 +12493,29 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@electron-forge/maker-base@7.10.2':
+  '@electron-forge/maker-base@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
       fs-extra: 10.1.0
       which: 2.0.2
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/maker-deb@7.10.2':
+  '@electron-forge/maker-deb@7.11.1':
     dependencies:
-      '@electron-forge/maker-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/maker-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
     optionalDependencies:
       electron-installer-debian: 3.2.0
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/maker-dmg@7.10.2':
+  '@electron-forge/maker-dmg@7.11.1':
     dependencies:
-      '@electron-forge/maker-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/maker-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       fs-extra: 10.1.0
     optionalDependencies:
       electron-installer-dmg: 5.0.1
@@ -12522,20 +12523,20 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/maker-rpm@7.10.2':
+  '@electron-forge/maker-rpm@7.11.1':
     dependencies:
-      '@electron-forge/maker-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/maker-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
     optionalDependencies:
       electron-installer-redhat: 3.4.0
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/maker-squirrel@7.10.2':
+  '@electron-forge/maker-squirrel@7.11.1':
     dependencies:
-      '@electron-forge/maker-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/maker-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       fs-extra: 10.1.0
     optionalDependencies:
       electron-winstaller: 5.4.0
@@ -12543,10 +12544,10 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/maker-zip@7.10.2':
+  '@electron-forge/maker-zip@7.11.1':
     dependencies:
-      '@electron-forge/maker-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/maker-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       cross-zip: 4.0.1
       fs-extra: 10.1.0
       got: 11.8.6
@@ -12554,34 +12555,34 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/plugin-auto-unpack-natives@7.10.2':
+  '@electron-forge/plugin-auto-unpack-natives@7.11.1':
     dependencies:
-      '@electron-forge/plugin-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/plugin-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/plugin-base@7.10.2':
+  '@electron-forge/plugin-base@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/plugin-fuses@7.10.2(@electron/fuses@1.8.0)':
+  '@electron-forge/plugin-fuses@7.11.1(@electron/fuses@1.8.0)':
     dependencies:
-      '@electron-forge/plugin-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/plugin-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       '@electron/fuses': 1.8.0
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/plugin-vite@7.10.2':
+  '@electron-forge/plugin-vite@7.11.1':
     dependencies:
-      '@electron-forge/plugin-base': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/plugin-base': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       chalk: 4.1.2
       debug: 4.4.3(supports-color@5.5.0)
       fs-extra: 10.1.0
@@ -12590,16 +12591,16 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/publisher-base@7.10.2':
+  '@electron-forge/publisher-base@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/shared-types@7.10.2':
+  '@electron-forge/shared-types@7.11.1':
     dependencies:
-      '@electron-forge/tracer': 7.10.2
+      '@electron-forge/tracer': 7.11.1
       '@electron/packager': 18.4.4
       '@electron/rebuild': 3.7.2
       listr2: 7.0.2
@@ -12607,10 +12608,10 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/template-base@7.10.2':
+  '@electron-forge/template-base@7.11.1':
     dependencies:
-      '@electron-forge/core-utils': 7.10.2
-      '@electron-forge/shared-types': 7.10.2
+      '@electron-forge/core-utils': 7.11.1
+      '@electron-forge/shared-types': 7.11.1
       '@malept/cross-spawn-promise': 2.0.0
       debug: 4.4.3(supports-color@5.5.0)
       fs-extra: 10.1.0
@@ -12620,28 +12621,28 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/template-vite-typescript@7.10.2':
+  '@electron-forge/template-vite-typescript@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
-      '@electron-forge/template-base': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
+      '@electron-forge/template-base': 7.11.1
       fs-extra: 10.1.0
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/template-vite@7.10.2':
+  '@electron-forge/template-vite@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
-      '@electron-forge/template-base': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
+      '@electron-forge/template-base': 7.11.1
       fs-extra: 10.1.0
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/template-webpack-typescript@7.10.2(esbuild@0.25.9)':
+  '@electron-forge/template-webpack-typescript@7.11.1(esbuild@0.25.9)':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
-      '@electron-forge/template-base': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
+      '@electron-forge/template-base': 7.11.1
       fs-extra: 10.1.0
       typescript: 5.4.5
       webpack: 5.104.1(esbuild@0.25.9)
@@ -12653,16 +12654,16 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@electron-forge/template-webpack@7.10.2':
+  '@electron-forge/template-webpack@7.11.1':
     dependencies:
-      '@electron-forge/shared-types': 7.10.2
-      '@electron-forge/template-base': 7.10.2
+      '@electron-forge/shared-types': 7.11.1
+      '@electron-forge/template-base': 7.11.1
       fs-extra: 10.1.0
     transitivePeerDependencies:
       - bluebird
       - supports-color
 
-  '@electron-forge/tracer@7.10.2':
+  '@electron-forge/tracer@7.11.1':
     dependencies:
       chrome-trace-event: 1.0.4
 
@@ -12670,7 +12671,7 @@ snapshots:
     dependencies:
       commander: 5.1.0
       glob: 7.2.3
-      minimatch: 3.1.2
+      minimatch: 3.1.5
 
   '@electron/fuses@1.8.0':
     dependencies:
@@ -16126,9 +16127,9 @@ snapshots:
       mime-types: 2.1.35
       negotiator: 0.6.3
 
-  acorn-import-phases@1.0.4(acorn@8.15.0):
+  acorn-import-phases@1.0.4(acorn@8.16.0):
     dependencies:
-      acorn: 8.15.0
+      acorn: 8.16.0
 
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
@@ -16381,6 +16382,33 @@ snapshots:
       '@better-fetch/fetch': 1.1.21
       '@noble/ciphers': 2.1.1
       '@noble/hashes': 2.0.1
+      better-call: 1.3.2(zod@4.3.5)
+      defu: 6.1.4
+      jose: 6.1.3
+      kysely: 0.28.11
+      nanostores: 1.1.1
+      zod: 4.3.6
+    optionalDependencies:
+      drizzle-kit: 0.31.8
+      drizzle-orm: 0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1)
+      next: 16.2.3(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      solid-js: 1.9.10
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+    transitivePeerDependencies:
+      - '@cloudflare/workers-types'
+
+  better-auth@1.5.3(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.11)(sql.js@1.14.1))(next@16.2.3(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)):
+    dependencies:
+      '@better-auth/core': 1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1)
+      '@better-auth/kysely-adapter': 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(kysely@0.28.11)
+      '@better-auth/memory-adapter': 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)
+      '@better-auth/telemetry': 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))
+      '@better-auth/utils': 0.3.1
+      '@better-fetch/fetch': 1.1.21
+      '@noble/ciphers': 2.1.1
+      '@noble/hashes': 2.0.1
       better-call: 1.3.2(zod@4.3.6)
       defu: 6.1.4
       jose: 6.1.3
@@ -16397,6 +16425,15 @@ snapshots:
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.6.1)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
+
+  better-call@1.3.2(zod@4.3.5):
+    dependencies:
+      '@better-auth/utils': 0.3.1
+      '@better-fetch/fetch': 1.1.21
+      rou3: 0.7.12
+      set-cookie-parser: 3.0.1
+    optionalDependencies:
+      zod: 4.3.5
 
   better-call@1.3.2(zod@4.3.6):
     dependencies:
@@ -17374,7 +17411,7 @@ snapshots:
 
   dir-compare@4.2.0:
     dependencies:
-      minimatch: 3.1.2
+      minimatch: 3.1.5
       p-limit: 3.1.0
 
   dir-glob@3.0.1:
@@ -17578,7 +17615,7 @@ snapshots:
       - supports-color
     optional: true
 
-  electron@40.6.1:
+  electron@40.9.3:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 24.10.9
@@ -19582,7 +19619,7 @@ snapshots:
     dependencies:
       cli-truncate: 3.1.0
       colorette: 2.0.20
-      eventemitter3: 5.0.1
+      eventemitter3: 5.0.4
       log-update: 5.0.1
       rfdc: 1.4.1
       wrap-ansi: 8.1.0
@@ -21308,9 +21345,9 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
-  react-devtools-electron@4.7.0(electron@40.6.1):
+  react-devtools-electron@4.7.0(electron@40.9.3):
     dependencies:
-      electron: 40.6.1
+      electron: 40.9.3
 
   react-docgen-typescript@2.4.0(typescript@5.9.3):
     dependencies:
@@ -22489,7 +22526,7 @@ snapshots:
   terser@5.44.1:
     dependencies:
       '@jridgewell/source-map': 0.3.11
-      acorn: 8.15.0
+      acorn: 8.16.0
       commander: 2.20.3
       source-map-support: 0.5.21
 
@@ -23328,8 +23365,8 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
-      acorn: 8.15.0
-      acorn-import-phases: 1.0.4(acorn@8.15.0)
+      acorn: 8.16.0
+      acorn-import-phases: 1.0.4(acorn@8.16.0)
       browserslist: 4.28.1
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.18.4
@@ -23361,8 +23398,8 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@webassemblyjs/wasm-edit': 1.14.1
       '@webassemblyjs/wasm-parser': 1.14.1
-      acorn: 8.15.0
-      acorn-import-phases: 1.0.4(acorn@8.15.0)
+      acorn: 8.16.0
+      acorn-import-phases: 1.0.4(acorn@8.16.0)
       browserslist: 4.28.1
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.18.4
