@@ -66,12 +66,12 @@ export function Sidebar() {
       <AgentsList />
 
       {/* Bottom auth section */}
-      <div className="flex flex-col gap-2">
+      <div className="mt-8 flex flex-col gap-2">
         <div className="flex flex-row items-center justify-between gap-2">
           {isAuthenticated && email ? (
             <button
               type="button"
-              className="app-no-drag flex min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-hover-derived active:bg-active-derived"
+              className="app-no-drag flex min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-foreground/8 active:bg-foreground/12"
               onClick={handleOpenAccount}
             >
               {/* Avatar */}

@@ -27,6 +27,7 @@ import {
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { AgentsSelector } from './_components/agents-selector';
+import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 
 type ActiveAgentCardData = {
   id: string;
@@ -334,6 +335,20 @@ export function AgentsList() {
   );
 
   const scrollRef = useRef<OverlayScrollbarRef>(null);
+  // Use state (not just a ref) so that when OverlayScrollbar initialises and
+  // calls onViewportRef, a re-render is triggered.  useIsContainerScrollable
+  // (used by useScrollFadeMask internally) only syncs a ref → element inside
+  // a no-dep useEffect that runs after every render — it never fires if the
+  // ref is updated without a render.
+  const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
+    null,
+  );
+  const scrollViewportRef = useRef<HTMLElement | null>(null);
+  scrollViewportRef.current = scrollViewport;
+  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
+    axis: 'vertical',
+    fadeDistance: 16,
+  });
 
   /** Scroll a card into the safe (non-masked) area of the scroll container.
    * The container has CSS mask gradients (8px top/bottom) that fade content
@@ -404,28 +419,33 @@ export function AgentsList() {
   if (!showActiveAgents) return null;
 
   return (
-    <div className="flex h-full flex-col overflow-x-hidden px-0.5 pt-2 group-data-[collapsed=true]:hidden">
+    <div className="flex h-full flex-col overflow-x-hidden pt-2 pl-0.5 group-data-[collapsed=true]:hidden">
       <div className="flex items-center justify-between gap-1">
         <span className="flex-1 px-0.5 font-medium text-muted-foreground text-sm">
           Agents
         </span>
         <AgentsSelector />
       </div>
+      <Button
+        variant="ghost"
+        size="md"
+        className="mt-2 w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
+        onClick={handleCreateAgent}
+      >
+        <IconPlusFill18 className="size-4" />
+        Create new agent
+      </Button>
       <OverlayScrollbar
         ref={scrollRef}
         className="min-h-5"
-        contentClassName="pt-2 pb-3.5"
-        options={{ overflow: { x: 'visible' } }}
+        contentClassName="pb-3.5 pr-1.5"
+        options={{
+          overflow: { x: 'visible' },
+          scrollbars: { theme: 'os-theme-stagewise-subtle' },
+        }}
+        style={maskStyle}
+        onViewportRef={setScrollViewport}
       >
-        <Button
-          variant="ghost"
-          size="md"
-          className="w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
-          onClick={handleCreateAgent}
-        >
-          <IconPlusFill18 className="size-4" />
-          Create new agent
-        </Button>
         {orderedAgents.map((agent) => {
           const isOpen = agent.id === openAgent;
           const hasUnseen = !isOpen && agent.unread;

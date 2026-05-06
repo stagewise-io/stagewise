@@ -47,7 +47,7 @@ export function DefaultLayout({ show }: { show: boolean }) {
               order={1}
               defaultSize={65}
               className={cn(
-                'h-full overflow-hidden rounded-l-lg ring-1 ring-derived-subtle',
+                'h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
                 !isMacOs && 'mt-px',
               )}
             >

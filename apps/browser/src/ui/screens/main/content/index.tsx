@@ -70,6 +70,7 @@ function AudioMuteButton({ tab }: { tab: TabState }) {
 // ---------------------------------------------------------------------------
 
 export function MainSection() {
+  const _isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
@@ -276,7 +277,6 @@ export function MainSection() {
               onAddItem={handleCreateTab}
             />
           </SortableTabs>
-          <div className="app-drag h-full min-w-2!" />
         </div>
         {/* Content area with per-tab UI */}
         <div className="relative flex size-full flex-col">

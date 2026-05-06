@@ -202,7 +202,7 @@ function BarTriggerContent({
         value={item.id}
         disabled={item.disabled}
         className={cn(
-          'flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent px-2.5 py-1 text-xs',
+          'flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent py-1 pr-1 pl-2.5 text-xs',
           item.disabled && 'cursor-not-allowed opacity-50',
         )}
       >
@@ -231,7 +231,7 @@ function BarTriggerContent({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={item.onClose}
           className={cn(
-            'flex shrink-0 items-center justify-center px-1 text-muted-foreground transition-colors hover:text-foreground',
+            'flex shrink-0 items-center justify-center pr-2 pl-0.5 text-muted-foreground transition-colors hover:text-foreground',
             // Only show on hover for inactive tabs (matches browser behaviour)
             !isActive && 'opacity-0 group-hover:opacity-100',
           )}

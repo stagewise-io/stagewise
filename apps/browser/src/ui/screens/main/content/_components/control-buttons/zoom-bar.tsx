@@ -1,7 +1,9 @@
-import { IconMinus, IconPlus } from 'nucleo-micro-bold';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconMagnifierMinusOutline18,
+  IconMagnifierPlusOutline18,
+} from 'nucleo-ui-outline-18';
 import { HotkeyComboText } from '@ui/components/hotkey-combo-text';
 import {
   Tooltip,
@@ -109,15 +111,13 @@ export function ZoomBar({ tabId }: ZoomBarProps) {
 
   return (
     <div
-      className="flex h-full flex-row items-center gap-2 pr-0.5 pl-1.5"
+      className="flex h-full flex-row items-center gap-0 px-1.5"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <IconMagnifierOutline18 className="block size-4 text-muted-foreground opacity-50" />
-
       <div className="flex flex-row items-center gap-0">
         <Button variant="ghost" size="icon-xs" onClick={zoomOut}>
-          <IconMinus className="size-3.5" />
+          <IconMagnifierMinusOutline18 className="size-4" />
         </Button>
         <Tooltip>
           <TooltipTrigger>
@@ -130,7 +130,7 @@ export function ZoomBar({ tabId }: ZoomBarProps) {
           </TooltipContent>
         </Tooltip>
         <Button variant="ghost" size="icon-xs" onClick={zoomIn}>
-          <IconPlus className="size-3.5" />
+          <IconMagnifierPlusOutline18 className="size-4" />
         </Button>
       </div>
     </div>
