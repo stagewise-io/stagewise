@@ -37,6 +37,7 @@ import {
   configurablePermissionTypes,
 } from './shared-types';
 import type { PageTransition, DownloadState } from '../pages-api/types';
+import type { CodingPlanId } from '../../coding-plans';
 import type {
   AgentState,
   AgentTypes,
@@ -1089,6 +1090,38 @@ export type KartonContract = {
         provider: ModelProvider,
         apiKey: string,
       ) => Promise<void>;
+      /** Clear the API key for a provider */
+      clearProviderApiKey: (provider: ModelProvider) => Promise<void>;
+      /**
+       * Atomically disconnect a provider: clear the encrypted API key and
+       * flip the provider's endpoint mode back to `'stagewise'` in a single
+       * patch update. Prevents the UI from observing a state where mode is
+       * disconnected but the key is still at rest (or vice versa).
+       */
+      disconnectProvider: (provider: ModelProvider) => Promise<void>;
+      /**
+       * Atomically connect a Tier-A coding plan: validate the user-supplied
+       * key against the plan's provider, encrypt+store it, and flip the
+       * provider's endpoint mode to `'official'`. No state change on
+       * validation failure — the UI never observes a half-connected state.
+       * Inverse of `disconnectProvider`; mirrors `pages-api.connectCodingPlan`.
+       */
+      connectCodingPlan: (
+        planId: CodingPlanId,
+        apiKey: string,
+      ) => Promise<{ success: true } | { success: false; error: string }>;
+      /**
+       * Atomically connect a provider's own API key: validate the
+       * user-supplied key, encrypt+store it, and flip the provider's
+       * endpoint mode to `'official'` in a single patch update. No state
+       * change on validation failure — the UI never observes a
+       * half-connected state (key stored but mode still `'stagewise'`, or
+       * vice versa). Inverse of `disconnectProvider`.
+       */
+      connectProvider: (
+        provider: ModelProvider,
+        apiKey: string,
+      ) => Promise<{ success: true } | { success: false; error: string }>;
     };
     devToolbar: {
       /** Update the global widget order */
@@ -1105,6 +1138,13 @@ export type KartonContract = {
     };
     /** Get omnibox suggestions based on input (history entries and search terms) */
     getOmniboxSuggestions: (input: string) => Promise<OmniboxSuggestions>;
+    /**
+     * Open an http(s) URL with the OS default handler (shell.openExternal).
+     * Used by the onboarding flow's "Get API key" buttons to bypass the UI
+     * window's setWindowOpenHandler, which would otherwise route the URL to
+     * a new tab behind the onboarding overlay.
+     */
+    openExternalUrl: (url: string) => Promise<void>;
   };
 };
 

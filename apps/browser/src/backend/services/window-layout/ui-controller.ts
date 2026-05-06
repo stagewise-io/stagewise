@@ -640,6 +640,33 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
 
   private registerKartonProcedures() {
     this.uiKarton.registerServerProcedureHandler(
+      'openExternalUrl',
+      async (_callingClientId: string, url: string): Promise<void> => {
+        let parsed: URL;
+        try {
+          parsed = new URL(url);
+        } catch {
+          // Log only length — the raw string is untrusted and may carry
+          // query-string or fragment secrets, and we have no parsed form to
+          // safely strip them.
+          this.logger.warn(
+            `[UIController] Rejected openExternalUrl (unparseable, length=${url.length})`,
+          );
+          return;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          // Log only scheme and host — pathname can leak sensitive data
+          // for non-HTTP schemes (e.g. mailto: local-part, file: paths),
+          // and search/hash/userinfo can carry tokens.
+          this.logger.warn(
+            `[UIController] Rejected openExternalUrl (bad scheme ${parsed.protocol}): ${parsed.protocol}//${parsed.host}`,
+          );
+          return;
+        }
+        await shell.openExternal(parsed.toString());
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.createTab',
       async (_callingClientId: string, url?: string, setActive?: boolean) => {
         this.emit('createTab', url, setActive);
@@ -1060,6 +1087,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   }
 
   public unregisterKartonProcedures() {
+    this.uiKarton.removeServerProcedureHandler('openExternalUrl');
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');
     this.uiKarton.removeServerProcedureHandler('browser.switchTab');

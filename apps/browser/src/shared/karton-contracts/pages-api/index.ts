@@ -207,6 +207,13 @@ export type PagesApiContract = {
     ) => Promise<void>;
     /** Clear the API key for a provider */
     clearProviderApiKey: (provider: ModelProvider) => Promise<void>;
+    /**
+     * Atomically disconnect a provider: clear the encrypted API key and flip
+     * the provider's endpoint mode back to `'stagewise'` in a single patch
+     * update. Prevents the UI from observing a state where mode is
+     * disconnected but the key is still at rest (or vice versa).
+     */
+    disconnectProvider: (provider: ModelProvider) => Promise<void>;
     /** Set an encrypted API key for a custom endpoint */
     setCustomEndpointApiKey: (
       endpointId: string,

@@ -20,6 +20,7 @@ import {
 } from '@shared/karton-contracts/ui/shared-types';
 import { availableModels } from '@shared/available-models';
 import { CODING_PLANS, type CodingPlan } from '@shared/coding-plans';
+import { CodingPlanCard } from '@ui/components/coding-plan-card';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 
 import { cn } from '@pages/utils';
@@ -334,133 +335,43 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
 // Coding Plans Section
 // =============================================================================
 
-function CodingPlanCard({ plan }: { plan: CodingPlan }) {
+function SettingsCodingPlanCard({ plan }: { plan: CodingPlan }) {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
   const connectCodingPlan = useKartonProcedure((s) => s.connectCodingPlan);
-  const clearProviderApiKey = useKartonProcedure((s) => s.clearProviderApiKey);
+  const disconnectProvider = useKartonProcedure((s) => s.disconnectProvider);
   const openExternalUrl = useKartonProcedure((s) => s.openExternalUrl);
 
   const config = preferences.providerConfigs?.[plan.provider] ?? {
     mode: 'stagewise' as const,
   };
-  const isConnected = !!config.encryptedApiKey && config.mode === 'official';
 
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleConnect = useCallback(async () => {
-    const key = apiKeyInput.trim();
-    if (!key) return;
-    setIsConnecting(true);
-    setError(null);
-    try {
-      const res = await connectCodingPlan(plan.id, key);
-      if (res.success) {
-        setApiKeyInput('');
-      } else {
-        setError(res.error);
-      }
-    } catch {
-      setError('Connection failed. Please try again.');
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [apiKeyInput, plan.id, connectCodingPlan]);
+  const handleConnect = useCallback(
+    (planId: typeof plan.id, apiKey: string) =>
+      connectCodingPlan(planId, apiKey),
+    [connectCodingPlan],
+  );
 
   const handleDisconnect = useCallback(async () => {
-    // Order matters: flip mode to 'stagewise' BEFORE clearing the key so that
-    // a failure in the second step leaves behind an unused (but stale) key
-    // rather than a provider configured for 'official' mode with no key —
-    // which would break model-provider routing.
-    const [, patches] = produceWithPatches(preferences, (draft) => {
-      draft.providerConfigs[plan.provider].mode = 'stagewise';
-    });
-    await updatePreferences(patches);
-    await clearProviderApiKey(plan.provider);
-    setError(null);
-  }, [plan.provider, clearProviderApiKey, preferences, updatePreferences]);
+    // Atomic: flips mode back to 'stagewise' AND clears the encrypted key in
+    // a single patch update on the backend. No partial-state window.
+    await disconnectProvider(plan.provider);
+  }, [plan.provider, disconnectProvider]);
 
-  const handleGetApiKey = useCallback(() => {
-    void openExternalUrl(plan.apiKeyUrl);
-  }, [plan.apiKeyUrl, openExternalUrl]);
+  const handleGetApiKey = useCallback(
+    (url: string) => {
+      void openExternalUrl(url);
+    },
+    [openExternalUrl],
+  );
 
   return (
-    <div className="space-y-3 rounded-lg border border-derived p-3">
-      <div className="-mt-1 flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="flex items-center gap-1.5 font-medium text-foreground text-sm">
-            {plan.displayName}
-            {isConnected && (
-              <span className="rounded-full border border-border-subtle bg-surface-1 px-1.5 py-[1px] font-medium text-[10px] text-muted-foreground">
-                Connected
-              </span>
-            )}
-          </h3>
-          <p className="truncate text-muted-foreground text-xs">
-            {plan.tagline}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-1">
-          {isConnected ? (
-            <Button variant="ghost" size="xs" onClick={handleDisconnect}>
-              Disconnect
-            </Button>
-          ) : (
-            <Button variant="ghost" size="xs" onClick={handleGetApiKey}>
-              Get API key
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {!isConnected && (
-        // <div className="space-y-1 border-derived border-t pt-3">
-        <div className="space-y-1">
-          <div className="flex gap-1.5">
-            <Input
-              type="password"
-              value={apiKeyInput}
-              placeholder="Enter API key..."
-              onValueChange={(v) => {
-                setApiKeyInput(v);
-                setError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && apiKeyInput.trim() && !isConnecting) {
-                  void handleConnect();
-                }
-              }}
-              disabled={isConnecting}
-              size="sm"
-              style={{ maxWidth: 'none' }}
-              className={cn(
-                'min-w-0 flex-1',
-                error && 'border-error-foreground',
-              )}
-            />
-            {apiKeyInput.trim() && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleConnect}
-                disabled={isConnecting}
-              >
-                {isConnecting ? 'Connecting…' : 'Connect'}
-              </Button>
-            )}
-          </div>
-          {error && <TruncatedErrorText text={error} />}
-          {!error && config.mode === 'custom' && (
-            <p className="text-2xs text-subtle-foreground">
-              This provider is currently set to Custom. Connecting will switch
-              it to Official.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
+    <CodingPlanCard
+      plan={plan}
+      config={config}
+      onConnect={handleConnect}
+      onDisconnect={handleDisconnect}
+      onGetApiKey={handleGetApiKey}
+    />
   );
 }
 
@@ -472,10 +383,12 @@ function CodingPlansSection() {
   return (
     <div className="space-y-3">
       {primary.map((plan) => (
-        <CodingPlanCard key={plan.id} plan={plan} />
+        <SettingsCodingPlanCard key={plan.id} plan={plan} />
       ))}
       {showAll &&
-        secondary.map((plan) => <CodingPlanCard key={plan.id} plan={plan} />)}
+        secondary.map((plan) => (
+          <SettingsCodingPlanCard key={plan.id} plan={plan} />
+        ))}
       {secondary.length > 0 && (
         <div className="flex justify-end">
           <Button
