@@ -94,13 +94,13 @@ export function Sidebar() {
           ) : (
             <button
               type="button"
-              className="app-no-drag flex min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-foreground/8 active:bg-foreground/12"
+              className="app-no-drag flex h-9 min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-foreground/8 active:bg-foreground/12"
               onClick={handleOpenAccount}
             >
-              <div className="flex min-w-0 flex-col items-start gap-px">
+              <div className="flex min-w-0 flex-row items-center gap-2">
+                <IconOpenRectArrowInOutline18 className="size-5 text-foreground" />
                 <span className="font-medium text-foreground text-sm leading-tight">
                   Not signed in
-                  <IconOpenRectArrowInOutline18 className="size-4" />
                 </span>
               </div>
             </button>
