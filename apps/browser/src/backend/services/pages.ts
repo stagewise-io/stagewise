@@ -794,18 +794,24 @@ export class PagesService extends DisposableService {
         try {
           parsed = new URL(url);
         } catch {
+          // Log only length — the raw string is untrusted and may carry
+          // query-string or fragment secrets, and we have no parsed form to
+          // safely strip them.
           this.logger.warn(
-            `[PagesService] Rejected openExternalUrl (unparseable): ${url}`,
+            `[PagesService] Rejected openExternalUrl (unparseable, length=${url.length})`,
           );
           return;
         }
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          // Log only scheme and host — pathname can leak sensitive data
+          // for non-HTTP schemes (e.g. mailto: local-part, file: paths),
+          // and search/hash/userinfo can carry tokens.
           this.logger.warn(
-            `[PagesService] Rejected openExternalUrl (bad scheme ${parsed.protocol}): ${url}`,
+            `[PagesService] Rejected openExternalUrl (bad scheme ${parsed.protocol}): ${parsed.protocol}//${parsed.host}`,
           );
           return;
         }
-        await shell.openExternal(url);
+        await shell.openExternal(parsed.toString());
       },
     );
 
@@ -1492,6 +1498,7 @@ export class PagesService extends DisposableService {
       planId: CodingPlanId,
       apiKey: string,
     ) => Promise<{ success: true } | { success: false; error: string }>,
+    disconnectProviderHandler: (provider: ModelProvider) => Promise<void>,
   ): void {
     this.getPreferencesHandler = getHandler;
     this.updatePreferencesHandler = updateHandler;
@@ -1602,6 +1609,13 @@ export class PagesService extends DisposableService {
         apiKey: string,
       ) => {
         return connectCodingPlanHandler(planId, apiKey);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'disconnectProvider',
+      async (_callingClientId: string, provider: ModelProvider) => {
+        await disconnectProviderHandler(provider);
       },
     );
 
@@ -2075,6 +2089,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('listAwsProfiles');
     this.kartonServer.removeServerProcedureHandler('validateProviderApiKey');
     this.kartonServer.removeServerProcedureHandler('connectCodingPlan');
+    this.kartonServer.removeServerProcedureHandler('disconnectProvider');
     this.kartonServer.removeServerProcedureHandler('sendOtp');
     this.kartonServer.removeServerProcedureHandler('verifyOtp');
     this.kartonServer.removeServerProcedureHandler('logout');

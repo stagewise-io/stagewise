@@ -3,8 +3,10 @@ import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { cn } from '@ui/utils';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
+import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTurnstile } from '@ui/hooks/use-turnstile';
 import {
   Tooltip,
@@ -12,11 +14,23 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
+import {
+  CodingPlanCard,
+  CODING_PLANS,
+  type CodingPlanId,
+} from '@ui/components/coding-plan-card';
+import { ProviderLogo } from '@ui/components/provider-logos';
+import {
+  IconChevronLeftOutline18,
+  IconChevronRightOutline18,
+} from 'nucleo-ui-outline-18';
 import type { StepValidityCallback } from '../index';
-import type { ApiKeyValidationResult } from '@shared/karton-contracts/ui';
-import type { TelemetryLevel } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  ModelProvider,
+  TelemetryLevel,
+} from '@shared/karton-contracts/ui/shared-types';
 
-type AuthMode = 'stagewise' | 'api-keys';
+type AuthMode = 'stagewise' | 'api-keys' | 'coding-plan';
 type AuthPhase = 'form-input' | 'waiting-for-otp' | 'authentication-validated';
 type ProviderKey =
   | 'anthropic'
@@ -26,7 +40,18 @@ type ProviderKey =
   | 'alibaba'
   | 'deepseek'
   | 'z-ai';
-type FieldErrors = Record<ProviderKey, string | null>;
+
+const API_KEY_PROVIDERS: ProviderKey[] = [
+  'anthropic',
+  'openai',
+  'google',
+  'moonshotai',
+  'alibaba',
+  'deepseek',
+  'z-ai',
+];
+
+type ConnectResult = { success: true } | { success: false; error: string };
 
 export function StepAuth({
   isActive,
@@ -38,14 +63,19 @@ export function StepAuth({
 }) {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
-  const validateApiKeys = useKartonProcedure(
-    (p) => p.userAccount.validateApiKeys,
+  const disconnectProvider = useKartonProcedure(
+    (p) => p.preferences.disconnectProvider,
   );
-  const setProviderApiKey = useKartonProcedure(
-    (p) => p.preferences.setProviderApiKey,
+  const connectCodingPlan = useKartonProcedure(
+    (p) => p.preferences.connectCodingPlan,
+  );
+  const connectProvider = useKartonProcedure(
+    (p) => p.preferences.connectProvider,
   );
   const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const authStatus = useKartonState((s) => s.userAccount.status);
+  const preferences = useKartonState((s) => s.preferences);
   const userEmail = useKartonState((s) =>
     s.userAccount.status === 'authenticated' ||
     s.userAccount.status === 'server_unreachable'
@@ -70,7 +100,6 @@ export function StepAuth({
   const [telemetry, setTelemetry] = useState<TelemetryLevel>('anonymous');
   const emailRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
-  const anthropicKeyRef = useRef<HTMLInputElement>(null);
 
   const {
     containerRef: turnstileRef,
@@ -81,24 +110,19 @@ export function StepAuth({
     reset: resetTurnstile,
   } = useTurnstile();
 
-  const [apiKey1, setApiKey1] = useState('');
-  const [apiKey2, setApiKey2] = useState('');
-  const [apiKey3, setApiKey3] = useState('');
-  const [apiKey4, setApiKey4] = useState('');
-  const [apiKey5, setApiKey5] = useState('');
-  const [apiKey6, setApiKey6] = useState('');
-  const [apiKey7, setApiKey7] = useState('');
   const [showMoreProviders, setShowMoreProviders] = useState(false);
-  const emptyErrors: FieldErrors = {
-    anthropic: null,
-    openai: null,
-    google: null,
-    moonshotai: null,
-    alibaba: null,
-    deepseek: null,
-    'z-ai': null,
-  };
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>(emptyErrors);
+
+  // API-keys list scroll fadeout — mirrors the models-list pattern in
+  // agent-settings.models-providers.tsx.
+  const [apiKeysViewport, setApiKeysViewport] = useState<HTMLElement | null>(
+    null,
+  );
+  const apiKeysScrollRef = useRef<HTMLElement | null>(null);
+  apiKeysScrollRef.current = apiKeysViewport;
+  const { maskStyle: apiKeysMaskStyle } = useScrollFadeMask(apiKeysScrollRef, {
+    axis: 'vertical',
+    fadeDistance: 24,
+  });
 
   useEffect(() => {
     if (
@@ -109,21 +133,9 @@ export function StepAuth({
       setMode('stagewise');
       setCode('');
       setError(null);
-      setFieldErrors(emptyErrors);
+      setSelectedCodingPlanId(null);
     }
   }, [authStatus]);
-
-  useEffect(() => {
-    if (
-      !isActive &&
-      mode === 'api-keys' &&
-      phase === 'authentication-validated'
-    ) {
-      setPhase('form-input');
-      setError(null);
-      setFieldErrors(emptyErrors);
-    }
-  }, [isActive]);
 
   useEffect(() => {
     if (isActive && mode === 'stagewise' && phase === 'form-input')
@@ -134,95 +146,46 @@ export function StepAuth({
     if (phase === 'waiting-for-otp') otpRef.current?.focus();
   }, [phase]);
 
-  useEffect(() => {
-    if (mode === 'api-keys') {
-      requestAnimationFrame(() => anthropicKeyRef.current?.focus());
-    }
-  }, [mode]);
+  const hasConnectedApiKey = useMemo(() => {
+    const cfgs = preferences.providerConfigs ?? {};
+    return API_KEY_PROVIDERS.some(
+      (p) => cfgs[p]?.mode === 'official' && !!cfgs[p]?.encryptedApiKey,
+    );
+  }, [preferences.providerConfigs]);
 
-  const hasAnyKey = !!(
-    apiKey1 ||
-    apiKey2 ||
-    apiKey3 ||
-    apiKey4 ||
-    apiKey5 ||
-    apiKey6 ||
-    apiKey7
+  const hasConnectedCodingPlan = useMemo(() => {
+    const cfgs = preferences.providerConfigs ?? {};
+    return Object.values(CODING_PLANS).some(
+      (plan) =>
+        cfgs[plan.provider]?.mode === 'official' &&
+        !!cfgs[plan.provider]?.encryptedApiKey,
+    );
+  }, [preferences.providerConfigs]);
+
+  const isValid =
+    phase === 'authentication-validated' ||
+    (mode === 'api-keys' && hasConnectedApiKey) ||
+    (mode === 'coding-plan' && hasConnectedCodingPlan);
+
+  const handleConnectSingleKey = useCallback(
+    async (provider: ProviderKey, apiKey: string): Promise<ConnectResult> => {
+      // Delegate to the backend's atomic `connectProvider` procedure.
+      // It validates the key, encrypts+stores it, and flips the provider's
+      // endpoint mode to `'official'` in a single RPC. No partial-state
+      // window: if any step fails, nothing is persisted.
+      return connectProvider(provider, apiKey);
+    },
+    [connectProvider],
   );
-  const isValid = phase === 'authentication-validated';
 
-  const handleSubmitApiKeys = useCallback(() => {
-    if (loading || !hasAnyKey) return;
-    setLoading(true);
-    setFieldErrors(emptyErrors);
-    void validateApiKeys({
-      anthropic: apiKey1,
-      openai: apiKey2,
-      google: apiKey3,
-      moonshotai: apiKey4,
-      alibaba: apiKey5,
-      deepseek: apiKey6,
-      'z-ai': apiKey7,
-    })
-      .then(async (results) => {
-        const next: FieldErrors = { ...emptyErrors };
-        for (const key of Object.keys(results) as ProviderKey[]) {
-          const r = results[key] as ApiKeyValidationResult;
-          next[key] = r && !r.success ? r.error : null;
-        }
-        setFieldErrors(next);
-        // Auto-expand the secondary section if any hidden provider errored,
-        // otherwise the error message is rendered into an unmounted field
-        // and the user gets no feedback.
-        const secondaryKeys: ProviderKey[] = [
-          'moonshotai',
-          'alibaba',
-          'deepseek',
-          'z-ai',
-        ];
-        if (secondaryKeys.some((k) => next[k] !== null)) {
-          setShowMoreProviders(true);
-        }
-        if (Object.values(next).every((v) => v === null)) {
-          const keysToSave = (
-            [
-              ['anthropic', apiKey1],
-              ['openai', apiKey2],
-              ['google', apiKey3],
-              ['moonshotai', apiKey4],
-              ['alibaba', apiKey5],
-              ['deepseek', apiKey6],
-              ['z-ai', apiKey7],
-            ] as [ProviderKey, string][]
-          ).filter(([, v]) => !!v);
-          for (const [provider, key] of keysToSave) {
-            await setProviderApiKey(provider, key);
-            await preferencesUpdate([
-              {
-                op: 'replace' as const,
-                path: ['providerConfigs', provider, 'mode'],
-                value: 'official',
-              },
-            ]);
-          }
-          setPhase('authentication-validated');
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [
-    loading,
-    hasAnyKey,
-    apiKey1,
-    apiKey2,
-    apiKey3,
-    apiKey4,
-    apiKey5,
-    apiKey6,
-    apiKey7,
-    validateApiKeys,
-    setProviderApiKey,
-    preferencesUpdate,
-  ]);
+  const handleDisconnectApiKey = useCallback(
+    async (provider: ProviderKey) => {
+      // Atomic: flips mode back to 'stagewise' AND clears the encrypted key
+      // in a single patch update on the backend. No partial-state window.
+      await disconnectProvider(provider);
+    },
+    [disconnectProvider],
+  );
 
   useEffect(() => {
     if (isActive) {
@@ -263,6 +226,44 @@ export function StepAuth({
     resetTurnstile,
     turnstileError,
   ]);
+
+  const codingPlans = useMemo(() => Object.values(CODING_PLANS), []);
+
+  // Sub-view state for the coding-plan mode. `null` = grid view,
+  // otherwise the plan detail view for that id.
+  const [selectedCodingPlanId, setSelectedCodingPlanId] =
+    useState<CodingPlanId | null>(null);
+
+  const handleConnectSinglePlan = useCallback(
+    async (
+      planId: CodingPlanId,
+      apiKey: string,
+    ): Promise<{ success: true } | { success: false; error: string }> => {
+      // Delegate to the backend's atomic `connectCodingPlan` procedure.
+      // It validates the key, encrypts+stores it, and flips the provider's
+      // endpoint mode to `'official'` in a single RPC. No partial state
+      // window: if any step fails, nothing is persisted.
+      return connectCodingPlan(planId, apiKey);
+    },
+    [connectCodingPlan],
+  );
+
+  const handleGetApiKey = useCallback(
+    (url: string) => {
+      void openExternalUrl(url);
+    },
+    [openExternalUrl],
+  );
+
+  const handleDisconnectPlan = useCallback(
+    async (planId: CodingPlanId) => {
+      const provider = CODING_PLANS[planId].provider;
+      // Atomic: flips mode back to 'stagewise' AND clears the encrypted key
+      // in a single patch update on the backend. No partial-state window.
+      await disconnectProvider(provider);
+    },
+    [disconnectProvider],
+  );
 
   const handleVerifyOtp = useCallback(async () => {
     if (!code.trim()) return;
@@ -330,40 +331,37 @@ export function StepAuth({
     );
   }
 
-  if (phase === 'authentication-validated' && mode === 'api-keys') {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4">
-        <div className="flex flex-col items-center gap-4">
-          <h1 className="font-medium text-foreground text-xl">
-            Your keys have been validated successfully.
-          </h1>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4">
-      <div className="flex flex-col items-center gap-2 pb-4">
-        <h1 className="font-medium text-foreground text-xl">Authenticate</h1>
-        {mode === 'stagewise' && phase === 'form-input' && (
-          <p className="text-muted-foreground text-sm">
-            Get access to the latest models with stagewise.
-          </p>
-        )}
-        {mode === 'stagewise' && phase === 'waiting-for-otp' && (
-          <p className="text-muted-foreground text-sm">
-            We sent a code to{' '}
-            <span className="font-semibold text-muted-foreground">{email}</span>
-            . Enter it below.
-          </p>
-        )}
-        {mode === 'api-keys' && (
-          <p className="text-muted-foreground text-sm">
-            Enter at least one provider key to authenticate.
-          </p>
-        )}
-      </div>
+      {!(mode === 'coding-plan' && selectedCodingPlanId !== null) && (
+        <div className="flex flex-col items-center gap-2 pb-2">
+          <h1 className="font-medium text-foreground text-xl">Authenticate</h1>
+          {mode === 'stagewise' && phase === 'form-input' && (
+            <p className="text-muted-foreground text-sm">
+              Get access to the latest models with stagewise.
+            </p>
+          )}
+          {mode === 'stagewise' && phase === 'waiting-for-otp' && (
+            <p className="text-muted-foreground text-sm">
+              We sent a code to{' '}
+              <span className="font-semibold text-muted-foreground">
+                {email}
+              </span>
+              . Enter it below.
+            </p>
+          )}
+          {mode === 'api-keys' && (
+            <p className="text-muted-foreground text-sm">
+              Enter at least one provider key to authenticate.
+            </p>
+          )}
+          {mode === 'coding-plan' && (
+            <p className="text-muted-foreground text-sm">
+              Connect a GLM, Kimi, Qwen, or MiniMax coding plan to authenticate.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Turnstile container — visible so interactive challenges can render */}
       <div ref={turnstileRef} />
@@ -374,7 +372,7 @@ export function StepAuth({
             ref={emailRef}
             placeholder="you@example.com"
             size="sm"
-            className="app-no-drag"
+            className="app-no-drag w-64"
             type="email"
             value={email}
             onValueChange={(v) => setEmail(v)}
@@ -437,237 +435,109 @@ export function StepAuth({
       )}
 
       {mode === 'api-keys' && (
-        <div className="flex w-full max-w-xs flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="api-key-1"
-              className="text-muted-foreground text-xs"
-            >
-              Anthropic
-            </label>
-            <Input
-              ref={anthropicKeyRef}
-              id="api-key-1"
+        <div className="app-no-drag flex w-full max-w-xs flex-col gap-3">
+          <OverlayScrollbar
+            className="mask-alpha max-h-96"
+            style={apiKeysMaskStyle}
+            onViewportRef={setApiKeysViewport}
+            contentClassName="space-y-3"
+          >
+            <ApiKeyRow
+              provider="anthropic"
+              label="Anthropic"
               placeholder="sk-ant-api01..."
-              size="sm"
-              className="app-no-drag"
-              value={apiKey1}
-              aria-invalid={!!fieldErrors.anthropic}
-              aria-describedby={
-                fieldErrors.anthropic ? 'api-key-1-error' : undefined
+              autoFocus
+              config={
+                preferences.providerConfigs?.anthropic ?? { mode: 'stagewise' }
               }
-              onValueChange={(v) => {
-                setApiKey1(v);
-                setFieldErrors((prev) => ({ ...prev, anthropic: null }));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmitApiKeys();
-              }}
+              onConnect={handleConnectSingleKey}
+              onDisconnect={handleDisconnectApiKey}
             />
-            {fieldErrors.anthropic && (
-              <TruncatedErrorText
-                id="api-key-1-error"
-                text={fieldErrors.anthropic}
-              />
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="api-key-2"
-              className="text-muted-foreground text-xs"
-            >
-              OpenAI
-            </label>
-            <Input
-              id="api-key-2"
+            <ApiKeyRow
+              provider="openai"
+              label="OpenAI"
               placeholder="sk-proj-LW..."
-              size="sm"
-              className="app-no-drag"
-              value={apiKey2}
-              aria-invalid={!!fieldErrors.openai}
-              aria-describedby={
-                fieldErrors.openai ? 'api-key-2-error' : undefined
+              config={
+                preferences.providerConfigs?.openai ?? { mode: 'stagewise' }
               }
-              onValueChange={(v) => {
-                setApiKey2(v);
-                setFieldErrors((prev) => ({ ...prev, openai: null }));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmitApiKeys();
-              }}
+              onConnect={handleConnectSingleKey}
+              onDisconnect={handleDisconnectApiKey}
             />
-            {fieldErrors.openai && (
-              <TruncatedErrorText
-                id="api-key-2-error"
-                text={fieldErrors.openai}
-              />
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="api-key-3"
-              className="text-muted-foreground text-xs"
-            >
-              Google
-            </label>
-            <Input
-              id="api-key-3"
+            <ApiKeyRow
+              provider="google"
+              label="Google"
               placeholder="AIykSyLeD..."
-              size="sm"
-              className="app-no-drag"
-              value={apiKey3}
-              aria-invalid={!!fieldErrors.google}
-              aria-describedby={
-                fieldErrors.google ? 'api-key-3-error' : undefined
+              config={
+                preferences.providerConfigs?.google ?? { mode: 'stagewise' }
               }
-              onValueChange={(v) => {
-                setApiKey3(v);
-                setFieldErrors((prev) => ({ ...prev, google: null }));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmitApiKeys();
-              }}
+              onConnect={handleConnectSingleKey}
+              onDisconnect={handleDisconnectApiKey}
             />
-            {fieldErrors.google && (
-              <TruncatedErrorText
-                id="api-key-3-error"
-                text={fieldErrors.google}
-              />
+            {showMoreProviders && (
+              <>
+                <ApiKeyRow
+                  provider="moonshotai"
+                  label="Moonshot AI"
+                  placeholder="sk-..."
+                  config={
+                    preferences.providerConfigs?.moonshotai ?? {
+                      mode: 'stagewise',
+                    }
+                  }
+                  onConnect={handleConnectSingleKey}
+                  onDisconnect={handleDisconnectApiKey}
+                />
+                <ApiKeyRow
+                  provider="alibaba"
+                  label="Alibaba Cloud"
+                  placeholder="sk-..."
+                  config={
+                    preferences.providerConfigs?.alibaba ?? {
+                      mode: 'stagewise',
+                    }
+                  }
+                  onConnect={handleConnectSingleKey}
+                  onDisconnect={handleDisconnectApiKey}
+                />
+                <ApiKeyRow
+                  provider="deepseek"
+                  label="DeepSeek"
+                  placeholder="sk-..."
+                  config={
+                    preferences.providerConfigs?.deepseek ?? {
+                      mode: 'stagewise',
+                    }
+                  }
+                  onConnect={handleConnectSingleKey}
+                  onDisconnect={handleDisconnectApiKey}
+                />
+                <ApiKeyRow
+                  provider="z-ai"
+                  label="Z.ai"
+                  placeholder="sk-..."
+                  config={
+                    preferences.providerConfigs?.['z-ai'] ?? {
+                      mode: 'stagewise',
+                    }
+                  }
+                  onConnect={handleConnectSingleKey}
+                  onDisconnect={handleDisconnectApiKey}
+                />
+              </>
             )}
-          </div>
-          {showMoreProviders && (
-            <>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="api-key-4"
-                  className="text-muted-foreground text-xs"
-                >
-                  Moonshot AI
-                </label>
-                <Input
-                  id="api-key-4"
-                  placeholder="sk-..."
-                  size="sm"
-                  className="app-no-drag"
-                  value={apiKey4}
-                  aria-invalid={!!fieldErrors.moonshotai}
-                  aria-describedby={
-                    fieldErrors.moonshotai ? 'api-key-4-error' : undefined
-                  }
-                  onValueChange={(v) => {
-                    setApiKey4(v);
-                    setFieldErrors((prev) => ({ ...prev, moonshotai: null }));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmitApiKeys();
-                  }}
-                />
-                {fieldErrors.moonshotai && (
-                  <TruncatedErrorText
-                    id="api-key-4-error"
-                    text={fieldErrors.moonshotai}
-                  />
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="api-key-5"
-                  className="text-muted-foreground text-xs"
-                >
-                  Alibaba Cloud
-                </label>
-                <Input
-                  id="api-key-5"
-                  placeholder="sk-..."
-                  size="sm"
-                  className="app-no-drag"
-                  value={apiKey5}
-                  aria-invalid={!!fieldErrors.alibaba}
-                  aria-describedby={
-                    fieldErrors.alibaba ? 'api-key-5-error' : undefined
-                  }
-                  onValueChange={(v) => {
-                    setApiKey5(v);
-                    setFieldErrors((prev) => ({ ...prev, alibaba: null }));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmitApiKeys();
-                  }}
-                />
-                {fieldErrors.alibaba && (
-                  <TruncatedErrorText
-                    id="api-key-5-error"
-                    text={fieldErrors.alibaba}
-                  />
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="api-key-6"
-                  className="text-muted-foreground text-xs"
-                >
-                  DeepSeek
-                </label>
-                <Input
-                  id="api-key-6"
-                  placeholder="sk-..."
-                  size="sm"
-                  className="app-no-drag"
-                  value={apiKey6}
-                  aria-invalid={!!fieldErrors.deepseek}
-                  aria-describedby={
-                    fieldErrors.deepseek ? 'api-key-6-error' : undefined
-                  }
-                  onValueChange={(v) => {
-                    setApiKey6(v);
-                    setFieldErrors((prev) => ({ ...prev, deepseek: null }));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmitApiKeys();
-                  }}
-                />
-                {fieldErrors.deepseek && (
-                  <TruncatedErrorText
-                    id="api-key-6-error"
-                    text={fieldErrors.deepseek}
-                  />
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="api-key-7"
-                  className="text-muted-foreground text-xs"
-                >
-                  Z.ai
-                </label>
-                <Input
-                  id="api-key-7"
-                  placeholder="sk-..."
-                  size="sm"
-                  className="app-no-drag"
-                  value={apiKey7}
-                  aria-invalid={!!fieldErrors['z-ai']}
-                  aria-describedby={
-                    fieldErrors['z-ai'] ? 'api-key-7-error' : undefined
-                  }
-                  onValueChange={(v) => {
-                    setApiKey7(v);
-                    setFieldErrors((prev) => ({ ...prev, 'z-ai': null }));
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmitApiKeys();
-                  }}
-                />
-                {fieldErrors['z-ai'] && (
-                  <TruncatedErrorText
-                    id="api-key-7-error"
-                    text={fieldErrors['z-ai']}
-                  />
-                )}
-              </div>
-            </>
-          )}
-          <div className="flex justify-end">
+          </OverlayScrollbar>
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                setMode('stagewise');
+                setError(null);
+                setSelectedCodingPlanId(null);
+              }}
+            >
+              Back to login
+            </Button>
             <Button
               variant="ghost"
               size="xs"
@@ -681,46 +551,310 @@ export function StepAuth({
 
       {error && <p className="text-error-foreground text-sm">{error}</p>}
 
-      {mode === 'api-keys' && (
-        <div className="flex w-full max-w-xs items-center justify-end gap-2 pt-2">
-          <Button
-            variant="ghost"
-            size="xs"
-            className=""
-            onClick={() => {
-              setMode('stagewise');
-              setError(null);
-              setFieldErrors(emptyErrors);
-            }}
-          >
-            Back to login
-          </Button>
-          <Button
-            disabled={loading || !hasAnyKey}
-            variant="primary"
-            size="sm"
-            className=""
-            onClick={handleSubmitApiKeys}
-          >
-            Submit
-          </Button>
+      {mode === 'coding-plan' && selectedCodingPlanId === null && (
+        <div className="app-no-drag flex w-full max-w-md flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3">
+            {codingPlans.map((plan) => {
+              const cfg = preferences.providerConfigs?.[plan.provider] ?? {
+                mode: 'stagewise' as const,
+              };
+              const isConnected =
+                cfg.mode === 'official' && !!cfg.encryptedApiKey;
+              return (
+                <CodingPlanGridCard
+                  key={plan.id}
+                  provider={plan.provider}
+                  displayName={plan.displayName}
+                  tagline={plan.tagline}
+                  isConnected={isConnected}
+                  onClick={() => setSelectedCodingPlanId(plan.id)}
+                />
+              );
+            })}
+          </div>
+          <div className="flex justify-start pt-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                setMode('stagewise');
+                setError(null);
+                setSelectedCodingPlanId(null);
+              }}
+            >
+              Back to login
+            </Button>
+          </div>
         </div>
       )}
 
+      {mode === 'coding-plan' &&
+        selectedCodingPlanId !== null &&
+        (() => {
+          const plan = CODING_PLANS[selectedCodingPlanId];
+          const cfg = preferences.providerConfigs?.[plan.provider] ?? {
+            mode: 'stagewise' as const,
+          };
+          return (
+            <div className="app-no-drag flex w-full max-w-md flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setSelectedCodingPlanId(null)}
+                  >
+                    <IconChevronLeftOutline18 className="size-4" />
+                  </Button>
+                  <ProviderLogo
+                    provider={plan.provider}
+                    className="size-5 text-foreground"
+                  />
+                  <h2 className="font-medium text-foreground text-sm">
+                    {plan.displayName}
+                  </h2>
+                </div>
+                <p className="text-muted-foreground text-xs">{plan.tagline}</p>
+              </div>
+              <CodingPlanCard
+                plan={plan}
+                config={cfg}
+                onConnect={handleConnectSinglePlan}
+                onDisconnect={() => handleDisconnectPlan(plan.id)}
+                onGetApiKey={handleGetApiKey}
+                onConnected={() => setSelectedCodingPlanId(null)}
+                hideHeader
+                autoFocusInput
+              />
+            </div>
+          );
+        })()}
+
       {mode === 'stagewise' && phase === 'form-input' && (
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={() => {
-            setMode('api-keys');
-            setError(null);
-            setFieldErrors(emptyErrors);
-          }}
-        >
-          I want to use my own API keys
-        </Button>
+        <div className="flex flex-col items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              setMode('api-keys');
+              setError(null);
+            }}
+          >
+            Use own API keys
+          </Button>
+          <div className="flex items-center gap-0">
+            <span className="text-subtle-foreground text-xs">or</span>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                setMode('coding-plan');
+                setError(null);
+              }}
+            >
+              Use existing subscription
+            </Button>
+          </div>
+        </div>
       )}
     </div>
+  );
+}
+
+function ApiKeyRow({
+  provider,
+  label,
+  placeholder,
+  autoFocus,
+  config,
+  onConnect,
+  onDisconnect,
+}: {
+  provider: ProviderKey;
+  label: string;
+  placeholder: string;
+  autoFocus?: boolean;
+  config: {
+    mode: 'stagewise' | 'official' | 'custom';
+    encryptedApiKey?: string | null;
+  };
+  onConnect: (provider: ProviderKey, apiKey: string) => Promise<ConnectResult>;
+  onDisconnect: (provider: ProviderKey) => Promise<void>;
+}) {
+  const isConnected = !!config.encryptedApiKey && config.mode === 'official';
+  const [localInput, setLocalInput] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Synchronous in-flight guards. React state updates are async, so overlapping
+  // handlers (blur + click, Enter + click) within the same event cycle would
+  // otherwise each see `isConnecting === false` and double-fire the RPC.
+  const connectInFlightRef = useRef(false);
+  const disconnectInFlightRef = useRef(false);
+  useEffect(
+    () => () => {
+      connectInFlightRef.current = false;
+      disconnectInFlightRef.current = false;
+    },
+    [],
+  );
+  const inputId = `api-key-${provider}`;
+  const errorId = `${inputId}-error`;
+
+  useEffect(() => {
+    if (!autoFocus || isConnected) return;
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [autoFocus, isConnected]);
+
+  const handleConnect = useCallback(async () => {
+    if (connectInFlightRef.current) return;
+    const key = localInput.trim();
+    if (!key) return;
+    connectInFlightRef.current = true;
+    setIsConnecting(true);
+    setLocalError(null);
+    try {
+      const res = await onConnect(provider, key);
+      if (res.success) {
+        setLocalInput('');
+      } else {
+        setLocalError(res.error);
+      }
+    } catch {
+      setLocalError('Connection failed. Please try again.');
+    } finally {
+      connectInFlightRef.current = false;
+      setIsConnecting(false);
+    }
+  }, [localInput, onConnect, provider]);
+
+  const handleDisconnect = useCallback(async () => {
+    if (disconnectInFlightRef.current) return;
+    disconnectInFlightRef.current = true;
+    setIsDisconnecting(true);
+    try {
+      await onDisconnect(provider);
+      setLocalError(null);
+    } catch (err) {
+      setLocalError(
+        err instanceof Error
+          ? err.message
+          : 'Disconnection failed. Please try again.',
+      );
+    } finally {
+      disconnectInFlightRef.current = false;
+      setIsDisconnecting(false);
+    }
+  }, [onDisconnect, provider]);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={inputId} className="text-muted-foreground text-xs">
+        {label}
+      </label>
+      <div className="flex gap-1.5">
+        <Input
+          ref={inputRef}
+          id={inputId}
+          placeholder={placeholder}
+          size="sm"
+          type="password"
+          value={isConnected ? '••••••••••••••••' : localInput}
+          aria-invalid={!!localError}
+          aria-describedby={localError ? errorId : undefined}
+          disabled={isConnecting || isConnected}
+          readOnly={isConnected}
+          style={{ maxWidth: 'none' }}
+          className={cn(
+            'min-w-0 flex-1',
+            localError && 'border-error-foreground',
+          )}
+          onValueChange={
+            isConnected
+              ? undefined
+              : (v) => {
+                  setLocalInput(v);
+                  setLocalError(null);
+                }
+          }
+          onKeyDown={(e) => {
+            if (isConnected) return;
+            if (e.key === 'Enter' && localInput.trim() && !isConnecting) {
+              void handleConnect();
+            }
+          }}
+          onBlur={() => {
+            if (isConnected) return;
+            if (localInput.trim() && !isConnecting) {
+              void handleConnect();
+            }
+          }}
+        />
+        {isConnected ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleDisconnect()}
+            disabled={isDisconnecting}
+          >
+            {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+          </Button>
+        ) : (
+          localInput.trim() && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void handleConnect()}
+              disabled={isConnecting}
+            >
+              {isConnecting ? 'Connecting…' : 'Connect'}
+            </Button>
+          )
+        )}
+      </div>
+      {localError && <TruncatedErrorText id={errorId} text={localError} />}
+    </div>
+  );
+}
+
+function CodingPlanGridCard({
+  provider,
+  displayName,
+  tagline,
+  isConnected,
+  onClick,
+}: {
+  provider: ModelProvider;
+  displayName: string;
+  tagline: string;
+  isConnected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex cursor-pointer items-center gap-3 rounded-lg border border-derived bg-surface-1 p-3 text-left transition-colors hover:bg-surface-2',
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-center">
+        <ProviderLogo provider={provider} className="size-6 text-foreground" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="font-medium text-foreground text-sm">{displayName}</h3>
+        <p className="truncate text-muted-foreground text-xs">{tagline}</p>
+      </div>
+      {isConnected ? (
+        <span className="shrink-0 self-end font-medium text-[11px] text-success-foreground">
+          Connected
+        </span>
+      ) : (
+        <IconChevronRightOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+    </button>
   );
 }
 
@@ -734,6 +868,7 @@ function TruncatedErrorText({ id, text }: { id: string; text: string }) {
         <p
           ref={ref}
           id={id}
+          role="alert"
           className={cn(
             'truncate text-2xs text-error-foreground',
             isTruncated && 'app-no-drag',

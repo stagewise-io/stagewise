@@ -27,7 +27,9 @@ export function OnboardingWizard() {
   );
 
   const isFirstStep = currentStep === 0;
+  const isAuthStep = currentStep === 1;
   const isLastStep = currentStep === stepIds.length - 1;
+  const hideBackButton = isFirstStep || isAuthStep;
 
   // Reset validity when navigating between steps.
   // Steps 0 (welcome) and 1 (auth) manage their own validity via
@@ -99,7 +101,7 @@ export function OnboardingWizard() {
             variant="ghost"
             size="sm"
             onClick={goBack}
-            className={cn(isFirstStep && 'invisible')}
+            className={cn(hideBackButton && 'invisible')}
           >
             <IconArrowLeftFill18 className="size-4" />
             Back

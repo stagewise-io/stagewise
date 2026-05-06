@@ -232,6 +232,42 @@ export class PreferencesService extends DisposableService {
       },
     );
 
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.clearProviderApiKey',
+      async (_callingClientId: string, provider: ModelProvider) => {
+        await this.clearProviderApiKey(provider);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.disconnectProvider',
+      async (_callingClientId: string, provider: ModelProvider) => {
+        await this.disconnectProvider(provider);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.connectCodingPlan',
+      async (
+        _callingClientId: string,
+        planId: CodingPlanId,
+        apiKey: string,
+      ) => {
+        return this.connectCodingPlan(planId, apiKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.connectProvider',
+      async (
+        _callingClientId: string,
+        provider: ModelProvider,
+        apiKey: string,
+      ) => {
+        return this.connectProvider(provider, apiKey);
+      },
+    );
+
     // Dev toolbar procedures
     this.uiKarton.registerServerProcedureHandler(
       'devToolbar.updateWidgetOrder',
@@ -330,6 +366,7 @@ export class PreferencesService extends DisposableService {
       (endpointId, credentials) =>
         this.setCustomEndpointGoogleCredentials(endpointId, credentials),
       (planId, apiKey) => this.connectCodingPlan(planId, apiKey),
+      (provider) => this.disconnectProvider(provider),
     );
   }
 
@@ -746,6 +783,96 @@ export class PreferencesService extends DisposableService {
   }
 
   /**
+   * Atomically disconnect a provider in one shot:
+   *   1. flip providerConfigs[provider].mode back to 'stagewise',
+   *   2. clear the encrypted API key.
+   *
+   * Both patches are applied in a single `update()` call, so the UI cannot
+   * observe a partial state where mode is 'stagewise' but the encrypted key
+   * is still at rest (or vice versa). This is the inverse of
+   * `connectCodingPlan` and replaces the previous two-RPC pattern.
+   */
+  public async disconnectProvider(provider: ModelProvider): Promise<void> {
+    this.assertNotDisposed();
+    modelProviderSchema.parse(provider);
+
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'mode'],
+        value: 'stagewise',
+      },
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'encryptedApiKey'],
+        value: undefined,
+      },
+    ];
+
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Disconnected provider: ${provider}`,
+    );
+  }
+
+  /**
+   * Atomically connect a provider in one shot:
+   *   1. validate the key against the provider,
+   *   2. encrypt+store it,
+   *   3. flip providerConfigs[provider].mode to 'official'.
+   *
+   * Both the encrypted-key patch and the mode patch are applied in a single
+   * `update()` call, so the UI cannot observe a partial state where the key
+   * is stored but mode is still 'stagewise' (or vice versa). This is the
+   * inverse of `disconnectProvider` and replaces the previous two-RPC pattern
+   * (`setProviderApiKey` + separate mode flip).
+   *
+   * Returns without mutating state if validation fails.
+   */
+  public async connectProvider(
+    provider: ModelProvider,
+    apiKey: string,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    this.assertNotDisposed();
+    modelProviderSchema.parse(provider);
+
+    if (!apiKey) {
+      return { success: false, error: 'API key is required' };
+    }
+
+    // 1. Validate the key against the provider.
+    const results = await validateApiKeys({ [provider]: apiKey });
+    const result = results[provider];
+    if (!result) {
+      return { success: false, error: 'Validation was skipped' };
+    }
+    if (result.success === false) {
+      return result;
+    }
+
+    // 2 + 3. Encrypt+store key and flip mode in one patch batch.
+    const encryptedBase64 = safeStorage
+      .encryptString(apiKey)
+      .toString('base64');
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'encryptedApiKey'],
+        value: encryptedBase64,
+      },
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'mode'],
+        value: 'official',
+      },
+    ];
+    await this.update(patches);
+
+    this.logger.debug(`[PreferencesService] Connected provider: ${provider}`);
+    return { success: true };
+  }
+
+  /**
    * Connect a Tier-A coding plan in one shot:
    *   1. validate the key against the plan's provider,
    *   2. encrypt+store it,
@@ -960,6 +1087,16 @@ export class PreferencesService extends DisposableService {
       this.uiKarton.removeServerProcedureHandler(
         'preferences.setProviderApiKey',
       );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.clearProviderApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.disconnectProvider',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.connectCodingPlan',
+      );
+      this.uiKarton.removeServerProcedureHandler('preferences.connectProvider');
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',
       );
