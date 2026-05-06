@@ -111,6 +111,7 @@ export function Sidebar() {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                aria-label="Settings"
                 className="app-no-drag shrink-0"
                 onClick={handleOpenSettings}
               >
