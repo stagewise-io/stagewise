@@ -21,3 +21,4 @@ Implement the most recently created plan.
 - **Stay focused** — no unplanned features or refactors.
 - **Update the plan** — if new information or edge cases emerge, reflect them in the plan file.
 - **Completion = 100%** — every checkbox must be `[x]`. Unnecessary tasks: delete the checkbox + add brief rationale. Never leave unchecked boxes.
+- **No user-side tasks** — if a checkbox turns out to require user action (manual testing, shell commands, credential setup, etc.), delete it, move its content into a `## Follow-ups for the user` prose section, and continue. Never leave it unchecked waiting on the user.

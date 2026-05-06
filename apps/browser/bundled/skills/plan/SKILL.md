@@ -25,6 +25,7 @@ You must create a structured implementation plan. Follow these instructions:
 
 Every checkbox = one concrete, completable work item.
 
+- **Agent-completable only** — every checkbox MUST be doable by you alone with your own tools. Never write tasks that require the user to act (manual testing, running commands in their shell, restarting a dev server, exporting env vars, reviewing, clicking through a UI, obtaining credentials, etc.). If such work is genuinely needed, describe it in a prose `## Follow-ups for the user` section — never as a checkbox.
 - **Short label** — the `- [ ]` line is a concise, scannable summary (one sentence). It says *what* to do, not *how*.
 - **Details below** — implementation specifics (file paths, code snippets, sub-steps) go in indented content underneath the checkbox line. Never cram these into the checkbox line itself.
 - **No alternatives** — resolve choices in prose above, then write one task for the chosen approach.
