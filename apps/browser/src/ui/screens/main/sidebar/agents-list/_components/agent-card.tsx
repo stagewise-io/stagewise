@@ -12,11 +12,22 @@ import {
   buildAgentContextMenuHandler,
 } from '../../../_components/shared-agent-context-menu';
 import { useInlineTitleEdit } from './use-inline-title-edit';
-import TimeAgo from 'javascript-time-ago';
-import en from 'javascript-time-ago/locale/en';
 
-TimeAgo.addLocale(en);
-const _timeAgo = new TimeAgo('en-US');
+function compactTimeAgo(timestamp: number): string {
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return `${diffSec}s`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}d`;
+  const diffWeek = Math.floor(diffDay / 7);
+  if (diffWeek < 5) return `${diffWeek}w`;
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMonth < 12) return `${diffMonth}mo`;
+  return `${Math.floor(diffDay / 365)}y`;
+}
 
 export interface AgentCardProps {
   id: string;
@@ -46,7 +57,7 @@ export function AgentCardSkeleton() {
   return (
     <div
       className={cn(
-        buttonVariants({ variant: 'ghost', size: 'md' }),
+        buttonVariants({ variant: 'ghost', size: 'sm' }),
         'justify-start pl-1.5 text-muted-foreground hover:bg-base-500/10',
       )}
     >
@@ -65,6 +76,7 @@ export const AgentCard = memo(
       isWaitingForUser,
       hasError,
       hasUnseen,
+      lastMessageAt,
       contextMenuState,
       onClick,
       onArchive,
@@ -126,7 +138,7 @@ export const AgentCard = memo(
           }
         }}
         className={cn(
-          buttonVariants({ variant: 'ghost', size: 'md' }),
+          buttonVariants({ variant: 'ghost', size: 'sm' }),
           'group/card relative justify-start pl-1.5 text-start text-muted-foreground hover:bg-foreground/8',
           isActive && 'bg-foreground/5 text-foreground',
         )}
@@ -143,7 +155,7 @@ export const AgentCard = memo(
                   ? 'bg-success-solid'
                   : null;
           return (
-            <div className="flex size-4 shrink-0 items-center justify-center">
+            <div className="flex size-4 shrink-0 items-center justify-center dark:brightness-125">
               {dotColor ? (
                 <>
                   <div
@@ -160,14 +172,14 @@ export const AgentCard = memo(
             </div>
           );
         })()}
-        <div className="mask-alpha mask-r-from-black mask-r-to-black group-hover/card:mask-r-to-transparent mask-r-from-80% mask-r-to-90% min-w-0 flex-1">
+        <div className="mask-alpha mask-l-from-black mask-l-to-black group-hover/card:mask-l-from-transparent mask-l-from-12 mask-l-to-18 min-w-0 flex-1">
           {isEditing ? (
             <span
               ref={titleRef}
               role="textbox"
               contentEditable
               suppressContentEditableWarning
-              className="block min-w-0 flex-1 cursor-text overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-sm leading-normal outline-none"
+              className="block min-w-0 flex-1 cursor-text overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left text-sm leading-normal outline-none"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
@@ -196,7 +208,7 @@ export const AgentCard = memo(
             <button
               type="button"
               tabIndex={-1}
-              className="block min-w-0 max-w-full shrink cursor-pointer overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left font-medium text-smleading-normal outline-none"
+              className="block min-w-0 max-w-full shrink cursor-pointer overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left text-sm leading-normal outline-none"
               onClick={(e) => {
                 if (!isActive) return;
                 e.stopPropagation();
@@ -212,7 +224,12 @@ export const AgentCard = memo(
           )}
         </div>
 
-        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 pr-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
+        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
+          {lastMessageAt > 0 && (
+            <span className="text-muted-foreground/60 text-xs tabular-nums">
+              {compactTimeAgo(lastMessageAt)}
+            </span>
+          )}
           <Tooltip>
             <TooltipTrigger delay={500}>
               <Button

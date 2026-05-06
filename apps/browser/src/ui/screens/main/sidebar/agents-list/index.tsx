@@ -12,7 +12,7 @@ import {
   OverlayScrollbar,
   type OverlayScrollbarRef,
 } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { IconPlusFill18 } from 'nucleo-ui-fill-18';
+import { IconPenPlusOutline18 } from 'nucleo-ui-outline-18';
 import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { useTrack } from '@ui/hooks/use-track';
@@ -127,6 +127,7 @@ export function AgentsList() {
   const showActiveAgents = useKartonState(
     (s) => s.preferences.sidebar?.showActiveAgents ?? true,
   );
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const [openAgent, setOpenAgent] = useOpenAgent();
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
@@ -419,26 +420,34 @@ export function AgentsList() {
   if (!showActiveAgents) return null;
 
   return (
-    <div className="flex h-full flex-col overflow-x-hidden pt-2 pl-0.5 group-data-[collapsed=true]:hidden">
-      <div className="flex items-center justify-between gap-1">
-        <span className="flex-1 px-0.5 font-medium text-muted-foreground text-sm">
-          Agents
-        </span>
-        <AgentsSelector />
+    <div className="flex h-full flex-col pl-0.5 group-data-[collapsed=true]:hidden">
+      <div className="shrink-0 pt-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="group/new-agent w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
+          onClick={handleCreateAgent}
+        >
+          <IconPenPlusOutline18 className="size-4" />
+          New Agent
+          <span
+            className="ml-auto font-mono text-muted-foreground/50 text-sm opacity-0 transition-[color,opacity] group-hover/new-agent:text-foreground group-hover/new-agent:opacity-100"
+            translate="no"
+          >
+            {isMacOs ? '⌘ N' : 'Ctrl N'}
+          </span>
+        </Button>
+        <div className="mt-2 flex items-center justify-between gap-1">
+          <span className="flex-1 pl-1.5 font-medium text-muted-foreground/60 text-xs">
+            Agents
+          </span>
+          <AgentsSelector />
+        </div>
       </div>
-      <Button
-        variant="ghost"
-        size="md"
-        className="mt-2 w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
-        onClick={handleCreateAgent}
-      >
-        <IconPlusFill18 className="size-4" />
-        Create new agent
-      </Button>
       <OverlayScrollbar
         ref={scrollRef}
-        className="min-h-5"
-        contentClassName="pb-3.5 pr-1.5"
+        className="-mr-1 min-h-5"
+        contentClassName="flex flex-col gap-px pb-3.5 pr-1.5"
         options={{
           overflow: { x: 'visible' },
           scrollbars: { theme: 'os-theme-stagewise-subtle' },
