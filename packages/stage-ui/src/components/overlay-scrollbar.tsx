@@ -130,8 +130,13 @@ export const OverlayScrollbar = forwardRef<
   // Handle viewport ref callback when instance is initialized
   const handleInitialized = useCallback(
     (instance: OverlayScrollbars) => {
+      const { viewport } = instance.elements();
+      // Remove the viewport from the Tab order. Keyboard scrolling still works
+      // when focus moves to items inside, but Tab should not land on the scroll
+      // container itself (which happens with certain overflow configurations).
+      viewport.tabIndex = -1;
       if (onViewportRef) {
-        onViewportRef(instance.elements().viewport);
+        onViewportRef(viewport);
       }
       if (onInitialized) {
         onInitialized(instance);

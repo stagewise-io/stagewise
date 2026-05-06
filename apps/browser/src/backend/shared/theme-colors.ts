@@ -10,9 +10,17 @@
 
 export const THEME_COLORS = {
   light: {
-    background: '#e5e4e3', // theme.css: --color-app-background → --color-base-150
+    background: '#f2f2f1', // theme.css: --color-app-background → --color-base-100
+    titleBarOverlay: {
+      color: '#f2f2f1', // theme.css: --color-app-background → --color-base-100
+      symbolColor: '#161515', // theme.css: --color-foreground → --color-base-900
+    },
   },
   dark: {
-    background: '#0d0d0d', // theme.css: --color-app-background → --color-base-950
+    background: '#1e1e1d', // theme.css: --color-app-background → --color-base-800
+    titleBarOverlay: {
+      color: '#1e1e1d', // theme.css: --color-app-background → --color-base-800
+      symbolColor: '#d8d7d6', // theme.css: --color-foreground → --color-base-200
+    },
   },
 } as const;

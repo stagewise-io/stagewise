@@ -19,6 +19,11 @@ export function ChromeDevToolsWidget({ tab }: { tab: TabState }) {
         <Button
           variant="ghost"
           size="icon-sm"
+          aria-label={
+            tab.devTools.chromeOpen
+              ? 'Hide Chrome DevTools'
+              : 'Show Chrome DevTools'
+          }
           onClick={() => toggleChromeDevTools(tab.id)}
           className={
             'text-muted-foreground data-[active=true]:text-primary-solid data-[active=true]:hover:text-primary-solid'
