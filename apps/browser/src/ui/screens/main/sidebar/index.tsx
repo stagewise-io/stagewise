@@ -4,7 +4,10 @@ import {
 } from '@stagewise/stage-ui/components/resizable';
 import { useRef, useCallback } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconGear2Outline18 } from 'nucleo-ui-outline-18';
+import {
+  IconGear2Outline18,
+  IconOpenRectArrowInOutline18,
+} from 'nucleo-ui-outline-18';
 import { AgentsList } from './agents-list';
 import {
   Tooltip,
@@ -57,10 +60,10 @@ export function Sidebar() {
       ref={panelRef}
       id="new-sidebar-panel"
       order={0}
-      defaultSize={35}
+      defaultSize={12}
       minSize={12}
       maxSize={50}
-      className="@container group overflow-visible! flex h-full min-w-40 max-w-2xl flex-col items-stretch p-2"
+      className="@container group overflow-visible! flex h-full min-w-44 max-w-2xl flex-col items-stretch p-2"
     >
       <MacOsTitlebarPlaceholder />
       <AgentsList />
@@ -68,7 +71,7 @@ export function Sidebar() {
       {/* Bottom auth section */}
       <div className="mt-8 flex flex-col gap-2">
         <div className="flex flex-row items-center justify-between gap-2">
-          {isAuthenticated && email ? (
+          {isAuthenticated ? (
             <button
               type="button"
               className="app-no-drag flex min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-foreground/8 active:bg-foreground/12"
@@ -84,31 +87,22 @@ export function Sidebar() {
                   {getPlanLabel(plan)}
                 </span>
                 <span className="truncate text-muted-foreground text-xs leading-tight">
-                  {email}
+                  {email ?? 'Unknown'}
                 </span>
               </div>
             </button>
           ) : (
             <button
               type="button"
-              className="app-no-drag flex min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1"
+              className="app-no-drag flex min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-foreground/8 active:bg-foreground/12"
               onClick={handleOpenAccount}
             >
-              {/* Placeholder avatar */}
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-subtle-foreground">
-                <span className="font-medium text-xs">?</span>
+              <div className="flex min-w-0 flex-col items-start gap-px">
+                <span className="font-medium text-foreground text-sm leading-tight">
+                  Not signed in
+                  <IconOpenRectArrowInOutline18 className="size-4" />
+                </span>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="app-no-drag"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenAccount();
-                }}
-              >
-                Sign in
-              </Button>
             </button>
           )}
 
