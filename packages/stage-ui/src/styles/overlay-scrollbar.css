@@ -37,6 +37,45 @@
   --os-handle-perpendicular-size-active: 100%;
 }
 
+/* Variant: subtle foreground-tinted handle — used where the default
+ * surface-2 thumb is too prominent (e.g. sidebar agent list). */
+.os-theme-stagewise-subtle {
+  --os-size: 6px;
+  --os-padding-perpendicular: 0px;
+  --os-padding-axis: 2px;
+  --os-track-border-radius: 4px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-handle-border-radius: 4px;
+  --os-handle-bg: color-mix(in srgb, var(--color-foreground) 20%, transparent);
+  --os-handle-bg-hover: color-mix(in srgb, var(--color-foreground) 35%, transparent);
+  --os-handle-bg-active: color-mix(in srgb, var(--color-foreground) 35%, transparent);
+  --os-handle-min-size: 33px;
+  --os-handle-perpendicular-size: 100%;
+  --os-handle-perpendicular-size-hover: 100%;
+  --os-handle-perpendicular-size-active: 100%;
+}
+
+.os-theme-stagewise-subtle.os-scrollbar-vertical {
+  top: var(--os-scrollbar-inset-top, 0px) !important;
+  bottom: var(--os-scrollbar-inset-bottom, 0px) !important;
+}
+
+.os-theme-stagewise-subtle.os-scrollbar {
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.os-theme-stagewise-subtle.os-scrollbar-auto-hide-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.os-theme-stagewise-subtle.os-scrollbar:not(.os-scrollbar-auto-hide-hidden) {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* Apply asymmetric inset overrides to vertical scrollbar track position.
  * Set --os-scrollbar-inset-top / --os-scrollbar-inset-bottom on the
  * OverlayScrollbar host element (via style or className) to push the

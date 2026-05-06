@@ -13,7 +13,7 @@ import {
   type Ref,
 } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
+import { IconSearchContentOutline18 } from 'nucleo-ui-outline-18';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 
@@ -181,8 +181,8 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
   if (!shouldShow) return null;
 
   return (
-    <div className="flex h-full min-w-48 basis-1/4 flex-row items-center justify-between gap-2 pr-0.5 pl-1.5">
-      <IconMagnifierOutline18 className="size-4 text-muted-foreground opacity-50" />
+    <div className="flex h-full w-48 flex-row items-center justify-between gap-2 pr-0.5 pl-1.5">
+      <IconSearchContentOutline18 className="size-4 text-muted-foreground opacity-50" />
       <input
         ref={inputRef}
         placeholder="Search in tab..."
