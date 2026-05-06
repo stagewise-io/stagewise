@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha083 (2026-05-06)
+
+### Features
+
+* add coding-plan UI into onboarding flow (1975688)
+* add coding plans integration (28ce6ff)
+
 ## 1.0.0-alpha082 (2026-05-06)
 
 ### Features
