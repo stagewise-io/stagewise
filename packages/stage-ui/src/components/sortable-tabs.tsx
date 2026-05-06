@@ -226,7 +226,7 @@ function BarTriggerContent({
       {showClose && (
         <button
           type="button"
-          tabIndex={-1}
+          aria-label="Close tab"
           // Prevent dnd-kit's PointerSensor from activating on the close btn
           onPointerDown={(e) => e.stopPropagation()}
           onClick={item.onClose}
@@ -495,6 +495,7 @@ export const SortableTabsList = ({
             {onAddItem && (
               <button
                 type="button"
+                aria-label="Add tab"
                 onClick={onAddItem}
                 className="flex h-8 shrink-0 cursor-pointer items-center justify-center border-surface-2 border-l bg-background px-2 text-muted-foreground transition-colors hover:bg-surface-1 hover:text-foreground"
               >

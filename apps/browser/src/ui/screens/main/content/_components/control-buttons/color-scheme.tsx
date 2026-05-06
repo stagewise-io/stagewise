@@ -26,6 +26,7 @@ export function ColorSchemeWidget({ tab }: { tab: TabState }) {
         <Button
           variant="ghost"
           size="icon-sm"
+          aria-label={`Toggle color scheme, current: ${tab.colorScheme === 'light' ? 'Light' : tab.colorScheme === 'dark' ? 'Dark' : `System (${nativeColorScheme === 'light' ? 'Light' : 'Dark'})`}`}
           onClick={handleClick}
           className={
             'text-muted-foreground data-[active=true]:text-primary-solid data-[active=true]:hover:text-primary-solid'

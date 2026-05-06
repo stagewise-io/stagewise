@@ -420,7 +420,7 @@ export function AgentsList() {
   if (!showActiveAgents) return null;
 
   return (
-    <div className="flex h-full flex-col pl-0.5 group-data-[collapsed=true]:hidden">
+    <div className="flex h-full flex-col group-data-[collapsed=true]:hidden">
       <div className="shrink-0 pt-2">
         <Button
           variant="ghost"
@@ -447,7 +447,7 @@ export function AgentsList() {
       <OverlayScrollbar
         ref={scrollRef}
         className="-mr-1 min-h-5"
-        contentClassName="flex flex-col gap-px pb-3.5 pr-1.5"
+        contentClassName="flex flex-col gap-px pl-0.5 pt-0.5 pb-3.5 pr-1.5"
         options={{
           overflow: { x: 'visible' },
           scrollbars: { theme: 'os-theme-stagewise-subtle' },

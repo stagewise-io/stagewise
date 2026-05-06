@@ -86,11 +86,7 @@ export const BarVariant: Story = {
     const [items, setItems] = useState<SortableTabItem[]>(() =>
       barItems.map((item) => ({
         ...item,
-        onClose:
-          // Don't allow closing if it's the last tab
-          barItems.length > 1
-            ? () => setItems((prev) => prev.filter((t) => t.id !== item.id))
-            : undefined,
+        onClose: () => setItems((prev) => prev.filter((t) => t.id !== item.id)),
       })),
     );
     const [active, setActive] = useState('home');
