@@ -222,7 +222,7 @@ export class WindowLayoutService extends DisposableService {
       x: this.lastNonMaximizedBounds.x,
       y: this.lastNonMaximizedBounds.y,
       title: __APP_NAME__,
-      titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+      titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'hiddenInset',
       show: false, // Don't show until UI is ready to prevent visual glitches
       // fullscreenable: false,
       ...(process.platform === 'linux'
@@ -236,8 +236,9 @@ export class WindowLayoutService extends DisposableService {
       trafficLightPosition: { x: 14, y: 16 },
       vibrancy: 'sidebar',
       backgroundMaterial: 'mica',
+      autoHideMenuBar: true,
       backgroundColor:
-        process.platform !== 'darwin' ? initialTheme.background : undefined,
+        process.platform === 'linux' ? initialTheme.background : undefined,
       transparent: process.platform === 'darwin', // Only make transparent on macOS since we get graphic bugs without that
       roundedCorners: true,
       closable: true,
@@ -2015,7 +2016,7 @@ export class WindowLayoutService extends DisposableService {
     const isDark = nativeTheme.shouldUseDarkColors;
     const theme = isDark ? THEME_COLORS.dark : THEME_COLORS.light;
 
-    if (process.platform !== 'darwin') {
+    if (process.platform === 'linux') {
       this.baseWindow.setBackgroundColor(theme.background);
     }
 
@@ -2049,7 +2050,7 @@ export class WindowLayoutService extends DisposableService {
       return;
     }
 
-    if (process.platform !== 'darwin') {
+    if (process.platform === 'linux') {
       this.baseWindow.setBackgroundColor(colors.theme.background);
     }
 
