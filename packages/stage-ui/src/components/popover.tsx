@@ -27,11 +27,18 @@ export type PopoverContentProps = React.ComponentProps<
 export const PopoverContent = ({
   children,
   className,
+  anchor,
+  positionMethod,
   side,
   sideOffset,
   align,
   alignOffset,
+  collisionBoundary,
+  collisionPadding,
+  arrowPadding,
   sticky,
+  disableAnchorTracking,
+  collisionAvoidance,
   ...props
 }: PopoverContentProps) => {
   return (
@@ -41,11 +48,18 @@ export const PopoverContent = ({
         onClick={(e) => e.stopPropagation()}
       />
       <PopoverBase.Positioner
-        sideOffset={sideOffset ?? 4}
+        anchor={anchor}
+        positionMethod={positionMethod}
         side={side}
+        sideOffset={sideOffset ?? 4}
         align={align}
         alignOffset={alignOffset}
+        collisionBoundary={collisionBoundary}
+        collisionPadding={collisionPadding}
+        arrowPadding={arrowPadding}
         sticky={sticky}
+        disableAnchorTracking={disableAnchorTracking}
+        collisionAvoidance={collisionAvoidance}
         className="z-50"
       >
         <PopoverBase.Popup

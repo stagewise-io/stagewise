@@ -407,15 +407,22 @@ export function AgentsList() {
   // Delete confirmation triggered from the context menu. Hoisted out of
   // AgentCard so the popover can survive the card losing hover / the menu
   // closing without tearing down the confirmation UI.
-  const [ctxDeleteId, setCtxDeleteId] = useState<string | null>(null);
-  const handleCtxDeleteRequest = useCallback((id: string) => {
-    setCtxDeleteId(id);
-  }, []);
+  const [ctxDelete, setCtxDelete] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const handleCtxDeleteRequest = useCallback(
+    (id: string, x: number, y: number) => {
+      setCtxDelete({ id, x, y });
+    },
+    [],
+  );
   const handleCtxDeleteConfirm = useCallback(() => {
-    const id = ctxDeleteId;
-    setCtxDeleteId(null);
+    const id = ctxDelete?.id;
+    setCtxDelete(null);
     if (id) handleDelete(id);
-  }, [ctxDeleteId, handleDelete]);
+  }, [ctxDelete, handleDelete]);
 
   if (!showActiveAgents) return null;
 
@@ -489,10 +496,11 @@ export function AgentsList() {
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover
-        open={ctxDeleteId !== null}
+        open={ctxDelete !== null}
         isolated
+        anchorPoint={ctxDelete ? { x: ctxDelete.x, y: ctxDelete.y } : undefined}
         onOpenChange={(open) => {
-          if (!open) setCtxDeleteId(null);
+          if (!open) setCtxDelete(null);
         }}
         onConfirm={handleCtxDeleteConfirm}
       />
