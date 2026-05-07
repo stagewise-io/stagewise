@@ -641,6 +641,15 @@ export class SessionManager {
   }
 
   /**
+   * Total number of sessions currently tracked (alive + exited-but-not-removed).
+   * Used by ShellService teardown logging to correlate crash reports with
+   * whether the PTY-kill path actually ran on shutdown.
+   */
+  public getSessionCount(): number {
+    return this.sessions.size;
+  }
+
+  /**
    * Returns the tail of the session's captured output for use as context in
    * downstream classifiers (e.g. smart approval). Internally delegates to
    * `collectRecentOutput`; kept as a separate public method so the private

@@ -488,18 +488,36 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       );
       runTeardown('autoUpdateService', () => autoUpdateService.teardown());
 
-      const telemetryTeardown = Promise.resolve()
-        .then(() => telemetryService.teardown())
-        .catch((error) => {
-          logger.warn('[Main] Failed to teardown telemetryService', error);
-        });
+      // Shared budget for async teardowns. Toolbox teardown kills live
+      // PTY sessions before Node env teardown begins — this is what
+      // prevents the node-pty ThreadSafeFunction crash during
+      // app.exit(). Telemetry flush is parallelised under the same cap.
+      const SHUTDOWN_BUDGET_MS = 1000;
+
+      const runAsyncTeardown = (name: string, fn: () => Promise<void> | void) =>
+        Promise.resolve()
+          .then(() => fn())
+          .catch((error) => {
+            logger.warn(`[Main] Failed to teardown ${name}`, error);
+          });
+
+      const asyncTeardowns = Promise.all([
+        runAsyncTeardown('toolboxService', () => toolboxService.teardown()),
+        runAsyncTeardown('telemetryService', () => telemetryService.teardown()),
+      ]);
 
       void Promise.race([
-        telemetryTeardown,
+        asyncTeardowns,
         new Promise<void>((resolve) => {
-          setTimeout(resolve, 500);
+          setTimeout(resolve, SHUTDOWN_BUDGET_MS);
         }),
-      ]).finally(exitApp);
+      ]).finally(() => {
+        // Defer `app.exit(0)` one event-loop turn to give libuv a final
+        // chance to drain any pending ThreadSafeFunction calls before
+        // Electron starts FreeEnvironment. Defense-in-depth; cannot
+        // deadlock because `exitApp` runs unconditionally.
+        setImmediate(exitApp);
+      });
     } catch (error) {
       logger.error(`[Main] Shutdown failed: ${String(error)}`);
       exitApp();
