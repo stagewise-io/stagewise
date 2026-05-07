@@ -83,7 +83,10 @@ export interface UseFileAttachmentsReturn {
   /** Current attachments */
   attachments: AttachmentMetadata[];
   /** Add a file attachment, returns the created attachment */
-  addFileAttachment: (file: File) => Promise<AttachmentMetadata>;
+  addFileAttachment: (
+    file: File,
+    insertPos?: number,
+  ) => Promise<AttachmentMetadata>;
   /** Remove an attachment by path */
   removeAttachment: (path: string) => void;
   /** Clear all attachments */
@@ -119,7 +122,7 @@ export function useFileAttachments(
   ) as Mount[];
 
   const addFileAttachment = useCallback(
-    async (file: File): Promise<AttachmentMetadata> => {
+    async (file: File, insertPos?: number): Promise<AttachmentMetadata> => {
       const mediaType = file.type || 'application/octet-stream';
       // Only store a meaningful originalFileName. Clipboard pastes in Electron
       // produce a generic name like "image.png" or "blob"; fall back to a
@@ -144,6 +147,7 @@ export function useFileAttachments(
         if (insertIntoEditor && chatInputRef?.current) {
           chatInputRef.current.insertAttachment(
             attachmentToAttachmentAttributes(placeholder),
+            insertPos,
           );
         }
         return placeholder;
@@ -161,6 +165,7 @@ export function useFileAttachments(
           if (insertIntoEditor && chatInputRef?.current) {
             chatInputRef.current.insertAttachment(
               attachmentToAttachmentAttributes(attachment),
+              insertPos,
             );
           }
           return attachment;
@@ -210,6 +215,7 @@ export function useFileAttachments(
       if (insertIntoEditor && chatInputRef?.current) {
         chatInputRef.current.insertAttachment(
           attachmentToAttachmentAttributes(attachment),
+          insertPos,
         );
       }
 
