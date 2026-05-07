@@ -1084,12 +1084,25 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   }
 
   public setContextSelectionMouseCoordinates(x: number, y: number) {
-    // Compensate for scroll position when emitting input events
-    // The coordinates are relative to the viewport, but we need to account for scroll
+    // Incoming (x, y) are UI-renderer CSS pixels relative to the WebContentsView
+    // overlay. We must convert them into the page's own CSS-pixel coordinate space
+    // before handing them to sendInputEvent() / DOM.getNodeForLocation(), which
+    // both interpret their inputs as page CSS pixels.
+    //
+    // Two multiplicative contractions can be in play:
+    //   - scale: DevTools device-emulation scale (1 outside device mode)
+    //   - zoom:  Chromium page zoom (user Cmd+-/+, persisted per origin)
+    //
+    // UI px = page px * zoom * scale, so page px = UI px / (zoom * scale).
+    // Previously only `scale` was divided out, which caused a coordinate offset
+    // that scales with the cursor's distance from the origin whenever page zoom
+    // was not 100% (e.g. ~30px offset at 90% zoom, ~2x that at 50%).
 
     const scale = this.currentViewportSize?.scale || 1;
-    const adjustedX = Math.floor(x / scale);
-    const adjustedY = Math.floor(y / scale);
+    const zoom = this.currentViewportLayout?.zoom || 1;
+    const factor = scale * zoom;
+    const adjustedX = Math.floor(x / factor);
+    const adjustedY = Math.floor(y / factor);
 
     // TODO: In some cases the coords are not right when changing to a small device in emulation and not reloading the page. I don't know why (glenn) but we should fix this sometime. For now this takes too much time.
 
@@ -1122,9 +1135,13 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     deltaX: number;
     deltaY: number;
   }) {
+    // Same coordinate-space conversion as setContextSelectionMouseCoordinates:
+    // UI px -> page px by dividing out both device-emulation scale and page zoom.
     const scale = this.currentViewportSize?.scale || 1;
-    const adjustedX = Math.floor(event.x / scale);
-    const adjustedY = Math.floor(event.y / scale);
+    const zoom = this.currentViewportLayout?.zoom || 1;
+    const factor = scale * zoom;
+    const adjustedX = Math.floor(event.x / factor);
+    const adjustedY = Math.floor(event.y / factor);
 
     const ev: Electron.MouseWheelInputEvent = {
       type: 'mouseWheel',
