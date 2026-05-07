@@ -72,6 +72,7 @@ function AudioMuteButton({ tab }: { tab: TabState }) {
 export function MainSection() {
   const _isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const tabs = useKartonState((s) => s.browser.tabs);
+  const activeAgentId = useKartonState((s) => s.browser.activeAgentId);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
@@ -90,7 +91,14 @@ export function MainSection() {
   // mutation (title / URL / loading state) — only the set/order of IDs matters.
   // ---------------------------------------------------------------------------
   const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
-    (s) => Object.keys(s.browser.tabs),
+    (s) =>
+      Object.values(s.browser.tabs)
+        .filter(
+          (tab) =>
+            tab.associatedAgentInstanceId == null ||
+            tab.associatedAgentInstanceId === s.browser.activeAgentId,
+        )
+        .map((tab) => tab.id),
     (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
   );
   const serverTabIds = useKartonState(tabIdsSelector);
@@ -114,11 +122,23 @@ export function MainSection() {
   // ---------------------------------------------------------------------------
   // Build SortableTabItem[] from optimistic order + Karton tab state
   // ---------------------------------------------------------------------------
+  const visibleTabs = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(tabs).filter(
+          ([, tab]) =>
+            tab.associatedAgentInstanceId == null ||
+            tab.associatedAgentInstanceId === activeAgentId,
+        ),
+      ),
+    [tabs, activeAgentId],
+  );
+
   const tabItems = useMemo<SortableTabItem[]>(() => {
-    const isOnlyTab = Object.keys(tabs).length === 1;
+    const isOnlyTab = Object.keys(visibleTabs).length === 1;
     return optimisticTabIds
       .map((id): SortableTabItem | null => {
-        const tab = tabs[id];
+        const tab = visibleTabs[id];
         if (!tab) return null;
         const isInternalPage =
           tab.url?.startsWith('stagewise://internal/') ?? false;
@@ -154,7 +174,7 @@ export function MainSection() {
         };
       })
       .filter((item): item is SortableTabItem => item !== null);
-  }, [optimisticTabIds, tabs, activeTabId, closeTab, removeTabUiState]);
+  }, [optimisticTabIds, visibleTabs, activeTabId, closeTab, removeTabUiState]);
 
   // ---------------------------------------------------------------------------
   // Omnibox focus plumbing (unchanged)
@@ -185,7 +205,7 @@ export function MainSection() {
         return () => clearTimeout(timeoutId);
       }
     }
-  }, [activeTabId, tabs, togglePanelKeyboardFocus]);
+  }, [activeTabId, visibleTabs, togglePanelKeyboardFocus]);
 
   const handleCreateTab = useCallback(() => {
     pendingOmniboxFocusFromTabIdRef.current = activeTabId;
@@ -193,7 +213,7 @@ export function MainSection() {
   }, [createTab, activeTabId]);
 
   const handleCleanAllTabs = useCallback(() => {
-    const tabIdsToClose = Object.keys(tabs).filter(
+    const tabIdsToClose = Object.keys(visibleTabs).filter(
       (tabId) => tabId !== activeTabId,
     );
     void Promise.allSettled(tabIdsToClose.map((tabId) => closeTab(tabId))).then(
@@ -206,7 +226,7 @@ export function MainSection() {
         }
       },
     );
-  }, [tabs, activeTabId, closeTab, track]);
+  }, [visibleTabs, activeTabId, closeTab, track]);
 
   const handleFocusUrlBar = useCallback(() => {
     if (activeTabId) {
@@ -292,7 +312,7 @@ export function MainSection() {
               }
             />
             {/* Per-tab content instances */}
-            {Object.keys(tabs).map((tabId) => (
+            {Object.keys(visibleTabs).map((tabId) => (
               <PerTabContent
                 key={tabId}
                 ref={(ref) => {

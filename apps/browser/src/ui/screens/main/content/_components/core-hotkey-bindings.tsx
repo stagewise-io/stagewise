@@ -18,11 +18,22 @@ export function CoreHotkeyBindings({
 }) {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const tabs = useKartonState((s) => s.browser.tabs);
+  const activeAgentId = useKartonState((s) => s.browser.activeAgentId);
   const { removeTabUiState } = useTabUIState();
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
-  const tabIds = useMemo(() => Object.keys(tabs), [tabs]);
+  const tabIds = useMemo(
+    () =>
+      Object.values(tabs)
+        .filter(
+          (tab) =>
+            tab.associatedAgentInstanceId == null ||
+            tab.associatedAgentInstanceId === activeAgentId,
+        )
+        .map((tab) => tab.id),
+    [tabs, activeAgentId],
+  );
   const tabCount = useMemo(() => tabIds.length, [tabIds]);
 
   const tabNeighborsToActiveTab = useMemo(() => {

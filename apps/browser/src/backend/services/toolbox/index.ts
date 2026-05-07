@@ -1200,17 +1200,18 @@ export class ToolboxService extends DisposableService {
 
   public getBrowserSnapshot(agentInstanceId?: string): BrowserSnapshot {
     const browser = this.uiKarton.state.browser;
-    const useAgentBrowserGroup =
-      !!agentInstanceId && agentInstanceId !== browser.activeAgentId;
-    const agentBrowserState = useAgentBrowserGroup
-      ? browser.tabsByAgent[agentInstanceId]
-      : null;
-    const browserTabs = useAgentBrowserGroup
-      ? (agentBrowserState?.tabs ?? {})
-      : browser.tabs;
-    const activeTabId = useAgentBrowserGroup
-      ? (agentBrowserState?.activeTabId ?? null)
-      : browser.activeTabId;
+    const browserTabs = Object.fromEntries(
+      Object.entries(browser.tabs).filter(
+        ([, tab]) =>
+          !agentInstanceId ||
+          tab.associatedAgentInstanceId == null ||
+          tab.associatedAgentInstanceId === agentInstanceId,
+      ),
+    );
+    const activeTabId =
+      browser.activeTabId && browserTabs[browser.activeTabId]
+        ? browser.activeTabId
+        : null;
     const activeTab = activeTabId ? browserTabs[activeTabId] : null;
 
     const allTabs = Object.values(browserTabs)

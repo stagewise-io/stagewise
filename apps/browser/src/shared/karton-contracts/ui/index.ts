@@ -388,6 +388,8 @@ export type TabState = {
   isContentFullscreen: boolean;
   /** Pending HTTP Basic Auth request for this tab */
   authenticationRequest: AuthenticationRequest | null;
+  /** `null` means global; otherwise this tab belongs to an agent instance. */
+  associatedAgentInstanceId?: string | null;
 };
 
 export type HistoryEntry = {
@@ -395,21 +397,6 @@ export type HistoryEntry = {
   title: string;
   faviconUrls: string[];
   lastVisitedAt: Date;
-};
-
-export type BrowserAgentState = {
-  tabs: Record<string, TabState>;
-  activeTabId: string | null;
-  contextSelectionMode: boolean;
-  selectedElements: SelectedElement[];
-  hoveredElement: SelectedElement | null;
-  viewportSize: {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-    scale: number;
-  } | null;
 };
 
 /** Suggestions returned by getOmniboxSuggestions */
@@ -622,14 +609,8 @@ export type AppState = {
 
   // Browser state
   browser: {
-    /**
-     * Agent currently owning the visible tab strip. `null` is used before any
-     * agent chat is open.
-     */
+    /** Agent currently driving agent-associated tab visibility. */
     activeAgentId: string | null;
-    /** Per-agent browser tab groups, keyed by agent instance ID. */
-    tabsByAgent: Record<string, BrowserAgentState>;
-    /** Visible tab strip for `activeAgentId` (kept for existing consumers). */
     tabs: Record<string, TabState>;
     activeTabId: string | null;
     /** Unique identifier for the current browser process lifetime. Changes on restart. */
@@ -908,6 +889,10 @@ export type KartonContract = {
     };
     browser: {
       setActiveAgent: (agentId: string | null) => Promise<void>;
+      setTabAssociation: (
+        tabId: string,
+        agentInstanceId: string | null,
+      ) => Promise<void>;
       createTab: (url?: string, setActive?: boolean) => Promise<void>;
       closeTab: (tabId: string) => Promise<void>;
       switchTab: (tabId: string) => Promise<void>;
@@ -1224,7 +1209,6 @@ export const defaultState: KartonContract['state'] = {
   notifications: [],
   browser: {
     activeAgentId: null,
-    tabsByAgent: {},
     tabs: {},
     activeTabId: null,
     sessionId: '',
