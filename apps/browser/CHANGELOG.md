@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0-alpha086 (2026-05-07)
+
+### Bug Fixes
+
+* fix insert-position of attachments (0ffeb1a)
+* fix element-selection offset with zoomed content (44649f8)
+* show hidden title-bar on Windows (cb3e998)
+
 ## 1.0.0-alpha085 (2026-05-07)
 
 ### Bug Fixes
