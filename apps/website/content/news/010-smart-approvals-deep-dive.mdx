@@ -1,0 +1,89 @@
+---
+title: "How Smart Approvals Work in stagewise"
+author: stagewise team
+type: technical
+description: "Smart Approvals add a third mode between Always ask and Always allow. Here is how the current implementation classifies shell commands, what context it uses, and when it falls back to manual approval."
+date: 2026-05-07T09:00:00.000Z
+---
+
+<div className="my-8 overflow-hidden rounded-2xl border border-border bg-black shadow-sm">
+  <div className="aspect-video w-full">
+    <iframe
+      className="h-full w-full"
+      src="https://www.youtube.com/embed/VTMSBRgMFDw"
+      title="stagewise Smart Approvals launch video"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      referrerPolicy="strict-origin-when-cross-origin"
+      allowFullScreen
+    />
+  </div>
+</div>
+
+## Why approval mode needed a middle ground
+
+Until now, shell tool calls in stagewise were either guarded by an aggressive "Always ask" mode or a fast but dangerous "Always allow" mode.
+
+With **Always ask**, the agent had to stop for every shell action. That is safe, but it gets tiring quickly when agents make heavy use of the shell for both routine and special tasks.
+
+With **Always allow**, the agent could move without interruption, but the trade-off was real. If the agent misunderstood a task, ran a risky command, or got pushed in the wrong direction, there was no check before execution.
+The result was potential data loss, leakage of personal information, or worse: malicious access to your machine.
+
+Smart Approvals are meant to be an intelligent middle ground between these two extremes, combining highly autonomous work with blocking for potentially dangerous actions.
+
+The idea is simple: do not treat every shell command the same. Let routine, workspace-scoped commands run. Stop and ask when the command crosses into something destructive, system-level, or broader than the mounted workspace.
+
+## How to enable Smart Approvals in your agent
+
+Stagewise now supports three approval modes:
+
+- **Always ask**
+- **Smart approval**
+- **Always allow**
+
+The default for new agents continues to be the safest option: **Always ask**.
+
+When the mode is set to **Smart approval**, the shell tool runs a classifier before execution. If the command looks routine, it runs. If it looks risky, the tool pauses and asks the user.
+
+## How Smart Approvals work
+
+In **Smart approval**, the command is first passed through a classifier and evaluated for its safety before execution.
+
+The classifier receives the following information to determine if the command is safe to run automatically:
+
+- The **command** the agent wants to run
+- the agent's **explanation** for why it wants to execute the action
+- the current state of the shell, including its **current working directory**, current output, previous commands, and which app the shell currently hosts
+
+This way, the classifier can evaluate both individual commands in a shell and interactions with a CLI, such as 'pressing' `y` to approve the installation of dependencies in a CLI tool.
+
+## The policy draws a hard line around risky commands
+
+The classifier prompt is explicit about what should require approval.
+
+Commands are routed to the user when they look like they could have **destructive, irreversible, system-level, or out-of-workspace effects**.
+
+That includes things like:
+
+- writing, deleting, or moving files **outside** a mounted workspace
+- global or system-level installs and configuration changes
+- commands that send data off the machine, such as remote uploads or mutating HTTP requests
+- destructive git operations such as force-pushes or hard resets
+- piping remote or decoded scripts into interpreters
+- commands that require elevated privileges such as `sudo`
+
+The classifier marks many normal development actions as safe to auto-approve:
+
+- read-only inspection commands such as `ls`, `cat`, `head`, `tail`, `grep`, and `find` without destructive flags
+- read-only git queries such as `status`, `log`, `diff`, and `show`
+- project scripts like `pnpm test`, `pnpm typecheck`, `pnpm check`, and `pnpm lint`
+- dependency installs scoped to the mounted workspace
+- ordinary file edits **inside** the mounted workspace
+- simple shell navigation and environment commands such as `cd`, `pwd`, `echo`, and `export`
+
+## Why this matters
+
+Users want agents to move faster, but not by giving them unlimited authority.
+
+Smart Approvals are one step toward a better trade-off. They keep routine shell work fast, reserve human review for commands that cross a more dangerous boundary, and fall back to manual approval when a command seems dangerous or out of bounds, or when the classification layer is unavailable.
+
+If you want to try it, open an agent in stagewise and switch the approval mode from **Always ask** to **Smart approval**.
