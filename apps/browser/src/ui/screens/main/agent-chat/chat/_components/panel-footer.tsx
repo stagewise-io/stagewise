@@ -1040,10 +1040,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   if (!allowUserInput) return null;
 
   return (
-    <footer className="z-20 flex shrink-0 flex-col items-stretch gap-1 px-2 pb-2">
+    <footer className="z-20 flex shrink-0 flex-col items-stretch gap-1 px-1 pb-1">
       <div
         className={cn(
-          'relative flex flex-row items-stretch gap-1 rounded-md bg-background p-3 shadow-elevation-1 ring-1 ring-derived-strong transition-colors dark:bg-surface-1',
+          'relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-elevation-1 ring-1 ring-derived-strong transition-colors dark:bg-surface-1',
           isDragOver && 'bg-hover-derived!',
         )}
         id="chat-input-container-box"
