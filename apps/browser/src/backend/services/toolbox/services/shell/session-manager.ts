@@ -250,14 +250,29 @@ export class SessionManager {
    */
   private readonly detectTimeoutMs: number;
 
+  /**
+   * Extra options merged into every `pty.spawn` call. Lets tests force
+   * winpty on Windows (`useConpty: false`) to avoid the `AttachConsole`
+   * storm from node-pty's `conpty_console_list_agent` helper, which races
+   * with fast-exiting test shells and floods logs. Production leaves this
+   * empty so ConPTY stays the default.
+   */
+  private readonly ptySpawnOptions: Partial<
+    pty.IPtyForkOptions & pty.IWindowsPtyForkOptions
+  >;
+
   constructor(
     shell: DetectedShell,
     getShellLogsDir?: (agentInstanceId: string) => string,
     detectTimeoutMs: number = SHELL_INTEGRATION_DETECT_MS,
+    ptySpawnOptions: Partial<
+      pty.IPtyForkOptions & pty.IWindowsPtyForkOptions
+    > = {},
   ) {
     this.shell = shell;
     this.getShellLogsDir = getShellLogsDir ?? null;
     this.detectTimeoutMs = detectTimeoutMs;
+    this.ptySpawnOptions = ptySpawnOptions;
   }
 
   // ─── Session creation ────────────────────────────────────────
@@ -286,6 +301,7 @@ export class SessionManager {
       rows: DEFAULT_TERMINAL_ROWS,
       cwd,
       env: { ...env, TERM: 'xterm-256color' },
+      ...this.ptySpawnOptions,
     });
 
     const parser = new OscParser();

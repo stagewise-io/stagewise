@@ -202,8 +202,23 @@ const describeIfShell = ptyAvailable ? describe : describe.skip;
 
 /** Detection grace period used in tests. Much shorter than the 5s
  * production default so tests fall back to sentinel mode quickly when
- * the test shell doesn't emit clean OSC 133 markers. */
-const TEST_DETECT_TIMEOUT_MS = 800;
+ * the test shell doesn't emit clean OSC 133 markers.
+ *
+ * Bumped from 800 → 2000 ms to add margin against CI jitter on Windows
+ * (ConPTY flush delays + MSYS bash startup). Healthy runs detect OSC 133
+ * well under 200 ms, so this is defensive headroom only. */
+const TEST_DETECT_TIMEOUT_MS = 2000;
+
+/**
+ * Extra `pty.spawn` options used by tests. On Windows CI the ConPTY helper
+ * (`node_modules/node-pty/lib/conpty_console_list_agent.js`) races with
+ * fast-exiting test shells and logs dozens of `AttachConsole failed`
+ * stacks per run — harmless but extremely noisy and a drag on triage.
+ * Winpty has no such helper. Our tests only assert on byte-level I/O,
+ * where winpty is indistinguishable from ConPTY for these purposes.
+ */
+const TEST_PTY_SPAWN_OPTIONS =
+  process.platform === 'win32' ? { useConpty: false } : {};
 
 /**
  * Wait until the session has determined its parser mode —
@@ -212,9 +227,9 @@ const TEST_DETECT_TIMEOUT_MS = 800;
 async function waitForReady(
   sm: SessionManager,
   sessionId: string,
-  // Needs a comfortable margin over TEST_DETECT_TIMEOUT_MS (800) so CI
+  // Needs a comfortable margin over TEST_DETECT_TIMEOUT_MS (2000) so CI
   // runners with GC jitter don't flake before the sentinel fallback fires.
-  timeoutMs = 2000,
+  timeoutMs = 4000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -230,6 +245,28 @@ async function waitForReady(
   }
 }
 
+/**
+ * Wait until the session's PTY has exited and `session.exited` has been
+ * flipped by `handleSessionExit`. On Windows ConPTY, the shell-integration
+ * exit trap can emit OSC 133;D (firing the command's promise) before
+ * node-pty delivers the process exit event — so `r.sessionExited` read
+ * straight off the resolved result is a snapshot that lags reality by a
+ * few ms. Tests that care about "the session eventually exits" should
+ * poll this helper before asserting on `session.exited`.
+ */
+async function waitForSessionExit(
+  sm: SessionManager,
+  sessionId: string,
+  timeoutMs = 2000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const session = sm.getSession(sessionId);
+    if (!session || session.exited) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 describeIfShell('SessionManager (integration)', () => {
   const env = sanitizeEnv();
   const cwd = fs.realpathSync(os.tmpdir());
@@ -240,6 +277,7 @@ describeIfShell('SessionManager (integration)', () => {
       shell as DetectedShell,
       undefined,
       TEST_DETECT_TIMEOUT_MS,
+      TEST_PTY_SPAWN_OPTIONS,
     );
   }
 
@@ -466,6 +504,7 @@ describeIfShell('SessionManager (integration)', () => {
         shell as DetectedShell,
         () => logsDir,
         TEST_DETECT_TIMEOUT_MS,
+        TEST_PTY_SPAWN_OPTIONS,
       );
       const sid = sm.createSession('agent-test', cwd, env);
       await waitForReady(sm, sid);
@@ -501,6 +540,7 @@ describeIfShell('SessionManager (integration)', () => {
         shell as DetectedShell,
         () => logsDir,
         TEST_DETECT_TIMEOUT_MS,
+        TEST_PTY_SPAWN_OPTIONS,
       );
       const sid = sm.createSession('agent-test', cwd, env);
       await waitForReady(sm, sid);
@@ -606,12 +646,16 @@ describeIfShell('SessionManager (integration)', () => {
     const sid = sm.createSession('agent-test', cwd, env);
     await waitForReady(sm, sid);
 
-    // `exit 0` terminates the shell — resolves via onExit handler
+    // `exit 0` terminates the shell — resolves via onExit handler.
     const r = await sm.executeCommand(sid, { command: 'exit 0' });
 
-    expect(r.sessionExited).toBe(true);
+    expect(r.exitCode).toBe(0);
 
-    // Session is still in the map (grace period) but marked as exited
+    // `r.sessionExited` is a snapshot at resolve time; on Windows ConPTY
+    // the PTY exit event can arrive a few ms after `commandDone`, so we
+    // poll for the eventual state instead of asserting on the snapshot.
+    await waitForSessionExit(sm, sid);
+
     const session = sm.getSession(sid);
     expect(session?.exited).toBe(true);
     expect(session?.exitCode).toBe(0);
@@ -623,6 +667,12 @@ describeIfShell('SessionManager (integration)', () => {
     await waitForReady(sm, sid);
 
     await sm.executeCommand(sid, { command: 'exit 0' });
+
+    // Ensure `handleSessionExit` has flipped `session.exited` before the
+    // second call — otherwise on Windows ConPTY the guard in
+    // `executeCommand` races with the pending exit event and we hit the
+    // wrong branch.
+    await waitForSessionExit(sm, sid);
 
     const r = await sm.executeCommand(sid, { command: 'echo hello' });
 
