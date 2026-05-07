@@ -612,13 +612,22 @@ describe('diff utilities', () => {
     });
 
     it('creates FileDiff with empty hunks when no changes', () => {
+      // Production invariant: identical content -> identical oid (computeOid is
+      // content-deterministic). Pin both ops to the same oid so this fixture
+      // matches reality; otherwise the synthetic-hunk guard in
+      // createFileDiffsFromGenerations legitimately fires on the oid mismatch.
+      const sharedOid = 'oid-same-content';
       const ops: OperationWithContent[] = [
         createOpWithContent(
-          createBaselineOp({ reason: 'init', filepath: '/readme.md' }),
+          createBaselineOp({
+            reason: 'init',
+            filepath: '/readme.md',
+            snapshot_oid: sharedOid,
+          }),
           'same content',
         ),
         createOpWithContent(
-          createEditOp({ filepath: '/readme.md' }),
+          createEditOp({ filepath: '/readme.md', snapshot_oid: sharedOid }),
           'same content',
         ),
       ];
