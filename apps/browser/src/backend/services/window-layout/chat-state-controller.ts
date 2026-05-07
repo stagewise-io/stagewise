@@ -1,14 +1,21 @@
 import type { KartonService } from '../karton';
 import type { TabController } from './tab-controller';
 import type { SelectedElement } from '@shared/selected-elements';
+import type { AppState } from '@shared/karton-contracts/ui';
 
 export class ChatStateController {
   private uiKarton: KartonService;
   private tabs: Record<string, TabController>;
+  private getActiveBrowserGroupId: () => string;
 
-  constructor(uiKarton: KartonService, tabs: Record<string, TabController>) {
+  constructor(
+    uiKarton: KartonService,
+    tabs: Record<string, TabController>,
+    getActiveBrowserGroupId: () => string,
+  ) {
     this.uiKarton = uiKarton;
     this.tabs = tabs;
+    this.getActiveBrowserGroupId = getActiveBrowserGroupId;
   }
 
   /**
@@ -32,6 +39,7 @@ export class ChatStateController {
       // Add if not exists
       if (!elements.some((e) => e.stagewiseId === element.stagewiseId))
         elements.push(element);
+      this.syncGroupSelection(draft.browser.tabsByAgent, elements);
     });
     this.broadcastSelectionUpdate();
   }
@@ -45,6 +53,10 @@ export class ChatStateController {
       draft.browser.selectedElements = draft.browser.selectedElements.filter(
         (e) => e.stagewiseId !== elementId,
       );
+      this.syncGroupSelection(
+        draft.browser.tabsByAgent,
+        draft.browser.selectedElements,
+      );
     });
     this.broadcastSelectionUpdate();
   }
@@ -55,6 +67,10 @@ export class ChatStateController {
   public clearElements(): void {
     this.uiKarton.setState((draft) => {
       draft.browser.selectedElements = [];
+      this.syncGroupSelection(
+        draft.browser.tabsByAgent,
+        draft.browser.selectedElements,
+      );
     });
     this.broadcastSelectionUpdate();
   }
@@ -66,6 +82,10 @@ export class ChatStateController {
   public restoreElements(elements: SelectedElement[]): void {
     this.uiKarton.setState((draft) => {
       draft.browser.selectedElements = [...elements];
+      this.syncGroupSelection(
+        draft.browser.tabsByAgent,
+        draft.browser.selectedElements,
+      );
     });
     this.broadcastSelectionUpdate();
   }
@@ -89,5 +109,15 @@ export class ChatStateController {
     Object.values(this.tabs).forEach((tab) => {
       tab.updateContextSelection(allSelectedElements);
     });
+  }
+
+  private syncGroupSelection(
+    tabsByAgent: AppState['browser']['tabsByAgent'],
+    selectedElements: SelectedElement[],
+  ): void {
+    const group = tabsByAgent[this.getActiveBrowserGroupId()];
+    if (group) {
+      group.selectedElements = [...selectedElements];
+    }
   }
 }

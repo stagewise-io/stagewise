@@ -141,6 +141,7 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 export interface UIControllerEventMap {
   uiReady: [];
   viewRecreated: [oldView: WebContentsView, newView: WebContentsView];
+  setActiveAgent: [agentId: string | null];
   createTab: [url?: string, setActive?: boolean];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
@@ -667,6 +668,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.setActiveAgent',
+      async (_callingClientId: string, agentId: string | null) => {
+        this.emit('setActiveAgent', agentId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.createTab',
       async (_callingClientId: string, url?: string, setActive?: boolean) => {
         this.emit('createTab', url, setActive);
@@ -1088,6 +1095,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
 
   public unregisterKartonProcedures() {
     this.uiKarton.removeServerProcedureHandler('openExternalUrl');
+    this.uiKarton.removeServerProcedureHandler('browser.setActiveAgent');
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');
     this.uiKarton.removeServerProcedureHandler('browser.switchTab');

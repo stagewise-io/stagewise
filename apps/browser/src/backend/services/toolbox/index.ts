@@ -1198,13 +1198,22 @@ export class ToolboxService extends DisposableService {
     this.shellService?.killSession(sessionId);
   }
 
-  public getBrowserSnapshot(): BrowserSnapshot {
+  public getBrowserSnapshot(agentInstanceId?: string): BrowserSnapshot {
     const browser = this.uiKarton.state.browser;
-    const activeTab = browser.activeTabId
-      ? browser.tabs[browser.activeTabId]
+    const useAgentBrowserGroup =
+      !!agentInstanceId && agentInstanceId !== browser.activeAgentId;
+    const agentBrowserState = useAgentBrowserGroup
+      ? browser.tabsByAgent[agentInstanceId]
       : null;
+    const browserTabs = useAgentBrowserGroup
+      ? (agentBrowserState?.tabs ?? {})
+      : browser.tabs;
+    const activeTabId = useAgentBrowserGroup
+      ? (agentBrowserState?.activeTabId ?? null)
+      : browser.activeTabId;
+    const activeTab = activeTabId ? browserTabs[activeTabId] : null;
 
-    const allTabs = Object.values(browser.tabs)
+    const allTabs = Object.values(browserTabs)
       .sort((a, b) => b.lastFocusedAt - a.lastFocusedAt)
       .map((tab) => ({
         id: tab.id,
@@ -1231,14 +1240,14 @@ export class ToolboxService extends DisposableService {
           }
         : null,
       tabs: allTabs,
-      totalTabCount: Object.keys(browser.tabs).length,
+      totalTabCount: Object.keys(browserTabs).length,
     };
   }
 
   public async captureEnvironmentSnapshot(
     agentInstanceId: string,
   ): Promise<EnvironmentSnapshot> {
-    const browserState = this.getBrowserSnapshot();
+    const browserState = this.getBrowserSnapshot(agentInstanceId);
     const workspaceState =
       this.mountManagerService?.getWorkspaceSnapshot(agentInstanceId);
     const toolboxState = this.uiKarton.state.toolbox[agentInstanceId];

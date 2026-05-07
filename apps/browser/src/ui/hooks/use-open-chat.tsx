@@ -2,10 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { useKartonProcedure } from './use-karton';
 
 type OpenAgentState = [
   /** Currently open agent ID (top of the history stack). */
@@ -41,6 +43,13 @@ export const OpenAgentProvider = ({
   // derived `openAgent` state is the single source of truth for React.
   const stackRef = useRef<string[]>([]);
   const [openAgent, setOpenAgentRaw] = useState<string | null>(null);
+  const setActiveBrowserAgent = useKartonProcedure(
+    (p) => p.browser.setActiveAgent,
+  );
+
+  useEffect(() => {
+    void setActiveBrowserAgent(openAgent);
+  }, [openAgent, setActiveBrowserAgent]);
 
   const setOpenAgent = useCallback((id: string | null) => {
     const stack = stackRef.current;

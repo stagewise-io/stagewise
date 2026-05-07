@@ -1,6 +1,11 @@
 import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import path from 'node:path';
-import type { SelectedElement } from '@shared/karton-contracts/ui';
+import type {
+  AppState,
+  BrowserAgentState,
+  SelectedElement,
+  TabState,
+} from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import { generateTabId, resetTabIdCounter } from './tab-id';
 import { getBrowserSessionId } from './browser-session';
@@ -78,6 +83,39 @@ function classifyTabUrl(url: string): {
   }
 }
 
+const GLOBAL_BROWSER_GROUP_ID = '__stagewise_global_browser__';
+
+type BrowserTabGroup = {
+  tabs: Record<string, TabController>;
+  activeTabId: string | null;
+  contextSelectionMode: boolean;
+  selectedElements: SelectedElement[];
+  hoveredElement: SelectedElement | null;
+  viewportSize: AppState['browser']['viewportSize'];
+};
+
+function createEmptyBrowserTabGroup(): BrowserTabGroup {
+  return {
+    tabs: {},
+    activeTabId: null,
+    contextSelectionMode: false,
+    selectedElements: [],
+    hoveredElement: null,
+    viewportSize: null,
+  };
+}
+
+function createEmptyBrowserAgentState(): BrowserAgentState {
+  return {
+    tabs: {},
+    activeTabId: null,
+    contextSelectionMode: false,
+    selectedElements: [],
+    hoveredElement: null,
+    viewportSize: null,
+  };
+}
+
 export class WindowLayoutService extends DisposableService {
   private readonly logger: Logger;
   private readonly historyService: HistoryService;
@@ -89,6 +127,11 @@ export class WindowLayoutService extends DisposableService {
 
   private baseWindow: BaseWindow | null = null;
   private uiController: UIController | null = null;
+  private activeBrowserAgentId: string | null = null;
+  private activeBrowserGroupId = GLOBAL_BROWSER_GROUP_ID;
+  private readonly tabGroups: Record<string, BrowserTabGroup> = {
+    [GLOBAL_BROWSER_GROUP_ID]: createEmptyBrowserTabGroup(),
+  };
   private tabs: Record<string, TabController> = {};
   private activeTabId: string | null = null;
   private chatStateController: ChatStateController | null = null;
@@ -140,6 +183,7 @@ export class WindowLayoutService extends DisposableService {
     super();
     // Reset to 1 on every cold start — mimics Chrome's per-session tab IDs.
     resetTabIdCounter();
+    this.tabs = this.tabGroups[GLOBAL_BROWSER_GROUP_ID]!.tabs;
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
@@ -315,6 +359,10 @@ export class WindowLayoutService extends DisposableService {
     // Initialize browser state
     this.uiKarton.setState((draft) => {
       draft.browser = {
+        activeAgentId: null,
+        tabsByAgent: {
+          [GLOBAL_BROWSER_GROUP_ID]: createEmptyBrowserAgentState(),
+        },
         tabs: {},
         activeTabId: null,
         sessionId: getBrowserSessionId(),
@@ -333,6 +381,7 @@ export class WindowLayoutService extends DisposableService {
     this.chatStateController = new ChatStateController(
       this.uiKarton,
       this.tabs,
+      () => this.activeBrowserGroupId,
     );
 
     // Determine initial tab URL based on startup page preference
@@ -651,6 +700,7 @@ export class WindowLayoutService extends DisposableService {
     if (!this.uiController) return;
 
     this.uiController.on('uiReady', this.handleUIReady);
+    this.uiController.on('setActiveAgent', this.handleSetActiveAgent);
     this.uiController.on('createTab', this.handleCreateTab);
     this.uiController.on('closeTab', this.handleCloseTab);
     this.uiController.on('switchTab', this.handleSwitchTab);
@@ -799,6 +849,86 @@ export class WindowLayoutService extends DisposableService {
     return this.tabs[this.activeTabId];
   }
 
+  private getBrowserGroupId(agentId: string | null): string {
+    return agentId ?? GLOBAL_BROWSER_GROUP_ID;
+  }
+
+  private getCurrentBrowserGroup(): BrowserTabGroup {
+    return this.getOrCreateBrowserGroup(this.activeBrowserGroupId);
+  }
+
+  private getOrCreateBrowserGroup(groupId: string): BrowserTabGroup {
+    if (!this.tabGroups[groupId]) {
+      this.tabGroups[groupId] = createEmptyBrowserTabGroup();
+    }
+    return this.tabGroups[groupId]!;
+  }
+
+  private setCurrentTabs(tabs: Record<string, TabController>): void {
+    this.tabs = tabs;
+    this.getCurrentBrowserGroup().tabs = tabs;
+    this.chatStateController?.updateTabsReference(this.tabs);
+  }
+
+  private setCurrentActiveTabId(tabId: string | null): void {
+    this.activeTabId = tabId;
+    this.getCurrentBrowserGroup().activeTabId = tabId;
+  }
+
+  private buildBrowserAgentState(group: BrowserTabGroup): BrowserAgentState {
+    const tabs: Record<string, TabState> = {};
+    for (const [id, tab] of Object.entries(group.tabs)) {
+      tabs[id] = {
+        id,
+        ...tab.getState(),
+      };
+    }
+
+    return {
+      tabs,
+      activeTabId: group.activeTabId,
+      contextSelectionMode: group.contextSelectionMode,
+      selectedElements: [...group.selectedElements],
+      hoveredElement: group.hoveredElement,
+      viewportSize: group.viewportSize,
+    };
+  }
+
+  private ensureDraftBrowserGroup(
+    tabsByAgent: AppState['browser']['tabsByAgent'],
+    groupId: string,
+  ): BrowserAgentState {
+    tabsByAgent[groupId] ??= createEmptyBrowserAgentState();
+    return tabsByAgent[groupId]!;
+  }
+
+  private syncCurrentBrowserGroupFromKarton(): void {
+    const group = this.getCurrentBrowserGroup();
+    const browser = this.uiKarton.state.browser;
+    group.contextSelectionMode = browser.contextSelectionMode;
+    group.selectedElements = [...browser.selectedElements];
+    group.hoveredElement = browser.hoveredElement;
+    group.viewportSize = browser.viewportSize;
+  }
+
+  private syncKartonBrowserFromCurrentGroup(): void {
+    const group = this.getCurrentBrowserGroup();
+    const groupId = this.activeBrowserGroupId;
+    const agentId = this.activeBrowserAgentId;
+    const state = this.buildBrowserAgentState(group);
+
+    this.uiKarton.setState((draft) => {
+      draft.browser.activeAgentId = agentId;
+      draft.browser.tabs = state.tabs;
+      draft.browser.activeTabId = state.activeTabId;
+      draft.browser.contextSelectionMode = state.contextSelectionMode;
+      draft.browser.selectedElements = state.selectedElements;
+      draft.browser.hoveredElement = state.hoveredElement;
+      draft.browser.viewportSize = state.viewportSize;
+      draft.browser.tabsByAgent[groupId] = state;
+    });
+  }
+
   /**
    * Get a tab by ID, or the active tab if no ID is provided.
    * Used by services like DevToolAPIService to access tabs.
@@ -812,6 +942,46 @@ export class WindowLayoutService extends DisposableService {
     }
     return this.activeTab;
   }
+
+  private handleSetActiveAgent = async (agentId: string | null) => {
+    const nextGroupId = this.getBrowserGroupId(agentId);
+
+    if (nextGroupId === this.activeBrowserGroupId) {
+      this.syncKartonBrowserFromCurrentGroup();
+      return;
+    }
+
+    this.syncCurrentBrowserGroupFromKarton();
+    this.syncKartonBrowserFromCurrentGroup();
+
+    if (this.activeTabId && this.contentFullscreenTabId === this.activeTabId) {
+      await this.tabs[this.activeTabId]?.exitContentFullscreen();
+      this.contentFullscreenTabId = null;
+    }
+
+    this.activeTab?.setVisible(false);
+
+    this.activeBrowserGroupId = nextGroupId;
+    this.activeBrowserAgentId = agentId;
+
+    const nextGroup = this.getOrCreateBrowserGroup(nextGroupId);
+    this.setCurrentTabs(nextGroup.tabs);
+
+    const nextActiveTabId = nextGroup.activeTabId;
+    this.setCurrentActiveTabId(null);
+    this.syncKartonBrowserFromCurrentGroup();
+
+    if (Object.keys(this.tabs).length === 0) {
+      await this.handleCreateTab(undefined, true);
+      return;
+    }
+
+    if (nextActiveTabId) {
+      await this.handleSwitchTab(nextActiveTabId);
+    } else {
+      this.syncKartonBrowserFromCurrentGroup();
+    }
+  };
 
   private handleCreateTab = async (
     url?: string,
@@ -862,6 +1032,7 @@ export class WindowLayoutService extends DisposableService {
     sourceTabId?: string,
   ): Promise<string> {
     const id = generateTabId();
+    const ownerGroupId = this.activeBrowserGroupId;
 
     // Create search utilities config that reads from current Karton state and preferences
     const searchUtilsConfig: SearchUtilsConfig = {
@@ -893,9 +1064,20 @@ export class WindowLayoutService extends DisposableService {
     // Subscribe to state updates
     tab.on('stateUpdated', (updates) => {
       this.uiKarton.setState((draft) => {
-        const tabState = draft.browser.tabs[id];
-        if (tabState) {
-          Object.assign(tabState, updates);
+        const groupState = this.ensureDraftBrowserGroup(
+          draft.browser.tabsByAgent,
+          ownerGroupId,
+        );
+        const storedTabState = groupState.tabs[id];
+        if (storedTabState) {
+          Object.assign(storedTabState, updates);
+        }
+
+        if (ownerGroupId === this.activeBrowserGroupId) {
+          const tabState = draft.browser.tabs[id];
+          if (tabState) {
+            Object.assign(tabState, updates);
+          }
         }
       });
     });
@@ -927,9 +1109,18 @@ export class WindowLayoutService extends DisposableService {
 
     tab.on('elementHovered', (element) => {
       // Only update if this is the active tab
-      if (this.activeTabId === id) {
+      if (
+        ownerGroupId === this.activeBrowserGroupId &&
+        this.activeTabId === id
+      ) {
+        this.getCurrentBrowserGroup().hoveredElement = element;
         this.uiKarton.setState((draft) => {
           draft.browser.hoveredElement = element;
+          const groupState = this.ensureDraftBrowserGroup(
+            draft.browser.tabsByAgent,
+            ownerGroupId,
+          );
+          groupState.hoveredElement = element;
         });
       }
     });
@@ -941,9 +1132,18 @@ export class WindowLayoutService extends DisposableService {
 
     tab.on('viewportSizeChanged', (size) => {
       // Only update if this is the active tab
-      if (this.activeTabId === id) {
+      if (
+        ownerGroupId === this.activeBrowserGroupId &&
+        this.activeTabId === id
+      ) {
+        this.getCurrentBrowserGroup().viewportSize = size;
         this.uiKarton.setState((draft) => {
           draft.browser.viewportSize = size;
+          const groupState = this.ensureDraftBrowserGroup(
+            draft.browser.tabsByAgent,
+            ownerGroupId,
+          );
+          groupState.viewportSize = size;
         });
       }
     });
@@ -1005,7 +1205,7 @@ export class WindowLayoutService extends DisposableService {
           newTabs[id] = tab;
         }
       }
-      this.tabs = newTabs;
+      this.setCurrentTabs(newTabs);
     } else {
       // Append to end (default behavior for UI-created tabs)
       this.tabs[id] = tab;
@@ -1024,19 +1224,32 @@ export class WindowLayoutService extends DisposableService {
       if (shouldInsertAfterSource && sourceTabId) {
         // Reconstruct tabs object to maintain order
         const newBrowserTabs: typeof draft.browser.tabs = {};
+        const newGroupTabs: typeof draft.browser.tabs = {};
+        const groupState = this.ensureDraftBrowserGroup(
+          draft.browser.tabsByAgent,
+          ownerGroupId,
+        );
         for (const [existingId, existingState] of Object.entries(
           draft.browser.tabs,
         )) {
           newBrowserTabs[existingId] = existingState;
+          newGroupTabs[existingId] = groupState.tabs[existingId]!;
           if (existingId === sourceTabId) {
             // Insert new tab right after source
             newBrowserTabs[id] = newTabState;
+            newGroupTabs[id] = newTabState;
           }
         }
         draft.browser.tabs = newBrowserTabs;
+        groupState.tabs = newGroupTabs;
       } else {
         // Append to end (default behavior)
         draft.browser.tabs[id] = newTabState;
+        const groupState = this.ensureDraftBrowserGroup(
+          draft.browser.tabsByAgent,
+          ownerGroupId,
+        );
+        groupState.tabs[id] = newTabState;
       }
     });
 
@@ -1064,6 +1277,7 @@ export class WindowLayoutService extends DisposableService {
   private handleCloseTab = async (tabId: string) => {
     const tab = this.tabs[tabId];
     if (tab) {
+      const ownerGroupId = this.activeBrowserGroupId;
       // Get tab order before deletion to determine next/previous tab
       const tabIdsBeforeDeletion = Object.keys(this.tabs);
       const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
@@ -1086,6 +1300,11 @@ export class WindowLayoutService extends DisposableService {
       // Clean up Karton state
       this.uiKarton.setState((draft) => {
         delete draft.browser.tabs[tabId];
+        const groupState = this.ensureDraftBrowserGroup(
+          draft.browser.tabsByAgent,
+          ownerGroupId,
+        );
+        delete groupState.tabs[tabId];
       });
 
       this.telemetryService?.capture('tab-destroyed', {
@@ -1109,6 +1328,7 @@ export class WindowLayoutService extends DisposableService {
         if (nextTabId) {
           await this.handleSwitchTab(nextTabId);
         } else {
+          this.setCurrentActiveTabId(null);
           // If no other tabs exist, create a new one
           const preferences = this.preferencesService.get();
           const newTabPage = preferences.general.newTabPage;
@@ -1134,7 +1354,7 @@ export class WindowLayoutService extends DisposableService {
       // The contentFullscreenChanged handler will clean up state
     }
 
-    this.activeTabId = tabId;
+    this.setCurrentActiveTabId(tabId);
     const newTab = this.tabs[tabId]!;
 
     // Show new tab BEFORE hiding old tab to prevent flicker.
@@ -1174,6 +1394,12 @@ export class WindowLayoutService extends DisposableService {
     this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
       draft.browser.viewportSize = newTab.getViewportSize();
+      const groupState = this.ensureDraftBrowserGroup(
+        draft.browser.tabsByAgent,
+        this.activeBrowserGroupId,
+      );
+      groupState.activeTabId = tabId;
+      groupState.viewportSize = newTab.getViewportSize();
     });
   };
 
@@ -1191,18 +1417,22 @@ export class WindowLayoutService extends DisposableService {
     for (const id of validTabIds) {
       newTabs[id] = this.tabs[id]!;
     }
-    this.tabs = newTabs;
-
-    // Update ChatStateController tabs reference
-    this.chatStateController?.updateTabsReference(this.tabs);
+    this.setCurrentTabs(newTabs);
 
     // Update Karton state with new tab order
     this.uiKarton.setState((draft) => {
       const newBrowserTabs: typeof draft.browser.tabs = {};
+      const newGroupTabs: typeof draft.browser.tabs = {};
+      const groupState = this.ensureDraftBrowserGroup(
+        draft.browser.tabsByAgent,
+        this.activeBrowserGroupId,
+      );
       for (const id of validTabIds) {
         newBrowserTabs[id] = draft.browser.tabs[id]!;
+        newGroupTabs[id] = groupState.tabs[id]!;
       }
       draft.browser.tabs = newBrowserTabs;
+      groupState.tabs = newGroupTabs;
     });
   };
 
@@ -1350,6 +1580,13 @@ export class WindowLayoutService extends DisposableService {
     this.uiKarton.setState((draft) => {
       if (draft.browser.tabs[tabId]) {
         draft.browser.tabs[tabId].isContentFullscreen = isFullscreen;
+      }
+      const groupState = this.ensureDraftBrowserGroup(
+        draft.browser.tabsByAgent,
+        this.activeBrowserGroupId,
+      );
+      if (groupState.tabs[tabId]) {
+        groupState.tabs[tabId].isContentFullscreen = isFullscreen;
       }
     });
   };
@@ -1547,6 +1784,11 @@ export class WindowLayoutService extends DisposableService {
       // Turn off for the currently active message ID
       this.uiKarton.setState((draft) => {
         draft.browser.contextSelectionMode = false;
+        const groupState = this.ensureDraftBrowserGroup(
+          draft.browser.tabsByAgent,
+          this.activeBrowserGroupId,
+        );
+        groupState.contextSelectionMode = false;
       });
 
       // Brief delay to ensure UI updates
@@ -1567,7 +1809,13 @@ export class WindowLayoutService extends DisposableService {
     }
     this.uiKarton.setState((draft) => {
       draft.browser.contextSelectionMode = active;
+      const groupState = this.ensureDraftBrowserGroup(
+        draft.browser.tabsByAgent,
+        this.activeBrowserGroupId,
+      );
+      groupState.contextSelectionMode = active;
     });
+    this.getCurrentBrowserGroup().contextSelectionMode = active;
   };
 
   private handleSelectHoveredElement = () => {
@@ -1744,6 +1992,14 @@ export class WindowLayoutService extends DisposableService {
       if (tab) {
         tab.isSearchBarActive = true;
       }
+      const groupState = this.ensureDraftBrowserGroup(
+        draft.browser.tabsByAgent,
+        this.activeBrowserGroupId,
+      );
+      const groupTab = groupState.tabs[this.activeTabId!];
+      if (groupTab) {
+        groupTab.isSearchBarActive = true;
+      }
     });
   };
 
@@ -1753,6 +2009,14 @@ export class WindowLayoutService extends DisposableService {
       const tab = draft.browser.tabs[this.activeTabId!];
       if (tab) {
         tab.isSearchBarActive = false;
+      }
+      const groupState = this.ensureDraftBrowserGroup(
+        draft.browser.tabsByAgent,
+        this.activeBrowserGroupId,
+      );
+      const groupTab = groupState.tabs[this.activeTabId!];
+      if (groupTab) {
+        groupTab.isSearchBarActive = false;
       }
     });
     // Also stop any active search
