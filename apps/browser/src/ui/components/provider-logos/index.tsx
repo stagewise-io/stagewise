@@ -2,6 +2,7 @@ import type { ComponentType, SVGProps } from 'react';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
 import { AlibabaLogo } from './alibaba';
 import { AnthropicLogo } from './anthropic';
+import { AwsLogo } from './aws';
 import { DeepSeekLogo } from './deepseek';
 import { GoogleLogo } from './google';
 import { MinimaxLogo } from './minimax';
@@ -43,6 +44,7 @@ export function ProviderLogo({
 export {
   AlibabaLogo,
   AnthropicLogo,
+  AwsLogo,
   DeepSeekLogo,
   GoogleLogo,
   MinimaxLogo,

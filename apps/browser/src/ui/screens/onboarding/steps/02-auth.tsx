@@ -19,7 +19,7 @@ import {
   CODING_PLANS,
   type CodingPlanId,
 } from '@ui/components/coding-plan-card';
-import { ProviderLogo } from '@ui/components/provider-logos';
+import { AwsLogo, ProviderLogo } from '@ui/components/provider-logos';
 import {
   IconChevronLeftOutline18,
   IconChevronRightOutline18,
@@ -27,6 +27,7 @@ import {
 import type { StepValidityCallback } from '../index';
 import type {
   ModelProvider,
+  Patch,
   TelemetryLevel,
 } from '@shared/karton-contracts/ui/shared-types';
 
@@ -52,6 +53,27 @@ const API_KEY_PROVIDERS: ProviderKey[] = [
 ];
 
 type ConnectResult = { success: true } | { success: false; error: string };
+
+/**
+ * Sentinel selection value used on the "Use existing subscription" grid to
+ * route to the AWS Bedrock sub-view. Kept distinct from `CodingPlanId` so
+ * the type system forces call-sites to handle the non-CodingPlan case.
+ */
+const BEDROCK_TILE_ID = 'bedrock-profile' as const;
+type SubscriptionSelection = CodingPlanId | typeof BEDROCK_TILE_ID;
+
+/**
+ * Map an AWS region to the Bedrock cross-region inference-profile prefix
+ * required by Claude 4.x on Bedrock. Mirrors the helper in the custom
+ * providers settings panel; kept inlined here to avoid exporting UI
+ * internals from that file.
+ */
+function bedrockInferencePrefix(region: string): string {
+  if (region.startsWith('us-') || region.startsWith('ca-')) return 'us.';
+  if (region.startsWith('eu-')) return 'eu.';
+  if (region.startsWith('ap-')) return 'apac.';
+  return 'us.';
+}
 
 export function StepAuth({
   isActive,
@@ -124,6 +146,14 @@ export function StepAuth({
     fadeDistance: 24,
   });
 
+  // AWS Bedrock login via a named AWS profile. Rendered inside the
+  // "Use existing subscription" detail view (no collapse toggle needed).
+  const [bedrockProfile, setBedrockProfile] = useState('default');
+  const [bedrockRegion, setBedrockRegion] = useState('us-east-1');
+  const [bedrockError, setBedrockError] = useState<string | null>(null);
+  const [bedrockConnecting, setBedrockConnecting] = useState(false);
+  const [bedrockDisconnecting, setBedrockDisconnecting] = useState(false);
+
   useEffect(() => {
     if (
       authStatus === 'unauthenticated' &&
@@ -136,6 +166,12 @@ export function StepAuth({
       setSelectedCodingPlanId(null);
     }
   }, [authStatus]);
+
+  // Clear transient Bedrock error state when the step goes inactive so the
+  // user doesn't return to a stale banner.
+  useEffect(() => {
+    if (!isActive) setBedrockError(null);
+  }, [isActive]);
 
   useEffect(() => {
     if (isActive && mode === 'stagewise' && phase === 'form-input')
@@ -162,10 +198,46 @@ export function StepAuth({
     );
   }, [preferences.providerConfigs]);
 
+  // "Connected via Bedrock" = anthropic or openai is routed through a custom
+  // endpoint whose `apiSpec === 'amazon-bedrock'`. Resolving the referenced
+  // `customProviderId` against `preferences.customEndpoints` is required so
+  // unrelated custom endpoints (e.g. an OpenAI-compatible proxy the user
+  // configured from settings) don't light up the Bedrock tile.
+  const bedrockEndpoint = useMemo(() => {
+    const cfgs = preferences.providerConfigs ?? {};
+    const endpoints = preferences.customEndpoints ?? [];
+    const bedrockIds = new Set(
+      endpoints
+        .filter((e) => e.apiSpec === 'amazon-bedrock')
+        .map((e) => e.id),
+    );
+    const candidateId =
+      (cfgs.anthropic?.mode === 'custom' && cfgs.anthropic.customProviderId) ||
+      (cfgs.openai?.mode === 'custom' && cfgs.openai.customProviderId) ||
+      null;
+    if (!candidateId || !bedrockIds.has(candidateId)) return null;
+    return endpoints.find((e) => e.id === candidateId) ?? null;
+  }, [preferences.providerConfigs, preferences.customEndpoints]);
+  const hasConnectedBedrock = bedrockEndpoint !== null;
+
+  // Keep the input fields in sync with a saved Bedrock endpoint so a
+  // remount (step navigation, page refresh) shows the actual connected
+  // profile/region rather than the hardcoded defaults.
+  useEffect(() => {
+    if (!bedrockEndpoint) return;
+    if (bedrockEndpoint.awsProfileName) {
+      setBedrockProfile(bedrockEndpoint.awsProfileName);
+    }
+    if (bedrockEndpoint.region) {
+      setBedrockRegion(bedrockEndpoint.region);
+    }
+  }, [bedrockEndpoint]);
+
   const isValid =
     phase === 'authentication-validated' ||
     (mode === 'api-keys' && hasConnectedApiKey) ||
-    (mode === 'coding-plan' && hasConnectedCodingPlan);
+    (mode === 'coding-plan' &&
+      (hasConnectedCodingPlan || hasConnectedBedrock));
 
   const handleConnectSingleKey = useCallback(
     async (provider: ProviderKey, apiKey: string): Promise<ConnectResult> => {
@@ -187,11 +259,122 @@ export function StepAuth({
     [disconnectProvider],
   );
 
+  // Connect AWS Bedrock using a named profile. Creates a custom endpoint
+  // and routes anthropic + openai providers through it so the built-in
+  // model picker works out of the box.
+  const handleConnectBedrock = useCallback(async () => {
+    const profile = bedrockProfile.trim();
+    const region = bedrockRegion.trim();
+    if (!profile || !region) {
+      setBedrockError('Profile and region are required.');
+      return;
+    }
+    setBedrockConnecting(true);
+    setBedrockError(null);
+    try {
+      const endpointId = crypto.randomUUID();
+      // Bedrock requires provider-specific cross-region inference-profile
+      // IDs. Without this mapping, `model-provider.ts` throws "Built-in
+      // model X cannot be routed through a amazon-bedrock endpoint" the
+      // first time the user sends a message.
+      const prefix = bedrockInferencePrefix(region);
+      const modelIdMapping: Record<string, string> = {
+        'claude-opus-4.7': `${prefix}anthropic.claude-opus-4-7`,
+        'claude-opus-4.6': `${prefix}anthropic.claude-opus-4-6-v1`,
+        'claude-sonnet-4.6': `${prefix}anthropic.claude-sonnet-4-6`,
+        'claude-haiku-4.5': `${prefix}anthropic.claude-haiku-4-5-20251001-v1:0`,
+      };
+      // Emit JSON-patch ops directly rather than going through immer's
+      // `produceWithPatches`. The backend applies them to canonical state.
+      // Using the `-` array-append sentinel so the add lands at the end
+      // regardless of any concurrent mutation between render and apply.
+      // Per-field replace ops on providerConfigs preserve any existing
+      // `encryptedApiKey` the user may have just stored for that provider.
+      const patches: Patch[] = [
+        {
+          op: 'add',
+          path: ['customEndpoints', '-'],
+          value: {
+            id: endpointId,
+            name: `AWS Bedrock (${profile})`,
+            apiSpec: 'amazon-bedrock',
+            baseUrl: '',
+            region,
+            awsAuthMode: 'profile',
+            awsProfileName: profile,
+            modelIdMapping,
+          },
+        },
+        {
+          op: 'replace',
+          path: ['providerConfigs', 'anthropic', 'mode'],
+          value: 'custom',
+        },
+        {
+          op: 'replace',
+          path: ['providerConfigs', 'anthropic', 'customProviderId'],
+          value: endpointId,
+        },
+        {
+          op: 'replace',
+          path: ['providerConfigs', 'openai', 'mode'],
+          value: 'custom',
+        },
+        {
+          op: 'replace',
+          path: ['providerConfigs', 'openai', 'customProviderId'],
+          value: endpointId,
+        },
+      ];
+      await preferencesUpdate(patches);
+    } catch (e) {
+      setBedrockError(
+        e instanceof Error
+          ? e.message
+          : 'Failed to save Bedrock configuration.',
+      );
+    } finally {
+      setBedrockConnecting(false);
+    }
+  }, [bedrockProfile, bedrockRegion, preferencesUpdate]);
+
+  // Revert the anthropic + openai provider configs to their stagewise default
+  // so Bedrock is no longer the routing target. The custom endpoint stays in
+  // `preferences.customEndpoints` so users can re-select it from agent settings.
+  const handleDisconnectBedrock = useCallback(async () => {
+    setBedrockDisconnecting(true);
+    setBedrockError(null);
+    try {
+      await preferencesUpdate([
+        {
+          op: 'replace',
+          path: ['providerConfigs', 'anthropic', 'mode'],
+          value: 'stagewise',
+        },
+        {
+          op: 'replace',
+          path: ['providerConfigs', 'openai', 'mode'],
+          value: 'stagewise',
+        },
+      ]);
+    } catch (e) {
+      setBedrockError(
+        e instanceof Error
+          ? e.message
+          : 'Failed to disconnect Bedrock configuration.',
+      );
+    } finally {
+      setBedrockDisconnecting(false);
+    }
+  }, [preferencesUpdate]);
+
   useEffect(() => {
     if (isActive) {
       onValidityChange?.(
         isValid,
-        isValid ? undefined : 'Sign in or provide at least one provider key',
+        isValid
+          ? undefined
+          : 'Sign in, provide a provider key, or connect a coding plan',
       );
     }
   }, [isActive, isValid, onValidityChange]);
@@ -230,9 +413,10 @@ export function StepAuth({
   const codingPlans = useMemo(() => Object.values(CODING_PLANS), []);
 
   // Sub-view state for the coding-plan mode. `null` = grid view,
-  // otherwise the plan detail view for that id.
+  // otherwise the detail view for that tile. The grid mixes real
+  // CodingPlan entries with the AWS Bedrock tile, so the state covers both.
   const [selectedCodingPlanId, setSelectedCodingPlanId] =
-    useState<CodingPlanId | null>(null);
+    useState<SubscriptionSelection | null>(null);
 
   const handleConnectSinglePlan = useCallback(
     async (
@@ -571,6 +755,10 @@ export function StepAuth({
                 />
               );
             })}
+            <BedrockGridCard
+              isConnected={hasConnectedBedrock}
+              onClick={() => setSelectedCodingPlanId(BEDROCK_TILE_ID)}
+            />
           </div>
           <div className="flex justify-start pt-2">
             <Button
@@ -590,6 +778,7 @@ export function StepAuth({
 
       {mode === 'coding-plan' &&
         selectedCodingPlanId !== null &&
+        selectedCodingPlanId !== BEDROCK_TILE_ID &&
         (() => {
           const plan = CODING_PLANS[selectedCodingPlanId];
           const cfg = preferences.providerConfigs?.[plan.provider] ?? {
@@ -629,6 +818,106 @@ export function StepAuth({
             </div>
           );
         })()}
+
+      {mode === 'coding-plan' && selectedCodingPlanId === BEDROCK_TILE_ID && (
+        <div className="app-no-drag flex w-full max-w-md flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setSelectedCodingPlanId(null)}
+              >
+                <IconChevronLeftOutline18 className="size-4" />
+              </Button>
+              <AwsLogo className="size-5 text-foreground" />
+              <h2 className="font-medium text-foreground text-sm">
+                AWS Bedrock
+              </h2>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Route Anthropic and OpenAI model calls through AWS Bedrock using
+              a named profile from ~/.aws/credentials (SSO, role assumption,
+              etc.).
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 rounded-lg border border-derived p-4">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="bedrock-profile"
+                className="text-muted-foreground text-xs"
+              >
+                AWS Profile Name
+              </label>
+              <Input
+                id="bedrock-profile"
+                placeholder="default"
+                size="sm"
+                value={bedrockProfile}
+                onValueChange={(v) => {
+                  setBedrockProfile(v);
+                  setBedrockError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleConnectBedrock();
+                }}
+                disabled={hasConnectedBedrock || bedrockConnecting}
+                autoFocus={!hasConnectedBedrock}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="bedrock-region"
+                className="text-muted-foreground text-xs"
+              >
+                AWS Region
+              </label>
+              <Input
+                id="bedrock-region"
+                placeholder="us-east-1"
+                size="sm"
+                value={bedrockRegion}
+                onValueChange={(v) => {
+                  setBedrockRegion(v);
+                  setBedrockError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleConnectBedrock();
+                }}
+                disabled={hasConnectedBedrock || bedrockConnecting}
+              />
+            </div>
+            {bedrockError && (
+              <p className="text-2xs text-error-foreground">{bedrockError}</p>
+            )}
+            <div className="flex justify-end">
+              {hasConnectedBedrock ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleDisconnectBedrock()}
+                  disabled={bedrockDisconnecting}
+                >
+                  {bedrockDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void handleConnectBedrock()}
+                  disabled={
+                    bedrockConnecting ||
+                    !bedrockProfile.trim() ||
+                    !bedrockRegion.trim()
+                  }
+                >
+                  {bedrockConnecting ? 'Connecting…' : 'Connect'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {mode === 'stagewise' && phase === 'form-input' && (
         <div className="flex flex-col items-center gap-1.5">
@@ -816,6 +1105,46 @@ function ApiKeyRow({
       </div>
       {localError && <TruncatedErrorText id={errorId} text={localError} />}
     </div>
+  );
+}
+
+/**
+ * Grid tile for the AWS Bedrock sub-view. Mirrors `CodingPlanGridCard`'s
+ * shape but renders the AWS mark directly — Bedrock is not a
+ * `ModelProvider`, so it cannot go through `ProviderLogo`.
+ */
+function BedrockGridCard({
+  isConnected,
+  onClick,
+}: {
+  isConnected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex cursor-pointer items-center gap-3 rounded-lg border border-derived bg-surface-1 p-3 text-left transition-colors hover:bg-surface-2',
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-center">
+        <AwsLogo className="size-6 text-foreground" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h3 className="font-medium text-foreground text-sm">AWS Bedrock</h3>
+        <p className="truncate text-muted-foreground text-xs">
+          Route Anthropic & OpenAI via a named AWS profile
+        </p>
+      </div>
+      {isConnected ? (
+        <span className="shrink-0 self-end font-medium text-[11px] text-success-foreground">
+          Connected
+        </span>
+      ) : (
+        <IconChevronRightOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+    </button>
   );
 }
 
