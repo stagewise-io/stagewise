@@ -21,6 +21,14 @@ import { API_URL } from './auth/server-interop';
 import { DisposableService } from './disposable';
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import type { TelemetryService } from './telemetry';
+import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
+import type { CodingPlanId } from '@shared/coding-plans';
+
+export type OnboardingAuthCompletion = {
+  auth_method: 'stagewise' | 'api-keys' | 'coding-plan' | 'unknown';
+  provider?: ModelProvider;
+  plan_id?: CodingPlanId;
+};
 
 export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
@@ -147,8 +155,13 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.registerServerProcedureHandler(
       'userExperience.setHasSeenOnboardingFlow',
-      async (_callingClientId: string, value: boolean) => {
-        await this.setHasSeenOnboardingFlow(value);
+      async (
+        _callingClientId: string,
+        input: boolean | { value: boolean; auth?: OnboardingAuthCompletion },
+      ) => {
+        const value = typeof input === 'boolean' ? input : input.value;
+        const auth = typeof input === 'boolean' ? undefined : input.auth;
+        await this.setHasSeenOnboardingFlow(value, auth);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -433,7 +446,10 @@ export class UserExperienceService extends DisposableService {
     };
   }
 
-  public async setHasSeenOnboardingFlow(value: boolean) {
+  public async setHasSeenOnboardingFlow(
+    value: boolean,
+    auth: OnboardingAuthCompletion = { auth_method: 'unknown' },
+  ) {
     try {
       await this.writeOnboardingState(value);
       // Update UI state with combined data
@@ -450,6 +466,7 @@ export class UserExperienceService extends DisposableService {
         this.telemetryService.capture('onboarding-completed', {
           skipped: false,
           telemetry_level: this.telemetryService.telemetryLevel,
+          ...auth,
         });
       }
     } catch (error) {

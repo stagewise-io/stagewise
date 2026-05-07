@@ -9,7 +9,7 @@ import { IconArrowLeftFill18, IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { StepWelcome } from './steps/01-welcome';
-import { StepAuth } from './steps/02-auth';
+import { StepAuth, type OnboardingAuthCompletion } from './steps/02-auth';
 import { StepDemo } from './steps/03-demo';
 const stepIds = ['welcome', 'auth', 'demo'];
 
@@ -22,6 +22,8 @@ export function OnboardingWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [canProceed, setCanProceed] = useState(false);
   const [blockReason, setBlockReason] = useState<string | null>(null);
+  const [authCompletion, setAuthCompletion] =
+    useState<OnboardingAuthCompletion | null>(null);
   const setHasSeenOnboardingFlow = useKartonProcedure(
     (p) => p.userExperience.setHasSeenOnboardingFlow,
   );
@@ -58,8 +60,11 @@ export function OnboardingWizard() {
   }, []);
 
   const complete = useCallback(() => {
-    setHasSeenOnboardingFlow(true);
-  }, [setHasSeenOnboardingFlow]);
+    setHasSeenOnboardingFlow({
+      value: true,
+      auth: authCompletion ?? { auth_method: 'unknown' },
+    });
+  }, [authCompletion, setHasSeenOnboardingFlow]);
 
   return (
     <div
@@ -88,6 +93,7 @@ export function OnboardingWizard() {
             isActive={currentStep === 1}
             onValidityChange={handleValidityChange}
             onStepComplete={() => goNext()}
+            onAuthCompleted={setAuthCompletion}
           />
         </div>
         {currentStep === 2 && <StepDemo />}

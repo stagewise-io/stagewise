@@ -29,11 +29,11 @@ import type {
   GlobalConfig,
   ModelProvider,
 } from '../ui/shared-types';
+import type { CodingPlanId } from '../../coding-plans';
 import type { ApiKeyValidationResult, AuthStatus, PlanEntry } from '../ui';
 import type { FileDiff } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
 import type { PluginDefinition } from '../../plugins';
-import type { CodingPlanId } from '../../coding-plans';
 
 export type WorkspaceMountInfo = {
   prefix: string;
@@ -184,7 +184,22 @@ export type PagesApiContract = {
       limit: number;
     }) => Promise<InspirationWebsite>;
     /** Set whether user has seen the onboarding flow */
-    setHasSeenOnboardingFlow: (value: boolean) => Promise<void>;
+    setHasSeenOnboardingFlow: (
+      input:
+        | boolean
+        | {
+            value: boolean;
+            auth?: {
+              auth_method: 'stagewise' | 'api-keys' | 'coding-plan' | 'unknown';
+              provider?: ModelProvider;
+              plan_id?:
+                | 'glm-coding-plan'
+                | 'kimi-plan'
+                | 'qwen-plan'
+                | 'minimax-plan';
+            };
+          },
+    ) => Promise<void>;
     /**
      * Trust a certificate for a specific origin in a tab and reload.
      * This adds the origin to a per-tab whitelist that allows certificate errors.
