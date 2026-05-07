@@ -78,7 +78,7 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     apiKeyUrl:
       'https://platform.minimax.io/user-center/basic-information/interface-key',
     helpText: 'Create one at platform.minimax.io → User Center → Interface key',
-    featuredModelIds: ['MiniMax-M2'],
+    featuredModelIds: ['minimax-m2.7'],
   },
 };
 
