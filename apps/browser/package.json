@@ -89,7 +89,7 @@
     "@stagewise/tailwindcss-color-modifiers": "workspace:*",
     "@storybook/addon-docs": "^10.0.7",
     "@storybook/addon-onboarding": "10.0.7",
-    "@storybook/react": "^10.0.8",
+    "@storybook/react": "^10.3.6",
     "@storybook/react-dom-shim": "^10.1.0",
     "@storybook/react-vite": "^10.0.8",
     "@tailwindcss/postcss": "^4.1.5",
