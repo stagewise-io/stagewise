@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha084 (2026-05-07)
+
+### Features
+
+* add minimax-M2.7 (e9dad1c)
+
 ## 1.0.0-alpha083 (2026-05-06)
 
 ### Features
