@@ -27,6 +27,7 @@ import type {
 import { validateApiKeys } from '../utils/validate-api-keys';
 import { listAwsProfiles } from '../utils/aws-profiles';
 import type { CodingPlanId } from '@shared/coding-plans';
+import type { OnboardingAuthCompletion } from './experience';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type { ThumbnailService } from './thumbnail';
@@ -1222,14 +1223,24 @@ export class PagesService extends DisposableService {
 
     this.kartonServer.registerServerProcedureHandler(
       'setHasSeenOnboardingFlow',
-      async (_callingClientId: string, value: boolean): Promise<void> => {
+      async (
+        _callingClientId: string,
+        input:
+          | boolean
+          | {
+              value: boolean;
+              auth?: OnboardingAuthCompletion;
+            },
+      ): Promise<void> => {
         if (!this.userExperienceService) {
           this.logger.warn(
             '[PagesService] setHasSeenOnboardingFlow called but UserExperienceService not set',
           );
           return;
         }
-        await this.userExperienceService.setHasSeenOnboardingFlow(value);
+        const value = typeof input === 'boolean' ? input : input.value;
+        const auth = typeof input === 'boolean' ? undefined : input.auth;
+        await this.userExperienceService.setHasSeenOnboardingFlow(value, auth);
       },
     );
 

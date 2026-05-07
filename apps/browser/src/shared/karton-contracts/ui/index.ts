@@ -856,8 +856,25 @@ export type KartonContract = {
         ) => Promise<void>;
       };
       setHasSeenOnboardingFlow: (
-        value: boolean,
-        suggestion?: { id: string; url: string; prompt: string },
+        input:
+          | boolean
+          | {
+              value: boolean;
+              auth?: {
+                auth_method:
+                  | 'stagewise'
+                  | 'api-keys'
+                  | 'coding-plan'
+                  | 'unknown';
+                provider?: ModelProvider;
+                plan_id?:
+                  | 'glm-coding-plan'
+                  | 'kimi-plan'
+                  | 'qwen-plan'
+                  | 'minimax-plan';
+              };
+              suggestion?: { id: string; url: string; prompt: string };
+            },
       ) => Promise<void>;
       clearPendingOnboardingSuggestion: () => Promise<void>;
     };

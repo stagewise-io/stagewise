@@ -7,6 +7,7 @@ import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollb
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+import { useTrack } from '@ui/hooks/use-track';
 import { useTurnstile } from '@ui/hooks/use-turnstile';
 import {
   Tooltip,
@@ -53,13 +54,21 @@ const API_KEY_PROVIDERS: ProviderKey[] = [
 
 type ConnectResult = { success: true } | { success: false; error: string };
 
+export type OnboardingAuthCompletion = {
+  auth_method: AuthMode;
+  provider?: ModelProvider;
+  plan_id?: CodingPlanId;
+};
+
 export function StepAuth({
   isActive,
   onValidityChange,
+  onAuthCompleted,
 }: {
   isActive: boolean;
   onStepComplete?: () => void;
   onValidityChange?: StepValidityCallback;
+  onAuthCompleted?: (completion: OnboardingAuthCompletion) => void;
 }) {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
@@ -74,6 +83,7 @@ export function StepAuth({
   );
   const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+  const track = useTrack();
   const authStatus = useKartonState((s) => s.userAccount.status);
   const preferences = useKartonState((s) => s.preferences);
   const userEmail = useKartonState((s) =>
@@ -125,19 +135,6 @@ export function StepAuth({
   });
 
   useEffect(() => {
-    if (
-      authStatus === 'unauthenticated' &&
-      phase === 'authentication-validated'
-    ) {
-      setPhase('form-input');
-      setMode('stagewise');
-      setCode('');
-      setError(null);
-      setSelectedCodingPlanId(null);
-    }
-  }, [authStatus]);
-
-  useEffect(() => {
     if (isActive && mode === 'stagewise' && phase === 'form-input')
       requestAnimationFrame(() => emailRef.current?.focus());
   }, [isActive, mode, phase]);
@@ -167,24 +164,74 @@ export function StepAuth({
     (mode === 'api-keys' && hasConnectedApiKey) ||
     (mode === 'coding-plan' && hasConnectedCodingPlan);
 
+  const switchMode = useCallback(
+    (to: AuthMode) => {
+      setMode((from) => {
+        if (from !== to) {
+          void track('onboarding-auth-mode-switched', { from, to });
+        }
+        return to;
+      });
+    },
+    [track],
+  );
+
+  useEffect(() => {
+    if (
+      authStatus === 'unauthenticated' &&
+      phase === 'authentication-validated'
+    ) {
+      setPhase('form-input');
+      switchMode('stagewise');
+      setCode('');
+      setError(null);
+      setSelectedCodingPlanId(null);
+    }
+  }, [authStatus, phase, switchMode]);
+
+  const trackAuthCompleted = useCallback(
+    (completion: OnboardingAuthCompletion) => {
+      void track('onboarding-auth-method-completed', completion);
+      onAuthCompleted?.(completion);
+    },
+    [onAuthCompleted, track],
+  );
+
   const handleConnectSingleKey = useCallback(
     async (provider: ProviderKey, apiKey: string): Promise<ConnectResult> => {
-      // Delegate to the backend's atomic `connectProvider` procedure.
-      // It validates the key, encrypts+stores it, and flips the provider's
-      // endpoint mode to `'official'` in a single RPC. No partial-state
-      // window: if any step fails, nothing is persisted.
-      return connectProvider(provider, apiKey);
+      try {
+        const result = await connectProvider(provider, apiKey);
+        if (result.success) {
+          trackAuthCompleted({ auth_method: 'api-keys', provider });
+        } else {
+          void track('onboarding-auth-method-failed', {
+            auth_method: 'api-keys',
+            provider,
+            error_kind: 'validation-error',
+          });
+        }
+        return result;
+      } catch (error) {
+        void track('onboarding-auth-method-failed', {
+          auth_method: 'api-keys',
+          provider,
+          error_kind: 'network-error',
+        });
+        throw error;
+      }
     },
-    [connectProvider],
+    [connectProvider, track, trackAuthCompleted],
   );
 
   const handleDisconnectApiKey = useCallback(
     async (provider: ProviderKey) => {
-      // Atomic: flips mode back to 'stagewise' AND clears the encrypted key
-      // in a single patch update on the backend. No partial-state window.
       await disconnectProvider(provider);
+      void track('onboarding-auth-provider-disconnected', {
+        auth_method: 'api-keys',
+        provider,
+      });
     },
-    [disconnectProvider],
+    [disconnectProvider, track],
   );
 
   useEffect(() => {
@@ -199,20 +246,30 @@ export function StepAuth({
   const handleSendOtp = useCallback(async () => {
     if (!email.trim()) return;
     if (turnstileEnabled && !turnstileToken && !turnstileError) {
+      void track('onboarding-auth-otp-failed', {
+        error_kind: 'turnstile-not-ready',
+      });
       setError('Security verification not ready. Please wait a moment.');
       return;
     }
+    void track('onboarding-auth-otp-requested');
     setError(null);
     setLoading(true);
     try {
       const result = await sendOtp(email.trim(), turnstileToken ?? '');
       if (result?.error) {
+        void track('onboarding-auth-otp-failed', {
+          error_kind: 'backend-error',
+        });
         setError(result.error);
         resetTurnstile();
       } else {
         setPhase('waiting-for-otp');
       }
     } catch {
+      void track('onboarding-auth-otp-failed', {
+        error_kind: 'network-error',
+      });
       setError('Failed to send verification code.');
       resetTurnstile();
     } finally {
@@ -221,6 +278,7 @@ export function StepAuth({
   }, [
     email,
     sendOtp,
+    track,
     turnstileToken,
     turnstileEnabled,
     resetTurnstile,
@@ -239,13 +297,35 @@ export function StepAuth({
       planId: CodingPlanId,
       apiKey: string,
     ): Promise<{ success: true } | { success: false; error: string }> => {
-      // Delegate to the backend's atomic `connectCodingPlan` procedure.
-      // It validates the key, encrypts+stores it, and flips the provider's
-      // endpoint mode to `'official'` in a single RPC. No partial state
-      // window: if any step fails, nothing is persisted.
-      return connectCodingPlan(planId, apiKey);
+      const provider = CODING_PLANS[planId].provider;
+      try {
+        const result = await connectCodingPlan(planId, apiKey);
+        if (result.success) {
+          trackAuthCompleted({
+            auth_method: 'coding-plan',
+            provider,
+            plan_id: planId,
+          });
+        } else {
+          void track('onboarding-auth-method-failed', {
+            auth_method: 'coding-plan',
+            provider,
+            plan_id: planId,
+            error_kind: 'validation-error',
+          });
+        }
+        return result;
+      } catch (error) {
+        void track('onboarding-auth-method-failed', {
+          auth_method: 'coding-plan',
+          provider,
+          plan_id: planId,
+          error_kind: 'network-error',
+        });
+        throw error;
+      }
     },
-    [connectCodingPlan],
+    [connectCodingPlan, track, trackAuthCompleted],
   );
 
   const handleGetApiKey = useCallback(
@@ -261,8 +341,13 @@ export function StepAuth({
       // Atomic: flips mode back to 'stagewise' AND clears the encrypted key
       // in a single patch update on the backend. No partial-state window.
       await disconnectProvider(provider);
+      void track('onboarding-auth-provider-disconnected', {
+        auth_method: 'coding-plan',
+        provider,
+        plan_id: planId,
+      });
     },
-    [disconnectProvider],
+    [disconnectProvider, track],
   );
 
   const handleVerifyOtp = useCallback(async () => {
@@ -271,14 +356,33 @@ export function StepAuth({
     setLoading(true);
     try {
       const result = await verifyOtp(email.trim(), code.trim());
-      if (result?.error) setError(result.error);
-      else setPhase('authentication-validated');
+      if (result?.error) {
+        void track('onboarding-auth-otp-failed', {
+          error_kind: 'backend-error',
+        });
+        void track('onboarding-auth-method-failed', {
+          auth_method: 'stagewise',
+          error_kind: 'validation-error',
+        });
+        setError(result.error);
+      } else {
+        void track('onboarding-auth-otp-verified');
+        trackAuthCompleted({ auth_method: 'stagewise' });
+        setPhase('authentication-validated');
+      }
     } catch {
+      void track('onboarding-auth-otp-failed', {
+        error_kind: 'network-error',
+      });
+      void track('onboarding-auth-method-failed', {
+        auth_method: 'stagewise',
+        error_kind: 'network-error',
+      });
       setError('Failed to verify code.');
     } finally {
       setLoading(false);
     }
-  }, [email, code, verifyOtp]);
+  }, [email, code, verifyOtp, track, trackAuthCompleted]);
 
   if (phase === 'authentication-validated' && mode === 'stagewise') {
     return (
@@ -452,6 +556,11 @@ export function StepAuth({
               }
               onConnect={handleConnectSingleKey}
               onDisconnect={handleDisconnectApiKey}
+              onFocusProvider={(provider) => {
+                void track('onboarding-auth-api-key-input-focused', {
+                  provider,
+                });
+              }}
             />
             <ApiKeyRow
               provider="openai"
@@ -462,6 +571,11 @@ export function StepAuth({
               }
               onConnect={handleConnectSingleKey}
               onDisconnect={handleDisconnectApiKey}
+              onFocusProvider={(provider) => {
+                void track('onboarding-auth-api-key-input-focused', {
+                  provider,
+                });
+              }}
             />
             <ApiKeyRow
               provider="google"
@@ -472,6 +586,11 @@ export function StepAuth({
               }
               onConnect={handleConnectSingleKey}
               onDisconnect={handleDisconnectApiKey}
+              onFocusProvider={(provider) => {
+                void track('onboarding-auth-api-key-input-focused', {
+                  provider,
+                });
+              }}
             />
             {showMoreProviders && (
               <>
@@ -486,6 +605,11 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  onFocusProvider={(provider) => {
+                    void track('onboarding-auth-api-key-input-focused', {
+                      provider,
+                    });
+                  }}
                 />
                 <ApiKeyRow
                   provider="alibaba"
@@ -498,6 +622,11 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  onFocusProvider={(provider) => {
+                    void track('onboarding-auth-api-key-input-focused', {
+                      provider,
+                    });
+                  }}
                 />
                 <ApiKeyRow
                   provider="deepseek"
@@ -510,6 +639,11 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  onFocusProvider={(provider) => {
+                    void track('onboarding-auth-api-key-input-focused', {
+                      provider,
+                    });
+                  }}
                 />
                 <ApiKeyRow
                   provider="z-ai"
@@ -522,6 +656,11 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  onFocusProvider={(provider) => {
+                    void track('onboarding-auth-api-key-input-focused', {
+                      provider,
+                    });
+                  }}
                 />
               </>
             )}
@@ -531,7 +670,7 @@ export function StepAuth({
               variant="ghost"
               size="xs"
               onClick={() => {
-                setMode('stagewise');
+                switchMode('stagewise');
                 setError(null);
                 setSelectedCodingPlanId(null);
               }}
@@ -541,7 +680,15 @@ export function StepAuth({
             <Button
               variant="ghost"
               size="xs"
-              onClick={() => setShowMoreProviders((v) => !v)}
+              onClick={() => {
+                setShowMoreProviders((expanded) => {
+                  const next = !expanded;
+                  void track('onboarding-auth-providers-expanded', {
+                    expanded: next,
+                  });
+                  return next;
+                });
+              }}
             >
               {showMoreProviders ? 'Show less' : 'Show 4 more providers'}
             </Button>
@@ -567,7 +714,13 @@ export function StepAuth({
                   displayName={plan.displayName}
                   tagline={plan.tagline}
                   isConnected={isConnected}
-                  onClick={() => setSelectedCodingPlanId(plan.id)}
+                  onClick={() => {
+                    void track('onboarding-auth-coding-plan-opened', {
+                      plan_id: plan.id,
+                      provider: plan.provider,
+                    });
+                    setSelectedCodingPlanId(plan.id);
+                  }}
                 />
               );
             })}
@@ -577,7 +730,7 @@ export function StepAuth({
               variant="ghost"
               size="xs"
               onClick={() => {
-                setMode('stagewise');
+                switchMode('stagewise');
                 setError(null);
                 setSelectedCodingPlanId(null);
               }}
@@ -636,7 +789,7 @@ export function StepAuth({
             variant="ghost"
             size="xs"
             onClick={() => {
-              setMode('api-keys');
+              switchMode('api-keys');
               setError(null);
             }}
           >
@@ -648,7 +801,7 @@ export function StepAuth({
               variant="ghost"
               size="xs"
               onClick={() => {
-                setMode('coding-plan');
+                switchMode('coding-plan');
                 setError(null);
               }}
             >
@@ -669,6 +822,7 @@ function ApiKeyRow({
   config,
   onConnect,
   onDisconnect,
+  onFocusProvider,
 }: {
   provider: ProviderKey;
   label: string;
@@ -680,6 +834,7 @@ function ApiKeyRow({
   };
   onConnect: (provider: ProviderKey, apiKey: string) => Promise<ConnectResult>;
   onDisconnect: (provider: ProviderKey) => Promise<void>;
+  onFocusProvider?: (provider: ProviderKey) => void;
 }) {
   const isConnected = !!config.encryptedApiKey && config.mode === 'official';
   const [localInput, setLocalInput] = useState('');
@@ -692,6 +847,7 @@ function ApiKeyRow({
   // otherwise each see `isConnecting === false` and double-fire the RPC.
   const connectInFlightRef = useRef(false);
   const disconnectInFlightRef = useRef(false);
+  const focusTrackedRef = useRef(false);
   useEffect(
     () => () => {
       connectInFlightRef.current = false;
@@ -779,6 +935,14 @@ function ApiKeyRow({
                   setLocalError(null);
                 }
           }
+          onFocus={(e) => {
+            if (isConnected || focusTrackedRef.current) return;
+            // Ignore programmatic focus (e.g. autoFocus on mount) so the
+            // provider-focus telemetry reflects genuine user intent only.
+            if (!e.isTrusted) return;
+            focusTrackedRef.current = true;
+            onFocusProvider?.(provider);
+          }}
           onKeyDown={(e) => {
             if (isConnected) return;
             if (e.key === 'Enter' && localInput.trim() && !isConnecting) {

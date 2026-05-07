@@ -4,13 +4,49 @@ import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { withTracing } from '@posthog/ai';
 import type { IdentifierService } from './identifier';
 import type { PreferencesService } from './preferences';
-import type {
-  TelemetryLevel,
-  ToolApprovalMode,
+import {
+  modelProviderSchema,
+  type ModelProvider,
+  type TelemetryLevel,
+  type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
+import type { CodingPlanId } from '@shared/coding-plans';
 import type { Logger } from './logger';
 import { DisposableService } from './disposable';
 import { captureProcessSnapshot } from './telemetry/process-snapshot';
+
+type OnboardingAuthMethod = 'stagewise' | 'api-keys' | 'coding-plan';
+type OnboardingAuthCompletionMethod = OnboardingAuthMethod | 'unknown';
+type OnboardingAuthFailureKind =
+  | 'validation-error'
+  | 'network-error'
+  | 'unknown-error';
+type OnboardingOtpFailureKind =
+  | 'backend-error'
+  | 'network-error'
+  | 'turnstile-not-ready';
+
+const onboardingAuthMethodSchema = z.enum([
+  'stagewise',
+  'api-keys',
+  'coding-plan',
+]);
+const codingPlanIdSchema = z.enum([
+  'glm-coding-plan',
+  'kimi-plan',
+  'qwen-plan',
+  'minimax-plan',
+]);
+const onboardingAuthFailureKindSchema = z.enum([
+  'validation-error',
+  'network-error',
+  'unknown-error',
+]);
+const onboardingOtpFailureKindSchema = z.enum([
+  'backend-error',
+  'network-error',
+  'turnstile-not-ready',
+]);
 
 export type EventProperties = {
   // Lifecycle
@@ -27,9 +63,47 @@ export type EventProperties = {
     skipped: boolean;
     suggestion_id?: string;
     telemetry_level: TelemetryLevel;
+    auth_method?: OnboardingAuthCompletionMethod;
+    provider?: ModelProvider;
+    plan_id?: CodingPlanId;
   };
   'onboarding-demo-slide-clicked': {
     slide_name: string;
+  };
+  'onboarding-auth-mode-switched': {
+    from: OnboardingAuthMethod;
+    to: OnboardingAuthMethod;
+  };
+  'onboarding-auth-providers-expanded': {
+    expanded: boolean;
+  };
+  'onboarding-auth-api-key-input-focused': {
+    provider: ModelProvider;
+  };
+  'onboarding-auth-coding-plan-opened': {
+    plan_id: CodingPlanId;
+    provider: ModelProvider;
+  };
+  'onboarding-auth-otp-requested': undefined;
+  'onboarding-auth-otp-verified': undefined;
+  'onboarding-auth-otp-failed': {
+    error_kind: OnboardingOtpFailureKind;
+  };
+  'onboarding-auth-method-completed': {
+    auth_method: OnboardingAuthMethod;
+    provider?: ModelProvider;
+    plan_id?: CodingPlanId;
+  };
+  'onboarding-auth-method-failed': {
+    auth_method: OnboardingAuthMethod;
+    provider?: ModelProvider;
+    plan_id?: CodingPlanId;
+    error_kind: OnboardingAuthFailureKind;
+  };
+  'onboarding-auth-provider-disconnected': {
+    auth_method: 'api-keys' | 'coding-plan';
+    provider: ModelProvider;
+    plan_id?: CodingPlanId;
   };
 
   // Workspace
@@ -356,6 +430,16 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'custom-provider-add-started',
   'element-selection-started',
   'element-selection-stopped',
+  'onboarding-auth-api-key-input-focused',
+  'onboarding-auth-coding-plan-opened',
+  'onboarding-auth-method-completed',
+  'onboarding-auth-method-failed',
+  'onboarding-auth-mode-switched',
+  'onboarding-auth-otp-failed',
+  'onboarding-auth-otp-requested',
+  'onboarding-auth-otp-verified',
+  'onboarding-auth-provider-disconnected',
+  'onboarding-auth-providers-expanded',
   'onboarding-demo-slide-clicked',
   'settings-opened',
   'suggestion-clicked',
@@ -406,6 +490,41 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'element-selection-started': z.undefined().optional(),
   'element-selection-stopped': z.object({
     element_selected: z.boolean(),
+  }),
+  'onboarding-auth-api-key-input-focused': z.object({
+    provider: modelProviderSchema,
+  }),
+  'onboarding-auth-coding-plan-opened': z.object({
+    plan_id: codingPlanIdSchema,
+    provider: modelProviderSchema,
+  }),
+  'onboarding-auth-method-completed': z.object({
+    auth_method: onboardingAuthMethodSchema,
+    provider: modelProviderSchema.optional(),
+    plan_id: codingPlanIdSchema.optional(),
+  }),
+  'onboarding-auth-method-failed': z.object({
+    auth_method: onboardingAuthMethodSchema,
+    provider: modelProviderSchema.optional(),
+    plan_id: codingPlanIdSchema.optional(),
+    error_kind: onboardingAuthFailureKindSchema,
+  }),
+  'onboarding-auth-mode-switched': z.object({
+    from: onboardingAuthMethodSchema,
+    to: onboardingAuthMethodSchema,
+  }),
+  'onboarding-auth-otp-failed': z.object({
+    error_kind: onboardingOtpFailureKindSchema,
+  }),
+  'onboarding-auth-otp-requested': z.undefined().optional(),
+  'onboarding-auth-otp-verified': z.undefined().optional(),
+  'onboarding-auth-provider-disconnected': z.object({
+    auth_method: z.enum(['api-keys', 'coding-plan']),
+    provider: modelProviderSchema,
+    plan_id: codingPlanIdSchema.optional(),
+  }),
+  'onboarding-auth-providers-expanded': z.object({
+    expanded: z.boolean(),
   }),
   'onboarding-demo-slide-clicked': z.object({
     slide_name: z.string(),
