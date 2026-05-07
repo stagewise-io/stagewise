@@ -459,8 +459,17 @@ export class ShellService extends DisposableService {
   }
 
   protected onTeardown(): Promise<void> | void {
+    // Capture count BEFORE killAll() so the log reflects how many PTYs
+    // we actually had to tear down on shutdown. This is the signal we
+    // need in crash reports to know the teardown path ran — absence of
+    // this log line on a crash means the shutdown handler itself never
+    // fired, not that the fix was insufficient.
+    const killedCount = this.sessionManager?.getSessionCount() ?? 0;
     this.sessionManager?.killAll();
     this.sessionManager = null;
+    this.logger.debug(
+      `[ShellService] Teardown complete (killed ${killedCount} PTY session(s))`,
+    );
 
     for (const timer of this.outputFlushTimers.values()) clearTimeout(timer);
 

@@ -2274,7 +2274,7 @@ export class ToolboxService extends DisposableService {
     }
   }
 
-  protected onTeardown(): Promise<void> | void {
+  protected async onTeardown(): Promise<void> {
     this.unsubPreferenceSync?.();
     this.unsubPreferenceSync = null;
 
@@ -2284,16 +2284,22 @@ export class ToolboxService extends DisposableService {
     this.stopLogsWatcher();
     this.stopGlobalSkillsWatchers();
 
-    void this.logIngestService?.teardown();
+    await this.logIngestService?.teardown();
     this.logIngestService = null;
 
-    void this.mountManagerService?.teardown();
+    await this.mountManagerService?.teardown();
     this.mountManagerService = null;
 
-    void this.sandboxService?.teardown();
+    await this.sandboxService?.teardown();
     this.sandboxService = null;
 
-    void this.shellService?.teardown();
+    // Shell teardown last — kills all live PTY processes synchronously.
+    // Ordering matters: downstream services may still hold references to
+    // the shell during their own teardown, but none of the services
+    // above use the shell, so tearing it down last is safe and keeps the
+    // PTY kill as close to `app.exit(0)` as possible, minimizing the
+    // window between kill and Node env teardown.
+    await this.shellService?.teardown();
     this.shellService = null;
   }
 }
