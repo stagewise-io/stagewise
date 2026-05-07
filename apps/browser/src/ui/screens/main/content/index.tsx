@@ -70,7 +70,8 @@ function AudioMuteButton({ tab }: { tab: TabState }) {
 // ---------------------------------------------------------------------------
 
 export function MainSection() {
-  const _isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
+  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
@@ -262,12 +263,16 @@ export function MainSection() {
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 flex-row items-start bg-background">
+        <div className="flex shrink-0 flex-row items-stretch bg-background">
           <SortableTabs
             value={activeTabId ?? ''}
             onValueChange={(id) => {
               if (id) void switchTab(id);
             }}
+            // Override default `w-full` so the tab list shrinks to content
+            // width, leaving the trailing draggable strip room to grow into
+            // the empty space.
+            className="w-auto min-w-0 shrink"
           >
             <SortableTabsList
               variant="bar"
@@ -277,6 +282,11 @@ export function MainSection() {
               onAddItem={handleCreateTab}
             />
           </SortableTabs>
+          {/* Trailing drag strip for macOS hidden-titlebar windows — fills
+              the empty row space so users can drag the window. */}
+          {isMacOs && !isFullScreen && (
+            <div className="app-drag h-8 grow" aria-hidden="true" />
+          )}
         </div>
         {/* Content area with per-tab UI */}
         <div className="relative flex size-full flex-col">
