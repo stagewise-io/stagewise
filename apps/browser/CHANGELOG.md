@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0-alpha085 (2026-05-07)
+
+### Bug Fixes
+
+* add app-drag to tabs containerQ (ba841ab)
+* fix delete-popover location (061f1b4)
+* fix app-crash on quit (c9f61fe)
+* fix diff-history hunks for empty files (7ebba5d)
+* fix diff-history hunks for empty files (af282ca)
+* reduce chat-input padding (20a6117)
+
+### Other Changes
+
+* enrich telemetry in onboarding (ded33e9)
+
 ## 1.0.0-alpha084 (2026-05-07)
 
 ### Features
