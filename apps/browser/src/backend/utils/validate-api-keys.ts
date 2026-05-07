@@ -67,7 +67,7 @@ const providerConfigs: Record<
     createOpenAI({
       apiKey,
       baseURL: baseURL ?? 'https://api.minimax.io/v1',
-    }).chat('MiniMax-M2'),
+    }).chat('minimax-m2.7'),
 };
 
 /**

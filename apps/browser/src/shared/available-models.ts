@@ -957,6 +957,44 @@ export const availableModels = [
   },
   {
     officialProvider: 'minimax',
+    modelId: 'minimax-m2.7',
+    modelDisplayName: 'MiniMax M2.7',
+    modelDescription:
+      'Next-gen MiniMax model with enhanced agentic and multi-agent capabilities.',
+    modelContext: '200k context',
+    modelContextRaw: 204_800,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.3,
+      outputPerMillion: 1.2,
+      relativeMultiplier: 0.25,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'minimax',
     modelId: 'MiniMax-M2',
     modelDisplayName: 'MiniMax M2',
     modelDescription:
@@ -971,9 +1009,9 @@ export const availableModels = [
     },
     thinkingEnabled: true,
     pricing: {
-      inputPerMillion: 1.2,
-      outputPerMillion: 8.0,
-      relativeMultiplier: 1,
+      inputPerMillion: 0.255,
+      outputPerMillion: 1.0,
+      relativeMultiplier: 0.25,
     },
     capabilities: {
       inputModalities: {
