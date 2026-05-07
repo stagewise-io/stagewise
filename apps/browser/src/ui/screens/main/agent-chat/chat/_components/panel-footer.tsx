@@ -853,14 +853,20 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   );
 
   /**
-   * Handle files pasted into the editor
+   * Handle files pasted into the editor.
+   *
+   * `insertPos` is captured synchronously inside the TipTap paste handler
+   * (before any async blob-store work) so the resulting badge is inserted
+   * at the caret position rather than wherever the selection happens to be
+   * when the IPC roundtrip resolves. Do NOT add a `focus('end')` call here:
+   * the editor already holds focus during paste, and `focus('end')` would
+   * reset the caret and undo this fix.
    */
   const handlePasteFiles = useCallback(
-    (files: File[]) => {
+    (files: File[], insertPos?: number) => {
       files.forEach((file) => {
-        addFileAttachment(file);
+        addFileAttachment(file, insertPos);
       });
-      chatInputRef.current?.focus();
     },
     [addFileAttachment],
   );

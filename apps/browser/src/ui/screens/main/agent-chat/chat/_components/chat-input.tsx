@@ -88,7 +88,7 @@ export interface ChatInputProps {
   onEscape?: () => void;
 
   // File paste handling
-  onPasteFiles?: (files: File[]) => void;
+  onPasteFiles?: (files: File[], insertPos?: number) => void;
 
   // Attachment removal callback (when badges are deleted from editor)
   onAttachmentRemoved?: (
@@ -113,7 +113,7 @@ export interface ChatInputHandle {
   focus: () => void;
   blur: () => void;
   /** Insert an attachment mention at the current cursor position */
-  insertAttachment: (attrs: AttachmentAttributes) => void;
+  insertAttachment: (attrs: AttachmentAttributes, position?: number) => void;
   getTextContent: () => string;
   /** Get the current TipTap JSON content as a string */
   getJsonContent: () => string;
@@ -275,9 +275,14 @@ export const ChatInput = memo(function ChatInput({
         }
         return false;
       },
-      handlePaste: (_view, event) => {
+      handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (!items || !onPasteFiles) return false;
+
+        // Snapshot the caret position synchronously here — the subsequent
+        // `addFileAttachment` flow awaits an IPC roundtrip to the blob store
+        // before inserting the badge, during which the selection may move.
+        const insertPos = view.state.selection.from;
 
         const files: File[] = [];
         for (let i = 0; i < items.length; i++) {
@@ -290,7 +295,7 @@ export const ChatInput = memo(function ChatInput({
 
         if (files.length > 0) {
           event.preventDefault();
-          onPasteFiles(files);
+          onPasteFiles(files, insertPos);
           return true;
         }
 
@@ -315,7 +320,7 @@ export const ChatInput = memo(function ChatInput({
           const file = new File([blob], fileName, {
             type: 'text/x-textclip',
           });
-          onPasteFiles([file]);
+          onPasteFiles([file], insertPos);
           return true;
         }
 
@@ -468,11 +473,11 @@ export const ChatInput = memo(function ChatInput({
     blur: () => {
       editor?.commands.blur();
     },
-    insertAttachment: (attrs: AttachmentAttributes) => {
+    insertAttachment: (attrs: AttachmentAttributes, position?: number) => {
       if (editor) {
         // Mark as internal change so valueEffect doesn't reset content
         isInternalChangeRef.current = true;
-        editor.commands.insertAttachment(attrs);
+        editor.commands.insertAttachment(attrs, position);
       }
     },
     getTextContent: () => {
