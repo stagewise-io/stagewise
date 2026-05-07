@@ -222,7 +222,7 @@ export class WindowLayoutService extends DisposableService {
       x: this.lastNonMaximizedBounds.x,
       y: this.lastNonMaximizedBounds.y,
       title: __APP_NAME__,
-      titleBarStyle: 'hidden',
+      titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'hiddenInset',
       show: false, // Don't show until UI is ready to prevent visual glitches
       // fullscreenable: false,
       ...(process.platform === 'linux'
