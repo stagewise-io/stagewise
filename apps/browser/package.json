@@ -115,7 +115,7 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.6.0",
-    "@vueless/storybook-dark-mode": "^10.0.3",
+    "@vueless/storybook-dark-mode": "^10.0.8",
     "ai": "6.0.116",
     "better-auth": "^1.5.3",
     "bowser": "^2.11.0",
