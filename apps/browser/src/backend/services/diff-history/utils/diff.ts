@@ -550,14 +550,49 @@ export function createFileDiffsFromGenerations(
       contributors: [...(hunkContributorSets.get(h.id) ?? [])],
     }));
 
+    // Step 7a: Synthesize an empty-transition hunk for state changes that
+    // produce no structural hunks (e.g. empty file creation null -> "", or
+    // deletion of an empty file "" -> null). Without this, the UI has no
+    // hunk id to pass to accept/reject and the file stays pending forever.
+    //
+    // The condition mirrors the UI's `hasRealChanges` predicate: we treat a
+    // diff as requiring a synthetic hunk whenever either the text differs or
+    // the snapshot OIDs differ. Under the content-addressable OID contract
+    // these are equivalent, but keeping both arms guards against future
+    // cases where OIDs carry metadata beyond text (encoding, BOM, etc.) and
+    // keeps backend/UI predicates structurally aligned.
+    const baselineOid = startsWithBaseline ? firstOp.snapshot_oid : null;
+    const currentOid = lastOp.snapshot_oid;
+    if (
+      hunks.length === 0 &&
+      (baseline !== current || baselineOid !== currentOid)
+    ) {
+      hunks.push({
+        oldStart: 0,
+        oldLines: 0,
+        newStart: 0,
+        newLines: 0,
+        lines: [],
+        id: generateDeterministicHunkId(
+          path,
+          0,
+          0,
+          0,
+          0,
+          `empty-transition:${baselineOid ?? 'null'}:${currentOid ?? 'null'}`,
+        ),
+        contributors: [lastOp.contributor],
+      });
+    }
+
     result.push({
       fileId,
       path,
       isExternal: false,
       baseline,
       current,
-      baselineOid: startsWithBaseline ? firstOp.snapshot_oid : null,
-      currentOid: lastOp.snapshot_oid,
+      baselineOid,
+      currentOid,
       lineChanges,
       hunks,
     });
@@ -644,6 +679,17 @@ export function acceptAndRejectHunks(
     // Skip if no hunks to process for this FileDiff
     if (hunksToAccept.length === 0 && hunksToReject.length === 0) continue;
 
+    // Synthetic empty-transition hunks (oldLines=0 && newLines=0 && lines=[])
+    // cannot be processed via applyPatch. They represent a whole-state
+    // transition (e.g. null -> "" empty file creation) and must promote/revert
+    // baseline/current directly. Split them out from the real hunk set.
+    const isEmptyTransitionHunk = (h: BlamedHunk) =>
+      h.oldLines === 0 && h.newLines === 0 && h.lines.length === 0;
+    const syntheticAccepts = hunksToAccept.filter(isEmptyTransitionHunk);
+    const syntheticRejects = hunksToReject.filter(isEmptyTransitionHunk);
+    const realAccepts = hunksToAccept.filter((h) => !isEmptyTransitionHunk(h));
+    const realRejects = hunksToReject.filter((h) => !isEmptyTransitionHunk(h));
+
     // Get working copies of baseline/current (convert null to '' for diffing)
     const diffBaseline = textFileDiff.baseline ?? '';
     const diffCurrent = textFileDiff.current ?? '';
@@ -654,8 +700,21 @@ export function acceptAndRejectHunks(
     let baselineChanged = false;
     let currentChanged = false;
 
+    // Apply synthetic empty-transition accepts/rejects first. Accept promotes
+    // baseline wholesale to the current state; reject reverts current to the
+    // baseline state. These bypass applyPatch because there is nothing to
+    // patch structurally.
+    if (syntheticAccepts.length > 0) {
+      workingBaseline = textFileDiff.current;
+      baselineChanged = true;
+    }
+    if (syntheticRejects.length > 0) {
+      workingCurrent = textFileDiff.baseline;
+      currentChanged = true;
+    }
+
     // Apply accepts (batch with fallback)
-    if (hunksToAccept.length > 0) {
+    if (realAccepts.length > 0) {
       // Build patch structure for accepted hunks
       const basePatch = structuredPatch(
         '',
@@ -665,7 +724,7 @@ export function acceptAndRejectHunks(
         '',
         '',
       );
-      const acceptPatch = { ...basePatch, hunks: hunksToAccept };
+      const acceptPatch = { ...basePatch, hunks: realAccepts };
       const patchString = formatPatch(acceptPatch);
 
       // Try batch apply first
@@ -678,7 +737,7 @@ export function acceptAndRejectHunks(
       } else {
         // Fallback: apply one-by-one to identify failures
         let currentWorkingBaseline = workingBaselineStr;
-        for (const hunk of hunksToAccept) {
+        for (const hunk of realAccepts) {
           const singlePatch = { ...basePatch, hunks: [hunk] };
           const singlePatchString = formatPatch(singlePatch);
           const singleResult = applyPatch(
@@ -696,7 +755,7 @@ export function acceptAndRejectHunks(
     }
 
     // Apply rejects (batch with fallback)
-    if (hunksToReject.length > 0) {
+    if (realRejects.length > 0) {
       // Build reversed patch structure for rejected hunks
       const basePatch = structuredPatch(
         '',
@@ -706,7 +765,7 @@ export function acceptAndRejectHunks(
         '',
         '',
       );
-      const rejectPatch = { ...basePatch, hunks: hunksToReject };
+      const rejectPatch = { ...basePatch, hunks: realRejects };
       const reversedPatch = reversePatch(rejectPatch);
       const patchString = formatPatch(reversedPatch);
 
@@ -720,7 +779,7 @@ export function acceptAndRejectHunks(
       } else {
         // Fallback: apply one-by-one to identify failures
         let currentWorkingCurrent = workingCurrentStr;
-        for (const hunk of hunksToReject) {
+        for (const hunk of realRejects) {
           const singlePatch = { ...basePatch, hunks: [hunk] };
           const reversedSingle = reversePatch(singlePatch);
           const singlePatchString = formatPatch(reversedSingle);
@@ -796,6 +855,14 @@ export function createFileDiffSnapshot(diff: FileDiff): FileDiffSnapshot {
     ),
   ];
 
+  // Fallback for empty-transition hunks (null <-> ""): lineChanges is empty
+  // because diffLines produces no add/remove entries, so the hunk itself
+  // carries the blame. Union hunk contributors to preserve the fingerprint.
+  const contributors =
+    uniqueContributors.length === 0
+      ? [...new Set(diff.hunks.flatMap((h) => h.contributors))]
+      : uniqueContributors;
+
   return {
     path: diff.path,
     fileId: diff.fileId,
@@ -803,7 +870,7 @@ export function createFileDiffSnapshot(diff: FileDiff): FileDiffSnapshot {
     baselineOid: diff.baselineOid,
     currentOid: diff.currentOid,
     hunkIds: diff.hunks.map((h) => h.id),
-    contributors: uniqueContributors,
+    contributors,
   };
 }
 

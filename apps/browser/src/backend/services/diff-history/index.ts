@@ -1658,7 +1658,4 @@ export class DiffHistoryService extends DisposableService {
   private logDebug(debug: string) {
     this.logger.debug(`[DiffHistory] ${debug}`);
   }
-  private logInfo(info: string) {
-    this.logger.info(`[DiffHistory] ${info}`);
-  }
 }

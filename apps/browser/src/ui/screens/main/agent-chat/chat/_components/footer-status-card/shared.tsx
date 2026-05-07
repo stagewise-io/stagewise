@@ -43,7 +43,11 @@ export function getLineStats(diff: FormattedFileDiff): {
 /** Check if diff represents a real change (not a noop) */
 export function hasRealChanges(diff: FormattedFileDiff): boolean {
   if (diff.isExternal) return diff.baselineOid !== diff.currentOid;
-  return diff.lineChanges.some((c) => c.added || c.removed);
+  // Line changes alone miss empty-file transitions (null -> "" / "" -> null)
+  // where diffLines produces no add/remove entries. Fall back to the oid
+  // transition, which matches the backend's synthetic-hunk criterion.
+  if (diff.lineChanges.some((c) => c.added || c.removed)) return true;
+  return diff.baselineOid !== diff.currentOid;
 }
 
 /** Get hunk IDs for accept/reject operations */
