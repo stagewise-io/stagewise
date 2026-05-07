@@ -827,6 +827,11 @@ export class AgentManagerService extends DisposableService {
       }
     }
 
+    await this.toolbox.restoreAssociatedBrowserTabsFromPersistence(
+      instanceId,
+      agent.associatedBrowserTabs,
+    );
+
     this.telemetryService.capture('agent-resumed', {
       agent_type: agent.type,
       agent_instance_id: instanceId,
@@ -854,6 +859,8 @@ export class AgentManagerService extends DisposableService {
 
     const mountedWorkspaces =
       this.toolbox.getWorkspaceSnapshotForPersistence(instanceId);
+    const associatedBrowserTabs =
+      this.toolbox.getAssociatedBrowserTabsForPersistence(instanceId);
 
     await this.agentPersistenceDB?.storeAgentInstance(
       {
@@ -871,6 +878,7 @@ export class AgentManagerService extends DisposableService {
         inputState: agentState.inputState,
         usedTokens: agentState.usedTokens,
         mountedWorkspaces,
+        associatedBrowserTabs,
       },
       agentState.history,
       dirtyMessageIndices,
@@ -931,6 +939,15 @@ export class AgentManagerService extends DisposableService {
 
     if (!agent) {
       return;
+    }
+
+    try {
+      await this.persistAgentState(instanceId);
+    } catch (error) {
+      this.logger.error(
+        `[AgentManager] Failed to persist agent ${instanceId} before archive`,
+        error,
+      );
     }
 
     await agent.stop();

@@ -91,6 +91,14 @@ const _sqliteJson = customType<{ data: unknown; driverData: string }>({
 
 export const meta = metaTable;
 
+export type PersistedBrowserTabs = {
+  version: 1;
+  tabs: Array<{
+    url: string;
+    active: boolean;
+  }>;
+};
+
 export const agentInstances = sqliteTable(
   'agentInstances',
   {
@@ -117,6 +125,9 @@ export const agentInstances = sqliteTable(
       _sqliteJson('mounted_workspaces').$type<
         Array<{ path: string; permissions: MountPermission[] }>
       >(),
+    associatedBrowserTabs: _sqliteJson(
+      'associated_browser_tabs',
+    ).$type<PersistedBrowserTabs>(),
     toolApprovalMode: toolApprovalMode('tool_approval_mode')
       .notNull()
       .$defaultFn(() => DEFAULT_TOOL_APPROVAL_MODE),

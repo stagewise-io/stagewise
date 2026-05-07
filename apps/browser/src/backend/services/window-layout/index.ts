@@ -43,6 +43,7 @@ import {
 import { writeBlob } from '@/utils/attachment-blobs';
 import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
 import sharp from 'sharp';
+import type { PersistedBrowserTabs } from '@/services/agent-manager/persistence/schema';
 
 const windowStateSchema = z.object({
   width: z.number(),
@@ -872,6 +873,55 @@ export class WindowLayoutService extends DisposableService {
     return this.activeTab;
   }
 
+  public async restoreAssociatedTabsForAgent(
+    agentInstanceId: string,
+    persistedTabs: PersistedBrowserTabs | null | undefined,
+  ): Promise<void> {
+    if (!persistedTabs || persistedTabs.version !== 1) return;
+
+    const existingTabIds = Object.values(this.uiKarton.state.browser.tabs)
+      .filter((tab) => tab.associatedAgentInstanceId === agentInstanceId)
+      .map((tab) => tab.id);
+    if (existingTabIds.length > 0) return;
+
+    const tabsToRestore = persistedTabs.tabs
+      .filter((tab) => tab.url.length > 0)
+      .slice(0, 50);
+    if (tabsToRestore.length === 0) return;
+
+    let activeTabId: string | null = null;
+    const now = Date.now();
+
+    for (const [index, tab] of tabsToRestore.entries()) {
+      const restoredTabId = await this.createTab(
+        tab.url,
+        false,
+        undefined,
+        agentInstanceId,
+      );
+      if (tab.active || activeTabId === null) {
+        activeTabId = restoredTabId;
+      }
+
+      this.uiKarton.setState((draft) => {
+        const restoredTab = draft.browser.tabs[restoredTabId];
+        if (restoredTab) {
+          restoredTab.lastFocusedAt = tab.active
+            ? now + tabsToRestore.length
+            : now + index;
+        }
+      });
+    }
+
+    if (
+      activeTabId &&
+      this.activeBrowserAgentId === agentInstanceId &&
+      this.isTabVisibleForActiveAgent(activeTabId)
+    ) {
+      await this.handleSwitchTab(activeTabId);
+    }
+  }
+
   private handleSetActiveAgent = async (agentId: string | null) => {
     if (agentId === this.activeBrowserAgentId) return;
 
@@ -953,14 +1003,18 @@ export class WindowLayoutService extends DisposableService {
     url: string | undefined,
     setActive: boolean,
     sourceTabId?: string,
+    associatedAgentInstanceIdOverride?: string | null,
   ): Promise<string> {
     const id = generateTabId();
     const sourceTabState = sourceTabId
       ? this.uiKarton.state.browser.tabs[sourceTabId]
       : undefined;
-    const associatedAgentInstanceId = sourceTabState
-      ? (sourceTabState.associatedAgentInstanceId ?? null)
-      : this.activeBrowserAgentId;
+    const associatedAgentInstanceId =
+      associatedAgentInstanceIdOverride !== undefined
+        ? associatedAgentInstanceIdOverride
+        : sourceTabState
+          ? (sourceTabState.associatedAgentInstanceId ?? null)
+          : this.activeBrowserAgentId;
 
     // Create search utilities config that reads from current Karton state and preferences
     const searchUtilsConfig: SearchUtilsConfig = {

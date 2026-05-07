@@ -7,6 +7,7 @@ import { up as v006Up } from './v006-rename-readfile-to-read';
 import { up as v007Up } from './v007-normalize-history';
 import { up as v008Up } from './v008-add-title-locked-by-user';
 import { up as v009Up } from './v009-add-tool-approval-mode';
+import { up as v010Up } from './v010-add-associated-browser-tabs';
 
 const registry: MigrationScript[] = [
   { version: 2, name: 'add-mounted-workspaces', up: v002Up },
@@ -17,7 +18,8 @@ const registry: MigrationScript[] = [
   { version: 7, name: 'normalize-history', up: v007Up },
   { version: 8, name: 'add-title-locked-by-user', up: v008Up },
   { version: 9, name: 'add-tool-approval-mode', up: v009Up },
+  { version: 10, name: 'add-associated-browser-tabs', up: v010Up },
 ];
-const schemaVersion = 9;
+const schemaVersion = 10;
 
 export { registry, schemaVersion };

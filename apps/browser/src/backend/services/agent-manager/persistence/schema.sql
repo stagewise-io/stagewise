@@ -1,4 +1,4 @@
--- VERSION: 9
+-- VERSION: 10
 
 CREATE TABLE IF NOT EXISTS meta(
   key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY,
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS agentInstances(
   input_state TEXT NOT NULL,
   used_tokens INTEGER NOT NULL,
   mounted_workspaces TEXT,
+  associated_browser_tabs TEXT,
   tool_approval_mode TEXT NOT NULL DEFAULT 'alwaysAsk'
 );
 

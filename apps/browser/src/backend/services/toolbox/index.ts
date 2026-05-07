@@ -100,6 +100,7 @@ import {
   type QuestionAnswerValue,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { BrowserSnapshot, WorkspaceSnapshot } from './types';
+import type { PersistedBrowserTabs } from '@/services/agent-manager/persistence/schema';
 import type {
   EnvironmentSnapshot,
   MountPermission,
@@ -1243,6 +1244,30 @@ export class ToolboxService extends DisposableService {
       tabs: allTabs,
       totalTabCount: Object.keys(browserTabs).length,
     };
+  }
+
+  public getAssociatedBrowserTabsForPersistence(
+    agentInstanceId: string,
+  ): PersistedBrowserTabs | null {
+    const tabs = Object.values(this.uiKarton.state.browser.tabs)
+      .filter((tab) => tab.associatedAgentInstanceId === agentInstanceId)
+      .slice(0, 50)
+      .map((tab) => ({
+        url: tab.url.slice(0, 4096),
+        active: tab.id === this.uiKarton.state.browser.activeTabId,
+      }));
+
+    return tabs.length > 0 ? { version: 1, tabs } : null;
+  }
+
+  public async restoreAssociatedBrowserTabsFromPersistence(
+    agentInstanceId: string,
+    persistedTabs: PersistedBrowserTabs | null | undefined,
+  ): Promise<void> {
+    await this.windowLayoutService.restoreAssociatedTabsForAgent(
+      agentInstanceId,
+      persistedTabs,
+    );
   }
 
   public async captureEnvironmentSnapshot(
