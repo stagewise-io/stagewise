@@ -1,7 +1,7 @@
 import { Menu as MenuBase } from '@base-ui/react/menu';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import {
   IconBoxArchiveOutline18,
@@ -96,8 +96,10 @@ export interface SharedAgentContextMenuHostProps {
   onClose: () => void;
   /** Archive an active agent (only shown when `target.isActive` is true). */
   onArchive: (id: string) => void;
-  /** User picked "Permanently delete" — caller is expected to show a confirm dialog. */
-  onDeleteRequest: (id: string) => void;
+  /** User picked "Permanently delete" — caller is expected to show a confirm dialog.
+   * Cursor coordinates are forwarded so the confirm popover can anchor
+   * right above the click position. */
+  onDeleteRequest: (id: string, x: number, y: number) => void;
 }
 
 export const SharedAgentContextMenuHost = memo(
@@ -109,6 +111,16 @@ export const SharedAgentContextMenuHost = memo(
   }: SharedAgentContextMenuHostProps) {
     const revealWorkingDirectory = useKartonProcedure(
       (p) => p.agents.revealWorkingDirectory,
+    );
+
+    // Keep the menu clear of the macOS traffic-light overlay (hidden
+    // titlebar). Matches the `h-8` (32px) titlebar placeholder plus a
+    // small visual margin; same padding used by DeleteConfirmPopover.
+    const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
+    const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
+    const collisionPadding = useMemo(
+      () => (isMacOs && !isFullScreen ? { top: 40 } : undefined),
+      [isMacOs, isFullScreen],
     );
 
     const popupRef = useRef<HTMLDivElement>(null);
@@ -168,6 +180,7 @@ export const SharedAgentContextMenuHost = memo(
             align="start"
             side="bottom"
             sideOffset={4}
+            collisionPadding={collisionPadding}
             className="z-50"
           >
             <MenuBase.Popup
@@ -203,7 +216,7 @@ export const SharedAgentContextMenuHost = memo(
               </AgentMenuItem>
               <AgentMenuItem
                 onClick={() => {
-                  onDeleteRequest(agentId);
+                  onDeleteRequest(agentId, anchorX, anchorY);
                   onClose();
                 }}
               >

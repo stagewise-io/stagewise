@@ -862,18 +862,25 @@ export function AgentsSelector() {
   // menu closing and the combobox closing — the menu's dismissal would
   // otherwise propagate to the combobox and reset the row-local
   // `pendingDeleteId` before the popover ever mounts.
-  const [ctxDeleteId, setCtxDeleteId] = useState<string | null>(null);
-  const handleCtxDeleteRequest = useCallback((id: string) => {
-    setCtxDeleteId(id);
-  }, []);
+  const [ctxDelete, setCtxDelete] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const handleCtxDeleteRequest = useCallback(
+    (id: string, x: number, y: number) => {
+      setCtxDelete({ id, x, y });
+    },
+    [],
+  );
   const handleCtxDeleteCancel = useCallback(() => {
-    setCtxDeleteId(null);
+    setCtxDelete(null);
   }, []);
   const handleCtxDeleteConfirm = useCallback(() => {
-    const id = ctxDeleteId;
-    setCtxDeleteId(null);
+    const id = ctxDelete?.id;
+    setCtxDelete(null);
     if (id) handleDeleteAgent(id);
-  }, [ctxDeleteId, handleDeleteAgent]);
+  }, [ctxDelete, handleDeleteAgent]);
 
   // Filter groups by search input — skip entirely when closed
   const filteredGroups = useMemo(() => {
@@ -1210,8 +1217,9 @@ export function AgentsSelector() {
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover
-        open={ctxDeleteId !== null}
+        open={ctxDelete !== null}
         isolated
+        anchorPoint={ctxDelete ? { x: ctxDelete.x, y: ctxDelete.y } : undefined}
         onOpenChange={(open) => {
           if (!open) handleCtxDeleteCancel();
         }}
