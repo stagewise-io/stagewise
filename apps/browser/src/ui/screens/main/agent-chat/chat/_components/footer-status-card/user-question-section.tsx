@@ -425,9 +425,7 @@ function FieldRenderer({
         >
           <span className="font-medium text-foreground text-xs">
             <InlineMarkdown>{field.label}</InlineMarkdown>
-            {field.required && (
-              <span className="text-destructive-solid"> *</span>
-            )}
+            {field.required && <span className="text-error-solid"> *</span>}
           </span>
           {field.description && (
             <span className="text-2xs text-muted-foreground">
@@ -507,9 +505,7 @@ function FieldRenderer({
         >
           <span className="font-medium text-foreground text-xs">
             <InlineMarkdown>{field.label}</InlineMarkdown>
-            {field.required && (
-              <span className="text-destructive-solid"> *</span>
-            )}
+            {field.required && <span className="text-error-solid"> *</span>}
           </span>
           {field.description && (
             <span className="text-2xs text-muted-foreground">
@@ -643,9 +639,7 @@ function FieldRenderer({
         >
           <span className="font-medium text-foreground text-xs">
             <InlineMarkdown>{field.label}</InlineMarkdown>
-            {field.required && (
-              <span className="text-destructive-solid"> *</span>
-            )}
+            {field.required && <span className="text-error-solid"> *</span>}
           </span>
           {field.description && (
             <span className="text-2xs text-muted-foreground">
