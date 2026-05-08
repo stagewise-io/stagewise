@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha087 (2026-05-08)
+
+### Features
+
+* allow collapsing of sidebar (2f5acad)
+
 ## 1.0.0-alpha086 (2026-05-07)
 
 ### Bug Fixes
