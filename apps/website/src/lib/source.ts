@@ -35,9 +35,11 @@ function loadNewsPost(filename: string): NewsPost {
   const raw = fs.readFileSync(filepath, 'utf-8');
   const { data, content } = matter(raw);
 
-  // Strip leading "NNN-" numeric prefix to get the slug, e.g.
-  // "001-the-coding-agent-built-for-the-web.mdx" â "the-coding-agent-built-for-the-web"
-  const slug = filename.replace(/\.mdx?$/, '').replace(/^\d+-/, '');
+  // Strip leading "yy-mm-dd-" date prefix to get the public slug, e.g.
+  // "26-04-08-the-coding-agent-built-for-the-web.mdx" → "the-coding-agent-built-for-the-web"
+  const slug = filename
+    .replace(/\.mdx?$/, '')
+    .replace(/^\d{2}-\d{2}-\d{2}-/, '');
 
   return {
     slug,
@@ -70,7 +72,7 @@ export function getNewsPost(slug: string): NewsPost | null {
     .readdirSync(dir)
     .filter((f) => f.endsWith('.mdx') || f.endsWith('.md'));
   const filename = files.find(
-    (f) => f.replace(/\.mdx?$/, '').replace(/^\d+-/, '') === slug,
+    (f) => f.replace(/\.mdx?$/, '').replace(/^\d{2}-\d{2}-\d{2}-/, '') === slug,
   );
   if (!filename) return null;
   return loadNewsPost(filename);

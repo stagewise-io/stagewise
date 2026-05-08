@@ -1,0 +1,84 @@
+---
+title: "We're Becoming the Open Source Agentic IDE"
+author: stagewise team
+type: announcements
+description: "We started by making web development better with AI. Here's what we learned — and how it's shaping the next evolution of stagewise."
+date: 2026-05-08
+---
+
+## The next step for stagewise
+
+stagewise started with a focused idea: make web development with AI feel much closer to the actual work.
+
+The old workflow had too much translation in it. You saw something in the browser, described it to an agent in another tool, waited for a change, then went back to the browser to check whether the agent understood the problem. A lot of time was lost between seeing the issue and fixing it.
+
+We built stagewise around that loop. The browser, the running app, the console, the debugger, the DOM, the codebase, and the agent all belonged in the same workspace. That made web development faster because the agent could work from the same context as the developer.
+
+That approach shaped a lot of what stagewise is today. It also taught us where the product has to go next.
+
+## What changed
+
+The capabilities of coding agents have expanded quickly.
+
+A year ago, many agent workflows still worked best when the problem was narrow and the environment was tightly scoped. That made specialization extremely valuable. If the task was frontend work, giving the agent deep browser context and a direct path into the codebase made a huge difference.
+
+That is still true. The difference is that models are now much more capable across the rest of the stack as well. They can reason about larger codebases, follow architectural constraints, work across many files, and stay useful through longer tasks.
+
+As that happened, a narrow product boundary started to feel less natural. Developers were using stagewise for the parts of the workflow where browser context mattered most, then moving elsewhere for backend changes, infrastructure work, refactors, planning, or repository-wide implementation.
+
+The browser-native workflow solved one form of context switching. The broader toolchain still created another one.
+
+That became the important lesson for us: once agents become capable across more of the development process, the environment around them has to expand too.
+
+## Becoming the open source agentic IDE
+
+stagewise is evolving into the **open source agentic IDE**.
+
+The web development capabilities stay at the center of the product. The browser, live page context, console access, debugger access, DOM inspection, element selection, temporary changes, and codebase integration all remain core to stagewise.
+
+The product is now growing around those capabilities. The agent should be able to move from a visual issue in the browser to the component that caused it, then continue into the API, data model, build setup, documentation, tests, or deployment path when the task requires it.
+
+That is the direction we are building toward: an agent-first development environment where web context is a major advantage, while the agent can still operate across the full codebase and the full development workflow.
+
+This is a natural continuation of what made stagewise useful in the first place. The goal is still to reduce the distance between intent and implementation. The surface area is larger now because agents can handle more of the work.
+
+## A more open approach
+
+We are also moving stagewise further in the direction of openness.
+
+Developers should be able to choose the models they trust for the work they are doing. The strongest model for planning may differ from the strongest model for fast edits, long-context analysis, visual reasoning, or cost-efficient routine work. That changes often, and the IDE should adapt with it.
+
+stagewise already supports bring-your-own-key and custom providers. We are extending that approach with easier access to existing coding subscriptions and model providers, including Kimi, Qwen, GLM, MiniMax, and others.
+
+For users, the idea is simple: if you already pay for capable models somewhere else, you should be able to use that access inside stagewise.
+
+The next step is opening the environment to more coding agents as well. We want stagewise to become a place where capable agents can work with the right context, the right tools, and a clear interface for developers to supervise and guide them.
+
+Our own agent remains a major investment, but the environment should become more open over time.
+
+## Investing in the agent
+
+At the same time, we are investing heavily in the stagewise agent itself.
+
+The next generation of coding agents will need more than stronger tool calls. They need to become easier to work with over time, and they need to work together more effectively. That means better memory, better planning, better use of context, clearer coordination between agents, and better judgment about when to act and when to ask.
+
+A few areas matter especially to us:
+
+- **Learning** — capturing useful guidance from real work and turning it into reusable knowledge
+- **Memory** — helping the agent understand a project across sessions instead of starting from scratch every time
+- **Efficiency** — reducing unnecessary context, tokens, and repetition so the agent can stay fast and useful
+- **Long-term planning** — breaking larger goals into steps and carrying them through without losing the thread
+- **Multi-agent collaboration** — coordinating teams of agents so larger features can be planned, split up, implemented, reviewed, and integrated more efficiently
+- **Execution quality** — making the agent more careful about uncertainty, validation, and the impact of changes
+
+We have already started moving in this direction with Learn. That is the first step toward agents that improve through repeated use while keeping the user in control of what gets remembered.
+
+## What this means
+
+The next version of stagewise is shaped by what we learned from the first one.
+
+Browser context matters. Visual development matters. Direct access to the runtime matters. The ability to point at a real product and ask for a change matters.
+
+Those ideas become more valuable when they are part of a broader IDE, because the agent can connect what happens in the browser to the rest of the system behind it.
+
+That is where stagewise is going: a more capable, more open, agent-first development environment for the way software is starting to be built.

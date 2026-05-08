@@ -50,12 +50,12 @@ export function StepWelcome({
       <Logo className="mb-4 size-16" />
       <div className="relative w-full text-center">
         <span className="invisible font-normal text-foreground text-lg">
-          Welcome to the coding agent built for the web.
+          Welcome to the Open Source Agentic IDE.
         </span>
         {showText && (
           <div className="absolute inset-0 flex items-center justify-center">
             <SplitText
-              text="Welcome to the coding agent built for the web."
+              text="Welcome to the Open Source Agentic IDE."
               className="font-normal text-foreground text-lg"
               delay={10}
               duration={0.25}

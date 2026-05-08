@@ -17,18 +17,18 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://stagewise.io'),
   title: 'stagewise',
   description:
-    'The coding agent built for the web. stagewise is a purpose-built browser for developers with a coding agent built right in.',
+    'The Open Source Agentic IDE. stagewise is a purpose-built browser for developers with a coding agent built right in.',
   openGraph: {
-    title: 'stagewise · The coding agent built for the web',
+    title: 'stagewise · The Open Source Agentic IDE',
     description:
-      'The coding agent built for the web. stagewise is a purpose-built browser for developers with a coding agent built right in.',
+      'The Open Source Agentic IDE. stagewise is a purpose-built browser for developers with a coding agent built right in.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'stagewise · The coding agent built for the web',
+    title: 'stagewise · The Open Source Agentic IDE',
     description:
-      'The coding agent built for the web. stagewise is a purpose-built browser for developers with a coding agent built right in.',
+      'The Open Source Agentic IDE. stagewise is a purpose-built browser for developers with a coding agent built right in.',
   },
 };
 

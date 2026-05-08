@@ -35,6 +35,12 @@ export function Footer() {
               <br />
               Unauthorized use is prohibited.
             </p>
+            <p className="max-w-lg text-muted-foreground/60 text-xs">
+              Third-party product names, logos, and brands referenced on this
+              site are property of their respective owners. Use is for
+              identification purposes only and does not imply any affiliation or
+              endorsement.
+            </p>
           </div>
           <div className="flex w-full flex-row flex-wrap justify-end gap-x-20 gap-y-6 text-right">
             <div className="flex flex-col items-end gap-1">

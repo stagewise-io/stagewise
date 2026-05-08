@@ -8,19 +8,21 @@ import { usePostHog } from 'posthog-js/react';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import experimentsImage from './feature-images/experiments-light.png';
-import experimentsImageDark from './feature-images/experiments-dark.png';
-import agentIdeIntegrationDark from './feature-images/agent-ide-integration-dark.png';
-import agentIdeIntegrationLight from './feature-images/agent-ide-integration-light.png';
-import reverseEngineeringDark from './feature-images/reverse-engineering-dark.png';
-import reverseEngineeringLight from './feature-images/reverse-engineering-light.png';
-import debuggerAccessDark from './feature-images/debugger-access-dark.png';
-import debuggerAccessLight from './feature-images/debugger-access-light.png';
+import efficientCodingAgentDark from './feature-images/efficient-coding-agent-dark.webp';
+import efficientCodingAgentLight from './feature-images/efficient-coding-agent-light.webp';
+import agentManagementDark from './feature-images/agent-management-dark.webp';
+import agentManagementLight from './feature-images/agent-management-light.webp';
+import useExistingSubscriptionDark from './feature-images/use-existing-subscription-dark.webp';
+import useExistingSubscriptionLight from './feature-images/use-existing-subscription-light.webp';
+import githubRepoIssuesDark from './feature-images/github-repo-issues-dark.webp';
+import githubRepoIssuesLight from './feature-images/github-repo-issues-light.webp';
 import fullDemoDark from './feature-images/full-demo-dark.png';
 import fullDemoLight from './feature-images/full-demo-light.png';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
+
 import { NewsSection } from './news-section';
+import { ModelProviderShowcase } from './model-provider-showcase';
 
 interface NewsPost {
   title: string;
@@ -102,7 +104,7 @@ function DownloadButtons({ className }: { className?: string }) {
 
 function FeatureSection() {
   return (
-    <section className="relative z-10 w-full py-40 md:py-48">
+    <section className="relative z-10 w-full py-20 md:py-28">
       <div className="flex justify-center">
         <ScrollReveal>
           <div className="mb-20 max-w-3xl pt-8 text-center">
@@ -110,8 +112,8 @@ function FeatureSection() {
               Built for developers
             </h2>
             <p className="text-base text-muted-foreground">
-              stagewise delivers a browsing experience that prioritizes the
-              needs of web developers.
+              stagewise delivers an agentic coding experience built around the
+              needs of developers.
             </p>
           </div>
         </ScrollReveal>
@@ -121,94 +123,169 @@ function FeatureSection() {
         <ScrollReveal delay={100}>
           <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="font-medium text-xl">
-                Full access to the devtools
-              </h3>
+              <h3 className="font-medium text-2xl">Efficient coding agent</h3>
               <p className="text-base text-muted-foreground">
-                The stagewise agent has console and debugger access on all tabs.
+                The stagewise agent maximizes cache-hit rates and dynamically
+                controls context — enabling long-running tasks at surprisingly
+                low cost.
               </p>
+              <div className="pt-12">
+                <p className="font-semibold text-3xl text-foreground tracking-tight">
+                  87.6%
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Avg. Cache Hit Rate
+                </p>
+              </div>
             </div>
-            <Image
-              src={debuggerAccessLight}
-              className="block w-full shrink-0 rounded-md border border-border/30 md:max-w-[60%] dark:hidden"
-              alt="Image showing a browser with an integrated coding agent"
-            />
-            <Image
-              src={debuggerAccessDark}
-              className="hidden w-full shrink-0 rounded-md border border-border/30 md:max-w-[60%] dark:block"
-              alt="Image showing a browser with an integrated coding agent"
-            />
+            <div
+              className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[60%]"
+              style={{ aspectRatio: '1 / 1' }}
+            >
+              <Image
+                src={bgLight}
+                className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                alt=""
+              />
+              <Image
+                src={bgDark}
+                className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+                alt=""
+              />
+              <Image
+                src={efficientCodingAgentLight}
+                className="absolute top-1/2 left-0 w-full dark:hidden"
+                style={{
+                  transform: 'translateX(0%) translateY(-50%) scale(1.6)',
+                  transformOrigin: 'left center',
+                }}
+                alt="Efficient coding agent view"
+              />
+              <Image
+                src={efficientCodingAgentDark}
+                className="absolute top-1/2 left-0 hidden w-full dark:block"
+                style={{
+                  transform: 'translateX(0%) translateY(-50%) scale(1.6)',
+                  transformOrigin: 'left center',
+                }}
+                alt="Efficient coding agent view"
+              />
+            </div>
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={200}>
           <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="font-medium text-xl">
-                Temporary or permanent changes
+              <h3 className="font-medium text-2xl">
+                Orchestrate many agents at once
               </h3>
               <p className="text-base text-muted-foreground">
-                Make quick test changes to any page, or connect a codebase for
-                permanent edits.
+                stagewise is your command center for running agents in parallel
+                — each implementing full features or fixing bugs independently.
               </p>
             </div>
-            <Image
-              src={experimentsImage}
-              className="block w-full shrink-0 rounded-md md:max-w-[60%] dark:hidden"
-              alt="Image showing a browser with an integrated coding agent"
-            />
-            <Image
-              src={experimentsImageDark}
-              className="hidden w-full shrink-0 rounded-md md:max-w-[60%] dark:block"
-              alt="Image showing a browser with an integrated coding agent"
-            />
+            <div
+              className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[60%]"
+              style={{ aspectRatio: '1 / 1' }}
+            >
+              <Image
+                src={bgLight}
+                className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                alt=""
+              />
+              <Image
+                src={bgDark}
+                className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+                alt=""
+              />
+              <Image
+                src={agentManagementLight}
+                className="absolute top-0 left-0 w-full dark:hidden"
+                style={{ transform: 'scale(3)', transformOrigin: 'top left' }}
+                alt="Agent management view"
+              />
+              <Image
+                src={agentManagementDark}
+                className="absolute top-0 left-0 hidden w-full dark:block"
+                style={{ transform: 'scale(3)', transformOrigin: 'top left' }}
+                alt="Agent management view"
+              />
+            </div>
           </div>
         </ScrollReveal>
 
         <ScrollReveal delay={300}>
           <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
             <div className="space-y-2">
-              <h3 className="font-medium text-xl">
-                Powerful reverse engineering tools
+              <h3 className="font-medium text-2xl">
+                Use any coding subscription
               </h3>
               <p className="text-base text-muted-foreground">
-                Understand and re-use components, style systems and color
-                palettes from any website.
+                Use all popular models through your stagewise account, or
+                connect any existing coding subscription.
               </p>
+              <div className="pt-12">
+                <p className="mb-3 text-muted-foreground text-sm">
+                  Supported subscriptions
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'GLM Coding Plan',
+                    'Kimi',
+                    'Qwen Coding Plan',
+                    'MiniMax',
+                    'OpenAI',
+                    'Anthropic',
+                    'Google Gemini',
+                    'DeepSeek',
+                  ].map((plan) => (
+                    <span
+                      key={plan}
+                      className="rounded-full border border-border-subtle px-3 py-1 text-foreground/80 text-sm"
+                    >
+                      {plan}
+                    </span>
+                  ))}
+                  <span className="px-1 py-1 text-muted-foreground/50 text-sm">
+                    & more
+                  </span>
+                </div>
+              </div>
             </div>
-            <Image
-              src={reverseEngineeringLight}
-              className="block w-full shrink-0 rounded-md md:max-w-[60%] dark:hidden"
-              alt="Reverse engineering tools extracting styles from websites"
-            />
-            <Image
-              src={reverseEngineeringDark}
-              className="hidden w-full shrink-0 rounded-md md:max-w-[60%] dark:block"
-              alt="Reverse engineering tools extracting styles from websites"
-            />
-          </div>
-        </ScrollReveal>
-
-        <ScrollReveal delay={400}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
-            <div className="space-y-2">
-              <h3 className="font-medium text-xl">
-                Integrated with your setup
-              </h3>
-              <p className="text-base text-muted-foreground">
-                Opt-in to view relevant and modified files in your favorite IDE
-              </p>
+            <div
+              className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[60%]"
+              style={{ aspectRatio: '1 / 1' }}
+            >
+              <Image
+                src={bgLight}
+                className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                alt=""
+              />
+              <Image
+                src={bgDark}
+                className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+                alt=""
+              />
+              <Image
+                src={useExistingSubscriptionLight}
+                className="absolute top-1/2 left-1/2 w-full dark:hidden"
+                style={{
+                  transform: 'translateX(-50%) translateY(-50%) scale(0.92)',
+                  transformOrigin: 'center center',
+                }}
+                alt="Use existing subscription view"
+              />
+              <Image
+                src={useExistingSubscriptionDark}
+                className="absolute top-1/2 left-1/2 hidden w-full dark:block"
+                style={{
+                  transform: 'translateX(-50%) translateY(-50%) scale(0.92)',
+                  transformOrigin: 'center center',
+                }}
+                alt="Use existing subscription view"
+              />
             </div>
-            <Image
-              src={agentIdeIntegrationLight}
-              className="block w-full shrink-0 rounded-md md:max-w-[60%] dark:hidden"
-              alt="IDE integration showing code changes in your favorite editor"
-            />
-            <Image
-              src={agentIdeIntegrationDark}
-              className="hidden w-full shrink-0 rounded-md md:max-w-[60%] dark:block"
-              alt="IDE integration showing code changes in your favorite editor"
-            />
           </div>
         </ScrollReveal>
       </div>
@@ -249,19 +326,21 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative z-10 w-full pb-16 md:pb-20">
+      <section className="relative z-10 w-full pb-4 md:pb-6">
         <div className="flex justify-start">
           <div className="w-full max-w-7xl">
             <ScrollReveal>
-              <div className="mt-4 mb-12 flex flex-col items-start px-4 text-left sm:px-0 md:mt-8 md:mb-20">
+              <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left sm:px-0 md:mt-2 md:mb-8">
                 <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
                   <span className="text-foreground">
-                    The coding agent built for the web
+                    The Open Source Agentic IDE
                   </span>
                 </h1>
                 <span className="mb-8 text-lg text-muted-foreground leading-relaxed">
-                  stagewise is a purpose-built browser for developers with a
-                  coding agent built right in.
+                  Create and orchestrate coding agents, show app previews and
+                  run git workflows.
+                  <br />
+                  Use your favorite models across all providers.
                 </span>
 
                 <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -283,7 +362,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
             </ScrollReveal>
 
             <ScrollReveal delay={300}>
-              <div className="relative mt-16 mb-16 flex w-full items-center justify-center overflow-hidden rounded-md p-0 md:mt-20">
+              <div className="relative mt-6 mb-6 flex w-full items-center justify-center overflow-hidden rounded-2xl p-6 md:mt-8 md:p-10">
                 <Image
                   src={bgLight}
                   alt=""
@@ -314,11 +393,67 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
         </div>
       </section>
 
+      {/* Model Provider Showcase */}
+      <ModelProviderShowcase />
+
       {/* Features */}
       <FeatureSection />
 
       {/* News section */}
       <NewsSection posts={newsPosts} />
+
+      {/* Open-Source section */}
+      <section className="relative z-10 w-full py-10 md:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ScrollReveal>
+            <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
+              <div className="space-y-2">
+                <h3 className="font-medium text-2xl">
+                  Open-Source and extensible
+                </h3>
+                <p className="text-base text-muted-foreground">
+                  A first-class coding experience, built in the open and
+                  compatible with your favorite models — including the ones you
+                  run locally.
+                </p>
+              </div>
+              <div
+                className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[45%]"
+                style={{ aspectRatio: '16 / 9' }}
+              >
+                <Image
+                  src={bgLight}
+                  className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                  alt=""
+                />
+                <Image
+                  src={bgDark}
+                  className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+                  alt=""
+                />
+                <Image
+                  src={githubRepoIssuesLight}
+                  className="absolute top-0 left-0 w-full dark:hidden"
+                  style={{
+                    transform: 'scale(1.5)',
+                    transformOrigin: 'top left',
+                  }}
+                  alt="GitHub repo issues view"
+                />
+                <Image
+                  src={githubRepoIssuesDark}
+                  className="absolute top-0 left-0 hidden w-full dark:block"
+                  style={{
+                    transform: 'scale(1.5)',
+                    transformOrigin: 'top left',
+                  }}
+                  alt="GitHub repo issues view"
+                />
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
 
       {/* Second Get Started Section */}
       <section className="relative z-10 w-full py-40 md:py-48">
@@ -327,7 +462,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
             <div className="w-full max-w-7xl pt-8 text-center">
               <h2 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
                 <span className="text-foreground">
-                  The coding agent built for the web
+                  The Open Source Agentic IDE
                 </span>
               </h2>
 
