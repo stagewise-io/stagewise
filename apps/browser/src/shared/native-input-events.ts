@@ -38,6 +38,13 @@ export function shouldNativeInputConsumeEvent(e: KeyboardEvent): boolean {
         // 1. Standard Editing Shortcuts (Copy, Paste, Undo, Select All)
         if (['a', 'c', 'v', 'x', 'z', 'y'].includes(key)) return true;
 
+        // 1b. Rich-text formatting shortcuts (bold, italic, underline).
+        // Used by contentEditable editors like TipTap. Only protect when
+        // the target is actually rich (contentEditable) — plain <input>
+        // and <textarea> don't interpret these.
+        if (target.isContentEditable && ['b', 'i', 'u'].includes(key))
+          return true;
+
         // 2. Text Navigation (Cmd+Arrows on Mac, Ctrl+Arrows on Win)
         if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key))
           return true;

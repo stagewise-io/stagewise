@@ -36,7 +36,8 @@ export function ChatPanel() {
   );
 
   // Auto-selecting the first agent when openAgent is null is handled
-  // centrally by SidebarTopSection — no need to duplicate it here.
+  // centrally by `useAutoSelectFirstAgent` at the main layout root —
+  // no need to duplicate it here.
 
   // Track drag-over state for visual feedback
   const [isDragOver, setIsDragOver] = useState(false);

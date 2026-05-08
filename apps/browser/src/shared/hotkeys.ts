@@ -24,6 +24,7 @@ export interface HotkeyDefinition {
 export enum HotkeyActions {
   // Stagewise specific
   TOGGLE_CONTEXT_SELECTOR = 'toggle_context_selector',
+  TOGGLE_SIDEBAR = 'toggle_sidebar',
   NEW_CHAT = 'new_chat',
   DOWNLOADS = 'downloads',
 
@@ -81,6 +82,14 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.TOGGLE_CONTEXT_SELECTOR]: {
     accelerator: 'Mod+I',
     captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_SIDEBAR]: {
+    // Matches Codex / VS Code / GitHub Desktop convention.
+    // NOT capture-dominant: Cmd/Ctrl+B is the universal "bold" shortcut
+    // inside rich-text editors (TipTap), so we let native editable
+    // elements consume the event first via `shouldNativeInputConsumeEvent`.
+    accelerator: 'Mod+B',
+    captureDominantly: false,
   },
   [HotkeyActions.NEW_CHAT]: {
     accelerator: 'Mod+N',

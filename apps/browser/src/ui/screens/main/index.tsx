@@ -12,60 +12,81 @@ import { Sidebar } from './sidebar';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { OpenAgentProvider } from '@ui/hooks/use-open-chat';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
+import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
+import { useAutoSelectFirstAgent } from '@ui/hooks/use-auto-select-agent';
+import {
+  SidebarCollapsedProvider,
+  useSidebarCollapsed,
+} from './_components/sidebar-collapsed-context';
 
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
 const layoutStorageKey = 'stagewise-panel-layout';
 
 export function DefaultLayout({ show }: { show: boolean }) {
-  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
-  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
-
   return (
     <OpenAgentProvider>
       <ChatDraftProvider>
-        <div
+        <SidebarCollapsedProvider>
+          <PendingRemovalsProvider>
+            <DefaultLayoutInner show={show} />
+          </PendingRemovalsProvider>
+        </SidebarCollapsedProvider>
+      </ChatDraftProvider>
+    </OpenAgentProvider>
+  );
+}
+
+function DefaultLayoutInner({ show }: { show: boolean }) {
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
+  const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
+  const { collapsed } = useSidebarCollapsed();
+
+  // Headless: keeps `openAgent` valid regardless of whether the sidebar
+  // (which used to own this effect) is mounted.
+  useAutoSelectFirstAgent();
+
+  return (
+    <div
+      className={cn(
+        'root pointer-events-auto inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
+        !show && 'pointer-events-none opacity-0 blur-lg',
+      )}
+    >
+      {/* Thin draggable strip at the very top for macOS hidden-titlebar windows */}
+      {isMacOs && !isFullScreen && (
+        <div className="app-drag fixed top-0 right-0 left-0 h-2" />
+      )}
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId={rootLayoutStorageKey}
+        className="overflow-visible! h-full w-full"
+      >
+        <Sidebar />
+
+        {!collapsed && <ResizableHandle />}
+
+        <ResizablePanel
+          id="content-panel"
+          order={1}
+          defaultSize={65}
           className={cn(
-            'root pointer-events-auto inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
-            !show && 'pointer-events-none opacity-0 blur-lg',
+            'h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
+            !isMacOs && 'mt-px',
           )}
         >
-          {/* Thin draggable strip at the very top for macOS hidden-titlebar windows */}
-          {isMacOs && !isFullScreen && (
-            <div className="app-drag fixed top-0 right-0 left-0 h-2" />
-          )}
           <ResizablePanelGroup
             direction="horizontal"
-            autoSaveId={rootLayoutStorageKey}
-            className="overflow-visible! h-full w-full"
+            autoSaveId={layoutStorageKey}
+            className="h-full divide-x divide-surface-1"
           >
-            <Sidebar />
+            <AgentChat />
 
             <ResizableHandle />
 
-            <ResizablePanel
-              id="content-panel"
-              order={1}
-              defaultSize={65}
-              className={cn(
-                'h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
-                !isMacOs && 'mt-px',
-              )}
-            >
-              <ResizablePanelGroup
-                direction="horizontal"
-                autoSaveId={layoutStorageKey}
-                className="h-full divide-x divide-surface-1"
-              >
-                <AgentChat />
-
-                <ResizableHandle />
-
-                <MainSection />
-              </ResizablePanelGroup>
-            </ResizablePanel>
+            <MainSection />
           </ResizablePanelGroup>
-        </div>
-      </ChatDraftProvider>
-    </OpenAgentProvider>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </div>
   );
 }
