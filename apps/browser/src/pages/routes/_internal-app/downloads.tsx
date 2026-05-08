@@ -369,7 +369,7 @@ function RowComponent({
                 {row.filename}
               </span>
               {!row.fileExists && !row.isActive && (
-                <span className="text-destructive text-xs">(Deleted)</span>
+                <span className="text-muted-foreground text-xs">(Deleted)</span>
               )}
             </div>
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -1030,7 +1030,7 @@ function Page() {
           ) : error ? (
             <div className="flex h-full flex-col items-center justify-center px-4">
               <div className="max-w-md space-y-2 text-center">
-                <p className="font-medium text-destructive text-sm">
+                <p className="font-medium text-error-foreground text-sm">
                   {error.message}
                 </p>
                 {import.meta.env.DEV && error.stack && (
