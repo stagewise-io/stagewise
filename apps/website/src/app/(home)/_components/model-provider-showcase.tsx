@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
@@ -136,8 +136,16 @@ export function ModelProviderShowcase() {
   };
 
   const leave = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setActiveId(null), 80);
   };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+    };
+  }, []);
 
   const keepOpen = () => {
     if (timerRef.current) clearTimeout(timerRef.current);

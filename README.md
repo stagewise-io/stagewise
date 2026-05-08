@@ -3,7 +3,7 @@
   <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
-### The Open Source Agentic IDE
+### The Open Source Agentic IDE for Developers
 
 English | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md)
 
@@ -15,7 +15,7 @@ English | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日�
 
 ## About the project
 
-**stagewise** is a purpose-built browser for developers with a coding agent built right in.
+**stagewise** is an open source agentic IDE for developers with a coding agent built right in.
 
 - **Browse and build** in the same tool — no context switching
 - **Work with a coding agent** that has **full access to your tab's console and debugger**
