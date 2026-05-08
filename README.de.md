@@ -15,7 +15,7 @@
 
 ## Über das Projekt
 
-**stagewise** ist ein speziell für Entwickler:innen konzipierter Browser mit einem integrierten Coding-Agenten.
+**stagewise** ist eine speziell für Entwickler:innen konzipierte Agentic-IDE mit einem integrierten Coding-Agenten.
 
 - **Surfen und entwickeln** im selben Tool — kein Kontextwechsel
 - **Mit einem Coding-Agenten arbeiten**, der **vollen Zugriff auf die Konsole und den Debugger deines Tabs** hat
