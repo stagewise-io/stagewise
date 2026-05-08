@@ -455,7 +455,7 @@ export function AgentsSelector() {
   const getAgentsHistoryList = useKartonProcedure(
     (p) => p.agents.getAgentsHistoryList,
   );
-  const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
+  const [openAgent, setOpenAgent] = useOpenAgent();
 
   // Narrow selector: only re-renders when the open agent's model changes.
   // Used by createAgentAndFocus (via ref) to seed the new chat with the same model.
@@ -580,24 +580,11 @@ export function AgentsSelector() {
     });
   }, [activeAgentIds]);
 
-  // If the open agent was removed, pop it from the history stack. The
-  // fallback parameter ensures that when the stack is empty, we jump
-  // straight to the first active agent in one render instead of going
-  // through null → pick.
-  // On initial load (openAgent === null), pick the first active agent.
-  useEffect(() => {
-    if (openAgent && !activeAgentIdSet.has(openAgent)) {
-      removeFromHistory(openAgent, activeAgentIds[0] ?? null);
-    } else if (!openAgent && activeAgentIds.length > 0) {
-      setOpenAgent(activeAgentIds[0]!);
-    }
-  }, [
-    openAgent,
-    activeAgentIdSet,
-    activeAgentIds,
-    removeFromHistory,
-    setOpenAgent,
-  ]);
+  // Auto-selection (picking the first active agent when `openAgent` is
+  // null, and popping evicted agents from the history stack) is now
+  // handled centrally by `useAutoSelectFirstAgent` at the main layout
+  // root, so it keeps working even when the sidebar is collapsed and
+  // this component is unmounted.
 
   // Mark the open agent as read when the user switches to it.
   useEffect(() => {

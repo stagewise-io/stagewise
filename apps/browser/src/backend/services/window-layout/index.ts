@@ -34,6 +34,7 @@ import {
   createSearchUtils,
 } from './utils/search-utils';
 import { HOME_PAGE_URL } from '@shared/internal-urls';
+import { MACOS_TRAFFIC_LIGHT_X, MACOS_TRAFFIC_LIGHT_Y } from '@shared/titlebar';
 import { SessionPermissionRegistry } from './tab-permission-handler/session-registry';
 import { z } from 'zod';
 import {
@@ -233,7 +234,10 @@ export class WindowLayoutService extends DisposableService {
             ),
           }
         : {}),
-      trafficLightPosition: { x: 14, y: 16 },
+      trafficLightPosition: {
+        x: MACOS_TRAFFIC_LIGHT_X,
+        y: MACOS_TRAFFIC_LIGHT_Y,
+      },
       vibrancy: 'sidebar',
       backgroundMaterial: 'mica',
       autoHideMenuBar: true,

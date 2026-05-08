@@ -31,6 +31,19 @@ import { isEmptyAssistantMessage, areAllPartsSettled } from './message-utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { calculateChatItemHeights } from '@ui/utils/calculate-chat-item-height';
 
+// Top inset reserved for titlebar-level chrome (sidebar toggle, future
+// top-right buttons). Sits as a sibling spacer ABOVE Virtuoso so items can
+// never scroll into it. Height matches the Tabs component (~32px) so the
+// chrome band feels consistent with other top-of-panel UI.
+const CHAT_TOP_INSET = 32;
+
+// Height of the soft fade at Virtuoso's top edge. Applied via mask-image
+// on the scroller itself so content visually dissolves before hitting the
+// clip line — no hard cut. The fade distance lerps with scrollTop so the
+// first message stays fully crisp at scrollTop=0 and only starts fading
+// once the user actually scrolls.
+const CHAT_FADE = 16;
+
 // Stable empty array to avoid infinite re-renders with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
 
@@ -144,6 +157,9 @@ export const ChatHistory = () => {
 
   // Track scroller element for spacerHeight calculation
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  // Track scroll offset to drive the top fade overlay. We only need an
+  // approximate value (used to fade between 0 and 16px) so no throttling.
+  const [scrollTop, setScrollTop] = useState(0);
   const scrollerRef = useCallback(
     (element: HTMLElement | Window | null) => {
       // Chain to auto-scroll hook
@@ -205,6 +221,25 @@ export const ChatHistory = () => {
       await clearPendingOnboardingSuggestion();
     })();
   }, [pendingSuggestion, openAgent]);
+
+  // Scroll listener for the top fade overlay. Attached to the scroller
+  // element tracked above. `passive: true` because we never preventDefault.
+  // We clamp to CHAT_FADE because past that threshold the mask string is
+  // identical — bailing out here prevents a re-render on every scroll
+  // pixel once the user is more than CHAT_FADE px into the list.
+  useEffect(() => {
+    if (!scroller) return;
+    const onScroll = () => {
+      setScrollTop((prev) => {
+        const next = Math.min(CHAT_FADE, scroller.scrollTop);
+        return prev === next ? prev : next;
+      });
+    };
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    // Initialize with current offset so the overlay reflects state on mount.
+    setScrollTop(Math.min(CHAT_FADE, scroller.scrollTop));
+    return () => scroller.removeEventListener('scroll', onScroll);
+  }, [scroller]);
 
   // Track container height to set the spacer
   useEffect(() => {
@@ -1026,6 +1061,7 @@ export const ChatHistory = () => {
             className={cn(
               'pointer-events-auto block h-max min-h-[inherit] text-foreground text-sm focus-within:outline-none focus:outline-none',
             )}
+            style={{ paddingTop: CHAT_TOP_INSET }}
           >
             {EmptyPlaceholder()}
           </section>
@@ -1037,20 +1073,40 @@ export const ChatHistory = () => {
   return (
     <MountedPathsProvider value={resolvedMounts}>
       <AttachmentMetadataProvider messages={filteredMessages}>
-        <Virtuoso
-          initialTopMostItemIndex={Math.max(0, filteredMessages.length - 2)}
-          style={{ scrollbarGutter: 'stable' }}
-          key={openAgent ?? 'no-chat'}
-          data={filteredMessages}
-          className="scrollbar-hover-only virtuoso-contain -mr-[2px]"
-          scrollerRef={scrollerRef}
-          increaseViewportBy={{ top: 400, bottom: 400 }} // Render items above and below viewport
-          heightEstimates={estimatedHeights}
-          itemContent={itemContent}
-          followOutput={false} // We use our own auto-scroll logic
-          computeItemKey={(_, message) => message.id}
-          totalCount={filteredMessages.length}
-        />
+        <div className="relative flex h-full flex-col">
+          {/* Sibling spacer above Virtuoso. Reserves the chrome band so
+              items never paint into the titlebar area. Kept transparent —
+              the parent's bg-background shows through. */}
+          <div
+            aria-hidden
+            className="shrink-0"
+            style={{ height: CHAT_TOP_INSET }}
+          />
+          <Virtuoso
+            initialTopMostItemIndex={Math.max(0, filteredMessages.length - 2)}
+            style={{
+              scrollbarGutter: 'stable',
+              minHeight: 0,
+              flex: 1,
+              // Fade Virtuoso's own top edge. The fade distance grows with
+              // scrollTop (clamped to CHAT_FADE), so at scrollTop=0 the
+              // mask is identity (no fade on the first item) and scrolling
+              // smoothly reveals the fade without any hard cut.
+              maskImage: `linear-gradient(to bottom, transparent 0, black ${Math.min(CHAT_FADE, scrollTop)}px, black 100%)`,
+              WebkitMaskImage: `linear-gradient(to bottom, transparent 0, black ${Math.min(CHAT_FADE, scrollTop)}px, black 100%)`,
+            }}
+            key={openAgent ?? 'no-chat'}
+            data={filteredMessages}
+            className="scrollbar-hover-only virtuoso-contain -mr-[2px]"
+            scrollerRef={scrollerRef}
+            increaseViewportBy={{ top: 400, bottom: 400 }} // Render items above and below viewport
+            heightEstimates={estimatedHeights}
+            itemContent={itemContent}
+            followOutput={false} // We use our own auto-scroll logic
+            computeItemKey={(_, message) => message.id}
+            totalCount={filteredMessages.length}
+          />
+        </div>
       </AttachmentMetadataProvider>
     </MountedPathsProvider>
   );

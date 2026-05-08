@@ -4,6 +4,7 @@ import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useCallback, useMemo } from 'react';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { HOME_PAGE_URL } from '@shared/internal-urls';
+import { useSidebarCollapsed } from '../../_components/sidebar-collapsed-context';
 
 export function CoreHotkeyBindings({
   onCreateTab,
@@ -22,6 +23,7 @@ export function CoreHotkeyBindings({
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
+  const { toggle: toggleSidebar } = useSidebarCollapsed();
   const tabIds = useMemo(() => Object.keys(tabs), [tabs]);
   const tabCount = useMemo(() => tabIds.length, [tabIds]);
 
@@ -221,6 +223,13 @@ export function CoreHotkeyBindings({
   }, [activeTabId, setZoomPercentage]);
 
   useHotKeyListener(handleResetZoom, HotkeyActions.ZOOM_RESET);
+
+  // SIDEBAR
+
+  // Toggle sidebar collapsed state (Mod+B).
+  useHotKeyListener(() => {
+    toggleSidebar();
+  }, HotkeyActions.TOGGLE_SIDEBAR);
 
   return null;
 }
