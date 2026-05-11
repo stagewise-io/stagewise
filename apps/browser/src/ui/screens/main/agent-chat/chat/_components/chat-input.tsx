@@ -806,7 +806,7 @@ export const ChatInputActions = memo(function ChatInputActions({
                 onClick={onStop}
                 aria-label="Stop agent"
                 variant="secondary"
-                className="group z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 opacity-100! shadow-md backdrop-blur-lg"
+                className="group z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 opacity-100! shadow-md"
               >
                 <SquareIcon className="size-3 fill-current" />
               </Button>
@@ -822,7 +822,7 @@ export const ChatInputActions = memo(function ChatInputActions({
                 onClick={onSubmit}
                 aria-label="Send message"
                 variant="primary"
-                className="z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 shadow-md backdrop-blur-lg transition-all disabled:opacity-50"
+                className="z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 shadow-md transition-all disabled:opacity-50"
               >
                 <ArrowUpIcon className="size-4 stroke-3" />
               </Button>
