@@ -26,6 +26,20 @@ const config = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/docs/:path*',
+        destination: 'https://docs.stagewise.io/:path*',
+        permanent: true,
+      },
+      {
+        source: '/team',
+        destination: '/mission',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
