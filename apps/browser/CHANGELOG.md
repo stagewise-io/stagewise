@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha088 (2026-05-11)
+
+### Bug Fixes
+
+* remove backdrop blur to prevent flickering during scroll (066db83)
+* fix text-colors in browser downloads (3e32de6)
+
 ## 1.0.0-alpha087 (2026-05-08)
 
 ### Features
