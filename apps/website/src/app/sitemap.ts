@@ -8,10 +8,6 @@ const appRoot = path.join(process.cwd(), 'src', 'app');
 const pageFilePattern = /^page\.(tsx|ts|jsx|js|mdx|md)$/;
 const ignoredRouteSegments = new Set(['vscode-extension']);
 
-function getLastModified(filepath: string): Date {
-  return fs.statSync(filepath).mtime;
-}
-
 function getRouteFromPageFile(filepath: string): string | null {
   const relativePath = path.relative(appRoot, filepath);
   const segments = relativePath.split(path.sep);
@@ -51,11 +47,11 @@ function getPageFiles(dir: string): string[] {
 
 function createSitemapEntry(
   url: string,
-  lastModified: Date,
+  lastModified?: Date,
 ): MetadataRoute.Sitemap[number] {
   return {
     url: new URL(url, siteUrl).toString(),
-    lastModified,
+    ...(lastModified ? { lastModified } : {}),
     changeFrequency: 'weekly',
     priority: url === '/' ? 1 : 0.7,
   };
@@ -67,7 +63,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       const route = getRouteFromPageFile(filepath);
       if (!route) return null;
 
-      return createSitemapEntry(route, getLastModified(filepath));
+      return createSitemapEntry(route);
     })
     .filter((entry): entry is MetadataRoute.Sitemap[number] => entry !== null);
 
