@@ -8,12 +8,12 @@ import {
 
 /**
  * Shared, sidebar-wide set of agent IDs that are being optimistically
- * removed from the UI (Archive or Permanently Delete). Lives at the
+ * removed from the UI (Permanently Delete). Lives at the
  * sidebar root so every component that drives auto-selection (the top
  * section's "pick first active" effect, the active-agents grid, the
  * history combobox) can agree on which ids are transient.
  *
- * Without a shared view, archiving the last live agent triggers a loop:
+ * Without a shared view, removing the last live agent triggers a loop:
  *   1. Grid removes archived id from history (openAgent becomes null).
  *   2. Top section sees `openAgent === null` + stale `activeAgentIds`
  *      still containing the archived id, and sets openAgent back to it.

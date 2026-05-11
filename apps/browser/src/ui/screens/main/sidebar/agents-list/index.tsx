@@ -6,14 +6,19 @@ import {
 } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
+import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   OverlayScrollbar,
   type OverlayScrollbarRef,
 } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { IconPenPlusOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconPenPlusOutline18,
+  IconMagnifierOutline18,
+} from 'nucleo-ui-outline-18';
 import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
+import { cn } from '@ui/utils';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { useTrack } from '@ui/hooks/use-track';
 import { AgentCardSkeleton } from './_components/agent-card';
@@ -26,8 +31,11 @@ import {
 } from '../../_components/shared-agent-context-menu';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
-import { AgentsSelector } from './_components/agents-selector';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+
+// ============================================================================
+// Types & helpers
+// ============================================================================
 
 type ActiveAgentCardData = {
   id: string;
@@ -38,8 +46,15 @@ type ActiveAgentCardData = {
   activityIsUserInput: boolean;
   hasError: boolean;
   lastMessageAt: number;
+  createdAt: number;
   messageCount: number;
   unread: boolean;
+};
+
+/** Unified entry for the merged active + history list. */
+type MergedAgentEntry = ActiveAgentCardData & {
+  /** True when this agent is currently loaded in-memory (active instance). */
+  isLive: boolean;
 };
 
 function activeAgentCardsEqual(
@@ -59,6 +74,7 @@ function activeAgentCardsEqual(
       ai.activityIsUserInput !== bi.activityIsUserInput ||
       ai.hasError !== bi.hasError ||
       ai.lastMessageAt !== bi.lastMessageAt ||
+      ai.createdAt !== bi.createdAt ||
       ai.messageCount !== bi.messageCount ||
       ai.unread !== bi.unread
     )
@@ -123,19 +139,77 @@ function deriveActivityText(
   return { text: '', isUserInput: false };
 }
 
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_VISIBLE = 10;
+const SHOW_MORE_INCREMENT = 20;
+const HISTORY_PAGE_SIZE = 200;
+
+// ============================================================================
+// Time grouping
+// ============================================================================
+
+type GroupLabel =
+  | 'Today'
+  | 'Yesterday'
+  | 'Last 7 days'
+  | 'Last 30 days'
+  | 'Older';
+
+function getGroupLabel(timestamp: number): GroupLabel {
+  // A zero timestamp means no messages yet — treat as "Today".
+  if (!timestamp) return 'Today';
+  const now = Date.now();
+  const diffMs = now - timestamp;
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffDays < 0) return 'Today'; // clock skew
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return 'Last 7 days';
+  if (diffDays < 30) return 'Last 30 days';
+  return 'Older';
+}
+
+type GroupedItem =
+  | { type: 'agent'; agent: MergedAgentEntry }
+  | { type: 'header'; label: GroupLabel };
+
+function insertGroupHeaders(agents: MergedAgentEntry[]): GroupedItem[] {
+  const result: GroupedItem[] = [];
+  let currentGroup: GroupLabel | null = null;
+  for (const agent of agents) {
+    const group = getGroupLabel(agent.lastMessageAt);
+    if (group !== currentGroup) {
+      currentGroup = group;
+      result.push({ type: 'header', label: group });
+    }
+    result.push({ type: 'agent', agent });
+  }
+  return result;
+}
+
+// ============================================================================
+// AgentsList
+// ============================================================================
+
 export function AgentsList() {
-  const showActiveAgents = useKartonState(
-    (s) => s.preferences.sidebar?.showActiveAgents ?? true,
-  );
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const [openAgent, setOpenAgent] = useOpenAgent();
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
-  const archiveAgent = useKartonProcedure((p) => p.agents.archive);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
+  const markAsRead = useKartonProcedure((p) => p.agents.markAsRead);
+  const getAgentsHistoryList = useKartonProcedure(
+    (p) => p.agents.getAgentsHistoryList,
+  );
 
   const [, emptyAgentIdRef] = useEmptyAgentId();
+
+  // Track app start time so agents created during this session always show.
+  const appStartTimeRef = useRef(Date.now());
 
   // Per-surface preview cache. Survives the ActiveAgents mount lifetime so
   // re-hovering the same card is instant. Not shared with the selector's
@@ -215,6 +289,9 @@ export function AgentsList() {
               lastMessageAt: lastMsg?.metadata?.createdAt
                 ? new Date(lastMsg.metadata.createdAt).getTime()
                 : 0,
+              createdAt: agent.state.history[0]?.metadata?.createdAt
+                ? new Date(agent.state.history[0].metadata.createdAt).getTime()
+                : 0,
               messageCount: history.length,
             };
           }),
@@ -223,9 +300,8 @@ export function AgentsList() {
   );
 
   // Optimistic removal: cards are hidden immediately while the backend processes.
-  // Used for both "Delete" (permanent) and "Suspend" (archived).
-  // Shared via context so SidebarTopSection's auto-select effect doesn't
-  // ping-pong openAgent back onto a being-removed id.
+  // Used for "Delete" (permanent). Shared via context so SidebarTopSection's
+  // auto-select effect doesn't ping-pong openAgent back onto a being-removed id.
   const {
     pending: pendingRemovals,
     add: addPendingRemoval,
@@ -233,40 +309,6 @@ export function AgentsList() {
   } = usePendingRemovals();
   const pendingRemovalsRef = useRef(pendingRemovals);
   pendingRemovalsRef.current = pendingRemovals;
-
-  // Stable ordering: agents keep their position in the list. New agents
-  // (created or resumed) are appended at the end. Removed agents are pruned.
-  // Uses a ref so the order persists across renders without causing re-renders.
-  const orderRef = useRef<string[]>([]);
-  const orderedAgents = useMemo(() => {
-    const currentIds = new Set(agents.map((a) => a.id));
-
-    // Prune removed agents
-    const kept = orderRef.current.filter((id) => currentIds.has(id));
-    const keptSet = new Set(kept);
-    // Append new agents at the end
-    for (const agent of agents) {
-      if (!keptSet.has(agent.id)) kept.push(agent.id);
-    }
-    orderRef.current = kept;
-
-    const byId = new Map(agents.map((a) => [a.id, a]));
-    // Exclude agents that are being optimistically removed
-    return kept
-      .filter((id) => !pendingRemovals.has(id))
-      .map((id) => byId.get(id)!);
-  }, [agents, pendingRemovals]);
-
-  // Clean up pending removals once the backend has confirmed removal.
-  // The memo already filters them from the rendered list, so this is
-  // purely housekeeping — no visual artifact from the effect timing.
-  useEffect(() => {
-    if (pendingRemovals.size === 0) return;
-    const currentIds = new Set(agents.map((a) => a.id));
-    pendingRemovals.forEach((id) => {
-      if (!currentIds.has(id)) removePendingRemoval(id);
-    });
-  }, [agents, pendingRemovals, removePendingRemoval]);
 
   // Hide skeleton as soon as agents list grows (same render cycle), rather
   // than waiting for the promise callback which lags 1-2 frames behind.
@@ -312,14 +354,6 @@ export function AgentsList() {
     [resumeAgent, setOpenAgent],
   );
 
-  const handleArchive = useCallback(
-    (id: string) => {
-      addPendingRemoval(id);
-      void archiveAgent(id);
-    },
-    [addPendingRemoval, archiveAgent],
-  );
-
   const handleDelete = useCallback(
     (id: string) => {
       addPendingRemoval(id);
@@ -335,12 +369,168 @@ export function AgentsList() {
     [setAgentTitle],
   );
 
+  // =========================================================================
+  // History agents — fetched from persisted DB, merged with active agents.
+  // =========================================================================
+
+  const [historyList, setHistoryList] = useState<AgentHistoryEntry[]>([]);
+
+  const activeAgentIds = useKartonState(
+    useComparingSelector((s) => Object.keys(s.agents.instances)),
+  );
+
+  // Fetch history once on startup (after first agent is active).
+  const historyFetchedRef = useRef(false);
+  useEffect(() => {
+    if (historyFetchedRef.current) return;
+    if (activeAgentIds.length === 0) return;
+    historyFetchedRef.current = true;
+    getAgentsHistoryList(0, HISTORY_PAGE_SIZE).then((entries) => {
+      setHistoryList(entries);
+    });
+  }, [activeAgentIds, getAgentsHistoryList]);
+
+  // Clean up pending removals once the backend has confirmed removal.
+  const prevPendingSizeRef = useRef(0);
+  useEffect(() => {
+    if (pendingRemovals.size === 0) {
+      // Refetch history after deletions complete so the list stays in sync.
+      if (prevPendingSizeRef.current > 0) {
+        getAgentsHistoryList(0, HISTORY_PAGE_SIZE).then((entries) => {
+          setHistoryList(entries);
+        });
+      }
+      prevPendingSizeRef.current = 0;
+      return;
+    }
+    prevPendingSizeRef.current = pendingRemovals.size;
+    const currentIds = new Set(agents.map((a) => a.id));
+    pendingRemovals.forEach((id) => {
+      if (!currentIds.has(id)) removePendingRemoval(id);
+    });
+  }, [agents, pendingRemovals, removePendingRemoval, getAgentsHistoryList]);
+
+  // =========================================================================
+  // Merged list: active + history, sorted newest-first by lastMessageAt.
+  // =========================================================================
+
+  const allAgents = useMemo((): MergedAgentEntry[] => {
+    const activeById = new Map(agents.map((a) => [a.id, a]));
+    const pendingSet = pendingRemovals;
+
+    // Index history entries by id for fallback lookups.
+    const historyById = new Map(historyList.map((e) => [e.id, e]));
+
+    // History entries: exclude those that are already active or pending removal.
+    const historyEntries: MergedAgentEntry[] = historyList
+      .filter((e) => !activeById.has(e.id) && !pendingSet.has(e.id))
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        isWorking: false,
+        isWaitingForUser: false,
+        activityText: '',
+        activityIsUserInput: false,
+        hasError: false,
+        unread: false,
+        lastMessageAt: new Date(e.lastMessageAt).getTime(),
+        createdAt: new Date(e.createdAt).getTime(),
+        messageCount: e.messageCount,
+        isLive: false,
+      }));
+
+    // Active entries: exclude those pending removal.
+    // When an agent was just resumed, its active state may still be loading
+    // (history empty) — fall back to the persisted history entry for
+    // timestamps so the card doesn't jump position.
+    // For brand-new agents (no history entry, no messages), use Date.now()
+    // so they sort to the top instead of being hidden at the bottom.
+    const now = Date.now();
+    const activeEntries: MergedAgentEntry[] = agents
+      .filter((a) => !pendingSet.has(a.id))
+      .map((a) => {
+        const h = historyById.get(a.id);
+        const createdAt =
+          a.createdAt > 0
+            ? a.createdAt
+            : h
+              ? new Date(h.createdAt).getTime()
+              : now;
+        return {
+          ...a,
+          isLive: true,
+          lastMessageAt:
+            a.lastMessageAt > 0
+              ? a.lastMessageAt
+              : h
+                ? new Date(h.lastMessageAt).getTime()
+                : 0,
+          createdAt,
+        };
+      });
+
+    // Sort by the higher of lastMessageAt and createdAt so new agents
+    // (no messages yet, createdAt = now) appear at the top.
+    const merged = [...activeEntries, ...historyEntries].sort(
+      (a, b) =>
+        Math.max(b.lastMessageAt, b.createdAt) -
+        Math.max(a.lastMessageAt, a.createdAt),
+    );
+
+    return merged;
+  }, [agents, historyList, pendingRemovals]);
+
+  // =========================================================================
+  // Search
+  // =========================================================================
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAgents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return allAgents;
+    return allAgents.filter((a) => a.title.toLowerCase().includes(q));
+  }, [allAgents, searchQuery]);
+
+  // =========================================================================
+  // "Show more" pagination
+  // =========================================================================
+
+  const [visibleCount, setVisibleCount] = useState(DEFAULT_VISIBLE);
+
+  // Agents created during this session always show (floor = their count).
+  const agentsCreatedThisSession = useMemo(
+    () =>
+      allAgents.filter((a) => a.createdAt >= appStartTimeRef.current).length,
+    [allAgents],
+  );
+
+  const effectiveVisible = useMemo(
+    () => Math.max(visibleCount, agentsCreatedThisSession, DEFAULT_VISIBLE),
+    [visibleCount, agentsCreatedThisSession],
+  );
+
+  const visibleAgents = useMemo(
+    () => filteredAgents.slice(0, effectiveVisible),
+    [filteredAgents, effectiveVisible],
+  );
+
+  const groupedItems = useMemo(
+    () => insertGroupHeaders(visibleAgents),
+    [visibleAgents],
+  );
+
+  const hasMoreToShow = effectiveVisible < filteredAgents.length;
+
+  const handleShowMore = useCallback(() => {
+    setVisibleCount((c) => c + SHOW_MORE_INCREMENT);
+  }, []);
+
+  // =========================================================================
+  // Scroll & mask
+  // =========================================================================
+
   const scrollRef = useRef<OverlayScrollbarRef>(null);
-  // Use state (not just a ref) so that when OverlayScrollbar initialises and
-  // calls onViewportRef, a re-render is triggered.  useIsContainerScrollable
-  // (used by useScrollFadeMask internally) only syncs a ref → element inside
-  // a no-dep useEffect that runs after every render — it never fires if the
-  // ref is updated without a render.
   const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
     null,
   );
@@ -351,10 +541,7 @@ export function AgentsList() {
     fadeDistance: 16,
   });
 
-  /** Scroll a card into the safe (non-masked) area of the scroll container.
-   * The container has CSS mask gradients (8px top/bottom) that fade content
-   * to hint at overflow. We only scroll when the card overlaps those fade
-   * zones — if it's already fully visible, we leave the position alone. */
+  /** Scroll a card into the safe (non-masked) area of the scroll container. */
   const scrollCardIntoView = useCallback((agentId: string) => {
     const container = scrollRef.current?.getViewport();
     if (!container) return;
@@ -380,6 +567,13 @@ export function AgentsList() {
     if (openAgent) scrollCardIntoView(openAgent);
   }, [openAgent, scrollCardIntoView]);
 
+  // Clear the unread dot when the user opens an agent.
+  useEffect(() => {
+    if (openAgent) {
+      void markAsRead(openAgent);
+    }
+  }, [openAgent, markAsRead]);
+
   // When an agent finishes (isWorking → false), scroll to its card.
   const prevWorkingRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -396,7 +590,10 @@ export function AgentsList() {
     prevWorkingRef.current = nowWorking;
   }, [agents, scrollCardIntoView]);
 
-  // Shared context-menu state for all cards — avoids per-card menu roots.
+  // =========================================================================
+  // Context menu & delete
+  // =========================================================================
+
   const [ctxMenuState, ctxMenuTarget, setCtxMenuTarget] =
     useSharedAgentContextMenu();
   const handleCtxMenuClose = useCallback(
@@ -404,9 +601,6 @@ export function AgentsList() {
     [setCtxMenuTarget],
   );
 
-  // Delete confirmation triggered from the context menu. Hoisted out of
-  // AgentCard so the popover can survive the card losing hover / the menu
-  // closing without tearing down the confirmation UI.
   const [ctxDelete, setCtxDelete] = useState<{
     id: string;
     x: number;
@@ -424,10 +618,13 @@ export function AgentsList() {
     if (id) handleDelete(id);
   }, [ctxDelete, handleDelete]);
 
-  if (!showActiveAgents) return null;
+  // =========================================================================
+  // Render
+  // =========================================================================
 
   return (
     <div className="flex h-full flex-col group-data-[collapsed=true]:hidden">
+      {/* Header: New Agent button + Search */}
       <div className="shrink-0 pt-2">
         <Button
           variant="ghost"
@@ -444,17 +641,26 @@ export function AgentsList() {
             {isMacOs ? '⌘ N' : 'Ctrl N'}
           </span>
         </Button>
-        <div className="mt-2 flex items-center justify-between gap-1">
-          <span className="flex-1 pl-1.5 font-medium text-muted-foreground/60 text-xs">
-            Agents
-          </span>
-          <AgentsSelector />
+        <div className="mt-2 flex items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1.5">
+          <IconMagnifierOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search agents…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={cn(
+              'w-full bg-transparent text-foreground text-sm placeholder:text-muted-foreground',
+              'outline-none',
+            )}
+          />
         </div>
       </div>
+
+      {/* Scrollable agent cards with time-group headers */}
       <OverlayScrollbar
         ref={scrollRef}
         className="-mr-1 min-h-5"
-        contentClassName="flex flex-col gap-px pl-0.5 pt-0.5 pb-3.5 pr-1.5"
+        contentClassName="flex flex-col gap-px pl-0.5 pt-3 pb-3.5 pr-1.5"
         options={{
           overflow: { x: 'visible' },
           scrollbars: { theme: 'os-theme-stagewise-subtle' },
@@ -462,7 +668,19 @@ export function AgentsList() {
         style={maskStyle}
         onViewportRef={setScrollViewport}
       >
-        {orderedAgents.map((agent) => {
+        {groupedItems.map((item) => {
+          if (item.type === 'header') {
+            return (
+              <div
+                key={`h-${item.label}`}
+                className="shrink-0 px-1.5 pt-3 pb-1 font-semibold text-muted-foreground text-xs"
+              >
+                {item.label}
+              </div>
+            );
+          }
+
+          const agent = item.agent;
           const isOpen = agent.id === openAgent;
           const hasUnseen = !isOpen && agent.unread;
 
@@ -481,18 +699,29 @@ export function AgentsList() {
               lastMessageAt={agent.lastMessageAt}
               contextMenuState={ctxMenuState}
               onClick={handleClick}
-              onArchive={handleArchive}
               onRename={handleRename}
               cache={previewCacheRef.current}
             />
           );
         })}
         {showCreateSkeleton && <AgentCardSkeleton />}
+
+        {/* "Show more" button */}
+        {hasMoreToShow && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1 w-full justify-start text-muted-foreground/60 text-xs hover:text-foreground"
+            onClick={handleShowMore}
+          >
+            Show more
+          </Button>
+        )}
       </OverlayScrollbar>
+
       <SharedAgentContextMenuHost
         target={ctxMenuTarget}
         onClose={handleCtxMenuClose}
-        onArchive={handleArchive}
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover
