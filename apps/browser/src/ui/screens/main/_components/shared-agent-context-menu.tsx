@@ -4,7 +4,6 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import {
-  IconBoxArchiveOutline18,
   IconCopyIdOutline18,
   IconFolderOpenOutline18,
   IconPen2Outline18,
@@ -23,12 +22,6 @@ import { useFloatingIsolation } from './use-floating-isolation';
 
 export interface AgentContextMenuTarget {
   agentId: string;
-  /**
-   * Whether the agent is a live instance. Active agents show an
-   * "Archive" action; suspended history agents omit it (you resume by
-   * clicking the row).
-   */
-  isActive: boolean;
   /** Viewport coords of the right-click — used as virtual menu anchor. */
   x: number;
   y: number;
@@ -69,12 +62,11 @@ export function useSharedAgentContextMenu(): [
 
 /**
  * Row-side helper. Attach as
- * `onContextMenu={buildAgentContextMenuHandler(state, id, isLive, startEditing)}`.
+ * `onContextMenu={buildAgentContextMenuHandler(state, id, startEditing)}`.
  */
 export function buildAgentContextMenuHandler(
   state: SharedAgentContextMenuState,
   agentId: string,
-  isActive: boolean,
   rename: () => void,
 ): (e: React.MouseEvent) => void {
   return (e) => {
@@ -82,7 +74,6 @@ export function buildAgentContextMenuHandler(
     e.stopPropagation();
     state.open({
       agentId,
-      isActive,
       x: e.clientX,
       y: e.clientY,
       showDev: e.shiftKey,
@@ -94,8 +85,6 @@ export function buildAgentContextMenuHandler(
 export interface SharedAgentContextMenuHostProps {
   target: AgentContextMenuTarget | null;
   onClose: () => void;
-  /** Archive an active agent (only shown when `target.isActive` is true). */
-  onArchive: (id: string) => void;
   /** User picked "Permanently delete" — caller is expected to show a confirm dialog.
    * Cursor coordinates are forwarded so the confirm popover can anchor
    * right above the click position. */
@@ -106,7 +95,6 @@ export const SharedAgentContextMenuHost = memo(
   function SharedAgentContextMenuHost({
     target,
     onClose,
-    onArchive,
     onDeleteRequest,
   }: SharedAgentContextMenuHostProps) {
     const revealWorkingDirectory = useKartonProcedure(
@@ -170,7 +158,7 @@ export const SharedAgentContextMenuHost = memo(
     );
 
     if (!activeTarget) return null;
-    const { agentId, isActive, showDev, rename } = activeTarget;
+    const { agentId, showDev, rename } = activeTarget;
 
     return (
       <MenuBase.Root open={open} onOpenChange={handleOpenChange}>
@@ -194,17 +182,6 @@ export const SharedAgentContextMenuHost = memo(
                 'data-ending-style:opacity-0 data-starting-style:opacity-0',
               )}
             >
-              {isActive && (
-                <AgentMenuItem
-                  onClick={() => {
-                    onArchive(agentId);
-                    onClose();
-                  }}
-                >
-                  <IconBoxArchiveOutline18 className="size-3.5 shrink-0" />
-                  <span>Archive</span>
-                </AgentMenuItem>
-              )}
               <AgentMenuItem
                 onClick={() => {
                   onClose();

@@ -1464,7 +1464,12 @@ export abstract class BaseAgent<
       this.state.set((draft) => {
         draft.title = newTitle;
       });
-      // We don't do persistence here, since that happens after a step is finished
+      // Persist immediately — the fire-and-forget updateTitle call races
+      // with the step's saveState at the tail of runStep, and if the LLM
+      // title generation hasn't returned by then, the old title gets
+      // written. Explicit saveState here ensures the auto-title lands in
+      // the DB regardless of timing.
+      await this.saveState();
     } catch (e) {
       const error = e as Error;
       this.logger.error(

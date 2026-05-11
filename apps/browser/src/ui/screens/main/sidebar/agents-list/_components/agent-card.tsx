@@ -1,12 +1,6 @@
 import { forwardRef, memo, useCallback } from 'react';
 import { cn } from '@ui/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@stagewise/stage-ui/components/tooltip';
-import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import { IconBoxArchiveOutline18 } from 'nucleo-ui-outline-18';
+import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
   type SharedAgentContextMenuState,
   buildAgentContextMenuHandler,
@@ -43,7 +37,6 @@ export interface AgentCardProps {
   /** Shared context-menu controller owned by the enclosing grid. */
   contextMenuState: SharedAgentContextMenuState;
   onClick: (id: string) => void;
-  onArchive: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   /** Optional hover/pointer callbacks — used by `AgentCardWithPreview` to
    *  drive the hover-preview without introducing a wrapping element that
@@ -79,7 +72,6 @@ export const AgentCard = memo(
       lastMessageAt,
       contextMenuState,
       onClick,
-      onArchive,
       onRename,
       onMouseEnter,
       onMouseLeave,
@@ -110,7 +102,6 @@ export const AgentCard = memo(
         onContextMenu={buildAgentContextMenuHandler(
           contextMenuState,
           id,
-          true,
           startEditing,
         )}
         onClick={() => onClick(id)}
@@ -124,7 +115,7 @@ export const AgentCard = memo(
         }}
         onKeyDown={(e) => {
           // Only handle keyboard interaction when the card itself is focused.
-          // Otherwise, nested buttons (archive/delete) would also trigger this.
+          // Otherwise, nested interactive elements would also trigger this.
           if (e.currentTarget !== e.target) return;
 
           if (e.key === 'Enter' || e.key === ' ') {
@@ -224,36 +215,17 @@ export const AgentCard = memo(
           )}
         </div>
 
-        <div className="absolute inset-y-[2px] right-[2px] flex items-center gap-1 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100">
-          {lastMessageAt > 0 && (
+        {lastMessageAt > 0 && (
+          <div className="absolute inset-y-[2px] right-[2px] flex items-center pr-1.5 opacity-0 transition-opacity group-hover/card:opacity-100">
             <span className="text-muted-foreground/60 text-xs tabular-nums">
               {compactTimeAgo(lastMessageAt)}
             </span>
-          )}
-          <Tooltip>
-            <TooltipTrigger delay={500}>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="archive-btn text-muted-foreground hover:text-foreground"
-                aria-label="Archive agent"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onArchive(id);
-                }}
-              >
-                <IconBoxArchiveOutline18 className="size-4 cursor-pointer" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span>Archive agent (can be resumed)</span>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+          </div>
+        )}
       </div>
     );
   }),
-  // Skip `onClick` / `onArchive` / `onDelete` / `onRename` in comparison —
+  // Skip `onClick` / `onDelete` / `onRename` in comparison —
   // their behavior is stable (always call the same RPC with the card's
   // `id`) but identity changes every render due to upstream
   // `useKartonProcedure` selectors.
