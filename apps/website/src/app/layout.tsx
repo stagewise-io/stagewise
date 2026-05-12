@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     apple: [{ url: '/apple-touch-icon.png', type: 'image/png' }],
   },
   metadataBase: new URL('https://stagewise.io'),
-  title: 'stagewise',
+  title: 'stagewise · The Open Source Agentic IDE',
   description:
     'The Open Source Agentic IDE. stagewise is a purpose-built browser for developers with a coding agent built right in.',
   openGraph: {
