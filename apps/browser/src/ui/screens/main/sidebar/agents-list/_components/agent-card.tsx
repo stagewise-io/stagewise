@@ -225,7 +225,7 @@ export const AgentCard = memo(
       </div>
     );
   }),
-  // Skip `onClick` / `onDelete` / `onRename` in comparison —
+  // Skip `onClick` / `onRename` in comparison —
   // their behavior is stable (always call the same RPC with the card's
   // `id`) but identity changes every render due to upstream
   // `useKartonProcedure` selectors.

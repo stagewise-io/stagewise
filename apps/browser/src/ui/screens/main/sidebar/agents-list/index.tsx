@@ -145,7 +145,7 @@ function deriveActivityText(
 
 const DEFAULT_VISIBLE = 10;
 const SHOW_MORE_INCREMENT = 20;
-const HISTORY_PAGE_SIZE = 200;
+const INITIAL_HISTORY_FETCH = DEFAULT_VISIBLE + SHOW_MORE_INCREMENT; // 30
 
 // ============================================================================
 // Time grouping
@@ -161,9 +161,20 @@ type GroupLabel =
 function getGroupLabel(timestamp: number): GroupLabel {
   // A zero timestamp means no messages yet — treat as "Today".
   if (!timestamp) return 'Today';
-  const now = Date.now();
-  const diffMs = now - timestamp;
-  const diffDays = Math.floor(diffMs / 86_400_000);
+  // Bucket by calendar days (local date), not elapsed 24-hour windows.
+  const now = new Date();
+  const ts = new Date(timestamp);
+  const nowMidnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const tsMidnight = new Date(
+    ts.getFullYear(),
+    ts.getMonth(),
+    ts.getDate(),
+  ).getTime();
+  const diffDays = Math.round((nowMidnight - tsMidnight) / 86_400_000);
   if (diffDays < 0) return 'Today'; // clock skew
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
@@ -347,7 +358,6 @@ export function AgentsList() {
   const handleClick = useCallback(
     (id: string) => {
       // Optimistic: update the open agent immediately, don't wait for the RPC.
-      // markAsRead is handled by SidebarTopSection's useEffect on openAgent.
       setOpenAgent(id);
       void resumeAgent(id);
     },
@@ -357,9 +367,36 @@ export function AgentsList() {
   const handleDelete = useCallback(
     (id: string) => {
       addPendingRemoval(id);
-      void deleteAgent(id);
+      // After the backend confirms deletion, refetch so the history list
+      // drops the entry. Keep the id in pendingRemovals until the refetch
+      // completes — clearing it before the updated history arrives causes
+      // a flicker where the stale cached entry briefly reappears.
+      deleteAgent(id)
+        .then(() => {
+          getAgentsHistoryList(0, fetchLimitRef.current)
+            .then((entries) => {
+              setHistoryList(entries);
+              removePendingRemoval(id);
+            })
+            .catch((err) => {
+              console.error(
+                'Failed to refetch agent history after deletion:',
+                err,
+              );
+              removePendingRemoval(id);
+            });
+        })
+        .catch((err) => {
+          console.error('Failed to delete agent:', err);
+          removePendingRemoval(id);
+        });
     },
-    [addPendingRemoval, deleteAgent],
+    [
+      addPendingRemoval,
+      deleteAgent,
+      removePendingRemoval,
+      getAgentsHistoryList,
+    ],
   );
 
   const handleRename = useCallback(
@@ -379,15 +416,24 @@ export function AgentsList() {
     useComparingSelector((s) => Object.keys(s.agents.instances)),
   );
 
+  // Tracks how many history entries have been fetched from the server.
+  // Bumped by `handleShowMore` when the visible count exceeds it.
+  const fetchLimitRef = useRef(INITIAL_HISTORY_FETCH);
+
   // Fetch history once on startup (after first agent is active).
   const historyFetchedRef = useRef(false);
   useEffect(() => {
     if (historyFetchedRef.current) return;
     if (activeAgentIds.length === 0) return;
     historyFetchedRef.current = true;
-    getAgentsHistoryList(0, HISTORY_PAGE_SIZE).then((entries) => {
-      setHistoryList(entries);
-    });
+    getAgentsHistoryList(0, fetchLimitRef.current)
+      .then((entries) => {
+        setHistoryList(entries);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch agent history:', err);
+        historyFetchedRef.current = false;
+      });
   }, [activeAgentIds, getAgentsHistoryList]);
 
   // Clean up pending removals once the backend has confirmed removal.
@@ -396,19 +442,38 @@ export function AgentsList() {
     if (pendingRemovals.size === 0) {
       // Refetch history after deletions complete so the list stays in sync.
       if (prevPendingSizeRef.current > 0) {
-        getAgentsHistoryList(0, HISTORY_PAGE_SIZE).then((entries) => {
-          setHistoryList(entries);
-        });
+        getAgentsHistoryList(0, fetchLimitRef.current)
+          .then((entries) => {
+            setHistoryList(entries);
+          })
+          .catch((err) => {
+            console.error(
+              'Failed to refetch agent history after cleanup:',
+              err,
+            );
+          });
       }
       prevPendingSizeRef.current = 0;
       return;
     }
     prevPendingSizeRef.current = pendingRemovals.size;
-    const currentIds = new Set(agents.map((a) => a.id));
+    // Check against both active and history IDs — history-only agents
+    // would otherwise be treated as confirmed too early since they're
+    // never in the active `agents` array.
+    const currentIds = new Set([
+      ...agents.map((a) => a.id),
+      ...historyList.map((e) => e.id),
+    ]);
     pendingRemovals.forEach((id) => {
       if (!currentIds.has(id)) removePendingRemoval(id);
     });
-  }, [agents, pendingRemovals, removePendingRemoval, getAgentsHistoryList]);
+  }, [
+    agents,
+    historyList,
+    pendingRemovals,
+    removePendingRemoval,
+    getAgentsHistoryList,
+  ]);
 
   // =========================================================================
   // Merged list: active + history, sorted newest-first by lastMessageAt.
@@ -441,8 +506,8 @@ export function AgentsList() {
 
     // Active entries: exclude those pending removal.
     // When an agent was just resumed, its active state may still be loading
-    // (history empty) — fall back to the persisted history entry for
-    // timestamps so the card doesn't jump position.
+    // — fall back to the persisted history entry for title and timestamps
+    // so the card doesn't flicker or jump position.
     // For brand-new agents (no history entry, no messages), use Date.now()
     // so they sort to the top instead of being hidden at the bottom.
     const now = Date.now();
@@ -458,6 +523,7 @@ export function AgentsList() {
               : now;
         return {
           ...a,
+          title: a.title || h?.title || a.title,
           isLive: true,
           lastMessageAt:
             a.lastMessageAt > 0
@@ -523,8 +589,28 @@ export function AgentsList() {
   const hasMoreToShow = effectiveVisible < filteredAgents.length;
 
   const handleShowMore = useCallback(() => {
-    setVisibleCount((c) => c + SHOW_MORE_INCREMENT);
-  }, []);
+    setVisibleCount((c) => {
+      const next = c + SHOW_MORE_INCREMENT;
+      // Fetch the next page from the server when the visible count
+      // reaches or exceeds what's been loaded so far. Using >=
+      // ensures the first click past the initial fetch actually
+      // triggers a server request. No end-guard is needed —
+      // hasMoreToShow naturally hides the button when all visible
+      // items fit within the fetched set.
+      if (next >= fetchLimitRef.current) {
+        fetchLimitRef.current += SHOW_MORE_INCREMENT;
+        getAgentsHistoryList(0, fetchLimitRef.current)
+          .then((entries) => {
+            setHistoryList(entries);
+          })
+          .catch((err) => {
+            console.error('Failed to fetch more agent history:', err);
+            fetchLimitRef.current -= SHOW_MORE_INCREMENT;
+          });
+      }
+      return next;
+    });
+  }, [getAgentsHistoryList]);
 
   // =========================================================================
   // Scroll & mask
@@ -645,6 +731,7 @@ export function AgentsList() {
           <IconMagnifierOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
           <input
             type="text"
+            aria-label="Search agents"
             placeholder="Search agents…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -673,7 +760,7 @@ export function AgentsList() {
             return (
               <div
                 key={`h-${item.label}`}
-                className="shrink-0 px-1.5 pt-3 pb-1 font-semibold text-muted-foreground text-xs"
+                className="shrink-0 px-1.5 pt-3 pb-1 font-semibold text-subtle-foreground text-xs"
               >
                 {item.label}
               </div>
@@ -711,10 +798,10 @@ export function AgentsList() {
           <Button
             variant="ghost"
             size="sm"
-            className="mt-1 w-full justify-start text-muted-foreground/60 text-xs hover:text-foreground"
+            className="mt-1 w-full justify-start pl-1.5 text-sm text-subtle-foreground hover:bg-foreground/8"
             onClick={handleShowMore}
           >
-            Show more
+            Show more...
           </Button>
         )}
       </OverlayScrollbar>
