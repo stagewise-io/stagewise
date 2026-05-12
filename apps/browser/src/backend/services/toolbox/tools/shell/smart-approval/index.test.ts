@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { TelemetryService } from '@/services/telemetry';
 
@@ -11,7 +11,7 @@ vi.mock('ai', () => ({
 
 // We import *after* vi.mock so vitest can intercept
 import { generateObject } from 'ai';
-import { classifyShellCommand, type ClassifyShellCommandInput } from './index';
+import { type ClassifyShellCommandInput, classifyShellCommand } from './index';
 
 const generateObjectMock = vi.mocked(generateObject);
 
@@ -82,7 +82,7 @@ describe('classifyShellCommand', () => {
     });
     expect(generateObjectMock).toHaveBeenCalledTimes(1);
     expect(mps.getModelWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.objectContaining({
         $ai_span_name: 'smart-approval-classification',
@@ -92,7 +92,7 @@ describe('classifyShellCommand', () => {
       'smart-approval-classified',
       expect.objectContaining({
         needs_approval: false,
-        model_id: 'gemini-3.1-flash-lite-preview',
+        model_id: 'gemini-3.1-flash-lite',
         fallback_index: 0,
       }),
     );

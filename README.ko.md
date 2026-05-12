@@ -57,7 +57,7 @@
 
 - **Anthropic**: Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5
 - **OpenAI**: GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
-- **Google**: Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite (Preview)
+- **Google**: Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
 - **Moonshot AI**: Kimi K2.6, Kimi K2.5
 - **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
 - **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
