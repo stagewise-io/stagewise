@@ -638,11 +638,27 @@ export class AgentManagerService extends DisposableService {
   > {
     const agentInstanceId = instanceId ?? randomUUID();
 
-    // For new chat agents (not resumed), use the model from the last persisted chat
-    // Validate the model still exists (it may have been a deleted custom model)
-    const lastChatModelId = await this.agentPersistenceDB?.getLastChatModelId();
+    // For new chat agents (not resumed), carry forward preferences from the
+    // most recently persisted chat agent so the UI feels stateful. Values
+    // are merged as defaults — an explicit `initialState` field (e.g. the
+    // UI passing a user-picked modelId) always wins.
+    const [lastChatModelId, lastChatToolApprovalMode] = await Promise.all([
+      this.agentPersistenceDB?.getLastChatModelId() ?? null,
+      this.agentPersistenceDB?.getLastChatToolApprovalMode() ?? null,
+    ]);
+    // Validate modelId — the referenced BYOK model may have been deleted.
+    // toolApprovalMode is a fixed enum, so no runtime validation is needed.
     const lastModelValid =
       lastChatModelId && this.modelProviderService.modelExists(lastChatModelId);
+    const inheritedState: Partial<AgentState> =
+      type === AgentTypes.CHAT
+        ? {
+            ...(lastModelValid ? { activeModelId: lastChatModelId } : {}),
+            ...(lastChatToolApprovalMode
+              ? { toolApprovalMode: lastChatToolApprovalMode }
+              : {}),
+          }
+        : {};
 
     // Build state object outside setState to avoid "Type instantiation is excessively deep" error
     // caused by complex Draft<[]> inference from the 'ai' package's UIMessage type
@@ -708,12 +724,9 @@ export class AgentManagerService extends DisposableService {
       // @ts-ignore - The onFinish handler returns outputs with the configured schema of the agent. dunno why ts doesn't get this right.
       parent?.onFinish,
       parent?.onError,
-      initialState ?? {
-        activeModelId:
-          lastModelValid && type === AgentTypes.CHAT
-            ? lastChatModelId
-            : undefined,
-      },
+      // Merge inherited defaults under any explicit initialState so
+      // caller-provided values (resume path, UI-picked modelId) win.
+      { ...inheritedState, ...initialState },
       this.assetCacheService,
       this.processedImageCacheService,
     );
@@ -726,6 +739,9 @@ export class AgentManagerService extends DisposableService {
       model_id:
         this.karton.state.agents.instances[agentInstanceId]?.state
           .activeModelId ?? 'unknown',
+      tool_approval_mode:
+        this.karton.state.agents.instances[agentInstanceId]?.state
+          .toolApprovalMode ?? 'unknown',
     });
 
     return agent as BaseAgent<

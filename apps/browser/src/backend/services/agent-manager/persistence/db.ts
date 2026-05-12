@@ -338,6 +338,36 @@ export class AgentPersistenceDB {
   }
 
   /**
+   * Returns the toolApprovalMode of the most recently persisted chat agent,
+   * or null if no chat agents exist. Used by AgentManager to carry the
+   * user's approval-policy preference forward into newly created chat
+   * agents (mirrors getLastChatModelId).
+   */
+  public async getLastChatToolApprovalMode(): Promise<
+    schema.StoredAgentInstance['toolApprovalMode'] | null
+  > {
+    const results = await this._db
+      .select({ toolApprovalMode: schema.agentInstances.toolApprovalMode })
+      .from(schema.agentInstances)
+      .where(
+        and(
+          isNull(schema.agentInstances.parentAgentInstanceId),
+          eq(schema.agentInstances.type, AgentTypes.CHAT),
+        ),
+      )
+      .orderBy(desc(schema.agentInstances.lastMessageAt))
+      .limit(1)
+      .catch((error) => {
+        this._logger.error(
+          `[AgentPersistenceDB] Failed to fetch last chat tool approval mode: ${error}`,
+        );
+        return null;
+      });
+
+    return results?.[0]?.toolApprovalMode ?? null;
+  }
+
+  /**
    * Returns the mountedWorkspaces of the most recently persisted chat agent,
    * or null if no chat agents exist.
    */

@@ -115,6 +115,7 @@ export type EventProperties = {
     agent_type: string;
     agent_instance_id: string;
     model_id: string;
+    tool_approval_mode: string;
   };
   'agent-message-sent': {
     agent_type: string;
