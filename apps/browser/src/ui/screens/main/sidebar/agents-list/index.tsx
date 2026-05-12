@@ -8,6 +8,7 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   OverlayScrollbar,
@@ -233,6 +234,11 @@ export function AgentsList() {
       ? (s.agents.instances[openAgent]?.state.activeModelId ?? null)
       : null,
   );
+  const openAgentToolApprovalMode = useKartonState((s) =>
+    openAgent
+      ? (s.agents.instances[openAgent]?.state.toolApprovalMode ?? null)
+      : null,
+  );
   const currentMounts = useKartonState((s) =>
     openAgent
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
@@ -240,6 +246,10 @@ export function AgentsList() {
   );
   const openAgentModelIdRef = useRef(openAgentModelId);
   openAgentModelIdRef.current = openAgentModelId;
+  const openAgentToolApprovalModeRef = useRef<ToolApprovalMode | null>(
+    openAgentToolApprovalMode,
+  );
+  openAgentToolApprovalModeRef.current = openAgentToolApprovalMode;
   const currentMountPathsRef = useRef(currentMounts.map((m) => m.path));
   currentMountPathsRef.current = currentMounts.map((m) => m.path);
 
@@ -344,10 +354,13 @@ export function AgentsList() {
     setPendingCreate(true);
     window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
     const currentModelId = openAgentModelIdRef.current ?? undefined;
+    const currentToolApprovalMode =
+      openAgentToolApprovalModeRef.current ?? undefined;
     const paths = currentMountPathsRef.current;
     void createAgent(
       undefined,
       currentModelId,
+      currentToolApprovalMode,
       paths.length > 0 ? paths : undefined,
     ).then((id) => {
       setOpenAgent(id);
