@@ -174,13 +174,17 @@ export class AgentManagerService extends DisposableService {
         toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
       ) => {
+        const normalizedToolApprovalMode =
+          toolApprovalMode === 'alwaysAllow' ? 'smart' : toolApprovalMode;
         const agent = await this.createAgent(
           AgentTypes.CHAT,
           undefined,
           undefined,
           {
             ...(modelId ? { activeModelId: modelId } : {}),
-            ...(toolApprovalMode ? { toolApprovalMode } : {}),
+            ...(normalizedToolApprovalMode
+              ? { toolApprovalMode: normalizedToolApprovalMode }
+              : {}),
           },
           undefined,
           initialInputState,
