@@ -59,6 +59,7 @@ import { deriveMaxReadChars } from './file-read-transformer/format-utils';
 import { clearPendingApproval } from './pending-approvals-cleanup';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import { stripStrictFromToolSet } from './strip-strict-from-tools';
+import type { StagewiseProviderMetadata } from '../../stagewise-provider';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
 
@@ -1464,12 +1465,7 @@ export abstract class BaseAgent<
       this.state.set((draft) => {
         draft.title = newTitle;
       });
-      // Persist immediately — the fire-and-forget updateTitle call races
-      // with the step's saveState at the tail of runStep, and if the LLM
-      // title generation hasn't returned by then, the old title gets
-      // written. Explicit saveState here ensures the auto-title lands in
-      // the DB regardless of timing.
-      await this.saveState();
+      // We don't do persistence here, since that happens after a step is finished
     } catch (e) {
       const error = e as Error;
       this.logger.error(
@@ -1493,6 +1489,12 @@ export abstract class BaseAgent<
     // Reset continuation flag at the start of every step so a leftover
     // value from a prior aborted step cannot leak into the tail.
     this._pendingContinue = null;
+
+    // Holds the `onFinish` result for use in the tail AFTER the UI
+    // stream has drained. Used to populate reasoning_details onto the
+    // assistant message at a point where it is guaranteed to exist in
+    // `state.history` — see the tail block below for the race rationale.
+    let finishedResult: StepResult<StagewiseToolSet> | null = null;
 
     let queueFlushIndex = -1;
     this.state.set((draft) => {
@@ -1616,6 +1618,13 @@ export abstract class BaseAgent<
       onFinish: async (result) => {
         // Guard: ignore if a newer step has started (e.g. queue flush)
         if (this._stepGeneration !== stepGen) return;
+
+        // Capture the result for the runStep tail. We do NOT extract
+        // reasoning_details here because onFinish fires before the UI
+        // stream has drained, and the assistant message may not yet be
+        // in `state.history`. The tail applies it safely after
+        // Promise.all resolves. See populateReasoningDetailsOnAssistantMessage.
+        finishedResult = result;
 
         // Log step completion details
         this.logger.debug(
@@ -1793,6 +1802,26 @@ export abstract class BaseAgent<
         ),
         stream.consumeStream(),
       ]);
+
+      // ─── Populate reasoning_details on the assistant message ───────
+      // MUST run AFTER Promise.all resolves for the same reason as
+      // populatePathReferences below: onFinish fires before the UI
+      // stream has drained, and handleUiStream() is the only code path
+      // that pushes the assistant message into state.history. Running
+      // this inside the callback would silently drop signatures for
+      // short steps / slow consumers, which would regress the B2 fix
+      // and re-introduce Bedrock "thinking blocks cannot be modified"
+      // rejections on the next turn. See
+      // populateReasoningDetailsOnAssistantMessage for details.
+      if (finishedResult && this._stepGeneration === stepGen) {
+        try {
+          this.populateReasoningDetailsOnAssistantMessage(finishedResult);
+        } catch (err) {
+          this.logger.debug(
+            `[BaseAgent:${this.instanceId}] Failed to populate reasoningDetails: ${this.formatError(err as Error)}`,
+          );
+        }
+      }
 
       // ─── Populate pathReferences on the assistant message ───────────
       // MUST run AFTER Promise.all resolves so the UI stream has fully
@@ -2472,6 +2501,59 @@ export abstract class BaseAgent<
         };
       });
     }
+  }
+
+  /**
+   * Persist the provider's signed `reasoning_details` array into the
+   * last assistant message's metadata so it can be re-injected on
+   * subsequent requests.
+   *
+   * Context: OpenRouter / Bedrock-hosted Claude refuses to extend a
+   * thinking process when the conversation carries unsigned reasoning
+   * blocks. We capture the per-step signatures here (extracted by the
+   * stagewise metadata extractor under
+   * `providerMetadata.openaiCompatible.reasoningDetails`) and later
+   * spread them back onto the outbound assistant message via
+   * `providerOptions.openaiCompatible.reasoning_details`.
+   *
+   * Multi-step continuations append to the existing array so the full
+   * thinking history stays intact across tool-call rounds.
+   *
+   * Must be called AFTER `handleUiStream` has drained. `handleUiStream`
+   * is the only site that pushes the assistant message into
+   * `state.history` (see `draft.history.push(uiMessage)` in the UI
+   * stream loop), and it runs concurrently with `onFinish`. Invoking
+   * this function from inside `onFinish`/`onStepFinish` therefore
+   * races with the history push and can silently no-op (the early
+   * return below triggers, no signatures are persisted, and the next
+   * turn ships unsigned `reasoning_content` to Bedrock → rejection).
+   * The safe site is the `runStep` tail after
+   * `Promise.all([handleUiStream, consumeStream])` resolves.
+   */
+  private populateReasoningDetailsOnAssistantMessage(
+    step: StepResult<StagewiseToolSet>,
+  ): void {
+    const meta = step.providerMetadata as StagewiseProviderMetadata | undefined;
+    const details = meta?.openaiCompatible?.reasoningDetails;
+    if (!Array.isArray(details) || details.length === 0) return;
+
+    const targetIdx = this.state.get().history.length - 1;
+    const lastMsg = this.state.get().history[targetIdx];
+    if (!lastMsg || lastMsg.role !== 'assistant') return;
+
+    this.state.set((draft) => {
+      const target = draft.history[targetIdx];
+      if (!target || target.role !== 'assistant') return;
+      target.metadata ??= {
+        createdAt: new Date(),
+        partsMetadata: [],
+      };
+      const existing = target.metadata.reasoningDetails ?? [];
+      target.metadata.reasoningDetails = [
+        ...existing,
+        ...(details as Record<string, unknown>[]),
+      ];
+    });
   }
 
   /**

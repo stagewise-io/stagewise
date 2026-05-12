@@ -736,52 +736,221 @@ function buildCompressedHistoryPart(
  * Convert an assistant UI message into model messages.
  * Returns only the assistant-role message(s). Sandbox file attachments
  * are handled by the main loop alongside env-changes.
+ *
+ * Also round-trips signed `reasoning_details` through the outbound
+ * `providerOptions.openaiCompatible.reasoning_details` hook that the
+ * SDK spreads onto the OpenAI-compatible request body. Without this,
+ * Bedrock-hosted Claude silently refuses to extend the thinking
+ * process because the history carries unsigned `reasoning_content`
+ * strings. See `plans/rehydrate-reasoning-signatures-openrouter.md`.
  */
 async function convertAssistantMessage(
   message: AgentMessage,
   tools: ToolSet,
 ): Promise<ModelMessage[]> {
+  const signedDetails = message.metadata?.reasoningDetails ?? [];
+  const hasSignatures = signedDetails.length > 0;
+
   const cleanedMessage = {
     ...message,
-    parts: message.parts.map((part) => {
-      const isToolPart =
-        part.type.startsWith('tool-') || part.type === 'dynamic-tool';
-      if (!isToolPart) return part;
+    parts: message.parts
+      // Drop `reasoning` UI parts from the outbound conversion ONLY
+      // when we have signed `reasoning_details` to replace them with
+      // (the stagewise / OpenRouter path).
+      //
+      // Rationale: for the openai-compatible SDK path,
+      // `convertToOpenAICompatibleChatMessages` concatenates reasoning
+      // parts into a top-level `reasoning_content` string. That string
+      // is UI-derived and not byte-identical to what the provider
+      // originally signed. Shipping it alongside our signed
+      // `reasoning_details` array causes Anthropic/Bedrock to reject
+      // the turn with `thinking blocks ... cannot be modified`.
+      //
+      // When signatures ARE present, we rely purely on
+      // `providerOptions.openaiCompatible.reasoning_details` (attached
+      // below) to round-trip signed reasoning. OpenRouter reconstructs
+      // Anthropic `thinking` / Gemini `thought` blocks from that
+      // structured array.
+      //
+      // When signatures are NOT present we leave reasoning parts
+      // alone. This matters for BYOK with native SDKs
+      // (@ai-sdk/anthropic, @ai-sdk/google) which consume reasoning
+      // parts via their own signature mechanism
+      // (`providerMetadata.anthropic.signature`,
+      // `providerMetadata.google.thoughtSignature`) and would
+      // otherwise lose cross-turn chain-of-thought. It also preserves
+      // pre-fix stagewise messages' reasoning text in outbound history
+      // — no worse than before.
+      //
+      // UI visibility is unaffected — this filter only touches the
+      // throwaway copy used for model conversion; persisted UI parts
+      // still carry reasoning for transcript display.
+      .filter((part) => !(hasSignatures && part.type === 'reasoning'))
+      .map((part) => {
+        const isToolPart =
+          part.type.startsWith('tool-') || part.type === 'dynamic-tool';
+        if (!isToolPart) return part;
 
-      let cleaned = { ...part };
+        let cleaned = { ...part };
 
-      // Sanitize tool input: providers reject non-object input in
-      // tool-call content blocks (e.g. raw strings from failed
-      // repair). Replace with empty object so the conversation
-      // stays recoverable — the tool result/error already carries
-      // enough context for the LLM.
-      if (
-        'input' in cleaned &&
-        (typeof cleaned.input !== 'object' ||
-          cleaned.input === null ||
-          Array.isArray(cleaned.input))
-      )
-        cleaned = { ...cleaned, input: {} } as typeof cleaned;
+        // Sanitize tool input: providers reject non-object input in
+        // tool-call content blocks (e.g. raw strings from failed
+        // repair). Replace with empty object so the conversation
+        // stays recoverable — the tool result/error already carries
+        // enough context for the LLM.
+        if (
+          'input' in cleaned &&
+          (typeof cleaned.input !== 'object' ||
+            cleaned.input === null ||
+            Array.isArray(cleaned.input))
+        )
+          cleaned = { ...cleaned, input: {} } as typeof cleaned;
 
-      // Strip internal underscore properties from tool output.
-      if (
-        'output' in cleaned &&
-        cleaned.output &&
-        typeof cleaned.output === 'object'
-      ) {
-        cleaned = {
-          ...cleaned,
-          output: stripUnderscoreProperties(
-            cleaned.output as Record<string, unknown>,
-          ),
-        } as typeof cleaned;
-      }
+        // Strip internal underscore properties from tool output.
+        if (
+          'output' in cleaned &&
+          cleaned.output &&
+          typeof cleaned.output === 'object'
+        ) {
+          cleaned = {
+            ...cleaned,
+            output: stripUnderscoreProperties(
+              cleaned.output as Record<string, unknown>,
+            ),
+          } as typeof cleaned;
+        }
 
-      return cleaned;
-    }),
+        return cleaned;
+      }),
   };
 
-  return convertToModelMessages([cleanedMessage], { tools });
+  const modelMessages = await convertToModelMessages([cleanedMessage], {
+    tools,
+  });
+
+  // ── Distribute signed reasoning_details per step ─────────────────
+  //
+  // `convertToModelMessages` splits a multi-step assistant UI message
+  // into one assistant ModelMessage per `step-start` boundary (see
+  // `ai/dist/index.js` — `processBlock` flush at each step-start).
+  // Each step originally carried its own thinking block(s); we must
+  // attach each step's reasoning_details to the ModelMessage that
+  // represents that step, not dump them all onto the first one.
+  //
+  // Putting every signature on the first assistant ModelMessage makes
+  // OpenRouter reconstruct `[thinking_A, thinking_B, text, tool_use]`
+  // for step 1 while step 2 is sent without any thinking block.
+  // Anthropic's validator then rejects the turn with:
+  //   `thinking blocks in the latest assistant message cannot be
+  //    modified. These blocks must remain as they were in the
+  //    original response.`
+  //
+  // The UI parts and the accumulated `reasoningDetails` array are both
+  // ordered by (step, position-in-step), so counting reasoning parts
+  // per step block and slicing the details array the same way keeps
+  // them aligned.
+  if (hasSignatures) {
+    const reasoningCountsPerStep = countReasoningPartsPerStep(message.parts);
+    const totalReasoningParts = reasoningCountsPerStep.reduce(
+      (a, b) => a + b,
+      0,
+    );
+
+    // Slice `signedDetails` into per-step chunks. Only when the UI
+    // reasoning-part count matches the captured-details count (the
+    // normal, post-fix case) do we trust the segmentation. Otherwise
+    // fall back to attaching the whole array to the first assistant
+    // ModelMessage — which is wrong for multi-step turns but preserves
+    // the pre-existing behaviour and is safer than shuffling unsigned
+    // content across steps.
+    const detailsPerStep: Record<string, unknown>[][] = [];
+    if (
+      totalReasoningParts === signedDetails.length &&
+      reasoningCountsPerStep.length > 0
+    ) {
+      let cursor = 0;
+      for (const count of reasoningCountsPerStep) {
+        detailsPerStep.push(signedDetails.slice(cursor, cursor + count));
+        cursor += count;
+      }
+    }
+
+    let stepIdx = 0;
+    let usedFallback = detailsPerStep.length === 0;
+    for (const modelMessage of modelMessages) {
+      if (modelMessage.role !== 'assistant') continue;
+
+      let stepDetails: Record<string, unknown>[];
+      if (usedFallback) {
+        // Legacy behaviour: everything on the first assistant message.
+        stepDetails = signedDetails;
+        usedFallback = false;
+      } else {
+        stepDetails = detailsPerStep[stepIdx] ?? [];
+        stepIdx++;
+      }
+
+      if (stepDetails.length === 0) continue;
+
+      // `providerOptions` is typed as `JSONValue`, but the SDK reads
+      // `message.providerOptions.openaiCompatible` verbatim and spreads
+      // it onto the outbound assistant message body. `reasoning_details`
+      // entries are provider-shaped records and are JSON-serialisable
+      // at runtime; the cast is needed because TS's `JSONObject` forbids
+      // `unknown` values even though the wire format is plain JSON.
+      const prior = (modelMessage.providerOptions ?? {}) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const priorOC = (prior.openaiCompatible ?? {}) as Record<string, unknown>;
+      modelMessage.providerOptions = {
+        ...prior,
+        openaiCompatible: {
+          ...priorOC,
+          reasoning_details: stepDetails,
+        },
+      } as unknown as typeof modelMessage.providerOptions;
+    }
+  }
+
+  return modelMessages;
+}
+
+/**
+ * Count how many `reasoning` UI parts fall inside each step block of
+ * an assistant UI message. A step block is delimited by `step-start`
+ * parts (matching the segmentation that `convertToModelMessages`
+ * performs in its `processBlock` loop).
+ *
+ * Examples:
+ *   `[step-start, reasoning, text, tool, step-start, reasoning, tool]`
+ *   → `[1, 1]` (one reasoning in each of the two step blocks)
+ *
+ *   `[text, tool]` (no step-start at all)
+ *   → `[0]` (single implicit block with no reasoning)
+ *
+ *   `[step-start, tool]` (step with no reasoning)
+ *   → `[0]`
+ */
+function countReasoningPartsPerStep(parts: AgentMessage['parts']): number[] {
+  const counts: number[] = [];
+  let current = 0;
+  let inStep = false;
+  for (const part of parts) {
+    if (part.type === 'step-start') {
+      if (inStep) counts.push(current);
+      current = 0;
+      inStep = true;
+    } else if (part.type === 'reasoning') {
+      current++;
+    }
+  }
+  if (inStep) counts.push(current);
+  // If the message had no step-start at all (unlikely but possible for
+  // legacy / synthetic messages), return a single implicit block so the
+  // caller still has one bucket to attach details to.
+  if (counts.length === 0) counts.push(current);
+  return counts;
 }
 
 /**

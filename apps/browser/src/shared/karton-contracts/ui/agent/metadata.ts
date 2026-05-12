@@ -340,6 +340,22 @@ const metadataSchema = z.object({
    * once across the conversation unless the hash changes.
    */
   pathReferences: z.record(z.string(), z.string()).optional(),
+  /**
+   * Signed `reasoning_details` captured from the provider response.
+   * Re-injected into outbound assistant messages on subsequent requests
+   * so providers (Anthropic via Bedrock/OpenRouter, Google) can verify
+   * chain-of-thought signatures and keep extending the thinking process.
+   *
+   * Shape is provider-defined (`reasoning.text`, `reasoning.encrypted`,
+   * `reasoning.summary`, etc., each carrying `signature` /
+   * `thought_signature` / `format`). We store entries verbatim so
+   * forward-compat is preserved — do NOT tighten this schema.
+   *
+   * Populated by `populateReasoningDetailsOnAssistantMessage` at step end.
+   * Consumed by `convertAssistantMessage` when building ModelMessages
+   * (attached under `providerOptions.openaiCompatible.reasoning_details`).
+   */
+  reasoningDetails: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 
 export type UserMessageMetadata = z.infer<typeof metadataSchema>;
