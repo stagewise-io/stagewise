@@ -98,7 +98,7 @@
     "@tanstack/react-router-devtools": "^1.141.4",
     "@tanstack/router-plugin": "^1.141.5",
     "@tiptap/core": "^3.20.0",
-    "@tiptap/pm": "^3.20.0",
+    "@tiptap/pm": "^3.23.1",
     "@tiptap/react": "^3.20.0",
     "@tiptap/starter-kit": "^3.20.0",
     "@types/electron-squirrel-startup": "^1.0.2",
