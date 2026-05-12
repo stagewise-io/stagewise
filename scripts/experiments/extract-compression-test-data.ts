@@ -35,6 +35,13 @@ import {
   COMPRESSION_SYSTEM_PROMPT,
   buildCompressionUserMessage,
 } from '../../apps/browser/src/backend/agents/shared/base-agent/history-compression/prompt';
+import { discoverSkills } from '../../apps/browser/src/backend/agents/shared/prompts/utils/get-skills';
+import {
+  extractSlashIdsFromText,
+  resolveSlashSkill,
+  type ResolvedSlashCommand,
+} from '../../apps/browser/src/backend/agents/shared/prompts/utils/metadata-converter/slash-items';
+import type { SkillDefinition } from '../../apps/browser/src/shared/skills';
 
 // ─── CLI args ────────────────────────────────────────────────────────────────
 
@@ -42,6 +49,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   let channel: 'release' | 'prerelease' | 'dev' = 'prerelease';
   let minMessages = 6;
+  let skillsDir = path.resolve('apps/browser/bundled');
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--channel' && args[i + 1]) {
@@ -57,8 +65,12 @@ function parseArgs() {
       minMessages = Number.parseInt(args[i + 1], 10);
       i++;
     }
+    if (args[i] === '--skills-dir' && args[i + 1]) {
+      skillsDir = path.resolve(args[i + 1]);
+      i++;
+    }
   }
-  return { channel, minMessages };
+  return { channel, minMessages, skillsDir };
 }
 
 // ─── Channel → DB path ──────────────────────────────────────────────────────
@@ -99,6 +111,61 @@ interface AgentMessage {
   metadata?: { compressedHistory?: string; [k: string]: unknown };
 }
 
+// ─── Skill loading ───────────────────────────────────────────────────────────
+
+/**
+ * Loads bundled builtin + plugin skills from the repo's `apps/browser/bundled/`
+ * tree and returns them as `SkillDefinition[]` compatible with
+ * `resolveSlashSkill`. ID formats match the live runtime exactly:
+ *  - builtins: `command:${name.toLowerCase()}` (see apps/browser/src/backend/main.ts)
+ *  - plugins:  `plugin:${pluginId}:${skill.name}` (see apps/browser/src/backend/services/toolbox/index.ts)
+ *
+ * `bundledRoot` should point at `apps/browser/bundled`. If the directory is
+ * missing, returns an empty array and logs a warning.
+ */
+async function loadBundledSkills(
+  bundledRoot: string,
+): Promise<SkillDefinition[]> {
+  const skillsSubdir = path.join(bundledRoot, 'skills');
+  const pluginsSubdir = path.join(bundledRoot, 'plugins');
+
+  if (!fs.existsSync(bundledRoot)) {
+    console.warn(`  ⚠ Skills directory not found: ${bundledRoot}`);
+    return [];
+  }
+
+  const [builtinRaw, pluginRaw] = await Promise.all([
+    discoverSkills(skillsSubdir),
+    discoverSkills(pluginsSubdir),
+  ]);
+
+  const builtins: SkillDefinition[] = builtinRaw.map((s) => ({
+    id: `command:${s.name.toLowerCase()}`,
+    displayName: s.name,
+    description: s.description,
+    source: 'builtin',
+    contentPath: `${s.path}/SKILL.md`,
+    userInvocable: s.userInvocable,
+    agentInvocable: s.agentInvocable,
+  }));
+
+  const plugins: SkillDefinition[] = pluginRaw.map((s) => {
+    const pluginId = path.basename(s.path);
+    return {
+      id: `plugin:${pluginId}:${s.name}`,
+      displayName: s.name,
+      description: s.description,
+      source: 'plugin',
+      contentPath: `${s.path}/SKILL.md`,
+      pluginId,
+      userInvocable: s.userInvocable,
+      agentInvocable: s.agentInvocable,
+    };
+  });
+
+  return [...builtins, ...plugins];
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function sanitizeTitle(title: string): string {
@@ -137,8 +204,8 @@ function findPreviousCompressionInSlice(messages: AgentMessage[]): number {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-function main() {
-  const { channel, minMessages } = parseArgs();
+async function main() {
+  const { channel, minMessages, skillsDir } = parseArgs();
   const dbPath = getDbPath(channel);
 
   if (!fs.existsSync(dbPath)) {
@@ -149,6 +216,10 @@ function main() {
   console.log(`Channel:      ${channel}`);
   console.log(`DB:           ${dbPath}`);
   console.log(`Min messages: ${minMessages}`);
+  console.log(`Skills dir:   ${skillsDir}`);
+
+  const skills = await loadBundledSkills(skillsDir);
+  console.log(`Loaded ${skills.length} skills from bundled tree`);
   console.log('');
 
   // Query all agent instances
@@ -212,6 +283,10 @@ function main() {
       `  ✓ ${row.title} — ${messages.length} msgs, ${compressionPoints.length} compressions`,
     );
 
+    // Per-chat cache: memoize slash resolution across this chat's compressions.
+    // `null` means "tried and not found" so we don't re-try every compression.
+    const chatSlashCache = new Map<string, ResolvedSlashCommand | null>();
+
     // Extract each compression point
     for (let cpIdx = 0; cpIdx < compressionPoints.length; cpIdx++) {
       const boundaryIndex = compressionPoints[cpIdx];
@@ -237,10 +312,41 @@ function main() {
           ? messagesToCompact.length - prevCompressionIndex
           : messagesToCompact.length;
 
+      // Gather unique slash IDs referenced in this compression's user messages
+      // and resolve each (with per-chat caching).
+      const sliceSlashIds = new Set<string>();
+      for (const m of messagesToCompact) {
+        if (m.role !== 'user' || !Array.isArray(m.parts)) continue;
+        for (const id of extractSlashIdsFromText(m.parts)) {
+          sliceSlashIds.add(id);
+        }
+      }
+
+      await Promise.all(
+        Array.from(sliceSlashIds).map(async (id) => {
+          if (chatSlashCache.has(id)) return;
+          const cmd = await resolveSlashSkill(id, skills);
+          chatSlashCache.set(id, cmd);
+        }),
+      );
+
+      const resolvedSlash = new Map<string, ResolvedSlashCommand>();
+      const slashIdsResolved: Array<{ id: string; resolved: boolean }> = [];
+      for (const id of sliceSlashIds) {
+        const cmd = chatSlashCache.get(id) ?? null;
+        slashIdsResolved.push({ id, resolved: cmd !== null });
+        if (cmd) resolvedSlash.set(id, cmd);
+      }
+      slashIdsResolved.sort((a, b) => a.id.localeCompare(b.id));
+
       // Generate the compact history — this is the exact input the
-      // compression LLM received.
-      const compactHistory =
-        convertAgentMessagesToCompactMessageHistoryString(messagesToCompact);
+      // compression LLM received (post-fix: slash bodies inlined).
+      const compactHistory = convertAgentMessagesToCompactMessageHistoryString(
+        messagesToCompact,
+        {
+          resolvedSlash,
+        },
+      );
       const userMessage = buildCompressionUserMessage(
         compactHistory,
         prevCompressionSize,
@@ -291,6 +397,7 @@ function main() {
             actualOutputIncludesPreviousTag: actualOutput.includes(
               '<previous-chat-history>',
             ),
+            slashIdsResolved,
           },
           null,
           2,
@@ -299,12 +406,16 @@ function main() {
 
       totalCompressions++;
 
+      const resolvedCount = slashIdsResolved.filter((s) => s.resolved).length;
       console.log(
         `    compression-${String(cpIdx + 1).padStart(3, '0')}: boundary=${boundaryIndex}, ` +
           `${serializedMessageCount} msgs serialized, ` +
           `input=${compactHistory.length} chars, ` +
           `output=${actualOutput.length} chars` +
-          (prevCompressionSize ? `, prev=${prevCompressionSize} chars` : ''),
+          (prevCompressionSize ? `, prev=${prevCompressionSize} chars` : '') +
+          (sliceSlashIds.size > 0
+            ? `, slashIds=${sliceSlashIds.size} resolved=${resolvedCount}`
+            : ''),
       );
     }
 
@@ -316,4 +427,7 @@ function main() {
   );
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
