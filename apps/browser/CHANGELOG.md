@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0-alpha089 (2026-05-12)
+
+### Features
+
+* carry over tool call permission mode (54597b7)
+* reuse tool call permission mode in new agents (a009c1b)
+
+### Bug Fixes
+
+* save and send missing reasoning signatures (49d6ac3)
+
+### Other Changes
+
+* put all agents into the sidebar (53980ca)
+
 ## 1.0.0-alpha088 (2026-05-11)
 
 ### Bug Fixes
