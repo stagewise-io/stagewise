@@ -1,5 +1,25 @@
+import type { Metadata } from 'next';
 import { getAllNewsPosts } from '@/lib/source';
 import { HomeClient } from './_components/home-client';
+
+export const metadata: Metadata = {
+  title: 'The Open Source Agentic IDE · stagewise',
+  description:
+    'Create and orchestrate coding agents, show app previews and run git workflows. Use your favorite models across all providers.',
+  openGraph: {
+    title: 'The Open Source Agentic IDE · stagewise',
+    description:
+      'Create and orchestrate coding agents, show app previews and run git workflows. Use your favorite models across all providers.',
+    type: 'website',
+  },
+  twitter: {
+    title: 'The Open Source Agentic IDE · stagewise',
+    description:
+      'Create and orchestrate coding agents, show app previews and run git workflows. Use your favorite models across all providers.',
+    creator: '@stagewise_io',
+  },
+  category: 'technology',
+};
 
 export default function Home() {
   const posts = getAllNewsPosts()

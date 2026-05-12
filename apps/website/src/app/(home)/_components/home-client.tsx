@@ -2,6 +2,7 @@
 import { IconGithub } from 'nucleo-social-media';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import type { NewsType } from '@/lib/news';
 import { usePostHog } from 'posthog-js/react';
@@ -407,7 +408,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ScrollReveal>
             <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <h3 className="font-medium text-2xl">
                   Open-Source and extensible
                 </h3>
@@ -416,6 +417,16 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                   compatible with your favorite models — including the ones you
                   run locally.
                 </p>
+                <a
+                  href="https://github.com/stagewise-io/stagewise"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-fit items-center gap-2 text-primary-foreground hover:text-hover-derived active:text-active-derived"
+                >
+                  <IconGithub className="size-4" />
+                  View on GitHub
+                  <IconArrowRightFill18 className="inline size-4" />
+                </a>
               </div>
               <div
                 className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[45%]"
