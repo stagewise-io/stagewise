@@ -204,10 +204,11 @@ const describeIfShell = ptyAvailable ? describe : describe.skip;
  * production default so tests fall back to sentinel mode quickly when
  * the test shell doesn't emit clean OSC 133 markers.
  *
- * Bumped from 800 → 2000 ms to add margin against CI jitter on Windows
- * (ConPTY flush delays + MSYS bash startup). Healthy runs detect OSC 133
- * well under 200 ms, so this is defensive headroom only. */
-const TEST_DETECT_TIMEOUT_MS = 2000;
+ * Bumped progressively: 800 → 2000 → 5000 ms. The latest bump accounts
+ * for heavy CPU contention when the full monorepo test suite runs via
+ * turbo with 4+ concurrent workspace test runners. Healthy runs detect
+ * OSC 133 well under 200 ms, so this is defensive headroom only. */
+const TEST_DETECT_TIMEOUT_MS = 5000;
 
 /**
  * Extra `pty.spawn` options used by tests. On Windows CI the ConPTY helper
@@ -227,9 +228,9 @@ const TEST_PTY_SPAWN_OPTIONS =
 async function waitForReady(
   sm: SessionManager,
   sessionId: string,
-  // Needs a comfortable margin over TEST_DETECT_TIMEOUT_MS (2000) so CI
+  // Needs a comfortable margin over TEST_DETECT_TIMEOUT_MS (5000) so CI
   // runners with GC jitter don't flake before the sentinel fallback fires.
-  timeoutMs = 4000,
+  timeoutMs = 8000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
