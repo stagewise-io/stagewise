@@ -1062,11 +1062,17 @@ export abstract class BaseAgent<
    */
   protected async compressHistory(history: AgentMessage[]): Promise<string> {
     // The standard compaction logic is very simple. We can make this more sophisticated later on.
+    // We pass the full skill list through so the serializer can resolve
+    // `[label](slash:id)` links to their full skill body and preserve
+    // behavioral directives (e.g. `/implement`) that would otherwise be
+    // stripped to a bare link stub during compression.
+    const skills = await this.toolbox.getSkillsList(this.instanceId);
     return await generateSimpleCompressedHistory(
       history,
       this.modelProviderService,
       this.instanceId,
       this.state.get().activeModelId,
+      skills,
     );
   }
 

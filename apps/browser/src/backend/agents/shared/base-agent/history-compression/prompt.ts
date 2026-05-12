@@ -20,7 +20,7 @@ Write in **second-person** for the agent ("you") and **third-person** for the us
 
 ## Input format
 The chat history uses XML-like tags:
-- \`<user>...</user>\` — user messages. May contain \`[attached: ...]\`, \`[mentioned: ...]\` annotations.
+- \`<user>...</user>\` — user messages. May contain \`[attached: ...]\`, \`[mentioned: ...]\` annotations, and nested \`<slash-command>...</slash-command>\` blocks carrying the full body of a slash-command the user invoked (see “Authoritative payload blocks” below).
 - \`<assistant>...</assistant>\` — agent messages. Text content plus tool annotations.
 - Tool annotations are compact one-liners like \`[read: path]\`, \`[edited: path (N edits)]\`, \`[shell: label → ✓]\`, \`[shell: label → exit 1]\`, \`[lint: paths → clean]\`, \`[lint: paths → N errors, M warnings]\`, \`[asked user: title → answers]\`, \`[created: path]\`, \`[wrote: path]\`, \`[searched: "query"]\`, etc.
 - \`<previous-chat-history>...</previous-chat-history>\` — a prior briefing. Treat as established ground truth.
@@ -31,13 +31,26 @@ The chat history uses XML-like tags:
 - Questions asked by either side (and answers, if given)
 - Errors, dead ends, reverted approaches, or rejected alternatives
 - Tool outcomes that changed direction or confirmed results (e.g. "linting revealed 3 errors in X", "curl against the live API showed the docs were wrong", "tests passed after the fix")
-- The current state: what is done, what is in progress, and what is still open or unresolved
+- The current state: what is done, what is in progress, and what is still open or unresolved — including any currently-binding directives from slash-commands or structured payload blocks (see “Authoritative payload blocks” below)
 
 ## What to preserve verbatim
 - File paths: use [](path:{mount-prefixed-path}) markdown links (e.g. [](path:weba9/apps/browser/src/foo.ts)). Convert plain paths from tool annotations to this format. Preserve existing path: links as-is. Legacy wsfile: links from older history should be converted to path: links.
 - Markdown links from the input — copy them as-is.
 - User decisions, stated preferences, constraints, and explicit rules.
 - Color values, directory structures, configuration details.
+
+## Authoritative payload blocks (slash-commands, env-changes, and similar)
+The input may contain structured payload blocks nested inside \`<user>\` or \`<assistant>\` elements. These carry authoritative context that the agent was required to follow at the time:
+- \`<slash-command id="..." name="..."><![CDATA[ ...body... ]]></slash-command>\` — the full body of a slash-command the user invoked (e.g. \`/implement\`, \`/plan\`). The body contains binding rules, workflows, or directives that governed the agent's behavior while the command was active.
+- Future structured blocks of the same shape (env-change payloads, plan-progress snapshots, etc.) — treat them the same way.
+
+For each such block, decide whether it is **currently binding** or **historical**:
+- **Currently binding** — the most recent turns show the agent still operating under the command's scope: tasks remain unfinished, the user has not paused or redirected, no higher-priority user request has superseded it, and no completion signal has been emitted. In this case, extract and restate the binding directives **in your own prose**, in second-person, inside the topic section where the command was invoked. Do not drop mission-critical rules such as "do not stop until all tasks are complete", checkbox discipline, question-batching rules, or any other imperative the block spells out. The agent must read your briefing and know it is still bound by those rules.
+- **Historical** — the command has since been superseded: the user interrupted with a new request, the agent completed all tasks, the user asked a question outside the command's scope, or the flow has clearly moved on. In this case, mention that the command was invoked and summarise what was done under it, but do **not** restate its directives as if they still apply. Never inject phrases like "do not stop" or "continue until all tasks are checked" when the scope has already closed.
+
+When uncertain, bias toward treating the block as binding only if the final turns in the history show ongoing work under it. If the final turns show discussion, review, Q&A, or a new topic, treat it as historical.
+
+Never emit the raw \`<slash-command>\` tag or CDATA wrapper in your output — paraphrase the relevant parts into markdown prose. The block is input structure, not output format.
 
 ## Previously compacted history and output budget
 If a \`<previous-chat-history>\` block is present in the input, it contains an earlier briefing. Use **progressive recency bias** when incorporating it:
@@ -55,7 +68,11 @@ Condensation rules (when shortening is needed):
 - Use \`##\` headings to separate distinct tasks or topic phases.
 - Within each topic, write flowing chronological prose — no sub-headings, no bullet lists, no tables.
 - **Recency bias:** Early resolved topics get 2–4 sentences. Recent or still-active topics get full detail — specific files changed, tool outcomes, user decisions, and current status.
-- If the conversation ends with an active/unresolved topic, end the briefing with its current status so the agent knows exactly where to pick up.
+- **Mandatory final section.** End every briefing with a \`## Current working state\` section composed of exactly two sentences, in this order:
+  1. A past-tense sentence naming the most recent concrete action you took, referencing a specific file, tool call, or user exchange.
+  2. A forward-looking sentence naming the single most specific action the agent must take next — the next file to touch, command to run, question to answer, or (only when all work is demonstrably finished and the user has sent a confirmation) the fact that the agent is waiting for the user's next instruction.
+  This section has no slot for state characterisations, summary adjectives, or wrap-up commentary. If you feel the urge to add a third sentence describing the overall state of the work, stop — the two-sentence constraint is deliberate, because overall-state sentences are where hallucinated completion tends to creep in.
+- **Completion claims require evidence.** Anywhere in the briefing, only describe a task as done, verified, tested, passed, fixed, resolved, or ready when the input contains a concrete confirming signal: an explicit user confirmation message, a \`[shell: ... → ✓]\` / \`[lint: ... → clean]\` / \`[tests: ... → passed]\` annotation, or a plan section whose checkboxes are all \`[x]\`. When no such signal exists, report only the action you took — never the quality, stability, or readiness of the resulting state. "You edited X to do Y" is always safe; "X now correctly does Y" requires evidence.
 
 ## Output rules
 - Output ONLY the briefing content. No titles, preambles, or meta-commentary.

@@ -2,6 +2,12 @@ import { generateText } from 'ai';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { ModelId } from '@shared/available-models';
+import type { SkillDefinition } from '@shared/skills';
+import {
+  extractSlashIdsFromText,
+  resolveSlashSkill,
+  type ResolvedSlashCommand,
+} from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
 
 // Import for local use + re-export so existing imports keep working.
 import {
@@ -108,9 +114,34 @@ export const generateSimpleCompressedHistory = async (
   modelProviderService: ModelProviderService,
   agentInstanceId: string,
   fallbackModelId?: ModelId,
+  skills?: ReadonlyArray<SkillDefinition>,
 ): Promise<string> => {
+  // Pre-resolve every unique slash-command ID referenced in user messages
+  // so the sync serializer can emit the full skill body as a
+  // `<slash-command>` sibling inside each `<user>` block. Without this
+  // the compression LLM only sees the raw link text
+  // (e.g. `[/implement](slash:command:implement)`) and loses all
+  // behavioral directives carried by the skill body.
+  const slashIds = new Set<string>();
+  for (const m of messages) {
+    if (m?.role !== 'user' || !Array.isArray(m.parts)) continue;
+    for (const id of extractSlashIdsFromText(m.parts)) slashIds.add(id);
+  }
+
+  const resolvedSlash = new Map<string, ResolvedSlashCommand>();
+  if (skills && skills.length > 0 && slashIds.size > 0) {
+    await Promise.all(
+      Array.from(slashIds).map(async (id) => {
+        const cmd = await resolveSlashSkill(id, skills);
+        if (cmd) resolvedSlash.set(id, cmd);
+      }),
+    );
+  }
+
   const compactConvertedChatHistory =
-    convertAgentMessagesToCompactMessageHistoryString(messages);
+    convertAgentMessagesToCompactMessageHistoryString(messages, {
+      resolvedSlash,
+    });
 
   // Find the previous briefing length (if any) so we can inject a dynamic
   // budget hint into the user message.
