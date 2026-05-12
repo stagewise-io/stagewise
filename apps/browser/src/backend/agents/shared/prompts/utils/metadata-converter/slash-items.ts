@@ -7,7 +7,7 @@ import xml from 'xml';
 import specialTokens from '../special-tokens';
 
 /** Regex to match `[label](slash:id)` links in message text. */
-const SLASH_LINK_RE = /\[([^\]]*)\]\(slash:([^)]+)\)/g;
+export const SLASH_LINK_RE = /\[([^\]]*)\]\(slash:([^)]+)\)/g;
 
 /**
  * Extracts slash command IDs from the text parts of a message.

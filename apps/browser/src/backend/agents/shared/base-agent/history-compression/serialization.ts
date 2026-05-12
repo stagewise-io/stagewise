@@ -1,5 +1,34 @@
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+import {
+  SLASH_LINK_RE,
+  inlineSlashLinksAsText,
+  renderSlashCommandXml,
+  type ResolvedSlashCommand,
+} from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
+
+/**
+ * Options for serialising a history for LLM-based compression.
+ */
+export interface CompactHistorySerializationOptions {
+  /**
+   * Pre-resolved slash-command bodies keyed by slash ID
+   * (e.g. `command:implement`).
+   *
+   * When a user message contains `[label](slash:id)` links and the `id`
+   * is present in this map, the rendered `<slash-command>` XML is emitted
+   * as a sibling **inside** the enclosing `<user>…</user>` element (before
+   * metadata annotations and text). The raw link text in the user body is
+   * additionally inlined to `/label` via `inlineSlashLinksAsText` so the
+   * body stays readable without duplicating link cruft.
+   *
+   * Defaults to an empty map. When empty, the serializer preserves the
+   * legacy behavior and passes link text through unchanged. This keeps
+   * callers that cannot resolve slash skills (e.g. the offline experiment
+   * script) working without disk access.
+   */
+  resolvedSlash?: ReadonlyMap<string, ResolvedSlashCommand>;
+}
 
 const escapeTextForXML = (text: string): string => {
   return String(text ?? '')
@@ -369,8 +398,12 @@ const estimateMetadataChars = (
  */
 export const convertAgentMessagesToCompactMessageHistoryString = (
   messages: AgentMessage[],
+  opts: CompactHistorySerializationOptions = {},
 ): string => {
   if (!Array.isArray(messages)) return '';
+
+  const resolvedSlash = opts.resolvedSlash;
+  const hasSlashResolutions = !!resolvedSlash && resolvedSlash.size > 0;
 
   const revertedCompactedHistoryStringParts: string[] = [];
 
@@ -395,11 +428,38 @@ export const convertAgentMessagesToCompactMessageHistoryString = (
           message.metadata,
         );
         const parts = Array.isArray(message.parts) ? message.parts : [];
+
+        // Collect slash-command bodies for every `[label](slash:id)` link
+        // present in the user text parts whose id is in `resolvedSlash`.
+        // These are already well-formed XML and MUST NOT be passed through
+        // `escapeTextForXML`.
+        const slashBodies: string[] = [];
+        if (hasSlashResolutions) {
+          for (const part of parts) {
+            try {
+              if (part?.type !== 'text' || !part.text) continue;
+              for (const match of part.text.matchAll(SLASH_LINK_RE)) {
+                const cmd = resolvedSlash!.get(match[2]!);
+                if (cmd) slashBodies.push(renderSlashCommandXml(cmd));
+              }
+            } catch {
+              // Skip malformed part rather than abort this message
+            }
+          }
+        }
+
         const textParts = parts
           .map((part) => {
             try {
               if (part?.type === 'text') {
-                return escapeTextForXML(part.text);
+                // Inline `[label](slash:id)` → `/label` so link cruft
+                // disappears from the user body when a resolution map is
+                // provided. Matches the live-prompt behavior in
+                // `convertUserMessage` (utils.ts).
+                const text = hasSlashResolutions
+                  ? inlineSlashLinksAsText(part.text ?? '')
+                  : (part.text ?? '');
+                return escapeTextForXML(text);
               }
             } catch {
               // Skip malformed user part
@@ -408,7 +468,7 @@ export const convertAgentMessagesToCompactMessageHistoryString = (
           })
           .filter((part) => part !== undefined);
 
-        const allParts = [...metadataAnnotations, ...textParts];
+        const allParts = [...slashBodies, ...metadataAnnotations, ...textParts];
 
         revertedCompactedHistoryStringParts.push(
           `<user>${allParts.join('\n')}</user>`,

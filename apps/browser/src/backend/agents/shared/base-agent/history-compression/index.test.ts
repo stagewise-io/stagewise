@@ -9,12 +9,33 @@ vi.mock('ai', () => ({
   generateText: vi.fn(),
 }));
 
+// Mock the slash-items module so `resolveSlashSkill` does not touch disk.
+// We intercept at the module boundary so the real `extractSlashIdsFromText`,
+// `inlineSlashLinksAsText`, `renderSlashCommandXml`, and `SLASH_LINK_RE`
+// continue to run — only disk resolution is stubbed.
+vi.mock(
+  '@/agents/shared/prompts/utils/metadata-converter/slash-items',
+  async () => {
+    const actual = await vi.importActual<
+      typeof import('@/agents/shared/prompts/utils/metadata-converter/slash-items')
+    >('@/agents/shared/prompts/utils/metadata-converter/slash-items');
+    return {
+      ...actual,
+      resolveSlashSkill: vi.fn(),
+    };
+  },
+);
+
 import { generateText } from 'ai';
+import { resolveSlashSkill } from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
+import type { SkillDefinition } from '@shared/skills';
 import {
   generateSimpleCompressedHistory,
   convertAgentMessagesToCompactMessageHistoryString,
   estimateMessageTokens,
 } from '.';
+
+const resolveSlashSkillMock = vi.mocked(resolveSlashSkill);
 
 const generateTextMock = vi.mocked(generateText);
 
@@ -1424,5 +1445,160 @@ describe('estimateMessageTokens', () => {
     } as AgentMessage;
     // 100k chars + 400 metadata overhead
     expect(estimateMessageTokens(msg)).toBe(Math.ceil((100_000 + 400) / 4));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slash-command body preservation in compression
+// ---------------------------------------------------------------------------
+
+describe('slash-command body preservation', () => {
+  const IMPLEMENT_BODY =
+    'Do not stop working until every checkbox in the active plan is satisfied.';
+
+  const implementSkill: SkillDefinition = {
+    id: 'command:implement',
+    displayName: 'implement',
+    description: 'Run the active plan to completion.',
+    source: 'builtin',
+    contentPath: '/fake/plugins/implement/SKILL.md',
+  };
+
+  beforeEach(() => {
+    generateTextMock.mockReset();
+    resolveSlashSkillMock.mockReset();
+    resolveSlashSkillMock.mockImplementation(async (id: string) => {
+      if (id === 'command:implement') {
+        return {
+          id: 'command:implement',
+          displayName: 'implement',
+          content: IMPLEMENT_BODY,
+        };
+      }
+      return null;
+    });
+  });
+
+  function makeSlashUserMessage(id: string, text: string): AgentMessage {
+    return {
+      id,
+      role: 'user',
+      parts: [{ type: 'text', text }],
+      metadata: { createdAt: new Date(), partsMetadata: [] },
+    } as AgentMessage;
+  }
+
+  it('injects the resolved slash-command body into the serialized history and inlines the link', async () => {
+    generateTextMock.mockResolvedValueOnce({
+      text: 'You will keep working through every task in the active plan until all of them are done.',
+    } as any);
+
+    const messages: AgentMessage[] = [
+      makeSlashUserMessage(
+        'u-0',
+        'Kick things off: [/implement](slash:command:implement)',
+      ),
+    ];
+
+    const mps = makeMockModelProviderService();
+    await generateSimpleCompressedHistory(messages, mps, 'agent-1', undefined, [
+      implementSkill,
+    ]);
+
+    const callArgs = generateTextMock.mock.calls[0][0] as any;
+    const userContent = callArgs.messages.find((m: any) => m.role === 'user')
+      .content as string;
+
+    // The `<slash-command>` XML sibling is present inside the user element.
+    expect(userContent).toContain(
+      '<slash-command id="command:implement" name="implement">',
+    );
+    expect(userContent).toContain(IMPLEMENT_BODY);
+    // The raw `[/implement](slash:command:implement)` link was inlined to `/implement`.
+    expect(userContent).toContain('/implement');
+    expect(userContent).not.toContain('[/implement](slash:command:implement)');
+    // resolveSlashSkill was called exactly once for the unique id.
+    expect(resolveSlashSkillMock).toHaveBeenCalledTimes(1);
+    expect(resolveSlashSkillMock).toHaveBeenCalledWith('command:implement', [
+      implementSkill,
+    ]);
+  });
+
+  it('leaves unresolved slash links unchanged when skills list is empty', async () => {
+    generateTextMock.mockResolvedValueOnce({
+      text: 'You continued the work based on the briefing provided earlier in the session.',
+    } as any);
+
+    const messages: AgentMessage[] = [
+      makeSlashUserMessage(
+        'u-0',
+        'Kick things off: [/implement](slash:command:implement)',
+      ),
+    ];
+
+    const mps = makeMockModelProviderService();
+    await generateSimpleCompressedHistory(messages, mps, 'agent-1');
+
+    const callArgs = generateTextMock.mock.calls[0][0] as any;
+    const userContent = callArgs.messages.find((m: any) => m.role === 'user')
+      .content as string;
+
+    // No `<slash-command>` tag since nothing could be resolved.
+    expect(userContent).not.toContain('<slash-command');
+    // Raw link text passes through escaped (the serializer XML-escapes text parts).
+    expect(userContent).toContain('[/implement](slash:command:implement)');
+    // And `resolveSlashSkill` was never called because no `skills` list was passed.
+    expect(resolveSlashSkillMock).not.toHaveBeenCalled();
+  });
+
+  it('emits a slash-command body for every occurrence across multiple user messages (no deduping)', async () => {
+    generateTextMock.mockResolvedValueOnce({
+      text: 'You continued to drive the plan forward across both invocations of the command.',
+    } as any);
+
+    const messages: AgentMessage[] = [
+      makeSlashUserMessage(
+        'u-0',
+        'First round: [/implement](slash:command:implement)',
+      ),
+      {
+        id: 'a-0',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Working on it.' }],
+        metadata: { createdAt: new Date(), partsMetadata: [] },
+      } as AgentMessage,
+      makeSlashUserMessage(
+        'u-1',
+        'Keep going: [/implement](slash:command:implement)',
+      ),
+    ];
+
+    const mps = makeMockModelProviderService();
+    await generateSimpleCompressedHistory(messages, mps, 'agent-1', undefined, [
+      implementSkill,
+    ]);
+
+    const callArgs = generateTextMock.mock.calls[0][0] as any;
+    const userContent = callArgs.messages.find((m: any) => m.role === 'user')
+      .content as string;
+
+    // Both user messages independently render the slash-command body.
+    const tagMatches = userContent.match(/<slash-command /g) ?? [];
+    expect(tagMatches.length).toBe(2);
+    // Resolution is still called only once (unique IDs are deduped before resolution).
+    expect(resolveSlashSkillMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('produces identical output for histories without slash links whether or not skills is provided', async () => {
+    const messages = makeMessages(4); // No slash links anywhere.
+
+    const withoutSkills =
+      convertAgentMessagesToCompactMessageHistoryString(messages);
+    const withEmptyResolved = convertAgentMessagesToCompactMessageHistoryString(
+      messages,
+      { resolvedSlash: new Map() },
+    );
+
+    expect(withEmptyResolved).toBe(withoutSkills);
   });
 });
