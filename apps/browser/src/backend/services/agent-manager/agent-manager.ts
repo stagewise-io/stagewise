@@ -176,16 +176,20 @@ export class AgentManagerService extends DisposableService {
       ) => {
         const normalizedToolApprovalMode =
           toolApprovalMode === 'alwaysAllow' ? 'smart' : toolApprovalMode;
+        const explicitInitialState =
+          modelId || normalizedToolApprovalMode
+            ? {
+                ...(modelId ? { activeModelId: modelId } : {}),
+                ...(normalizedToolApprovalMode
+                  ? { toolApprovalMode: normalizedToolApprovalMode }
+                  : {}),
+              }
+            : undefined;
         const agent = await this.createAgent(
           AgentTypes.CHAT,
           undefined,
           undefined,
-          {
-            ...(modelId ? { activeModelId: modelId } : {}),
-            ...(normalizedToolApprovalMode
-              ? { toolApprovalMode: normalizedToolApprovalMode }
-              : {}),
-          },
+          explicitInitialState,
           undefined,
           initialInputState,
         );
@@ -722,13 +726,20 @@ export class AgentManagerService extends DisposableService {
       // @ts-ignore - The onFinish handler returns outputs with the configured schema of the agent. dunno why ts doesn't get this right.
       parent?.onFinish,
       parent?.onError,
-      initialState ?? {
+      {
+        ...(initialState ?? {}),
         activeModelId:
-          lastModelValid && type === AgentTypes.CHAT
-            ? lastChatModelId
-            : undefined,
+          initialState && 'activeModelId' in initialState
+            ? initialState.activeModelId
+            : lastModelValid && type === AgentTypes.CHAT
+              ? lastChatModelId
+              : undefined,
         toolApprovalMode:
-          type === AgentTypes.CHAT ? inheritedToolApprovalMode : undefined,
+          initialState && 'toolApprovalMode' in initialState
+            ? initialState.toolApprovalMode
+            : type === AgentTypes.CHAT
+              ? inheritedToolApprovalMode
+              : undefined,
       },
       this.assetCacheService,
       this.processedImageCacheService,
