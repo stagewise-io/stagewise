@@ -680,6 +680,7 @@ export type KartonContract = {
       create: (
         initialInputState?: string,
         modelId?: ModelId,
+        toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
       ) => Promise<string>;
       resume: (agentId: string) => Promise<void>;

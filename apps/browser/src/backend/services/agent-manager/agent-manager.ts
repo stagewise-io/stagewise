@@ -171,13 +171,17 @@ export class AgentManagerService extends DisposableService {
         _callingClientId: string,
         initialInputState?: string,
         modelId?: ModelId,
+        toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
       ) => {
         const agent = await this.createAgent(
           AgentTypes.CHAT,
           undefined,
           undefined,
-          modelId ? { activeModelId: modelId } : undefined,
+          {
+            ...(modelId ? { activeModelId: modelId } : {}),
+            ...(toolApprovalMode ? { toolApprovalMode } : {}),
+          },
           undefined,
           initialInputState,
         );
@@ -638,11 +642,17 @@ export class AgentManagerService extends DisposableService {
   > {
     const agentInstanceId = instanceId ?? randomUUID();
 
-    // For new chat agents (not resumed), use the model from the last persisted chat
-    // Validate the model still exists (it may have been a deleted custom model)
+    // For new chat agents (not resumed), reuse settings from the most recent chat.
+    // Validate the model still exists (it may have been a deleted custom model).
     const lastChatModelId = await this.agentPersistenceDB?.getLastChatModelId();
+    const lastChatToolApprovalMode =
+      await this.agentPersistenceDB?.getLastChatToolApprovalMode();
     const lastModelValid =
       lastChatModelId && this.modelProviderService.modelExists(lastChatModelId);
+    const inheritedToolApprovalMode =
+      lastChatToolApprovalMode === 'alwaysAllow'
+        ? 'smart'
+        : (lastChatToolApprovalMode ?? DEFAULT_TOOL_APPROVAL_MODE);
 
     // Build state object outside setState to avoid "Type instantiation is excessively deep" error
     // caused by complex Draft<[]> inference from the 'ai' package's UIMessage type
@@ -713,6 +723,8 @@ export class AgentManagerService extends DisposableService {
           lastModelValid && type === AgentTypes.CHAT
             ? lastChatModelId
             : undefined,
+        toolApprovalMode:
+          type === AgentTypes.CHAT ? inheritedToolApprovalMode : undefined,
       },
       this.assetCacheService,
       this.processedImageCacheService,
