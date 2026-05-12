@@ -129,11 +129,12 @@ type KartonStateIsValid<T> = T extends { state: infer S }
   : false;
 
 // If the state is invalid, require a phantom error property to force a type error at the usage site
-type RequireValidState<S> = DeepHasFunctionTypes<S> extends true
-  ? {
-      __error_state_contains_functions_or_generators: 'Karton state must not contain functions or generator-like types';
-    }
-  : Record<never, never>;
+type RequireValidState<S> =
+  DeepHasFunctionTypes<S> extends true
+    ? {
+        __error_state_contains_functions_or_generators: 'Karton state must not contain functions or generator-like types';
+      }
+    : Record<never, never>;
 
 type KartonClientProceduresAreValid<T> = T extends {
   clientProcedures: infer S;
@@ -172,13 +173,14 @@ export type AppType<
   } & RequireValidState<T['state']> &
     RequireValidProcedures<T['serverProcedures']> &
     RequireValidProcedures<T['clientProcedures']> = any,
-> = KartonStateIsValid<T> extends true
-  ? KartonClientProceduresAreValid<T> extends true
-    ? KartonServerProceduresAreValid<T> extends true
-      ? T
+> =
+  KartonStateIsValid<T> extends true
+    ? KartonClientProceduresAreValid<T> extends true
+      ? KartonServerProceduresAreValid<T> extends true
+        ? T
+        : never
       : never
-    : never
-  : never;
+    : never;
 
 export type KartonState<T> = T extends { state: infer S } ? S : never;
 

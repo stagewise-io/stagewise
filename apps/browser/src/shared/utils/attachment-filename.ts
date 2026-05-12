@@ -61,7 +61,7 @@ export function generateAttachmentFilename(
       ? `${prefix}_${suffix}.${extension}`
       : `${prefix}_${suffix}`;
 
-    if (!existingFilenames || !existingFilenames.has(filename)) {
+    if (!existingFilenames?.has(filename)) {
       return filename;
     }
   }

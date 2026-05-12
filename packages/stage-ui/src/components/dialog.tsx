@@ -37,7 +37,7 @@ export const DialogContent = ({
       <BaseDialog.Popup
         {...props}
         className={cn(
-          'app-no-drag -translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 z-40',
+          'app-no-drag absolute top-1/2 left-1/2 z-40 -translate-x-1/2 -translate-y-1/2',
           'flex h-full w-full flex-col items-stretch gap-6 p-5',
           'bg-background text-foreground backdrop-blur-lg',
           'border border-border-subtle',
@@ -94,8 +94,11 @@ export const DialogClose = ({
   ...props
 }: Omit<
   React.ComponentProps<typeof BaseDialog.Close>,
-  'render' | 'children'
->) => {
+  'render' | 'children' | 'style' | 'className'
+> & {
+  style?: React.CSSProperties;
+  className?: string;
+}) => {
   return (
     <BaseDialog.Close
       render={

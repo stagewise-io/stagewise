@@ -167,7 +167,7 @@ export function TextClipBadge(props: BadgeProps) {
                 onClick={handleExpandClick}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
-                  '-translate-y-1/2 absolute top-1/2 right-px flex size-4 cursor-pointer items-center justify-center rounded-r bg-surface-1 opacity-0 transition-opacity group-hover/badge:opacity-100',
+                  'absolute top-1/2 right-px flex size-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-r bg-surface-1 opacity-0 transition-opacity group-hover/badge:opacity-100',
                 )}
                 title="Use raw text"
               >

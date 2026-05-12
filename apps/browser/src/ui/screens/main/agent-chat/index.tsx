@@ -34,7 +34,7 @@ export function AgentChat() {
       {/* Add a small draggable area for macOS hidden-titlebar windows */}
       {isMacOS && (
         <div
-          className="-z-10 app-drag absolute top-0 left-0 w-full"
+          className="app-drag absolute top-0 left-0 -z-10 w-full"
           style={{ height: TITLEBAR_HEIGHT }}
         />
       )}

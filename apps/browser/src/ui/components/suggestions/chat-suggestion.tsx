@@ -38,7 +38,7 @@ export const ChatSuggestion: React.FC<ChatSuggestionProps> = ({
         <Button
           variant="ghost"
           size="icon-xs"
-          className="-translate-y-1/2 absolute top-1/2 right-1 ml-auto hidden text-muted-foreground group-hover/suggestion:flex"
+          className="absolute top-1/2 right-1 ml-auto hidden -translate-y-1/2 text-muted-foreground group-hover/suggestion:flex"
           onClick={(e) => {
             e.stopPropagation();
             onRemove();

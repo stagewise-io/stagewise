@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.0.6/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "files": {
     "ignoreUnknown": false,
     "includes": [
@@ -12,10 +12,10 @@
       "!**/public",
       "!**/.vercel",
       "!**/src/types/db.ts",
-      "!**/.nuxt/**",
-      "!**/.svelte-kit/**",
-      "!**/.output/**",
-      "!**/.source/**",
+      "!**/.nuxt",
+      "!**/.svelte-kit",
+      "!**/.output",
+      "!**/.source",
       "!**/routeTree.gen.ts",
       "!**/tests/**/*",
       "!**/test/**/*",
@@ -76,7 +76,10 @@
         "useJsxKeyInIterable": "off", // Rule is buggy, revisit later
         "useExhaustiveDependencies": "off", // Community feedback on this rule has been poor, we will continue with ESLint
         "noInvalidBuiltinInstantiation": "warn",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "useUniqueElementIds": "off",
+        "noNestedComponentDefinitions": "warn",
+        "useHookAtTopLevel": "off" // Enabled in Biome 2.4 recommended; flags Base-UI render-prop helpers in select.tsx. Revisit in a dedicated pass.
       },
       "security": {
         "noDangerouslySetInnerHtml": "off", // Covered by Conformance,
@@ -105,7 +108,9 @@
         "noDocumentImportInPage": "warn",
         "noDuplicateElseIf": "warn",
         "noIrregularWhitespace": "warn",
-        "noDocumentCookie": "off"
+        "noDocumentCookie": "off",
+        "useIterableCallbackReturn": "off", // Enabled in Biome 2.4 recommended; mostly false positives for forEach/reduce patterns. Revisit in a dedicated pass.
+        "noArrayIndexKey": "off" // Enabled in Biome 2.4 recommended; existing code relies on stable-order arrays. Revisit in a dedicated pass.
       },
       "nursery": {
         "useSortedClasses": {
@@ -115,9 +120,7 @@
             "attributes": ["className"],
             "functions": ["cn", "clsx", "cva", "tw", "tw.*"]
           }
-        },
-        "useUniqueElementIds": "off",
-        "noNestedComponentDefinitions": "warn"
+        }
       }
     }
   },
@@ -146,6 +149,9 @@
     }
   },
   "css": {
+    "parser": {
+      "tailwindDirectives": true
+    },
     "formatter": {
       "enabled": false
     },

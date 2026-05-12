@@ -909,7 +909,7 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
                   </span>
                 )}
               </div>
-              <span className="-translate-y-1/2 absolute top-1/2 right-1 opacity-0 transition-opacity duration-150 group-hover/item:opacity-100">
+              <span className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity duration-150 group-hover/item:opacity-100">
                 <IconPlusFill18 className="size-3 text-muted-foreground group-hover/item:text-foreground" />
               </span>
             </div>

@@ -141,7 +141,7 @@ export function AnimatedBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="-z-10 fixed top-0 left-0 h-full w-full opacity-30 dark:opacity-30"
+      className="fixed top-0 left-0 -z-10 h-full w-full opacity-30 dark:opacity-30"
     />
   );
 }

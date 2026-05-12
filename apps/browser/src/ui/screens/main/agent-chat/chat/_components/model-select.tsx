@@ -257,7 +257,7 @@ export const ModelSelect = memo(function ModelSelect({
       <ComboboxBase.Trigger
         className={cn(
           'inline-flex min-w-0 max-w-full cursor-pointer items-center justify-between gap-1 rounded-lg p-0 font-normal text-xs shadow-none transition-colors',
-          'focus-visible:-outline-offset-2 focus-visible:outline-1 focus-visible:outline-muted-foreground/35',
+          'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
           'has-disabled:pointer-events-none has-disabled:opacity-50',
           'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
           'h-4 w-auto',

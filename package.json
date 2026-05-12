@@ -31,7 +31,7 @@
     "postinstall": "node -e \"const{chmodSync,existsSync}=require('fs');const p='node_modules/node-pty/prebuilds/'+process.platform+'-'+process.arch+'/spawn-helper';try{if(existsSync(p)){chmodSync(p,0o755);console.log('node-pty: fixed spawn-helper permissions')}}catch(e){console.warn('node-pty: spawn-helper chmod failed:',e.message)}\""
   },
   "devDependencies": {
-    "@biomejs/biome": "2.0.6",
+    "@biomejs/biome": "2.4.15",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@commitlint/config-pnpm-scopes": "^20.1.0",
@@ -39,13 +39,13 @@
     "@types/node": "22.15.2",
     "@types/semver": "^7.7.1",
     "conventional-changelog-cli": "^5.0.0",
-    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "conventional-recommended-bump": "^11.2.0",
-    "git-raw-commits": "^5.0.0",
+    "git-raw-commits": "^5.0.1",
     "lefthook": "^1.12.2",
-    "semver": "^7.7.3",
+    "semver": "^7.8.0",
     "ts-node": "10.9.2",
-    "turbo": "^2.5.4",
+    "turbo": "^2.9.12",
     "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.30.3",
@@ -87,7 +87,7 @@
     ],
     "overrides": {
       "lucide-react": "0.554.0",
-      "@types/react": "19.2.7",
+      "@types/react": "19.2.14",
       "@types/react-dom": "19.2.3",
       "@types/glob": "8.1.0",
       "@types/minimatch": "5.1.2"
@@ -96,14 +96,14 @@
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.77",
     "@ai-sdk/azure": "^3.0.42",
-    "@aws-sdk/credential-providers": "^3.908.0",
+    "@aws-sdk/credential-providers": "^3.1045.0",
     "@smithy/shared-ini-file-loader": "^4.4.9",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai-compatible": "^2.0.35",
-    "@better-auth/electron": "^1.5.3",
+    "@better-auth/electron": "^1.6.10",
     "@streamdown/math": "^1.0.2",
     "@xterm/headless": "^6.0.0",
-    "better-auth": "^1.5.3",
+    "better-auth": "^1.6.10",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
     "tsx": "^4.20.3"

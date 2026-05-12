@@ -303,7 +303,7 @@ function PermissionRequestRow({
     <div className="relative flex shrink-0 flex-col items-stretch gap-2 py-2">
       {/* Pulsing bg for new requests */}
       {showPulse && (
-        <div className="-mx-1 pointer-events-none absolute inset-0 animate-pulse-full rounded-lg bg-primary/10" />
+        <div className="pointer-events-none absolute inset-0 -mx-1 animate-pulse-full rounded-lg bg-primary/10" />
       )}
       {/* Header: icons + timestamp + close button */}
       <div className="flex w-full flex-row items-center justify-start gap-2">

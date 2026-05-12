@@ -203,7 +203,7 @@ export function ModelProviderShowcase() {
             {/* Full-bleed hover panel — outside ScrollReveal so backdrop-filter isn't clipped by transform */}
             <div
               className={cn(
-                '-translate-x-1/2 absolute top-full left-1/2 z-50 w-screen',
+                'absolute top-full left-1/2 z-50 w-screen -translate-x-1/2',
                 'bg-surface-1/80 shadow-black/5 shadow-lg backdrop-blur-lg',
                 'transition-opacity duration-250 ease-out',
                 activeId

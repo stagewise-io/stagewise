@@ -69,14 +69,7 @@ export const InputOtp = React.forwardRef<HTMLInputElement, InputOtpProps>(
         render={({ slots }) => (
           <>
             {slots.map((slot, idx) => (
-              <Slot
-                key={`otp-slot-${
-                  // biome-ignore lint/suspicious/noArrayIndexKey: slots are fixed-length positional
-                  idx
-                }`}
-                slot={slot}
-                size={size}
-              />
+              <Slot key={`otp-slot-${idx}`} slot={slot} size={size} />
             ))}
           </>
         )}

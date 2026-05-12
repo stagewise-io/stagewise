@@ -115,7 +115,7 @@ async function extractPageImages(
 
       try {
         const imgData = await resolveObj(page, imgId);
-        if (!imgData || !imgData.data) continue;
+        if (!imgData?.data) continue;
 
         const { width, height, data, kind } = imgData as {
           width: number;

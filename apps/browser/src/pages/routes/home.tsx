@@ -445,7 +445,7 @@ function MostVisitedCard({
           onClick(e as unknown as React.MouseEvent);
         }
       }}
-      className={`flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-derived-strong bg-background text-foreground shadow-elevation-1 transition-shadow duration-300 hover:bg-hover-derived hover:text-hover-derived focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-solid dark:bg-surface-1${isOffline ? ' opacity-50' : ''}`}
+      className={`flex w-64 shrink-0 cursor-pointer flex-col items-center overflow-hidden rounded-lg border border-derived-strong bg-background text-foreground shadow-elevation-1 transition-shadow duration-300 hover:bg-hover-derived hover:text-hover-derived focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-solid dark:bg-surface-1 ${isOffline ? 'opacity-50' : ''}`}
     >
       <div className="relative h-40 w-full">
         {thumbnail ? (

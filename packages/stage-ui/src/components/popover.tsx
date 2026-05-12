@@ -122,8 +122,11 @@ export const PopoverDescription = ({
 
 export type PopoverCloseProps = Omit<
   React.ComponentProps<typeof PopoverBase.Close>,
-  'render' | 'children'
->;
+  'render' | 'children' | 'style' | 'className'
+> & {
+  style?: React.CSSProperties;
+  className?: string;
+};
 export const PopoverClose = ({ className, ...props }: PopoverCloseProps) => {
   return (
     <PopoverBase.Close

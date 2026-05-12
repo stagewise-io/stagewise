@@ -546,7 +546,7 @@ const SyntaxColorCard = ({
         }}
       >
         {fontStyle && (
-          <div className="-top-1 -right-1 absolute">
+          <div className="absolute -top-1 -right-1">
             <span
               className="flex size-4 items-center justify-center rounded-full bg-black font-bold text-[8px] text-white"
               title={fontStyle}

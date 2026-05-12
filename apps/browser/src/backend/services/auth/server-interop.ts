@@ -10,7 +10,13 @@ import type {
 export const API_URL = process.env.API_URL || 'https://v1.api.stagewise.io';
 const AUTH_URL = process.env.AUTH_URL || API_URL;
 
-export type BetterAuthClient = ReturnType<typeof createBetterAuthClient>;
+type BetterAuthClientOptions = {
+  plugins: [ReturnType<typeof emailOTPClient>];
+};
+
+export type BetterAuthClient = ReturnType<
+  typeof createAuthClient<BetterAuthClientOptions>
+>;
 
 /**
  * Creates a better-auth client for the Electron main process.
@@ -26,7 +32,7 @@ export type BetterAuthClient = ReturnType<typeof createBetterAuthClient>;
 export function createBetterAuthClient(
   getToken: () => string | null,
   onTokenReceived: (token: string) => void,
-) {
+): BetterAuthClient {
   return createAuthClient({
     baseURL: AUTH_URL,
     basePath: '/v1/auth',

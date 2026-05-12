@@ -165,6 +165,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private kartonTransport: ElectronServerTransport;
   private selectedElementTracker: SelectedElementTracker;
   // Context menu instance - stored to keep alive but not accessed directly
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: GC keep-alive reference - the context menu must not be collected while the tab is live.
   private _contextMenuWebContent: ContextMenuWebContent;
 
   // Current state cache
@@ -232,8 +233,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private searchUtilsConfig: SearchUtilsConfig;
 
   // Search state tracking
-  // Note: _currentSearchRequestId is tracked but not currently used for validation
-  private _currentSearchRequestId: number | null = null;
   private currentSearchText: string | null = null;
 
   // Console log capturing
@@ -1936,8 +1935,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
    */
   private async updateViewportSizeFromDevTools() {
     if (
-      !this.devToolsDebugger ||
-      !this.devToolsDebugger.isAttached() ||
+      !this.devToolsDebugger?.isAttached() ||
       !this.devToolsPlaceholderObjectId
     ) {
       // DevTools debugger not ready yet, skip this update
@@ -2156,7 +2154,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
    * Get reference to the inspected page placeholder element and device mode wrapper from DevTools
    */
   private async getDevToolsPlaceholderElement() {
-    if (!this.devToolsDebugger || !this.devToolsDebugger.isAttached()) {
+    if (!this.devToolsDebugger?.isAttached()) {
       return;
     }
 
@@ -2236,8 +2234,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.currentSearchText = searchText;
 
     // Start new search - use findNext: true to initiate search and highlight first result
-    const requestId = wc.findInPage(searchText, { findNext: true });
-    this._currentSearchRequestId = requestId;
+    wc.findInPage(searchText, { findNext: true });
 
     // Update state immediately to show search is active
     this.updateState({
@@ -2256,8 +2253,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.currentSearchText = searchText;
 
     // Update search text - use findNext: true to initiate new search
-    const requestId = wc.findInPage(searchText, { findNext: true });
-    this._currentSearchRequestId = requestId;
+    wc.findInPage(searchText, { findNext: true });
 
     this.updateState({
       search: {
@@ -2295,7 +2291,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     if (wc.isDestroyed()) return;
 
     wc.stopFindInPage('clearSelection');
-    this._currentSearchRequestId = null;
     this.currentSearchText = null;
 
     this.updateState({ search: null });
