@@ -1,8 +1,8 @@
-import { generateText } from 'ai';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import { generateText } from 'ai';
 import {
-  type ModelProviderService,
   deepMergeProviderOptions,
+  type ModelProviderService,
 } from '@/agents/model-provider';
 import { TITLE_GENERATION_SYSTEM_PROMPT } from './prompt';
 
@@ -12,7 +12,7 @@ import { TITLE_GENERATION_SYSTEM_PROMPT } from './prompt';
  * tried in order when the previous one fails or times out.
  */
 const TITLE_GENERATION_MODELS = [
-  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-flash-lite',
   'gpt-5.4-nano',
   'claude-haiku-4.5',
 ] as const;

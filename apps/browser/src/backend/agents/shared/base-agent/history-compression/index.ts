@@ -1,12 +1,12 @@
-import { generateText } from 'ai';
-import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
-import type { ModelProviderService } from '@/agents/model-provider';
 import type { ModelId } from '@shared/available-models';
+import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { SkillDefinition } from '@shared/skills';
+import { generateText } from 'ai';
+import type { ModelProviderService } from '@/agents/model-provider';
 import {
   extractSlashIdsFromText,
-  resolveSlashSkill,
   type ResolvedSlashCommand,
+  resolveSlashSkill,
 } from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
 
 // Import for local use + re-export so existing imports keep working.
@@ -21,9 +21,9 @@ export {
 
 // Re-export prompt pieces so existing imports from this module keep working.
 import {
+  buildCompressionUserMessage,
   COMPRESSION_SYSTEM_PROMPT,
   COMPRESSION_TARGET_CHARS,
-  buildCompressionUserMessage,
 } from './prompt';
 export {
   COMPRESSION_SYSTEM_PROMPT,
@@ -37,7 +37,7 @@ export {
  * tried in order when the previous one fails or times out.
  */
 const HISTORY_COMPRESSION_MODELS = [
-  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-flash-lite',
   'gpt-5.4-nano',
   'claude-haiku-4.5',
 ] as const;

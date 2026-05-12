@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelProviderService } from '@/agents/model-provider';
 
 // ---------------------------------------------------------------------------
@@ -26,13 +26,13 @@ vi.mock(
   },
 );
 
+import type { SkillDefinition } from '@shared/skills';
 import { generateText } from 'ai';
 import { resolveSlashSkill } from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
-import type { SkillDefinition } from '@shared/skills';
 import {
-  generateSimpleCompressedHistory,
   convertAgentMessagesToCompactMessageHistoryString,
   estimateMessageTokens,
+  generateSimpleCompressedHistory,
 } from '.';
 
 const resolveSlashSkillMock = vi.mocked(resolveSlashSkill);
@@ -959,7 +959,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(result).toBe('The user asked the assistant to help with a task.');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(mps.getModelWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'history-compression' }),
     );
@@ -1078,7 +1078,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
@@ -1107,7 +1107,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
@@ -1333,7 +1333,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(mps.getModelWithOptions).toHaveBeenCalledTimes(1);
     expect(mps.getModelWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );

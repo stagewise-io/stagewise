@@ -627,8 +627,8 @@ export const availableModels = [
   },
   {
     officialProvider: 'google',
-    modelId: 'gemini-3.1-flash-lite-preview',
-    modelDisplayName: 'Gemini 3.1 Flash Lite (Preview)',
+    modelId: 'gemini-3.1-flash-lite',
+    modelDisplayName: 'Gemini 3.1 Flash Lite',
     modelDescription:
       "Google's workhorse model for high-speed and high-volume use, with improvements across translation, data extraction, and code completion.",
     modelContext: '1m context',

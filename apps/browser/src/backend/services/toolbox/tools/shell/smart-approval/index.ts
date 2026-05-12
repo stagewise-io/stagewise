@@ -1,9 +1,9 @@
+import type { ModelId } from '@shared/available-models';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import type { ModelId } from '@shared/available-models';
 import {
-  type ModelProviderService,
   deepMergeProviderOptions,
+  type ModelProviderService,
 } from '@/agents/model-provider';
 import type { TelemetryService } from '@/services/telemetry';
 import { SMART_APPROVAL_SYSTEM_PROMPT } from './prompt';
@@ -16,7 +16,7 @@ import { SMART_APPROVAL_SYSTEM_PROMPT } from './prompt';
  * of which provider they have configured.
  */
 export const SMART_APPROVAL_MODELS: readonly ModelId[] = [
-  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-flash-lite',
   'gpt-5.4-nano',
   'claude-haiku-4.5',
 ];

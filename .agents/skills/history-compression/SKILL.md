@@ -34,6 +34,7 @@ Kept-budget = `min(0.2 × contextWindow, 40k tokens)` (`KEPT_BUDGET_FRACTION`, `
 Preferred floor = `max(5, config.minUncompressedMessages ?? 10)`.
 
 Walk backward from history end:
+
 1. Accumulate `estimateMessageTokens(msg)` until next msg would bust budget → boundary there.
 2. Else stop once kept-count ≥ floor.
 3. Edge: single last msg > budget → keep just that one, warn.
@@ -44,6 +45,7 @@ Then: `messagesToCompact = history.slice(0, boundary)` → compress → write re
 ### Token estimation quirks
 
 `estimateMessageTokens` = `ceil(chars / 4)`. Includes:
+
 - Text parts.
 - Tool-call `toolName` + JSON-stringified `input` + `output`.
 - Metadata overhead: env-snapshot, compressedHistory, mentions, attachments.
@@ -65,10 +67,11 @@ When `messagesToCompact` already contains a prior `compressedHistory`:
 ## Serialization format
 
 Input to LLM is XML-ish:
+
 - `<user>` — text + `[attached: ...]`, `[mentioned: ...]` metadata annotations.
 - `<assistant>` — text + one-liner tool markers: `[read: path]`, `[edited: path (N edits)]`, `[shell: label → ✓ / exit N / timed out]`, `[lint: paths → clean / N errors, M warnings]`, `[asked user: title → field: answer; ...]`, `[searched: "query"]`, `[created: path]`, `[wrote: path]`.
 - `<previous-chat-history>` — inlined prior briefing (see above).
-- Error state on any tool → ` ✗ <msg>` suffix.
+- Error state on any tool → `✗ <msg>` suffix.
 - Unknown tool types → `[tool-xxx]` generic marker (never silently dropped).
 
 ## Prompt design (`apps/browser/src/backend/agents/shared/base-agent/history-compression/prompt.ts`)
@@ -82,7 +85,8 @@ Input to LLM is XML-ish:
 
 ## Model cascade (`apps/browser/src/backend/agents/shared/base-agent/history-compression/index.ts`)
 
-1. `gemini-3.1-flash-lite-preview` → 2. `gpt-5.4-nano` → 3. `claude-haiku-4.5`.
+1. `gemini-3.1-flash-lite` → 2. `gpt-5.4-nano` → 3. `claude-haiku-4.5`.
+
 - Each 30s abort timeout, `temperature: 0.1`, `maxOutputTokens: 20000`.
 - Min valid output: 30 chars (shorter → fallback).
 - Final fallback: active chat model (only if not already tried).
@@ -116,6 +120,7 @@ npx tsx scripts/experiments/extract-compression-test-data.ts --channel dev --min
 Channels map to `<appData>/{stagewise | stagewise-prerelease | stagewise-dev}/stagewise/agents/instances.sqlite`.
 
 Per chat, for each boundary message (every real compression event):
+
 - Slices `messages[0..boundary)`.
 - Runs **real** `convertAgentMessagesToCompactMessageHistoryString` + `buildCompressionUserMessage` (imported from app source → fidelity guaranteed).
 - Writes to `experiments-data/history-compression/<channel>/NNN-title/compression-NNN/`:

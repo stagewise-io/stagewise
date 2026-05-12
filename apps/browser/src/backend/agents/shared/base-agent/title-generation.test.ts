@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelProviderService } from '@/agents/model-provider';
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ describe('generateSimpleTitle', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     // Should use the primary model
     expect(mps.getModelWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'title-generation' }),
     );
@@ -202,7 +202,7 @@ describe('generateSimpleTitle', () => {
     // First model attempted, then fallback
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
@@ -233,7 +233,7 @@ describe('generateSimpleTitle', () => {
     // Verify all three model IDs were attempted in order
     expect(mps.getModelWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
