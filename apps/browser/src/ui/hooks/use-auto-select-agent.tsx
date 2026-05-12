@@ -29,7 +29,10 @@ export function useAutoSelectFirstAgent(): void {
   // Track when openAgent was last set so we can give resumed agents a
   // grace period to appear in activeAgentIds before auto-removing them.
   const openAgentSetAtRef = useRef(0);
-  const prevOpenAgentRef = useRef(openAgent);
+  // Must start null so the first render always sets the timestamp when
+  // openAgent is non-null — otherwise a restored agent on mount would
+  // bypass the grace period (prevOpenAgentRef === openAgent at init).
+  const prevOpenAgentRef = useRef<string | null>(null);
   if (prevOpenAgentRef.current !== openAgent) {
     prevOpenAgentRef.current = openAgent;
     if (openAgent) openAgentSetAtRef.current = Date.now();

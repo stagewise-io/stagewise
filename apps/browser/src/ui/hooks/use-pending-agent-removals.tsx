@@ -14,9 +14,9 @@ import {
  * history combobox) can agree on which ids are transient.
  *
  * Without a shared view, removing the last live agent triggers a loop:
- *   1. Grid removes archived id from history (openAgent becomes null).
+ *   1. Grid removes the pending id from history (openAgent becomes null).
  *   2. Top section sees `openAgent === null` + stale `activeAgentIds`
- *      still containing the archived id, and sets openAgent back to it.
+ *      still containing the pending id, and sets openAgent back to it.
  *   3. Grid again clears it. GOTO 1.
  */
 export type PendingRemovalsState = {
