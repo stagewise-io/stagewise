@@ -296,7 +296,7 @@ export class MountManagerService extends DisposableService {
     const agentType =
       this.uiKarton.state.agents.instances[agentInstanceId]?.type ?? 'unknown';
     const mounts = this.agentMounts.get(agentInstanceId);
-    if (!mounts || !mounts.has(mountPrefix)) return;
+    if (!mounts?.has(mountPrefix)) return;
 
     mounts.delete(mountPrefix);
     this.releaseMountIfUnused(mountPrefix);
@@ -551,7 +551,7 @@ export class MountManagerService extends DisposableService {
         if (segments.length === 1) return !allowedTopLevel.has(segments[0]);
         if (segments.length === 2) {
           const allowed = allowedChildren[segments[0]];
-          return !allowed || !allowed.has(segments[1]);
+          return !allowed?.has(segments[1]);
         }
         return !(
           (segments[0] === '.stagewise' || segments[0] === '.agents') &&

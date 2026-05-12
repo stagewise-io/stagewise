@@ -77,7 +77,7 @@ export const MessageUserPlanAction = memo(function MessageUserPlanAction({
             }
           : undefined
       }
-      className={`mt-2 flex w-full items-center gap-1.5 rounded-lg border border-derived bg-surface-1 px-2.5 py-1.5 text-[13px] dark:bg-surface-tinted${onEdit ? ' cursor-pointer hover:bg-hover-derived active:bg-active-derived' : ''}`}
+      className={`mt-2 flex w-full items-center gap-1.5 rounded-lg border border-derived bg-surface-1 px-2.5 py-1.5 text-[13px] dark:bg-surface-tinted ${onEdit ? 'cursor-pointer hover:bg-hover-derived active:bg-active-derived' : ''}`}
     >
       <IconClipboardContent className="size-3 shrink-0 text-muted-foreground dark:text-foreground" />
       <span className="font-semibold text-muted-foreground dark:text-foreground">

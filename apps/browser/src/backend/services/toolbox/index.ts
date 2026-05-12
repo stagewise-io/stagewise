@@ -23,7 +23,6 @@ import {
 } from '@shared/karton-contracts/ui/shared-types';
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
-import type { GlobalConfigService } from '@/services/global-config';
 import { DisposableService } from '@/services/disposable';
 import type { DiffHistoryService } from '@/services/diff-history';
 import type { WindowLayoutService } from '@/services/window-layout';
@@ -155,7 +154,6 @@ function getGlobalSkillsMounts(): Array<{
 export class ToolboxService extends DisposableService {
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
-  private readonly globalConfigService: GlobalConfigService;
   private readonly diffHistoryService: DiffHistoryService;
   private readonly windowLayoutService: WindowLayoutService;
   private readonly authService: AuthService;
@@ -337,7 +335,6 @@ export class ToolboxService extends DisposableService {
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
-    globalConfigService: GlobalConfigService,
     diffHistoryService: DiffHistoryService,
     windowLayoutService: WindowLayoutService,
     authService: AuthService,
@@ -349,7 +346,6 @@ export class ToolboxService extends DisposableService {
     super();
     this.logger = logger;
     this.uiKarton = uiKarton;
-    this.globalConfigService = globalConfigService;
     this.diffHistoryService = diffHistoryService;
     this.windowLayoutService = windowLayoutService;
     this.authService = authService;
@@ -362,7 +358,6 @@ export class ToolboxService extends DisposableService {
   public static async create(
     logger: Logger,
     uiKarton: KartonService,
-    globalConfigService: GlobalConfigService,
     diffHistoryService: DiffHistoryService,
     windowLayoutService: WindowLayoutService,
     authService: AuthService,
@@ -374,7 +369,6 @@ export class ToolboxService extends DisposableService {
     const instance = new ToolboxService(
       logger,
       uiKarton,
-      globalConfigService,
       diffHistoryService,
       windowLayoutService,
       authService,

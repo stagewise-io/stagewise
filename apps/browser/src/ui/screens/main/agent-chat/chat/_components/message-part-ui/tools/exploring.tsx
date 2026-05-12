@@ -593,8 +593,8 @@ export const ExploringToolParts = memo(
       if (
         !hasExploredFiles &&
         hasCheckedLinting &&
-        !!lintingErrors &&
-        !!lintingWarnings
+        lintingErrors &&
+        lintingWarnings
       ) {
         const foundText = `Found ${textParts.slice(0, -1).join(', ')} and ${textParts.at(-1)}`;
         return enabledPrefix

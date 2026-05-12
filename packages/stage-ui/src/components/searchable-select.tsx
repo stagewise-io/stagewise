@@ -355,7 +355,7 @@ export const SearchableSelect = memo(function SearchableSelect({
       ) : (
         <SelectBase.Trigger
           className={cn(
-            'focus-visible:-outline-offset-2 inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none transition-colors focus-visible:outline-1 focus-visible:outline-muted-foreground/35 has-disabled:pointer-events-none has-disabled:opacity-50',
+            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none transition-colors focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2 has-disabled:pointer-events-none has-disabled:opacity-50',
             triggerVariants[triggerVariant],
             sizes.trigger[size],
             triggerClassName,

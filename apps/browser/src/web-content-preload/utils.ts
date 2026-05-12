@@ -541,7 +541,7 @@ const getReactInfo = (element: Element): ReactSelectedElementInfo => {
 
   const getFiberFromDevtools = (node: Element): any | null => {
     const hook = (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-    if (!hook || !hook.renderers) return null;
+    if (!hook?.renderers) return null;
     try {
       // hook.renderers is a Map-like of rendererId -> rendererInterface
       const renderers: Map<number, any> = hook.renderers;

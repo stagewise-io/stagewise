@@ -825,7 +825,7 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
       this.initializeFrameTree(frameTree.frameTree);
 
       const frameInfo = await this.getFrameInfo(frameId, false);
-      if (!frameInfo || !frameInfo.url) {
+      if (!frameInfo?.url) {
         // Frame doesn't exist or has no URL
         return false;
       }

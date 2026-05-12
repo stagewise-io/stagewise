@@ -136,6 +136,7 @@ const ErrorPagesErrorPageLoadFailedRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof InternalAppRouteRouteWithChildren
   '/home': typeof HomeRoute
   '/about': typeof InternalAppAboutRoute
   '/account': typeof InternalAppAccountRoute
@@ -156,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/browsing-settings/': typeof InternalAppBrowsingSettingsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof InternalAppRouteRouteWithChildren
   '/home': typeof HomeRoute
   '/about': typeof InternalAppAboutRoute
   '/account': typeof InternalAppAccountRoute
@@ -199,6 +201,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/home'
     | '/about'
     | '/account'
@@ -219,6 +222,7 @@ export interface FileRouteTypes {
     | '/browsing-settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/home'
     | '/about'
     | '/account'
@@ -279,7 +283,7 @@ declare module '@tanstack/react-router' {
     '/_internal-app': {
       id: '/_internal-app'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof InternalAppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }

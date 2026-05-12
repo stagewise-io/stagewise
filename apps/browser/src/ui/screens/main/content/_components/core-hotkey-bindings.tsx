@@ -29,7 +29,7 @@ export function CoreHotkeyBindings({
 
   const tabNeighborsToActiveTab = useMemo(() => {
     if (tabCount <= 1) return null;
-    const currentIndex = tabIds.findIndex((id) => id === activeTabId);
+    const currentIndex = tabIds.indexOf(activeTabId as string);
     return {
       previous: tabIds[(currentIndex - 1 + tabCount) % tabCount],
       next: tabIds[(currentIndex + 1) % tabCount],
@@ -86,7 +86,7 @@ export function CoreHotkeyBindings({
 
   // Switch to next tab (aliases handled in definition: Ctrl+Tab, Mod+PageDown, Mod+Alt+Arrow on Mac)
   const handleNextTab = useCallback(async () => {
-    if (!tabNeighborsToActiveTab || !tabNeighborsToActiveTab.next) return;
+    if (!tabNeighborsToActiveTab?.next) return;
     await handleSwitchTab(tabNeighborsToActiveTab.next);
   }, [tabNeighborsToActiveTab, handleSwitchTab]);
 
@@ -94,7 +94,7 @@ export function CoreHotkeyBindings({
 
   // Switch to previous tab (aliases handled in definition)
   const handlePreviousTab = useCallback(() => {
-    if (!tabNeighborsToActiveTab || !tabNeighborsToActiveTab.previous) return;
+    if (!tabNeighborsToActiveTab?.previous) return;
     handleSwitchTab(tabNeighborsToActiveTab.previous);
   }, [tabNeighborsToActiveTab, handleSwitchTab]);
 

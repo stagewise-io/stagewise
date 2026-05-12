@@ -473,7 +473,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
           className={cn(
             'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0',
             'shadow-none transition-colors',
-            'focus-visible:-outline-offset-2 focus-visible:outline-1 focus-visible:outline-muted-foreground/35',
+            'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
             'data-disabled:pointer-events-none data-disabled:opacity-50',
             triggerVariants[triggerVariant],
             sizes.trigger[size],
@@ -532,7 +532,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
             )}
             onKeyDown={handleCtrlNavKeys}
           >
-            <SelectBase.ScrollUpArrow className="-ml-1 top-0 z-1 flex h-5 w-full shrink-0 items-center justify-center rounded-t-md bg-background text-muted-foreground">
+            <SelectBase.ScrollUpArrow className="top-0 z-1 -ml-1 flex h-5 w-full shrink-0 items-center justify-center rounded-t-md bg-background text-muted-foreground">
               <IconChevronUpFill18 className="size-3" />
             </SelectBase.ScrollUpArrow>
 
@@ -552,7 +552,6 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                         if (isSeparator(item)) {
                           return (
                             <SelectBase.Separator
-                              // biome-ignore lint/suspicious/noArrayIndexKey: <we need to use the index to ensure the separator is unique>
                               key={`separator-${groupIndex}-${itemIndex}`}
                               className="my-1 h-px shrink-0 bg-border-subtle"
                             />
@@ -606,7 +605,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
               </SelectBase.List>
             </OverlayScrollbar>
 
-            <SelectBase.ScrollDownArrow className="-ml-1 bottom-0 z-1 flex h-5 w-full shrink-0 items-center justify-center rounded-b-md bg-background text-muted-foreground">
+            <SelectBase.ScrollDownArrow className="bottom-0 z-1 -ml-1 flex h-5 w-full shrink-0 items-center justify-center rounded-b-md bg-background text-muted-foreground">
               <IconChevronDownFill18 className="size-2" />
             </SelectBase.ScrollDownArrow>
           </SelectBase.Popup>

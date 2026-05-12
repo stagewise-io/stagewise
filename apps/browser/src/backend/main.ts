@@ -310,7 +310,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const toolboxService = await ToolboxService.create(
     logger,
     uiKarton,
-    globalConfigService,
     diffHistoryService,
     windowLayoutService,
     authService,

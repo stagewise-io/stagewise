@@ -201,7 +201,6 @@ function SlideIndicators({
         return (
           <button
             type="button"
-            // biome-ignore lint/suspicious/noArrayIndexKey: static list
             key={`slide-btn-${index}`}
             onClick={() => onGoTo(index)}
             className={cn(

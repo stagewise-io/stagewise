@@ -213,6 +213,7 @@ export class ElectronServerTransport implements ServerTransport {
   private connections = new Map<string, ElectronServerConnection>();
   private connectionHandler: ((serverTransport: Transport) => void) | null =
     null;
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: TODO - handler is stored but never invoked. The server currently never delivers close events through the ServerTransport.onClose contract; activating this path is tracked as a follow-up (see plans/biome-warning-cleanup.md).
   private closeHandler: ((connectionId: string) => void) | null = null;
 
   /**

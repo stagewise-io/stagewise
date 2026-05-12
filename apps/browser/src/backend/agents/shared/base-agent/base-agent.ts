@@ -1391,7 +1391,6 @@ export abstract class BaseAgent<
             this.spawnChildAgentHandler<AT>(
               agentType,
               // Use any cast to avoid deep type instantiation
-              // @ts-ignore - TS can't keep up with the type definitions...
               config,
               (finishOutput) => {
                 resolve(finishOutput);

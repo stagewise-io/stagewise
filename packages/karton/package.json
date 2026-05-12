@@ -41,15 +41,15 @@
   "dependencies": {
     "superjson": "^2.2.2",
     "uuid": "^11.0.4",
-    "ws": "^8.18.0"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "immer": "^10.1.1",
-    "@testing-library/react": "^16.3.0",
+    "@testing-library/react": "^16.3.2",
     "@testing-library/react-hooks": "^8.0.1",
     "@types/express": "^5.0.3",
     "@types/node": "^22.10.2",
-    "@types/react": "19.2.7",
+    "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.14",

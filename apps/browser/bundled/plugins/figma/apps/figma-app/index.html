@@ -63,7 +63,7 @@
       for (const node of nodes) {
         const pill = document.createElement('div');
         pill.className = 'badge';
-        pill.title = (node.type || 'NODE') + ' · ' + node.id + (node.width ? ' (' + node.width + '×' + node.height + ')' : '');
+        pill.title = `${node.type || 'NODE'} · ${node.id}${node.width ? ` (${node.width}×${node.height})` : ''}`;
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'badge-name';

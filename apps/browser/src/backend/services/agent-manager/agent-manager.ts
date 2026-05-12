@@ -701,7 +701,7 @@ export class AgentManagerService extends DisposableService {
             .state as Readonly<AgentState>,
         set: (recipe) => {
           this.karton.setState((draft) => {
-            // @ts-ignore - We have to call the state update recipe with the draft this way to keep "immer" working.
+            // @ts-expect-error - We have to call the state update recipe with the draft this way to keep "immer" working.
             recipe(draft.agents.instances[agentInstanceId].state);
             draft.agents.instances[agentInstanceId].type = type;
           });
@@ -723,7 +723,7 @@ export class AgentManagerService extends DisposableService {
           onError,
         );
       },
-      // @ts-ignore - The onFinish handler returns outputs with the configured schema of the agent. dunno why ts doesn't get this right.
+      // @ts-expect-error - The onFinish handler returns outputs with the configured schema of the agent. dunno why ts doesn't get this right.
       parent?.onFinish,
       parent?.onError,
       {

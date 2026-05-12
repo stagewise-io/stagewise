@@ -291,7 +291,7 @@ export const Omnibox = ({
                 // Only apply transitions and animation styles for mouse interactions
                 isKeyboardInteraction
                   ? 'transition-none'
-                  : 'data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 transition-all duration-150 ease-out data-ending-style:scale-y-95 data-starting-style:scale-y-95 data-ending-style:rounded-t-none data-starting-style:rounded-t-none data-ending-style:opacity-0 data-starting-style:opacity-0',
+                  : 'transition-all duration-150 ease-out data-ending-style:-translate-y-2 data-starting-style:-translate-y-2 data-ending-style:scale-y-95 data-starting-style:scale-y-95 data-ending-style:rounded-t-none data-starting-style:rounded-t-none data-ending-style:opacity-0 data-starting-style:opacity-0',
               )}
               finalFocus={false}
             >

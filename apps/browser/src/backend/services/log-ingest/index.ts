@@ -35,7 +35,6 @@ export class LogIngestService {
   private port = 0;
   private buffers = new Map<string, BufferedEntry[]>();
   private flushTimer: ReturnType<typeof setInterval> | null = null;
-  private closed = false;
 
   private constructor() {
     this.token = randomUUID();
@@ -75,7 +74,6 @@ export class LogIngestService {
   }
 
   async teardown(): Promise<void> {
-    this.closed = true;
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
       this.flushTimer = null;

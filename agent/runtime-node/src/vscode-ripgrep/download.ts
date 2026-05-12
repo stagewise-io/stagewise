@@ -251,7 +251,6 @@ function unzipWindows(
                     readStream.pipe(file);
                     file.on('finish', () => {
                       // Wait until the file is finished writing, then read the next entry.
-                      // @ts-ignore: Typing for close() is wrong.
                       file.close(() => {
                         zipFile.readEntry();
                       });

@@ -118,7 +118,7 @@ export const ComboboxTrigger = forwardRef<
     ref={ref}
     className={cn(
       'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none transition-colors',
-      'focus-visible:-outline-offset-2 focus-visible:outline-1 focus-visible:outline-muted-foreground/35',
+      'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
       'has-disabled:pointer-events-none has-disabled:opacity-50',
       triggerVariants[variant],
       sizes.trigger[size],

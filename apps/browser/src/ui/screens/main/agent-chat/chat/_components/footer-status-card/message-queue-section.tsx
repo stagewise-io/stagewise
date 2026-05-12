@@ -72,7 +72,7 @@ function MessageQueueSectionContent({
             </span>
             <div
               className={cn(
-                '-translate-y-1/2 absolute top-1/2 right-1 flex-row items-center',
+                'absolute top-1/2 right-1 -translate-y-1/2 flex-row items-center',
                 showButtons ? 'flex' : 'hidden',
               )}
             >
