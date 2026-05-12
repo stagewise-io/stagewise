@@ -75,6 +75,7 @@ export class LspClient extends EventEmitter {
   private initializePromise: Promise<void> | null = null;
   private initializationOptions: Record<string, unknown> | undefined;
   private disposed = false;
+  private disposePromise: Promise<void> | null = null;
 
   /**
    * Compute a simple hash of diagnostics for deduplication
@@ -275,23 +276,34 @@ export class LspClient extends EventEmitter {
     // Handle progress creation (acknowledge but don't track)
     this.connection.onRequest('window/workDoneProgress/create', () => null);
 
-    // Handle process exit — mark as disposed so pending/delayed calls bail out
+    // Handle process exit — defer full cleanup to dispose() (idempotent,
+    // single-flight) so we never race against an in-flight dispose().
+    // Do NOT null `this.process` or emit 'close' here: dispose() snapshots
+    // the handle atomically and emits 'close' at the end of performDispose
+    // so observers see the client in its final state. `kill()` on an
+    // already-exited process is a no-op, so leaving the handle in place
+    // is safe.
     this.process.on('exit', (code) => {
       this.logger.debug(
         `[LspClient:${this.serverID}] Process exited with code: ${code}`,
       );
-      this.disposed = true;
-      this.connection?.dispose();
-      this.connection = null;
-      this.emit('close');
+      this.dispose().catch((err) => {
+        this.logger.debug(
+          `[LspClient:${this.serverID}] dispose() after process exit failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     });
 
+    // Do NOT null `this.process` here: on 'error' the process is typically
+    // still alive, and dispose() needs the handle to kill it.
     this.process.on('error', (error) => {
       this.logger.error(`[LspClient:${this.serverID}] Process error:`, error);
-      this.disposed = true;
-      this.connection?.dispose();
-      this.connection = null;
       this.emit('error', error);
+      this.dispose().catch((err) => {
+        this.logger.debug(
+          `[LspClient:${this.serverID}] dispose() after process error failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     });
 
     // Log stderr for debugging
@@ -339,13 +351,16 @@ export class LspClient extends EventEmitter {
       const filePath = fileURLToPath(uri);
 
       const requestPullDiagnostics = async () => {
-        if (!this.connection || this.disposed) return;
+        // Snapshot the connection so a concurrent dispose() that nulls
+        // `this.connection` mid-flight cannot cause a null-deref here.
+        const conn = this.connection;
+        if (!conn || this.disposed) return;
 
         try {
-          const diagResult = await this.connection.sendRequest(
-            'textDocument/diagnostic',
-            { textDocument: { uri } },
-          );
+          const diagResult = await conn.sendRequest('textDocument/diagnostic', {
+            textDocument: { uri },
+          });
+          if (this.disposed) return;
           const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
           this.updateDiagnostics(filePath, items);
         } catch (error) {
@@ -478,24 +493,32 @@ export class LspClient extends EventEmitter {
     if (this.openDocuments.has(uri)) {
       try {
         const content = await fs.promises.readFile(filePath, 'utf-8');
+        // Snapshot the connection after the readFile await so a concurrent
+        // dispose() (which synchronously nulls `this.connection`) cannot
+        // cause a null-deref on the sendNotification below.
+        const conn = this.connection;
+        if (!conn || this.disposed) return;
         const currentVersion = this.openDocuments.get(uri)!;
         const newVersion = currentVersion + 1;
         this.openDocuments.set(uri, newVersion);
-        await this.connection.sendNotification(
-          DidChangeTextDocumentNotification.type,
-          {
-            textDocument: { uri, version: newVersion },
-            contentChanges: [{ text: content }],
-          },
-        );
+        await conn.sendNotification(DidChangeTextDocumentNotification.type, {
+          textDocument: { uri, version: newVersion },
+          contentChanges: [{ text: content }],
+        });
       } catch {
-        // File may have been deleted between open and re-read
+        // File may have been deleted between open and re-read, or the
+        // connection was disposed while we were reading.
       }
       return;
     }
 
     try {
       const content = await fs.promises.readFile(filePath, 'utf-8');
+      // Snapshot the connection after the readFile await so a concurrent
+      // dispose() (which synchronously nulls `this.connection`) cannot
+      // cause a null-deref on the sendNotification calls below.
+      const conn = this.connection;
+      if (!conn || this.disposed) return;
       const languageId = getLanguageId(filePath);
 
       const textDocument: TextDocumentItem = {
@@ -507,10 +530,7 @@ export class LspClient extends EventEmitter {
 
       this.openDocuments.set(uri, 1);
       const params: DidOpenTextDocumentParams = { textDocument };
-      await this.connection.sendNotification(
-        DidOpenTextDocumentNotification.type,
-        params,
-      );
+      await conn.sendNotification(DidOpenTextDocumentNotification.type, params);
 
       // ESLint's run: "onType" setting responds to changes, not just opens
       // Send a no-op change to trigger validation
@@ -522,7 +542,7 @@ export class LspClient extends EventEmitter {
         contentChanges: [{ text: content }],
       };
       this.openDocuments.set(uri, 2);
-      await this.connection.sendNotification(
+      await conn.sendNotification(
         DidChangeTextDocumentNotification.type,
         changeParams,
       );
@@ -531,27 +551,33 @@ export class LspClient extends EventEmitter {
       // ESLint uses pull diagnostics - we need to explicitly request them
       if (
         (this.capabilities as Record<string, unknown>)?.diagnosticProvider &&
-        this.connection
+        !this.disposed
       ) {
         const requestPullDiagnostics = async (delay: number) => {
-          if (!this.connection || this.disposed) return;
+          if (this.disposed) return;
           await new Promise((resolve) => setTimeout(resolve, delay));
-          if (!this.connection || this.disposed) return;
+          // Snapshot the connection after the timeout so dispose() nulling
+          // `this.connection` mid-flight cannot cause a null-deref here.
+          const conn = this.connection;
+          if (!conn || this.disposed) return;
 
           try {
-            const diagResult = await this.connection.sendRequest(
+            const diagResult = await conn.sendRequest(
               'textDocument/diagnostic',
               {
                 textDocument: { uri },
               },
             );
+            if (this.disposed) return;
             // Process pull diagnostics result (deduplication handled by updateDiagnostics)
             const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
             if (items.length > 0) {
               this.updateDiagnostics(filePath, items);
             }
           } catch (pullError) {
-            // Server may not support pull diagnostics despite advertising
+            // Server may not support pull diagnostics despite advertising,
+            // or dispose() may have torn the connection down between the
+            // timeout and the sendRequest resolving.
             this.logger.debug(
               `[LspClient:${this.serverID}] Pull diagnostics failed for ${filePath}:`,
               pullError,
@@ -611,17 +637,18 @@ export class LspClient extends EventEmitter {
       this.connection
     ) {
       const requestPullDiagnostics = async (delay: number) => {
-        if (!this.connection || this.disposed) return;
+        if (this.disposed) return;
         await new Promise((resolve) => setTimeout(resolve, delay));
-        if (!this.connection || this.disposed) return;
+        // Snapshot the connection after the timeout so dispose() nulling
+        // `this.connection` mid-flight cannot cause a null-deref here.
+        const conn = this.connection;
+        if (!conn || this.disposed) return;
 
         try {
-          const diagResult = await this.connection.sendRequest(
-            'textDocument/diagnostic',
-            {
-              textDocument: { uri },
-            },
-          );
+          const diagResult = await conn.sendRequest('textDocument/diagnostic', {
+            textDocument: { uri },
+          });
+          if (this.disposed) return;
           const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
           // Always update diagnostics (even if empty) to clear stale ones
           this.updateDiagnostics(filePath, items);
@@ -980,38 +1007,95 @@ export class LspClient extends EventEmitter {
   }
 
   /**
-   * Dispose of the client and shut down the server
+   * Dispose of the client and shut down the server.
+   *
+   * Idempotent and race-safe:
+   * - Synchronously sets `disposed` and nulls `connection` / `process`
+   *   so concurrent callers (process 'exit' / 'error' handlers, delayed
+   *   pull-diagnostic timers, `refreshAllDiagnostics`, in-flight document
+   *   operations) observe the disposed state immediately and bail out
+   *   via their existing guards.
+   * - Single-flight: repeat calls return the same in-flight promise.
+   * - `performDispose` operates on local snapshots of `connection` /
+   *   `process`; no `this.connection` access crosses an `await` boundary
+   *   inside dispose. Other I/O-heavy methods (`openDocument`, delayed
+   *   pull-diagnostic closures) follow the same snapshot-after-await
+   *   discipline so a concurrent dispose cannot null-deref them.
+   * - Each Shutdown/Exit send is wrapped individually because some
+   *   servers close stdin the moment they answer Shutdown, which would
+   *   otherwise leak `ERR_STREAM_DESTROYED` from the Exit notification
+   *   as an unhandled rejection.
    */
-  public async dispose(): Promise<void> {
-    if (this.disposed) return;
-    this.disposed = true;
+  public dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise;
 
-    if (this.connection) {
+    this.disposed = true;
+    const connection = this.connection;
+    const childProcess = this.process;
+    this.connection = null;
+    this.process = null;
+
+    this.disposePromise = this.performDispose(connection, childProcess);
+    return this.disposePromise;
+  }
+
+  private async performDispose(
+    connection: ProtocolConnection | null,
+    childProcess: ChildProcessWithoutNullStreams | null,
+  ): Promise<void> {
+    if (connection) {
+      const gracefulShutdown = async () => {
+        try {
+          await connection.sendRequest(ShutdownRequest.type);
+        } catch (err) {
+          this.logger.debug(
+            `[LspClient:${this.serverID}] Shutdown request failed during dispose: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        try {
+          await connection.sendNotification(ExitNotification.type);
+        } catch (err) {
+          this.logger.debug(
+            `[LspClient:${this.serverID}] Exit notification failed during dispose: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      };
+
+      await Promise.race([
+        gracefulShutdown(),
+        new Promise<void>((resolve) =>
+          setTimeout(resolve, LspClient.SHUTDOWN_TIMEOUT_MS),
+        ),
+      ]);
+
       try {
-        await Promise.race([
-          (async () => {
-            await this.connection!.sendRequest(ShutdownRequest.type);
-            await this.connection!.sendNotification(ExitNotification.type);
-          })(),
-          new Promise<void>((resolve) =>
-            setTimeout(resolve, LspClient.SHUTDOWN_TIMEOUT_MS),
-          ),
-        ]);
-      } catch {
-        // Server may have already exited
+        connection.dispose();
+      } catch (err) {
+        this.logger.debug(
+          `[LspClient:${this.serverID}] Connection dispose failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
-      this.connection.dispose();
-      this.connection = null;
     }
 
-    if (this.process) {
-      this.process.kill();
-      this.process = null;
+    if (childProcess) {
+      try {
+        childProcess.kill();
+      } catch (err) {
+        this.logger.debug(
+          `[LspClient:${this.serverID}] Process kill failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     this.openDocuments.clear();
     this.diagnostics.clear();
     this.diagnosticsHash.clear();
+
+    // Emit 'close' after all teardown work completes so observers
+    // (LspService.on('close'), tests) see the client in its final
+    // state. removeAllListeners runs last so external listeners still
+    // receive this final event.
+    this.emit('close');
     this.removeAllListeners();
 
     this.logger.debug(`[LspClient:${this.serverID}] Disposed`);

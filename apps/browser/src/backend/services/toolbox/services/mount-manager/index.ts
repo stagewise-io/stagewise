@@ -338,7 +338,18 @@ export class MountManagerService extends DisposableService {
     this.workspacePathsPerMount.delete(mountPrefix);
     this.stopWorkspaceWatcher(workspacePath);
     const lspService = this.lspServicesPerPath.get(workspacePath);
-    if (lspService) void lspService.teardown();
+    if (lspService) {
+      // Fire-and-forget is fine here — the workspace is already
+      // detached. But the rejection must be caught so it doesn't
+      // surface as an unhandled rejection when a client teardown
+      // races the server exit.
+      lspService.teardown().catch((err) => {
+        this.logger.warn(
+          `[MountManager] Failed to teardown LSP for ${workspacePath}`,
+          err,
+        );
+      });
+    }
     this.clientRuntimesPerPath.delete(workspacePath);
     this.lspServicesPerPath.delete(workspacePath);
     this.lspReady.delete(workspacePath);
@@ -672,16 +683,29 @@ export class MountManagerService extends DisposableService {
     });
   }
 
-  protected onTeardown(): Promise<void> | void {
+  protected async onTeardown(): Promise<void> {
     for (const wsPath of this.watchersPerPath.keys())
       this.stopWorkspaceWatcher(wsPath);
-    for (const lspService of this.lspServicesPerPath.values())
-      void lspService.teardown();
+
+    // Await every LSP teardown so the overall shutdown chain (main
+    // process -> toolbox -> mount-manager -> lsp -> client) is fully
+    // sequenced. Per-service rejections are caught individually to
+    // prevent one failing LSP from aborting the aggregate teardown.
+    const teardownPromises = Array.from(this.lspServicesPerPath.values()).map(
+      (lspService) =>
+        lspService.teardown().catch((err) => {
+          this.logger.warn(
+            '[MountManager] Failed to teardown LSP during onTeardown',
+            err,
+          );
+        }),
+    );
+    await Promise.all(teardownPromises);
+
     this.lspServicesPerPath.clear();
     this.clientRuntimesPerPath.clear();
     this.uiKarton.removeServerProcedureHandler('toolbox.mountWorkspace');
     this.uiKarton.removeServerProcedureHandler('toolbox.unmountWorkspace');
     this.uiKarton.removeServerProcedureHandler('toolbox.searchMentionFiles');
-    return Promise.resolve();
   }
 }

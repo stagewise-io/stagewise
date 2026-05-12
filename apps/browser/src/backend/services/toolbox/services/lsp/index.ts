@@ -564,23 +564,33 @@ export class LspService extends DisposableService {
   }
 
   /**
-   * Dispose of all clients and clean up
+   * Dispose of all clients and clean up.
+   *
+   * The returned promise resolves only after every in-flight client
+   * dispose completes, so callers (MountManagerService, main-process
+   * shutdown) can await full LSP teardown before proceeding. Each
+   * client dispose is wrapped individually so a single misbehaving
+   * client cannot reject the overall teardown and leak as unhandled.
    */
-  protected onTeardown(): void {
+  protected async onTeardown(): Promise<void> {
     this.logger.debug('[LspService] Tearing down');
 
     const disposePromises = Array.from(this.clients.values()).map((client) =>
-      client.dispose(),
+      client.dispose().catch((err) => {
+        this.logger.debug(
+          `[LspService] Client dispose failed during teardown: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }),
     );
 
-    Promise.all(disposePromises).then(() => {
-      this.clients.clear();
-      this.brokenServers.clear();
-      this.pendingClients.clear();
-      this.activationCache.clear();
-      this.emitter.removeAllListeners();
-      this.logger.debug('[LspService] Teardown complete');
-    });
+    await Promise.all(disposePromises);
+
+    this.clients.clear();
+    this.brokenServers.clear();
+    this.pendingClients.clear();
+    this.activationCache.clear();
+    this.emitter.removeAllListeners();
+    this.logger.debug('[LspService] Teardown complete');
   }
 }
 
