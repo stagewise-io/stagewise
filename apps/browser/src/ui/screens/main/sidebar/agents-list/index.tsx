@@ -550,6 +550,11 @@ export function AgentsList() {
 
     // Sort by the higher of lastMessageAt and createdAt so new agents
     // (no messages yet, createdAt = now) appear at the top.
+    // NOTE: This must stay aligned with `getAgentHistoryEntries` on the
+    // backend, which paginates ordered by lastMessageAt. If the two
+    // diverge, paginated fetches return a different slice than the one
+    // the UI sorts/groups by, and agents go missing from time-bucket
+    // sections until the user clicks "Show more".
     const merged = [...activeEntries, ...historyEntries].sort(
       (a, b) =>
         Math.max(b.lastMessageAt, b.createdAt) -
