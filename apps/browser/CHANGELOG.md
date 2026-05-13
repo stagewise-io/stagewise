@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha090 (2026-05-13)
+
+### Bug Fixes
+
+* preserve slash-command bodies during history compression (bffd4b8)
+
 ## 1.0.0-alpha089 (2026-05-12)
 
 ### Features
