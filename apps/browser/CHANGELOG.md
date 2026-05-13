@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha091 (2026-05-13)
+
+### Bug Fixes
+
+* fix sorting in agents-sidebar (90d5bdf)
+* fix lsp-crash on app-quit (5eb2e77)
+
 ## 1.0.0-alpha090 (2026-05-13)
 
 ### Bug Fixes
