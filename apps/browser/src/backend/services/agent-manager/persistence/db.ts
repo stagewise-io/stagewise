@@ -98,7 +98,14 @@ export class AgentPersistenceDB {
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
       })
       .from(schema.agentInstances)
-      .orderBy(desc(schema.agentInstances.createdAt))
+      // Order by lastMessageAt so the sidebar's time-bucket grouping
+      // (Today / Yesterday / Last 7 days / ...) — which is keyed on
+      // lastMessageAt — sees a contiguous, correctly-ordered page.
+      // Ordering by createdAt here let agents whose latest activity was
+      // recent but whose creation is older drop out of the initial page,
+      // making them silently missing from groups like "Yesterday" until
+      // the user clicked "Show more".
+      .orderBy(desc(schema.agentInstances.lastMessageAt))
       .limit(limit)
       .offset(offset)
       .where(
