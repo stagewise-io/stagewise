@@ -689,6 +689,15 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [flushQueue, openAgent]);
 
   const [chatInputActive, setChatInputActive] = useState<boolean>(false);
+  // Mirror `chatInputActive` into a ref so synchronous handlers
+  // (`omnibox-focus-requested`, `search-bar-focus-requested`, `onInputBlur`)
+  // can read the up-to-date value within the same event-loop turn instead of
+  // a stale `useCallback` closure value. Without this, programmatic blurs
+  // triggered by the omnibox/search-bar focus chain re-arm
+  // `wasActiveBeforeAppBlurRef` against the very listener that just cleared
+  // it, causing the chat input to steal focus on the next window 'focus'.
+  const chatInputActiveRef = useRef(chatInputActive);
+  chatInputActiveRef.current = chatInputActive;
   // Track if input was focused before app lost focus (for restoring on app regain)
   const wasActiveBeforeAppBlurRef = useRef(false);
 
@@ -714,34 +723,35 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     wasActiveBeforeAppBlurRef.current = false;
   }, [chatInputActive]);
 
-  const onInputBlur = useCallback(
-    (ev: FocusEvent) => {
-      const target = ev.relatedTarget as HTMLElement;
-      // We should only allow chat blur if the user clicked outside the chat box or the context selector element tree. Otherwise, we should keep the input active by refocusing it.
-      if (target?.closest('#chat-file-attachment-menu-content')) {
-        return;
-      }
-      // Let focus move naturally into status card inputs (e.g. user question form)
-      if (target?.closest('[data-status-card]')) {
-        return;
-      }
-      if (
-        !target ||
-        (!target.closest('#chat-input-container-box') &&
-          !target.closest('#element-selector-element-canvas'))
-      ) {
-        // If relatedTarget is null, the app might be losing focus (e.g., CMD+tab)
-        // Track this so we can restore focus when the app regains focus
-        if (!target && chatInputActive)
-          wasActiveBeforeAppBlurRef.current = true;
+  const onInputBlur = useCallback((ev: FocusEvent) => {
+    const target = ev.relatedTarget as HTMLElement;
+    // We should only allow chat blur if the user clicked outside the chat box or the context selector element tree. Otherwise, we should keep the input active by refocusing it.
+    if (target?.closest('#chat-file-attachment-menu-content')) {
+      return;
+    }
+    // Let focus move naturally into status card inputs (e.g. user question form)
+    if (target?.closest('[data-status-card]')) {
+      return;
+    }
+    if (
+      !target ||
+      (!target.closest('#chat-input-container-box') &&
+        !target.closest('#element-selector-element-canvas'))
+    ) {
+      // If relatedTarget is null, the app might be losing focus (e.g., CMD+tab)
+      // Track this so we can restore focus when the app regains focus.
+      // Read from the ref (not the closure) so synchronous resets dispatched
+      // earlier in the same event-loop turn (e.g. by
+      // `omnibox-focus-requested`) are honoured before the programmatic blur
+      // they trigger reaches us.
+      if (!target && chatInputActiveRef.current)
+        wasActiveBeforeAppBlurRef.current = true;
 
-        setChatInputActive(false);
-      } else if (chatInputActive) {
-        chatInputRef.current?.focus();
-      }
-    },
-    [chatInputActive],
-  );
+      setChatInputActive(false);
+    } else if (chatInputActiveRef.current) {
+      chatInputRef.current?.focus();
+    }
+  }, []);
 
   // Restore focus when the app regains focus (e.g., after CMD+tab back)
   useEventListener(
@@ -759,6 +769,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   // Clear focus restoration flag when omnibox takes focus (prevents chat from reclaiming focus)
   useEventListener('omnibox-focus-requested', () => {
     wasActiveBeforeAppBlurRef.current = false;
+    // Synchronously mark the input as inactive so the blur fired by the
+    // omnibox's `focus()` chain (which blurs all contenteditable elements)
+    // doesn't re-arm `wasActiveBeforeAppBlurRef` via `onInputBlur` before the
+    // `setChatInputActive(false)` state update commits.
+    chatInputActiveRef.current = false;
     setChatInputActive(false);
     // Also stop context selection to prevent its ESC handler from consuming the first ESC
     stopContextSelector();
@@ -767,6 +782,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   // Clear focus restoration flag when search bar takes focus (prevents chat from reclaiming focus)
   useEventListener('search-bar-focus-requested', () => {
     wasActiveBeforeAppBlurRef.current = false;
+    // See `omnibox-focus-requested` above for why we update the ref
+    // synchronously before the state setter.
+    chatInputActiveRef.current = false;
     setChatInputActive(false);
     // Also stop context selection to prevent its ESC handler from consuming the first ESC
     stopContextSelector();

@@ -915,15 +915,20 @@ export class WindowLayoutService extends DisposableService {
     });
 
     tab.on('tabFocused', (id) => {
-      // FIX: On Win32, webContents may auto-focus multiple times during page load
+      // FIX: webContents may auto-focus multiple times during page load
       // (wc.on('focus') fires on visibility, DOM load, script execution, etc.).
       // When isWebContentInteractive is false, the UI should have focus priority.
       // Reclaim it immediately to prevent the tab from stealing keyboard input.
-      if (
-        process.platform === 'win32' &&
-        !this.isWebContentInteractive &&
-        id === this.activeTabId
-      ) {
+      //
+      // Originally scoped to Win32, but macOS exhibits the same behavior:
+      // during CMD+T new-tab creation the tab's webContents grabs native OS
+      // focus while still loading (url='', isLoading=true), which moves focus
+      // away from the renderer's BrowserWindow. The omnibox INPUT remains
+      // document.activeElement but document.hasFocus() returns false —
+      // typing goes nowhere. UIController.focus() calls webContents.focus()
+      // on the UI view; it does NOT change z-order, so it is safe on all
+      // platforms (see Invariant #2 in focus-handling.md).
+      if (!this.isWebContentInteractive && id === this.activeTabId) {
         this.uiController?.focus();
       }
       this.uiController?.forwardFocusEvent(id);
