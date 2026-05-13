@@ -28,22 +28,26 @@ export enum HotkeyActions {
   NEW_CHAT = 'new_chat',
   DOWNLOADS = 'downloads',
 
-  // Tab & window navigation
+  // Tab & window navigation (browser tabs only)
   NEW_TAB = 'new_tab',
   RESTORE_TAB = 'restore_tab',
   CLOSE_TAB = 'close_tab',
   CLOSE_WINDOW = 'close_window',
   NEXT_TAB = 'next_tab',
   PREV_TAB = 'prev_tab',
-  FOCUS_TAB_1 = 'focus_tab_1',
-  FOCUS_TAB_2 = 'focus_tab_2',
-  FOCUS_TAB_3 = 'focus_tab_3',
-  FOCUS_TAB_4 = 'focus_tab_4',
-  FOCUS_TAB_5 = 'focus_tab_5',
-  FOCUS_TAB_6 = 'focus_tab_6',
-  FOCUS_TAB_7 = 'focus_tab_7',
-  FOCUS_TAB_8 = 'focus_tab_8',
-  FOCUS_TAB_LAST = 'focus_tab_last',
+
+  // Agent switching (sidebar agents — independent of browser tabs)
+  NEXT_AGENT = 'next_agent',
+  PREV_AGENT = 'prev_agent',
+  FOCUS_AGENT_1 = 'focus_agent_1',
+  FOCUS_AGENT_2 = 'focus_agent_2',
+  FOCUS_AGENT_3 = 'focus_agent_3',
+  FOCUS_AGENT_4 = 'focus_agent_4',
+  FOCUS_AGENT_5 = 'focus_agent_5',
+  FOCUS_AGENT_6 = 'focus_agent_6',
+  FOCUS_AGENT_7 = 'focus_agent_7',
+  FOCUS_AGENT_8 = 'focus_agent_8',
+  FOCUS_AGENT_LAST = 'focus_agent_last',
 
   // History navigation
   HISTORY_BACK = 'history_back',
@@ -119,54 +123,65 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+Shift+W',
     captureDominantly: true,
   },
+  // Browser-tab navigation. Ctrl+Tab is intentionally NOT bound here —
+  // those keys drive agent switching via NEXT_AGENT / PREV_AGENT.
   [HotkeyActions.NEXT_TAB]: {
-    // Ctrl+Tab works on all platforms (explicit Ctrl, not Mod)
-    accelerator: 'Ctrl+Tab',
-    aliases: ['Mod+PageDown'],
+    accelerator: 'Mod+PageDown',
     mac: 'Mod+Alt+ArrowRight',
-    macAliases: ['Ctrl+Tab', 'Mod+PageDown'],
+    macAliases: ['Mod+PageDown'],
     captureDominantly: true,
   },
   [HotkeyActions.PREV_TAB]: {
-    accelerator: 'Ctrl+Shift+Tab',
-    aliases: ['Mod+PageUp'],
+    accelerator: 'Mod+PageUp',
     mac: 'Mod+Alt+ArrowLeft',
-    macAliases: ['Ctrl+Shift+Tab', 'Mod+PageUp'],
+    macAliases: ['Mod+PageUp'],
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_1]: {
+
+  // Agent switching. Ctrl+Tab works on all platforms (explicit Ctrl, not
+  // Mod) — Cmd+Tab on macOS is reserved by the OS app switcher and cannot
+  // be intercepted reliably.
+  [HotkeyActions.NEXT_AGENT]: {
+    accelerator: 'Ctrl+Tab',
+    captureDominantly: true,
+  },
+  [HotkeyActions.PREV_AGENT]: {
+    accelerator: 'Ctrl+Shift+Tab',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_AGENT_1]: {
     accelerator: 'Mod+1',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_2]: {
+  [HotkeyActions.FOCUS_AGENT_2]: {
     accelerator: 'Mod+2',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_3]: {
+  [HotkeyActions.FOCUS_AGENT_3]: {
     accelerator: 'Mod+3',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_4]: {
+  [HotkeyActions.FOCUS_AGENT_4]: {
     accelerator: 'Mod+4',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_5]: {
+  [HotkeyActions.FOCUS_AGENT_5]: {
     accelerator: 'Mod+5',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_6]: {
+  [HotkeyActions.FOCUS_AGENT_6]: {
     accelerator: 'Mod+6',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_7]: {
+  [HotkeyActions.FOCUS_AGENT_7]: {
     accelerator: 'Mod+7',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_8]: {
+  [HotkeyActions.FOCUS_AGENT_8]: {
     accelerator: 'Mod+8',
     captureDominantly: true,
   },
-  [HotkeyActions.FOCUS_TAB_LAST]: {
+  [HotkeyActions.FOCUS_AGENT_LAST]: {
     accelerator: 'Mod+9',
     captureDominantly: true,
   },

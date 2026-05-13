@@ -38,9 +38,15 @@ import {
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
+import {
+  activeAgentCardsEqual,
+  mergeAgentEntries,
+  type ActiveAgentCardData,
+  type MergedAgentEntry,
+} from './agent-list-model';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -74,26 +80,6 @@ enablePatches();
 // Types & helpers
 // ============================================================================
 
-type ActiveAgentCardData = {
-  id: string;
-  title: string;
-  isWorking: boolean;
-  isWaitingForUser: boolean;
-  activityText: string;
-  activityIsUserInput: boolean;
-  hasError: boolean;
-  lastMessageAt: number;
-  createdAt: number;
-  messageCount: number;
-  unread: boolean;
-};
-
-/** Unified entry for the merged active + history list. */
-type MergedAgentEntry = ActiveAgentCardData & {
-  /** True when this agent is currently loaded in-memory (active instance). */
-  isLive: boolean;
-};
-
 function stringArraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   return a.every((value, index) => value === b[index]);
@@ -114,32 +100,6 @@ function agentHistoryEntriesEqual(
       ai.lastMessageAt !== bi.lastMessageAt ||
       ai.messageCount !== bi.messageCount ||
       ai.parentAgentInstanceId !== bi.parentAgentInstanceId
-    )
-      return false;
-  }
-  return true;
-}
-
-function activeAgentCardsEqual(
-  a: ActiveAgentCardData[],
-  b: ActiveAgentCardData[],
-): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i]!;
-    const bi = b[i]!;
-    if (
-      ai.id !== bi.id ||
-      ai.title !== bi.title ||
-      ai.isWorking !== bi.isWorking ||
-      ai.isWaitingForUser !== bi.isWaitingForUser ||
-      ai.activityText !== bi.activityText ||
-      ai.activityIsUserInput !== bi.activityIsUserInput ||
-      ai.hasError !== bi.hasError ||
-      ai.lastMessageAt !== bi.lastMessageAt ||
-      ai.createdAt !== bi.createdAt ||
-      ai.messageCount !== bi.messageCount ||
-      ai.unread !== bi.unread
     )
       return false;
   }
@@ -371,6 +331,7 @@ function SortablePinnedAgentCard({
 export function AgentsList() {
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const [openAgent, setOpenAgent] = useOpenAgent();
+  const { previewAgentId } = useAgentSwitcher();
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
@@ -669,83 +630,24 @@ export function AgentsList() {
   // Merged list: active + history, sorted newest-first by lastMessageAt.
   // =========================================================================
 
-  const allAgents = useMemo((): MergedAgentEntry[] => {
-    const activeById = new Map(agents.map((a) => [a.id, a]));
-    const pendingSet = pendingRemovals;
+  const mergedHistoryList = useMemo(
+    () =>
+      [...pinnedHistoryList, ...historyList].filter(
+        (entry, index, entries) =>
+          entries.findIndex((candidate) => candidate.id === entry.id) === index,
+      ),
+    [pinnedHistoryList, historyList],
+  );
 
-    // Index history entries by id for fallback lookups. Pinned-by-id
-    // entries come first so older pinned agents outside the paginated
-    // history slice can still be resolved.
-    const mergedHistoryList = [...pinnedHistoryList, ...historyList].filter(
-      (entry, index, entries) =>
-        entries.findIndex((candidate) => candidate.id === entry.id) === index,
-    );
-    const historyById = new Map(mergedHistoryList.map((e) => [e.id, e]));
-
-    // History entries: exclude those that are already active or pending removal.
-    const historyEntries: MergedAgentEntry[] = mergedHistoryList
-      .filter((e) => !activeById.has(e.id) && !pendingSet.has(e.id))
-      .map((e) => ({
-        id: e.id,
-        title: e.title,
-        isWorking: false,
-        isWaitingForUser: false,
-        activityText: '',
-        activityIsUserInput: false,
-        hasError: false,
-        unread: false,
-        lastMessageAt: new Date(e.lastMessageAt).getTime(),
-        createdAt: new Date(e.createdAt).getTime(),
-        messageCount: e.messageCount,
-        isLive: false,
-      }));
-
-    // Active entries: exclude those pending removal.
-    // When an agent was just resumed, its active state may still be loading
-    // — fall back to the persisted history entry for title and timestamps
-    // so the card doesn't flicker or jump position.
-    // For brand-new agents (no history entry, no messages), use Date.now()
-    // so they sort to the top instead of being hidden at the bottom.
-    const now = Date.now();
-    const activeEntries: MergedAgentEntry[] = agents
-      .filter((a) => !pendingSet.has(a.id))
-      .map((a) => {
-        const h = historyById.get(a.id);
-        const createdAt =
-          a.createdAt > 0
-            ? a.createdAt
-            : h
-              ? new Date(h.createdAt).getTime()
-              : now;
-        return {
-          ...a,
-          title: a.title || h?.title || a.title,
-          isLive: true,
-          lastMessageAt:
-            a.lastMessageAt > 0
-              ? a.lastMessageAt
-              : h
-                ? new Date(h.lastMessageAt).getTime()
-                : 0,
-          createdAt,
-        };
-      });
-
-    // Sort by the higher of lastMessageAt and createdAt so new agents
-    // (no messages yet, createdAt = now) appear at the top.
-    // NOTE: This must stay aligned with `getAgentHistoryEntries` on the
-    // backend, which paginates ordered by lastMessageAt. If the two
-    // diverge, paginated fetches return a different slice than the one
-    // the UI sorts/groups by, and agents go missing from time-bucket
-    // sections until the user clicks "Show more".
-    const merged = [...activeEntries, ...historyEntries].sort(
-      (a, b) =>
-        Math.max(b.lastMessageAt, b.createdAt) -
-        Math.max(a.lastMessageAt, a.createdAt),
-    );
-
-    return merged;
-  }, [agents, historyList, pendingRemovals, pinnedHistoryList]);
+  const allAgents = useMemo(
+    (): MergedAgentEntry[] =>
+      mergeAgentEntries({
+        activeAgents: agents,
+        historyList: mergedHistoryList,
+        pendingRemovals,
+      }),
+    [agents, mergedHistoryList, pendingRemovals],
+  );
 
   // =========================================================================
   // Pinned agent preferences
@@ -1087,6 +989,12 @@ export function AgentsList() {
     if (openAgent) scrollCardIntoView(openAgent);
   }, [openAgent, scrollCardIntoView]);
 
+  // During Ctrl+Tab cycling, keep the preview-highlighted card visible without
+  // committing the chat-panel switch.
+  useEffect(() => {
+    if (previewAgentId) scrollCardIntoView(previewAgentId);
+  }, [previewAgentId, scrollCardIntoView]);
+
   // Clear the unread dot when the user opens an agent.
   useEffect(() => {
     if (openAgent) {
@@ -1272,6 +1180,7 @@ export function AgentsList() {
 
           const agent = item.agent;
           const isOpen = agent.id === openAgent;
+          const isPreviewOpen = agent.id === previewAgentId;
           const hasUnseen = !isOpen && agent.unread;
 
           return (
@@ -1280,6 +1189,7 @@ export function AgentsList() {
               id={agent.id}
               title={agent.title}
               isActive={isOpen}
+              isPreviewActive={isPreviewOpen}
               isWorking={agent.isWorking}
               isWaitingForUser={agent.isWaitingForUser}
               hasError={agent.hasError}

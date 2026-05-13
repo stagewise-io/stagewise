@@ -11,7 +11,11 @@ import { ChatPanelFooter } from './panel-footer';
 import { InternalAppFrame } from './internal-app-frame';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
-import { useOpenAgent, OpenAgentContext } from '@ui/hooks/use-open-chat';
+import {
+  useOpenAgent,
+  OpenAgentContext,
+  noopAgentSwitcher,
+} from '@ui/hooks/use-open-chat';
 
 export function ChatPanel() {
   const { forwardDropEvent } = useMessageEditState();
@@ -85,12 +89,15 @@ export function ChatPanel() {
 
   // Context override: ChatHistory reads openAgent from context, so we provide
   // the deferred value so React can schedule the heavy render as interruptible.
-  const deferredContext: [
-    string | null,
-    (id: string | null) => void,
-    (id: string) => void,
-  ] = useMemo(
-    () => [deferredAgent, setOpenAgent, removeFromHistory],
+  const deferredContext = useMemo(
+    () => ({
+      tuple: [deferredAgent, setOpenAgent, removeFromHistory] as [
+        string | null,
+        (id: string | null) => void,
+        (id: string, fallback?: string | null) => void,
+      ],
+      switcher: noopAgentSwitcher,
+    }),
     [deferredAgent, setOpenAgent, removeFromHistory],
   );
 
