@@ -28,10 +28,16 @@ export function UsageWarningBadge() {
   // Scan all agents — not just the open one — so the warning is global.
   const instances = useKartonState((s) => s.agents.instances);
   const stateUsageWarning = useMemo(() => {
+    let highest:
+      | NonNullable<(typeof instances)[string]['state']['usageWarning']>
+      | undefined;
     for (const instance of Object.values(instances)) {
-      if (instance.state.usageWarning) return instance.state.usageWarning;
+      const warning = instance.state.usageWarning;
+      if (warning && (!highest || warning.usedPercent > highest.usedPercent)) {
+        highest = warning;
+      }
     }
-    return undefined;
+    return highest;
   }, [instances]);
 
   if (!stateUsageWarning) return null;
