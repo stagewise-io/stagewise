@@ -23,6 +23,8 @@ import {
   readInitialSidebarCollapsed,
   useSidebarCollapsed,
 } from '../_components/sidebar-collapsed-context';
+import { NotificationBanners } from '../agent-chat/chat/_components/notification-banners';
+import { UsageWarningBadge } from '../agent-chat/chat/_components/usage-warning-badge';
 
 // Read the persisted collapsed state *once* at module eval so we can seed
 // `defaultSize` on first render. Without this the panel mounts expanded
@@ -98,8 +100,13 @@ export function Sidebar() {
         >
           <AgentsList />
 
+          <div className="mt-8 flex shrink-0 flex-col gap-2">
+            <NotificationBanners />
+            <UsageWarningBadge />
+          </div>
+
           {/* Bottom auth section */}
-          <div className="mt-8 flex flex-col gap-2">
+          <div className="mt-2 flex shrink-0 flex-col gap-2">
             <div className="flex flex-row items-center justify-between gap-2">
               {isAuthenticated ? (
                 <button

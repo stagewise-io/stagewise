@@ -19,12 +19,12 @@ export function NotificationBanners() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex shrink-0 flex-col gap-2">
       {notifications.map((notification) => (
         <div
           key={notification.id}
           className={cn(
-            'relative flex shrink-0 flex-col gap-1.5 rounded-md bg-background p-2.5 shadow-elevation-1 ring-1 ring-derived-strong dark:bg-surface-1',
+            'relative flex shrink-0 flex-col gap-1.5 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-strong backdrop-blur-xl dark:bg-surface-1/60',
           )}
         >
           <div className="flex flex-row items-start gap-2">
