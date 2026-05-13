@@ -1,6 +1,5 @@
 import { DisposableService } from './disposable';
 import type { Logger } from './logger';
-import type { PagesService } from './pages';
 import type { LocalPortEntry } from '@shared/karton-contracts/pages-api/types';
 import { getAllListeningPorts, checkPortHasContent } from '../utils/port-utils';
 
@@ -11,32 +10,21 @@ import { getAllListeningPorts, checkPortHasContent } from '../utils/port-utils';
  */
 export class LocalPortsScannerService extends DisposableService {
   private readonly logger: Logger;
-  private readonly pagesService: PagesService;
   private readonly excludePorts: Set<number>;
   private cachedEntries: LocalPortEntry[] = [];
   private lastScanTime = 0;
 
-  private constructor(
-    logger: Logger,
-    pagesService: PagesService,
-    excludePorts: number[],
-  ) {
+  private constructor(logger: Logger, excludePorts: number[]) {
     super();
     this.logger = logger;
-    this.pagesService = pagesService;
     this.excludePorts = new Set(excludePorts);
   }
 
   public static async create(
     logger: Logger,
-    pagesService: PagesService,
     excludePorts: number[] = [],
   ): Promise<LocalPortsScannerService> {
-    const instance = new LocalPortsScannerService(
-      logger,
-      pagesService,
-      excludePorts,
-    );
+    const instance = new LocalPortsScannerService(logger, excludePorts);
     logger.debug('[LocalPortsScanner] Created service');
     return instance;
   }
@@ -71,7 +59,6 @@ export class LocalPortsScannerService extends DisposableService {
       this.cachedEntries = entries;
       this.lastScanTime = Date.now();
 
-      await this.pagesService.syncLocalPortsState(entries);
       this.logger.debug(
         `[LocalPortsScanner] Updated local ports: ${entries.length} found`,
       );

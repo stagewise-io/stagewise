@@ -14,12 +14,8 @@ import type {
   AddSearchEngineResult,
   RemoveSearchEngineResult,
   InspirationWebsite,
-  StoredExperienceData,
   ContextFilesResult,
   ExternalFileContentResult,
-  LocalPortEntry,
-  OriginThumbnailResult,
-  MostVisitedOriginEntry,
   CurrentUsageResponse,
   UsageHistoryResponse,
 } from './types';
@@ -57,11 +53,6 @@ export type PagesApiState = {
   globalConfig: GlobalConfig;
   /** Available search engines from Web Data database */
   searchEngines: SearchEngine[];
-  /** Home page state (for stagewise://internal/home) */
-  homePage: {
-    storedExperienceData: StoredExperienceData;
-    localPorts: LocalPortEntry[];
-  };
   /** User account status, synced from AuthService */
   userAccount: {
     status: AuthStatus;
@@ -291,17 +282,6 @@ export type PagesApiContract = {
     verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
     /** Log the current user out */
     logout: () => Promise<void>;
-    /** Trigger a fresh scan of local ports */
-    scanLocalPorts: () => Promise<void>;
-    /** Get thumbnail images for a list of origins (for home page local port cards) */
-    getThumbnailsForOrigins: (
-      origins: string[],
-    ) => Promise<Record<string, OriginThumbnailResult>>;
-    /** Get most visited origins from browsing history (for home page) */
-    getMostVisitedOrigins: (params: {
-      offset: number;
-      limit: number;
-    }) => Promise<MostVisitedOriginEntry[]>;
     /** Get current usage stats (window percentages + prepaid balance) */
     getUsageCurrent: () => Promise<CurrentUsageResponse>;
     /** Get daily usage history breakdown */
@@ -363,14 +343,6 @@ export const defaultState: PagesApiState = {
   configuredCredentialIds: [],
   plugins: [],
   plans: [],
-  homePage: {
-    storedExperienceData: {
-      recentlyOpenedWorkspaces: [],
-      hasSeenOnboardingFlow: null,
-      lastViewedChats: {},
-    },
-    localPorts: [],
-  },
   appInfo: {
     baseName: __APP_BASE_NAME__,
     name: __APP_NAME__,

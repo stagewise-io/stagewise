@@ -32,7 +32,6 @@ import {
 } from '@shared/karton-contracts/pages-api/types';
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
-import type { ThumbnailService } from '../thumbnail';
 import type { TelemetryService } from '../telemetry';
 import {
   canBrowserHandleUrl,
@@ -159,7 +158,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private logger: Logger;
   private historyService: HistoryService;
   private faviconService: FaviconService;
-  private thumbnailService: ThumbnailService | null = null;
   private readonly telemetryService: TelemetryService | null;
   private kartonServer: KartonServer<TabKartonContract>;
   private kartonTransport: ElectronServerTransport;
@@ -211,11 +209,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
   private readonly SCREENSHOT_INTERVAL_MS = 15000; // 15 seconds
   private screenshotOnResizeTimeout: NodeJS.Timeout | null = null;
   private readonly SCREENSHOT_RESIZE_DEBOUNCE_MS = 200; // 200ms debounce
-
-  // Thumbnail persistence throttle (one save per origin per 60s)
-  private lastThumbnailSaveOrigin: string | null = null;
-  private lastThumbnailSaveTime = 0;
-  private readonly THUMBNAIL_SAVE_INTERVAL_MS = 60_000;
 
   // DevTools debugger tracking
   private devToolsDebugger: Electron.Debugger | null = null;
@@ -277,7 +270,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       setActive?: boolean,
       sourceTabId?: string,
     ) => void,
-    thumbnailService?: ThumbnailService,
     telemetryService?: TelemetryService,
   ) {
     super();
@@ -288,7 +280,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.faviconService = faviconService;
     this.searchUtilsConfig = searchUtilsConfig;
     this.onCreateTab = onCreateTab;
-    this.thumbnailService = thumbnailService ?? null;
     this.telemetryService = telemetryService ?? null;
 
     this.webContentsView = new WebContentsView({
@@ -1733,95 +1724,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       const dataUrl = this.compressImageToTargetSize(image);
       // Update state with screenshot
       this.updateState({ screenshot: dataUrl });
-      // Persist a downscaled thumbnail per origin (fire-and-forget)
-      this.persistOriginThumbnail(image).catch((err) => {
-        this.logger.debug(
-          `[TabController] Failed to persist thumbnail: ${err}`,
-        );
-      });
     } catch (err) {
       // Log error but don't throw - screenshot capture failures shouldn't break the tab
       this.logger.debug(`[TabController] Error capturing screenshot: ${err}`);
     }
-  }
-
-  /**
-   * Downscale a NativeImage to a 400px-wide JPEG thumbnail for DB storage.
-   */
-  private createThumbnailBuffer(image: NativeImage): {
-    buffer: Buffer;
-    width: number;
-    height: number;
-  } {
-    const size = image.getSize();
-    const targetWidth = 400;
-    if (size.width <= 0 || size.height <= 0) {
-      return {
-        buffer: image.toJPEG(50),
-        width: size.width,
-        height: size.height,
-      };
-    }
-    const scale = targetWidth / size.width;
-    const targetHeight = Math.round(size.height * scale);
-    const resized = image.resize({ width: targetWidth, height: targetHeight });
-    return {
-      buffer: resized.toJPEG(50),
-      width: targetWidth,
-      height: targetHeight,
-    };
-  }
-
-  /**
-   * Persist the latest screenshot as a thumbnail keyed by origin.
-   * Only updates when the current URL path is shorter than or equal to
-   * the stored path, keeping the thumbnail in its most "root" state.
-   * Time-throttled for same-length paths; shorter paths bypass the
-   * throttle so the thumbnail converges to the root quickly.
-   */
-  private async persistOriginThumbnail(image: NativeImage): Promise<void> {
-    if (!this.thumbnailService) return;
-
-    let origin: string;
-    let urlPath: string;
-    try {
-      const parsed = new URL(this.currentState.url);
-      origin = parsed.origin;
-      urlPath = parsed.pathname;
-    } catch {
-      return;
-    }
-    // Skip internal pages and invalid origins
-    if (!origin || origin === 'null') return;
-
-    // Path-based guard: only update when the current path is at the
-    // same depth or shallower than the previously stored thumbnail.
-    const { allowed, isShorterPath } =
-      await this.thumbnailService.shouldUpdateThumbnail(origin, urlPath);
-    if (!allowed) return;
-
-    // Time-based throttle: apply only when the path is the same length.
-    // Shorter paths bypass the throttle to converge quickly.
-    if (!isShorterPath) {
-      const now = Date.now();
-      if (
-        this.lastThumbnailSaveOrigin === origin &&
-        now - this.lastThumbnailSaveTime < this.THUMBNAIL_SAVE_INTERVAL_MS
-      ) {
-        return;
-      }
-    }
-
-    const { buffer, width, height } = this.createThumbnailBuffer(image);
-    await this.thumbnailService.storeThumbnail(
-      origin,
-      urlPath,
-      buffer,
-      width,
-      height,
-    );
-    this.lastThumbnailSaveOrigin = origin;
-    this.lastThumbnailSaveTime = Date.now();
   }
 
   private async updateViewportInfo() {

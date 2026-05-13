@@ -34,7 +34,6 @@ export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
   private readonly telemetryService: TelemetryService;
-  private pagesService?: PagesService;
   private inspirationSeed = crypto.randomUUID();
   private cachedInspirationWebsites: InspirationWebsite = {
     websites: [],
@@ -47,9 +46,6 @@ export class UserExperienceService extends DisposableService {
 
   // Store bound callback reference for proper unregistration
   private readonly boundHandleServiceStateChange: () => void;
-
-  // Track last synced storedExperienceData to prevent infinite loops
-  private lastSyncedStoredExperienceData: string | null = null;
 
   // Flag to prevent re-entrant initialization
   private isLoadingStoredExperienceData = false;
@@ -217,14 +213,8 @@ export class UserExperienceService extends DisposableService {
         this.uiKarton.setState((draft) => {
           draft.userExperience.storedExperienceData = storedExperienceData;
         });
-        // Sync to pages API
-        this.syncHomePageStateToPagesService();
       });
     }
-
-    // Only sync if not currently loading (to prevent loops)
-    if (!this.isLoadingStoredExperienceData)
-      this.syncHomePageStateToPagesService();
   }
 
   /**
@@ -418,8 +408,6 @@ export class UserExperienceService extends DisposableService {
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
       });
-      // Sync to pages API
-      this.syncHomePageStateToPagesService();
       this.logger.debug(
         `[UserExperienceService] Saved recently opened workspace: ${workspacePath}`,
       );
@@ -457,8 +445,6 @@ export class UserExperienceService extends DisposableService {
       this.uiKarton.setState((draft) => {
         draft.userExperience.storedExperienceData = storedData;
       });
-      // Sync to pages API
-      this.syncHomePageStateToPagesService();
       this.logger.debug(
         `[UserExperienceService] Set hasSeenOnboardingFlow to: ${value}`,
       );
@@ -478,43 +464,11 @@ export class UserExperienceService extends DisposableService {
   }
 
   /**
-   * Set the PagesService instance for syncing home page state.
-   * This should be called by main.ts after services are created.
+   * Set the PagesService instance for wiring handlers.
+   * This should be called by pages-handler-wiring.ts after services are created.
    */
   public setPagesService(pagesService: PagesService): void {
     this.pagesService = pagesService;
-    // Sync initial state
-    this.syncHomePageStateToPagesService();
-  }
-
-  /**
-   * Sync current home page state to PagesService.
-   * Uses memoization for storedExperienceData to prevent infinite loops.
-   */
-  private syncHomePageStateToPagesService(): void {
-    if (!this.pagesService) {
-      return;
-    }
-    const state = this.uiKarton.state;
-
-    // Stringify storedExperienceData for comparison (cheap memoization)
-    const currentStoredData = JSON.stringify(
-      state.userExperience.storedExperienceData,
-    );
-
-    // Check if storedExperienceData changed
-    const storedDataChanged =
-      currentStoredData !== this.lastSyncedStoredExperienceData;
-
-    // Update memoization cache for storedExperienceData
-    if (storedDataChanged)
-      this.lastSyncedStoredExperienceData = currentStoredData;
-
-    this.pagesService.syncHomePageState({
-      storedExperienceData: storedDataChanged
-        ? state.userExperience.storedExperienceData
-        : undefined,
-    });
   }
 
   private async pruneRecentlyOpenedWorkspaces({

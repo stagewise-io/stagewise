@@ -9,7 +9,6 @@ import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
 import type { HistoryService } from '../history';
 import type { FaviconService } from '../favicon';
-import type { ThumbnailService } from '../thumbnail';
 import type { PagesService } from '../pages';
 import type { PreferencesService } from '../preferences';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
@@ -83,7 +82,6 @@ export class WindowLayoutService extends DisposableService {
   private readonly logger: Logger;
   private readonly historyService: HistoryService;
   private readonly faviconService: FaviconService;
-  private readonly thumbnailService: ThumbnailService | null;
   private readonly pagesService: PagesService;
   private readonly preferencesService: PreferencesService;
   private readonly telemetryService: TelemetryService | null;
@@ -135,7 +133,6 @@ export class WindowLayoutService extends DisposableService {
     faviconService: FaviconService,
     pagesService: PagesService,
     preferencesService: PreferencesService,
-    thumbnailService?: ThumbnailService,
     telemetryService?: TelemetryService,
   ) {
     super();
@@ -144,7 +141,6 @@ export class WindowLayoutService extends DisposableService {
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
-    this.thumbnailService = thumbnailService ?? null;
     this.pagesService = pagesService;
     this.preferencesService = preferencesService;
     this.telemetryService = telemetryService ?? null;
@@ -156,7 +152,6 @@ export class WindowLayoutService extends DisposableService {
     faviconService: FaviconService,
     pagesService: PagesService,
     preferencesService: PreferencesService,
-    thumbnailService?: ThumbnailService,
     telemetryService?: TelemetryService,
   ): Promise<WindowLayoutService> {
     const instance = new WindowLayoutService(
@@ -165,7 +160,6 @@ export class WindowLayoutService extends DisposableService {
       faviconService,
       pagesService,
       preferencesService,
-      thumbnailService,
       telemetryService,
     );
     await instance.initialize();
@@ -890,7 +884,6 @@ export class WindowLayoutService extends DisposableService {
         const resolvedUrl = searchUtils.resolveNavigationTarget(target);
         void this.handleCreateTab(resolvedUrl, setActive, id);
       },
-      this.thumbnailService ?? undefined,
       this.telemetryService ?? undefined,
     );
 
