@@ -80,8 +80,7 @@ export function wirePagesHandlers(deps: {
     getUsageHistory: (params) => authService.getUsageHistory(params.days),
   });
 
-  // --- Home page services bidirectional wiring ---
-  userExperienceService.setPagesService(pagesService);
+  // --- Wire user experience service into pages service ---
   pagesService.setUserExperienceService(userExperienceService);
 
   // --- Accept/reject pending edits handlers ---
