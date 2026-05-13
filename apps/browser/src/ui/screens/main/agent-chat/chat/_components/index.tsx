@@ -9,8 +9,6 @@ import {
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
 import { InternalAppFrame } from './internal-app-frame';
-import { UsageWarningBadge } from './usage-warning-badge';
-import { NotificationBanners } from './notification-banners';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { useOpenAgent, OpenAgentContext } from '@ui/hooks/use-open-chat';
@@ -131,8 +129,6 @@ export function ChatPanel() {
           }}
         >
           <InternalAppFrame />
-          <NotificationBanners />
-          <UsageWarningBadge />
         </div>
         <ChatPanelFooter key={openAgent} />
       </div>
