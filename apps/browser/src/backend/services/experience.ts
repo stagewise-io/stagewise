@@ -15,7 +15,6 @@ import {
 } from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
-import type { PagesService } from './pages';
 import { type ApiClient, createApiClient } from '@stagewise/api-client';
 import { API_URL } from './auth/server-interop';
 import { DisposableService } from './disposable';
@@ -461,14 +460,6 @@ export class UserExperienceService extends DisposableService {
       );
       this.report(error as Error, 'saveOnboardingState');
     }
-  }
-
-  /**
-   * Set the PagesService instance for wiring handlers.
-   * This should be called by pages-handler-wiring.ts after services are created.
-   */
-  public setPagesService(pagesService: PagesService): void {
-    this.pagesService = pagesService;
   }
 
   private async pruneRecentlyOpenedWorkspaces({
