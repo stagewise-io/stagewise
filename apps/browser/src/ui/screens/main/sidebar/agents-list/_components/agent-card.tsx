@@ -31,6 +31,7 @@ export interface AgentCardProps {
   id: string;
   title: string;
   isActive: boolean;
+  isPreviewActive?: boolean;
   isWorking: boolean;
   isWaitingForUser: boolean;
   hasError: boolean;
@@ -71,6 +72,7 @@ export const AgentCard = memo(
       id,
       title,
       isActive,
+      isPreviewActive = false,
       isWorking,
       isWaitingForUser,
       hasError,
@@ -141,6 +143,7 @@ export const AgentCard = memo(
         className={cn(
           buttonVariants({ variant: 'ghost', size: 'sm' }),
           'group/card relative justify-start pl-1.5 text-start text-muted-foreground hover:bg-foreground/8',
+          isPreviewActive && !isActive && 'bg-foreground/8 text-foreground',
           isActive && 'bg-foreground/5 text-foreground',
         )}
       >
@@ -278,6 +281,7 @@ export const AgentCard = memo(
     prev.id === next.id &&
     prev.title === next.title &&
     prev.isActive === next.isActive &&
+    prev.isPreviewActive === next.isPreviewActive &&
     prev.isWorking === next.isWorking &&
     prev.isWaitingForUser === next.isWaitingForUser &&
     prev.hasError === next.hasError &&

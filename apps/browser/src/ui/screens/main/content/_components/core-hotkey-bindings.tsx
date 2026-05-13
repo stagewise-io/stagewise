@@ -84,7 +84,9 @@ export function CoreHotkeyBindings({
     onCleanAllTabs();
   }, HotkeyActions.CLOSE_WINDOW);
 
-  // Switch to next tab (aliases handled in definition: Ctrl+Tab, Mod+PageDown, Mod+Alt+Arrow on Mac)
+  // Switch to next browser tab (Mod+PageDown / Mac Cmd+Alt+ArrowRight).
+  // Ctrl+Tab is no longer bound here — it now drives agent switching
+  // (see `agent-hotkey-bindings.tsx`).
   const handleNextTab = useCallback(async () => {
     if (!tabNeighborsToActiveTab?.next) return;
     await handleSwitchTab(tabNeighborsToActiveTab.next);
@@ -92,7 +94,7 @@ export function CoreHotkeyBindings({
 
   useHotKeyListener(handleNextTab, HotkeyActions.NEXT_TAB);
 
-  // Switch to previous tab (aliases handled in definition)
+  // Switch to previous browser tab (Mod+PageUp / Mac Cmd+Alt+ArrowLeft).
   const handlePreviousTab = useCallback(() => {
     if (!tabNeighborsToActiveTab?.previous) return;
     handleSwitchTab(tabNeighborsToActiveTab.previous);
@@ -100,34 +102,8 @@ export function CoreHotkeyBindings({
 
   useHotKeyListener(handlePreviousTab, HotkeyActions.PREV_TAB);
 
-  // Focus specific tabs (Mod+1 through Mod+9)
-  const createTabIndexHandler = useCallback(
-    (index: number) => {
-      return () => {
-        if (index === 9) {
-          // Mod+9 focuses last tab
-          if (tabCount === 0) return;
-          const lastTabId = tabIds[tabCount - 1]!;
-          handleSwitchTab(lastTabId);
-        } else {
-          // Mod+1-8 focus tabs by index (0-based)
-          if (index >= tabCount) return;
-          handleSwitchTab(tabIds[index]!);
-        }
-      };
-    },
-    [tabIds, tabCount, handleSwitchTab],
-  );
-
-  useHotKeyListener(createTabIndexHandler(0), HotkeyActions.FOCUS_TAB_1);
-  useHotKeyListener(createTabIndexHandler(1), HotkeyActions.FOCUS_TAB_2);
-  useHotKeyListener(createTabIndexHandler(2), HotkeyActions.FOCUS_TAB_3);
-  useHotKeyListener(createTabIndexHandler(3), HotkeyActions.FOCUS_TAB_4);
-  useHotKeyListener(createTabIndexHandler(4), HotkeyActions.FOCUS_TAB_5);
-  useHotKeyListener(createTabIndexHandler(5), HotkeyActions.FOCUS_TAB_6);
-  useHotKeyListener(createTabIndexHandler(6), HotkeyActions.FOCUS_TAB_7);
-  useHotKeyListener(createTabIndexHandler(7), HotkeyActions.FOCUS_TAB_8);
-  useHotKeyListener(createTabIndexHandler(9), HotkeyActions.FOCUS_TAB_LAST);
+  // Mod+1…9 are no longer browser-tab index jumps — they focus agents now
+  // (see `agent-hotkey-bindings.tsx`).
 
   // HISTORY NAVIGATION
 

@@ -18,6 +18,7 @@ import {
   SidebarCollapsedProvider,
   useSidebarCollapsed,
 } from './_components/sidebar-collapsed-context';
+import { AgentHotkeyBindings } from './_components/agent-hotkey-bindings';
 
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
 const layoutStorageKey = 'stagewise-panel-layout';
@@ -46,47 +47,50 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   useAutoSelectFirstAgent();
 
   return (
-    <div
-      className={cn(
-        'root pointer-events-auto inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
-        !show && 'pointer-events-none opacity-0 blur-lg',
-      )}
-    >
-      {/* Thin draggable strip at the very top for macOS hidden-titlebar windows */}
-      {isMacOs && !isFullScreen && (
-        <div className="app-drag fixed top-0 right-0 left-0 h-2" />
-      )}
-      <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId={rootLayoutStorageKey}
-        className="overflow-visible! h-full w-full"
+    <>
+      {show && <AgentHotkeyBindings />}
+      <div
+        className={cn(
+          'root pointer-events-auto inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
+          !show && 'pointer-events-none opacity-0 blur-lg',
+        )}
       >
-        <Sidebar />
-
-        {!collapsed && <ResizableHandle />}
-
-        <ResizablePanel
-          id="content-panel"
-          order={1}
-          defaultSize={65}
-          className={cn(
-            'h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
-            !isMacOs && 'mt-px',
-          )}
+        {/* Thin draggable strip at the very top for macOS hidden-titlebar windows */}
+        {isMacOs && !isFullScreen && (
+          <div className="app-drag fixed top-0 right-0 left-0 h-2" />
+        )}
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId={rootLayoutStorageKey}
+          className="overflow-visible! h-full w-full"
         >
-          <ResizablePanelGroup
-            direction="horizontal"
-            autoSaveId={layoutStorageKey}
-            className="h-full divide-x divide-surface-1"
+          <Sidebar />
+
+          {!collapsed && <ResizableHandle />}
+
+          <ResizablePanel
+            id="content-panel"
+            order={1}
+            defaultSize={65}
+            className={cn(
+              'h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
+              !isMacOs && 'mt-px',
+            )}
           >
-            <AgentChat />
+            <ResizablePanelGroup
+              direction="horizontal"
+              autoSaveId={layoutStorageKey}
+              className="h-full divide-x divide-surface-1"
+            >
+              <AgentChat />
 
-            <ResizableHandle />
+              <ResizableHandle />
 
-            <MainSection />
-          </ResizablePanelGroup>
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
+              <MainSection />
+            </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </>
   );
 }
