@@ -23,7 +23,6 @@ import { PagesService } from './services/pages';
 import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
-import { ThumbnailService } from './services/thumbnail';
 import { WebDataService } from './services/webdata';
 import { DownloadsService } from './services/download-manager';
 import { DiffHistoryService } from './services/diff-history';
@@ -109,12 +108,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
   );
   const faviconService = await FaviconService.create(logger);
-  const thumbnailService = await ThumbnailService.create(logger);
-
-  // Evict thumbnails older than 30 days (fire-and-forget)
-  thumbnailService.evictStaleThumbnails(30).catch((err) => {
-    logger.warn('[Main] Failed to evict stale thumbnails', err);
-  });
 
   // Create DownloadsService to track active downloads for pause/resume/cancel
   const downloadsService = await DownloadsService.create(
@@ -131,20 +124,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     downloadsService,
     webDataService,
     telemetryService,
-    thumbnailService,
   );
 
   // Initialize search engines state
   await pagesService.syncSearchEnginesState();
 
   // Create LocalPortsScannerService to discover local dev servers
-  const localPortsScannerService = await LocalPortsScannerService.create(
-    logger,
-    pagesService,
-  );
-
-  // Wire scan trigger so the UI can request a fresh port scan
-  pagesService.setScanLocalPortsHandler(() => localPortsScannerService.scan());
+  const localPortsScannerService =
+    await LocalPortsScannerService.create(logger);
 
   // Create WindowLayoutService with all dependencies including PreferencesService
   // This also applies the startup page preference during initialization
@@ -154,7 +141,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     faviconService,
     pagesService,
     preferencesService,
-    thumbnailService,
     telemetryService,
   );
   const uiKarton = windowLayoutService.uiKarton;
@@ -479,7 +465,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       runTeardown('webDataService', () => webDataService.teardown());
       runTeardown('historyService', () => historyService.teardown());
       runTeardown('faviconService', () => faviconService.teardown());
-      runTeardown('thumbnailService', () => thumbnailService.teardown());
       runTeardown('diffHistoryService', () => diffHistoryService.teardown());
       runTeardown('assetCacheService', () => assetCacheService.teardown());
       runTeardown('processedImageCacheService', () =>

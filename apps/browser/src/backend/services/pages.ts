@@ -30,7 +30,6 @@ import type { CodingPlanId } from '@shared/coding-plans';
 import type { OnboardingAuthCompletion } from './experience';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
-import type { ThumbnailService } from './thumbnail';
 import type { DownloadsService } from './download-manager';
 import type { WebDataService } from './webdata';
 import type { UserExperienceService } from './experience';
@@ -49,9 +48,6 @@ import type {
   InspirationWebsite,
   ContextFilesResult,
   ExternalFileContentResult,
-  LocalPortEntry,
-  OriginThumbnailResult,
-  MostVisitedOriginEntry,
   CurrentUsageResponse,
   UsageHistoryResponse,
 } from '@shared/karton-contracts/pages-api/types';
@@ -75,7 +71,6 @@ export class PagesService extends DisposableService {
   private readonly logger: Logger;
   private readonly historyService: HistoryService;
   private readonly faviconService: FaviconService;
-  private readonly thumbnailService?: ThumbnailService;
   private readonly downloadsService?: DownloadsService;
   private readonly webDataService?: WebDataService;
   private kartonServer: KartonServer<PagesApiContract>;
@@ -126,7 +121,6 @@ export class PagesService extends DisposableService {
   private getExternalFileContentHandler?: (
     oid: string,
   ) => Promise<ExternalFileContentResult | null>;
-  private scanLocalPortsHandler?: () => Promise<void>;
   private getUsageCurrentHandler?: () => Promise<CurrentUsageResponse>;
   private getUsageHistoryHandler?: (params: {
     days?: number;
@@ -144,13 +138,11 @@ export class PagesService extends DisposableService {
     downloadsService: DownloadsService | undefined,
     webDataService: WebDataService | undefined,
     telemetryService: TelemetryService,
-    thumbnailService?: ThumbnailService,
   ) {
     super();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
-    this.thumbnailService = thumbnailService;
     this.downloadsService = downloadsService;
     this.webDataService = webDataService;
     this.telemetryService = telemetryService;
@@ -212,7 +204,6 @@ export class PagesService extends DisposableService {
     downloadsService: DownloadsService | undefined,
     webDataService: WebDataService | undefined,
     telemetryService: TelemetryService,
-    thumbnailService?: ThumbnailService,
   ): Promise<PagesService> {
     const instance = new PagesService(
       logger,
@@ -221,7 +212,6 @@ export class PagesService extends DisposableService {
       downloadsService,
       webDataService,
       telemetryService,
-      thumbnailService,
     );
     await instance.initialize();
     logger.debug('[PagesService] Created service');
@@ -894,19 +884,10 @@ export class PagesService extends DisposableService {
           if (options.favicons) {
             // Clear all favicons
             result.faviconsCleared = await this.faviconService.clearAllData();
-            // Also clear thumbnails when favicons are cleared
-            if (this.thumbnailService) {
-              await this.thumbnailService.clearAllData();
-            }
           } else if (options.history) {
             // If only history was cleared, clean up orphaned favicons
             result.faviconsCleared =
               await this.faviconService.cleanupOrphanedFavicons();
-          }
-
-          // Clear thumbnails when cache is cleared
-          if (options.cache && this.thumbnailService) {
-            await this.thumbnailService.clearAllData();
           }
 
           // Clear session data (cookies, cache, storage, etc.)
@@ -989,9 +970,6 @@ export class PagesService extends DisposableService {
             }
             if (options.favicons) {
               vacuumPromises.push(this.faviconService.vacuum());
-            }
-            if ((options.favicons || options.cache) && this.thumbnailService) {
-              vacuumPromises.push(this.thumbnailService.vacuum());
             }
             await Promise.all(vacuumPromises);
           }
@@ -1302,38 +1280,6 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
-      'scanLocalPorts',
-      async (_callingClientId: string): Promise<void> => {
-        if (!this.scanLocalPortsHandler) {
-          this.logger.warn(
-            '[PagesService] scanLocalPorts called but no handler is set',
-          );
-          return;
-        }
-        await this.scanLocalPortsHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getThumbnailsForOrigins',
-      async (
-        _callingClientId: string,
-        origins: string[],
-      ): Promise<Record<string, OriginThumbnailResult>> => {
-        if (!this.thumbnailService) {
-          return {};
-        }
-        const map =
-          await this.thumbnailService.getThumbnailsForOrigins(origins);
-        const result: Record<string, OriginThumbnailResult> = {};
-        for (const [origin, thumbnail] of map) {
-          result[origin] = thumbnail;
-        }
-        return result;
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
       'getUsageCurrent',
       async (_callingClientId: string): Promise<CurrentUsageResponse> => {
         if (!this.getUsageCurrentHandler) {
@@ -1353,49 +1299,6 @@ export class PagesService extends DisposableService {
           throw new Error('Usage handler not available');
         }
         return this.getUsageHistoryHandler(params);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getMostVisitedOrigins',
-      async (
-        _callingClientId: string,
-        params: { offset: number; limit: number },
-      ): Promise<MostVisitedOriginEntry[]> => {
-        const origins = await this.historyService.getMostVisitedOrigins({
-          limit: params.limit,
-          offset: params.offset,
-          timespanDays: 3,
-          minVisitCount: 1,
-        });
-
-        if (origins.length === 0) return [];
-
-        // Single batched query for titles + last URLs instead of N+1 calls
-        const details = await this.historyService.getLastVisitedUrlsForOrigins(
-          origins.map((o) => o.origin),
-        );
-
-        // Batch-fetch favicon URLs for the last visited pages
-        const lastUrls = [...details.values()]
-          .map((d) => d.url)
-          .filter(Boolean);
-        const faviconMap =
-          lastUrls.length > 0
-            ? await this.faviconService.getFaviconsForUrls(lastUrls)
-            : new Map<string, string>();
-
-        return origins.map((o) => {
-          const detail = details.get(o.origin);
-          return {
-            origin: o.origin,
-            visitCount: o.visitCount,
-            lastVisitTime: o.lastVisitTime.getTime(),
-            title: detail?.title ?? null,
-            lastUrl: detail?.url ?? null,
-            faviconUrl: (detail?.url && faviconMap.get(detail.url)) ?? null,
-          };
-        });
       },
     );
   }
@@ -1926,63 +1829,6 @@ export class PagesService extends DisposableService {
   }
 
   /**
-   * Sync home page state to the Pages API Karton state.
-   * Called by UserExperienceService when home page data changes.
-   */
-  public syncHomePageState(state: {
-    storedExperienceData?: PagesApiContract['state']['homePage']['storedExperienceData'];
-  }): void {
-    this.kartonServer.setState((draft) => {
-      if (state.storedExperienceData !== undefined) {
-        draft.homePage.storedExperienceData = state.storedExperienceData;
-      }
-    });
-  }
-
-  /**
-   * Set the handler for triggering a local ports scan.
-   * This should be called by main.ts to wire up to LocalPortsScannerService.
-   */
-  public setScanLocalPortsHandler(handler: () => Promise<void>): void {
-    this.scanLocalPortsHandler = handler;
-  }
-
-  /**
-   * Sync local ports state to the Pages API Karton state.
-   * Sorts ports by history (most recently visited first), then by port number.
-   * Called by LocalPortsScannerService when discovered ports change.
-   */
-  public async syncLocalPortsState(
-    localPorts: LocalPortEntry[],
-  ): Promise<void> {
-    // Look up last visit time for each port origin
-    const portsWithVisitTime = await Promise.all(
-      localPorts.map(async (entry) => {
-        const lastVisit = await this.historyService.getLastVisitTimeForOrigin(
-          entry.url,
-        );
-        return { entry, lastVisit };
-      }),
-    );
-
-    // Sort: visited ports first (most recent on top), unvisited last (by port)
-    portsWithVisitTime.sort((a, b) => {
-      if (a.lastVisit && b.lastVisit) {
-        return b.lastVisit.getTime() - a.lastVisit.getTime();
-      }
-      if (a.lastVisit) return -1;
-      if (b.lastVisit) return 1;
-      return a.entry.port - b.entry.port;
-    });
-
-    const sorted = portsWithVisitTime.map((p) => p.entry);
-
-    this.kartonServer.setState((draft) => {
-      draft.homePage.localPorts = sorted;
-    });
-  }
-
-  /**
    * Accept a new MessagePort connection for the PagesApi contract.
    *
    * @param port - The MessagePortMain from the main process side
@@ -2104,9 +1950,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('sendOtp');
     this.kartonServer.removeServerProcedureHandler('verifyOtp');
     this.kartonServer.removeServerProcedureHandler('logout');
-    this.kartonServer.removeServerProcedureHandler('scanLocalPorts');
-    this.kartonServer.removeServerProcedureHandler('getThumbnailsForOrigins');
-    this.kartonServer.removeServerProcedureHandler('getMostVisitedOrigins');
+
     this.kartonServer.removeServerProcedureHandler('getUsageCurrent');
     this.kartonServer.removeServerProcedureHandler('getUsageHistory');
     this.kartonServer.removeServerProcedureHandler('setCredential');
@@ -2137,7 +1981,7 @@ export class PagesService extends DisposableService {
     this.getContextFilesHandler = undefined;
     this.generateWorkspaceMdHandler = undefined;
     this.getExternalFileContentHandler = undefined;
-    this.scanLocalPortsHandler = undefined;
+
     this.getUsageCurrentHandler = undefined;
     this.getUsageHistoryHandler = undefined;
     this.sendOtpHandler = undefined;
