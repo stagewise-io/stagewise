@@ -85,11 +85,13 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.TOGGLE_SIDEBAR]: {
     // Matches Codex / VS Code / GitHub Desktop convention.
-    // NOT capture-dominant: Cmd/Ctrl+B is the universal "bold" shortcut
-    // inside rich-text editors (TipTap), so we let native editable
-    // elements consume the event first via `shouldNativeInputConsumeEvent`.
+    // Capture-dominant: the chat composer (TipTap) is configured as
+    // plain-text only (no bold/italic/underline marks), so there is no
+    // formatting shortcut to protect. Running in the capture phase makes
+    // Cmd/Ctrl+B reliably toggle the sidebar even when the chat input
+    // (a contentEditable element) is focused.
     accelerator: 'Mod+B',
-    captureDominantly: false,
+    captureDominantly: true,
   },
   [HotkeyActions.NEW_CHAT]: {
     accelerator: 'Mod+N',
