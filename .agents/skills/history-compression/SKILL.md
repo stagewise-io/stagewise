@@ -21,10 +21,10 @@ All paths are repo-root-relative.
 
 After every step → `handlePostStep` checks:
 
-`usedTokens > min(compactionThreshold × contextWindow, 100k)`
+`usedTokens > min(compactionThreshold × contextWindow, 200k)`
 
 - `compactionThreshold` default **0.65**; chat agent overrides to **0.5**.
-- `100k` hard cap (`HISTORY_COMPRESSION_HARD_CAP_TOKENS`) = 1M-ctx models trigger at same absolute count as 200k models.
+- `200k` hard cap (`HISTORY_COMPRESSION_HARD_CAP_TOKENS`) = 1M-ctx models trigger at the same absolute count as a 200k-context model running near its full window.
 - Runs via `void` (async, non-blocking). Guarded by `_isCompressingHistory` flag → no concurrent runs.
 - Silent failure — agent keeps going, context overflow later surfaces normal model error.
 
@@ -97,7 +97,7 @@ Input to LLM is XML-ish:
 | Knob | Where | Default | Effect |
 |---|---|---|---|
 | `compactionThreshold` | `config.historyCompressionThreshold` | 0.65 (chat: 0.5) | Trigger fraction of ctx window |
-| `HISTORY_COMPRESSION_HARD_CAP_TOKENS` | `base-agent.ts` const | 100_000 | Absolute trigger cap |
+| `HISTORY_COMPRESSION_HARD_CAP_TOKENS` | `base-agent.ts` const | 200_000 | Absolute trigger cap |
 | `KEPT_BUDGET_FRACTION` | `base-agent.ts` const | 0.2 | Fraction kept uncompressed |
 | `KEPT_BUDGET_HARD_CAP_TOKENS` | `base-agent.ts` const | 40_000 | Absolute kept cap |
 | `minUncompressedMessages` | `config` | 10 | Floor on kept msg count |

@@ -1921,10 +1921,11 @@ export abstract class BaseAgent<
    * Absolute maximum (in tokens) for the compression trigger threshold.
    * Used via `Math.min(fraction * contextWindowSize, HARD_CAP)` so
    * large-context models (e.g. 1M) compress at the same absolute token
-   * count as the 200k-model sweet spot. Calibrated to `0.5 × 200_000`
-   * matching the chat agent's `historyCompressionThreshold = 0.5`.
+   * count as a 200k-context model running near its full window. The cap
+   * is intentionally a hard ceiling on input size, independent of
+   * `historyCompressionThreshold`.
    */
-  private static readonly HISTORY_COMPRESSION_HARD_CAP_TOKENS = 100_000;
+  private static readonly HISTORY_COMPRESSION_HARD_CAP_TOKENS = 200_000;
 
   /**
    * Absolute maximum (in tokens) for the kept-uncompressed budget after
