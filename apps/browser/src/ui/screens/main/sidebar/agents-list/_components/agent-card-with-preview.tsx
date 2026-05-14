@@ -20,6 +20,8 @@ const MARGIN = 4;
 
 interface AgentCardWithPreviewProps extends AgentCardProps {
   cache: Map<string, CachedPreview>;
+  /** True when the agent is currently loaded in Karton state. */
+  isLiveAgent: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ interface AgentCardWithPreviewProps extends AgentCardProps {
  */
 export function AgentCardWithPreview({
   cache,
+  isLiveAgent,
   ...cardProps
 }: AgentCardWithPreviewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -193,19 +196,16 @@ export function AgentCardWithPreview({
     // intent delay. By the time the timer fires the RPC is typically
     // already resolved and the cache is warm — the panel then mounts with
     // content on the very first frame, no skeleton flash.
-    // `isLiveAgent=true`: every card in `ActiveAgentsGrid` is sourced from
-    // `s.agents.instances`, so it is by construction a live (in-memory)
-    // agent — regardless of whether it's the currently-focused card
-    // (`cardProps.isActive`, which is pure visual state). Passing the
-    // visual flag here would cause prefetch to cache `{ data: null }` for
-    // non-focused live agents whose stored row hasn't been flushed yet,
-    // pinning their preview blank for the grid lifetime.
+    // `isLiveAgent` must describe the data source, not the visual open state
+    // (`cardProps.isActive`). Live agents can use Karton overlay data before
+    // their stored row has flushed; history-only pinned agents rely on the
+    // persisted preview data returned by `getStoredInstance`.
     const prefetchPromise = prefetchAgentPreview(
       cardProps.id,
       cache,
       getStoredInstanceRef.current,
       getTouchedFilesRef.current,
-      true,
+      isLiveAgent,
     );
     showTimerRef.current = setTimeout(async () => {
       showTimerRef.current = null;
@@ -235,7 +235,7 @@ export function AgentCardWithPreview({
     // Dep-array intentionally omits `getStoredInstance` / `getTouchedFiles`
     // — they're read via refs above, so reference changes should not
     // re-create the callback. See the comment where the refs are set up.
-  }, [cancelShowTimer, cancelExitTimer, cardProps.id, cache]);
+  }, [cancelShowTimer, cancelExitTimer, cardProps.id, cache, isLiveAgent]);
 
   // Measure-then-show: runs synchronously before paint so the panel never
   // renders at a stale position.
@@ -319,12 +319,12 @@ export function AgentCardWithPreview({
             <AgentPreviewPanel
               key={cardProps.id}
               agentId={cardProps.id}
-              // Always `true` in this surface — see the prefetch call above
-              // for the rationale. `cardProps.isActive` here would make the
-              // panel skip the Karton live-overlay (title / messageCount /
-              // workspaces) for non-focused live cards, rendering stale
-              // persisted values instead.
-              isActive={true}
+              // `isActive` here controls whether the preview overlays live
+              // Karton state. It intentionally uses data-source liveness,
+              // not `cardProps.isActive`, which is only the open-row visual
+              // state. History-only pinned agents should render persisted
+              // preview data instead of assuming a live instance exists.
+              isActive={isLiveAgent}
               cache={cache}
             />
           </div>,

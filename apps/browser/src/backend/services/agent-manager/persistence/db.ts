@@ -3,6 +3,7 @@ import * as schema from './schema';
 import {
   and,
   notInArray,
+  inArray,
   ilike,
   desc,
   isNull,
@@ -133,6 +134,39 @@ export class AgentPersistenceDB {
    *
    * @returns The stored agent instances
    */
+  public async getAgentHistoryEntriesByIds(
+    ids: string[],
+  ): Promise<AgentHistoryEntry[]> {
+    if (ids.length === 0) return [];
+
+    const results = await this._db
+      .select({
+        id: schema.agentInstances.id,
+        title: schema.agentInstances.title,
+        createdAt: schema.agentInstances.createdAt,
+        lastMessageAt: schema.agentInstances.lastMessageAt,
+        messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
+        parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
+      })
+      .from(schema.agentInstances)
+      .where(
+        and(
+          inArray(schema.agentInstances.id, ids),
+          isNull(schema.agentInstances.parentAgentInstanceId),
+          eq(schema.agentInstances.type, AgentTypes.CHAT),
+        ),
+      );
+
+    this._logger.debug(
+      `[AgentPersistenceDB] Fetched agent history entries by ids`,
+    );
+
+    const resultById = new Map(results.map((entry) => [entry.id, entry]));
+    return ids
+      .map((id) => resultById.get(id))
+      .filter((entry): entry is AgentHistoryEntry => entry !== undefined);
+  }
+
   public async getStoredAgentInstanceById(
     id: string,
   ): Promise<schema.StoredAgentInstance | null> {
