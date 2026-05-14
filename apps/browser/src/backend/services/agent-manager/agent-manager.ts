@@ -454,6 +454,12 @@ export class AgentManagerService extends DisposableService {
       },
     );
     this.karton.registerServerProcedureHandler(
+      'agents.getAgentHistoryEntriesByIds',
+      async (_callingClientId: string, ids: string[]) => {
+        return await this.getAgentHistoryEntriesByIds(ids);
+      },
+    );
+    this.karton.registerServerProcedureHandler(
       'agents.updateInputState',
       async (
         _callingClientId: string,
@@ -1341,5 +1347,13 @@ export class AgentManagerService extends DisposableService {
         ? `%${searchString.trim()}%`
         : undefined,
     );
+  }
+
+  private async getAgentHistoryEntriesByIds(
+    ids: string[],
+  ): Promise<AgentHistoryEntry[]> {
+    const db = await this.ensureDBReady();
+    if (!db) return [];
+    return await db.getAgentHistoryEntriesByIds(ids);
   }
 }

@@ -7,6 +7,8 @@ import {
   IconCopyIdOutline18,
   IconFolderOpenOutline18,
   IconPen2Outline18,
+  IconPinTackOutline18,
+  IconPinTackSlashOutline18,
 } from 'nucleo-ui-outline-18';
 import { useFloatingIsolation } from './use-floating-isolation';
 
@@ -33,6 +35,8 @@ export interface AgentContextMenuTarget {
    * when the user picks "Rename".
    */
   rename: () => void;
+  isPinned?: boolean;
+  togglePinned?: (id: string) => void;
 }
 
 export interface SharedAgentContextMenuState {
@@ -68,6 +72,8 @@ export function buildAgentContextMenuHandler(
   state: SharedAgentContextMenuState,
   agentId: string,
   rename: () => void,
+  isPinned?: boolean,
+  togglePinned?: (id: string) => void,
 ): (e: React.MouseEvent) => void {
   return (e) => {
     e.preventDefault();
@@ -78,6 +84,8 @@ export function buildAgentContextMenuHandler(
       y: e.clientY,
       showDev: e.shiftKey,
       rename,
+      isPinned,
+      togglePinned,
     });
   };
 }
@@ -158,7 +166,7 @@ export const SharedAgentContextMenuHost = memo(
     );
 
     if (!activeTarget) return null;
-    const { agentId, showDev, rename } = activeTarget;
+    const { agentId, showDev, rename, isPinned, togglePinned } = activeTarget;
 
     return (
       <MenuBase.Root open={open} onOpenChange={handleOpenChange}>
@@ -191,6 +199,21 @@ export const SharedAgentContextMenuHost = memo(
                 <IconPen2Outline18 className="size-3.5 shrink-0" />
                 <span>Rename</span>
               </AgentMenuItem>
+              {togglePinned && (
+                <AgentMenuItem
+                  onClick={() => {
+                    togglePinned(agentId);
+                    onClose();
+                  }}
+                >
+                  {isPinned ? (
+                    <IconPinTackSlashOutline18 className="size-3.5 shrink-0" />
+                  ) : (
+                    <IconPinTackOutline18 className="size-3.5 shrink-0" />
+                  )}
+                  <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+                </AgentMenuItem>
+              )}
               <AgentMenuItem
                 onClick={() => {
                   onDeleteRequest(agentId, anchorX, anchorY);

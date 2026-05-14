@@ -5,6 +5,10 @@ import {
   type SharedAgentContextMenuState,
   buildAgentContextMenuHandler,
 } from '../../../_components/shared-agent-context-menu';
+import {
+  IconPinTackOutline18,
+  IconPinTackSlashOutline18,
+} from 'nucleo-ui-outline-18';
 import { useInlineTitleEdit } from './use-inline-title-edit';
 
 function compactTimeAgo(timestamp: number): string {
@@ -38,6 +42,8 @@ export interface AgentCardProps {
   contextMenuState: SharedAgentContextMenuState;
   onClick: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
+  isPinned?: boolean;
+  onTogglePinned?: (id: string) => void;
   /** Optional hover/pointer callbacks — used by `AgentCardWithPreview` to
    *  drive the hover-preview without introducing a wrapping element that
    *  would disrupt the parent grid layout. */
@@ -73,6 +79,8 @@ export const AgentCard = memo(
       contextMenuState,
       onClick,
       onRename,
+      isPinned = false,
+      onTogglePinned,
       onMouseEnter,
       onMouseLeave,
       onMouseDown,
@@ -103,6 +111,8 @@ export const AgentCard = memo(
           contextMenuState,
           id,
           startEditing,
+          isPinned,
+          onTogglePinned,
         )}
         onClick={() => onClick(id)}
         onMouseEnter={onMouseEnter}
@@ -146,19 +156,49 @@ export const AgentCard = memo(
                   ? 'bg-success-solid'
                   : null;
           return (
-            <div className="flex size-4 shrink-0 items-center justify-center dark:brightness-125">
+            <div className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125">
               {dotColor ? (
-                <>
-                  <div
-                    className={cn('size-2 shrink-0 rounded-full', dotColor)}
-                  />
+                <div
+                  className={cn(
+                    'relative size-2 shrink-0 transition-opacity',
+                    onTogglePinned && 'group-hover/card:opacity-0',
+                  )}
+                >
+                  <div className={cn('size-full rounded-full', dotColor)} />
                   <div
                     className={cn(
-                      'absolute size-2 shrink-0 animate-ping rounded-full',
+                      'absolute inset-0 size-full animate-ping rounded-full',
                       dotColor,
                     )}
                   />
-                </>
+                </div>
+              ) : null}
+              {onTogglePinned ? (
+                <button
+                  type="button"
+                  data-no-dnd="true"
+                  aria-label={isPinned ? 'Unpin agent' : 'Pin agent'}
+                  title={isPinned ? 'Unpin agent' : 'Pin agent'}
+                  className={cn(
+                    'absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm',
+                    'text-muted-foreground/60 opacity-0 outline-none transition-[color,opacity]',
+                    'hover:text-foreground focus-visible:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100',
+                  )}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTogglePinned(id);
+                  }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  {isPinned ? (
+                    <IconPinTackSlashOutline18 className="size-3.5" />
+                  ) : (
+                    <IconPinTackOutline18 className="size-3.5" />
+                  )}
+                </button>
               ) : null}
             </div>
           );
@@ -169,6 +209,7 @@ export const AgentCard = memo(
               ref={titleRef}
               role="textbox"
               contentEditable
+              data-no-dnd="true"
               suppressContentEditableWarning
               className="block min-w-0 flex-1 cursor-text overflow-x-clip truncate text-ellipsis whitespace-nowrap bg-transparent p-0 text-left text-sm leading-normal outline-none"
               onClick={(e) => e.stopPropagation()}
@@ -204,10 +245,6 @@ export const AgentCard = memo(
                 if (!isActive) return;
                 e.stopPropagation();
                 startEditing();
-              }}
-              onPointerDown={(e) => {
-                if (!isActive) return;
-                e.stopPropagation();
               }}
             >
               {displayTitle}
@@ -248,6 +285,8 @@ export const AgentCard = memo(
     prev.activityText === next.activityText &&
     prev.activityIsUserInput === next.activityIsUserInput &&
     prev.lastMessageAt === next.lastMessageAt &&
+    prev.isPinned === next.isPinned &&
+    prev.onTogglePinned === next.onTogglePinned &&
     prev.onMouseEnter === next.onMouseEnter &&
     prev.onMouseLeave === next.onMouseLeave &&
     prev.onMouseDown === next.onMouseDown,

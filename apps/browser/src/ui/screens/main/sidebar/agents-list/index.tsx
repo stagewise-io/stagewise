@@ -1,4 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import { enablePatches, type Patch } from 'immer';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  type PointerSensorOptions,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  type AnimateLayoutChanges,
+} from '@dnd-kit/sortable';
+import {
+  restrictToFirstScrollableAncestor,
+  restrictToVerticalAxis,
+} from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 import {
   useComparingSelector,
   useKartonProcedure,
@@ -22,7 +56,7 @@ import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
 import { cn } from '@ui/utils';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { useTrack } from '@ui/hooks/use-track';
-import { AgentCardSkeleton } from './_components/agent-card';
+import { AgentCard, AgentCardSkeleton } from './_components/agent-card';
 import { AgentCardWithPreview } from './_components/agent-card-with-preview';
 import type { CachedPreview } from '../../_components/agent-preview-panel';
 import { getToolActivityLabel } from './_utils/tool-label';
@@ -33,6 +67,8 @@ import {
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+
+enablePatches();
 
 // ============================================================================
 // Types & helpers
@@ -57,6 +93,32 @@ type MergedAgentEntry = ActiveAgentCardData & {
   /** True when this agent is currently loaded in-memory (active instance). */
   isLive: boolean;
 };
+
+function stringArraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function agentHistoryEntriesEqual(
+  a: AgentHistoryEntry[],
+  b: AgentHistoryEntry[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const ai = a[i]!;
+    const bi = b[i]!;
+    if (
+      ai.id !== bi.id ||
+      ai.title !== bi.title ||
+      ai.createdAt !== bi.createdAt ||
+      ai.lastMessageAt !== bi.lastMessageAt ||
+      ai.messageCount !== bi.messageCount ||
+      ai.parentAgentInstanceId !== bi.parentAgentInstanceId
+    )
+      return false;
+  }
+  return true;
+}
 
 function activeAgentCardsEqual(
   a: ActiveAgentCardData[],
@@ -203,6 +265,106 @@ function insertGroupHeaders(agents: MergedAgentEntry[]): GroupedItem[] {
 }
 
 // ============================================================================
+// Sortable pinned rows
+// ============================================================================
+
+const disableSortableLayoutAnimation: AnimateLayoutChanges = () => false;
+
+function isPinnedDragBlockedTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    !!target.closest('[data-no-dnd="true"], [contenteditable="true"]')
+  );
+}
+
+class PinnedPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: 'onPointerDown' as const,
+      handler: (
+        event: ReactPointerEvent,
+        { onActivation }: PointerSensorOptions,
+      ) => {
+        const nativeEvent = event.nativeEvent;
+        if (
+          isPinnedDragBlockedTarget(nativeEvent.target) ||
+          !nativeEvent.isPrimary ||
+          nativeEvent.button !== 0
+        ) {
+          return false;
+        }
+
+        onActivation?.({ event: nativeEvent });
+        return true;
+      },
+    },
+  ];
+}
+
+function SortablePinnedAgentCard({
+  agent,
+  isOpen,
+  hasUnseen,
+  contextMenuState,
+  onClick,
+  onRename,
+  onTogglePinned,
+  cache,
+}: {
+  agent: MergedAgentEntry;
+  isOpen: boolean;
+  hasUnseen: boolean;
+  contextMenuState: ReturnType<typeof useSharedAgentContextMenu>[0];
+  onClick: (id: string) => void;
+  onRename: (id: string, newTitle: string) => void;
+  onTogglePinned: (id: string) => void;
+  cache: Map<string, CachedPreview>;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: agent.id,
+    animateLayoutChanges: disableSortableLayoutAnimation,
+    transition: null,
+  });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <AgentCardWithPreview
+        id={agent.id}
+        title={agent.title}
+        isActive={isOpen}
+        isWorking={agent.isWorking}
+        isWaitingForUser={agent.isWaitingForUser}
+        hasError={agent.hasError}
+        hasUnseen={hasUnseen}
+        activityText={agent.activityText}
+        activityIsUserInput={agent.activityIsUserInput}
+        lastMessageAt={agent.lastMessageAt}
+        contextMenuState={contextMenuState}
+        onClick={onClick}
+        onRename={onRename}
+        isPinned
+        onTogglePinned={onTogglePinned}
+        cache={cache}
+        isLiveAgent={agent.isLive}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
 // AgentsList
 // ============================================================================
 
@@ -216,6 +378,15 @@ export function AgentsList() {
   const markAsRead = useKartonProcedure((p) => p.agents.markAsRead);
   const getAgentsHistoryList = useKartonProcedure(
     (p) => p.agents.getAgentsHistoryList,
+  );
+  const getAgentHistoryEntriesByIds = useKartonProcedure(
+    (p) => p.agents.getAgentHistoryEntriesByIds,
+  );
+  const getAgentHistoryEntriesByIdsRef = useRef(getAgentHistoryEntriesByIds);
+  getAgentHistoryEntriesByIdsRef.current = getAgentHistoryEntriesByIds;
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const pinnedAgentIds = useKartonState(
+    useComparingSelector((s) => s.preferences.sidebar.pinnedAgentIds),
   );
 
   const [, emptyAgentIdRef] = useEmptyAgentId();
@@ -424,9 +595,15 @@ export function AgentsList() {
   // =========================================================================
 
   const [historyList, setHistoryList] = useState<AgentHistoryEntry[]>([]);
+  const [pinnedHistoryList, setPinnedHistoryList] = useState<
+    AgentHistoryEntry[]
+  >([]);
 
   const activeAgentIds = useKartonState(
-    useComparingSelector((s) => Object.keys(s.agents.instances)),
+    useComparingSelector(
+      (s) => Object.keys(s.agents.instances),
+      stringArraysEqual,
+    ),
   );
 
   // Tracks how many history entries have been fetched from the server.
@@ -496,11 +673,17 @@ export function AgentsList() {
     const activeById = new Map(agents.map((a) => [a.id, a]));
     const pendingSet = pendingRemovals;
 
-    // Index history entries by id for fallback lookups.
-    const historyById = new Map(historyList.map((e) => [e.id, e]));
+    // Index history entries by id for fallback lookups. Pinned-by-id
+    // entries come first so older pinned agents outside the paginated
+    // history slice can still be resolved.
+    const mergedHistoryList = [...pinnedHistoryList, ...historyList].filter(
+      (entry, index, entries) =>
+        entries.findIndex((candidate) => candidate.id === entry.id) === index,
+    );
+    const historyById = new Map(mergedHistoryList.map((e) => [e.id, e]));
 
     // History entries: exclude those that are already active or pending removal.
-    const historyEntries: MergedAgentEntry[] = historyList
+    const historyEntries: MergedAgentEntry[] = mergedHistoryList
       .filter((e) => !activeById.has(e.id) && !pendingSet.has(e.id))
       .map((e) => ({
         id: e.id,
@@ -562,7 +745,132 @@ export function AgentsList() {
     );
 
     return merged;
-  }, [agents, historyList, pendingRemovals]);
+  }, [agents, historyList, pendingRemovals, pinnedHistoryList]);
+
+  // =========================================================================
+  // Pinned agent preferences
+  // =========================================================================
+
+  const [optimisticPinnedAgentIds, setOptimisticPinnedAgentIds] = useState<
+    string[] | null
+  >(null);
+  const displayedPinnedAgentIds = optimisticPinnedAgentIds ?? pinnedAgentIds;
+
+  const updatePinnedAgentIds = useCallback(
+    async (
+      updater: (ids: string[]) => string[],
+      basePinnedAgentIds = displayedPinnedAgentIds,
+    ) => {
+      const nextIds = updater(basePinnedAgentIds).filter(
+        (id, index, ids) => ids.indexOf(id) === index,
+      );
+
+      if (stringArraysEqual(nextIds, basePinnedAgentIds)) return;
+
+      const patches: Patch[] = [
+        {
+          op: 'replace',
+          path: ['sidebar', 'pinnedAgentIds'],
+          value: nextIds,
+        },
+      ];
+
+      setOptimisticPinnedAgentIds(nextIds);
+      try {
+        await updatePreferences(patches);
+      } catch (err) {
+        setOptimisticPinnedAgentIds(null);
+        throw err;
+      }
+    },
+    [displayedPinnedAgentIds, updatePreferences],
+  );
+
+  const handlePinAgent = useCallback(
+    (id: string) =>
+      updatePinnedAgentIds((ids) => [
+        id,
+        ...ids.filter((value) => value !== id),
+      ]),
+    [updatePinnedAgentIds],
+  );
+
+  const handleUnpinAgent = useCallback(
+    (id: string) =>
+      updatePinnedAgentIds((ids) => ids.filter((value) => value !== id)),
+    [updatePinnedAgentIds],
+  );
+
+  const handleTogglePinned = useCallback(
+    (id: string) => {
+      if (displayedPinnedAgentIds.includes(id)) {
+        return handleUnpinAgent(id);
+      }
+      return handlePinAgent(id);
+    },
+    [displayedPinnedAgentIds, handlePinAgent, handleUnpinAgent],
+  );
+
+  const handleReorderPinnedAgents = useCallback(
+    (ids: string[]) => updatePinnedAgentIds(() => ids),
+    [updatePinnedAgentIds],
+  );
+
+  const updatePinnedAgentIdsRef = useRef(updatePinnedAgentIds);
+  updatePinnedAgentIdsRef.current = updatePinnedAgentIds;
+  const pinnedAgentIdsRef = useRef(pinnedAgentIds);
+  pinnedAgentIdsRef.current = pinnedAgentIds;
+
+  const activeAgentIdSet = useMemo(
+    () => new Set(activeAgentIds),
+    [activeAgentIds],
+  );
+
+  const historyPinnedAgentIds = useMemo(
+    () => pinnedAgentIds.filter((id) => !activeAgentIdSet.has(id)),
+    [activeAgentIdSet, pinnedAgentIds],
+  );
+  const historyPinnedAgentIdsKey = historyPinnedAgentIds.join('\0');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (historyPinnedAgentIds.length === 0) {
+      setPinnedHistoryList((entries) => (entries.length === 0 ? entries : []));
+      return;
+    }
+
+    getAgentHistoryEntriesByIdsRef
+      .current(historyPinnedAgentIds)
+      .then((entries) => {
+        if (cancelled) return;
+        setPinnedHistoryList((currentEntries) =>
+          agentHistoryEntriesEqual(currentEntries, entries)
+            ? currentEntries
+            : entries,
+        );
+
+        const foundIds = new Set(entries.map((entry) => entry.id));
+        const missingIds = historyPinnedAgentIds.filter(
+          (id) => !foundIds.has(id),
+        );
+        if (missingIds.length > 0) {
+          void updatePinnedAgentIdsRef.current(
+            (ids) => ids.filter((id) => !missingIds.includes(id)),
+            pinnedAgentIdsRef.current,
+          );
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Failed to fetch pinned agent history:', err);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [historyPinnedAgentIdsKey]);
 
   // =========================================================================
   // Search
@@ -570,11 +878,117 @@ export function AgentsList() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredAgents = useMemo(() => {
+  useEffect(() => {
+    if (!optimisticPinnedAgentIds) return;
+
+    if (stringArraysEqual(optimisticPinnedAgentIds, pinnedAgentIds)) {
+      setOptimisticPinnedAgentIds(null);
+      return;
+    }
+
+    const pinnedIdSet = new Set(pinnedAgentIds);
+    const hasSamePinnedIds =
+      optimisticPinnedAgentIds.length === pinnedAgentIds.length &&
+      optimisticPinnedAgentIds.every((id) => pinnedIdSet.has(id));
+
+    if (!hasSamePinnedIds) {
+      setOptimisticPinnedAgentIds(null);
+    }
+  }, [optimisticPinnedAgentIds, pinnedAgentIds]);
+
+  const pinnedAgentIdSet = useMemo(
+    () => new Set(displayedPinnedAgentIds),
+    [displayedPinnedAgentIds],
+  );
+
+  const allAgentsById = useMemo(
+    () => new Map(allAgents.map((agent) => [agent.id, agent])),
+    [allAgents],
+  );
+
+  const { filteredPinnedAgents, filteredUnpinnedAgents } = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return allAgents;
-    return allAgents.filter((a) => a.title.toLowerCase().includes(q));
-  }, [allAgents, searchQuery]);
+    const matchesSearch = (agent: MergedAgentEntry) =>
+      !q || agent.title.toLowerCase().includes(q);
+
+    return {
+      filteredPinnedAgents: displayedPinnedAgentIds
+        .map((id) => allAgentsById.get(id))
+        .filter(
+          (agent): agent is MergedAgentEntry => !!agent && matchesSearch(agent),
+        ),
+      filteredUnpinnedAgents: allAgents.filter(
+        (agent) => !pinnedAgentIdSet.has(agent.id) && matchesSearch(agent),
+      ),
+    };
+  }, [
+    allAgents,
+    allAgentsById,
+    displayedPinnedAgentIds,
+    pinnedAgentIdSet,
+    searchQuery,
+  ]);
+
+  const dndSensors = useSensors(
+    useSensor(PinnedPointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const [activePinnedDragId, setActivePinnedDragId] = useState<string | null>(
+    null,
+  );
+
+  const activePinnedDragAgent = useMemo(
+    () =>
+      activePinnedDragId
+        ? (allAgentsById.get(activePinnedDragId) ?? null)
+        : null,
+    [activePinnedDragId, allAgentsById],
+  );
+
+  const handlePinnedDragStart = useCallback(({ active }: DragStartEvent) => {
+    setActivePinnedDragId(String(active.id));
+  }, []);
+
+  const handlePinnedDragEnd = useCallback(
+    ({ active, over }: DragEndEvent) => {
+      setActivePinnedDragId(null);
+      if (!over || active.id === over.id) return;
+
+      const visiblePinnedIds = filteredPinnedAgents.map((agent) => agent.id);
+      const oldVisibleIndex = visiblePinnedIds.indexOf(String(active.id));
+      const newVisibleIndex = visiblePinnedIds.indexOf(String(over.id));
+      if (oldVisibleIndex === -1 || newVisibleIndex === -1) return;
+
+      const reorderedVisibleIds = arrayMove(
+        visiblePinnedIds,
+        oldVisibleIndex,
+        newVisibleIndex,
+      );
+      const reorderedVisibleIdSet = new Set(reorderedVisibleIds);
+      let visibleIndex = 0;
+      const nextPinnedIds = displayedPinnedAgentIds.map((id) => {
+        if (!reorderedVisibleIdSet.has(id)) return id;
+        const nextVisibleId = reorderedVisibleIds[visibleIndex++];
+        return nextVisibleId ?? id;
+      });
+
+      if (!stringArraysEqual(nextPinnedIds, displayedPinnedAgentIds)) {
+        void handleReorderPinnedAgents(nextPinnedIds).catch(() => {
+          setOptimisticPinnedAgentIds(null);
+        });
+      }
+    },
+    [filteredPinnedAgents, handleReorderPinnedAgents, displayedPinnedAgentIds],
+  );
+
+  const handlePinnedDragCancel = useCallback(() => {
+    setActivePinnedDragId(null);
+  }, []);
 
   // =========================================================================
   // "Show more" pagination
@@ -585,8 +999,10 @@ export function AgentsList() {
   // Agents created during this session always show (floor = their count).
   const agentsCreatedThisSession = useMemo(
     () =>
-      allAgents.filter((a) => a.createdAt >= appStartTimeRef.current).length,
-    [allAgents],
+      filteredUnpinnedAgents.filter(
+        (a) => a.createdAt >= appStartTimeRef.current,
+      ).length,
+    [filteredUnpinnedAgents],
   );
 
   const effectiveVisible = useMemo(
@@ -594,17 +1010,17 @@ export function AgentsList() {
     [visibleCount, agentsCreatedThisSession],
   );
 
-  const visibleAgents = useMemo(
-    () => filteredAgents.slice(0, effectiveVisible),
-    [filteredAgents, effectiveVisible],
+  const visibleUnpinnedAgents = useMemo(
+    () => filteredUnpinnedAgents.slice(0, effectiveVisible),
+    [filteredUnpinnedAgents, effectiveVisible],
   );
 
   const groupedItems = useMemo(
-    () => insertGroupHeaders(visibleAgents),
-    [visibleAgents],
+    () => insertGroupHeaders(visibleUnpinnedAgents),
+    [visibleUnpinnedAgents],
   );
 
-  const hasMoreToShow = effectiveVisible < filteredAgents.length;
+  const hasMoreToShow = effectiveVisible < filteredUnpinnedAgents.length;
 
   const handleShowMore = useCallback(() => {
     setVisibleCount((c) => {
@@ -773,6 +1189,75 @@ export function AgentsList() {
         style={maskStyle}
         onViewportRef={setScrollViewport}
       >
+        {filteredPinnedAgents.length > 0 && (
+          <>
+            <div className="shrink-0 px-1.5 pt-0 pb-1 font-semibold text-subtle-foreground text-xs">
+              Pinned
+            </div>
+            <DndContext
+              sensors={dndSensors}
+              collisionDetection={closestCenter}
+              modifiers={[
+                restrictToVerticalAxis,
+                restrictToFirstScrollableAncestor,
+              ]}
+              onDragStart={handlePinnedDragStart}
+              onDragEnd={handlePinnedDragEnd}
+              onDragCancel={handlePinnedDragCancel}
+            >
+              <SortableContext
+                items={filteredPinnedAgents.map((agent) => agent.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {filteredPinnedAgents.map((agent) => {
+                  const isOpen = agent.id === openAgent;
+                  const hasUnseen = !isOpen && agent.unread;
+
+                  return (
+                    <SortablePinnedAgentCard
+                      key={agent.id}
+                      agent={agent}
+                      isOpen={isOpen}
+                      hasUnseen={hasUnseen}
+                      contextMenuState={ctxMenuState}
+                      onClick={handleClick}
+                      onRename={handleRename}
+                      onTogglePinned={handleTogglePinned}
+                      cache={previewCacheRef.current}
+                    />
+                  );
+                })}
+              </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activePinnedDragAgent ? (
+                  <AgentCard
+                    id={activePinnedDragAgent.id}
+                    title={activePinnedDragAgent.title}
+                    isActive={activePinnedDragAgent.id === openAgent}
+                    isWorking={activePinnedDragAgent.isWorking}
+                    isWaitingForUser={activePinnedDragAgent.isWaitingForUser}
+                    hasError={activePinnedDragAgent.hasError}
+                    hasUnseen={
+                      activePinnedDragAgent.id !== openAgent &&
+                      activePinnedDragAgent.unread
+                    }
+                    activityText={activePinnedDragAgent.activityText}
+                    activityIsUserInput={
+                      activePinnedDragAgent.activityIsUserInput
+                    }
+                    lastMessageAt={activePinnedDragAgent.lastMessageAt}
+                    contextMenuState={ctxMenuState}
+                    onClick={handleClick}
+                    onRename={handleRename}
+                    isPinned
+                    onTogglePinned={handleTogglePinned}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </>
+        )}
+
         {groupedItems.map((item) => {
           if (item.type === 'header') {
             return (
@@ -805,7 +1290,10 @@ export function AgentsList() {
               contextMenuState={ctxMenuState}
               onClick={handleClick}
               onRename={handleRename}
+              isPinned={false}
+              onTogglePinned={handleTogglePinned}
               cache={previewCacheRef.current}
+              isLiveAgent={agent.isLive}
             />
           );
         })}

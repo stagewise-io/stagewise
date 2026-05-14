@@ -405,6 +405,21 @@ export const DEFAULT_TOOL_APPROVAL_MODE: ToolApprovalMode = 'alwaysAsk';
 export const updateChannelSchema = z.enum(['alpha', 'beta']);
 export type UpdateChannel = z.infer<typeof updateChannelSchema>;
 
+const defaultSidebarPreferences = {
+  showActiveAgents: true,
+  pinnedAgentIds: [],
+};
+
+const sidebarPreferencesSchema = z
+  .object({
+    /** Whether to show the active agents grid in the sidebar */
+    showActiveAgents: z.boolean().default(true),
+    /** Ordered agent IDs pinned to the top of the sidebar */
+    pinnedAgentIds: z.array(z.string()).default([]),
+  })
+  .default(defaultSidebarPreferences)
+  .catch(defaultSidebarPreferences);
+
 export const userPreferencesSchema = z.object({
   privacy: z
     .object({
@@ -451,12 +466,7 @@ export const userPreferencesSchema = z.object({
       lastUsedOrigin: null,
     }),
   /** Sidebar display preferences */
-  sidebar: z
-    .object({
-      /** Whether to show the active agents grid in the sidebar */
-      showActiveAgents: z.boolean().default(true),
-    })
-    .default({ showActiveAgents: true }),
+  sidebar: sidebarPreferencesSchema,
   /** Per-workspace agent settings (keyed by workspace absolute path) */
   agent: z
     .object({
@@ -563,7 +573,7 @@ export const defaultUserPreferences: UserPreferences = {
   },
   permissions: defaultPermissionsForUserPrefs,
   devToolbar: defaultDevToolbarForUserPrefs,
-  sidebar: { showActiveAgents: true },
+  sidebar: defaultSidebarPreferences,
   agent: {
     workspaceSettings: {},
     disabledModelIds: ['claude-opus-4.6', 'kimi-k2.5', 'gpt-5.4', 'MiniMax-M2'],

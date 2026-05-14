@@ -691,6 +691,9 @@ export type KartonContract = {
         limit: number,
         searchString?: string,
       ) => Promise<AgentHistoryEntry[]>;
+      getAgentHistoryEntriesByIds: (
+        ids: string[],
+      ) => Promise<AgentHistoryEntry[]>;
       updateInputState: (agentId: string, inputState: string) => Promise<void>;
       sendUserMessage: (
         agentId: string,
