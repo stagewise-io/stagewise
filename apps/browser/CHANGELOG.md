@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-alpha092 (2026-05-14)
+
+### Features
+
+* support tabbing through agents (7f86c17)
+* support agent-pinning (0370c3e)
+
+### Bug Fixes
+
+* fix omnibox-focus-loss (5df221e)
+* enable cmd-b sidebar toggle when chat focused (275ef5f)
+
 ## 1.0.0-alpha091 (2026-05-13)
 
 ### Bug Fixes
