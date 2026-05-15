@@ -264,6 +264,7 @@ class PinnedPointerSensor extends PointerSensor {
 function SortablePinnedAgentCard({
   agent,
   isOpen,
+  isPreviewOpen,
   hasUnseen,
   contextMenuState,
   onClick,
@@ -273,6 +274,7 @@ function SortablePinnedAgentCard({
 }: {
   agent: MergedAgentEntry;
   isOpen: boolean;
+  isPreviewOpen: boolean;
   hasUnseen: boolean;
   contextMenuState: ReturnType<typeof useSharedAgentContextMenu>[0];
   onClick: (id: string) => void;
@@ -305,6 +307,7 @@ function SortablePinnedAgentCard({
         id={agent.id}
         title={agent.title}
         isActive={isOpen}
+        isPreviewActive={isPreviewOpen}
         isWorking={agent.isWorking}
         isWaitingForUser={agent.isWaitingForUser}
         hasError={agent.hasError}
@@ -1119,6 +1122,7 @@ export function AgentsList() {
               >
                 {filteredPinnedAgents.map((agent) => {
                   const isOpen = agent.id === openAgent;
+                  const isPreviewOpen = agent.id === previewAgentId;
                   const hasUnseen = !isOpen && agent.unread;
 
                   return (
@@ -1126,6 +1130,7 @@ export function AgentsList() {
                       key={agent.id}
                       agent={agent}
                       isOpen={isOpen}
+                      isPreviewOpen={isPreviewOpen}
                       hasUnseen={hasUnseen}
                       contextMenuState={ctxMenuState}
                       onClick={handleClick}
