@@ -4,9 +4,6 @@ import {
   type ImperativePanelHandle,
 } from '@stagewise/stage-ui/components/resizable';
 import { useRef } from 'react';
-import { TITLEBAR_HEIGHT } from '@shared/titlebar';
-import { useKartonState } from '@ui/hooks/use-karton';
-import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
 import { useSidebarCollapsed } from '../_components/sidebar-collapsed-context';
 import { SidebarTitlebarRow } from '../_components/sidebar-titlebar-row';
 
@@ -14,8 +11,6 @@ export function AgentChat() {
   const panelRef = useRef<ImperativePanelHandle>(null);
   const previousSizeRef = useRef<number | null>(null);
 
-  const isMacOS = useKartonState((s) => s.appInfo.platform === 'darwin');
-  const counterScale = useUiZoomCounterScale();
   const { collapsed } = useSidebarCollapsed();
 
   return (
@@ -33,15 +28,6 @@ export function AgentChat() {
       }}
       className="@container group overflow-visible! relative z-10 flex h-full flex-col items-stretch justify-between bg-background"
     >
-      {/* Add a small draggable area for macOS hidden-titlebar windows.
-          Height is counter-scaled so it stays aligned with the native
-          traffic-light region regardless of UI zoom. */}
-      {isMacOS && (
-        <div
-          className="app-drag absolute top-0 left-0 -z-10 w-full"
-          style={{ height: TITLEBAR_HEIGHT * counterScale }}
-        />
-      )}
       {collapsed && <SidebarTitlebarRow absolute />}
       <div className="flex h-full flex-col items-stretch justify-between p-1">
         <Chat />

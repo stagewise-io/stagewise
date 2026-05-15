@@ -141,7 +141,11 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 export interface UIControllerEventMap {
   uiReady: [];
   viewRecreated: [oldView: WebContentsView, newView: WebContentsView];
-  createTab: [url?: string, setActive?: boolean];
+  createTab: [
+    url?: string,
+    setActive?: boolean,
+    agentInstanceId?: string | null,
+  ];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
   reorderTabs: [tabIds: string[]];
@@ -162,6 +166,8 @@ export interface UIControllerEventMap {
   setColorScheme: [scheme: ColorScheme, tabId?: string];
   cycleColorScheme: [tabId?: string];
   setZoomPercentage: [percentage: number, tabId?: string];
+  setTabAgentInstance: [tabId: string, agentInstanceId: string | null];
+  setLastOpenAgentId: [agentInstanceId: string | null];
   setContextSelectionMode: [active: boolean];
   setContextSelectionMouseCoordinates: [x: number, y: number];
   clearContextSelectionMouseCoordinates: [];
@@ -668,8 +674,13 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.createTab',
-      async (_callingClientId: string, url?: string, setActive?: boolean) => {
-        this.emit('createTab', url, setActive);
+      async (
+        _callingClientId: string,
+        url?: string,
+        setActive?: boolean,
+        agentInstanceId?: string | null,
+      ) => {
+        this.emit('createTab', url, setActive, agentInstanceId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -787,6 +798,22 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       'browser.setZoomPercentage',
       async (_callingClientId: string, percentage: number, tabId?: string) => {
         this.emit('setZoomPercentage', percentage, tabId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.setTabAgentInstance',
+      async (
+        _callingClientId: string,
+        tabId: string,
+        agentInstanceId: string | null,
+      ) => {
+        this.emit('setTabAgentInstance', tabId, agentInstanceId);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.setLastOpenAgentId',
+      async (_callingClientId: string, agentInstanceId: string | null) => {
+        this.emit('setLastOpenAgentId', agentInstanceId);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -1113,6 +1140,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.setColorScheme');
     this.uiKarton.removeServerProcedureHandler('browser.cycleColorScheme');
     this.uiKarton.removeServerProcedureHandler('browser.setZoomPercentage');
+    this.uiKarton.removeServerProcedureHandler('browser.setTabAgentInstance');
     this.uiKarton.removeServerProcedureHandler(
       'browser.contextSelection.setActive',
     );

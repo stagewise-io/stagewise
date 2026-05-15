@@ -56,6 +56,8 @@ import type {
 export interface TabState {
   title: string;
   url: string;
+  /** Agent instance this tab is attached to, or null if globally visible */
+  agentInstanceId: string | null;
   faviconUrls: string[];
   isLoading: boolean;
   isResponsive: boolean;
@@ -366,6 +368,7 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
     this.currentState = {
       title: 'New tab',
       url: initialUrl || '',
+      agentInstanceId: null,
       isLoading: false,
       isResponsive: true,
       isPlayingAudio: this.webContentsView.webContents.isCurrentlyAudible(),
@@ -800,6 +803,11 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
 
   public focus() {
     this.webContentsView.webContents.focus();
+  }
+
+  /** Set the agent instance this tab is attached to (null = globally visible) */
+  public setAgentInstance(agentInstanceId: string | null) {
+    this.updateState({ agentInstanceId });
   }
 
   public async setContextSelectionMode(active: boolean) {

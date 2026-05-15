@@ -1192,13 +1192,21 @@ export class ToolboxService extends DisposableService {
     this.shellService?.killSession(sessionId);
   }
 
-  public getBrowserSnapshot(): BrowserSnapshot {
+  public getBrowserSnapshot(agentInstanceId: string): BrowserSnapshot {
     const browser = this.uiKarton.state.browser;
-    const activeTab = browser.activeTabId
-      ? browser.tabs[browser.activeTabId]
-      : null;
 
-    const allTabs = Object.values(browser.tabs)
+    // Filter: only global tabs (null) and tabs assigned to this agent
+    const isTabVisible = (tab: { agentInstanceId: string | null }) =>
+      tab.agentInstanceId === null || tab.agentInstanceId === agentInstanceId;
+
+    const activeTab =
+      browser.activeTabId && browser.tabs[browser.activeTabId]
+        ? browser.tabs[browser.activeTabId]
+        : null;
+
+    const visibleTabs = Object.values(browser.tabs).filter(isTabVisible);
+
+    const allTabs = visibleTabs
       .sort((a, b) => b.lastFocusedAt - a.lastFocusedAt)
       .map((tab) => ({
         id: tab.id,
@@ -1210,29 +1218,35 @@ export class ToolboxService extends DisposableService {
         consoleLogCount: tab.consoleLogCount,
         consoleErrorCount: tab.consoleErrorCount,
         faviconUrl: tab.faviconUrls?.[0],
+        agentInstanceId: tab.agentInstanceId,
         lastFocusedAt: tab.lastFocusedAt,
       }));
 
+    // Only show active tab if it's visible to this agent
+    const activeTabVisible =
+      activeTab && isTabVisible(activeTab) ? activeTab : null;
+
     return {
-      activeTab: activeTab
+      activeTab: activeTabVisible
         ? {
-            id: activeTab.id,
-            title: activeTab.title,
-            url: activeTab.url,
-            error: activeTab.error,
-            consoleLogCount: activeTab.consoleLogCount,
-            consoleErrorCount: activeTab.consoleErrorCount,
+            id: activeTabVisible.id,
+            title: activeTabVisible.title,
+            url: activeTabVisible.url,
+            error: activeTabVisible.error,
+            consoleLogCount: activeTabVisible.consoleLogCount,
+            consoleErrorCount: activeTabVisible.consoleErrorCount,
+            agentInstanceId: activeTabVisible.agentInstanceId,
           }
         : null,
       tabs: allTabs,
-      totalTabCount: Object.keys(browser.tabs).length,
+      totalTabCount: visibleTabs.length,
     };
   }
 
   public async captureEnvironmentSnapshot(
     agentInstanceId: string,
   ): Promise<EnvironmentSnapshot> {
-    const browserState = this.getBrowserSnapshot();
+    const browserState = this.getBrowserSnapshot(agentInstanceId);
     const workspaceState =
       this.mountManagerService?.getWorkspaceSnapshot(agentInstanceId);
     const toolboxState = this.uiKarton.state.toolbox[agentInstanceId];

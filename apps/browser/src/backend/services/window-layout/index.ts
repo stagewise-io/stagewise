@@ -55,6 +55,24 @@ const windowStateSchema = z.object({
 
 type WindowState = z.infer<typeof windowStateSchema>;
 
+const tabStateSchema = z.object({
+  /** Ordered list of tabs that were open */
+  tabs: z.array(
+    z.object({
+      url: z.string(),
+      agentInstanceId: z.string().nullable(),
+    }),
+  ),
+  /** Index into `tabs` of the active tab, or -1 if none */
+  activeTabIndex: z.number().int().min(-1),
+  /** Last active tab per agent instance */
+  lastActiveTabPerAgent: z.record(z.string(), z.string()),
+  /** ID of the agent instance that was last open, for restoration on restart */
+  lastOpenAgentId: z.string().nullable(),
+});
+
+type PersistedTabState = z.infer<typeof tabStateSchema>;
+
 /**
  * Anonymous URL classification for telemetry. Returns coarse booleans
  * (`isLocal`, `isHttps`) without exposing the host or path, so events can
@@ -99,6 +117,8 @@ export class WindowLayoutService extends DisposableService {
   private contentFullscreenTabId: string | null = null;
 
   private saveStateTimeout: NodeJS.Timeout | null = null;
+  /** Tracks the last active tab per agent instance for persistence & restore. */
+  private lastActiveTabPerAgent: Record<string, string> = {};
   private lastNonMaximizedBounds: {
     width: number;
     height: number;
@@ -291,6 +311,7 @@ export class WindowLayoutService extends DisposableService {
     });
     this.baseWindow.on('close', () => {
       this.saveWindowState();
+      this.saveTabState();
     });
 
     // Listen for OS theme changes and update window colors accordingly
@@ -321,6 +342,8 @@ export class WindowLayoutService extends DisposableService {
         selectedElements: [],
         hoveredElement: null,
         viewportSize: null,
+        lastActiveTabPerAgent: {},
+        lastOpenAgentId: null,
       };
       draft.appInfo.isFullScreen = this.baseWindow?.isFullScreen() ?? false;
       draft.appInfo.otherVersions = { ...process.versions, modules: undefined };
@@ -333,16 +356,8 @@ export class WindowLayoutService extends DisposableService {
       this.tabs,
     );
 
-    // Determine initial tab URL based on startup page preference
-    const preferences = this.preferencesService.get();
-    const startupPage = preferences.general.startupPage;
-    const initialUrl =
-      startupPage.type === 'custom' && startupPage.customUrl
-        ? startupPage.customUrl
-        : HOME_PAGE_URL;
-
-    // Create initial tab with the appropriate URL
-    this.createTab(initialUrl, true);
+    // Restore persisted tabs from previous session
+    await this.loadTabState();
 
     this.logger.debug('[WindowLayoutService] Service initialized');
   }
@@ -357,6 +372,8 @@ export class WindowLayoutService extends DisposableService {
 
   protected onTeardown() {
     this.logger.debug('[WindowLayoutService] Teardown called');
+
+    this.saveTabState();
 
     // Clean up session-level permission registry
     SessionPermissionRegistry.getInstance()?.destroy();
@@ -677,6 +694,8 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on('setColorScheme', this.handleSetColorScheme);
     this.uiController.on('cycleColorScheme', this.handleCycleColorScheme);
     this.uiController.on('setZoomPercentage', this.handleSetZoomPercentage);
+    this.uiController.on('setTabAgentInstance', this.handleSetTabAgentInstance);
+    this.uiController.on('setLastOpenAgentId', this.handleSetLastOpenAgentId);
     this.uiController.on(
       'setContextSelectionMode',
       this.handleSetContextSelectionMode,
@@ -814,6 +833,7 @@ export class WindowLayoutService extends DisposableService {
   private handleCreateTab = async (
     url?: string,
     setActive?: boolean,
+    agentInstanceId?: string | null,
     sourceTabId?: string,
   ) => {
     // If no URL is provided, check user's new tab page preference
@@ -851,13 +871,20 @@ export class WindowLayoutService extends DisposableService {
       }
     }
 
-    await this.createTab(targetUrl, setActive ?? true, sourceTabId);
+    await this.createTab(
+      targetUrl,
+      setActive ?? true,
+      sourceTabId,
+      agentInstanceId,
+    );
+    this.saveTabState();
   };
 
   private async createTab(
     url: string | undefined,
     setActive: boolean,
     sourceTabId?: string,
+    agentInstanceId?: string | null,
   ): Promise<string> {
     const id = generateTabId();
 
@@ -882,7 +909,7 @@ export class WindowLayoutService extends DisposableService {
       (target: NavigationTarget, setActive?: boolean) => {
         // Resolve the navigation target to a URL
         const resolvedUrl = searchUtils.resolveNavigationTarget(target);
-        void this.handleCreateTab(resolvedUrl, setActive, id);
+        void this.handleCreateTab(resolvedUrl, setActive, undefined, id);
       },
       this.telemetryService ?? undefined,
     );
@@ -1054,6 +1081,9 @@ export class WindowLayoutService extends DisposableService {
     // (or tab content if isWebContentInteractive is true)
     this.updateZOrder();
 
+    // Assign to agent instance (null = globally visible)
+    tab.setAgentInstance(agentInstanceId ?? null);
+
     // Only activate new tab if requested AND source tab is active (or no source tab)
     // This prevents background tabs from stealing focus when they open links
     const shouldActivate =
@@ -1111,16 +1141,20 @@ export class WindowLayoutService extends DisposableService {
         if (nextTabId) {
           await this.handleSwitchTab(nextTabId);
         } else {
-          // If no other tabs exist, create a new one
-          const preferences = this.preferencesService.get();
-          const newTabPage = preferences.general.newTabPage;
-          const initialUrl =
-            newTabPage.type === 'custom' && newTabPage.customUrl
-              ? newTabPage.customUrl
-              : HOME_PAGE_URL;
-          await this.createTab(initialUrl, true);
+          // No tabs left — clear active tab
+          this.activeTabId = null;
+          this.uiKarton.setState((draft) => {
+            draft.browser.activeTabId = null;
+          });
         }
       }
+
+      // Clean up stale lastActiveTabPerAgent entries for the closed tab
+      for (const [aid, tid] of Object.entries(this.lastActiveTabPerAgent)) {
+        if (tid === tabId) delete this.lastActiveTabPerAgent[aid];
+      }
+
+      this.saveTabState();
     }
   };
 
@@ -1171,12 +1205,20 @@ export class WindowLayoutService extends DisposableService {
 
     this.updateZOrder();
 
-    // Set viewport size to the new tab's current viewport size
-    // Don't set to null and wait for event - the event only fires on size CHANGE
+    const agentInstanceId = newTab.getState().agentInstanceId;
+    if (agentInstanceId) {
+      this.lastActiveTabPerAgent[agentInstanceId] = tabId;
+    }
+
     this.uiKarton.setState((draft) => {
       draft.browser.activeTabId = tabId;
       draft.browser.viewportSize = newTab.getViewportSize();
+      if (agentInstanceId) {
+        draft.browser.lastActiveTabPerAgent[agentInstanceId] = tabId;
+      }
     });
+
+    this.saveTabState();
   };
 
   private handleReorderTabs = async (tabIds: string[]) => {
@@ -1540,6 +1582,34 @@ export class WindowLayoutService extends DisposableService {
   ) => {
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     tab?.setZoomPercentage(percentage);
+  };
+
+  private handleSetTabAgentInstance = async (
+    tabId: string,
+    agentInstanceId: string | null,
+  ) => {
+    const tab = this.tabs[tabId];
+    if (!tab) {
+      this.logger.warn(
+        `[WindowLayoutService] setTabAgentInstance: tab ${tabId} not found`,
+      );
+      return;
+    }
+    tab.setAgentInstance(agentInstanceId);
+    // If unpinning, remove stale last-active-tab entries for this tab
+    if (agentInstanceId === null) {
+      for (const [aid, tid] of Object.entries(this.lastActiveTabPerAgent)) {
+        if (tid === tabId) delete this.lastActiveTabPerAgent[aid];
+      }
+    }
+    this.saveTabState();
+  };
+
+  private handleSetLastOpenAgentId = async (agentInstanceId: string | null) => {
+    this.uiKarton.setState((draft) => {
+      draft.browser.lastOpenAgentId = agentInstanceId;
+    });
+    this.saveTabState();
   };
 
   private handleSetContextSelectionMode = async (active: boolean) => {
@@ -1977,6 +2047,84 @@ export class WindowLayoutService extends DisposableService {
         '[WindowLayoutService] Failed to save window state',
         error,
       );
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Tab State Persistence
+  // -------------------------------------------------------------------------
+
+  /** Persist open tabs and agent-tab associations so they survive restart. */
+  private saveTabState() {
+    try {
+      // Sort global-first to match the UI display order
+      const sortedIds = [...Object.keys(this.tabs)].sort((a, b) => {
+        const aGlobal = this.tabs[a]!.getState().agentInstanceId === null;
+        const bGlobal = this.tabs[b]!.getState().agentInstanceId === null;
+        if (aGlobal && !bGlobal) return -1;
+        if (!aGlobal && bGlobal) return 1;
+        return 0;
+      });
+      const activeIndex = this.activeTabId
+        ? sortedIds.indexOf(this.activeTabId)
+        : -1;
+      const state: PersistedTabState = {
+        tabs: sortedIds.map((id) => {
+          const tabState = this.tabs[id]!.getState();
+          return {
+            url: tabState.url,
+            agentInstanceId: tabState.agentInstanceId,
+          };
+        }),
+        activeTabIndex: activeIndex,
+        lastActiveTabPerAgent: this.lastActiveTabPerAgent,
+        lastOpenAgentId: this.uiKarton.state.browser.lastOpenAgentId ?? null,
+      };
+      writePersistedDataSync('tab-state', tabStateSchema, state);
+    } catch (error) {
+      this.logger.error(
+        '[WindowLayoutService] Failed to save tab state',
+        error,
+      );
+    }
+  }
+
+  /** Restore tabs and agent associations from persisted state. */
+  private async loadTabState() {
+    const state = readPersistedDataSync(
+      'tab-state',
+      tabStateSchema,
+      null as unknown as PersistedTabState,
+    );
+    if (!state || state.tabs.length === 0) return;
+
+    this.logger.debug(
+      `[WindowLayoutService] Restoring ${state.tabs.length} persisted tabs`,
+    );
+
+    // Restore the last-active-tab-per-agent map first
+    this.lastActiveTabPerAgent = state.lastActiveTabPerAgent || {};
+    // Push to Karton state so the UI can use it
+    this.uiKarton.setState((draft) => {
+      draft.browser.lastActiveTabPerAgent = { ...this.lastActiveTabPerAgent };
+      draft.browser.lastOpenAgentId = state.lastOpenAgentId ?? null;
+    });
+
+    // Re-create tabs in saved order; tabs are appended so index is preserved.
+    for (const savedTab of state.tabs) {
+      await this.createTab(
+        savedTab.url,
+        false,
+        undefined,
+        savedTab.agentInstanceId,
+      );
+    }
+
+    // Activate the tab at the saved index
+    if (state.activeTabIndex >= 0 && state.activeTabIndex < state.tabs.length) {
+      const tabIds = Object.keys(this.tabs);
+      const targetId = tabIds[state.activeTabIndex];
+      if (targetId) await this.handleSwitchTab(targetId);
     }
   }
 

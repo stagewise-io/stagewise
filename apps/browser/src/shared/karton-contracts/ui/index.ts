@@ -350,6 +350,8 @@ export type TabState = {
   title: string;
   url: string;
   faviconUrls: string[];
+  /** Agent instance this tab is attached to, or null if globally visible */
+  agentInstanceId: string | null;
   isLoading: boolean;
   isResponsive: boolean;
   isPlayingAudio: boolean;
@@ -623,6 +625,10 @@ export type AppState = {
       height: number;
       scale: number;
     } | null;
+    /** Last active tab ID per agent instance. Key is agentInstanceId, value is tab ID. */
+    lastActiveTabPerAgent: Record<string, string>;
+    /** Agent instance ID that was open last, persisted across restarts. */
+    lastOpenAgentId: string | null;
   };
 
   // Downloads state for the control button
@@ -905,7 +911,11 @@ export type KartonContract = {
       ) => Promise<void>;
     };
     browser: {
-      createTab: (url?: string, setActive?: boolean) => Promise<void>;
+      createTab: (
+        url?: string,
+        setActive?: boolean,
+        agentInstanceId?: string | null,
+      ) => Promise<void>;
       closeTab: (tabId: string) => Promise<void>;
       switchTab: (tabId: string) => Promise<void>;
       reorderTabs: (tabIds: string[]) => Promise<void>;
@@ -985,6 +995,13 @@ export type KartonContract = {
       setColorScheme: (scheme: ColorScheme, tabId?: string) => Promise<void>;
       cycleColorScheme: (tabId?: string) => Promise<void>;
       setZoomPercentage: (percentage: number, tabId?: string) => Promise<void>;
+      /** Set the agent instance ID this tab is attached to (null = globally visible) */
+      setTabAgentInstance: (
+        tabId: string,
+        agentInstanceId: string | null,
+      ) => Promise<void>;
+      /** Persist the last-opened agent instance ID for restoration on restart. */
+      setLastOpenAgentId: (agentId: string | null) => Promise<void>;
       contextSelection: {
         setActive: (active: boolean) => Promise<void>;
         setMouseCoordinates: (x: number, y: number) => Promise<void>; // Used by the client to communicate where the mouse is currently located. Will be forwarded to the tab to check which element is at that point.
@@ -1228,6 +1245,8 @@ export const defaultState: KartonContract['state'] = {
     selectedElements: [],
     hoveredElement: null,
     viewportSize: null,
+    lastActiveTabPerAgent: {},
+    lastOpenAgentId: null,
   },
   downloads: {
     items: [],

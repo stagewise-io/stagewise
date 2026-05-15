@@ -17,6 +17,7 @@ export type BrowserTabInfo = {
   consoleLogCount: number;
   consoleErrorCount: number;
   faviconUrl?: string;
+  agentInstanceId: string | null;
 };
 
 /**

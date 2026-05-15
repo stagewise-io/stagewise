@@ -9,9 +9,11 @@ import { AgentChat } from './agent-chat';
 import { MainSection } from './content';
 import { cn } from '@ui/utils';
 import { Sidebar } from './sidebar';
-import { useKartonState } from '@ui/hooks/use-karton';
-import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
-import { OpenAgentProvider } from '@ui/hooks/use-open-chat';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { OpenAgentProvider, useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useCallback, useMemo } from 'react';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { IconGlobePointerOutline18 } from 'nucleo-ui-outline-18';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
 import { useAutoSelectFirstAgent } from '@ui/hooks/use-auto-select-agent';
@@ -41,8 +43,22 @@ export function DefaultLayout({ show }: { show: boolean }) {
 function DefaultLayoutInner({ show }: { show: boolean }) {
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
+  const tabs = useKartonState((s) => s.browser.tabs);
+  const [openAgent] = useOpenAgent();
   const { collapsed } = useSidebarCollapsed();
-  const counterScale = useUiZoomCounterScale();
+
+  const hasVisibleTabs = useMemo(() => {
+    return Object.values(tabs).some(
+      (tab) =>
+        tab.agentInstanceId === null || tab.agentInstanceId === openAgent,
+    );
+  }, [tabs, openAgent]);
+
+  const createTab = useKartonProcedure((p) => p.browser.createTab);
+
+  const handleOpenTab = useCallback(() => {
+    createTab(undefined, undefined, openAgent);
+  }, [createTab, openAgent]);
 
   // Headless: keeps `openAgent` valid regardless of whether the sidebar
   // (which used to own this effect) is mounted.
@@ -53,18 +69,13 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
       {show && <AgentHotkeyBindings />}
       <div
         className={cn(
-          'root pointer-events-auto inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
+          'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
           !show && 'pointer-events-none opacity-0 blur-lg',
         )}
       >
-        {/* Thin draggable strip at the very top for macOS hidden-titlebar
-            windows. Height is counter-scaled so it stays aligned with the
-            native traffic-light region regardless of UI zoom. */}
+        {/* Single global drag zone for macOS titlebar — sits behind everything */}
         {isMacOs && !isFullScreen && (
-          <div
-            className="app-drag fixed top-0 right-0 left-0"
-            style={{ height: 8 * counterScale }}
-          />
+          <div className="app-drag absolute top-0 left-0 -z-10 h-8 w-full" />
         )}
         <ResizablePanelGroup
           direction="horizontal"
@@ -80,10 +91,21 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
             order={1}
             defaultSize={65}
             className={cn(
-              'h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
+              'relative h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
               !isMacOs && 'mt-px',
             )}
           >
+            {/* Globe button — always visible top-right for creating new tabs */}
+            <div className="app-no-drag absolute top-1 right-1 z-20">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Open new browser tab"
+                onClick={handleOpenTab}
+              >
+                <IconGlobePointerOutline18 className="size-4" />
+              </Button>
+            </div>
             <ResizablePanelGroup
               direction="horizontal"
               autoSaveId={layoutStorageKey}
@@ -91,9 +113,8 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
             >
               <AgentChat />
 
-              <ResizableHandle />
-
-              <MainSection />
+              {hasVisibleTabs && <ResizableHandle />}
+              {hasVisibleTabs && <MainSection />}
             </ResizablePanelGroup>
           </ResizablePanel>
         </ResizablePanelGroup>
