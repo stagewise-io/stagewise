@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-alpha093 (2026-05-15)
+
+### Features
+
+* decrease history compression threshold (507a2aa)
+
+### Bug Fixes
+
+* add tabbing-highlights to pinned agents (9ba2f10)
+
 ## 1.0.0-alpha092 (2026-05-14)
 
 ### Features
