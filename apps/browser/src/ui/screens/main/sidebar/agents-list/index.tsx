@@ -349,6 +349,9 @@ export function AgentsList() {
   const getAgentHistoryEntriesByIdsRef = useRef(getAgentHistoryEntriesByIds);
   getAgentHistoryEntriesByIdsRef.current = getAgentHistoryEntriesByIds;
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
   const pinnedAgentIds = useKartonState(
     useComparingSelector((s) => s.preferences.sidebar.pinnedAgentIds),
   );
@@ -1079,6 +1082,13 @@ export function AgentsList() {
             aria-label="Search agents"
             placeholder="Search agents…"
             value={searchQuery}
+            onPointerDown={(e) => {
+              if (!e.isPrimary || e.button !== 0) return;
+              window.dispatchEvent(
+                new Event('sidebar-agent-search-focus-requested'),
+              );
+              void togglePanelKeyboardFocus('stagewise-ui');
+            }}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={cn(
               'w-full bg-transparent text-foreground text-sm placeholder:text-muted-foreground',

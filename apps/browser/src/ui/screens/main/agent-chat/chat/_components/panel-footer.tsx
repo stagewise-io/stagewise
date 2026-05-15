@@ -698,6 +698,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   // it, causing the chat input to steal focus on the next window 'focus'.
   const chatInputActiveRef = useRef(chatInputActive);
   chatInputActiveRef.current = chatInputActive;
+  // Natural/programmatic focus transfers already blur TipTap. Calling
+  // `editor.commands.blur()` again while another UI input is taking focus can
+  // race with that input's native focus, so the next inactive effect may skip
+  // the redundant blur. Explicit deactivation paths still blur normally.
+  const skipNextInactiveBlurRef = useRef(false);
   // Track if input was focused before app lost focus (for restoring on app regain)
   const wasActiveBeforeAppBlurRef = useRef(false);
 
@@ -711,6 +716,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       // Don't automatically deactivate element selection here
       // Element selection can be controlled by other components (inline edit mode)
       // It will be deactivated explicitly when needed (Escape key, send message, agent working, panel closed)
+      if (skipNextInactiveBlurRef.current) {
+        skipNextInactiveBlurRef.current = false;
+        return;
+      }
       chatInputRef.current?.blur();
     }
   }, [chatInputActive]);
@@ -744,8 +753,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       // earlier in the same event-loop turn (e.g. by
       // `omnibox-focus-requested`) are honoured before the programmatic blur
       // they trigger reaches us.
-      if (!target && chatInputActiveRef.current)
+      const wasChatInputActive = chatInputActiveRef.current;
+      if (!target && wasChatInputActive)
         wasActiveBeforeAppBlurRef.current = true;
+      if (target && wasChatInputActive) skipNextInactiveBlurRef.current = true;
 
       setChatInputActive(false);
     } else if (chatInputActiveRef.current) {
@@ -766,29 +777,35 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     window,
   );
 
-  // Clear focus restoration flag when omnibox takes focus (prevents chat from reclaiming focus)
-  useEventListener('omnibox-focus-requested', () => {
+  const deactivateChatInputForExternalFocus = useCallback(() => {
     wasActiveBeforeAppBlurRef.current = false;
-    // Synchronously mark the input as inactive so the blur fired by the
-    // omnibox's `focus()` chain (which blurs all contenteditable elements)
-    // doesn't re-arm `wasActiveBeforeAppBlurRef` via `onInputBlur` before the
-    // `setChatInputActive(false)` state update commits.
+    // Synchronously mark the input as inactive so focus chains that blur
+    // contenteditable elements cannot re-arm app-blur focus restoration before
+    // the `setChatInputActive(false)` state update commits.
+    const wasChatInputActive = chatInputActiveRef.current;
     chatInputActiveRef.current = false;
+    skipNextInactiveBlurRef.current = wasChatInputActive;
     setChatInputActive(false);
     // Also stop context selection to prevent its ESC handler from consuming the first ESC
     stopContextSelector();
-  });
+  }, [stopContextSelector]);
+
+  // Clear focus restoration flag when omnibox takes focus (prevents chat from reclaiming focus)
+  useEventListener(
+    'omnibox-focus-requested',
+    deactivateChatInputForExternalFocus,
+  );
 
   // Clear focus restoration flag when search bar takes focus (prevents chat from reclaiming focus)
-  useEventListener('search-bar-focus-requested', () => {
-    wasActiveBeforeAppBlurRef.current = false;
-    // See `omnibox-focus-requested` above for why we update the ref
-    // synchronously before the state setter.
-    chatInputActiveRef.current = false;
-    setChatInputActive(false);
-    // Also stop context selection to prevent its ESC handler from consuming the first ESC
-    stopContextSelector();
-  });
+  useEventListener(
+    'search-bar-focus-requested',
+    deactivateChatInputForExternalFocus,
+  );
+
+  useEventListener(
+    'sidebar-agent-search-focus-requested',
+    deactivateChatInputForExternalFocus,
+  );
 
   useHotKeyListener(
     useCallback(async () => {
