@@ -39,6 +39,8 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import { HotkeyActions } from '@shared/hotkeys';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
 import {
@@ -505,6 +507,10 @@ export function AgentsList() {
       setPendingCreate(false);
     });
   }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent, track]);
+
+  // Cmd/Ctrl+N: create (or focus an existing empty) agent from the keyboard.
+  // Mirrors the click handler on the "new agent" button.
+  useHotKeyListener(handleCreateAgent, HotkeyActions.NEW_CHAT);
 
   const handleClick = useCallback(
     (id: string) => {
