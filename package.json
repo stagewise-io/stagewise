@@ -28,6 +28,8 @@
     "version:stagewise:release": "tsx scripts/release/index.ts --package stagewise --channel release",
     "version:karton": "tsx scripts/release/index.ts --package karton",
     "extract:compression-test-data": "tsx scripts/experiments/extract-compression-test-data.ts",
+    "extract:memory-domain-test-data": "tsx --tsconfig apps/browser/tsconfig.backend.json scripts/experiments/extract-memory-domain-test-data.ts",
+    "run:memory-domain-test-data": "tsx --tsconfig apps/browser/tsconfig.backend.json scripts/experiments/run-memory-domain-test-data.ts",
     "postinstall": "node -e \"const{chmodSync,existsSync}=require('fs');const p='node_modules/node-pty/prebuilds/'+process.platform+'-'+process.arch+'/spawn-helper';try{if(existsSync(p)){chmodSync(p,0o755);console.log('node-pty: fixed spawn-helper permissions')}}catch(e){console.warn('node-pty: spawn-helper chmod failed:',e.message)}\""
   },
   "devDependencies": {
@@ -98,11 +100,13 @@
     "@ai-sdk/azure": "^3.0.42",
     "@aws-sdk/credential-providers": "^3.1045.0",
     "@smithy/shared-ini-file-loader": "^4.4.9",
+    "@ai-sdk/google": "3.0.71",
     "@ai-sdk/google-vertex": "^4.0.80",
     "@ai-sdk/openai-compatible": "^2.0.35",
     "@better-auth/electron": "^1.6.10",
     "@streamdown/math": "^1.0.2",
     "@xterm/headless": "^6.0.0",
+    "ai": "6.0.177",
     "better-auth": "^1.6.10",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
