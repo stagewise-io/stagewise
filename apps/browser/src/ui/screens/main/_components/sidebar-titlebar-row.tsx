@@ -42,11 +42,6 @@ export function SidebarTitlebarRow({
     >
       <TrafficLightGutter />
       <SidebarToggleButton />
-      {/* Trailing drag region: fills the rest of the row so the area right
-          of the toggle button remains a window grab handle (matches the
-          pre-collapse sidebar behavior where the whole titlebar was
-          draggable). `shrink-0` + `flex-1` gives it all remaining width. */}
-      <div aria-hidden className="app-drag min-h-full flex-1" />
     </div>
   );
 }

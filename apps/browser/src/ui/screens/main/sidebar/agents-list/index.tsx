@@ -339,6 +339,9 @@ export function AgentsList() {
   const { previewAgentId } = useAgentSwitcher();
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
+  const setLastOpenAgentId = useKartonProcedure(
+    (p) => p.browser.setLastOpenAgentId,
+  );
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
   const markAsRead = useKartonProcedure((p) => p.agents.markAsRead);
@@ -486,6 +489,7 @@ export function AgentsList() {
     const existingEmpty = emptyAgentIdRef.current;
     if (existingEmpty && !pendingRemovalsRef.current.has(existingEmpty)) {
       setOpenAgent(existingEmpty);
+      void setLastOpenAgentId(existingEmpty);
       window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
       return;
     }
@@ -505,6 +509,7 @@ export function AgentsList() {
     ).then((id) => {
       setOpenAgent(id);
       setPendingCreate(false);
+      void setLastOpenAgentId(id);
     });
   }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent, track]);
 
@@ -517,8 +522,9 @@ export function AgentsList() {
       // Optimistic: update the open agent immediately, don't wait for the RPC.
       setOpenAgent(id);
       void resumeAgent(id);
+      void setLastOpenAgentId(id);
     },
-    [resumeAgent, setOpenAgent],
+    [resumeAgent, setOpenAgent, setLastOpenAgentId],
   );
 
   const handleDelete = useCallback(

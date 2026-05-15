@@ -19,6 +19,8 @@ import {
   type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { z } from 'zod';
+import { z as zod } from 'zod';
+import { readPersistedDataSync } from '@/utils/persisted-data';
 import { AgentPersistenceDB } from './persistence/db';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
 import { writeBlob, deleteAgentBlobs } from '@/utils/attachment-blobs';
@@ -114,9 +116,60 @@ export class AgentManagerService extends DisposableService {
         return null;
       });
 
-    // Create an empty default agent only after the DB is ready
-    // This ensures that when there's an active agent, the DB is guaranteed to be initialized
+    // After the DB is ready, either restore the last-opened agent or
+    // create a new empty default agent if no persisted state exists.
     this.dbReadyPromise.then(async () => {
+      if (!this.agentPersistenceDB) {
+        // DB init failed — still create a default agent so the UI is usable
+        await this.createAgent(AgentTypes.CHAT, undefined);
+        return;
+      }
+
+      // Try to restore the last-opened agent
+      const state = readPersistedDataSync(
+        'tab-state',
+        zod.object({
+          lastOpenAgentId: zod.string().nullable().catch(null),
+        }),
+        { lastOpenAgentId: null },
+      );
+      const lastOpenAgentId = state.lastOpenAgentId;
+
+      if (lastOpenAgentId) {
+        try {
+          await this.resumeAgent(lastOpenAgentId);
+          this.logger.debug(
+            `[AgentManager] Resumed last agent ${lastOpenAgentId} on startup`,
+          );
+          // Mount last chat workspaces on the resumed agent
+          const lastWorkspaces =
+            await this.agentPersistenceDB.getLastChatWorkspacePaths();
+          if (lastWorkspaces) {
+            for (const ws of lastWorkspaces) {
+              try {
+                await this.toolbox.handleMountWorkspace(
+                  lastOpenAgentId,
+                  ws.path,
+                  ws.permissions,
+                );
+              } catch (error) {
+                this.logger.warn(
+                  `[AgentManager] Failed to mount workspace ${ws.path} on startup`,
+                  { error },
+                );
+              }
+            }
+          }
+          return;
+        } catch (error) {
+          this.logger.warn(
+            '[AgentManager] Failed to resume last agent, creating new one',
+            { error },
+          );
+        }
+      }
+
+      // No persisted agent or resume failed — create default
       const agent = await this.createAgent(AgentTypes.CHAT, undefined);
       const lastWorkspaces =
         await this.agentPersistenceDB?.getLastChatWorkspacePaths();

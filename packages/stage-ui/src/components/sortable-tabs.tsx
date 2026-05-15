@@ -69,13 +69,11 @@ import { CSS } from '@dnd-kit/utilities';
 import { Tabs as TabsBase } from '@base-ui/react/tabs';
 import {
   useCallback,
-  useEffect,
-  useRef,
   useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { PlusIcon, XIcon } from 'lucide-react';
+import { XIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -138,7 +136,7 @@ export type SortableTabsProps = React.ComponentProps<typeof TabsBase.Root>;
 export const SortableTabs = ({ className, ...props }: SortableTabsProps) => (
   <TabsBase.Root
     {...props}
-    className={cn('flex w-full flex-col items-start gap-2', className)}
+    className={cn('flex w-full flex-row items-stretch', className)}
   />
 );
 
@@ -191,10 +189,8 @@ function BarTriggerContent({
     <div
       onAuxClick={item.onAuxClick}
       className={cn(
-        'group flex h-8 flex-row items-stretch ring-1 transition-colors duration-150 ease-out',
-        isActive
-          ? 'bg-surface-1 ring-derived-subtle'
-          : 'bg-transparent ring-transparent hover:bg-surface-1',
+        'group relative flex h-7 flex-row items-stretch rounded-md transition-colors duration-150 ease-out',
+        isActive ? 'bg-surface-1' : 'bg-transparent hover:bg-surface-1',
       )}
     >
       {/* Trigger — fills remaining width, handles tab activation */}
@@ -202,7 +198,7 @@ function BarTriggerContent({
         value={item.id}
         disabled={item.disabled}
         className={cn(
-          'flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent py-1 pr-1 pl-2.5 text-xs',
+          'flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent py-0.5 pr-3 pl-2 text-xs',
           item.disabled && 'cursor-not-allowed opacity-50',
         )}
       >
@@ -210,9 +206,9 @@ function BarTriggerContent({
           <span className="size-4 shrink-0 [&>*]:size-full">{item.icon}</span>
         )}
         <span
+          data-active={isActive}
           className={cn(
-            'flex-1 truncate text-left font-regular',
-            isActive ? 'text-foreground' : 'text-muted-foreground',
+            'mask-alpha mask-l-from-black mask-l-to-black group-hover:mask-l-from-transparent mask-l-from-3 mask-l-to-6 flex-1 truncate text-left font-regular text-muted-foreground data-[active=true]:text-foreground',
           )}
         >
           {item.label}
@@ -222,7 +218,7 @@ function BarTriggerContent({
       {/* Extra actions (e.g. audio mute toggle) — sibling to Tabs.Tab */}
       {item.actions}
 
-      {/* Close button — sibling to Tabs.Tab, never causes nested <button> */}
+      {/* Close button — absolute overlay on the right, fades in on hover/active */}
       {showClose && (
         <button
           type="button"
@@ -231,9 +227,7 @@ function BarTriggerContent({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={item.onClose}
           className={cn(
-            'flex shrink-0 items-center justify-center pr-2 pl-0.5 text-muted-foreground transition-colors hover:text-foreground',
-            // Only show on hover for inactive tabs (matches browser behaviour)
-            !isActive && 'opacity-0 group-hover:opacity-100',
+            'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground group-hover:opacity-100',
           )}
         >
           <XIcon className="size-3" />
@@ -269,17 +263,10 @@ function BarOverlayContent({
   const showClose = item.closeable !== false && !!item.onClose;
 
   return (
-    <div
-      className={cn(
-        'flex h-8 flex-row items-stretch shadow-elevation-1 ring-1',
-        isActive
-          ? 'bg-surface-1 ring-derived-subtle'
-          : 'bg-surface-1 ring-derived',
-      )}
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-1 text-xs">
+    <div className="relative flex h-7 flex-row items-stretch bg-surface-1 shadow-elevation-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-0.5 text-xs">
         {item.icon && (
-          <span className="size-4 shrink-0 [&>*]:size-full">{item.icon}</span>
+          <span className="size-6 shrink-0 [&>*]:size-full">{item.icon}</span>
         )}
         <span
           className={cn(
@@ -291,7 +278,7 @@ function BarOverlayContent({
         </span>
       </div>
       {showClose && (
-        <div className="flex shrink-0 items-center justify-center px-1 text-muted-foreground">
+        <div className="absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground">
           <XIcon className="size-3" />
         </div>
       )}
@@ -336,9 +323,10 @@ function SortableTrigger({
     return (
       <div
         ref={setNodeRef}
+        className="app-no-drag"
         style={{
           ...style,
-          minWidth: '6rem',
+          minWidth: '5rem',
           maxWidth: '11rem',
         }}
         {...attributes}
@@ -400,27 +388,9 @@ export const SortableTabsList = ({
   onReorder,
   variant = 'pill',
   activeValue,
-  onAddItem,
   className,
 }: SortableTabsListProps) => {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const barScrollRef = useRef<HTMLDivElement>(null);
-
-  // Redirect vertical mouse-wheel to horizontal scroll on the tab bar.
-  // Must be a non-passive listener so we can call preventDefault().
-  useEffect(() => {
-    if (variant !== 'bar') return;
-    const el = barScrollRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (e.deltaX !== 0) return; // already horizontal — leave it alone
-      if (e.deltaY === 0) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [variant]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -471,38 +441,16 @@ export const SortableTabsList = ({
           // runs out of space the tabs compress proportionally. Once every tab
           // hits its minWidth floor the container overflows and scrolls.
           // min-w-full on the List keeps tabs filling the container width.
-          <div
-            className={cn(
-              'flex w-full min-w-0 flex-row items-stretch',
-              className,
-            )}
-          >
-            <div
-              ref={barScrollRef}
-              className="min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              <TabsBase.List className="flex h-full w-fit flex-row items-stretch divide-x divide-surface-2">
-                {items.map((item) => (
-                  <SortableTrigger
-                    key={item.id}
-                    item={item}
-                    variant="bar"
-                    activeValue={activeValue}
-                  />
-                ))}
-              </TabsBase.List>
-            </div>
-            {onAddItem && (
-              <button
-                type="button"
-                aria-label="Add tab"
-                onClick={onAddItem}
-                className="flex h-8 shrink-0 cursor-pointer items-center justify-center border-surface-2 border-l bg-background px-2 text-muted-foreground transition-colors hover:bg-surface-1 hover:text-foreground"
-              >
-                <PlusIcon className="size-3" />
-              </button>
-            )}
-          </div>
+          <TabsBase.List className="flex h-full w-fit flex-row items-stretch gap-1">
+            {items.map((item) => (
+              <SortableTrigger
+                key={item.id}
+                item={item}
+                variant="bar"
+                activeValue={activeValue}
+              />
+            ))}
+          </TabsBase.List>
         ) : (
           // Pill: equal-width grid in a rounded container
           <TabsBase.List
