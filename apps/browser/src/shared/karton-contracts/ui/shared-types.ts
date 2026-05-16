@@ -438,10 +438,13 @@ export const userPreferencesSchema = z.object({
       newTabPage: pageSettingSchema.default({ type: 'home' }),
       /** Default page opened when the browser starts */
       startupPage: pageSettingSchema.default({ type: 'home' }),
+      /** UI zoom percentage applied to the Stagewise interface (70-130) */
+      uiZoomPercentage: z.number().min(70).max(130).default(100),
     })
     .default({
       newTabPage: { type: 'home' },
       startupPage: { type: 'home' },
+      uiZoomPercentage: 100,
     }),
   /** Website permission settings (defaults and host-specific overrides) */
   permissions: z.lazy(() => permissionsPreferencesSchema),
@@ -570,6 +573,7 @@ export const defaultUserPreferences: UserPreferences = {
   general: {
     newTabPage: { type: 'home' },
     startupPage: { type: 'home' },
+    uiZoomPercentage: 100,
   },
   permissions: defaultPermissionsForUserPrefs,
   devToolbar: defaultDevToolbarForUserPrefs,

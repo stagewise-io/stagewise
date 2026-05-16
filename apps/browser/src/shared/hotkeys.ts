@@ -246,9 +246,12 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     captureDominantly: true,
   },
 
-  // Zoom
+  // Zoom — match both Cmd+= and Cmd+Shift+= (US: Plus key).
+  // Primary: Mod+Equal (Cmd+=), alias: Mod+Shift+Equal (Cmd++).
+  // Key matching uses both ev.code (US layout) and ev.key (QWERTZ/AZERTY).
   [HotkeyActions.ZOOM_IN]: {
-    accelerator: 'Mod+Shift+Equal', // + key requires shift on US layout
+    accelerator: 'Mod+Equal',
+    aliases: ['Mod+Shift+Equal'],
     captureDominantly: true,
   },
   [HotkeyActions.ZOOM_OUT]: {
@@ -372,8 +375,9 @@ function matchKeyToken(ev: KeyboardEvent, token: string): boolean {
     // Punctuation/symbols
     case 'EQUAL':
     case 'PLUS':
-      // + key is Equal with Shift on US layout
-      return ev.code === 'Equal' || ev.code === 'NumpadAdd';
+      // Match by physical key code AND by character so both US and
+      // non-US layouts (QWERTZ, AZERTY, etc.) work correctly.
+      return ev.code === 'Equal' || ev.code === 'NumpadAdd' || ev.key === '+';
     case 'MINUS':
       return (
         ev.code === 'Minus' ||

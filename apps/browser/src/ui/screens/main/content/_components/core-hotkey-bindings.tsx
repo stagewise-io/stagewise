@@ -5,6 +5,9 @@ import { useCallback, useMemo } from 'react';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { HOME_PAGE_URL } from '@shared/internal-urls';
 import { useSidebarCollapsed } from '../../_components/sidebar-collapsed-context';
+import { produceWithPatches, enablePatches } from 'immer';
+
+enablePatches();
 
 export function CoreHotkeyBindings({
   onCreateTab,
@@ -47,6 +50,15 @@ export function CoreHotkeyBindings({
     (p) => p.browser.setZoomPercentage,
   );
   const { tabUiState } = useTabUIState();
+
+  const preferences = useKartonState((s) => s.preferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const uiZoomPercentage = useKartonState(
+    (s) => s.preferences.general.uiZoomPercentage,
+  );
+  const focusedPanel = activeTabId
+    ? (tabUiState[activeTabId]?.focusedPanel ?? 'stagewise-ui')
+    : 'stagewise-ui';
 
   const currentZoomPercentage = useKartonState((s) =>
     activeTabId ? s.browser.tabs[activeTabId]?.zoomPercentage : 100,
@@ -176,27 +188,80 @@ export function CoreHotkeyBindings({
 
   // Zoom in
   const handleZoomIn = useCallback(() => {
-    if (!activeTabId || !currentZoomPercentage) return;
-    if (currentZoomPercentage >= 500) return; // Max zoom limit
-    setZoomPercentage(currentZoomPercentage + 10, activeTabId);
-  }, [activeTabId, currentZoomPercentage, setZoomPercentage]);
+    if (focusedPanel === 'tab-content') {
+      // Per-tab web content zoom
+      if (!activeTabId || !currentZoomPercentage) return;
+      if (currentZoomPercentage >= 500) return;
+      setZoomPercentage(currentZoomPercentage + 10, activeTabId);
+    } else {
+      // UI zoom
+      if (uiZoomPercentage >= 130) return;
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = Math.min(uiZoomPercentage + 10, 130);
+      });
+      void updatePreferences(patches);
+    }
+  }, [
+    focusedPanel,
+    activeTabId,
+    currentZoomPercentage,
+    uiZoomPercentage,
+    setZoomPercentage,
+    preferences,
+    updatePreferences,
+  ]);
 
   useHotKeyListener(handleZoomIn, HotkeyActions.ZOOM_IN);
 
   // Zoom out
   const handleZoomOut = useCallback(() => {
-    if (!activeTabId || !currentZoomPercentage) return;
-    if (currentZoomPercentage <= 50) return; // Min zoom limit
-    setZoomPercentage(currentZoomPercentage - 10, activeTabId);
-  }, [activeTabId, currentZoomPercentage, setZoomPercentage]);
+    if (focusedPanel === 'tab-content') {
+      // Per-tab web content zoom
+      if (!activeTabId || !currentZoomPercentage) return;
+      if (currentZoomPercentage <= 50) return;
+      setZoomPercentage(currentZoomPercentage - 10, activeTabId);
+    } else {
+      // UI zoom
+      if (uiZoomPercentage <= 70) return;
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = Math.max(uiZoomPercentage - 10, 70);
+      });
+      void updatePreferences(patches);
+    }
+  }, [
+    focusedPanel,
+    activeTabId,
+    currentZoomPercentage,
+    uiZoomPercentage,
+    setZoomPercentage,
+    preferences,
+    updatePreferences,
+  ]);
 
   useHotKeyListener(handleZoomOut, HotkeyActions.ZOOM_OUT);
 
   // Reset zoom
   const handleResetZoom = useCallback(() => {
-    if (!activeTabId) return;
-    setZoomPercentage(100, activeTabId);
-  }, [activeTabId, setZoomPercentage]);
+    if (focusedPanel === 'tab-content') {
+      // Per-tab web content zoom
+      if (!activeTabId) return;
+      setZoomPercentage(100, activeTabId);
+    } else {
+      // UI zoom
+      if (uiZoomPercentage === 100) return;
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = 100;
+      });
+      void updatePreferences(patches);
+    }
+  }, [
+    focusedPanel,
+    activeTabId,
+    uiZoomPercentage,
+    setZoomPercentage,
+    preferences,
+    updatePreferences,
+  ]);
 
   useHotKeyListener(handleResetZoom, HotkeyActions.ZOOM_RESET);
 
