@@ -269,7 +269,7 @@ export function MainSection() {
 
     // No visible tabs for this agent — do nothing;
     // effectiveActiveTabId derived below will show empty state.
-  }, [openAgent, activeTabId, tabs, switchTab]);
+  }, [openAgent]);
 
   // ---------------------------------------------------------------------------
   // Optimistic tab order
