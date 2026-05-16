@@ -1,4 +1,7 @@
-import { ResizablePanel } from '@stagewise/stage-ui/components/resizable';
+import {
+  ResizablePanel,
+  type ImperativePanelHandle,
+} from '@stagewise/stage-ui/components/resizable';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import {
   useComparingSelector,
@@ -32,11 +35,17 @@ import {
   type SortableTabItem,
 } from '@stagewise/stage-ui/components/sortable-tabs';
 import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
 import {
   IconPinTackOutline18,
   IconPinTackSlashOutline18,
 } from 'nucleo-ui-outline-18';
+import { GlobePlusIcon } from '../_components/globe-plus-icon';
 import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 
 // ---------------------------------------------------------------------------
@@ -136,7 +145,27 @@ function TabPinIcon({
 // MainSection
 // ---------------------------------------------------------------------------
 
+const CONTENT_SIZE_KEY = 'stagewise-content-panel-size';
+
+function readContentSize(): number {
+  try {
+    const stored = localStorage.getItem(CONTENT_SIZE_KEY);
+    return stored ? Number.parseFloat(stored) : 70;
+  } catch {
+    return 70;
+  }
+}
+
+function persistContentSize(size: number) {
+  try {
+    localStorage.setItem(CONTENT_SIZE_KEY, String(size));
+  } catch {
+    // ignore
+  }
+}
+
 export function MainSection() {
+  const panelRef = useRef<ImperativePanelHandle>(null);
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
@@ -150,6 +179,26 @@ export function MainSection() {
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
   const track = useTrack();
+
+  // Persisted panel size survives mount/unmount (conditional rendering).
+  const storedSizeRef = useRef(readContentSize());
+  // Block onResize→persist during mount-time layout and programmatic restore.
+  // Starts true: onResize fires BEFORE useEffect, and the panel group's
+  // auto-layout size must not leak into localStorage.
+  const isRestoringRef = useRef(true);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const saved = storedSizeRef.current;
+    requestAnimationFrame(() => {
+      panel.resize(saved);
+      const tid = setTimeout(() => {
+        isRestoringRef.current = false;
+      }, 150);
+      return () => clearTimeout(tid);
+    });
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Per-agent last-active-tab tracking + auto-switch on agent change
@@ -219,6 +268,7 @@ export function MainSection() {
   // useComparingSelector prevents a new array reference on every tab property
   // mutation (title / URL / loading state) — only the set/order of IDs matters.
   // ---------------------------------------------------------------------------
+
   const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
     (s) => Object.keys(s.browser.tabs),
     (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
@@ -416,6 +466,10 @@ export function MainSection() {
     createTab(undefined, undefined, openAgent);
   }, [createTab, activeTabId, openAgent]);
 
+  const handleGlobeClick = useCallback(() => {
+    createTab(undefined, undefined, openAgent);
+  }, [createTab, openAgent]);
+
   const handleCleanAllTabs = useCallback(() => {
     const tabIdsToClose = Object.keys(tabs).filter(
       (tabId) => tabId !== activeTabId,
@@ -495,9 +549,17 @@ export function MainSection() {
 
   return (
     <ResizablePanel
+      ref={panelRef}
       id="opened-content-panel"
       order={2}
-      defaultSize={70}
+      defaultSize={storedSizeRef.current}
+      minSize={20}
+      onResize={(size) => {
+        if (size > 0 && !isRestoringRef.current) {
+          storedSizeRef.current = size;
+          persistContentSize(size);
+        }
+      }}
       className="@container overflow-visible! flex h-full flex-1 flex-col items-start justify-between"
     >
       <CoreHotkeyBindings
@@ -508,7 +570,7 @@ export function MainSection() {
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 flex-row items-stretch bg-background py-1.5 pr-9 pl-1">
+        <div className="flex shrink-0 flex-row items-stretch gap-1 bg-background py-1.5 pl-1">
           <SortableTabs
             value={effectiveActiveTabId ?? ''}
             onValueChange={(id) => {
@@ -543,6 +605,20 @@ export function MainSection() {
               />
             )}
           </SortableTabs>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Open new browser tab"
+                className="size-7 rounded-md"
+                onClick={handleGlobeClick}
+              >
+                <GlobePlusIcon className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open browsing tab</TooltipContent>
+          </Tooltip>
         </div>
         {/* Content area with per-tab UI */}
         <div className="relative flex size-full flex-col">

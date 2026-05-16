@@ -13,7 +13,12 @@ import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { OpenAgentProvider, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useCallback, useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconGlobePointerOutline18 } from 'nucleo-ui-outline-18';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@stagewise/stage-ui/components/tooltip';
+import { GlobePlusIcon } from './_components/globe-plus-icon';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
 import { useAutoSelectFirstAgent } from '@ui/hooks/use-auto-select-agent';
@@ -21,19 +26,25 @@ import {
   SidebarCollapsedProvider,
   useSidebarCollapsed,
 } from './_components/sidebar-collapsed-context';
+import {
+  ContentCollapsedProvider,
+  useContentCollapsed,
+} from './_components/content-collapsed-context';
+import { ContentToggleButton } from './_components/content-toggle-button';
 import { AgentHotkeyBindings } from './_components/agent-hotkey-bindings';
 
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
-const layoutStorageKey = 'stagewise-panel-layout';
 
 export function DefaultLayout({ show }: { show: boolean }) {
   return (
     <OpenAgentProvider>
       <ChatDraftProvider>
         <SidebarCollapsedProvider>
-          <PendingRemovalsProvider>
-            <DefaultLayoutInner show={show} />
-          </PendingRemovalsProvider>
+          <ContentCollapsedProvider>
+            <PendingRemovalsProvider>
+              <DefaultLayoutInner show={show} />
+            </PendingRemovalsProvider>
+          </ContentCollapsedProvider>
         </SidebarCollapsedProvider>
       </ChatDraftProvider>
     </OpenAgentProvider>
@@ -45,7 +56,9 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const tabs = useKartonState((s) => s.browser.tabs);
   const [openAgent] = useOpenAgent();
-  const { collapsed } = useSidebarCollapsed();
+  const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
+  const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
+    useContentCollapsed();
 
   const hasVisibleTabs = useMemo(() => {
     return Object.values(tabs).some(
@@ -55,10 +68,13 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   }, [tabs, openAgent]);
 
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  // content panel visible when there are visible tabs AND it's not collapsed
+  const showContent = hasVisibleTabs && !contentCollapsed;
 
   const handleOpenTab = useCallback(() => {
+    if (contentCollapsed) setContentCollapsed(false);
     createTab(undefined, undefined, openAgent);
-  }, [createTab, openAgent]);
+  }, [createTab, openAgent, contentCollapsed, setContentCollapsed]);
 
   // Headless: keeps `openAgent` valid regardless of whether the sidebar
   // (which used to own this effect) is mounted.
@@ -84,7 +100,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
         >
           <Sidebar />
 
-          {!collapsed && <ResizableHandle />}
+          {!sidebarCollapsed && <ResizableHandle />}
 
           <ResizablePanel
             id="content-panel"
@@ -95,26 +111,34 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
               !isMacOs && 'mt-px',
             )}
           >
-            {/* Globe button — always visible top-right for creating new tabs */}
+            {/* Top-right action button: content toggle when tabs visible, globe when none */}
             <div className="app-no-drag absolute top-1 right-1 z-20">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Open new browser tab"
-                onClick={handleOpenTab}
-              >
-                <IconGlobePointerOutline18 className="size-4" />
-              </Button>
+              {hasVisibleTabs ? (
+                <ContentToggleButton />
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Open new browser tab"
+                      onClick={handleOpenTab}
+                    >
+                      <GlobePlusIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open browsing tab</TooltipContent>
+                </Tooltip>
+              )}
             </div>
             <ResizablePanelGroup
               direction="horizontal"
-              autoSaveId={layoutStorageKey}
               className="h-full divide-x divide-surface-1"
             >
               <AgentChat />
 
-              {hasVisibleTabs && <ResizableHandle />}
-              {hasVisibleTabs && <MainSection />}
+              <ResizableHandle />
+              {showContent && <MainSection />}
             </ResizablePanelGroup>
           </ResizablePanel>
         </ResizablePanelGroup>

@@ -856,13 +856,16 @@ export class WindowLayoutService extends DisposableService {
       }
     }
 
-    // For internal pages, check if a non-active tab with the same URL already exists
-    // If the active tab already has this URL, we still create a new tab (user explicitly wants another)
+    // For internal pages, check if a non-active tab with the same URL already
+    // exists AND is visible to the requesting agent (global or matching).
+    // If the active tab already has this URL, we still create a new tab.
     if (targetUrl?.startsWith('stagewise://')) {
-      const existingTab = Object.entries(this.tabs).find(
-        ([id, tab]) =>
-          id !== this.activeTabId && tab.getState().url === targetUrl,
-      );
+      const existingTab = Object.entries(this.tabs).find(([id, tab]) => {
+        if (id === this.activeTabId) return false;
+        if (tab.getState().url !== targetUrl) return false;
+        const tabAgent = tab.getState().agentInstanceId;
+        return tabAgent === null || tabAgent === (agentInstanceId ?? null);
+      });
 
       if (existingTab) {
         const [existingTabId] = existingTab;
@@ -1086,9 +1089,8 @@ export class WindowLayoutService extends DisposableService {
 
     // Only activate new tab if requested AND source tab is active (or no source tab)
     // This prevents background tabs from stealing focus when they open links
-    const shouldActivate =
-      setActive && (!sourceTabId || sourceTabId === this.activeTabId);
-    if (shouldActivate) await this.handleSwitchTab(id);
+    if (setActive && (!sourceTabId || sourceTabId === this.activeTabId))
+      await this.handleSwitchTab(id);
 
     return id;
   }
@@ -1100,6 +1102,7 @@ export class WindowLayoutService extends DisposableService {
       const tabIdsBeforeDeletion = Object.keys(this.tabs);
       const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
       const isActiveTab = this.activeTabId === tabId;
+      const closedAgentInstanceId = tab.getState().agentInstanceId;
 
       // Check if webContents is already destroyed (e.g., crash, external closure)
       const webContents = tab.getViewContainer().webContents;
@@ -1115,39 +1118,73 @@ export class WindowLayoutService extends DisposableService {
       // Update ChatStateController tabs reference
       this.chatStateController?.updateTabsReference(this.tabs);
 
-      // Clean up Karton state
-      this.uiKarton.setState((draft) => {
-        delete draft.browser.tabs[tabId];
-      });
-
       this.telemetryService?.capture('tab-destroyed', {
         tab_count_after: Object.keys(this.tabs).length,
       });
 
+      // Compute next tab BEFORE any Karton state update.
+      // Prefer tabs visible to the closed tab's agent (global + same-agent)
+      // so we don't switch to a tab the UI will hide, leaving empty content.
+      let nextTabId: string | undefined;
+      let nextTabAgentInstanceId: string | undefined;
       if (isActiveTab) {
-        // Get remaining tabs after deletion
         const remainingTabIds = Object.keys(this.tabs);
-
-        // Try next tab first
-        let nextTabId: string | undefined;
-        if (currentIndex < remainingTabIds.length) {
-          // Next tab is at the same index (since we removed current)
-          nextTabId = remainingTabIds[currentIndex];
-        } else if (currentIndex > 0) {
-          // If no next tab, try previous tab
-          nextTabId = remainingTabIds[currentIndex - 1];
+        // Filter to tabs visible from the closed tab's agent perspective
+        const visibleRemaining = remainingTabIds.filter((id) => {
+          const agentId = this.tabs[id]?.getState().agentInstanceId;
+          return agentId === null || agentId === closedAgentInstanceId;
+        });
+        if (visibleRemaining.length > 0) {
+          // Pick the next visible tab in positional order (prefer same index,
+          // fall back to last in filtered list)
+          const nextVisible =
+            visibleRemaining.find(
+              (id) => remainingTabIds.indexOf(id) >= currentIndex,
+            ) ?? visibleRemaining[visibleRemaining.length - 1];
+          nextTabId = nextVisible;
+        } else if (remainingTabIds.length > 0) {
+          // No visible tabs left — fall back to any remaining tab
+          if (currentIndex < remainingTabIds.length) {
+            nextTabId = remainingTabIds[currentIndex];
+          } else if (currentIndex > 0) {
+            nextTabId = remainingTabIds[currentIndex - 1];
+          }
         }
-
         if (nextTabId) {
-          await this.handleSwitchTab(nextTabId);
-        } else {
-          // No tabs left — clear active tab
-          this.activeTabId = null;
-          this.uiKarton.setState((draft) => {
-            draft.browser.activeTabId = null;
-          });
+          nextTabAgentInstanceId =
+            this.tabs[nextTabId]?.getState().agentInstanceId ?? undefined;
         }
       }
+
+      // Do internal tab switch (bounds, visibility, z-order) but skip its
+      // setState — we combine deletion + active-tab update below atomically.
+      if (isActiveTab) {
+        if (nextTabId) {
+          await this.handleSwitchTab(nextTabId, true);
+          this.activeTabId = nextTabId;
+          if (nextTabAgentInstanceId) {
+            this.lastActiveTabPerAgent[nextTabAgentInstanceId] = nextTabId;
+          }
+        } else {
+          this.activeTabId = null;
+        }
+      }
+
+      // Single atomic Karton state update: delete closed tab + set new active
+      const newTab = nextTabId ? this.tabs[nextTabId] : undefined;
+      this.uiKarton.setState((draft) => {
+        delete draft.browser.tabs[tabId];
+        if (isActiveTab) {
+          draft.browser.activeTabId = nextTabId ?? null;
+          if (newTab) {
+            draft.browser.viewportSize = newTab.getViewportSize();
+            if (nextTabAgentInstanceId) {
+              draft.browser.lastActiveTabPerAgent[nextTabAgentInstanceId] =
+                nextTabId!;
+            }
+          }
+        }
+      });
 
       // Clean up stale lastActiveTabPerAgent entries for the closed tab
       for (const [aid, tid] of Object.entries(this.lastActiveTabPerAgent)) {
@@ -1158,7 +1195,7 @@ export class WindowLayoutService extends DisposableService {
     }
   };
 
-  private handleSwitchTab = async (tabId: string) => {
+  private handleSwitchTab = async (tabId: string, skipSetState = false) => {
     if (!this.tabs[tabId]) return;
     if (this.activeTabId === tabId) return;
 
@@ -1210,15 +1247,17 @@ export class WindowLayoutService extends DisposableService {
       this.lastActiveTabPerAgent[agentInstanceId] = tabId;
     }
 
-    this.uiKarton.setState((draft) => {
-      draft.browser.activeTabId = tabId;
-      draft.browser.viewportSize = newTab.getViewportSize();
-      if (agentInstanceId) {
-        draft.browser.lastActiveTabPerAgent[agentInstanceId] = tabId;
-      }
-    });
+    if (!skipSetState) {
+      this.uiKarton.setState((draft) => {
+        draft.browser.activeTabId = tabId;
+        draft.browser.viewportSize = newTab.getViewportSize();
+        if (agentInstanceId) {
+          draft.browser.lastActiveTabPerAgent[agentInstanceId] = tabId;
+        }
+      });
 
-    this.saveTabState();
+      this.saveTabState();
+    }
   };
 
   private handleReorderTabs = async (tabIds: string[]) => {
