@@ -32,7 +32,7 @@ import { UsageWarningBadge } from '../agent-chat/chat/_components/usage-warning-
 // (`defaultSize={12}`) and then collapses via effect on the next frame,
 // producing a visible flash when the user last left the sidebar collapsed.
 const INITIAL_COLLAPSED = readInitialSidebarCollapsed();
-const DEFAULT_EXPANDED_SIZE = 12;
+const DEFAULT_EXPANDED_SIZE = 6;
 
 function getPlanLabel(plan: string | undefined): string {
   if (!plan) return 'Free';
@@ -41,6 +41,7 @@ function getPlanLabel(plan: string | undefined): string {
 
 export function Sidebar() {
   const panelRef = useRef<ImperativePanelHandle>(null);
+  const preCollapseSizeRef = useRef<number>(DEFAULT_EXPANDED_SIZE);
 
   const track = useTrack();
   const createTab = useKartonProcedure((p) => p.browser.createTab);
@@ -74,9 +75,19 @@ export function Sidebar() {
     if (!panel) return;
     const isPanelCollapsed = panel.isCollapsed();
     if (collapsed && !isPanelCollapsed) {
+      const currentSize = panel.getSize();
+      if (currentSize > 0) preCollapseSizeRef.current = currentSize;
       panel.collapse();
     } else if (!collapsed && isPanelCollapsed) {
       panel.expand();
+      // Restore the pre-collapse size instead of defaultSize.
+      // `panel.expand()` may set defaultSize; override with the
+      // remembered size so user-resized widths survive collapse cycles.
+      const restoreSize = preCollapseSizeRef.current;
+      if (restoreSize !== DEFAULT_EXPANDED_SIZE) {
+        // Delay one tick so expand() has settled.
+        requestAnimationFrame(() => panel.resize(restoreSize));
+      }
     }
   }, [collapsed]);
 
@@ -86,7 +97,7 @@ export function Sidebar() {
       id="new-sidebar-panel"
       order={0}
       defaultSize={INITIAL_COLLAPSED ? 0 : DEFAULT_EXPANDED_SIZE}
-      minSize={DEFAULT_EXPANDED_SIZE}
+      minSize={6}
       maxSize={50}
       collapsible
       collapsedSize={0}
