@@ -906,7 +906,6 @@ export class WindowLayoutService extends DisposableService {
 
     // Create search utils instance for resolving navigation targets
     const searchUtils = createSearchUtils(searchUtilsConfig);
-
     const tab = new TabController(
       id,
       this.baseWindow!,
@@ -918,7 +917,9 @@ export class WindowLayoutService extends DisposableService {
       (target: NavigationTarget, setActive?: boolean) => {
         // Resolve the navigation target to a URL
         const resolvedUrl = searchUtils.resolveNavigationTarget(target);
-        void this.handleCreateTab(resolvedUrl, setActive, undefined, id);
+        // Inherit the parent tab's current agent scope (handles re-pinning).
+        const parentAgentId = this.tabs[id]?.getState().agentInstanceId ?? null;
+        void this.handleCreateTab(resolvedUrl, setActive, parentAgentId, id);
       },
       this.telemetryService ?? undefined,
     );
@@ -1640,13 +1641,23 @@ export class WindowLayoutService extends DisposableService {
       );
       return;
     }
+    // Capture old agent before reassignment so we can clean up the stale
+    // last-active-tab entry. The current code only cleaned up on unpin,
+    // which left dangling pointers when re-pinning tab A→B.
+    const oldAgentId = tab.getState().agentInstanceId;
     tab.setAgentInstance(agentInstanceId);
-    // If unpinning, remove stale last-active-tab entries for this tab
-    if (agentInstanceId === null) {
-      for (const [aid, tid] of Object.entries(this.lastActiveTabPerAgent)) {
-        if (tid === tabId) delete this.lastActiveTabPerAgent[aid];
-      }
+
+    // Remove old agent's last-active-tab entry if it points to this tab.
+    if (oldAgentId && this.lastActiveTabPerAgent[oldAgentId] === tabId) {
+      delete this.lastActiveTabPerAgent[oldAgentId];
     }
+
+    // When pinning to a new agent, record this tab as that agent's
+    // last-active tab so the agent has a valid entry immediately.
+    if (agentInstanceId) {
+      this.lastActiveTabPerAgent[agentInstanceId] = tabId;
+    }
+
     this.saveTabState();
   };
 
