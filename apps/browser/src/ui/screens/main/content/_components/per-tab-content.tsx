@@ -68,7 +68,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
         {/* Control Bar */}
         <div
           className={cn(
-            'flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived-subtle border-t px-1 py-0',
+            'flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived-subtle border-t bg-background px-1 py-0',
           )}
         >
           <NavButtons tabId={tabId} tab={tab} />

@@ -10,6 +10,7 @@ import { MainSection } from './content';
 import { cn } from '@ui/utils';
 import { Sidebar } from './sidebar';
 import { useKartonState } from '@ui/hooks/use-karton';
+import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
 import { OpenAgentProvider } from '@ui/hooks/use-open-chat';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
@@ -41,6 +42,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const { collapsed } = useSidebarCollapsed();
+  const counterScale = useUiZoomCounterScale();
 
   // Headless: keeps `openAgent` valid regardless of whether the sidebar
   // (which used to own this effect) is mounted.
@@ -55,9 +57,14 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
           !show && 'pointer-events-none opacity-0 blur-lg',
         )}
       >
-        {/* Thin draggable strip at the very top for macOS hidden-titlebar windows */}
+        {/* Thin draggable strip at the very top for macOS hidden-titlebar
+            windows. Height is counter-scaled so it stays aligned with the
+            native traffic-light region regardless of UI zoom. */}
         {isMacOs && !isFullScreen && (
-          <div className="app-drag fixed top-0 right-0 left-0 h-2" />
+          <div
+            className="app-drag fixed top-0 right-0 left-0"
+            style={{ height: 8 * counterScale }}
+          />
         )}
         <ResizablePanelGroup
           direction="horizontal"

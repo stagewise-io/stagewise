@@ -17,6 +17,7 @@ import {
 import { SETTINGS_PAGE_URL, ACCOUNT_PAGE_URL } from '@shared/internal-urls';
 import { useTrack } from '@ui/hooks/use-track';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
 import { TITLEBAR_HEIGHT } from '@shared/titlebar';
 import { SidebarTitlebarRow } from '../_components/sidebar-titlebar-row';
 import {
@@ -43,6 +44,7 @@ export function Sidebar() {
 
   const track = useTrack();
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const counterScale = useUiZoomCounterScale();
 
   const { collapsed, setCollapsed } = useSidebarCollapsed();
 
@@ -96,7 +98,7 @@ export function Sidebar() {
       {!collapsed && (
         <div
           className="flex h-full flex-col items-stretch p-2"
-          style={{ paddingTop: TITLEBAR_HEIGHT + 8 }}
+          style={{ paddingTop: (TITLEBAR_HEIGHT + 8) * counterScale }}
         >
           <AgentsList />
 
