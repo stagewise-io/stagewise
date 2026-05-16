@@ -21,7 +21,7 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useEventListener } from '@ui/hooks/use-event-listener';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
-import { BackgroundWithCutout } from './_components/background-with-cutout';
+
 import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
 import {
   PerTabContent,
@@ -637,15 +637,6 @@ export function MainSection() {
         <div className="relative flex size-full flex-col">
           {/* Inner container with overflow clipping */}
           <div className="flex size-full flex-col overflow-hidden">
-            {/* Background with mask for the web-content */}
-            <BackgroundWithCutout
-              className="z-0"
-              targetElementId={
-                effectiveActiveTabId
-                  ? `dev-app-preview-container-${effectiveActiveTabId}`
-                  : undefined
-              }
-            />
             {/* Per-tab content instances — only visible tabs */}
             {visibleTabIds.map((tabId) => (
               <PerTabContent
