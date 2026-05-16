@@ -14,7 +14,8 @@
  * For the `"bar"` variant, pass `activeValue` matching the `value` you
  * pass to `SortableTabs` so active-tab styling is applied correctly to
  * the outer wrapper (which covers both the trigger text area and the close
- * button).
+ * button). Any "add tab" UI belongs outside `SortableTabsList` — render
+ * it as a sibling after the component.
  *
  * ## Persistence
  * Callers own persistence. `onReorder` fires with the new item array and
@@ -36,7 +37,6 @@
  *     items={items}
  *     onReorder={setItems}
  *     activeValue={active}
- *     onAddItem={handleAddTab}
  *   />
  *   <TabsContent value="a">…</TabsContent>
  * </SortableTabs>
@@ -375,11 +375,6 @@ export interface SortableTabsListProps {
    * Pass the same value you pass to `SortableTabs value={...}`.
    */
   activeValue?: string;
-  /**
-   * Rendered as an "add" button after the last tab in the `"bar"` variant.
-   * Not shown in the `"pill"` variant.
-   */
-  onAddItem?: () => void;
   className?: string;
 }
 

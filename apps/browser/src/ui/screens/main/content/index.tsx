@@ -116,11 +116,11 @@ function TabPinIcon({
       <span
         role="button"
         tabIndex={0}
-        title={isAttachedToCurrentAgent ? 'Unpin' : 'Pin globally'}
+        title={isAttachedToCurrentAgent ? 'Unpin' : 'Pin to agent'}
         aria-label={
           isAttachedToCurrentAgent
             ? 'Unpin tab (make global)'
-            : 'Pin tab globally'
+            : 'Pin tab to current agent'
         }
         className="absolute inset-0 m-0 block flex size-full items-center justify-center p-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
         onPointerDown={(e) => e.stopPropagation()}
@@ -150,7 +150,9 @@ const CONTENT_SIZE_KEY = 'stagewise-content-panel-size';
 function readContentSize(): number {
   try {
     const stored = localStorage.getItem(CONTENT_SIZE_KEY);
-    return stored ? Number.parseFloat(stored) : 70;
+    if (!stored) return 70;
+    const parsed = Number.parseFloat(stored);
+    return Number.isFinite(parsed) && parsed >= 20 ? parsed : 70;
   } catch {
     return 70;
   }
@@ -191,13 +193,19 @@ export function MainSection() {
     const panel = panelRef.current;
     if (!panel) return;
     const saved = storedSizeRef.current;
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       panel.resize(saved);
       const tid = setTimeout(() => {
         isRestoringRef.current = false;
       }, 150);
-      return () => clearTimeout(tid);
+      // If the effect unmounts during this RAF, cancel the timeout.
+      timeoutId = tid;
     });
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -374,10 +382,15 @@ export function MainSection() {
   const handleReorderAgent = useCallback(
     (newItems: SortableTabItem[]) => {
       const newOrder = newItems.map((t) => t.id);
+      const newAgentSet = new Set(newOrder);
       const globalIds = optimisticTabIds.filter(
         (id) => tabs[id]?.agentInstanceId === null,
       );
-      const newFullIds = [...globalIds, ...newOrder];
+      // Preserve other agents' tabs that weren't part of this reorder.
+      const otherAgentIds = optimisticTabIds.filter(
+        (id) => tabs[id]?.agentInstanceId !== null && !newAgentSet.has(id),
+      );
+      const newFullIds = [...globalIds, ...otherAgentIds, ...newOrder];
       setOptimisticTabIds(newFullIds);
       reorderTabs(newFullIds);
     },

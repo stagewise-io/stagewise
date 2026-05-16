@@ -91,20 +91,6 @@ export const BarVariant: Story = {
     );
     const [active, setActive] = useState('home');
 
-    const handleAdd = () => {
-      const id = `tab-${Date.now()}`;
-      setItems((prev) => [
-        ...prev,
-        {
-          id,
-          label: 'New tab',
-          icon: <GlobeIcon />,
-          onClose: () => setItems((p) => p.filter((t) => t.id !== id)),
-        },
-      ]);
-      setActive(id);
-    };
-
     return (
       <div className="flex flex-col overflow-hidden rounded-lg border border-border/20">
         {/* Tab bar — sits at the top like a browser chrome */}
@@ -115,7 +101,6 @@ export const BarVariant: Story = {
               items={items}
               onReorder={setItems}
               activeValue={active}
-              onAddItem={handleAdd}
             />
             {items.map((item) => (
               <TabsContent key={item.id} value={item.id} className="p-4">

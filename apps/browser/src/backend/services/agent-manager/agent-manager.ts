@@ -141,25 +141,10 @@ export class AgentManagerService extends DisposableService {
           this.logger.debug(
             `[AgentManager] Resumed last agent ${lastOpenAgentId} on startup`,
           );
-          // Mount last chat workspaces on the resumed agent
-          const lastWorkspaces =
-            await this.agentPersistenceDB.getLastChatWorkspacePaths();
-          if (lastWorkspaces) {
-            for (const ws of lastWorkspaces) {
-              try {
-                await this.toolbox.handleMountWorkspace(
-                  lastOpenAgentId,
-                  ws.path,
-                  ws.permissions,
-                );
-              } catch (error) {
-                this.logger.warn(
-                  `[AgentManager] Failed to mount workspace ${ws.path} on startup`,
-                  { error },
-                );
-              }
-            }
-          }
+          // resumeAgent already restores the agent's own mountedWorkspaces.
+          // Do NOT call getLastChatWorkspacePaths() here — it returns the
+          // most-recently-active chat agent's workspaces (by lastMessageAt),
+          // which may belong to a different agent.
           return;
         } catch (error) {
           this.logger.warn(

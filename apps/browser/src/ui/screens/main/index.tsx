@@ -137,8 +137,12 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
             >
               <AgentChat />
 
-              <ResizableHandle />
-              {showContent && <MainSection />}
+              {showContent && (
+                <>
+                  <ResizableHandle />
+                  <MainSection />
+                </>
+              )}
             </ResizablePanelGroup>
           </ResizablePanel>
         </ResizablePanelGroup>
