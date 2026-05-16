@@ -15,10 +15,7 @@ import {
   AgentTypes,
   type AgentMessage,
 } from '@shared/karton-contracts/ui/agent';
-import type {
-  Mount,
-  ShellSessionSnapshot,
-} from '@shared/karton-contracts/ui/agent/metadata';
+import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
@@ -47,13 +44,11 @@ import {
 } from './log-channel-section';
 import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
-import { ShellSessionsSection } from './shell-sessions-section';
 
 // Stable empty arrays/sets to avoid infinite loop with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
 const EMPTY_QUEUE: (AgentMessage & { role: 'user' })[] = [];
 const EMPTY_MOUNTS_SNAPSHOT: Mount[] = [];
-const EMPTY_SHELL_SESSIONS: ShellSessionSnapshot[] = [];
 const EMPTY_SET = new Set<string>();
 
 type WorkspaceMdAgentEntry = {
@@ -190,31 +185,6 @@ export function StatusCard() {
   );
   const stopAgent = useKartonProcedure((p) => p.agents.stop);
 
-  const shellSessions = useKartonState(
-    useComparingSelector(
-      (s): ShellSessionSnapshot[] =>
-        openAgentId
-          ? (s.toolbox[openAgentId]?.shells?.sessions ?? EMPTY_SHELL_SESSIONS)
-          : EMPTY_SHELL_SESSIONS,
-      (a, b) => {
-        if (a === b) return true;
-        if (a.length !== b.length) return false;
-        return a.every(
-          (s, i) =>
-            s.id === b[i]?.id &&
-            s.exited === b[i]?.exited &&
-            s.lineCount === b[i]?.lineCount &&
-            s.tailContent === b[i]?.tailContent &&
-            s.lastLine === b[i]?.lastLine,
-        );
-      },
-    ),
-  );
-
-  const killShellSession = useKartonProcedure(
-    (p) => p.toolbox.killShellSession,
-  );
-
   // All workspace-md agent instances with their workspace paths
   const workspaceMdAgents = useKartonState(
     useComparingSelector((s): WorkspaceMdAgentEntry[] => {
@@ -337,10 +307,6 @@ export function StatusCard() {
   const goBackUserQuestion = useKartonProcedure(
     (p) => p.toolbox.goBackUserQuestion,
   );
-
-  const openShellTerminalPage = useCallback((_sessionId: string) => {
-    // No-op for now — terminal UI not yet available in this release.
-  }, []);
 
   const openDiffReviewPage = useCallback(
     (fileId: string) => {
@@ -584,16 +550,6 @@ export function StatusCard() {
 
     for (const section of workspaceMdSections) result.push(section);
 
-    const shellSection = ShellSessionsSection({
-      sessions: shellSessions,
-      onKill: (sessionId) => {
-        if (!openAgentId) return;
-        void killShellSession(openAgentId, sessionId);
-      },
-      onOpenTerminal: openShellTerminalPage,
-    });
-    if (shellSection) result.push(shellSection);
-
     const userQuestionSection = UserQuestionSection({
       pendingQuestion: pendingUserQuestion,
       onSubmitStep: async (questionId, answers) => {
@@ -699,9 +655,6 @@ export function StatusCard() {
     submitUserQuestionStep,
     cancelUserQuestion,
     goBackUserQuestion,
-    shellSessions,
-    killShellSession,
-    openShellTerminalPage,
   ]);
 
   // Sync card height with CSS variable for ChatHistory padding
