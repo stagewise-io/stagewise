@@ -117,6 +117,12 @@ export class WindowLayoutService extends DisposableService {
   private contentFullscreenTabId: string | null = null;
 
   private saveStateTimeout: NodeJS.Timeout | null = null;
+  /** Tabs deferred at startup, grouped by agentInstanceId. Populated during
+   *  loadTabState(); consumed and cleared lazily by ensureAgentTabsCreated(). */
+  private deferredTabConfigs = new Map<
+    string | null,
+    { url: string; agentInstanceId: string | null }[]
+  >();
   /** Tracks the last active tab per agent instance for persistence & restore. */
   private lastActiveTabPerAgent: Record<string, string> = {};
   private lastNonMaximizedBounds: {
@@ -1644,7 +1650,27 @@ export class WindowLayoutService extends DisposableService {
     this.saveTabState();
   };
 
+  /** Lazily create persisted tabs for an agent when it is first selected.
+   *  Consumes from the snapshot stored at startup — never re-reads persisted
+   *  state, so tabs re-assigned after startup won't be duplicated. */
+  private async ensureAgentTabsCreated(agentInstanceId: string | null) {
+    const configs = this.deferredTabConfigs.get(agentInstanceId);
+    if (!configs || configs.length === 0) return;
+    this.deferredTabConfigs.delete(agentInstanceId);
+
+    this.logger.debug(
+      `[WindowLayoutService] Lazily creating ${configs.length} tabs for agent ${agentInstanceId}`,
+    );
+
+    for (const cfg of configs) {
+      await this.createTab(cfg.url, false, undefined, cfg.agentInstanceId);
+    }
+  }
+
   private handleSetLastOpenAgentId = async (agentInstanceId: string | null) => {
+    // Lazily create tabs when switching to a not-yet-activated agent.
+    await this.ensureAgentTabsCreated(agentInstanceId);
+
     this.uiKarton.setState((draft) => {
       draft.browser.lastOpenAgentId = agentInstanceId;
     });
@@ -2128,7 +2154,10 @@ export class WindowLayoutService extends DisposableService {
     }
   }
 
-  /** Restore tabs and agent associations from persisted state. */
+  /** Restore tabs and agent associations from persisted state.
+   *  Only global tabs and tabs belonging to the last-open agent are eagerly
+   *  created. Other agent tabs are stored in deferredTabConfigs and created
+   *  lazily when that agent is selected. */
   private async loadTabState() {
     const state = readPersistedDataSync(
       'tab-state',
@@ -2137,8 +2166,10 @@ export class WindowLayoutService extends DisposableService {
     );
     if (!state || state.tabs.length === 0) return;
 
+    const lastOpenAgentId = state.lastOpenAgentId;
+
     this.logger.debug(
-      `[WindowLayoutService] Restoring ${state.tabs.length} persisted tabs`,
+      `[WindowLayoutService] Restoring tabs (lastOpenAgentId=${lastOpenAgentId})`,
     );
 
     // Restore the last-active-tab-per-agent map first
@@ -2146,11 +2177,27 @@ export class WindowLayoutService extends DisposableService {
     // Push to Karton state so the UI can use it
     this.uiKarton.setState((draft) => {
       draft.browser.lastActiveTabPerAgent = { ...this.lastActiveTabPerAgent };
-      draft.browser.lastOpenAgentId = state.lastOpenAgentId ?? null;
+      draft.browser.lastOpenAgentId = lastOpenAgentId ?? null;
     });
 
-    // Re-create tabs in saved order; tabs are appended so index is preserved.
-    for (const savedTab of state.tabs) {
+    // Partition into eager (global + last-open agent) and deferred (the rest).
+    const visibleTabs: typeof state.tabs = [];
+    for (const t of state.tabs) {
+      if (!t.agentInstanceId || t.agentInstanceId === lastOpenAgentId) {
+        visibleTabs.push(t);
+      } else {
+        const group = this.deferredTabConfigs.get(t.agentInstanceId);
+        if (group) group.push(t);
+        else this.deferredTabConfigs.set(t.agentInstanceId, [t]);
+      }
+    }
+
+    const deferredCount = state.tabs.length - visibleTabs.length;
+    this.logger.debug(
+      `[WindowLayoutService] Eagerly creating ${visibleTabs.length} tabs, deferring ${deferredCount}`,
+    );
+
+    for (const savedTab of visibleTabs) {
       await this.createTab(
         savedTab.url,
         false,
@@ -2159,11 +2206,17 @@ export class WindowLayoutService extends DisposableService {
       );
     }
 
-    // Activate the tab at the saved index
+    // Activate the tab at the saved index (only if it was among the visible tabs)
     if (state.activeTabIndex >= 0 && state.activeTabIndex < state.tabs.length) {
-      const tabIds = Object.keys(this.tabs);
-      const targetId = tabIds[state.activeTabIndex];
-      if (targetId) await this.handleSwitchTab(targetId);
+      const targetTab = state.tabs[state.activeTabIndex]!;
+      if (
+        !targetTab.agentInstanceId ||
+        targetTab.agentInstanceId === lastOpenAgentId
+      ) {
+        const tabIds = Object.keys(this.tabs);
+        const targetId = tabIds[visibleTabs.indexOf(targetTab)];
+        if (targetId) await this.handleSwitchTab(targetId);
+      }
     }
   }
 
