@@ -528,7 +528,7 @@ export function MainSection() {
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 flex-row items-stretch gap-1 bg-background py-1.5 pl-1">
+        <div className="flex shrink-0 flex-row items-stretch gap-1 bg-background py-1.5 pr-10 pl-1">
           <SortableTabs
             value={effectiveActiveTabId ?? ''}
             onValueChange={(id) => {
@@ -569,7 +569,7 @@ export function MainSection() {
                 variant="ghost"
                 size="icon-sm"
                 aria-label="Open new browser tab"
-                className="size-7 rounded-md"
+                className="size-7 shrink-0 rounded-md"
                 onClick={handleGlobeClick}
               >
                 <GlobePlusIcon className="size-4" />
