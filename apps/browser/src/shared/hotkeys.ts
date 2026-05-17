@@ -25,16 +25,29 @@ export enum HotkeyActions {
   // Stagewise specific
   TOGGLE_CONTEXT_SELECTOR = 'toggle_context_selector',
   TOGGLE_SIDEBAR = 'toggle_sidebar',
+  TOGGLE_CHAT_FOCUS = 'toggle_chat_focus',
   NEW_CHAT = 'new_chat',
   DOWNLOADS = 'downloads',
 
-  // Tab & window navigation (browser tabs only)
+  // Tab & window navigation
   NEW_TAB = 'new_tab',
   RESTORE_TAB = 'restore_tab',
   CLOSE_TAB = 'close_tab',
   CLOSE_WINDOW = 'close_window',
   NEXT_TAB = 'next_tab',
   PREV_TAB = 'prev_tab',
+
+  // Content panel tab switching (per-agent, Mod+Alt based)
+  FOCUS_TAB_1 = 'focus_tab_1',
+  FOCUS_TAB_2 = 'focus_tab_2',
+  FOCUS_TAB_3 = 'focus_tab_3',
+  FOCUS_TAB_4 = 'focus_tab_4',
+  FOCUS_TAB_5 = 'focus_tab_5',
+  FOCUS_TAB_6 = 'focus_tab_6',
+  FOCUS_TAB_7 = 'focus_tab_7',
+  FOCUS_TAB_8 = 'focus_tab_8',
+  FOCUS_TAB_9 = 'focus_tab_9',
+  TOGGLE_CONTENT_PANEL = 'toggle_content_panel',
 
   // Agent switching (sidebar agents — independent of browser tabs)
   NEXT_AGENT = 'next_agent',
@@ -52,7 +65,6 @@ export enum HotkeyActions {
   // History navigation
   HISTORY_BACK = 'history_back',
   HISTORY_FORWARD = 'history_forward',
-  HOME_PAGE = 'home_page',
 
   // URL bar
   FOCUS_URL_BAR = 'focus_url_bar',
@@ -88,18 +100,16 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     captureDominantly: true,
   },
   [HotkeyActions.TOGGLE_SIDEBAR]: {
-    // Matches Codex / VS Code / GitHub Desktop convention.
-    // Capture-dominant: the chat composer (TipTap) is configured as
-    // plain-text only (no bold/italic/underline marks), so there is no
-    // formatting shortcut to protect. Running in the capture phase makes
-    // Cmd/Ctrl+B reliably toggle the sidebar even when the chat input
-    // (a contentEditable element) is focused.
     accelerator: 'Mod+B',
+    captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_CHAT_FOCUS]: {
+    accelerator: 'Mod+L',
     captureDominantly: true,
   },
   [HotkeyActions.NEW_CHAT]: {
     accelerator: 'Mod+N',
-    captureDominantly: false, // Allows 'Down' navigation in lists on Windows/Linux
+    captureDominantly: false,
   },
   [HotkeyActions.DOWNLOADS]: {
     accelerator: 'Mod+J',
@@ -123,18 +133,13 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+Shift+W',
     captureDominantly: true,
   },
-  // Browser-tab navigation. Ctrl+Tab is intentionally NOT bound here —
-  // those keys drive agent switching via NEXT_AGENT / PREV_AGENT.
+  // Content-panel tab navigation (per-agent, Mod+Alt prefixes).
   [HotkeyActions.NEXT_TAB]: {
-    accelerator: 'Mod+PageDown',
-    mac: 'Mod+Alt+ArrowRight',
-    macAliases: ['Mod+PageDown'],
+    accelerator: 'Mod+Alt+PageDown',
     captureDominantly: true,
   },
   [HotkeyActions.PREV_TAB]: {
-    accelerator: 'Mod+PageUp',
-    mac: 'Mod+Alt+ArrowLeft',
-    macAliases: ['Mod+PageUp'],
+    accelerator: 'Mod+Alt+PageUp',
     captureDominantly: true,
   },
 
@@ -143,10 +148,12 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   // be intercepted reliably.
   [HotkeyActions.NEXT_AGENT]: {
     accelerator: 'Ctrl+Tab',
+    aliases: ['Mod+PageDown'],
     captureDominantly: true,
   },
   [HotkeyActions.PREV_AGENT]: {
     accelerator: 'Ctrl+Shift+Tab',
+    aliases: ['Mod+PageUp'],
     captureDominantly: true,
   },
   [HotkeyActions.FOCUS_AGENT_1]: {
@@ -186,6 +193,48 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     captureDominantly: true,
   },
 
+  // Agent-scoped tab switching (Mod+Alt+1-9).
+  [HotkeyActions.FOCUS_TAB_1]: {
+    accelerator: 'Mod+Alt+1',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_2]: {
+    accelerator: 'Mod+Alt+2',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_3]: {
+    accelerator: 'Mod+Alt+3',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_4]: {
+    accelerator: 'Mod+Alt+4',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_5]: {
+    accelerator: 'Mod+Alt+5',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_6]: {
+    accelerator: 'Mod+Alt+6',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_7]: {
+    accelerator: 'Mod+Alt+7',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_8]: {
+    accelerator: 'Mod+Alt+8',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_TAB_9]: {
+    accelerator: 'Mod+Alt+9',
+    captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_CONTENT_PANEL]: {
+    accelerator: 'Mod+Alt+B',
+    captureDominantly: true,
+  },
+
   // History navigation
   [HotkeyActions.HISTORY_BACK]: {
     accelerator: 'Alt+ArrowLeft',
@@ -199,14 +248,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     macAliases: ['Mod+BracketRight'],
     captureDominantly: false,
   },
-  [HotkeyActions.HOME_PAGE]: {
-    accelerator: 'Mod+Shift+H',
-    captureDominantly: false,
-  },
 
   // URL bar
   [HotkeyActions.FOCUS_URL_BAR]: {
-    accelerator: 'Mod+L',
+    accelerator: 'Mod+Alt+L',
     aliases: ['Alt+D', 'F6'],
     captureDominantly: true,
   },

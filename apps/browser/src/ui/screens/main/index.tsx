@@ -31,6 +31,7 @@ import {
   useContentCollapsed,
 } from './_components/content-collapsed-context';
 import { ContentToggleButton } from './_components/content-toggle-button';
+import { GlobalHotkeyBindings } from './_components/global-hotkey-bindings';
 import { AgentHotkeyBindings } from './_components/agent-hotkey-bindings';
 
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
@@ -82,6 +83,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
 
   return (
     <>
+      {show && <GlobalHotkeyBindings />}
       {show && <AgentHotkeyBindings />}
       <div
         className={cn(

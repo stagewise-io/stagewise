@@ -171,6 +171,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     (s) => s.browser.contextSelectionMode,
   );
 
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
     return selectionModeActive;
@@ -807,34 +809,42 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     deactivateChatInputForExternalFocus,
   );
 
+  // Cmd+I: toggle context element selection. Always focuses chat input,
+  // never unfocuses. Only works when a browser tab is visible.
   useHotKeyListener(
     useCallback(async () => {
-      if (!chatInputActive) {
-        // State 1: Sidebar is closed → open it and enable element selection
-        window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
-        startContextSelector();
-        await togglePanelKeyboardFocus('stagewise-ui');
-      } else if (
-        !elementSelectionActive &&
-        !activeTabUrl?.startsWith('stagewise://internal/')
-      ) {
-        // State 2: Sidebar open, element selection OFF, *not* on the start page → activate element selection
-        startContextSelector();
-        // Ensure keyboard focus is on stagewise-ui so ESC key works
-        await togglePanelKeyboardFocus('stagewise-ui');
+      if (!activeTabId) return;
+      if (elementSelectionActive) {
+        stopContextSelector();
       } else {
-        // State 3: Sidebar open AND element selection ON → close sidebar
-        window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
-        await togglePanelKeyboardFocus('tab-content');
+        startContextSelector();
+      }
+      if (!chatInputActive) {
+        setChatInputActive(true);
+        await togglePanelKeyboardFocus('stagewise-ui');
       }
     }, [
-      chatInputActive,
+      activeTabId,
       elementSelectionActive,
+      chatInputActive,
       startContextSelector,
+      stopContextSelector,
+      setChatInputActive,
       togglePanelKeyboardFocus,
-      activeTabUrl,
     ]),
     HotkeyActions.TOGGLE_CONTEXT_SELECTOR,
+  );
+
+  // Cmd+L: toggle chat input focus.
+  useHotKeyListener(
+    useCallback(() => {
+      if (chatInputActive) {
+        window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
+      } else {
+        window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+      }
+    }, [chatInputActive]),
+    HotkeyActions.TOGGLE_CHAT_FOCUS,
   );
 
   useEventListener(
