@@ -816,7 +816,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       if (!activeTabId) return;
       if (elementSelectionActive) {
         stopContextSelector();
-      } else {
+      } else if (!activeTabUrl?.startsWith('stagewise://internal/')) {
         startContextSelector();
       }
       if (!chatInputActive) {
@@ -825,6 +825,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       }
     }, [
       activeTabId,
+      activeTabUrl,
       elementSelectionActive,
       chatInputActive,
       startContextSelector,

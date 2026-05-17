@@ -170,13 +170,10 @@ export function GlobalHotkeyBindings() {
 
   useHotKeyListener(() => {
     if (!activeTabId) return;
-    void Promise.allSettled(
-      Object.keys(tabs)
-        .filter((id) => id !== activeTabId)
-        .map((id) => closeTab(id)),
-    ).then((results) => {
-      for (const r of results) {
-        if (r.status === 'fulfilled') removeTabUiState(activeTabId);
+    const ids = Object.keys(tabs).filter((id) => id !== activeTabId);
+    void Promise.allSettled(ids.map((id) => closeTab(id))).then((results) => {
+      for (let i = 0; i < results.length; i++) {
+        if (results[i]!.status === 'fulfilled') removeTabUiState(ids[i]!);
       }
     });
   }, HotkeyActions.CLOSE_WINDOW);
