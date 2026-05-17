@@ -10,6 +10,7 @@ import type { FilePickerService } from '@/services/file-picker';
 import type { KartonService } from '@/services/karton';
 import type { UserExperienceService } from '@/services/experience';
 import type { TelemetryService } from '@/services/telemetry';
+import type { GitService } from '@/services/git';
 import type { WorkspaceSnapshot } from '../../types';
 import { FULL_PERMISSIONS, type MountPermission } from '@/services/sandbox/ipc';
 import {
@@ -22,7 +23,6 @@ import {
 } from '@/agents/shared/prompts/utils/read-workspace-md';
 import { readAgentsMd } from '@/agents/shared/prompts/utils/read-agents-md';
 import { getSkills } from '@/agents/shared/prompts/utils/get-skills';
-import { isGitRepo, getGitBranch } from '@/utils/git-tools';
 import { getRipgrepBasePath } from '@/utils/paths';
 
 type AgentInstanceId = string;
@@ -54,6 +54,7 @@ export class MountManagerService extends DisposableService {
   private readonly userExperienceService: UserExperienceService;
   private readonly uiKarton: KartonService;
   private readonly telemetryService: TelemetryService;
+  private readonly gitService: GitService;
   private readonly mentionSearch: MentionSearchService;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
   private onMountsChanged?: (agentInstanceId: string) => void;
@@ -83,6 +84,7 @@ export class MountManagerService extends DisposableService {
     userExperienceService: UserExperienceService,
     uiKarton: KartonService,
     telemetryService: TelemetryService,
+    gitService: GitService,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ) {
     super();
@@ -91,6 +93,7 @@ export class MountManagerService extends DisposableService {
     this.userExperienceService = userExperienceService;
     this.uiKarton = uiKarton;
     this.telemetryService = telemetryService;
+    this.gitService = gitService;
     this.resolvedEnvPromise = resolvedEnvPromise ?? Promise.resolve(null);
 
     const searchCtx: MentionSearchContext = {
@@ -116,6 +119,7 @@ export class MountManagerService extends DisposableService {
     userExperienceService: UserExperienceService,
     uiKarton: KartonService,
     telemetryService: TelemetryService,
+    gitService: GitService,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ): Promise<MountManagerService> {
     const instance = new MountManagerService(
@@ -124,6 +128,7 @@ export class MountManagerService extends DisposableService {
       userExperienceService,
       uiKarton,
       telemetryService,
+      gitService,
       resolvedEnvPromise,
     );
     await instance.initialize();
@@ -261,15 +266,15 @@ export class MountManagerService extends DisposableService {
       readAgentsMd(clientRuntime),
       getSkills(clientRuntime),
     ]);
-    const gitRepo = isGitRepo(resolvedWorkspacePath);
-    const gitBranch = getGitBranch(resolvedWorkspacePath);
+    const git = await this.gitService.getMountedWorkspaceSummary(
+      resolvedWorkspacePath,
+    );
 
     this.uiKarton.setState((draft) => {
       draft.toolbox[agentInstanceId].workspace.mounts.push({
         prefix,
         path: resolvedWorkspacePath,
-        isGitRepo: gitRepo,
-        gitBranch,
+        git,
         skills: skills.map((s) => ({
           name: s.name,
           description: s.description,
@@ -635,14 +640,14 @@ export class MountManagerService extends DisposableService {
         description: s.description,
       }));
 
-      const gitBranch = getGitBranch(wsPath);
+      const git = await this.gitService.getMountedWorkspaceSummary(wsPath);
 
       this.uiKarton.setState((draft) => {
         for (const agentId in draft.toolbox) {
           for (const mount of draft.toolbox[agentId].workspace.mounts) {
             if (mount.path !== wsPath) continue;
             mount.skills = skillEntries;
-            mount.gitBranch = gitBranch;
+            mount.git = git;
             mount.workspaceMdContent = workspaceMdContent;
             mount.agentsMdContent = agentsMdContent;
           }

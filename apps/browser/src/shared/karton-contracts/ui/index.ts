@@ -452,11 +452,28 @@ export type LogChannelEntry = {
   tailLines: string[];
 };
 
+export type MountedWorkspaceGitStatusSummary = {
+  dirty: boolean;
+  stagedCount: number;
+  unstagedCount: number;
+  untrackedCount: number;
+};
+
+export type MountedWorkspaceGitSummary = {
+  repositoryId: string;
+  worktreeId: string;
+  repoRoot: string;
+  commonGitDir: string;
+  isWorktree: boolean;
+  branch: string | null;
+  headSha: string | null;
+  status: MountedWorkspaceGitStatusSummary | null;
+};
+
 export type MountEntry = {
   prefix: string;
   path: string;
-  isGitRepo: boolean;
-  gitBranch: string | null;
+  git: MountedWorkspaceGitSummary | null;
   skills: Array<{ name: string; description: string }>;
   /** Full file content, or `null` when the file does not exist on disk. */
   workspaceMdContent: string | null;

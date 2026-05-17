@@ -35,9 +35,9 @@ import {
   extractSlashIdsFromText,
   redactSlashIdsForTelemetry,
 } from '@/agents/shared/prompts/utils/metadata-converter/slash-items';
-import { getGitInfo } from '@/utils/git-tools';
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
+import type { GitService } from '@/services/git';
 
 function toFiniteTimestamp(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -81,6 +81,7 @@ export class AgentManagerService extends DisposableService {
   private readonly modelProviderService: ModelProviderService;
   private readonly assetCacheService?: AssetCacheService;
   private readonly processedImageCacheService?: ProcessedImageCacheService;
+  private readonly gitService: GitService;
 
   private agentPersistenceDB: AgentPersistenceDB | null = null;
   private readonly dbReadyPromise: Promise<AgentPersistenceDB | null>;
@@ -91,6 +92,7 @@ export class AgentManagerService extends DisposableService {
     toolbox: ToolboxService,
     logger: Logger,
     modelProviderService: ModelProviderService,
+    gitService: GitService,
     assetCacheService?: AssetCacheService,
     processedImageCacheService?: ProcessedImageCacheService,
   ) {
@@ -100,6 +102,7 @@ export class AgentManagerService extends DisposableService {
     this.toolbox = toolbox;
     this.logger = logger;
     this.modelProviderService = modelProviderService;
+    this.gitService = gitService;
     this.assetCacheService = assetCacheService;
     this.processedImageCacheService = processedImageCacheService;
 
@@ -567,7 +570,7 @@ export class AgentManagerService extends DisposableService {
           ? await Promise.all(
               row.mountedWorkspaces.map(async (w) => ({
                 ...w,
-                ...(await getGitInfo(w.path)),
+                git: await this.gitService.getMountedWorkspaceSummary(w.path),
               })),
             )
           : null;

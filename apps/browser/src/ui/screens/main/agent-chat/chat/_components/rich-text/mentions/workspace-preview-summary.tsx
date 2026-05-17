@@ -12,6 +12,7 @@ export function WorkspacePreviewSummary({
   name,
 }: WorkspacePreviewSummaryProps) {
   const hasSkills = mount.skills.length > 0;
+  const gitRef = mount.git?.branch ?? mount.git?.headSha?.slice(0, 7) ?? null;
 
   return (
     <div className="flex flex-col text-xs">
@@ -21,12 +22,12 @@ export function WorkspacePreviewSummary({
           <span className="truncate font-semibold text-foreground text-xs">
             {name}
           </span>
-          {mount.isGitRepo && (
+          {mount.git && (
             <>
               <IconCodeBranchOutline18 className="size-3 shrink-0 text-muted-foreground" />
-              {mount.gitBranch && (
+              {gitRef && (
                 <span className="max-w-24 truncate text-2xs text-subtle-foreground leading-normal">
-                  {mount.gitBranch}
+                  {gitRef}
                 </span>
               )}
             </>

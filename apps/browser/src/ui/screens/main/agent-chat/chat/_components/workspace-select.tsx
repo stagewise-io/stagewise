@@ -28,7 +28,12 @@ import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
-import { type MountEntry, EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import {
+  type MountEntry,
+  type MountedWorkspaceGitStatusSummary,
+  type MountedWorkspaceGitSummary,
+  EMPTY_MOUNTS,
+} from '@shared/karton-contracts/ui';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
@@ -45,6 +50,29 @@ import buildFormatter from 'react-timeago/lib/formatters/buildFormatter';
 import { Button } from '@stagewise/stage-ui/components/button';
 
 const EMPTY_SKILLS: string[] = [];
+
+function formatGitRef(git: MountedWorkspaceGitSummary): string | null {
+  return git.branch ?? git.headSha?.slice(0, 7) ?? null;
+}
+
+function formatGitStatus(
+  status: MountedWorkspaceGitStatusSummary | null,
+): string | null {
+  if (!status?.dirty) return null;
+
+  const parts = [
+    status.stagedCount > 0 ? `+${status.stagedCount}` : null,
+    status.unstagedCount > 0 ? `~${status.unstagedCount}` : null,
+    status.untrackedCount > 0 ? `?${status.untrackedCount}` : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(' ') : 'dirty';
+}
+
+function formatWorktree(git: MountedWorkspaceGitSummary): string {
+  if (!git.isWorktree) return 'main';
+  return getBaseName(git.worktreeId) || git.worktreeId;
+}
 
 const WorkspaceBadge = memo(function WorkspaceBadge({
   mount,
@@ -245,7 +273,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
         >
           <PreviewCardTrigger delay={200} closeDelay={300}>
             <span className="inline-flex items-center gap-1">
-              {mount.isGitRepo ? (
+              {mount.git ? (
                 <IconCodeBranchOutline18 className="size-3 shrink-0" />
               ) : (
                 <IconFolder5Outline18 className="size-3 shrink-0" />
@@ -472,6 +500,9 @@ function WorkspacePreviewCardContent({
 }) {
   const hasSkills = mount.skills.length > 0;
   const agentsMdDisabled = mount.agentsMdContent === null;
+  const gitRef = mount.git ? formatGitRef(mount.git) : null;
+  const gitStatus = mount.git ? formatGitStatus(mount.git.status) : null;
+  const worktree = mount.git ? formatWorktree(mount.git) : null;
 
   const [skillsViewport, setSkillsViewport] = useState<HTMLElement | null>(
     null,
@@ -493,12 +524,17 @@ function WorkspacePreviewCardContent({
           <span className="truncate font-semibold text-foreground text-xs">
             {name}
           </span>
-          {mount.isGitRepo && (
+          {mount.git && (
             <>
               <IconCodeBranchOutline18 className="size-3 shrink-0 text-muted-foreground" />
-              {mount.gitBranch && (
+              {gitRef && (
                 <span className="max-w-24 truncate text-2xs text-subtle-foreground leading-normal">
-                  {mount.gitBranch}
+                  {gitRef}
+                </span>
+              )}
+              {gitStatus && (
+                <span className="shrink-0 text-2xs text-subtle-foreground leading-normal">
+                  {gitStatus}
                 </span>
               )}
             </>
@@ -510,6 +546,12 @@ function WorkspacePreviewCardContent({
         >
           <span dir="ltr">{mount.path}</span>
         </span>
+        {worktree && (
+          <div className="flex max-w-full items-baseline gap-1 text-2xs leading-normal">
+            <span className="shrink-0 text-subtle-foreground">Worktree:</span>
+            <span className="truncate text-muted-foreground">{worktree}</span>
+          </div>
+        )}
       </div>
 
       {/* Context files section */}

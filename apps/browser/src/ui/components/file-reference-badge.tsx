@@ -31,7 +31,7 @@ function classifyPath(filePath: string): PathKind {
 interface WorkspaceData {
   name: string;
   path: string;
-  isGitRepo: boolean;
+  hasGit: boolean;
   isMounted: boolean;
 }
 
@@ -55,7 +55,7 @@ function useWorkspaceData(prefix: string): WorkspaceData | null {
       return {
         name: getBaseName(liveMount.path) || liveMount.path,
         path: liveMount.path,
-        isGitRepo: liveMount.isGitRepo,
+        hasGit: liveMount.git !== null,
         isMounted: true,
       };
     }
@@ -66,7 +66,7 @@ function useWorkspaceData(prefix: string): WorkspaceData | null {
         return {
           name: getBaseName(snapshot.path) || snapshot.path,
           path: snapshot.path,
-          isGitRepo: false,
+          hasGit: false,
           isMounted: false,
         };
       }
@@ -85,7 +85,7 @@ function resolveIcon(
   displayFileName: string | undefined,
 ): ReactNode {
   if (pathKind === 'workspace-root') {
-    return wsData?.isGitRepo ? (
+    return wsData?.hasGit ? (
       <IconCodeBranchOutline18 className="size-3 shrink-0" />
     ) : (
       <IconFolder5Outline18 className="size-3 shrink-0" />

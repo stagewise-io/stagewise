@@ -1,15 +1,7 @@
 import type { IPty } from 'node-pty';
 import type { OscParser } from './osc-parser';
 import type { SessionLogger } from './session-logger';
-
-// ─── Shell detection types (unchanged) ────────────────────────────
-
-export type ShellType = 'bash' | 'zsh' | 'sh' | 'powershell';
-
-export interface DetectedShell {
-  type: ShellType;
-  path: string;
-}
+export type { DetectedShell, ShellType } from '@/utils/shell-env';
 
 // ─── Output capping constants (unchanged) ─────────────────────────
 

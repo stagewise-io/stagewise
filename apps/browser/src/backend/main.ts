@@ -32,6 +32,9 @@ import { DevToolAPIService } from './services/dev-tool-api';
 import { OmniboxSuggestionsService } from './services/omnibox-suggestions';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { ToolboxService } from './services/toolbox';
+import type { KartonContract } from '@shared/karton-contracts/ui';
+import type { KartonService } from './services/karton';
+import { GitService } from './services/git';
 import { CredentialsService } from './services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { ModelProviderService } from './agents/model-provider';
@@ -50,6 +53,7 @@ import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
+import { detectShell, resolveShellEnv } from './utils/shell-env';
 
 export type MainParameters = {
   launchOptions: {
@@ -143,11 +147,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     preferencesService,
     telemetryService,
   );
-  const uiKarton = windowLayoutService.uiKarton;
+  const uiKarton: KartonService = windowLayoutService.uiKarton;
 
   // Push bundled plugin definitions to UI karton state
   discoverPlugins(getPluginsPath()).then((plugins) => {
-    uiKarton.setState((draft) => {
+    uiKarton.setState((draft: KartonContract['state']) => {
       draft.plugins = plugins;
     });
     if (verbose)
@@ -293,6 +297,24 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   credentialsService.setAccessTokenProvider(() => authService.accessToken);
 
+  const detectedShell = detectShell();
+  const resolvedEnvPromise: Promise<Record<string, string> | null> =
+    detectedShell
+      ? resolveShellEnv(detectedShell).catch((err) => {
+          logger.warn(
+            '[Main] Error resolving shell environment — falling back to process.env',
+            err,
+          );
+          return null;
+        })
+      : Promise.resolve(null);
+
+  const gitService = await GitService.create({
+    logger,
+    telemetryService,
+    resolvedEnvPromise,
+  });
+
   const toolboxService = await ToolboxService.create(
     logger,
     uiKarton,
@@ -303,6 +325,9 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     filePickerService,
     userExperienceService,
     credentialsService,
+    gitService,
+    detectedShell,
+    resolvedEnvPromise,
   );
 
   // Give DiffHistoryService a way to resolve workspace roots for the
@@ -385,6 +410,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     toolboxService,
     logger,
     modelProviderService,
+    gitService,
     assetCacheService,
     processedImageCacheService,
   );
@@ -487,6 +513,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
       const asyncTeardowns = Promise.all([
         runAsyncTeardown('toolboxService', () => toolboxService.teardown()),
+        runAsyncTeardown('gitService', () => gitService.teardown()),
         runAsyncTeardown('telemetryService', () => telemetryService.teardown()),
       ]);
 
