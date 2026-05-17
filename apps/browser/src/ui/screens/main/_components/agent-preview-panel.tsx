@@ -6,6 +6,7 @@ import {
 } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { getBaseName, getParentPath } from '@shared/path-utils';
+import type { MountedWorkspaceGitSummary } from '@shared/karton-contracts/ui';
 import type { StoredAgentPreview } from '@shared/karton-contracts/ui/agent';
 import { FileIcon } from '@ui/components/file-icon';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
@@ -23,8 +24,7 @@ export type PreviewData = {
   lastMessageAt: Date;
   workspaces: Array<{
     path: string;
-    isGitRepo: boolean;
-    gitBranch: string | null;
+    git: MountedWorkspaceGitSummary | null;
   }>;
   touchedFiles: string[];
 };
@@ -59,8 +59,7 @@ function shapeStoredInstance(
     lastMessageAt: stored.lastMessageAt,
     workspaces: (stored.mountedWorkspaces ?? []).map((w) => ({
       path: w.path,
-      isGitRepo: w.isGitRepo,
-      gitBranch: w.gitBranch,
+      git: w.git,
     })),
   };
 }
@@ -133,8 +132,10 @@ function workspacesEqual(
     const y = b[i]!;
     if (
       x.path !== y.path ||
-      x.isGitRepo !== y.isGitRepo ||
-      x.gitBranch !== y.gitBranch
+      x.git?.repositoryId !== y.git?.repositoryId ||
+      x.git?.worktreeId !== y.git?.worktreeId ||
+      x.git?.branch !== y.git?.branch ||
+      x.git?.headSha !== y.git?.headSha
     ) {
       return false;
     }
@@ -179,8 +180,7 @@ export const AgentPreviewPanel = memo(function AgentPreviewPanel({
         messageCount: instance.state.history.length,
         workspaces: (toolbox?.workspace?.mounts ?? []).map((m) => ({
           path: m.path,
-          isGitRepo: m.isGitRepo,
-          gitBranch: m.gitBranch,
+          git: m.git,
         })),
       };
     }, activeOverlayEqual),
@@ -348,12 +348,7 @@ function PreviewContent({ preview }: { preview: PreviewData }) {
       {preview.workspaces.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {preview.workspaces.map((w) => (
-            <WorkspacePathBadge
-              key={w.path}
-              path={w.path}
-              isGitRepo={w.isGitRepo}
-              gitBranch={w.gitBranch}
-            />
+            <WorkspacePathBadge key={w.path} path={w.path} git={w.git} />
           ))}
         </div>
       )}
@@ -401,15 +396,14 @@ function EditedFilesSection({ files }: { files: string[] }) {
 
 function WorkspacePathBadge({
   path,
-  isGitRepo,
-  gitBranch,
+  git,
 }: {
   path: string;
-  isGitRepo: boolean;
-  gitBranch: string | null;
+  git: MountedWorkspaceGitSummary | null;
 }) {
   const name = getBaseName(path) || path;
-  const tooltip = isGitRepo && gitBranch ? `${path} (${gitBranch})` : path;
+  const gitRef = git?.branch ?? git?.headSha?.slice(0, 7) ?? null;
+  const tooltip = gitRef ? `${path} (${gitRef})` : path;
   return (
     <span
       className={cn(
@@ -419,7 +413,7 @@ function WorkspacePathBadge({
       )}
       title={tooltip}
     >
-      {isGitRepo ? (
+      {git ? (
         <IconCodeBranchOutline18 className="size-3 shrink-0" />
       ) : (
         <IconFolder5Outline18 className="size-3 shrink-0" />

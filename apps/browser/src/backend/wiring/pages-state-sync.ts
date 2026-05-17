@@ -94,8 +94,7 @@ export async function wirePagesStateSync(deps: {
       return [...seen.values()].map((m) => ({
         prefix: m.prefix,
         path: m.path,
-        isGitRepo: m.isGitRepo,
-        gitBranch: m.gitBranch,
+        git: m.git,
         skills: m.skills,
         workspaceMdContent: m.workspaceMdContent,
         agentsMdContent: m.agentsMdContent,

@@ -26,7 +26,12 @@ import type {
   ModelProvider,
 } from '../ui/shared-types';
 import type { CodingPlanId } from '../../coding-plans';
-import type { ApiKeyValidationResult, AuthStatus, PlanEntry } from '../ui';
+import type {
+  ApiKeyValidationResult,
+  AuthStatus,
+  MountedWorkspaceGitSummary,
+  PlanEntry,
+} from '../ui';
 import type { FileDiff } from '../ui/shared-types';
 import { defaultUserPreferences } from '../ui/shared-types';
 import type { PluginDefinition } from '../../plugins';
@@ -34,7 +39,7 @@ import type { PluginDefinition } from '../../plugins';
 export type WorkspaceMountInfo = {
   prefix: string;
   path: string;
-  isGitRepo: boolean;
+  git: MountedWorkspaceGitSummary | null;
   skills: Array<{ name: string; description: string }>;
   /** Full file content, or `null` when the file does not exist on disk. */
   workspaceMdContent: string | null;

@@ -1,5 +1,6 @@
 import type { ToolUIPart, UIDataTypes, UIMessage } from 'ai';
 import type { ModelId } from '@shared/available-models';
+import type { MountedWorkspaceGitSummary } from '..';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import type { MountPermission, UserMessageMetadata } from './metadata';
 import type { UIAgentTools } from './tools/types';
@@ -105,7 +106,6 @@ export type StoredAgentPreview = {
   mountedWorkspaces: Array<{
     path: string;
     permissions: MountPermission[];
-    isGitRepo: boolean;
-    gitBranch: string | null;
+    git: MountedWorkspaceGitSummary | null;
   }> | null;
 };
