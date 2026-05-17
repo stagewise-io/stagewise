@@ -6,6 +6,7 @@ import {
 } from 'nucleo-ui-outline-18';
 import { useCallback, useMemo, useRef } from 'react';
 import { ToolPartUI } from './shared/tool-part-ui';
+import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
@@ -13,7 +14,10 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { cn } from '@ui/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
-import type { ExecuteShellCommandToolOutput } from '@shared/karton-contracts/ui/agent/tools/types';
+import type {
+  CreateShellSessionToolOutput,
+  ExecuteShellCommandToolOutput,
+} from '@shared/karton-contracts/ui/agent/tools/types';
 import {
   Tooltip,
   TooltipContent,
@@ -25,7 +29,10 @@ export const ExecuteShellCommandToolPart = ({
   part,
   isLastPart = false,
 }: {
-  part: Extract<AgentToolUIPart, { type: 'tool-executeShellCommand' }>;
+  part: Extract<
+    AgentToolUIPart,
+    { type: 'tool-executeShellCommand' | 'tool-createShellSession' }
+  >;
   isLastPart?: boolean;
 }) => {
   const [openAgentId] = useOpenAgent();
@@ -67,7 +74,10 @@ export const ExecuteShellCommandToolPart = ({
   if (finished && !prevFinishedRef.current) retainedOutputsRef.current = null;
   prevFinishedRef.current = finished;
 
-  const output = part.output as ExecuteShellCommandToolOutput | undefined;
+  const output = part.output as
+    | ExecuteShellCommandToolOutput
+    | CreateShellSessionToolOutput
+    | undefined;
 
   const state = useMemo(() => {
     if (part.state === 'approval-requested') return 'approval' as const;
@@ -86,13 +96,15 @@ export const ExecuteShellCommandToolPart = ({
     return 'success' as const;
   }, [part.state, pendingOutputs]);
 
-  const command = part.input?.command ?? '';
-  const explanation = part.input?.explanation ?? '';
-  const isStdin = !!part.input?.stdin && !command;
-  const isKill = !!part.input?.kill;
+  const isCreateSession = part.type === 'tool-createShellSession';
+  const command = isCreateSession ? '' : (part.input?.command ?? '');
+  const explanation = isCreateSession ? '' : (part.input?.explanation ?? '');
+  const isStdin = isCreateSession ? false : !!part.input?.stdin && !command;
+  const isKill = isCreateSession ? false : !!part.input?.kill;
 
   const effectiveOutputText = useMemo(() => {
-    if (output?.output) return output.output;
+    if (isCreateSession && output && 'message' in output) return output.message;
+    if (output && 'output' in output && output.output) return output.output;
     // Backend always ships a single-element array containing the current
     // rendered grid snapshot. The array shape is preserved for the Karton
     // contract but is effectively scalar — do not re-introduce join-based
@@ -100,7 +112,7 @@ export const ExecuteShellCommandToolPart = ({
     if (retainedOutputsRef.current?.length)
       return retainedOutputsRef.current[0] ?? null;
     return null;
-  }, [output?.output, pendingOutputs]);
+  }, [output, isCreateSession, pendingOutputs]);
 
   const { expanded, handleUserSetExpanded } = useToolAutoExpand({
     isStreaming: state === 'streaming' || state === 'approval',
@@ -118,9 +130,9 @@ export const ExecuteShellCommandToolPart = ({
   }, [openAgentId, part.state, part.approval, sendApproval]);
 
   const sessionId =
-    (part.output as ExecuteShellCommandToolOutput | undefined)?.session_id ??
+    output?.session_id ??
     pendingSessionId ??
-    part.input?.session_id;
+    (isCreateSession ? undefined : part.input?.session_id);
 
   const handleCancel = useCallback(() => {
     if (!openAgentId || !sessionId) return;
@@ -189,6 +201,36 @@ export const ExecuteShellCommandToolPart = ({
       : undefined,
   );
 
+  // Minimal display for create / kill — like copy/move UI
+  if (isCreateSession || isKill) {
+    const streamingText = isCreateSession
+      ? 'Opening new terminal…'
+      : 'Closing terminal…';
+    const finishedText = isCreateSession
+      ? 'Opened new terminal'
+      : 'Closed terminal';
+
+    return (
+      <ToolPartUINotCollapsible
+        icon={<IconTerminalOutline18 className="size-3" />}
+        part={part}
+        minimal
+        disableShimmer={isKill}
+        streamingText={streamingText}
+        finishedText={
+          <span className="flex min-w-0 gap-1">
+            <span className="shrink-0 font-medium">{finishedText}</span>
+            {isCreateSession && sessionId && (
+              <span className="truncate font-normal opacity-75">
+                {sessionId}
+              </span>
+            )}
+          </span>
+        }
+      />
+    );
+  }
+
   const trigger = useMemo(() => {
     if (state === 'approval' || state === 'approval-responded') {
       return (
@@ -237,11 +279,7 @@ export const ExecuteShellCommandToolPart = ({
             <TruncatedCommandText
               text={
                 explanation ||
-                (isStdin
-                  ? 'Sending input'
-                  : isKill
-                    ? 'Killing session'
-                    : `Running ${command}`) ||
+                (isStdin ? 'Sending input' : `Running ${command}`) ||
                 '...'
               }
               className="shimmer-text-primary"
@@ -263,23 +301,17 @@ export const ExecuteShellCommandToolPart = ({
       );
     }
 
-    const exitCode = output?.exit_code;
-    const timedOut = output?.timed_out;
-    const sessionExited = output?.session_exited;
+    const exitCode = output && 'exit_code' in output ? output.exit_code : null;
+    const timedOut = output && 'timed_out' in output ? output.timed_out : false;
+    const sessionExited =
+      output && 'session_exited' in output ? output.session_exited : false;
 
     if (!timedOut) {
       return (
         <div className="pointer-events-none flex min-w-0 flex-1 flex-row items-center justify-start gap-1">
           <IconTerminalOutline18 className="size-3 shrink-0" />
           <TruncatedCommandText
-            text={
-              explanation ||
-              (isStdin
-                ? 'Sent input'
-                : isKill
-                  ? 'Killed session'
-                  : 'Ran command')
-            }
+            text={explanation || (isStdin ? 'Sent input' : 'Ran command')}
             className="text-xs"
           />
           {exitCode !== 0 && exitCode != null && (
@@ -298,7 +330,6 @@ export const ExecuteShellCommandToolPart = ({
     else if (exitCode !== null && exitCode !== undefined)
       statusLabel = `exit ${exitCode}`;
     else statusLabel = 'killed';
-    // TODO: Make 'approve' and 'run', etc. have the same content height!!! (SO there are no jumps when approving and streaming starts)
 
     return (
       <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
@@ -310,14 +341,7 @@ export const ExecuteShellCommandToolPart = ({
         </span>
       </div>
     );
-  }, [
-    state,
-    explanation,
-    part.errorText,
-    output?.exit_code,
-    output?.timed_out,
-    output?.session_exited,
-  ]);
+  }, [state, explanation, part.errorText, isStdin, command, sessionId, output]);
 
   const content = useMemo(() => {
     if (state === 'error') return undefined;
@@ -342,12 +366,6 @@ export const ExecuteShellCommandToolPart = ({
               <span className="select-none text-subtle-foreground">→ </span>
               <HumanizedStdin value={part.input?.stdin ?? ''} />
             </>
-          ) : isKill ? (
-            <>
-              <span className="select-none text-subtle-foreground">⊘ </span>
-              Kill session
-              {part.input?.session_id ? ` ${part.input.session_id}` : ''}
-            </>
           ) : (
             <>
               <span className="select-none text-subtle-foreground">$ </span>
@@ -362,15 +380,7 @@ export const ExecuteShellCommandToolPart = ({
         )}
       </div>
     );
-  }, [
-    state,
-    effectiveOutputText,
-    command,
-    isStdin,
-    isKill,
-    part.input?.stdin,
-    part.input?.session_id,
-  ]);
+  }, [state, effectiveOutputText, command, isStdin, part.input?.stdin]);
 
   const contentFooter = useMemo(() => {
     if (

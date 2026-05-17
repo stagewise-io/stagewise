@@ -143,6 +143,11 @@ const serializeToolPart = (
     case 'tool-delete':
       return `[deleted: ${part.input.path}${err ?? ''}]`;
 
+    case 'tool-createShellSession': {
+      const sid = part.output?.session_id ?? '?';
+      return `[shell: new session ${sid} in ${part.input.cwd ?? ''}]`;
+    }
+
     case 'tool-executeShellCommand': {
       const label = String(
         part.input.explanation ?? part.input.command ?? '',

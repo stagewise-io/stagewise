@@ -324,7 +324,10 @@ export class SessionManager {
       );
     }
 
-    const sessionId = randomUUID().slice(0, 8);
+    let sessionId: string;
+    do {
+      sessionId = randomUUID().slice(0, 4);
+    } while (this.sessions.has(sessionId));
 
     const spawnArgs = this.getSpawnArgs();
     const ptyProcess = pty.spawn(this.shell.path, spawnArgs, {

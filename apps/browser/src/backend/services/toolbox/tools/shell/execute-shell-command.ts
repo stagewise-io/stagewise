@@ -1,10 +1,17 @@
 import {
+  type CreateShellSessionToolInput,
+  createShellSessionToolInputSchema,
   type ExecuteShellCommandToolInput,
+  type ExecuteShellCommandToolOutput,
   executeShellCommandToolInputSchema,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import { tool } from 'ai';
 import { capToolOutput } from '../../utils';
 import type { ShellService } from '@/services/toolbox/services/shell';
+import type {
+  SessionCommandRequest,
+  SessionCommandResult,
+} from '@/services/toolbox/services/shell/types';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { TelemetryService } from '@/services/telemetry';
 import { homedir } from 'node:os';
@@ -14,6 +21,33 @@ import { classifyShellCommand } from './smart-approval';
 
 /** Max lines of recent shell output fed to the smart-approval classifier. */
 const SMART_APPROVAL_TAIL_LINES = 30;
+
+function mapWaitUntil(
+  wu: ExecuteShellCommandToolInput['wait_until'],
+): SessionCommandRequest['waitUntil'] {
+  if (!wu) return undefined;
+  return {
+    timeoutMs: wu.timeout_ms,
+    exited: wu.exited,
+    outputPattern: wu.output_pattern,
+    idleMs: wu.idle_ms,
+  };
+}
+
+function buildResult(
+  result: SessionCommandResult,
+): ExecuteShellCommandToolOutput {
+  const capped = capToolOutput(result.output);
+  return {
+    session_id: result.sessionId,
+    output: capped.result,
+    recent_output: pickRecentOutput(capped.result, result.recentOutput),
+    exit_code: result.exitCode,
+    session_exited: result.sessionExited,
+    timed_out: result.timedOut,
+    resolved_by: result.resolvedBy,
+  };
+}
 
 /**
  * Dependencies the shell tool needs to run the smart-approval classifier
@@ -31,51 +65,64 @@ export interface SmartApprovalDeps {
   recordPendingApproval: (toolCallId: string, explanation: string) => void;
 }
 
-export const DESCRIPTION = `Execute a shell command in the user's system shell. Initial \`cwd\` MUST be a mount prefix from the environment snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".
+export const CREATE_SHELL_SESSION_DESCRIPTION = `Create new persistent shell (PTY) session on user machine.
 
-## Required parameters on every call
+## When to create
 
-- \`explanation\` — always required. Include it on first calls, polls, stdin, and kill. Omitting it causes a schema error.
+Sessions stateful — vars, cwd, running processes persist across commands. Only create new session when need multiple independent terminal states:
+
+- Long-running process (dev server, watcher) occupies one session, need run other commands.
+- Set env vars in one session that later commands depend on, while doing unrelated work.
+- Working in two different directories simultaneously.
+
+Do NOT create new session just because existing one in different directory — use \`cd\` in existing idle session instead.
+
+Active sessions listed in \`<shell-sessions>\` in env-snapshot — check first. Creating session expensive (shell init delay).
+
+## Parameters
+
+- \`cwd\` (string, required) — initial working directory as mount prefix from env-snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".`;
+
+export const EXECUTE_SHELL_COMMAND_DESCRIPTION = `Send input to existing persistent shell session. Session MUST already exist — use \`createShellSession\` first if no \`session_id\`.
 
 ## Snapshot model
 
-Returns within ~15s. Does NOT block until the command finishes — the returned \`output\` is whatever was produced so far. The full session log is persisted to \`shells/<session_id>.shell.log\` and can be re-read with the \`read\` tool.
+Returns within ~15s. Does NOT block until command finishes — returned \`output\` is whatever produced so far. Full session log persisted to \`shells/<session_id>.shell.log\`, re-readable with \`read\` tool.
 
 ## resolved_by values
 
-- \`exit\` — command finished cleanly. \`exit_code\` is set.
+- \`exit\` — command finished. \`exit_code\` set.
 - \`pattern\` — \`wait_until.output_pattern\` matched. Still running.
-- \`idle\` — no output for the idle window (default 5000ms). Usually waiting for input.
+- \`idle\` — no output for idle window (default 5000ms). Usually waiting for input.
 - \`timeout\` — hard timeout. Still running.
 - \`abort\` — user cancelled.
-- \`session_exited\` — shell itself died.
+- \`session_exited\` — shell died.
 
 ## Follow-up pattern
 
-When \`resolved_by\` is \`idle\`, \`pattern\`, or \`timeout\`, the command is still running. Use the same \`session_id\` to:
+When \`resolved_by\` is \`idle\`, \`pattern\`, or \`timeout\`, command still running. Use same \`session_id\` to:
 
-- Send stdin to answer prompts: \`{ explanation, session_id, stdin: "y\\r" }\`. \`command\` is NOT required here.
-- Poll for more output: \`{ explanation, session_id, command: "" }\`.
-- Kill the session: \`{ explanation, session_id, kill: true }\`.
+- Send stdin to answer prompts: \`{ explanation, session_id, stdin: "y\\r" }\`. \`command\` NOT required here.
+- Poll output: \`{ explanation, session_id, command: "" }\`.
+- Kill session: \`{ explanation, session_id, kill: true }\`.
 
-\`explanation\` stays required in every follow-up shape.
+\`explanation\` required on every follow-up.
 
-## Parameter guidance (read before setting wait_until)
+## Parameter guidance
 
-Defaults are correct for installs, builds, git, tests, and interactive prompts — idle detection is how interactive prompts are detected. Only set \`wait_until\` when you have a specific reason.
+Defaults right for installs, builds, git, tests, interactive prompts — idle detection catches prompts. Only set \`wait_until\` when specific reason.
 
-- Do NOT set \`wait_until.idle_ms: 0\` defensively. It disables the mechanism that catches stuck/interactive commands. Only use it for commands with proven long silent phases *during active work* (e.g. a dev server that pauses between startup log lines).
-- Do NOT raise \`wait_until.timeout_ms\` above 30000 unless the command genuinely needs it. Longer timeouts do not make commands finish sooner; follow-up calls are cheap.
-- \`wait_until: { exited: true }\` alone is complete — it doesn't need to be combined with other overrides.
+- Do NOT set \`wait_until.idle_ms: 0\` — disables stuck/interactive detection. Only for commands with proven long silent phases *during active work* (e.g. dev server pauses between log lines).
+- Do NOT raise \`wait_until.timeout_ms\` above 30000 unless command genuinely needs it. Longer timeouts do not make commands finish sooner; follow-up calls cheap.
+- \`wait_until: { exited: true }\` complete alone — no need to combine with other overrides.
 
 ## Schema summary
 
-- \`explanation\` (string, required) — short human-readable summary.
-- \`command\` (string) — required on first call and on polls; omit when sending \`stdin\` or \`kill\`.
-- \`cwd\` (string, mount prefix) — only used on new sessions.
-- \`session_id\` (string) — reuse an existing session. Omit to create one.
-- \`stdin\` (string) — raw bytes to write to the PTY. Mutually exclusive with \`command\` and \`kill\`. Requires \`session_id\`. Common: "\\x03" (Ctrl+C), "\\x1b[A" (Up), "\\r" (Enter), "y\\r" (type y + Enter).
-- \`kill: true\` — hard-kill the session. Requires \`session_id\`. Mutually exclusive with \`command\` and \`stdin\`.
+- \`explanation\` (string, required) — short summary.
+- \`session_id\` (string, required) — from \`createShellSession\`. Never omit.
+- \`command\` (string) — required on first call and polls; omit for \`stdin\` or \`kill\`.
+- \`stdin\` (string) — raw bytes to PTY. Mutually exclusive with \`command\` and \`kill\`. Common: "\\x03" (Ctrl+C), "\\x1b[A" (Up), "\\r" (Enter), "y\\r" (type y + Enter).
+- \`kill: true\` — hard-kill session. Mutually exclusive with \`command\` and \`stdin\`.
 - \`wait_until\` (object, optional) — \`{ timeout_ms?, idle_ms?, output_pattern?, exited? }\`.`;
 
 /**
@@ -162,15 +209,39 @@ function resolveCwd(
   return homedir();
 }
 
-export const executeShellCommand = (
+export const createShellSession = (
   shellService: ShellService,
   agentInstanceId: string,
   getMountedPaths: MountedPathsGetter,
+) => {
+  return tool({
+    description: CREATE_SHELL_SESSION_DESCRIPTION,
+    inputSchema: createShellSessionToolInputSchema,
+    strict: false,
+    needsApproval: async () => false,
+    execute: async (params: CreateShellSessionToolInput, { toolCallId }) => {
+      const cwd = resolveCwd(params.cwd, getMountedPaths);
+      const sessionId = shellService.createSession(
+        agentInstanceId,
+        toolCallId,
+        cwd,
+      );
+      return {
+        session_id: sessionId,
+        message: `Session ${sessionId} created in ${params.cwd}.`,
+      };
+    },
+  });
+};
+
+export const executeShellCommand = (
+  shellService: ShellService,
+  agentInstanceId: string,
   getToolApprovalMode: () => ToolApprovalMode,
   smartApproval: SmartApprovalDeps,
 ) => {
   return tool({
-    description: DESCRIPTION,
+    description: EXECUTE_SHELL_COMMAND_DESCRIPTION,
     inputSchema: executeShellCommandToolInputSchema,
     strict: false,
     needsApproval: async (
@@ -180,11 +251,6 @@ export const executeShellCommand = (
       const mode = getToolApprovalMode();
       if (mode === 'alwaysAllow') return false;
       if (mode === 'alwaysAsk') return true;
-
-      // 'smart' mode — classify the call before deciding. We deliberately
-      // do NOT resolve the absolute cwd here: the classifier runs on a
-      // remote LLM and the short mount prefix (e.g. `w1e07/apps/browser`)
-      // is both sufficient for classification and privacy-preserving.
 
       // Short-circuit read-only session operations. `kill` terminates a
       // shell session we ourselves spawned, and an empty-command poll on
@@ -209,7 +275,7 @@ export const executeShellCommand = (
       const result = await classifyShellCommand(
         {
           command: classifierCommand,
-          cwdPrefix: input.cwd ?? '',
+          cwdPrefix: '',
           agentExplanation: input.explanation ?? '',
           shellTail,
         },
@@ -228,15 +294,11 @@ export const executeShellCommand = (
       { toolCallId, abortSignal },
     ) => {
       try {
-        // Early-return branches below (stdin/kill validation errors) omit
-        // `recent_output` deliberately: those responses are synthetic
-        // tool-layer strings, not captured session output, so there is
-        // nothing meaningful to attach.
         // Stdin mode — write raw bytes, capture output
         if (params.stdin !== undefined) {
           if (params.command || params.kill) {
             return {
-              session_id: params.session_id ?? null,
+              session_id: params.session_id,
               output: 'stdin is mutually exclusive with command and kill.',
               exit_code: null,
               session_exited: false,
@@ -244,61 +306,23 @@ export const executeShellCommand = (
               resolved_by: 'abort' as const,
             };
           }
-          if (!params.session_id) {
-            return {
-              session_id: null,
-              output: 'stdin requires a session_id.',
-              exit_code: null,
-              session_exited: false,
-              timed_out: false,
-              resolved_by: 'abort' as const,
-            };
-          }
-          const cwd = resolveCwd(params.cwd, getMountedPaths);
           const expandedStdin = expandCEscapes(params.stdin);
           const result = await shellService.executeInSession(
             agentInstanceId,
             toolCallId,
             {
               command: expandedStdin,
-              cwd,
               sessionId: params.session_id,
               rawInput: true,
-              waitUntil: params.wait_until
-                ? {
-                    timeoutMs: params.wait_until.timeout_ms,
-                    exited: params.wait_until.exited,
-                    outputPattern: params.wait_until.output_pattern,
-                    idleMs: params.wait_until.idle_ms,
-                  }
-                : undefined,
+              waitUntil: mapWaitUntil(params.wait_until),
               abortSignal,
             },
           );
-          const capped = capToolOutput(result.output);
-          return {
-            session_id: result.sessionId,
-            output: capped.result,
-            recent_output: pickRecentOutput(capped.result, result.recentOutput),
-            exit_code: result.exitCode,
-            session_exited: result.sessionExited,
-            timed_out: result.timedOut,
-            resolved_by: result.resolvedBy,
-          };
+          return buildResult(result);
         }
 
         // Kill mode — terminate session immediately
-        if (params.kill && !params.session_id) {
-          return {
-            session_id: null,
-            output: 'kill requires a session_id.',
-            exit_code: null,
-            session_exited: false,
-            timed_out: false,
-            resolved_by: 'abort' as const,
-          };
-        }
-        if (params.kill && params.session_id) {
+        if (params.kill) {
           const killed = shellService.killSession(params.session_id);
           return {
             session_id: params.session_id,
@@ -312,36 +336,17 @@ export const executeShellCommand = (
           };
         }
 
-        const cwd = resolveCwd(params.cwd, getMountedPaths);
         const result = await shellService.executeInSession(
           agentInstanceId,
           toolCallId,
           {
             command: params.command ?? '',
-            cwd,
             sessionId: params.session_id,
-            waitUntil: params.wait_until
-              ? {
-                  timeoutMs: params.wait_until.timeout_ms,
-                  exited: params.wait_until.exited,
-                  outputPattern: params.wait_until.output_pattern,
-                  idleMs: params.wait_until.idle_ms,
-                }
-              : undefined,
+            waitUntil: mapWaitUntil(params.wait_until),
             abortSignal,
           },
         );
-
-        const capped = capToolOutput(result.output);
-        return {
-          session_id: result.sessionId,
-          output: capped.result,
-          recent_output: pickRecentOutput(capped.result, result.recentOutput),
-          exit_code: result.exitCode,
-          session_exited: result.sessionExited,
-          timed_out: result.timedOut,
-          resolved_by: result.resolvedBy,
-        };
+        return buildResult(result);
       } finally {
         shellService.clearPendingOutputs(agentInstanceId, toolCallId);
       }

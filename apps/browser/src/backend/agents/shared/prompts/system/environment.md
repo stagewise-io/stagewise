@@ -146,18 +146,21 @@ return `Saved as ${fileName}`;
 
 **Read the `javascript-sandbox` plugin** for CDP domain rules, credential details, runtime/module lists, and advanced patterns.
 
-### 2. Shell (`executeShellCommand`)
+### 2. Shell (`createShellSession` + `executeShellCommand`)
 
-Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session.
+Two tools: one to create persistent PTY sessions, one to send input to them.
 
-**Snapshot model.** The tool usually returns quickly with whatever the command produced so far. The full session output is persisted to `shells/<session_id>.shell.log` and can be re-read any time. Self-exiting long commands can opt into a longer wait with `wait_until: { exited: true }`.
+**`createShellSession`** — create a new persistent shell session. Sessions are stateful (variables, cwd, running processes persist). Only create a new session when you need multiple independent terminal states — e.g. a dev server occupying one session while you run other commands, env vars set in one session that later commands depend on, or working across two different directories simultaneously. Active sessions are listed in `<shell-sessions>` in the env-snapshot — check there first. Creating a session is expensive (shell init delay).
+
+**`executeShellCommand`** — send input to an existing session. `session_id` is always required. Get one from `createShellSession`. State (variables, cwd, aliases) persists across commands in a session.
+
+**Snapshot model.** The tool usually returns quickly with whatever the command produced so far. The full session output is persisted to `shells/<session_id>.shell.log` and can be re-read with the `read` tool.
 
 **Choose the smallest wait mode that fits.** For quick commands, omit `wait_until` (10 s hard cap, 5 s idle after first output). For long self-exiting commands — installs, builds, typechecks, tests, git operations expected to finish — use bare `wait_until: { exited: true }` (5 min hard cap, 15 s idle after first output). For dev servers, use `output_pattern` for the ready signal.
 
 **Common mistake:** Do NOT set `idle_ms: 0` defensively "to prevent premature exit." Idle detection is your primary signal that a command is waiting for input or has gone quiet after producing useful output. Disabling it turns interactive CLIs into long hangs. The same applies to raising `timeout_ms` casually — longer waits do not make commands finish faster; they just block you.
 
-- **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
-- **Reuse sessions.** Creating a session is expensive (shell init delay). Reuse an existing session (`session_id`) whenever one is available — active sessions are listed in `<shell-sessions>` in the env-snapshot. Only create a new session when no suitable one exists or when you need parallel execution (e.g. long-running dev server in one session, short commands in another).
+- **Reuse sessions.** Reuse an existing session (`session_id`) whenever one is available — active sessions are listed in `<shell-sessions>` in the env-snapshot. Only create a new session when no suitable one exists or when you need parallel execution (e.g. long-running dev server in one session, short commands in another).
 - **`command`:** Writes text + Enter to the shell.
 - **`wait_until`:** Optional; controls when the tool returns.
   - `timeout_ms` — hard cap. Normal `wait_until` max is 60 s (default 15 s). With `exited: true`, max/default is 5 min. Without `wait_until`, default is 10 s. **Leave at default unless you know the command needs a different cap.**
@@ -187,17 +190,17 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 - OS/shell type in env snapshot. Prefer native tools for file ops; shell for dev scripts, git, installs.
 
 ```jsonc
-// `explanation` is required on every call — keep it to ≤5 words.
+// Create a session first, then send commands to it.
+// Sessions are created with cwd (mount prefix).
+{ "explanation": "Create shell session", "cwd": "w1" }
 // Quick command — no wait_until needed.
-{ "explanation": "Check git status", "command": "git status", "cwd": "w1" }
+{ "explanation": "Check git status", "command": "git status", "session_id": "abc123" }
 // Long self-exiting command — allow up to 5 min, return earlier on exit or 15s idle.
-{ "explanation": "Run typecheck", "command": "pnpm typecheck", "cwd": "w1", "wait_until": { "exited": true } }
+{ "explanation": "Run typecheck", "command": "pnpm typecheck", "session_id": "abc123", "wait_until": { "exited": true } }
 // Interactive CLI — defaults work. Idle fires at ~5s when the prompt appears.
 // resolved_by will be 'idle'; send stdin to answer.
-{ "explanation": "Scaffold Next.js app", "command": "npx create-next-app test", "cwd": "w1" }
+{ "explanation": "Scaffold Next.js app", "command": "npx create-next-app test", "session_id": "abc123" }
 { "explanation": "Send Enter key", "session_id": "abc123", "stdin": "\r" }
-// Reuse an existing idle session for a quick command.
-{ "explanation": "Check health endpoint", "session_id": "f8a3b1c2", "command": "curl localhost:3000/health" }
 // Poll an already-running command for more output without sending input.
 // Keep polls short; do not set a 60s timeout.
 { "explanation": "Poll running command", "session_id": "abc123", "command": "" }
@@ -206,7 +209,7 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 // Edge case: dev server with genuinely long silent startup phases.
 // output_pattern is the correctness signal; idle_ms=0 because the server
 // legitimately pauses between log lines during startup.
-{ "explanation": "Start dev server", "command": "pnpm dev", "cwd": "w1", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000, "idle_ms": 0 } }
+{ "explanation": "Start dev server", "command": "pnpm dev", "session_id": "abc123", "wait_until": { "output_pattern": "ready|listening", "timeout_ms": 30000, "idle_ms": 0 } }
 ```
 
 ### 3. Browser Access (CDP)

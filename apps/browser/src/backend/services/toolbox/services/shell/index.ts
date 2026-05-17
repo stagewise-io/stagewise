@@ -138,6 +138,69 @@ export class ShellService extends DisposableService {
   }
 
   /**
+   * Create a new PTY session without executing any command.
+   * Returns immediately with the session ID — does not wait for shell init.
+   */
+  createSession(
+    agentInstanceId: string,
+    toolCallId: string,
+    cwd: string,
+  ): string {
+    this.assertNotDisposed();
+
+    if (!this.shell || !this.sessionManager) {
+      throw new Error('Shell service is not available — no shell detected.');
+    }
+
+    const env = sanitizeEnv(this.resolvedEnv, this.shell.type);
+    const sessionId = this.sessionManager.createSession(
+      agentInstanceId,
+      cwd,
+      env,
+      () => {},
+    );
+
+    // Wire streaming callback
+    this.sessionManager.setOnData(sessionId, (_sid: string, _chunk: string) => {
+      if (!this.kartonService) return;
+      const entry = this.outputBuffers.get(toolCallId);
+      if (entry) {
+        entry.dirty = true;
+      } else {
+        this.outputBuffers.set(toolCallId, {
+          sessionId,
+          dirty: true,
+        });
+      }
+      this.scheduleFlush(agentInstanceId, toolCallId);
+      this.scheduleShellManifestPush(agentInstanceId);
+    });
+
+    this.pushShellsToKarton(agentInstanceId);
+
+    // Publish session ID to Karton state
+    if (this.kartonService) {
+      this.kartonService.setState((draft) => {
+        if (!draft.toolbox[agentInstanceId]) {
+          draft.toolbox[agentInstanceId] = {
+            workspace: { mounts: [] },
+            pendingFileDiffs: [],
+            editSummary: [],
+            pendingUserQuestion: null,
+          };
+        }
+        if (!draft.toolbox[agentInstanceId].pendingShellSessionIds) {
+          draft.toolbox[agentInstanceId].pendingShellSessionIds = {};
+        }
+        draft.toolbox[agentInstanceId].pendingShellSessionIds![toolCallId] =
+          sessionId;
+      });
+    }
+
+    return sessionId;
+  }
+
+  /**
    * Execute a command in a persistent PTY session.
    *
    * If `request.sessionId` is provided, the command runs in that existing session.
@@ -146,7 +209,7 @@ export class ShellService extends DisposableService {
   async executeInSession(
     agentInstanceId: string,
     toolCallId: string,
-    request: SessionCommandRequest & { cwd: string },
+    request: SessionCommandRequest,
   ): Promise<SessionCommandResult> {
     this.assertNotDisposed();
 
@@ -191,7 +254,7 @@ export class ShellService extends DisposableService {
         // after so we can close over the sessionId for snapshot reads.
         sessionId = this.sessionManager.createSession(
           agentInstanceId,
-          request.cwd,
+          request.cwd ?? '',
           env,
           () => {},
         );
