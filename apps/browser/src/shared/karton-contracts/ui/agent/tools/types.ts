@@ -716,6 +716,39 @@ export const copyToolSchema = {
   outputSchema: copyToolOutputSchema,
 } as const;
 
+// ============================================================================
+// Create Shell Session Tool
+// ============================================================================
+
+export const createShellSessionToolInputSchema = z.object({
+  cwd: z
+    .string()
+    .describe(
+      'Mount prefix for the initial working directory. Must be a mount prefix from the environment snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".',
+    ),
+});
+
+export const createShellSessionToolOutputSchema = z.object({
+  session_id: z.string(),
+  message: z.string(),
+});
+
+export type CreateShellSessionToolInput = z.infer<
+  typeof createShellSessionToolInputSchema
+>;
+export type CreateShellSessionToolOutput = z.infer<
+  typeof createShellSessionToolOutputSchema
+>;
+
+export const createShellSessionToolSchema = {
+  inputSchema: createShellSessionToolInputSchema,
+  outputSchema: createShellSessionToolOutputSchema,
+} as const;
+
+// ============================================================================
+// Execute Shell Command Tool (session input)
+// ============================================================================
+
 export const executeShellCommandToolInputSchema = z.object({
   explanation: z
     .string()
@@ -726,14 +759,11 @@ export const executeShellCommandToolInputSchema = z.object({
     .string()
     .optional()
     .describe('The command to run. Required unless kill is true.'),
-  cwd: z
-    .string()
-    .optional()
-    .describe('Mount prefix for cwd. Only used when creating a new session.'),
   session_id: z
     .string()
-    .optional()
-    .describe('Session ID to reuse. Omit to create a new session.'),
+    .describe(
+      'Session ID returned by createShellSession. Required — use createShellSession first if no session exists yet.',
+    ),
   stdin: z
     .string()
     .optional()
@@ -858,6 +888,7 @@ export const allToolSchemas = {
   listLibraryDocs: listLibraryDocsToolSchema,
   searchInLibraryDocs: searchInLibraryDocsToolSchema,
   askUserQuestions: askUserQuestionsToolSchema,
+  createShellSession: createShellSessionToolSchema,
   executeShellCommand: executeShellCommandToolSchema,
 } as const;
 /**

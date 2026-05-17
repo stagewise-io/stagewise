@@ -74,7 +74,10 @@ import {
 import { mkdir as mkdirTool } from './tools/file-modification/mkdir';
 import { grepSearch as grepSearchTool } from './tools/file-modification/grep-search';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
-import { executeShellCommand as executeShellCommandTool } from './tools/shell/execute-shell-command';
+import {
+  executeShellCommand as executeShellCommandTool,
+  createShellSession as createShellSessionTool,
+} from './tools/shell/execute-shell-command';
 import { readConsoleLogs as readConsoleLogsTool } from './tools/browser/read-console-logs';
 import {
   askUserQuestions as askUserQuestionsTool,
@@ -1040,6 +1043,12 @@ export class ToolboxService extends DisposableService {
         return readConsoleLogsTool(this.windowLayoutService, agentInstanceId);
       case 'askUserQuestions':
         return askUserQuestionsTool(this.uiKarton, agentInstanceId);
+      case 'createShellSession': {
+        if (!this.shellService?.isAvailable()) return null;
+        return createShellSessionTool(this.shellService, agentInstanceId, () =>
+          this.getMountedPathsForAgent(agentInstanceId),
+        );
+      }
       case 'executeShellCommand': {
         if (!this.shellService?.isAvailable()) return null;
         const smartApproval: SmartApprovalDeps = {
@@ -1075,7 +1084,6 @@ export class ToolboxService extends DisposableService {
         return executeShellCommandTool(
           this.shellService,
           agentInstanceId,
-          () => this.getMountedPathsForAgent(agentInstanceId),
           getToolApprovalMode,
           smartApproval,
         );

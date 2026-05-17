@@ -178,6 +178,7 @@ const SinglePartRenderer = memo(
         return <WriteToolPart key={stableKey} part={part} />;
       case 'tool-askUserQuestions':
         return <AskUserQuestionsToolPart key={stableKey} part={part} />;
+      case 'tool-createShellSession':
       case 'tool-executeShellCommand':
         return (
           <ExecuteShellCommandToolPart

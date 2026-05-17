@@ -82,6 +82,7 @@ export class ChatAgent extends BaseAgent<never, undefined> {
       grepSearch: await box.getTool('grepSearch', id),
       readConsoleLogs: await box.getTool('readConsoleLogs', id),
       askUserQuestions: await box.getTool('askUserQuestions', id),
+      createShellSession: await box.getTool('createShellSession', id),
       executeShellCommand: await box.getTool('executeShellCommand', id),
       // IMPORTANT: The type for this tool is defined in @apps/browser/src/shared/karton-contracts/ui/agent/tools/types.ts - update the type when you change this input schema.
       updateWorkspaceMd: this.getSpawnChildAgentTool(
