@@ -260,13 +260,11 @@ function BarOverlayContent({
   item: SortableTabItem;
   isActive: boolean;
 }) {
-  const showClose = item.closeable !== false && !!item.onClose;
-
   return (
-    <div className="relative flex h-7 flex-row items-stretch bg-surface-1 shadow-elevation-1">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-0.5 text-xs">
+    <div className="relative flex h-7 flex-row items-stretch rounded-md bg-surface-1 shadow-elevation-1">
+      <div className="flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent py-0.5 pr-3 pl-2 text-xs">
         {item.icon && (
-          <span className="size-6 shrink-0 [&>*]:size-full">{item.icon}</span>
+          <span className="size-4 shrink-0 [&>*]:size-full">{item.icon}</span>
         )}
         <span
           className={cn(
@@ -277,11 +275,6 @@ function BarOverlayContent({
           {item.label}
         </span>
       </div>
-      {showClose && (
-        <div className="absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground">
-          <XIcon className="size-3" />
-        </div>
-      )}
     </div>
   );
 }
@@ -466,7 +459,7 @@ export const SortableTabsList = ({
       <DragOverlay>
         {activeItem ? (
           variant === 'bar' ? (
-            <div style={{ width: '8rem', minWidth: '5rem', maxWidth: '8rem' }}>
+            <div style={{ minWidth: '5rem', maxWidth: '11rem' }}>
               <BarOverlayContent
                 item={activeItem}
                 isActive={activeValue === activeItem.id}

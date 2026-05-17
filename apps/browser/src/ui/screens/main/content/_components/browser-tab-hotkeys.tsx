@@ -1,0 +1,142 @@
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import { HotkeyActions } from '@shared/hotkeys';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
+import { produceWithPatches, enablePatches } from 'immer';
+
+enablePatches();
+
+/**
+ * Browser-tab–scoped hotkeys — mounted per content panel. Handles
+ * per-tab web actions: history navigation, page reload, find, dev tools,
+ * zoom, downloads, and URL bar focus.
+ */
+export function BrowserTabHotkeys({
+  onFocusUrlBar,
+  onFocusSearchBar,
+}: {
+  onFocusUrlBar: () => void;
+  onFocusSearchBar: () => void;
+}) {
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const { tabUiState } = useTabUIState();
+  const focusedPanel = activeTabId
+    ? (tabUiState[activeTabId]?.focusedPanel ?? 'stagewise-ui')
+    : 'stagewise-ui';
+
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
+  const goBack = useKartonProcedure((p) => p.browser.goBack);
+  const goForward = useKartonProcedure((p) => p.browser.goForward);
+  const reload = useKartonProcedure((p) => p.browser.reload);
+  const goto = useKartonProcedure((p) => p.browser.goto);
+  const toggleDevTools = useKartonProcedure((p) => p.browser.devTools.toggle);
+  const setZoomPercentage = useKartonProcedure(
+    (p) => p.browser.setZoomPercentage,
+  );
+
+  const preferences = useKartonState((s) => s.preferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const uiZoomPercentage = useKartonState(
+    (s) => s.preferences.general.uiZoomPercentage,
+  );
+
+  const currentZoomPercentage = useKartonState((s) =>
+    activeTabId ? s.browser.tabs[activeTabId]?.zoomPercentage : 100,
+  );
+
+  // Zoom helpers
+  useHotKeyListener(() => {
+    if (focusedPanel === 'tab-content') {
+      if (!activeTabId || !currentZoomPercentage) return;
+      if (currentZoomPercentage >= 500) return;
+      setZoomPercentage(currentZoomPercentage + 10, activeTabId);
+    } else {
+      if (uiZoomPercentage >= 130) return;
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = Math.min(uiZoomPercentage + 10, 130);
+      });
+      void updatePreferences(patches);
+    }
+  }, HotkeyActions.ZOOM_IN);
+
+  useHotKeyListener(() => {
+    if (focusedPanel === 'tab-content') {
+      if (!activeTabId || !currentZoomPercentage) return;
+      if (currentZoomPercentage <= 50) return;
+      setZoomPercentage(currentZoomPercentage - 10, activeTabId);
+    } else {
+      if (uiZoomPercentage <= 70) return;
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = Math.max(uiZoomPercentage - 10, 70);
+      });
+      void updatePreferences(patches);
+    }
+  }, HotkeyActions.ZOOM_OUT);
+
+  useHotKeyListener(() => {
+    if (focusedPanel === 'tab-content') {
+      if (!activeTabId) return;
+      setZoomPercentage(100, activeTabId);
+    } else {
+      if (uiZoomPercentage === 100) return;
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = 100;
+      });
+      void updatePreferences(patches);
+    }
+  }, HotkeyActions.ZOOM_RESET);
+
+  // URL bar (Mod+Alt+L): toggle between omnibox focus and tab content.
+  useHotKeyListener(() => {
+    if (focusedPanel === 'stagewise-ui') {
+      togglePanelKeyboardFocus('tab-content');
+    } else {
+      togglePanelKeyboardFocus('stagewise-ui');
+      onFocusUrlBar();
+    }
+  }, HotkeyActions.FOCUS_URL_BAR);
+
+  // Search bar
+  useHotKeyListener(() => {
+    togglePanelKeyboardFocus('stagewise-ui');
+    onFocusSearchBar();
+  }, HotkeyActions.FIND_IN_PAGE);
+
+  // History navigation
+  useHotKeyListener(() => {
+    if (!activeTabId) return;
+    goBack(activeTabId);
+  }, HotkeyActions.HISTORY_BACK);
+
+  useHotKeyListener(() => {
+    if (!activeTabId) return;
+    goForward(activeTabId);
+  }, HotkeyActions.HISTORY_FORWARD);
+
+  // Page reload
+  useHotKeyListener(() => {
+    if (!activeTabId) return;
+    reload(activeTabId);
+  }, HotkeyActions.RELOAD);
+
+  useHotKeyListener(() => {
+    if (!activeTabId) return;
+    reload(activeTabId);
+  }, HotkeyActions.HARD_RELOAD);
+
+  // Dev tools
+  useHotKeyListener(() => {
+    if (!activeTabId) return;
+    toggleDevTools(activeTabId);
+  }, HotkeyActions.DEV_TOOLS);
+
+  // Downloads
+  useHotKeyListener(() => {
+    if (!activeTabId) return;
+    goto('stagewise://internal/downloads', activeTabId);
+  }, HotkeyActions.DOWNLOADS);
+
+  return null;
+}

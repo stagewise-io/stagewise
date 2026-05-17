@@ -22,7 +22,7 @@ import { useEventListener } from '@ui/hooks/use-event-listener';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
 
-import { CoreHotkeyBindings } from './_components/core-hotkey-bindings';
+import { BrowserTabHotkeys } from './_components/browser-tab-hotkeys';
 import {
   PerTabContent,
   type PerTabContentRef,
@@ -180,7 +180,7 @@ export function MainSection() {
 
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
-  const track = useTrack();
+  const _track = useTrack();
 
   // Persisted panel size survives mount/unmount (conditional rendering).
   const storedSizeRef = useRef(readContentSize());
@@ -474,30 +474,9 @@ export function MainSection() {
     }
   }, [activeTabId, tabs, togglePanelKeyboardFocus]);
 
-  const handleCreateTab = useCallback(() => {
-    pendingOmniboxFocusFromTabIdRef.current = activeTabId;
-    createTab(undefined, undefined, openAgent);
-  }, [createTab, activeTabId, openAgent]);
-
   const handleGlobeClick = useCallback(() => {
     createTab(undefined, undefined, openAgent);
   }, [createTab, openAgent]);
-
-  const handleCleanAllTabs = useCallback(() => {
-    const tabIdsToClose = Object.keys(tabs).filter(
-      (tabId) => tabId !== activeTabId,
-    );
-    void Promise.allSettled(tabIdsToClose.map((tabId) => closeTab(tabId))).then(
-      (results) => {
-        const closedCount = results.filter(
-          (result) => result.status === 'fulfilled',
-        ).length;
-        if (closedCount > 0) {
-          track('tabs-cleaned', { closed_count: closedCount });
-        }
-      },
-    );
-  }, [tabs, activeTabId, closeTab, track]);
 
   const handleFocusUrlBar = useCallback(() => {
     if (activeTabId) {
@@ -575,11 +554,9 @@ export function MainSection() {
       }}
       className="@container overflow-visible! flex h-full flex-1 flex-col items-start justify-between"
     >
-      <CoreHotkeyBindings
-        onCreateTab={handleCreateTab}
+      <BrowserTabHotkeys
         onFocusUrlBar={handleFocusUrlBar}
         onFocusSearchBar={handleFocusSearchBar}
-        onCleanAllTabs={handleCleanAllTabs}
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
