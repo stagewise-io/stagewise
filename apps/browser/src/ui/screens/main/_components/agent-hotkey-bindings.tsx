@@ -35,8 +35,6 @@ export function AgentHotkeyBindings() {
     createTab(undefined, undefined, openAgent);
   }, HotkeyActions.NEW_TAB);
 
-  // Mod+Shift+T: restore last closed tab (TODO: implement browser.restoreTab)
-
   // Mod+W: close active tab
   useHotKeyListener(() => {
     if (!activeTabId) return;
@@ -45,28 +43,33 @@ export function AgentHotkeyBindings() {
   }, HotkeyActions.CLOSE_TAB);
 
   // -- Content panel tab navigation (Mod+Alt+PageDown / Mod+Alt+PageUp) --
-  const tabIds = Object.keys(tabs);
+  // Only tabs visible for the current agent (global + agent-attached).
+  const visibleTabIds = Object.keys(tabs).filter(
+    (id) =>
+      tabs[id]?.agentInstanceId === null ||
+      tabs[id]?.agentInstanceId === openAgent,
+  );
 
   const switchToTabByIndex = useCallback(
     (index: number) => {
-      const id = tabIds[index];
+      const id = visibleTabIds[index];
       if (id) void switchTab(id);
     },
-    [tabIds, switchTab],
+    [visibleTabIds, switchTab],
   );
 
   const cycleTab = useCallback(
     (direction: 'next' | 'previous') => {
-      if (tabIds.length <= 1 || !activeTabId) return;
-      const idx = tabIds.indexOf(activeTabId);
+      if (visibleTabIds.length <= 1 || !activeTabId) return;
+      const idx = visibleTabIds.indexOf(activeTabId);
       if (idx === -1) return;
       const nextIdx =
         direction === 'next'
-          ? (idx + 1) % tabIds.length
-          : (idx - 1 + tabIds.length) % tabIds.length;
-      void switchTab(tabIds[nextIdx]!);
+          ? (idx + 1) % visibleTabIds.length
+          : (idx - 1 + visibleTabIds.length) % visibleTabIds.length;
+      void switchTab(visibleTabIds[nextIdx]!);
     },
-    [tabIds, activeTabId, switchTab],
+    [visibleTabIds, activeTabId, switchTab],
   );
 
   useHotKeyListener(() => cycleTab('next'), HotkeyActions.NEXT_TAB);

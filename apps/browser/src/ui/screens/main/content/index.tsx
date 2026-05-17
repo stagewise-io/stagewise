@@ -20,7 +20,6 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useEventListener } from '@ui/hooks/use-event-listener';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import { useTrack } from '@ui/hooks/use-track';
 
 import { BrowserTabHotkeys } from './_components/browser-tab-hotkeys';
 import {
@@ -174,14 +173,9 @@ export function MainSection() {
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const reorderTabs = useKartonProcedure((p) => p.browser.reorderTabs);
-  const togglePanelKeyboardFocus = useKartonProcedure(
-    (p) => p.browser.layout.togglePanelKeyboardFocus,
-  );
 
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
-  const _track = useTrack();
-
   // Persisted panel size survives mount/unmount (conditional rendering).
   const storedSizeRef = useRef(readContentSize());
   // Block onResize→persist during mount-time layout and programmatic restore.
@@ -447,32 +441,6 @@ export function MainSection() {
   // Omnibox focus plumbing (unchanged)
   // ---------------------------------------------------------------------------
   const tabContentRefs = useRef<Record<string, PerTabContentRef | null>>({});
-  const pendingOmniboxFocusFromTabIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const pendingFromTabId = pendingOmniboxFocusFromTabIdRef.current;
-    if (
-      pendingFromTabId !== null &&
-      activeTabId &&
-      activeTabId !== pendingFromTabId
-    ) {
-      const tryFocus = () => {
-        const ref = tabContentRefs.current[activeTabId];
-        if (!ref) return false;
-        void togglePanelKeyboardFocus('stagewise-ui');
-        ref.focusOmnibox();
-        pendingOmniboxFocusFromTabIdRef.current = null;
-        return true;
-      };
-
-      if (!tryFocus()) {
-        const timeoutId = setTimeout(() => {
-          tryFocus();
-        }, 50);
-        return () => clearTimeout(timeoutId);
-      }
-    }
-  }, [activeTabId, tabs, togglePanelKeyboardFocus]);
 
   const handleGlobeClick = useCallback(() => {
     createTab(undefined, undefined, openAgent);
