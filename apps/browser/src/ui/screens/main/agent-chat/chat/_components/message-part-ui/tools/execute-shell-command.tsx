@@ -97,9 +97,11 @@ export const ExecuteShellCommandToolPart = ({
   }, [part.state, pendingOutputs]);
 
   const isCreateSession = part.type === 'tool-createShellSession';
+  const isExecute = part.type === 'tool-executeShellCommand';
   const command = isCreateSession ? '' : (part.input?.command ?? '');
   const explanation = isCreateSession ? '' : (part.input?.explanation ?? '');
-  const isStdin = isCreateSession ? false : !!part.input?.stdin && !command;
+  const stdin = isExecute ? part.input?.stdin : undefined;
+  const isStdin = isCreateSession ? false : !!stdin && !command;
   const isKill = isCreateSession ? false : !!part.input?.kill;
 
   const effectiveOutputText = useMemo(() => {
@@ -201,8 +203,14 @@ export const ExecuteShellCommandToolPart = ({
       : undefined,
   );
 
-  // Minimal display for create / kill — like copy/move UI
-  if (isCreateSession || isKill) {
+  // Minimal display for create / kill — like copy/move UI.
+  // Skip when kill needs approval (always-ask mode); fall through to the
+  // standard approval trigger below so the UI doesn't block progression.
+  if (
+    (isCreateSession || isKill) &&
+    state !== 'approval' &&
+    state !== 'approval-responded'
+  ) {
     const streamingText = isCreateSession
       ? 'Opening new terminal…'
       : 'Closing terminal…';
@@ -364,7 +372,7 @@ export const ExecuteShellCommandToolPart = ({
           {isStdin ? (
             <>
               <span className="select-none text-subtle-foreground">→ </span>
-              <HumanizedStdin value={part.input?.stdin ?? ''} />
+              <HumanizedStdin value={stdin ?? ''} />
             </>
           ) : (
             <>
@@ -380,7 +388,7 @@ export const ExecuteShellCommandToolPart = ({
         )}
       </div>
     );
-  }, [state, effectiveOutputText, command, isStdin, part.input?.stdin]);
+  }, [state, effectiveOutputText, command, isStdin, stdin]);
 
   const contentFooter = useMemo(() => {
     if (

@@ -192,14 +192,18 @@ function resolveCwd(
     const rest = slashIdx === -1 ? '' : mountPrefix.slice(slashIdx + 1);
 
     const mountRoot = mounts.get(prefix);
-    if (mountRoot) {
-      if (!rest) return mountRoot;
-      const full = resolve(join(mountRoot, rest));
-      // Prevent traversal outside the mount root
-      if (full === mountRoot || full.startsWith(`${mountRoot}${sep}`))
-        return full;
-      return mountRoot;
+    if (!mountRoot) {
+      throw new Error(
+        `Unknown mount prefix "${prefix}". ` +
+          `Available: ${[...mounts.keys()].filter((k) => k.length <= 6).join(', ')}.`,
+      );
     }
+    if (!rest) return mountRoot;
+    const full = resolve(join(mountRoot, rest));
+    // Prevent traversal outside the mount root
+    if (full === mountRoot || full.startsWith(`${mountRoot}${sep}`))
+      return full;
+    return mountRoot;
   }
 
   for (const [prefix, fsPath] of mounts) {
