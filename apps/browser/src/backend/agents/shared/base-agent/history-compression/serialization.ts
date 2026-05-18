@@ -145,7 +145,7 @@ const serializeToolPart = (
 
     case 'tool-createShellSession': {
       const sid = part.output?.session_id ?? '?';
-      return `[shell: new session ${sid} in ${part.input.cwd ?? ''}]`;
+      return `[shell: new session ${sid} in ${part.input.cwd ?? ''}${err ?? ''}]`;
     }
 
     case 'tool-executeShellCommand': {
