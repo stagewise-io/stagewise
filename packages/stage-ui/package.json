@@ -39,7 +39,7 @@
     "@storybook/react-vite": "^10.3.6",
     "@tailwindcss/postcss": "^4.3.0",
     "@tailwindcss/vite": "^4.3.0",
-    "@turbo/gen": "^2.9.12",
+    "@turbo/gen": "^2.9.14",
     "@types/culori": "^4.0.1",
     "@types/node": "22.15.2",
     "@types/react": "19.2.14",
