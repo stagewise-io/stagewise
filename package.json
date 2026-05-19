@@ -94,7 +94,7 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^4.0.77",
+    "@ai-sdk/amazon-bedrock": "^4.0.107",
     "@ai-sdk/azure": "^3.0.42",
     "@aws-sdk/credential-providers": "^3.1045.0",
     "@smithy/shared-ini-file-loader": "^4.4.9",

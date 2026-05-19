@@ -54,7 +54,7 @@
     "yauzl": "^3.3.0"
   },
   "devDependencies": {
-    "@ai-sdk/amazon-bedrock": "^4.0.103",
+    "@ai-sdk/amazon-bedrock": "^4.0.107",
     "@ai-sdk/anthropic": "3.0.76",
     "@aws-sdk/credential-providers": "^3.908.0",
     "@smithy/shared-ini-file-loader": "^4.4.9",
