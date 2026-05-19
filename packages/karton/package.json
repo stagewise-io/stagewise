@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "superjson": "^2.2.2",
-    "uuid": "^11.0.4",
+    "uuid": "^11.1.1",
     "ws": "^8.20.0"
   },
   "devDependencies": {
@@ -51,7 +51,7 @@
     "@types/node": "^22.10.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@types/uuid": "^10.0.0",
+    "@types/uuid": "^11.0.0",
     "@types/ws": "^8.5.14",
     "esbuild": "0.25.9",
     "jsdom": "^26.1.0",
