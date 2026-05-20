@@ -3,9 +3,12 @@
  *
  * This includes preferences for what's shown in UI, the progress of getting started experiences etc.
  *
- * @warning The state of worksapce-specific experiences is to be managed by the workspace manager etc.
+ * @warning The state of workspace-specific experiences is to be managed by the workspace manager etc.
  */
 
+import { createHash } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {
   recentlyOpenedWorkspacesArraySchema,
   onboardingStateSchema,
@@ -22,6 +25,7 @@ import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import type { TelemetryService } from './telemetry';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
 import type { CodingPlanId } from '@shared/coding-plans';
+import type { GitRepositoryInfo, GitService } from './git';
 
 export type OnboardingAuthCompletion = {
   auth_method: 'stagewise' | 'api-keys' | 'coding-plan' | 'unknown';
@@ -29,10 +33,15 @@ export type OnboardingAuthCompletion = {
   plan_id?: CodingPlanId;
 };
 
+function redactWorkspacePathForTelemetry(workspacePath: string): string {
+  return createHash('sha256').update(workspacePath).digest('hex').slice(0, 12);
+}
+
 export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
   private readonly telemetryService: TelemetryService;
+  private readonly gitService: GitService;
   private inspirationSeed = crypto.randomUUID();
   private cachedInspirationWebsites: InspirationWebsite = {
     websites: [],
@@ -54,11 +63,13 @@ export class UserExperienceService extends DisposableService {
     logger: Logger,
     uiKarton: KartonService,
     telemetryService: TelemetryService,
+    gitService: GitService,
   ) {
     super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.telemetryService = telemetryService;
+    this.gitService = gitService;
 
     // Bind once and store reference for later unregistration
     this.boundHandleServiceStateChange =
@@ -81,12 +92,14 @@ export class UserExperienceService extends DisposableService {
     logger: Logger,
     uiKarton: KartonService,
     telemetryService: TelemetryService,
+    gitService: GitService,
   ) {
     logger.debug('[UserExperienceService] Creating service');
     const instance = new UserExperienceService(
       logger,
       uiKarton,
       telemetryService,
+      gitService,
     );
     await instance.initialize();
     logger.debug('[UserExperienceService] Created service');
@@ -334,6 +347,149 @@ export class UserExperienceService extends DisposableService {
     );
   }
 
+  public async getRecentlyOpenedWorkspaces(): Promise<
+    RecentlyOpenedWorkspace[]
+  > {
+    const persistedWorkspaces = await this.readRecentlyOpenedWorkspaces();
+    const normalizedWorkspaces =
+      await this.normalizeRecentlyOpenedWorkspaces(persistedWorkspaces);
+    return normalizedWorkspaces;
+  }
+
+  private async getRecentWorkspaceRepositoryInfo(
+    workspacePath: string,
+  ): Promise<GitRepositoryInfo | null> {
+    try {
+      const repositoryInfo =
+        await this.gitService.getWorkspaceRepositoryInfo(workspacePath);
+      return repositoryInfo;
+    } catch (error) {
+      this.logger.debug(
+        `[UserExperienceService] Failed to resolve repository info for recent workspace ${workspacePath}: ${error}`,
+      );
+      this.report(error as Error, 'resolveRecentWorkspaceRepository', {
+        redactedWorkspacePath: redactWorkspacePathForTelemetry(workspacePath),
+      });
+      return null;
+    }
+  }
+
+  private async getRecentWorkspaceMainWorktreePath(
+    workspacePath: string,
+  ): Promise<string | null> {
+    try {
+      return await this.gitService.getWorkspaceMainWorktreePath(workspacePath);
+    } catch (error) {
+      this.logger.debug(
+        `[UserExperienceService] Failed to resolve main worktree for recent workspace ${workspacePath}: ${error}`,
+      );
+      this.report(error as Error, 'resolveRecentWorkspaceMainWorktree', {
+        redactedWorkspacePath: redactWorkspacePathForTelemetry(workspacePath),
+      });
+      return null;
+    }
+  }
+
+  private async recentWorkspacePathExists(
+    workspacePath: string,
+  ): Promise<boolean> {
+    try {
+      await fs.access(workspacePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async filterExistingRecentWorkspaces(
+    workspaces: RecentlyOpenedWorkspace[],
+  ): Promise<RecentlyOpenedWorkspace[]> {
+    const existenceResults = await Promise.all(
+      workspaces.map(async (workspace) => ({
+        workspace,
+        exists: await this.recentWorkspacePathExists(workspace.path),
+      })),
+    );
+
+    return existenceResults
+      .filter((result) => result.exists)
+      .map((result) => result.workspace);
+  }
+
+  private async normalizeRecentlyOpenedWorkspace(
+    workspace: RecentlyOpenedWorkspace,
+  ): Promise<
+    RecentlyOpenedWorkspace & {
+      repositoryId?: string;
+      hasResolvedMainWorktreePath: boolean;
+    }
+  > {
+    const [repositoryInfo, mainWorktreePath] = await Promise.all([
+      this.getRecentWorkspaceRepositoryInfo(workspace.path),
+      this.getRecentWorkspaceMainWorktreePath(workspace.path),
+    ]);
+
+    const normalizedPath = mainWorktreePath ?? workspace.path;
+
+    const normalizedWorkspace = {
+      path: normalizedPath,
+      name: path.basename(normalizedPath),
+      openedAt: workspace.openedAt,
+      repositoryId: repositoryInfo?.repositoryId,
+      hasResolvedMainWorktreePath: mainWorktreePath !== null,
+    };
+    return normalizedWorkspace;
+  }
+
+  private async normalizeRecentlyOpenedWorkspaces(
+    workspaces: RecentlyOpenedWorkspace[],
+  ): Promise<RecentlyOpenedWorkspace[]> {
+    const existingWorkspaces =
+      await this.filterExistingRecentWorkspaces(workspaces);
+    const normalizedWorkspaces = await Promise.all(
+      existingWorkspaces.map((workspace) =>
+        this.normalizeRecentlyOpenedWorkspace(workspace),
+      ),
+    );
+    const workspacesByKey = new Map<
+      string,
+      RecentlyOpenedWorkspace & { hasResolvedMainWorktreePath: boolean }
+    >();
+
+    for (const workspace of normalizedWorkspaces) {
+      const { repositoryId, ...recentWorkspace } = workspace;
+      const key = repositoryId ?? recentWorkspace.path;
+      const existing = workspacesByKey.get(key);
+      if (!existing) {
+        workspacesByKey.set(key, recentWorkspace);
+        continue;
+      }
+
+      const preferredPathWorkspace =
+        existing.hasResolvedMainWorktreePath ===
+        recentWorkspace.hasResolvedMainWorktreePath
+          ? recentWorkspace.openedAt > existing.openedAt
+            ? recentWorkspace
+            : existing
+          : existing.hasResolvedMainWorktreePath
+            ? existing
+            : recentWorkspace;
+
+      const mergedWorkspace = {
+        ...preferredPathWorkspace,
+        openedAt: Math.max(existing.openedAt, recentWorkspace.openedAt),
+      };
+      workspacesByKey.set(key, mergedWorkspace);
+    }
+
+    return [...workspacesByKey.values()]
+      .map(
+        ({ hasResolvedMainWorktreePath: _hasResolved, ...workspace }) =>
+          workspace,
+      )
+      .sort((a, b) => b.openedAt - a.openedAt);
+  }
+
   /**
    * Write the recently opened workspaces to persisted data.
    */
@@ -379,28 +535,15 @@ export class UserExperienceService extends DisposableService {
     name: string;
     openedAt: number;
   }) {
-    // Load existing workspaces
-    const workspaces = await this.readRecentlyOpenedWorkspaces();
-
-    // Check if workspace with this path already exists
-    const existingIndex = workspaces.findIndex(
-      (ws) => ws.path === workspacePath,
-    );
-
-    const workspaceEntry: RecentlyOpenedWorkspace = {
-      path: workspacePath,
-      name,
-      openedAt,
-    };
-
-    // Update existing entry or add new one
-    if (existingIndex !== -1) {
-      workspaces[existingIndex] = workspaceEntry;
-    } else {
-      workspaces.push(workspaceEntry);
-    }
+    const workspaceEntry = { path: workspacePath, name, openedAt };
 
     try {
+      const persistedWorkspaces = await this.readRecentlyOpenedWorkspaces();
+      const workspaces = await this.normalizeRecentlyOpenedWorkspaces([
+        ...persistedWorkspaces,
+        workspaceEntry,
+      ]);
+
       await this.writeRecentlyOpenedWorkspaces(workspaces);
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();
@@ -424,7 +567,7 @@ export class UserExperienceService extends DisposableService {
    */
   public async getStoredExperienceData(): Promise<StoredExperienceData> {
     const [recentlyOpenedWorkspaces, hasSeenOnboardingFlow] = await Promise.all(
-      [this.readRecentlyOpenedWorkspaces(), this.readOnboardingState()],
+      [this.getRecentlyOpenedWorkspaces(), this.readOnboardingState()],
     );
     return {
       recentlyOpenedWorkspaces,
@@ -469,28 +612,23 @@ export class UserExperienceService extends DisposableService {
     maxAmount: number;
     hasBeenOpenedBeforeDate: number;
   }) {
-    const workspaces = await this.readRecentlyOpenedWorkspaces();
-
-    if (workspaces.length === 0) {
-      this.logger.debug(
-        `[UserExperienceService] No recently opened workspaces to prune`,
-      );
-      return;
-    }
-
-    // Filter out workspaces opened before the specified date
-    let filteredWorkspaces = workspaces.filter(
-      (ws) => ws.openedAt >= hasBeenOpenedBeforeDate,
-    );
-
-    // Sort by openedAt (most recent first)
-    filteredWorkspaces.sort((a, b) => b.openedAt - a.openedAt);
-    // Keep only the most recent maxAmount entries
-    if (filteredWorkspaces.length > maxAmount) {
-      filteredWorkspaces = filteredWorkspaces.slice(0, maxAmount);
-    }
-
     try {
+      const persistedWorkspaces = await this.readRecentlyOpenedWorkspaces();
+      const workspaces =
+        await this.normalizeRecentlyOpenedWorkspaces(persistedWorkspaces);
+
+      // Filter out workspaces opened before the specified date
+      let filteredWorkspaces = workspaces.filter(
+        (ws) => ws.openedAt >= hasBeenOpenedBeforeDate,
+      );
+
+      // Sort by openedAt (most recent first)
+      filteredWorkspaces.sort((a, b) => b.openedAt - a.openedAt);
+      // Keep only the most recent maxAmount entries
+      if (filteredWorkspaces.length > maxAmount) {
+        filteredWorkspaces = filteredWorkspaces.slice(0, maxAmount);
+      }
+
       await this.writeRecentlyOpenedWorkspaces(filteredWorkspaces);
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();

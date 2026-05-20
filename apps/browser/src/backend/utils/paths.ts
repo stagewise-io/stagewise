@@ -74,6 +74,9 @@ export const getPlansDir = (): string => path.join(getUserDataDir(), 'plans');
 
 export const getLogsDir = (): string => path.join(getUserDataDir(), 'logs');
 
+export const getWorktreesDir = (): string =>
+  path.join(app.getPath('home'), '.stagewise', 'worktrees');
+
 export const getRipgrepBasePath = (): string => path.join(getDataRoot(), 'bin');
 
 export async function ensureDataDirectories(): Promise<void> {
@@ -86,6 +89,7 @@ export async function ensureDataDirectories(): Promise<void> {
     fs.mkdir(getUserDataDir(), { recursive: true }),
     fs.mkdir(getPlansDir(), { recursive: true }),
     fs.mkdir(getLogsDir(), { recursive: true }),
+    fs.mkdir(getWorktreesDir(), { recursive: true }),
   ]);
 }
 

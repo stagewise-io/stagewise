@@ -32,6 +32,20 @@ import {
   ChatInputActions,
   type ChatInputHandle,
 } from './chat-input';
+import {
+  WorkspaceSelect,
+  createDefaultWorkspaceActionConfig,
+  executeWorkspaceGitAction,
+  hydrateWorkspaceActionConfigWithDefaults,
+  type WorkspaceActionConfig,
+} from './workspace-select';
+import {
+  getBranchSelectItems,
+  getBranchSelectItemsFromGit,
+  getDefaultBranchValue,
+  getWorktreeSelectItems,
+  getWorktreeSelectItemsFromGit,
+} from './worktree-utils';
 import type { AttachmentType } from '@ui/screens/main/agent-chat/chat/_components/rich-text/attachments';
 import type { MentionContext } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions';
 import type { FileMentionItem } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions/types';
@@ -39,7 +53,7 @@ import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metad
 import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
-import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { availableModels } from '@shared/available-models';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
@@ -53,6 +67,19 @@ import { getCurrentDraftAnswers } from './footer-status-card/user-question-secti
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
 const EMPTY_QUEUE: (AgentMessage & { role: 'user' })[] = [];
+const EMPTY_WORKSPACE_ACTION_CONFIGS: ReadonlyMap<
+  string,
+  WorkspaceActionConfig
+> = new Map();
+
+function formatWorkspaceGitRef(git: MountEntry['git']): string | null {
+  return git?.branch ?? git?.headSha?.slice(0, 7) ?? null;
+}
+
+function getWorkspaceDisplayName(mount: MountEntry): string {
+  return mount.path.split(/[\\/]/).filter(Boolean).at(-1) ?? mount.path;
+}
+
 export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const { registerDraftGetter } = useChatDraft();
@@ -85,6 +112,14 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     historyRef.current = openAgent
       ? (s.agents.instances[openAgent]?.state.history ?? EMPTY_HISTORY)
       : EMPTY_HISTORY;
+    return null;
+  });
+
+  const mountsRef = useRef<MountEntry[]>(EMPTY_MOUNTS);
+  useKartonState((s) => {
+    mountsRef.current = openAgent
+      ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
+      : EMPTY_MOUNTS;
     return null;
   });
 
@@ -187,6 +222,25 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   );
   const sendUserMessage = useKartonProcedure((p) => p.agents.sendUserMessage);
   const stopAgent = useKartonProcedure((p) => p.agents.stop);
+  const createWorkspaceGitWorktree = useKartonProcedure(
+    (p) => p.toolbox.createWorkspaceGitWorktree,
+  );
+  const createWorkspaceGitBranch = useKartonProcedure(
+    (p) => p.toolbox.createWorkspaceGitBranch,
+  );
+  const switchWorkspaceGitBranch = useKartonProcedure(
+    (p) => p.toolbox.switchWorkspaceGitBranch,
+  );
+  const listWorkspaceGitBranches = useKartonProcedure(
+    (p) => p.toolbox.listWorkspaceGitBranches,
+  );
+  const listWorkspaceGitWorktrees = useKartonProcedure(
+    (p) => p.toolbox.listWorkspaceGitWorktrees,
+  );
+  const mountWorkspace = useKartonProcedure((p) => p.toolbox.mountWorkspace);
+  const unmountWorkspace = useKartonProcedure(
+    (p) => p.toolbox.unmountWorkspace,
+  );
   const revertToUserMessage = useKartonProcedure(
     (p) => p.agents.revertToUserMessage,
   );
@@ -546,8 +600,106 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     (p) => p.agents.interruptQuestionWithMessage,
   );
 
+  const executePendingWorkspaceActions = useCallback(async () => {
+    if (!openAgent || historyRef.current.length > 0)
+      return { ok: true as const };
+
+    let configs = new Map(workspaceActionConfigsRef.current);
+    for (const mount of mountsRef.current) {
+      if (!mount.git) continue;
+
+      const existingConfig = configs.get(mount.prefix);
+      if (!existingConfig) continue;
+
+      try {
+        const fallbackGitRef = formatWorkspaceGitRef(mount.git);
+        const [branchesResult, worktreesResult] = await Promise.all([
+          listWorkspaceGitBranches(openAgent, mount.prefix),
+          listWorkspaceGitWorktrees(openAgent, mount.prefix),
+        ]);
+        const sourceBranchItems = getBranchSelectItemsFromGit(
+          branchesResult,
+          fallbackGitRef,
+          'source',
+        );
+        const checkoutBranchItems = getBranchSelectItemsFromGit(
+          branchesResult,
+          fallbackGitRef,
+          'checkout-target',
+        );
+        const worktreeItems = getWorktreeSelectItemsFromGit(worktreesResult);
+        const defaults = createDefaultWorkspaceActionConfig(
+          sourceBranchItems,
+          worktreeItems,
+          checkoutBranchItems,
+          getDefaultBranchValue(branchesResult, fallbackGitRef),
+        );
+        const config = hydrateWorkspaceActionConfigWithDefaults(
+          existingConfig,
+          defaults,
+        );
+
+        const result = await executeWorkspaceGitAction({
+          agentInstanceId: openAgent,
+          mount,
+          config,
+          executor: {
+            createWorkspaceGitWorktree,
+            createWorkspaceGitBranch,
+            switchWorkspaceGitBranch,
+            mountWorkspace,
+            unmountWorkspace,
+          },
+        });
+
+        if (!result.ok) {
+          return {
+            ok: false as const,
+            message: `${getWorkspaceDisplayName(mount)}: ${result.message}`,
+          };
+        }
+
+        configs.delete(mount.prefix);
+        const nextConfigs =
+          configs.size === 0
+            ? EMPTY_WORKSPACE_ACTION_CONFIGS
+            : new Map(configs);
+        workspaceActionConfigsRef.current = nextConfigs;
+        setWorkspaceActionConfigs(nextConfigs);
+        configs = new Map(nextConfigs);
+      } catch (error) {
+        return {
+          ok: false as const,
+          message: `${getWorkspaceDisplayName(mount)}: ${
+            error instanceof Error
+              ? error.message
+              : 'Failed to execute workspace action.'
+          }`,
+        };
+      }
+    }
+
+    return { ok: true as const };
+  }, [
+    createWorkspaceGitBranch,
+    createWorkspaceGitWorktree,
+    listWorkspaceGitBranches,
+    listWorkspaceGitWorktrees,
+    mountWorkspace,
+    openAgent,
+    switchWorkspaceGitBranch,
+    unmountWorkspace,
+  ]);
+
   const handleSubmit = useCallback(async () => {
     if (!canSendMessageRef.current) return;
+
+    const workspaceActionResult = await executePendingWorkspaceActions();
+    if (!workspaceActionResult.ok) {
+      setWorkspaceActionError(workspaceActionResult.message);
+      return;
+    }
+    setWorkspaceActionError(null);
 
     // Read frequently-changing values from refs at call time
     const currentLocalInputState = localInputStateRef.current;
@@ -653,6 +805,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     clearAll,
     stopContextSelector,
     interruptQuestionWithMessage,
+    executePendingWorkspaceActions,
   ]);
 
   // Quantize to nearest 1 000 tokens so the value only changes when
@@ -1109,7 +1262,94 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     openAgent ? s.agents.instances[openAgent]?.allowUserInput : false,
   );
 
+  // The workspace strip below the chat-input is now always rendered: it owns
+  // the only "Connect new workspace" affordance, so empty-chat suggestions
+  // never need to surface that fallback. Bool selector keeps the
+  // subscription cheap.
+  const historyIsEmpty = useKartonState((s) =>
+    openAgent
+      ? (s.agents.instances[openAgent]?.state.history?.length ?? 0) === 0
+      : true,
+  );
+
+  const [workspaceActionError, setWorkspaceActionError] = useState<
+    string | null
+  >(null);
+
+  const [workspaceActionConfigs, setWorkspaceActionConfigs] = useState<
+    ReadonlyMap<string, WorkspaceActionConfig>
+  >(EMPTY_WORKSPACE_ACTION_CONFIGS);
+  const workspaceActionConfigsRef = useRef(workspaceActionConfigs);
+  workspaceActionConfigsRef.current = workspaceActionConfigs;
+
+  const workspaceActionMountsKey = useKartonState((s) =>
+    openAgent
+      ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
+          .map(
+            (mount) =>
+              `${mount.prefix}|${mount.path}|${mount.git ? formatWorkspaceGitRef(mount.git) : ''}`,
+          )
+          .join('\n')
+      : '',
+  );
+
+  useEffect(() => {
+    setWorkspaceActionError(null);
+
+    if (!historyIsEmpty) {
+      if (workspaceActionConfigsRef.current.size > 0) {
+        setWorkspaceActionConfigs(EMPTY_WORKSPACE_ACTION_CONFIGS);
+      }
+      return;
+    }
+
+    const mounts = mountsRef.current;
+    setWorkspaceActionConfigs((prev) => {
+      let changed = false;
+      const next = new Map<string, WorkspaceActionConfig>();
+
+      for (const mount of mounts) {
+        if (!mount.git) continue;
+
+        const existing = prev.get(mount.prefix);
+        if (existing) {
+          next.set(mount.prefix, existing);
+          continue;
+        }
+
+        const gitRef = formatWorkspaceGitRef(mount.git);
+        next.set(
+          mount.prefix,
+          createDefaultWorkspaceActionConfig(
+            getBranchSelectItems(gitRef),
+            getWorktreeSelectItems(),
+          ),
+        );
+        changed = true;
+      }
+
+      if (next.size !== prev.size) changed = true;
+      return changed ? next : prev;
+    });
+  }, [historyIsEmpty, workspaceActionMountsKey]);
+
+  const handleWorkspaceActionConfigChange = useCallback(
+    (mount: MountEntry, config: WorkspaceActionConfig) => {
+      setWorkspaceActionError(null);
+      setWorkspaceActionConfigs((prev) => {
+        const next = new Map(prev);
+        next.set(mount.prefix, config);
+        return next;
+      });
+    },
+    [],
+  );
+
   const handleModelChange = useCallback(() => {
+    chatInputRef.current?.focus();
+  }, []);
+
+  const handleWorkspaceChange = useCallback(() => {
     chatInputRef.current?.focus();
   }, []);
 
@@ -1194,6 +1434,17 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         />
         <StatusCard />
       </div>
+      {workspaceActionError && (
+        <div className="px-1 text-error-foreground text-xs">
+          {workspaceActionError}
+        </div>
+      )}
+      <WorkspaceSelect
+        onWorkspaceChange={handleWorkspaceChange}
+        chatIsEmpty={historyIsEmpty}
+        workspaceActionConfigs={workspaceActionConfigs}
+        onWorkspaceActionConfigChange={handleWorkspaceActionConfigChange}
+      />
     </footer>
   );
 });

@@ -472,7 +472,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
           ref={ref}
           className={cn(
             'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0',
-            'shadow-none transition-colors',
+            'shadow-none',
             'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
             'data-disabled:pointer-events-none data-disabled:opacity-50',
             triggerVariants[triggerVariant],
@@ -568,7 +568,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                             className={cn(
                               'group/item',
                               'w-full min-w-36 shrink-0 cursor-default select-none rounded-md outline-none',
-                              'text-foreground transition-colors duration-150 ease-out',
+                              'text-foreground',
                               'data-highlighted:bg-surface-1',
                               'data-disabled:pointer-events-none data-disabled:opacity-50',
                               hasDescription ? 'items-start' : 'items-center',

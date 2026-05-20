@@ -32,7 +32,6 @@ import { DevToolAPIService } from './services/dev-tool-api';
 import { OmniboxSuggestionsService } from './services/omnibox-suggestions';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { ToolboxService } from './services/toolbox';
-import type { KartonContract } from '@shared/karton-contracts/ui';
 import type { KartonService } from './services/karton';
 import { GitService } from './services/git';
 import { CredentialsService } from './services/credentials';
@@ -151,7 +150,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   // Push bundled plugin definitions to UI karton state
   discoverPlugins(getPluginsPath()).then((plugins) => {
-    uiKarton.setState((draft: KartonContract['state']) => {
+    uiKarton.setState((draft) => {
       draft.plugins = plugins;
     });
     if (verbose)
@@ -287,12 +286,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
   );
 
-  const userExperienceService = await UserExperienceService.create(
-    logger,
-    uiKarton,
-    telemetryService,
-  );
-
   const credentialsService = await CredentialsService.create(logger);
 
   credentialsService.setAccessTokenProvider(() => authService.accessToken);
@@ -314,6 +307,13 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
     resolvedEnvPromise,
   });
+
+  const userExperienceService = await UserExperienceService.create(
+    logger,
+    uiKarton,
+    telemetryService,
+    gitService,
+  );
 
   const toolboxService = await ToolboxService.create(
     logger,

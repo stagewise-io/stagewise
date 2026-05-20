@@ -3,7 +3,6 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { ModelSelect } from './model-select';
 import { ToolApprovalSelect } from './tool-approval-select';
-import { WorkspaceSelect } from './workspace-select';
 import { ContextUsageRing } from './context-usage-ring';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { cn } from '@ui/utils';
@@ -63,10 +62,6 @@ export interface ChatInputProps {
   // Model selector
   showModelSelect?: boolean;
   onModelChange?: () => void;
-
-  // Workspace selector
-  showWorkspaceSelect?: boolean;
-  onWorkspaceChange?: () => void;
 
   // Tool approval selector
   showToolApprovalSelect?: boolean;
@@ -139,9 +134,6 @@ export const ChatInput = memo(function ChatInput({
 
   showModelSelect = true,
   onModelChange,
-
-  showWorkspaceSelect = true,
-  onWorkspaceChange,
 
   showToolApprovalSelect = true,
   onToolApprovalChange,
@@ -537,14 +529,12 @@ export const ChatInput = memo(function ChatInput({
     },
   }));
 
-  // Stable callbacks for ModelSelect/WorkspaceSelect — avoids creating
+  // Stable callbacks for ModelSelect/ToolApprovalSelect — avoids creating
   // new closures on every ChatInput render which would bust their memo().
   const editorRef = useRef(editor);
   editorRef.current = editor;
   const onModelChangeRef = useRef(onModelChange);
   onModelChangeRef.current = onModelChange;
-  const onWorkspaceChangeRef = useRef(onWorkspaceChange);
-  onWorkspaceChangeRef.current = onWorkspaceChange;
   const onToolApprovalChangeRef = useRef(onToolApprovalChange);
   onToolApprovalChangeRef.current = onToolApprovalChange;
 
@@ -553,15 +543,6 @@ export const ChatInput = memo(function ChatInput({
       requestAnimationFrame(() => {
         editorRef.current?.commands.focus('end');
         onModelChangeRef.current?.();
-      });
-    });
-  }, []);
-
-  const handleWorkspaceChange = useCallback(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        editorRef.current?.commands.focus('end');
-        onWorkspaceChangeRef.current?.();
       });
     });
   }, []);
@@ -638,19 +619,14 @@ export const ChatInput = memo(function ChatInput({
 
       {/* Controls area - only shown when not disabled and has content to show */}
       {!disabled &&
-        (showWorkspaceSelect ||
-          showModelSelect ||
+        (showModelSelect ||
           showToolApprovalSelect ||
           (showContextUsageRing && contextUsedPercentage > 0)) && (
           <div
             className={cn(
-              'flex shrink-0 flex-row flex-wrap items-center justify-start gap-2 pr-2 *:shrink-0',
-              !showWorkspaceSelect && 'pl-1',
+              'flex shrink-0 flex-row flex-wrap items-center justify-start gap-2 pr-2 pl-1 *:shrink-0',
             )}
           >
-            {showWorkspaceSelect && (
-              <WorkspaceSelect onWorkspaceChange={handleWorkspaceChange} />
-            )}
             {showModelSelect && (
               <ModelSelect onModelChange={handleModelSelectChange} />
             )}

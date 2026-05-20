@@ -2,6 +2,7 @@ import { DisposableService } from '@/services/disposable';
 import type { Logger } from '@/services/logger';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { LspService } from '../lsp';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pickOwningWorkspace } from '@/utils/workspace-resolution';
 import { createHash } from 'node:crypto';
@@ -11,6 +12,13 @@ import type { KartonService } from '@/services/karton';
 import type { UserExperienceService } from '@/services/experience';
 import type { TelemetryService } from '@/services/telemetry';
 import type { GitService } from '@/services/git';
+import type {
+  MountedWorkspaceGitSummary,
+  WorkspaceGitCreateBranchOptions,
+  WorkspaceGitCreateWorktreeOptions,
+  WorkspaceGitCreateWorktreeResult,
+  WorkspaceGitMutationResult,
+} from '@shared/karton-contracts/ui';
 import type { WorkspaceSnapshot } from '../../types';
 import { FULL_PERMISSIONS, type MountPermission } from '@/services/sandbox/ipc';
 import {
@@ -23,11 +31,19 @@ import {
 } from '@/agents/shared/prompts/utils/read-workspace-md';
 import { readAgentsMd } from '@/agents/shared/prompts/utils/read-agents-md';
 import { getSkills } from '@/agents/shared/prompts/utils/get-skills';
-import { getRipgrepBasePath } from '@/utils/paths';
+import { getRipgrepBasePath, getWorktreesDir } from '@/utils/paths';
 
 type AgentInstanceId = string;
 type MountPrefix = string;
 type WorkspacePath = string;
+
+async function safeRealpath(targetPath: string): Promise<string | null> {
+  try {
+    return await fs.realpath(targetPath);
+  } catch {
+    return null;
+  }
+}
 
 function mountPrefixForPath(workspacePath: string): MountPrefix {
   const hash = createHash('sha256')
@@ -168,6 +184,152 @@ export class MountManagerService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'toolbox.listGitBranchesByPath',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.listGitBranchesByPath(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.listGitWorktreesByPath',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.listGitWorktreesByPath(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.switchGitBranchByPath',
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        branchName: string,
+      ) => {
+        return this.switchGitBranchByPath(workspacePath, branchName);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.createGitBranchByPath',
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        options: WorkspaceGitCreateBranchOptions,
+      ) => {
+        return this.createGitBranchByPath(workspacePath, options);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.createGitWorktreeByPath',
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        options: WorkspaceGitCreateWorktreeOptions,
+      ) => {
+        return this.createGitWorktreeByPath(workspacePath, options);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.listWorkspaceGitBranches',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        mountPrefix: string,
+      ) => {
+        const mount = this.resolveMountedWorkspace(
+          agentInstanceId,
+          mountPrefix,
+        );
+        if (!mount) return null;
+        return this.listGitBranchesByPath(mount.path);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.listWorkspaceGitWorktrees',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        mountPrefix: string,
+      ) => {
+        const mount = this.resolveMountedWorkspace(
+          agentInstanceId,
+          mountPrefix,
+        );
+        if (!mount) return null;
+        return this.listGitWorktreesByPath(mount.path);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.switchWorkspaceGitBranch',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        mountPrefix: string,
+        branchName: string,
+      ) => {
+        const mount = this.resolveMountedWorkspace(
+          agentInstanceId,
+          mountPrefix,
+        );
+        if (!mount) return this.notGitRepoResult();
+        const result = await this.switchGitBranchByPath(mount.path, branchName);
+        if (result.ok) {
+          this.updateMountedWorkspaceGit(
+            agentInstanceId,
+            mountPrefix,
+            result.git,
+          );
+        }
+        return result;
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.createWorkspaceGitBranch',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        mountPrefix: string,
+        options: WorkspaceGitCreateBranchOptions,
+      ) => {
+        const mount = this.resolveMountedWorkspace(
+          agentInstanceId,
+          mountPrefix,
+        );
+        if (!mount) return this.notGitRepoResult();
+        const result = await this.createGitBranchByPath(mount.path, options);
+        if (result.ok) {
+          this.updateMountedWorkspaceGit(
+            agentInstanceId,
+            mountPrefix,
+            result.git,
+          );
+        }
+        return result;
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.createWorkspaceGitWorktree',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        mountPrefix: string,
+        options: WorkspaceGitCreateWorktreeOptions,
+      ) => {
+        const mount = this.resolveMountedWorkspace(
+          agentInstanceId,
+          mountPrefix,
+        );
+        if (!mount) return this.notGitRepoCreateWorktreeResult();
+        return this.createGitWorktreeByPath(mount.path, options);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'toolbox.searchMentionFiles',
       async (
         _callingClientId: string,
@@ -177,6 +339,114 @@ export class MountManagerService extends DisposableService {
         return this.mentionSearch.search(agentInstanceId, query);
       },
     );
+  }
+
+  private resolveMountedWorkspace(
+    agentInstanceId: string,
+    mountPrefix: string,
+  ): { prefix: string; path: string } | null {
+    const mount = this.uiKarton.state.toolbox[
+      agentInstanceId
+    ]?.workspace.mounts.find((item) => item.prefix === mountPrefix);
+    if (!mount) return null;
+    return { prefix: mount.prefix, path: mount.path };
+  }
+
+  private notGitRepoResult(): WorkspaceGitMutationResult {
+    return {
+      ok: false,
+      reason: 'not-git-repo',
+      message: 'Workspace is not a Git repo.',
+    };
+  }
+
+  private notGitRepoCreateWorktreeResult(): WorkspaceGitCreateWorktreeResult {
+    return {
+      ok: false,
+      reason: 'not-git-repo',
+      message: 'Workspace is not a Git repo.',
+    };
+  }
+
+  private async isTrustedGitPath(workspacePath: string): Promise<boolean> {
+    const resolvedPath = await safeRealpath(workspacePath);
+    if (!resolvedPath) return false;
+
+    for (const mountedPath of this.workspacePathsPerMount.values()) {
+      const resolvedMountedPath = await safeRealpath(mountedPath);
+      if (resolvedMountedPath === resolvedPath) return true;
+    }
+
+    const recentWorkspaces =
+      await this.userExperienceService.getRecentlyOpenedWorkspaces();
+    for (const workspace of recentWorkspaces) {
+      const resolvedRecentPath = await safeRealpath(workspace.path);
+      if (resolvedRecentPath === resolvedPath) return true;
+    }
+
+    const worktreesDir = await safeRealpath(getWorktreesDir());
+    if (!worktreesDir) return false;
+
+    const relativeToWorktrees = path.relative(worktreesDir, resolvedPath);
+    return (
+      relativeToWorktrees.length > 0 &&
+      !relativeToWorktrees.startsWith('..') &&
+      !path.isAbsolute(relativeToWorktrees)
+    );
+  }
+
+  private async listGitBranchesByPath(workspacePath: string) {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+    return this.gitService.listBranches(workspacePath);
+  }
+
+  private async listGitWorktreesByPath(workspacePath: string) {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+    return this.gitService.listWorkspaceWorktrees(workspacePath);
+  }
+
+  private async switchGitBranchByPath(
+    workspacePath: string,
+    branchName: string,
+  ): Promise<WorkspaceGitMutationResult> {
+    if (!(await this.isTrustedGitPath(workspacePath))) {
+      return this.notGitRepoResult();
+    }
+    return this.gitService.switchBranch(workspacePath, branchName);
+  }
+
+  private async createGitBranchByPath(
+    workspacePath: string,
+    options: WorkspaceGitCreateBranchOptions,
+  ): Promise<WorkspaceGitMutationResult> {
+    if (!(await this.isTrustedGitPath(workspacePath))) {
+      return this.notGitRepoResult();
+    }
+    return this.gitService.createBranch(workspacePath, options);
+  }
+
+  private async createGitWorktreeByPath(
+    workspacePath: string,
+    options: WorkspaceGitCreateWorktreeOptions,
+  ): Promise<WorkspaceGitCreateWorktreeResult> {
+    if (!(await this.isTrustedGitPath(workspacePath))) {
+      return this.notGitRepoCreateWorktreeResult();
+    }
+    return this.gitService.createWorktree(workspacePath, options);
+  }
+
+  private updateMountedWorkspaceGit(
+    agentInstanceId: string,
+    mountPrefix: string,
+    git: MountedWorkspaceGitSummary | null,
+  ): void {
+    this.uiKarton.setState((draft) => {
+      const mount = draft.toolbox[agentInstanceId]?.workspace.mounts.find(
+        (item) => item.prefix === mountPrefix,
+      );
+      if (mount) mount.git = git;
+    });
+    this.onMountsChanged?.(agentInstanceId);
   }
 
   public async handleMountWorkspace(
@@ -711,6 +981,30 @@ export class MountManagerService extends DisposableService {
     this.clientRuntimesPerPath.clear();
     this.uiKarton.removeServerProcedureHandler('toolbox.mountWorkspace');
     this.uiKarton.removeServerProcedureHandler('toolbox.unmountWorkspace');
+    this.uiKarton.removeServerProcedureHandler('toolbox.listGitBranchesByPath');
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.listGitWorktreesByPath',
+    );
+    this.uiKarton.removeServerProcedureHandler('toolbox.switchGitBranchByPath');
+    this.uiKarton.removeServerProcedureHandler('toolbox.createGitBranchByPath');
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.createGitWorktreeByPath',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.listWorkspaceGitBranches',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.listWorkspaceGitWorktrees',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.switchWorkspaceGitBranch',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.createWorkspaceGitBranch',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.createWorkspaceGitWorktree',
+    );
     this.uiKarton.removeServerProcedureHandler('toolbox.searchMentionFiles');
   }
 }

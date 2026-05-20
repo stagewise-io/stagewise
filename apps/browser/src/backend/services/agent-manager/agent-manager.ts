@@ -38,6 +38,7 @@ import {
 import type { AssetCacheService } from '@/services/asset-cache';
 import type { ProcessedImageCacheService } from '@/services/processed-image-cache';
 import type { GitService } from '@/services/git';
+import { resolveNewAgentWorkspaceMountPath } from './workspace-mount-normalization';
 
 function toFiniteTimestamp(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -164,9 +165,10 @@ export class AgentManagerService extends DisposableService {
       if (!lastWorkspaces) return;
       for (const ws of lastWorkspaces) {
         try {
+          const mountPath = await this.getNewAgentWorkspaceMountPath(ws.path);
           await this.toolbox.handleMountWorkspace(
             agent.instanceId,
-            ws.path,
+            mountPath,
             ws.permissions,
           );
         } catch (error) {
@@ -235,17 +237,37 @@ export class AgentManagerService extends DisposableService {
           initialInputState,
         );
         if (workspacePaths) {
-          for (const wp of workspacePaths)
-            await this.toolbox.handleMountWorkspace(agent.instanceId, wp);
+          try {
+            for (const wp of workspacePaths) {
+              const mountPath = await this.getNewAgentWorkspaceMountPath(wp);
+              await this.toolbox.handleMountWorkspace(
+                agent.instanceId,
+                mountPath,
+              );
+            }
+          } catch (error) {
+            try {
+              await this.deleteAgent(agent.instanceId);
+            } catch (cleanupError) {
+              this.logger.error(
+                `[AgentManager] Failed to clean up agent ${agent.instanceId} after workspace mount failure`,
+                cleanupError,
+              );
+            }
+            throw error;
+          }
         } else {
           const lastWorkspaces =
             await this.agentPersistenceDB?.getLastChatWorkspacePaths();
           if (lastWorkspaces) {
             for (const ws of lastWorkspaces) {
               try {
+                const mountPath = await this.getNewAgentWorkspaceMountPath(
+                  ws.path,
+                );
                 await this.toolbox.handleMountWorkspace(
                   agent.instanceId,
-                  ws.path,
+                  mountPath,
                   ws.permissions,
                 );
               } catch (error) {
@@ -634,6 +656,16 @@ export class AgentManagerService extends DisposableService {
     this.activeAgents.clear();
   }
 
+  private async getNewAgentWorkspaceMountPath(
+    workspacePath: string,
+  ): Promise<string> {
+    return await resolveNewAgentWorkspaceMountPath(
+      workspacePath,
+      (path) => this.gitService.getWorkspaceMainWorktreePath(path),
+      this.logger,
+    );
+  }
+
   /**
    * Trigger WORKSPACE.md generation for a specific workspace path.
    * Finds a parent chat agent that has this path mounted and spawns
@@ -748,8 +780,9 @@ export class AgentManagerService extends DisposableService {
             .state as Readonly<AgentState>,
         set: (recipe) => {
           this.karton.setState((draft) => {
-            // @ts-expect-error - We have to call the state update recipe with the draft this way to keep "immer" working.
-            recipe(draft.agents.instances[agentInstanceId].state);
+            const agentState = draft.agents.instances[agentInstanceId]
+              .state as AgentState;
+            recipe(agentState);
             draft.agents.instances[agentInstanceId].type = type;
           });
         },
@@ -888,7 +921,7 @@ export class AgentManagerService extends DisposableService {
       for (const ws of agent.mountedWorkspaces) {
         try {
           await this.toolbox.handleMountWorkspace(
-            instanceId,
+            createdAgent.instanceId,
             ws.path,
             ws.permissions,
           );

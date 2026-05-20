@@ -658,7 +658,6 @@ export const MessageUser = memo(
                       onEscape={handleCancelEditing}
                       placeholder="Edit your message..."
                       showModelSelect
-                      showWorkspaceSelect={false}
                       onModelChange={() => chatInputRef.current?.focus()}
                       showContextUsageRing={false}
                       attachmentCount={totalAttachments}
