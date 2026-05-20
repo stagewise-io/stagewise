@@ -580,7 +580,13 @@ export const defaultUserPreferences: UserPreferences = {
   sidebar: defaultSidebarPreferences,
   agent: {
     workspaceSettings: {},
-    disabledModelIds: ['claude-opus-4.6', 'kimi-k2.5', 'gpt-5.4', 'MiniMax-M2'],
+    disabledModelIds: [
+      'claude-opus-4.6',
+      'kimi-k2.5',
+      'gpt-5.4',
+      'MiniMax-M2',
+      'gemini-3-flash-preview',
+    ],
     disabledPluginIds: [],
   },
   providerConfigs: {
