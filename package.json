@@ -45,7 +45,7 @@
     "lefthook": "^1.12.2",
     "semver": "^7.8.0",
     "ts-node": "10.9.2",
-    "turbo": "^2.9.12",
+    "turbo": "^2.9.14",
     "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.30.3",
