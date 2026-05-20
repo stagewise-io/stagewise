@@ -90,6 +90,23 @@ const GOOGLE_INPUT_CONSTRAINTS: InputConstraints = {
   },
 };
 
+const GEMINI35_INPUT_CONSTRAINTS: InputConstraints = {
+  ...GOOGLE_INPUT_CONSTRAINTS,
+  audio: {
+    mimeTypes: [
+      'audio/aac',
+      'audio/aiff',
+      'audio/flac',
+      'audio/mp3',
+      'audio/mpeg',
+      'audio/ogg',
+      'audio/wav',
+      'audio/webm',
+    ],
+    maxBytes: 20_971_520, // 20 MB inline request limit
+  },
+};
+
 export const availableModels = [
   // Anthropic Models
   {
@@ -546,6 +563,46 @@ export const availableModels = [
         file: false,
       },
       inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'google',
+    modelId: 'gemini-3.5-flash',
+    modelDisplayName: 'Gemini 3.5 Flash',
+    modelDescription:
+      "Google's most intelligent model for sustained frontier performance on agentic and coding tasks.",
+    modelContext: '1m context',
+    modelContextRaw: 1_048_576,
+    headers: googleHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.5,
+      outputPerMillion: 9.0,
+      relativeMultiplier: 1.75,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: true,
+        image: true,
+        video: true,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GEMINI35_INPUT_CONSTRAINTS,
       toolCalling: true,
     },
   },
