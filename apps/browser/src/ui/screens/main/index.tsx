@@ -33,6 +33,11 @@ import {
 import { ContentToggleButton } from './_components/content-toggle-button';
 import { GlobalHotkeyBindings } from './_components/global-hotkey-bindings';
 import { AgentHotkeyBindings } from './_components/agent-hotkey-bindings';
+import {
+  CommandCenter,
+  CommandCenterHotkeys,
+  CommandCenterProvider,
+} from './command-center';
 
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
 
@@ -43,7 +48,9 @@ export function DefaultLayout({ show }: { show: boolean }) {
         <SidebarCollapsedProvider>
           <ContentCollapsedProvider>
             <PendingRemovalsProvider>
-              <DefaultLayoutInner show={show} />
+              <CommandCenterProvider>
+                <DefaultLayoutInner show={show} />
+              </CommandCenterProvider>
             </PendingRemovalsProvider>
           </ContentCollapsedProvider>
         </SidebarCollapsedProvider>
@@ -154,6 +161,8 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
     <>
       {show && <GlobalHotkeyBindings />}
       {show && <AgentHotkeyBindings onCreateTab={handleCreateTab} />}
+      {show && <CommandCenterHotkeys />}
+      <CommandCenter />
       <div
         className={cn(
           'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',

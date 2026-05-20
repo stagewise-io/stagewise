@@ -26,6 +26,7 @@ export enum HotkeyActions {
   TOGGLE_CONTEXT_SELECTOR = 'toggle_context_selector',
   TOGGLE_SIDEBAR = 'toggle_sidebar',
   FOCUS_CHAT_INPUT = 'focus_chat_input',
+  OPEN_COMMAND_CENTER = 'open_command_center',
   NEW_CHAT = 'new_chat',
   DOWNLOADS = 'downloads',
 
@@ -105,6 +106,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   // Focus the chat input. One-way focus command; does not toggle away.
   [HotkeyActions.FOCUS_CHAT_INPUT]: {
     accelerator: 'Mod+L',
+    captureDominantly: true,
+  },
+  [HotkeyActions.OPEN_COMMAND_CENTER]: {
+    accelerator: 'Mod+K',
     captureDominantly: true,
   },
   [HotkeyActions.NEW_CHAT]: {
@@ -305,15 +310,25 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
 };
 
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    platform?: string;
+  };
+};
+
 /**
  * Detects the current platform based on navigator.
  */
 export function getCurrentPlatform(): Platform {
-  if (typeof navigator !== 'undefined') {
-    const platform = navigator.platform.toLowerCase();
-    if (platform.includes('mac')) return 'mac';
-    if (platform.includes('win')) return 'windows';
-  }
+  if (typeof navigator === 'undefined') return 'linux';
+
+  const { userAgentData } = navigator as NavigatorWithUserAgentData;
+  const platform = userAgentData?.platform ?? '';
+  const userAgent = navigator.userAgent ?? '';
+  const platformInfo = `${platform} ${userAgent}`.toLowerCase();
+
+  if (platformInfo.includes('mac')) return 'mac';
+  if (platformInfo.includes('win')) return 'windows';
   return 'linux';
 }
 

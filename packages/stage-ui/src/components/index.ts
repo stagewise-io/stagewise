@@ -7,6 +7,14 @@ export { Switch } from './switch';
 export { Checkbox } from './checkbox';
 export { Skeleton, type SkeletonProps } from './skeleton';
 export {
+  ShortcutCombo,
+  ShortcutKey,
+  type ShortcutComboProps,
+  type ShortcutKeyProps,
+  type ShortcutKeySize,
+  type ShortcutKeyVariant,
+} from './shortcut-key';
+export {
   Select,
   type SelectProps,
   type SelectItem,
