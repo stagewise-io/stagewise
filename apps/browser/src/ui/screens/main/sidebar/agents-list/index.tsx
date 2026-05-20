@@ -41,6 +41,7 @@ import {
 import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
 import {
@@ -48,7 +49,7 @@ import {
   mergeAgentEntries,
   type ActiveAgentCardData,
   type MergedAgentEntry,
-} from './agent-list-model';
+} from '../../_lib/agent-list-model';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -75,6 +76,7 @@ import {
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+import { useCommandCenter } from '../../command-center';
 
 enablePatches();
 
@@ -334,7 +336,6 @@ function SortablePinnedAgentCard({
 // ============================================================================
 
 export function AgentsList() {
-  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const [openAgent, setOpenAgent] = useOpenAgent();
   const { previewAgentId } = useAgentSwitcher();
   const createAgent = useKartonProcedure((p) => p.agents.create);
@@ -354,9 +355,7 @@ export function AgentsList() {
   const getAgentHistoryEntriesByIdsRef = useRef(getAgentHistoryEntriesByIds);
   getAgentHistoryEntriesByIdsRef.current = getAgentHistoryEntriesByIds;
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const togglePanelKeyboardFocus = useKartonProcedure(
-    (p) => p.browser.layout.togglePanelKeyboardFocus,
-  );
+  const { open: openCommandCenter } = useCommandCenter();
   const pinnedAgentIds = useKartonState(
     useComparingSelector((s) => s.preferences.sidebar.pinnedAgentIds),
   );
@@ -796,7 +795,7 @@ export function AgentsList() {
   // Search
   // =========================================================================
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = '';
 
   useEffect(() => {
     if (!optimisticPinnedAgentIds) return;
@@ -1080,12 +1079,12 @@ export function AgentsList() {
         >
           <IconPenPlusOutline18 className="size-4" />
           New Agent
-          <span
-            className="ml-auto font-mono text-muted-foreground/50 text-sm opacity-0 transition-[color,opacity] group-hover/new-agent:text-foreground group-hover/new-agent:opacity-100"
-            translate="no"
-          >
-            {isMacOs ? '⌘ N' : 'Ctrl N'}
-          </span>
+          <HotkeyCombo
+            action={HotkeyActions.NEW_CHAT}
+            className="ml-auto opacity-0 transition-opacity group-hover/new-agent:opacity-100"
+            size="xs"
+            variant="chrome"
+          />
         </Button>
         <div className="mt-2 flex items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1.5">
           <IconMagnifierOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
@@ -1093,19 +1092,24 @@ export function AgentsList() {
             type="text"
             aria-label="Search agents"
             placeholder="Search agents…"
-            value={searchQuery}
+            value=""
             onPointerDown={(e) => {
               if (!e.isPrimary || e.button !== 0) return;
-              window.dispatchEvent(
-                new Event('sidebar-agent-search-focus-requested'),
-              );
-              void togglePanelKeyboardFocus('stagewise-ui');
+              e.preventDefault();
+              openCommandCenter({ initialMode: 'agents' });
             }}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => openCommandCenter({ initialMode: 'agents' })}
+            onChange={() => {}}
             className={cn(
               'w-full bg-transparent text-foreground text-sm placeholder:text-muted-foreground',
               'outline-none',
             )}
+          />
+          <HotkeyCombo
+            action={HotkeyActions.OPEN_COMMAND_CENTER}
+            className="shrink-0"
+            size="xs"
+            variant="chrome"
           />
         </div>
       </div>
