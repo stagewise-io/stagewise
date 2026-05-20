@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha095 (2026-05-20)
+
+### Features
+
+* add gemini 3.5 flash (d5cb1c6)
+
 ## 1.0.0-alpha094 (2026-05-18)
 
 ### Features
