@@ -65,6 +65,9 @@ function Page() {
               email={userAccount.user?.email}
               subscription={userAccount.subscription}
               machineId={userAccount.machineId}
+              serverUnreachable={
+                userAccount.status === 'server_unreachable'
+              }
               onLogout={() => void logout()}
             />
           ) : (
@@ -80,6 +83,7 @@ function AuthenticatedView({
   email,
   subscription,
   machineId,
+  serverUnreachable,
   onLogout,
 }: {
   email?: string;
@@ -89,12 +93,20 @@ function AuthenticatedView({
     expiresAt?: string;
   };
   machineId?: string;
+  serverUnreachable?: boolean;
   onLogout: () => void;
 }) {
   const openTab = useKartonProcedure((p) => p.openTab);
 
   return (
     <>
+      {serverUnreachable && (
+        <p className="rounded-md bg-warning-background px-3 py-2 text-sm text-warning-foreground">
+          Unable to connect to the stagewise server. Showing cached account
+          data.
+        </p>
+      )}
+
       {/* User info */}
       <div className="flex flex-col gap-2">
         <h2 className="font-medium text-foreground text-lg">
