@@ -17,7 +17,7 @@ import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@ui/utils';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { useAutoScroll } from '@ui/hooks/use-auto-scroll';
-import { ChatSuggestion, suggestions } from '@ui/components/suggestions';
+import { EmptyChatSuggestions } from './empty-chat-suggestions';
 import { useMessageEditState } from '@ui/hooks/use-message-edit-state';
 import { useScrollbarWidth } from '@ui/hooks/use-scrollbar-width';
 import { AttachmentMetadataProvider } from '@ui/hooks/use-attachment-metadata';
@@ -268,22 +268,6 @@ export const ChatHistory = () => {
       resizeObserver?.disconnect();
     };
   }, [isAutoScrollEnabled, scrollToBottom, scroller]);
-
-  // Shuffle suggestions once on mount using Fisher-Yates algorithm
-  const [shuffledSuggestions] = useState(() => {
-    const shuffled = [...suggestions];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]!] = [shuffled[j]!, shuffled[i]!];
-    }
-    return shuffled;
-  });
-
-  const visibleSuggestions = useMemo(() => {
-    return shuffledSuggestions
-      .filter((s) => !removedSuggestionIds.has(s.id))
-      .slice(0, 3);
-  }, [removedSuggestionIds, shuffledSuggestions]);
 
   const handleRemoveSuggestion = (id: string) => {
     // State update first — telemetry is fire-and-forget and must never be
@@ -1022,34 +1006,13 @@ export const ChatHistory = () => {
   const EmptyPlaceholder = useCallback(() => {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center gap-1 px-6 pb-[calc(12px+var(--status-card-height,0px))] text-sm">
-        {visibleSuggestions.map((suggestion) => (
-          <ChatSuggestion
-            key={suggestion.id}
-            {...suggestion}
-            onClick={async () => {
-              if (!openAgent) return;
-              track('suggestion-clicked', {
-                suggestion_id: suggestion.id,
-                context: 'empty-chat',
-              });
-              await createTab(suggestion.origin.url);
-              await sendUserMessage(openAgent, {
-                id: crypto.randomUUID(),
-                role: 'user',
-                parts: [
-                  {
-                    type: 'text',
-                    text: suggestion.prompt,
-                  },
-                ],
-              });
-            }}
-            onRemove={() => handleRemoveSuggestion(suggestion.id)}
-          />
-        ))}
+        <EmptyChatSuggestions
+          removedSuggestionIds={removedSuggestionIds}
+          onDismiss={handleRemoveSuggestion}
+        />
       </div>
     );
-  }, [visibleSuggestions, createTab, sendUserMessage, track]);
+  }, [removedSuggestionIds]);
 
   // If no messages, show empty state directly
   if (filteredMessages.length === 0) {

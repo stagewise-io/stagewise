@@ -355,7 +355,7 @@ export const SearchableSelect = memo(function SearchableSelect({
       ) : (
         <SelectBase.Trigger
           className={cn(
-            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none transition-colors focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2 has-disabled:pointer-events-none has-disabled:opacity-50',
+            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2 has-disabled:pointer-events-none has-disabled:opacity-50',
             triggerVariants[triggerVariant],
             sizes.trigger[size],
             triggerClassName,
@@ -439,7 +439,7 @@ export const SearchableSelect = memo(function SearchableSelect({
                                 key={String(gItem.value)}
                                 value={String(gItem.value)}
                                 className={cn(
-                                  'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md bg-background text-foreground outline-none transition-colors duration-150 ease-out hover:bg-hover-derived',
+                                  'group/item grid w-full min-w-24 cursor-default items-center gap-2 rounded-md bg-background text-foreground outline-none hover:bg-hover-derived',
                                   gItem.action
                                     ? 'grid-cols-[0.75rem_1fr_auto]'
                                     : 'grid-cols-[0.75rem_1fr]',
@@ -478,7 +478,7 @@ export const SearchableSelect = memo(function SearchableSelect({
                                   <button
                                     type="button"
                                     className={cn(
-                                      'col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground',
+                                      'col-start-3 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground',
                                       gItem.action.showOnHover &&
                                         'opacity-0 group-hover/item:opacity-100',
                                     )}

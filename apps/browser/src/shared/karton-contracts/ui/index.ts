@@ -56,7 +56,90 @@ export type DownloadSpeedDataPoint = {
   totalBytes: number;
 };
 
-/** Summary download info for the control button display */
+export type WorkspaceGitSummary = {
+  repositoryId: string;
+  worktreeId: string;
+  repoRoot: string;
+  commonGitDir: string;
+  isWorktree: boolean;
+  branch: string | null;
+  headSha: string | null;
+  status: {
+    dirty: boolean;
+    stagedCount: number;
+    unstagedCount: number;
+    untrackedCount: number;
+  } | null;
+};
+
+export type WorkspaceGitBranchInfo = {
+  name: string;
+  current: boolean;
+  checkedOut: boolean;
+  checkedOutPath?: string;
+};
+
+export type WorkspaceGitBranchesResult = {
+  current: string | null;
+  defaultBranch: string | null;
+  branches: WorkspaceGitBranchInfo[];
+};
+
+export type WorkspaceGitWorktreeInfo = {
+  worktreeId: string;
+  path: string;
+  branch: string | null;
+  headSha: string | null;
+  isDetached: boolean;
+  isMainWorktree: boolean;
+  current: boolean;
+};
+
+/**
+ * Worktree switching intentionally returns a path only; callers replace the
+ * mounted workspace with existing mount/unmount procedures. In no-message-yet
+ * chats, the UI may mount the repo root first for @-mentions, then run the
+ * selected Git action on first send and swap to the resulting path.
+ */
+export type WorkspaceGitWorktreesResult = {
+  currentPath: string | null;
+  worktrees: WorkspaceGitWorktreeInfo[];
+};
+
+export type WorkspaceGitFailureReason =
+  | 'not-git-repo'
+  | 'branch-not-found'
+  | 'branch-already-exists'
+  | 'branch-checked-out'
+  | 'worktree-already-exists'
+  | 'invalid-name'
+  | 'checkout-failed'
+  | 'worktree-create-failed';
+
+export type WorkspaceGitFailure = {
+  ok: false;
+  reason: WorkspaceGitFailureReason;
+  message: string;
+};
+
+export type WorkspaceGitMutationResult =
+  | { ok: true; git: WorkspaceGitSummary | null }
+  | WorkspaceGitFailure;
+
+export type WorkspaceGitCreateWorktreeResult =
+  | { ok: true; path: string; git: WorkspaceGitSummary | null }
+  | WorkspaceGitFailure;
+
+export type WorkspaceGitCreateBranchOptions = {
+  branchName: string;
+  sourceBranch: string;
+};
+
+export type WorkspaceGitCreateWorktreeOptions = {
+  worktreeName: string;
+  sourceBranch: string;
+};
+
 export type DownloadSummary = {
   /** Download ID */
   id: number;
@@ -459,16 +542,7 @@ export type MountedWorkspaceGitStatusSummary = {
   untrackedCount: number;
 };
 
-export type MountedWorkspaceGitSummary = {
-  repositoryId: string;
-  worktreeId: string;
-  repoRoot: string;
-  commonGitDir: string;
-  isWorktree: boolean;
-  branch: string | null;
-  headSha: string | null;
-  status: MountedWorkspaceGitStatusSummary | null;
-};
+export type MountedWorkspaceGitSummary = WorkspaceGitSummary;
 
 export type MountEntry = {
   prefix: string;
@@ -806,6 +880,47 @@ export type KartonContract = {
         agentInstanceId: string,
         mountPrefix: string,
       ) => Promise<void>;
+      listGitBranchesByPath: (
+        workspacePath: string,
+      ) => Promise<WorkspaceGitBranchesResult | null>;
+      listGitWorktreesByPath: (
+        workspacePath: string,
+      ) => Promise<WorkspaceGitWorktreesResult | null>;
+      switchGitBranchByPath: (
+        workspacePath: string,
+        branchName: string,
+      ) => Promise<WorkspaceGitMutationResult>;
+      createGitBranchByPath: (
+        workspacePath: string,
+        options: WorkspaceGitCreateBranchOptions,
+      ) => Promise<WorkspaceGitMutationResult>;
+      createGitWorktreeByPath: (
+        workspacePath: string,
+        options: WorkspaceGitCreateWorktreeOptions,
+      ) => Promise<WorkspaceGitCreateWorktreeResult>;
+      listWorkspaceGitBranches: (
+        agentInstanceId: string,
+        mountPrefix: string,
+      ) => Promise<WorkspaceGitBranchesResult | null>;
+      listWorkspaceGitWorktrees: (
+        agentInstanceId: string,
+        mountPrefix: string,
+      ) => Promise<WorkspaceGitWorktreesResult | null>;
+      switchWorkspaceGitBranch: (
+        agentInstanceId: string,
+        mountPrefix: string,
+        branchName: string,
+      ) => Promise<WorkspaceGitMutationResult>;
+      createWorkspaceGitBranch: (
+        agentInstanceId: string,
+        mountPrefix: string,
+        options: WorkspaceGitCreateBranchOptions,
+      ) => Promise<WorkspaceGitMutationResult>;
+      createWorkspaceGitWorktree: (
+        agentInstanceId: string,
+        mountPrefix: string,
+        options: WorkspaceGitCreateWorktreeOptions,
+      ) => Promise<WorkspaceGitCreateWorktreeResult>;
       generateWorkspaceMd: (
         agentInstanceId: string,
         mountPrefix: string,

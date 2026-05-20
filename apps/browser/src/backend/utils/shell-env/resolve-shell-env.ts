@@ -171,12 +171,14 @@ export async function resolveShellEnv(
   // empty process.env (no HOME, USER, PATH, etc.). Seed essential vars so
   // the login shell can bootstrap, locate ~/.profile / ~/.zprofile, and
   // produce a fully populated environment.
+  const fallbackPath =
+    '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/opt/homebrew/sbin';
   const env: Record<string, string> = {
-    PATH: '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/opt/homebrew/sbin',
-    HOME: homedir(),
-    USER: safeUsername(),
-    SHELL: shell.path,
     ...process.env,
+    PATH: process.env.PATH?.trim() ? process.env.PATH : fallbackPath,
+    HOME: homedir(),
+    USER: safeUsername() || process.env.USER,
+    SHELL: shell.path,
     STAGEWISE_RESOLVING_ENVIRONMENT: '1',
   } as Record<string, string>;
 

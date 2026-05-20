@@ -26,19 +26,23 @@ function isBlacklisted(shellPath: string): boolean {
   return BLACKLISTED_SHELLS.has(extractBasename(shellPath));
 }
 
-function deriveShellType(shellPath: string): ShellType {
+function deriveShellType(shellPath: string): ShellType | null {
   const name = extractBasename(shellPath);
   if (name === 'zsh') return 'zsh';
   if (name === 'bash') return 'bash';
   if (name === 'sh') return 'sh';
   if (name === 'pwsh' || name === 'powershell') return 'powershell';
-  return 'sh';
+  return null;
 }
 
 function tryCandidate(shellPath: string): DetectedShell | null {
   if (!fileExists(shellPath)) return null;
   if (isBlacklisted(shellPath)) return null;
-  return { type: deriveShellType(shellPath), path: shellPath };
+
+  const type = deriveShellType(shellPath);
+  if (!type) return null;
+
+  return { type, path: shellPath };
 }
 
 function whereLookup(binary: string): string | null {
