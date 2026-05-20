@@ -72,7 +72,13 @@ export class AuthServerInterop {
     const SUBSCRIPTION_TIMEOUT_MS = 15_000;
     const subscriptionData = await Promise.race([
       client.v1.billing.plan.get().then(({ data, error }) => {
-        if (error) throw new Error(String(error));
+        if (error)
+          throw new Error(
+            typeof error === 'string'
+              ? error
+              : ((error as { message?: string }).message ??
+                JSON.stringify(error)),
+          );
         return data;
       }),
       new Promise<null>((_, reject) =>
@@ -124,7 +130,12 @@ export class AuthServerInterop {
     const { data, error } = await client.v1.usage.history.get({
       query: { days: String(days) },
     });
-    if (error) throw new Error(String(error));
+    if (error)
+      throw new Error(
+        typeof error === 'string'
+          ? error
+          : ((error as { message?: string }).message ?? JSON.stringify(error)),
+      );
     return data as UsageHistoryResponse;
   }
 }
