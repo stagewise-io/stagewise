@@ -3,6 +3,7 @@ import { StatusCard } from './footer-status-card';
 import type { SelectedElement } from '@shared/selected-elements';
 import { useMessageEditState } from '@ui/hooks/use-message-edit-state';
 import { useFileAttachments } from '@ui/hooks/use-file-attachments';
+import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useDragDrop } from '@ui/hooks/use-drag-drop';
 import { useElementSelectionWatcher } from '@ui/hooks/use-element-selection-watcher';
 import { cn, generateId, collectUserMessageMetadata } from '@ui/utils';
@@ -65,6 +66,11 @@ import {
   enrichTipTapContent,
 } from '@ui/utils/tiptap-content-utils';
 import { getCurrentDraftAnswers } from './footer-status-card/user-question-section';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -80,6 +86,44 @@ function formatWorkspaceGitRef(git: MountEntry['git']): string | null {
 
 function getWorkspaceDisplayName(mount: MountEntry): string {
   return mount.path.split(/[\\/]/).filter(Boolean).at(-1) ?? mount.path;
+}
+
+function formatWorkspaceActionError(message: string): string {
+  const trimmed = message.trim();
+  const withoutCliPrefix = trimmed.replace(
+    /^([^:\n]+:\s*)?stagewise:\s*error:\s*/i,
+    '',
+  );
+
+  return withoutCliPrefix.trim() || trimmed;
+}
+
+function WorkspaceActionErrorMessage({ message }: { message: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { isTruncated, tooltipOpen, setTooltipOpen } = useIsTruncated(ref);
+  const displayMessage = formatWorkspaceActionError(message);
+
+  return (
+    <Tooltip open={isTruncated && tooltipOpen} onOpenChange={setTooltipOpen}>
+      <TooltipTrigger>
+        <div
+          ref={ref}
+          role="alert"
+          className={cn(
+            'line-clamp-3 whitespace-pre-wrap break-words px-1 text-error-foreground text-xs',
+            isTruncated && 'app-no-drag',
+          )}
+        >
+          {displayMessage}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        <div className="max-h-48 max-w-80 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed">
+          {displayMessage}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function getPendingWorkspacePreparationKind(
@@ -1515,9 +1559,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         <StatusCard />
       </div>
       {workspaceActionError && (
-        <div className="px-1 text-error-foreground text-xs">
-          {workspaceActionError}
-        </div>
+        <WorkspaceActionErrorMessage message={workspaceActionError} />
       )}
       <WorkspaceSelect
         onWorkspaceChange={handleWorkspaceChange}

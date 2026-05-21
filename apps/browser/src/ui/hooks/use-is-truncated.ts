@@ -9,7 +9,11 @@ export function useIsTruncated(ref: RefObject<HTMLElement | null>) {
     if (!el) return;
 
     const check = () => {
-      setIsTruncated(el.isConnected && el.scrollWidth > el.clientWidth);
+      setIsTruncated(
+        el.isConnected &&
+          (el.scrollWidth > el.clientWidth ||
+            el.scrollHeight > el.clientHeight),
+      );
     };
     check();
 
