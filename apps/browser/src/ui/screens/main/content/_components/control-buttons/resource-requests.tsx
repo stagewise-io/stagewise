@@ -426,7 +426,8 @@ export function ResourceRequestsControlButton({
 }) {
   const permissionRequests = useKartonState(
     (s) =>
-      s.browser.tabs[tabId]?.permissionRequests ?? EMPTY_PERMISSION_REQUESTS,
+      s.contentTabs.tabs[tabId]?.permissionRequests ??
+      EMPTY_PERMISSION_REQUESTS,
   );
 
   const acceptPermission = useKartonProcedure(

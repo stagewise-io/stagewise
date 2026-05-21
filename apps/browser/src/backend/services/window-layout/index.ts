@@ -1,6 +1,6 @@
 import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import path from 'node:path';
-import type { SelectedElement } from '@shared/karton-contracts/ui';
+import type { SelectedElement, TabState } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import { generateTabId, resetTabIdCounter } from './tab-id';
 import { getBrowserSessionId } from './browser-session';
@@ -15,16 +15,17 @@ import type { PreferencesService } from '../preferences';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import { UIController } from './ui-controller';
 import {
-  TabController,
+  BrowsingTabController,
   type ConsoleLogEntry,
   type GetConsoleLogsOptions,
-} from './tab-controller';
+} from './browsing-tab-controller';
 import { ChatStateController } from './chat-state-controller';
 import {
   type ColorScheme,
   type ConfigurablePermissionType,
   PermissionSetting,
   configurablePermissionTypes,
+  getTerminalTabDefaults,
 } from '@shared/karton-contracts/ui';
 import { THEME_COLORS } from '@/shared/theme-colors';
 import { DisposableService } from '../disposable';
@@ -56,13 +57,31 @@ const windowStateSchema = z.object({
 
 type WindowState = z.infer<typeof windowStateSchema>;
 
+const tabEntrySchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('browser'),
+    url: z.string(),
+    agentInstanceId: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal('terminal'),
+    id: z.string(),
+    cwd: z.string(),
+    title: z.string(),
+    agentInstanceId: z.string().nullable(),
+  }),
+]);
+
 const tabStateSchema = z.object({
   /** Ordered list of tabs that were open */
   tabs: z.array(
-    z.object({
-      url: z.string(),
-      agentInstanceId: z.string().nullable(),
-    }),
+    z.preprocess((val) => {
+      // Normalize legacy entries (no `type` field) to `type: 'browser'`.
+      if (typeof val === 'object' && val !== null && !('type' in val)) {
+        return { type: 'browser', ...(val as Record<string, unknown>) };
+      }
+      return val;
+    }, tabEntrySchema),
   ),
   /** Index into `tabs` of the active tab, or -1 if none */
   activeTabIndex: z.number().int().min(-1),
@@ -107,7 +126,7 @@ export class WindowLayoutService extends DisposableService {
 
   private baseWindow: BaseWindow | null = null;
   private uiController: UIController | null = null;
-  private tabs: Record<string, TabController> = {};
+  private tabs: Record<string, BrowsingTabController> = {};
   private activeTabId: string | null = null;
   private chatStateController: ChatStateController | null = null;
 
@@ -122,10 +141,122 @@ export class WindowLayoutService extends DisposableService {
    *  loadTabState(); consumed and cleared lazily by ensureAgentTabsCreated(). */
   private deferredTabConfigs = new Map<
     string | null,
-    { url: string; agentInstanceId: string | null }[]
+    z.infer<typeof tabEntrySchema>[]
   >();
   /** Tracks the last active tab per agent instance for persistence & restore. */
   private lastActiveTabPerAgent: Record<string, string> = {};
+  /** Callback wired by ToolboxService — invoked when a terminal tab is
+   *  closed so TerminalService can kill the PTY and clean up buffers. */
+  private onCloseTerminal: ((terminalId: string) => void) | null = null;
+
+  /** Register a callback that WindowLayoutService uses to delegate PTY
+   *  teardown to TerminalService when the user closes a terminal tab. */
+  public setOnCloseTerminal(fn: (terminalId: string) => void): void {
+    this.onCloseTerminal = fn;
+  }
+
+  /** Callback invoked before tab state persistence so TerminalService
+   *  can refresh each live terminal's current cwd in Karton state. */
+  private onBeforeSaveTabState: (() => void) | null = null;
+
+  public setOnBeforeSaveTabState(fn: () => void): void {
+    this.onBeforeSaveTabState = fn;
+  }
+
+  /** Callback invoked when a deferred terminal tab is lazily restored
+   *  so TerminalService can spawn the PTY that was skipped during eager
+   *  init. */
+  private onDeferredTerminalRestored:
+    | ((terminalId: string, cwd: string) => void)
+    | null = null;
+
+  public setOnDeferredTerminalRestored(
+    fn: (terminalId: string, cwd: string) => void,
+  ): void {
+    this.onDeferredTerminalRestored = fn;
+  }
+
+  /** Called by TerminalService after inserting a terminal tab into
+   *  contentTabs.  Routes activation through handleSwitchTab so the
+   *  previous browser tab's Electron WebContentsView is hidden,
+   *  this.activeTabId is updated, and Karton state is synced — all
+   *  in the single centralized code path.  Without this call,
+   *  TerminalService would have to duplicate view management. */
+  public activateTerminalTab(terminalId: string): void {
+    void this.handleSwitchTab(terminalId).catch((err) =>
+      this.logger.error('activateTerminalTab failed', err),
+    );
+  }
+
+  /** Called by TerminalService when a PTY exits asynchronously (not
+   *  via user-initiated close).  This path is separate from
+   *  handleCloseTab because the close was not triggered through the
+   *  UI → UIController → handleCloseTab chain.  If the exited
+   *  terminal was the active tab, picks the next tab via
+   *  handleSwitchTab (which persists via saveTabState).  The
+   *  terminal has already been removed from contentTabs.tabs by
+   *  TerminalService.onPtyExit, so saveTabState will see the
+   *  correct post-exit state. */
+  /** Shared visibility filter for tab-close and terminal-exit paths.
+   *  Returns the last tab in `allIds` whose agentInstanceId is either
+   *  null (global) or matches `agentFilter`.  When `preferAtIndex` is
+   *  provided, prefers the first tab at or after that index; falls back
+   *  to the last visible tab otherwise. */
+  private pickNextVisibleTab(
+    allIds: string[],
+    agentFilter: string | null,
+    preferAtIndex?: number,
+  ): string | undefined {
+    const tabs = this.uiKarton.state.contentTabs.tabs;
+    const visible = allIds.filter((id) => {
+      const kt = tabs[id];
+      if (!kt) return false;
+      if (kt.type === 'terminal') return true;
+      const aid = kt.agentInstanceId;
+      return aid === null || aid === agentFilter;
+    });
+    if (visible.length === 0) return undefined;
+    if (preferAtIndex !== undefined) {
+      return (
+        visible.find((id) => allIds.indexOf(id) >= preferAtIndex) ??
+        visible[visible.length - 1]
+      );
+    }
+    return visible[visible.length - 1];
+  }
+
+  /** Shared cleanup of lastActiveTabPerAgent entries pointing to a
+   *  removed tab. */
+  private purgeLastActiveRefs(removedTabId: string): void {
+    for (const [aid, tid] of Object.entries(this.lastActiveTabPerAgent)) {
+      if (tid === removedTabId) delete this.lastActiveTabPerAgent[aid];
+    }
+  }
+
+  public async handleTerminalTabExited(terminalId: string): Promise<void> {
+    if (this.activeTabId !== terminalId) {
+      this.purgeLastActiveRefs(terminalId);
+      return;
+    }
+
+    const remainingIds = Object.keys(this.uiKarton.state.contentTabs.tabs);
+    const lastOpenAgent = this.uiKarton.state.browser.lastOpenAgentId;
+    const nextTabId = this.pickNextVisibleTab(remainingIds, lastOpenAgent);
+
+    if (nextTabId) {
+      await this.handleSwitchTab(nextTabId);
+    } else {
+      this.activeTabId = null;
+      this.isWebContentInteractive = false;
+      this.uiKarton.setState((draft) => {
+        draft.contentTabs.activeTabId = null;
+      });
+      this.saveTabState();
+    }
+
+    this.purgeLastActiveRefs(terminalId);
+  }
+
   private lastNonMaximizedBounds: {
     width: number;
     height: number;
@@ -818,7 +949,7 @@ export class WindowLayoutService extends DisposableService {
     );
   }
 
-  private get activeTab(): TabController | undefined {
+  private get activeTab(): BrowsingTabController | undefined {
     if (!this.activeTabId) return undefined;
     return this.tabs[this.activeTabId];
   }
@@ -828,9 +959,9 @@ export class WindowLayoutService extends DisposableService {
    * Used by services like DevToolAPIService to access tabs.
    *
    * @param tabId - Optional tab ID. If not provided, returns the active tab.
-   * @returns The TabController instance or undefined if not found
+   * @returns The BrowsingTabController instance or undefined if not found
    */
-  public getTab(tabId?: string): TabController | undefined {
+  public getTab(tabId?: string): BrowsingTabController | undefined {
     if (tabId) {
       return this.tabs[tabId];
     }
@@ -917,7 +1048,7 @@ export class WindowLayoutService extends DisposableService {
 
     // Create search utils instance for resolving navigation targets
     const searchUtils = createSearchUtils(searchUtilsConfig);
-    const tab = new TabController(
+    const tab = new BrowsingTabController(
       id,
       this.baseWindow!,
       this.logger,
@@ -938,7 +1069,7 @@ export class WindowLayoutService extends DisposableService {
     // Subscribe to state updates
     tab.on('stateUpdated', (updates) => {
       this.uiKarton.setState((draft) => {
-        const tabState = draft.browser.tabs[id];
+        const tabState = draft.contentTabs.tabs[id];
         if (tabState) {
           Object.assign(tabState, updates);
         }
@@ -982,7 +1113,7 @@ export class WindowLayoutService extends DisposableService {
       // Only update if this is the active tab
       if (this.activeTabId === id) {
         this.uiKarton.setState((draft) => {
-          draft.browser.hoveredElement = element;
+          draft.browsing.hoveredElement = element;
         });
       }
     });
@@ -1050,7 +1181,7 @@ export class WindowLayoutService extends DisposableService {
 
     if (shouldInsertAfterSource) {
       // Insert new tab right after the source tab by reconstructing the tabs object
-      const newTabs: Record<string, TabController> = {};
+      const newTabs: Record<string, BrowsingTabController> = {};
       for (const [existingId, existingTab] of Object.entries(this.tabs)) {
         newTabs[existingId] = existingTab;
         if (existingId === sourceTabId) {
@@ -1069,16 +1200,20 @@ export class WindowLayoutService extends DisposableService {
 
     // Initialize state in Karton with proper ordering
     this.uiKarton.setState((draft) => {
+      // tab.getState() returns BrowsingTabController's local TabState
+      // (no cwd).  Karton's TabState requires cwd — supply empty string
+      // for browser tabs (terminal tabs go through a different path).
       const newTabState = {
         id,
+        cwd: '',
         ...tab.getState(),
       };
 
       if (shouldInsertAfterSource && sourceTabId) {
         // Reconstruct tabs object to maintain order
-        const newBrowserTabs: typeof draft.browser.tabs = {};
+        const newBrowserTabs: typeof draft.contentTabs.tabs = {};
         for (const [existingId, existingState] of Object.entries(
-          draft.browser.tabs,
+          draft.contentTabs.tabs,
         )) {
           newBrowserTabs[existingId] = existingState;
           if (existingId === sourceTabId) {
@@ -1086,10 +1221,10 @@ export class WindowLayoutService extends DisposableService {
             newBrowserTabs[id] = newTabState;
           }
         }
-        draft.browser.tabs = newBrowserTabs;
+        draft.contentTabs.tabs = newBrowserTabs;
       } else {
         // Append to end (default behavior)
-        draft.browser.tabs[id] = newTabState;
+        draft.contentTabs.tabs[id] = newTabState;
       }
     });
 
@@ -1118,9 +1253,50 @@ export class WindowLayoutService extends DisposableService {
 
   private handleCloseTab = async (tabId: string) => {
     const tab = this.tabs[tabId];
+    const isTerminal =
+      !tab && this.uiKarton.state.contentTabs.tabs[tabId]?.type === 'terminal';
+
+    if (isTerminal) {
+      // Delegate PTY teardown and buffer cleanup to TerminalService.
+      // WindowLayoutService owns active-tab selection — handle it here
+      // after the terminal tab has been removed from Karton state.
+      const wasActive =
+        this.activeTabId === tabId ||
+        this.uiKarton.state.contentTabs.activeTabId === tabId;
+      // Snapshot the terminal's agent before onCloseTerminal removes it.
+      const kartonTab = this.uiKarton.state.contentTabs.tabs[tabId];
+      const closedAgentInstanceId = kartonTab?.agentInstanceId ?? null;
+      this.onCloseTerminal?.(tabId);
+      if (wasActive) {
+        const remainingIds = Object.keys(this.uiKarton.state.contentTabs.tabs);
+        const nextTabId = this.pickNextVisibleTab(
+          remainingIds,
+          closedAgentInstanceId,
+        );
+        if (nextTabId) {
+          await this.handleSwitchTab(nextTabId);
+        } else {
+          this.activeTabId = null;
+          this.isWebContentInteractive = false;
+          this.uiKarton.setState((draft) => {
+            draft.contentTabs.activeTabId = null;
+          });
+          this.saveTabState();
+        }
+        this.purgeLastActiveRefs(tabId);
+      } else {
+        this.saveTabState();
+      }
+      return;
+    }
+
     if (tab) {
-      // Get tab order before deletion to determine next/previous tab
-      const tabIdsBeforeDeletion = Object.keys(this.tabs);
+      // Get tab order before deletion to determine next/previous tab.
+      // Use contentTabs.tabs (not this.tabs) so terminal tabs are included
+      // in positional calculations.
+      const tabIdsBeforeDeletion = Object.keys(
+        this.uiKarton.state.contentTabs.tabs,
+      );
       const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
       const isActiveTab = this.activeTabId === tabId;
       const closedAgentInstanceId = tab.getState().agentInstanceId;
@@ -1147,78 +1323,101 @@ export class WindowLayoutService extends DisposableService {
       // Prefer tabs visible to the closed tab's agent (global + same-agent)
       // so we don't switch to a tab the UI will hide, leaving empty content.
       let nextTabId: string | undefined;
-      let nextTabAgentInstanceId: string | undefined;
       if (isActiveTab) {
-        const remainingTabIds = Object.keys(this.tabs);
-        // Filter to tabs visible from the closed tab's agent perspective
-        const visibleRemaining = remainingTabIds.filter((id) => {
-          const agentId = this.tabs[id]?.getState().agentInstanceId;
-          return agentId === null || agentId === closedAgentInstanceId;
-        });
-        if (visibleRemaining.length > 0) {
-          // Pick the next visible tab in positional order (prefer same index,
-          // fall back to last in filtered list)
-          const nextVisible =
-            visibleRemaining.find(
-              (id) => remainingTabIds.indexOf(id) >= currentIndex,
-            ) ?? visibleRemaining[visibleRemaining.length - 1];
-          nextTabId = nextVisible;
-        } else if (remainingTabIds.length > 0) {
-          // No visible tabs left — fall back to any remaining tab
-          if (currentIndex < remainingTabIds.length) {
-            nextTabId = remainingTabIds[currentIndex];
-          } else if (currentIndex > 0) {
-            nextTabId = remainingTabIds[currentIndex - 1];
-          }
-        }
-        if (nextTabId) {
-          nextTabAgentInstanceId =
-            this.tabs[nextTabId]?.getState().agentInstanceId ?? undefined;
-        }
+        const allRemainingIds = Object.keys(
+          this.uiKarton.state.contentTabs.tabs,
+        ).filter((id) => id !== tabId);
+        nextTabId = this.pickNextVisibleTab(
+          allRemainingIds,
+          closedAgentInstanceId,
+          currentIndex,
+        );
       }
 
       // Do internal tab switch (bounds, visibility, z-order) but skip its
       // setState — we combine deletion + active-tab update below atomically.
+      // handleSwitchTab already updates this.lastActiveTabPerAgent with
+      // effectiveAgentId (tab-specific agent, falling back to lastOpenAgent).
       if (isActiveTab) {
         if (nextTabId) {
           await this.handleSwitchTab(nextTabId, true);
           this.activeTabId = nextTabId;
-          if (nextTabAgentInstanceId) {
-            this.lastActiveTabPerAgent[nextTabAgentInstanceId] = nextTabId;
-          }
         } else {
           this.activeTabId = null;
         }
       }
 
-      // Single atomic Karton state update: delete closed tab + set new active
+      // Single atomic Karton state update: delete closed tab + set new active.
+      // The skipSetState path in handleSwitchTab doesn't sync
+      // lastActiveTabPerAgent into Karton state, so apply the same
+      // effectiveAgentId logic here.
       const newTab = nextTabId ? this.tabs[nextTabId] : undefined;
       this.uiKarton.setState((draft) => {
-        delete draft.browser.tabs[tabId];
+        delete draft.contentTabs.tabs[tabId];
         if (isActiveTab) {
-          draft.browser.activeTabId = nextTabId ?? null;
+          draft.contentTabs.activeTabId = nextTabId ?? null;
           if (newTab) {
             draft.browser.viewportSize = newTab.getViewportSize();
-            if (nextTabAgentInstanceId) {
-              draft.browser.lastActiveTabPerAgent[nextTabAgentInstanceId] =
+            const nextTabAgentId = newTab.getState().agentInstanceId;
+            const effectiveNextAgentId =
+              nextTabAgentId ?? draft.browser.lastOpenAgentId;
+            if (effectiveNextAgentId) {
+              draft.browser.lastActiveTabPerAgent[effectiveNextAgentId] =
                 nextTabId!;
             }
           }
         }
       });
 
-      // Clean up stale lastActiveTabPerAgent entries for the closed tab
-      for (const [aid, tid] of Object.entries(this.lastActiveTabPerAgent)) {
-        if (tid === tabId) delete this.lastActiveTabPerAgent[aid];
-      }
+      this.purgeLastActiveRefs(tabId);
 
       this.saveTabState();
     }
   };
 
   private handleSwitchTab = async (tabId: string, skipSetState = false) => {
-    if (!this.tabs[tabId]) return;
+    // Terminal tabs are managed by TerminalService, not by Electron views.
+    // They have no BrowsingTabController — just update activeTabId in
+    // state.  Short-circuiting on this.activeTabId === tabId is now safe
+    // because TerminalService no longer sets activeTabId directly; all
+    // tab activations (creation, user click, PTY-exit fallback) route
+    // through this method, keeping this.activeTabId authoritative.
+    const isTerminal =
+      this.uiKarton.state.contentTabs.tabs[tabId]?.type === 'terminal';
+    if (!this.tabs[tabId] && !isTerminal) return;
     if (this.activeTabId === tabId) return;
+
+    if (isTerminal) {
+      const previousTabId = this.activeTabId;
+      // Hide previous browser tab if any
+      if (previousTabId && this.tabs[previousTabId]) {
+        this.tabs[previousTabId]!.setVisible(false);
+      }
+      this.activeTabId = tabId;
+      this.isWebContentInteractive = false;
+
+      // Track last-active tab per agent.  If the tab is agent-scoped
+      // use its own agent; otherwise record it for the currently open
+      // agent so global tabs are remembered across agent switches.
+      const tabAgentInstanceId =
+        this.uiKarton.state.contentTabs.tabs[tabId]?.agentInstanceId ?? null;
+      const effectiveAgentId =
+        tabAgentInstanceId ?? this.uiKarton.state.browser.lastOpenAgentId;
+      if (effectiveAgentId) {
+        this.lastActiveTabPerAgent[effectiveAgentId] = tabId;
+      }
+
+      if (!skipSetState) {
+        this.uiKarton.setState((draft) => {
+          draft.contentTabs.activeTabId = tabId;
+          if (effectiveAgentId) {
+            draft.browser.lastActiveTabPerAgent[effectiveAgentId] = tabId;
+          }
+        });
+        this.saveTabState();
+      }
+      return;
+    }
 
     const previousTabId = this.activeTabId;
 
@@ -1263,17 +1462,22 @@ export class WindowLayoutService extends DisposableService {
 
     this.updateZOrder();
 
-    const agentInstanceId = newTab.getState().agentInstanceId;
-    if (agentInstanceId) {
-      this.lastActiveTabPerAgent[agentInstanceId] = tabId;
+    // Track last-active tab per agent.  If the tab is agent-scoped
+    // use its own agent; otherwise record it for the currently open
+    // agent so global tabs are remembered across agent switches.
+    const tabAgentInstanceId = newTab.getState().agentInstanceId;
+    const effectiveAgentId =
+      tabAgentInstanceId ?? this.uiKarton.state.browser.lastOpenAgentId;
+    if (effectiveAgentId) {
+      this.lastActiveTabPerAgent[effectiveAgentId] = tabId;
     }
 
     if (!skipSetState) {
       this.uiKarton.setState((draft) => {
-        draft.browser.activeTabId = tabId;
+        draft.contentTabs.activeTabId = tabId;
         draft.browser.viewportSize = newTab.getViewportSize();
-        if (agentInstanceId) {
-          draft.browser.lastActiveTabPerAgent[agentInstanceId] = tabId;
+        if (effectiveAgentId) {
+          draft.browser.lastActiveTabPerAgent[effectiveAgentId] = tabId;
         }
       });
 
@@ -1282,32 +1486,44 @@ export class WindowLayoutService extends DisposableService {
   };
 
   private handleReorderTabs = async (tabIds: string[]) => {
-    // Validate that all provided tab IDs exist
-    const validTabIds = tabIds.filter((id) => this.tabs[id]);
+    const kartonTabs = this.uiKarton.state.contentTabs.tabs;
+
+    // Validate: browser tab IDs must exist in this.tabs; terminal tab IDs
+    // must exist in Karton state (they have no BrowsingTabController).
+    const validTabIds = tabIds.filter(
+      (id) => this.tabs[id] || kartonTabs[id]?.type === 'terminal',
+    );
     if (validTabIds.length !== tabIds.length) {
       this.logger.warn(
         '[WindowLayoutService] Some tab IDs in reorder request are invalid',
       );
     }
 
-    // Reorder internal tabs record
-    const newTabs: Record<string, TabController> = {};
+    // Reorder internal browser-tabs record (terminal tabs don't go here).
+    const newTabs: Record<string, BrowsingTabController> = {};
     for (const id of validTabIds) {
-      newTabs[id] = this.tabs[id]!;
+      if (this.tabs[id]) {
+        newTabs[id] = this.tabs[id]!;
+      }
     }
     this.tabs = newTabs;
 
     // Update ChatStateController tabs reference
     this.chatStateController?.updateTabsReference(this.tabs);
 
-    // Update Karton state with new tab order
+    // Rebuild Karton contentTabs.tabs in the new order.
+    // Preserve terminal tab entries (no BrowsingTabController) alongside browser tabs.
     this.uiKarton.setState((draft) => {
-      const newBrowserTabs: typeof draft.browser.tabs = {};
+      const newContentTabs: typeof draft.contentTabs.tabs = {};
       for (const id of validTabIds) {
-        newBrowserTabs[id] = draft.browser.tabs[id]!;
+        if (draft.contentTabs.tabs[id]) {
+          newContentTabs[id] = draft.contentTabs.tabs[id]!;
+        }
       }
-      draft.browser.tabs = newBrowserTabs;
+      draft.contentTabs.tabs = newContentTabs;
     });
+
+    this.saveTabState();
   };
 
   private handleUIReady = async () => {
@@ -1452,8 +1668,8 @@ export class WindowLayoutService extends DisposableService {
 
     // Update Karton state for UI
     this.uiKarton.setState((draft) => {
-      if (draft.browser.tabs[tabId]) {
-        draft.browser.tabs[tabId].isContentFullscreen = isFullscreen;
+      if (draft.contentTabs.tabs[tabId]) {
+        draft.contentTabs.tabs[tabId].isContentFullscreen = isFullscreen;
       }
     });
   };
@@ -1648,6 +1864,25 @@ export class WindowLayoutService extends DisposableService {
     tabId: string,
     agentInstanceId: string | null,
   ) => {
+    // Terminal tab path: no BrowsingTabController, update Karton state directly.
+    const terminalTab = this.uiKarton.state.contentTabs.tabs[tabId];
+    if (terminalTab?.type === 'terminal') {
+      const oldAgentId = terminalTab.agentInstanceId;
+      this.uiKarton.setState((draft) => {
+        const t = draft.contentTabs.tabs[tabId];
+        if (t) t.agentInstanceId = agentInstanceId;
+      });
+      if (oldAgentId && this.lastActiveTabPerAgent[oldAgentId] === tabId) {
+        delete this.lastActiveTabPerAgent[oldAgentId];
+      }
+      if (agentInstanceId) {
+        this.lastActiveTabPerAgent[agentInstanceId] = tabId;
+      }
+      this.saveTabState();
+      return;
+    }
+
+    // Browser tab path (existing)
     const tab = this.tabs[tabId];
     if (!tab) {
       this.logger.warn(
@@ -1687,9 +1922,63 @@ export class WindowLayoutService extends DisposableService {
       `[WindowLayoutService] Lazily creating ${configs.length} tabs for agent ${agentInstanceId}`,
     );
 
+    const restoredIds = new Map<(typeof configs)[number], string>();
     for (const cfg of configs) {
-      await this.createTab(cfg.url, false, undefined, cfg.agentInstanceId);
+      if (cfg.type === 'terminal') {
+        this.uiKarton.setState((draft) => {
+          draft.contentTabs.tabs[cfg.id] ??= {
+            ...getTerminalTabDefaults(),
+            id: cfg.id,
+            title: cfg.title,
+            agentInstanceId: cfg.agentInstanceId,
+            cwd: cfg.cwd,
+            createdAt: Date.now(),
+            lastFocusedAt: Date.now(),
+          };
+        });
+        restoredIds.set(cfg, cfg.id);
+        // Spawn the PTY that was skipped during eager init.
+        this.onDeferredTerminalRestored?.(cfg.id, cfg.cwd ?? process.cwd());
+      } else {
+        const id = await this.createTab(
+          cfg.url,
+          false,
+          undefined,
+          cfg.agentInstanceId,
+        );
+        restoredIds.set(cfg, id);
+      }
     }
+
+    const restoredOrder = configs
+      .map((cfg) => restoredIds.get(cfg))
+      .filter((id): id is string => Boolean(id));
+    if (restoredOrder.length === 0) return;
+
+    this.uiKarton.setState((draft) => {
+      const restoredSet = new Set(restoredOrder);
+      const existingTabs: typeof draft.contentTabs.tabs = {};
+      for (const [id, tab] of Object.entries(draft.contentTabs.tabs)) {
+        if (!restoredSet.has(id)) existingTabs[id] = tab;
+      }
+      for (const id of restoredOrder) {
+        const tab = draft.contentTabs.tabs[id];
+        if (tab) existingTabs[id] = tab;
+      }
+      draft.contentTabs.tabs = existingTabs;
+    });
+
+    const restoredSet = new Set(restoredOrder);
+    const existingBrowserTabs: Record<string, BrowsingTabController> = {};
+    for (const [id, tab] of Object.entries(this.tabs)) {
+      if (!restoredSet.has(id)) existingBrowserTabs[id] = tab;
+    }
+    for (const id of restoredOrder) {
+      const tab = this.tabs[id];
+      if (tab) existingBrowserTabs[id] = tab;
+    }
+    this.tabs = existingBrowserTabs;
+    this.chatStateController?.updateTabsReference(this.tabs);
   }
 
   private handleSetLastOpenAgentId = async (agentInstanceId: string | null) => {
@@ -1700,7 +1989,61 @@ export class WindowLayoutService extends DisposableService {
       draft.browser.lastOpenAgentId = agentInstanceId;
     });
     this.saveTabState();
+
+    // After lazy tab creation, activate an appropriate tab for the
+    // new agent.  The frontend effect may have already run before
+    // tabs were available, so the backend ensures the switch happens.
+    if (agentInstanceId) {
+      await this.activateAgentTab(agentInstanceId);
+    }
   };
+
+  /** Activate the best available tab for an agent after lazy restore.
+   *  Prefers: last-active tab → any agent-specific tab → any global
+   *  tab.  Safe to call even when the agent's tabs already exist
+   *  (no-op if a matching tab is already active). */
+  private async activateAgentTab(agentInstanceId: string): Promise<void> {
+    const tabs = this.uiKarton.state.contentTabs.tabs;
+    const activeId = this.uiKarton.state.contentTabs.activeTabId;
+
+    if (activeId && tabs[activeId]?.agentInstanceId === agentInstanceId) {
+      return;
+    }
+
+    const visibleIds = Object.keys(tabs).filter((id) => {
+      const t = tabs[id];
+      return (
+        t &&
+        (t.agentInstanceId === null || t.agentInstanceId === agentInstanceId)
+      );
+    });
+
+    if (visibleIds.length === 0) return;
+
+    // 1) Previously active tab for this agent
+    const prevActive = this.lastActiveTabPerAgent[agentInstanceId];
+    if (prevActive && tabs[prevActive] && visibleIds.includes(prevActive)) {
+      await this.handleSwitchTab(prevActive);
+      return;
+    }
+
+    // 2) Any agent-specific tab
+    const agentTab = visibleIds.find(
+      (id) => tabs[id]?.agentInstanceId === agentInstanceId,
+    );
+    if (agentTab) {
+      await this.handleSwitchTab(agentTab);
+      return;
+    }
+
+    // 3) Any global tab
+    const globalTab = visibleIds.find(
+      (id) => tabs[id]?.agentInstanceId === null,
+    );
+    if (globalTab) {
+      await this.handleSwitchTab(globalTab);
+    }
+  }
 
   private handleSetContextSelectionMode = async (active: boolean) => {
     const isAlreadyActive = this.uiKarton.state.browser.contextSelectionMode;
@@ -1708,7 +2051,7 @@ export class WindowLayoutService extends DisposableService {
     if (active && isAlreadyActive) {
       // Turn off for the currently active message ID
       this.uiKarton.setState((draft) => {
-        draft.browser.contextSelectionMode = false;
+        draft.browsing.contextSelectionMode = false;
       });
 
       // Brief delay to ensure UI updates
@@ -1728,7 +2071,7 @@ export class WindowLayoutService extends DisposableService {
       }
     }
     this.uiKarton.setState((draft) => {
-      draft.browser.contextSelectionMode = active;
+      draft.browsing.contextSelectionMode = active;
     });
   };
 
@@ -1902,7 +2245,7 @@ export class WindowLayoutService extends DisposableService {
   private handleActivateSearchBar = () => {
     if (!this.activeTabId) return;
     this.uiKarton.setState((draft) => {
-      const tab = draft.browser.tabs[this.activeTabId!];
+      const tab = draft.contentTabs.tabs[this.activeTabId!];
       if (tab) {
         tab.isSearchBarActive = true;
       }
@@ -1912,7 +2255,7 @@ export class WindowLayoutService extends DisposableService {
   private handleDeactivateSearchBar = () => {
     if (!this.activeTabId) return;
     this.uiKarton.setState((draft) => {
-      const tab = draft.browser.tabs[this.activeTabId!];
+      const tab = draft.contentTabs.tabs[this.activeTabId!];
       if (tab) {
         tab.isSearchBarActive = false;
       }
@@ -2144,24 +2487,38 @@ export class WindowLayoutService extends DisposableService {
   // Tab State Persistence
   // -------------------------------------------------------------------------
 
-  /** Persist open tabs and agent-tab associations so they survive restart. */
+  /** Persist open tabs and agent-tab associations so they survive restart.
+   *  Reads contentTabs.tabs live from Karton state — terminal deletions
+   *  performed by TerminalService (handleCloseTerminal, onPtyExit) are
+   *  already reflected by the time any active-tab switch calls this. */
   private saveTabState() {
     try {
-      // Sort global-first to match the UI display order
-      const sortedIds = [...Object.keys(this.tabs)].sort((a, b) => {
-        const aGlobal = this.tabs[a]!.getState().agentInstanceId === null;
-        const bGlobal = this.tabs[b]!.getState().agentInstanceId === null;
-        if (aGlobal && !bGlobal) return -1;
-        if (!aGlobal && bGlobal) return 1;
-        return 0;
-      });
-      const activeIndex = this.activeTabId
-        ? sortedIds.indexOf(this.activeTabId)
-        : -1;
+      // Terminal cwd can change after creation via `cd`. Ask
+      // TerminalService to refresh live PTY cwd values into Karton before
+      // reading contentTabs.tabs for persistence.
+      this.onBeforeSaveTabState?.();
+      // contentTabs.tabs key order matches the UI tab bar order (rebuilt
+      // on every reorder), so deriving allIds directly preserves the exact
+      // UI layout including browser/terminal interleaving.
+      const contentTabsTabs = this.uiKarton.state.contentTabs.tabs;
+      const allIds = Object.keys(contentTabsTabs);
+      const activeId = this.uiKarton.state.contentTabs.activeTabId;
+      const activeIndex = activeId ? allIds.indexOf(activeId) : -1;
       const state: PersistedTabState = {
-        tabs: sortedIds.map((id) => {
+        tabs: allIds.map((id) => {
+          const terminalTab = contentTabsTabs[id];
+          if (terminalTab?.type === 'terminal') {
+            return {
+              type: 'terminal' as const,
+              id: terminalTab.id,
+              cwd: terminalTab.cwd ?? '',
+              title: terminalTab.title,
+              agentInstanceId: terminalTab.agentInstanceId,
+            };
+          }
           const tabState = this.tabs[id]!.getState();
           return {
+            type: 'browser' as const,
             url: tabState.url,
             agentInstanceId: tabState.agentInstanceId,
           };
@@ -2222,14 +2579,58 @@ export class WindowLayoutService extends DisposableService {
       `[WindowLayoutService] Eagerly creating ${visibleTabs.length} tabs, deferring ${deferredCount}`,
     );
 
+    // Restore eager tabs and keep an explicit persisted-entry → runtime-id
+    // mapping. Browser tabs receive fresh IDs from createTab(); terminal tabs
+    // reuse their persisted IDs so TerminalService can respawn their PTYs.
+    const restoredIds = new Map<(typeof visibleTabs)[number], string>();
     for (const savedTab of visibleTabs) {
-      await this.createTab(
-        savedTab.url,
-        false,
-        undefined,
-        savedTab.agentInstanceId,
-      );
+      if (savedTab.type === 'terminal') {
+        this.uiKarton.setState((draft) => {
+          draft.contentTabs.tabs[savedTab.id] ??= {
+            ...getTerminalTabDefaults(),
+            id: savedTab.id,
+            title: savedTab.title,
+            agentInstanceId: savedTab.agentInstanceId,
+            cwd: savedTab.cwd,
+            createdAt: Date.now(),
+            lastFocusedAt: Date.now(),
+          };
+        });
+        restoredIds.set(savedTab, savedTab.id);
+      } else {
+        const id = await this.createTab(
+          savedTab.url,
+          false,
+          undefined,
+          savedTab.agentInstanceId,
+        );
+        restoredIds.set(savedTab, id);
+      }
     }
+
+    // createTab() and terminal insertion mutate contentTabs independently;
+    // explicitly rebuild the record in persisted order so mixed browser /
+    // terminal ordering survives restart.
+    const visibleOrder = visibleTabs
+      .map((savedTab) => restoredIds.get(savedTab))
+      .filter((id): id is string => Boolean(id));
+    this.uiKarton.setState((draft) => {
+      const orderedTabs: Record<string, TabState> = {};
+      for (const id of visibleOrder) {
+        const tab = draft.contentTabs.tabs[id];
+        if (tab) orderedTabs[id] = tab;
+      }
+      draft.contentTabs.tabs = orderedTabs;
+    });
+
+    // Keep internal browser-tab order aligned with the UI/Karton order.
+    const orderedBrowserTabs: Record<string, BrowsingTabController> = {};
+    for (const id of visibleOrder) {
+      const tab = this.tabs[id];
+      if (tab) orderedBrowserTabs[id] = tab;
+    }
+    this.tabs = orderedBrowserTabs;
+    this.chatStateController?.updateTabsReference(this.tabs);
 
     // Activate the tab at the saved index (only if it was among the visible tabs)
     if (state.activeTabIndex >= 0 && state.activeTabIndex < state.tabs.length) {
@@ -2238,8 +2639,7 @@ export class WindowLayoutService extends DisposableService {
         !targetTab.agentInstanceId ||
         targetTab.agentInstanceId === lastOpenAgentId
       ) {
-        const tabIds = Object.keys(this.tabs);
-        const targetId = tabIds[visibleTabs.indexOf(targetTab)];
+        const targetId = restoredIds.get(targetTab);
         if (targetId) await this.handleSwitchTab(targetId);
       }
     }
@@ -2331,12 +2731,12 @@ export class WindowLayoutService extends DisposableService {
   // =========================================================================
 
   /**
-   * Resolves a tab ID to a TabController instance.
+   * Resolves a tab ID to a BrowsingTabController instance.
    *
    * @param tabId - The tab ID (e.g., "1", "2", …)
-   * @returns The TabController instance or null if not found
+   * @returns The BrowsingTabController instance or null if not found
    */
-  private resolveTabById(tabId: string): TabController | null {
+  private resolveTabById(tabId: string): BrowsingTabController | null {
     return this.tabs[tabId] ?? null;
   }
 

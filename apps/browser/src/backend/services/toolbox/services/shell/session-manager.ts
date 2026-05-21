@@ -106,6 +106,7 @@ __stagewise_prompt_command() {
     printf '\\033]133;D;%d\\007' "$exit_code"
     __stagewise_command_executed=0
   fi
+  printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$PWD"
   printf '\\033]133;A\\007'
 }
 __stagewise_pre_exec() {
@@ -120,6 +121,7 @@ if [ -z "$PROMPT_COMMAND" ]; then
 else
   PROMPT_COMMAND="__stagewise_prompt_command;\${PROMPT_COMMAND}"
 fi
+printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$PWD"
 printf '\\033]133;A\\007'
 `.trim();
 
@@ -139,6 +141,7 @@ __stagewise_precmd() {
     printf '\\033]133;D;%d\\007' "$exit_code"
     __stagewise_command_executed=0
   fi
+  printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$PWD"
   printf '\\033]133;A\\007'
 }
 __stagewise_preexec() {
@@ -153,6 +156,7 @@ else
   precmd_functions+=(__stagewise_precmd)
   preexec_functions+=(__stagewise_preexec)
 fi
+printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$PWD"
 printf '\\033]133;A\\007'
 `.trim();
 

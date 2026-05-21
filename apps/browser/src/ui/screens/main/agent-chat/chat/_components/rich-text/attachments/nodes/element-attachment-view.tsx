@@ -137,7 +137,7 @@ function ElementPreviewContent({
   const openInIdeSelection = useKartonState(
     (s) => s.globalConfig.openFilesInIde,
   );
-  const tabs = useKartonState((s) => s.browser.tabs);
+  const tabs = useKartonState((s) => s.contentTabs.tabs);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const scrollToElement = useKartonProcedure((p) => p.browser.scrollToElement);
   const checkElementExists = useKartonProcedure(

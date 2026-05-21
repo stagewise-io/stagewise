@@ -14,6 +14,8 @@ import { WebContentsOverlayProvider } from '@ui/contexts';
 import { BasicAuthDialog } from './basic-auth-dialog';
 import { ColorSchemeWidget } from './control-buttons/color-scheme';
 import { ChromeDevToolsWidget } from './control-buttons/chrome-devtools';
+import { TabErrorBoundary } from './tab-error-boundary';
+import { PerTerminalContent } from '../../terminal-panel/_components/per-terminal-content';
 
 export interface PerTabContentRef {
   focusOmnibox: () => void;
@@ -27,7 +29,7 @@ interface PerTabContentProps {
 
 export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
   ({ tabId, isActive }, ref) => {
-    const tab = useKartonState((s) => s.browser.tabs[tabId]) as
+    const tab = useKartonState((s) => s.contentTabs.tabs[tabId]) as
       | TabState
       | undefined;
     const omniboxRef = useRef<OmniboxRef>(null);
@@ -59,58 +61,74 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
     );
 
     return (
-      <div
-        className={cn(
-          'absolute inset-0 flex flex-col',
-          isActive ? 'z-10' : 'hidden',
-        )}
-      >
-        {/* Control Bar */}
-        <div
-          className={cn(
-            'flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived-subtle border-t bg-background px-1 py-0',
-          )}
-        >
-          <NavButtons tabId={tabId} tab={tab} />
-          <Omnibox
-            ref={omniboxRef}
-            tabId={tabId}
-            tab={tab}
-            isActive={isActive}
-          />
-          <ZoomBar tabId={tabId} />
-          <SearchBar tabId={tabId} ref={searchBarRef} />
-          <div className="flex flex-row items-center gap-0.5">
-            <ResourceRequestsControlButton tabId={tabId} isActive={isActive} />
-            <DownloadsControlButton isActive={isActive} />
-
-            {tab && <ColorSchemeWidget tab={tab} />}
-
-            {tab && <ChromeDevToolsWidget tab={tab} />}
+      <TabErrorBoundary tabId={tabId}>
+        {tab?.type === 'terminal' ? (
+          <div
+            className={cn(
+              'absolute inset-0 flex flex-col',
+              isActive ? 'z-10' : 'hidden',
+            )}
+          >
+            <PerTerminalContent terminalId={tabId} isActive={isActive} />
           </div>
-        </div>
-        {/* Content area - wrapped with WebContentsOverlayProvider for overlay access */}
-        <WebContentsOverlayProvider>
-          <div className="flex size-full flex-col items-center justify-center overflow-hidden ring-1 ring-derived-subtle">
+        ) : (
+          <div
+            className={cn(
+              'absolute inset-0 flex flex-col',
+              isActive ? 'z-10' : 'hidden',
+            )}
+          >
+            {/* Control Bar */}
             <div
-              ref={devAppPreviewContainerRef}
-              id={`dev-app-preview-container-${tabId}`}
-              className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
-            >
-              {/* Unified web contents overlay for devtools and DOM selection */}
-              {isActive && !isInternalPage && <WebContentsOverlay />}
-              {/* DOM context selector - uses the unified overlay via hook */}
-              {isActive && !isInternalPage && <DOMContextSelector />}
-              {isActive && tab?.authenticationRequest && (
-                <BasicAuthDialog
-                  request={tab.authenticationRequest}
-                  container={devAppPreviewContainerRef}
-                />
+              className={cn(
+                'flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0',
               )}
+            >
+              <NavButtons tabId={tabId} tab={tab} />
+              <Omnibox
+                ref={omniboxRef}
+                tabId={tabId}
+                tab={tab}
+                isActive={isActive}
+              />
+              <ZoomBar tabId={tabId} />
+              <SearchBar tabId={tabId} ref={searchBarRef} />
+              <div className="flex flex-row items-center gap-0.5">
+                <ResourceRequestsControlButton
+                  tabId={tabId}
+                  isActive={isActive}
+                />
+                <DownloadsControlButton isActive={isActive} />
+
+                {tab && <ColorSchemeWidget tab={tab} />}
+
+                {tab && <ChromeDevToolsWidget tab={tab} />}
+              </div>
             </div>
+            {/* Content area - wrapped with WebContentsOverlayProvider for overlay access */}
+            <WebContentsOverlayProvider>
+              <div className="flex size-full flex-col items-center justify-center overflow-hidden">
+                <div
+                  ref={devAppPreviewContainerRef}
+                  id={`dev-app-preview-container-${tabId}`}
+                  className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+                >
+                  {/* Unified web contents overlay for devtools and DOM selection */}
+                  {isActive && !isInternalPage && <WebContentsOverlay />}
+                  {/* DOM context selector - uses the unified overlay via hook */}
+                  {isActive && !isInternalPage && <DOMContextSelector />}
+                  {isActive && tab?.authenticationRequest && (
+                    <BasicAuthDialog
+                      request={tab.authenticationRequest}
+                      container={devAppPreviewContainerRef}
+                    />
+                  )}
+                </div>
+              </div>
+            </WebContentsOverlayProvider>
           </div>
-        </WebContentsOverlayProvider>
-      </div>
+        )}
+      </TabErrorBoundary>
     );
   },
 );

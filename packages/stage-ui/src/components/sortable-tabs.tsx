@@ -161,7 +161,7 @@ function PillTriggerContent({ item }: { item: SortableTabItem }) {
       disabled={item.disabled}
       className={(state) =>
         cn(
-          'h-full select-none rounded-full px-2 py-1 font-medium text-xs transition-colors',
+          'h-full cursor-pointer select-none rounded-full px-2 py-1 font-medium text-xs transition-colors',
           state.active
             ? 'bg-active-derived! text-primary-foreground'
             : 'text-muted-foreground hover:text-foreground',
@@ -218,7 +218,7 @@ function BarTriggerContent({
         value={item.id}
         disabled={item.disabled}
         className={cn(
-          'flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent py-0.5 pr-3 pl-2 text-xs',
+          'flex min-w-0 flex-1 cursor-pointer select-none flex-row items-center gap-1.5 bg-transparent py-0.5 pr-3 pl-2 text-xs',
           item.disabled && 'cursor-not-allowed opacity-50',
         )}
       >
@@ -264,7 +264,7 @@ function BarTriggerContent({
 
 function PillOverlayContent({ item }: { item: SortableTabItem }) {
   return (
-    <div className="select-none rounded-full bg-surface-2 px-2 py-1 font-medium text-foreground text-xs shadow-elevation-1">
+    <div className="cursor-grabbing select-none rounded-full bg-surface-2 px-2 py-1 font-medium text-foreground text-xs shadow-elevation-1">
       {item.label}
     </div>
   );
@@ -278,7 +278,7 @@ function BarOverlayContent({
   isActive: boolean;
 }) {
   return (
-    <div className="relative flex h-7 flex-row items-stretch rounded-md bg-surface-1 shadow-elevation-1">
+    <div className="relative flex h-7 cursor-grabbing flex-row items-stretch rounded-md bg-surface-1 shadow-elevation-1">
       <div className="flex min-w-0 flex-1 select-none flex-row items-center gap-1.5 bg-transparent py-0.5 pr-3 pl-2 text-xs">
         {item.icon && (
           <span className="size-4 shrink-0 [&>*]:size-full">{item.icon}</span>
@@ -446,7 +446,12 @@ export const SortableTabsList = ({
           // runs out of space the tabs compress proportionally. Once every tab
           // hits its minWidth floor the container overflows and scrolls.
           // min-w-full on the List keeps tabs filling the container width.
-          <TabsBase.List className="flex h-full w-fit flex-row items-stretch gap-1">
+          <TabsBase.List
+            className={cn(
+              'flex h-full w-fit flex-row items-stretch gap-1',
+              className,
+            )}
+          >
             {items.map((item) => (
               <SortableTrigger
                 key={item.id}

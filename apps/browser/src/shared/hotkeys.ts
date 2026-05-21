@@ -63,7 +63,6 @@ export enum HotkeyActions {
   // Tab & window navigation
   NEW_TAB = 'new_tab',
   CLOSE_TAB = 'close_tab',
-  CLOSE_WINDOW = 'close_window',
   NEXT_TAB = 'next_tab',
   PREV_TAB = 'prev_tab',
 
@@ -201,10 +200,6 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.CLOSE_TAB]: {
     accelerator: 'Mod+W',
-    captureDominantly: true,
-  },
-  [HotkeyActions.CLOSE_WINDOW]: {
-    accelerator: 'Mod+Shift+W',
     captureDominantly: true,
   },
   // Content-panel tab navigation (per-agent, Mod+Alt prefixes).

@@ -8,7 +8,7 @@ import { useLayoutEffect } from 'react';
 type Bounds = { x: number; y: number; width: number; height: number };
 
 export const WebContentsBoundsSyncer = () => {
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const connected = useKartonConnected();
   const updateLayout = useKartonProcedure((p) => p.browser.layout.update);
   const movePanelToForeground = useKartonProcedure(

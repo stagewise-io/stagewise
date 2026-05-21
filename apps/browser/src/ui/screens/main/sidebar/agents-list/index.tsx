@@ -26,7 +26,6 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
-  type AnimateLayoutChanges,
 } from '@dnd-kit/sortable';
 import {
   restrictToFirstScrollableAncestor,
@@ -242,8 +241,6 @@ function insertGroupHeaders(agents: MergedAgentEntry[]): GroupedItem[] {
 // Sortable pinned rows
 // ============================================================================
 
-const disableSortableLayoutAnimation: AnimateLayoutChanges = () => false;
-
 function isPinnedDragBlockedTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
@@ -305,18 +302,22 @@ function SortablePinnedAgentCard({
     isDragging,
   } = useSortable({
     id: agent.id,
-    animateLayoutChanges: disableSortableLayoutAnimation,
-    transition: null,
   });
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.35 : 1,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      className={isDragging ? 'cursor-grabbing' : 'cursor-pointer'}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
       <AgentCardWithPreview
         id={agent.id}
         title={agent.title}
@@ -1221,28 +1222,30 @@ export function AgentsList() {
               </SortableContext>
               <DragOverlay dropAnimation={null}>
                 {activePinnedDragAgent ? (
-                  <AgentCard
-                    id={activePinnedDragAgent.id}
-                    title={activePinnedDragAgent.title}
-                    isActive={activePinnedDragAgent.id === openAgent}
-                    isWorking={activePinnedDragAgent.isWorking}
-                    isWaitingForUser={activePinnedDragAgent.isWaitingForUser}
-                    hasError={activePinnedDragAgent.hasError}
-                    hasUnseen={
-                      activePinnedDragAgent.id !== openAgent &&
-                      activePinnedDragAgent.unread
-                    }
-                    activityText={activePinnedDragAgent.activityText}
-                    activityIsUserInput={
-                      activePinnedDragAgent.activityIsUserInput
-                    }
-                    lastMessageAt={activePinnedDragAgent.lastMessageAt}
-                    contextMenuState={ctxMenuState}
-                    onClick={handleClick}
-                    onRename={handleRename}
-                    isPinned
-                    onTogglePinned={handleTogglePinned}
-                  />
+                  <div className="[&_*]:!cursor-grabbing shadow-elevation-1">
+                    <AgentCard
+                      id={activePinnedDragAgent.id}
+                      title={activePinnedDragAgent.title}
+                      isActive={activePinnedDragAgent.id === openAgent}
+                      isWorking={activePinnedDragAgent.isWorking}
+                      isWaitingForUser={activePinnedDragAgent.isWaitingForUser}
+                      hasError={activePinnedDragAgent.hasError}
+                      hasUnseen={
+                        activePinnedDragAgent.id !== openAgent &&
+                        activePinnedDragAgent.unread
+                      }
+                      activityText={activePinnedDragAgent.activityText}
+                      activityIsUserInput={
+                        activePinnedDragAgent.activityIsUserInput
+                      }
+                      lastMessageAt={activePinnedDragAgent.lastMessageAt}
+                      contextMenuState={ctxMenuState}
+                      onClick={handleClick}
+                      onRename={handleRename}
+                      isPinned
+                      onTogglePinned={handleTogglePinned}
+                    />
+                  </div>
                 ) : null}
               </DragOverlay>
             </DndContext>

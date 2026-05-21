@@ -18,40 +18,17 @@ export interface TabErrorState {
 }
 
 /**
- * Subframe error tracking
- */
-export interface SubframeError {
-  /** Unique frame identifier */
-  frameId: string;
-  /** Process ID of the frame */
-  frameProcessId: number;
-  /** Routing ID of the frame */
-  frameRoutingId: number;
-  /** URL that failed to load */
-  errorUrl: string;
-  /** Chromium error code */
-  errorCode: number;
-  /** Error description */
-  errorMessage: string;
-  /** Timestamp when error occurred */
-  timestamp: number;
-}
-
-/**
  * Callbacks for TabErrorHandler to communicate state changes
  */
 export interface TabErrorHandlerCallbacks {
   /** Called when error state changes */
   onErrorStateUpdate: (state: TabErrorState) => void;
-  /** Called when subframe errors array changes */
-  onSubframeErrorsUpdate: (errors: SubframeError[]) => void;
   /** Called to update the display URL (shown in address bar) */
   onDisplayUrlUpdate: (url: string) => void;
   /** Called when loading state should change */
   onLoadingStateUpdate: (isLoading: boolean) => void;
 }
 
-const MAX_SUBFRAME_ERRORS = 50;
 export const ERROR_PAGE_PATH = '/error/page-load-failed';
 
 /**
@@ -79,9 +56,6 @@ export class TabErrorHandler {
     isErrorPageDisplayed: false,
     historyIndexBeforeError: null,
   };
-
-  /** Subframe errors (ring buffer) */
-  private subframeErrors: SubframeError[] = [];
 
   /** Whether we're in the process of navigating to an error page */
   private isNavigatingToErrorPage = false;
@@ -168,8 +142,8 @@ export class TabErrorHandler {
     errorDescription: string,
     validatedUrl: string,
     isMainFrame: boolean,
-    frameProcessId: number,
-    frameRoutingId: number,
+    _frameProcessId: number,
+    _frameRoutingId: number,
   ): void {
     // Ignore abort errors (user stopped navigation, navigation replaced, etc.)
     if (errorCode === -3) {
@@ -192,14 +166,6 @@ export class TabErrorHandler {
 
     if (isMainFrame) {
       this.handleMainFrameError(errorCode, errorDescription, validatedUrl);
-    } else {
-      this.handleSubframeError(
-        errorCode,
-        errorDescription,
-        validatedUrl,
-        frameProcessId,
-        frameRoutingId,
-      );
     }
   }
 
@@ -290,44 +256,6 @@ export class TabErrorHandler {
 
     // Navigate to error page
     this.navigateToErrorPage(errorCode, errorDescription, failedUrl);
-  }
-
-  /**
-   * Handle subframe error - track it but never navigate the subframe or the parent page.
-   * Matches Chrome behavior: subframe failures show a broken/blank iframe and
-   * do not affect the parent page in any way.
-   *
-   * Previously this method tried to navigate failed subframes to internal error
-   * pages (stagewise://internal/error/...), but that caused several issues:
-   * - Loading a full React app (with karton connections) inside third-party iframes
-   * - Cascading did-fail-load events when the internal URL failed to load in the frame
-   * - Potential renderer instability from executing JS in frames with no document context
-   */
-  private handleSubframeError(
-    errorCode: number,
-    errorDescription: string,
-    failedUrl: string,
-    frameProcessId: number,
-    frameRoutingId: number,
-  ): void {
-    // Track subframe error in state
-    const subframeError: SubframeError = {
-      frameId: `${frameProcessId}:${frameRoutingId}`,
-      frameProcessId,
-      frameRoutingId,
-      errorUrl: failedUrl,
-      errorCode,
-      errorMessage: errorDescription,
-      timestamp: Date.now(),
-    };
-
-    // Ring buffer behavior
-    if (this.subframeErrors.length >= MAX_SUBFRAME_ERRORS) {
-      this.subframeErrors.shift();
-    }
-    this.subframeErrors.push(subframeError);
-
-    this.callbacks.onSubframeErrorsUpdate([...this.subframeErrors]);
   }
 
   /**
@@ -501,21 +429,6 @@ export class TabErrorHandler {
   }
 
   /**
-   * Get subframe errors (immutable copy)
-   */
-  public getSubframeErrors(): readonly SubframeError[] {
-    return [...this.subframeErrors];
-  }
-
-  /**
-   * Clear all subframe errors
-   */
-  public clearSubframeErrors(): void {
-    this.subframeErrors = [];
-    this.callbacks.onSubframeErrorsUpdate([]);
-  }
-
-  /**
    * Clear error state (called when navigating away from error page)
    */
   private clearErrorState(): void {
@@ -590,7 +503,6 @@ export class TabErrorHandler {
     this.trustedCertificateOrigins.clear();
 
     this.clearErrorState();
-    this.subframeErrors = [];
 
     this.logger.debug('[TabErrorHandler] Destroyed');
   }

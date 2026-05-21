@@ -1107,6 +1107,8 @@ export const ChatHistory = () => {
               snapshot.browserSessionId !== undefined
             )
               messageBrowserSessionId = snapshot.browserSessionId;
+            // snapshot.browser is the EnvironmentSnapshot browser-domain
+            // field (not the deprecated Karton state.browser live state).
             if (messageTabs === null && snapshot.browser?.tabs) {
               messageTabs = new Map(
                 snapshot.browser.tabs.map((t) => [t.id, t]),

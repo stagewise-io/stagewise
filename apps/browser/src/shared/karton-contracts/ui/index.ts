@@ -454,6 +454,8 @@ export interface AuthenticationRequest {
 
 export type TabState = {
   id: string;
+  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs. */
+  type?: 'browser' | 'terminal';
   title: string;
   url: string;
   faviconUrls: string[];
@@ -497,7 +499,50 @@ export type TabState = {
   isContentFullscreen: boolean;
   /** Pending HTTP Basic Auth request for this tab */
   authenticationRequest: AuthenticationRequest | null;
+  /** ── Terminal-specific fields (present when type === 'terminal') ── */
+  /** Working directory the PTY was spawned in. Always set for terminal tabs. */
+  cwd: string;
+  createdAt?: number;
+  exited?: boolean;
+  exitCode?: number | null;
 };
+
+/** Browser-neutral defaults for terminal tab entries.  Spread these and
+ *  override the tab-identity fields (id, title, agentInstanceId, cwd,
+ *  createdAt, lastFocusedAt, exited, exitCode).  All tabs share a single
+ *  definition so adding a new field to `TabState` doesn't require hunting
+ *  down every inline object literal. */
+export function getTerminalTabDefaults(): Omit<
+  TabState,
+  'id' | 'title' | 'createdAt' | 'lastFocusedAt'
+> {
+  return {
+    type: 'terminal' as const,
+    url: '',
+    cwd: '',
+    faviconUrls: [],
+    agentInstanceId: null as string | null,
+    isLoading: false,
+    isResponsive: false,
+    isPlayingAudio: false,
+    isMuted: false,
+    colorScheme: 'system' as TabState['colorScheme'],
+    error: null,
+    navigationHistory: { canGoBack: false, canGoForward: false },
+    devTools: { open: false, chromeOpen: false },
+    screenshot: null,
+    search: null,
+    isSearchBarActive: false,
+    zoomPercentage: 100,
+    consoleLogCount: 0,
+    consoleErrorCount: 0,
+    permissionRequests: [] as TabState['permissionRequests'],
+    isContentFullscreen: false,
+    authenticationRequest: null,
+    exited: false,
+    exitCode: null,
+  };
+}
 
 export type HistoryEntry = {
   url: string;
@@ -718,7 +763,37 @@ export type AppState = {
     }[]; // Allows up to three actions. Every action except for the first will be rendered as secondary. More than three actions will be ignored. Clicking on an action will also dismiss the notification.
   }[];
 
-  // Browser state
+  // Terminal output buffers — active, keyed by terminalId.
+  // Terminal tabs live in `contentTabs.tabs` with `type: 'terminal'`.
+  terminals: {
+    /** Batched PTY output buffers, keyed by terminalId. */
+    outputBuffers: Record<string, string>;
+    /** Monotonic output offsets for each terminal buffer. */
+    outputBufferOffsets: Record<
+      string,
+      { baseOffset: number; endOffset: number }
+    >;
+  };
+
+  // Unified content tabs (browser + terminal + future tab types)
+  contentTabs: {
+    /** All tabs keyed by ID, discriminated by `type` field. */
+    tabs: Record<string, TabState>;
+    /** Currently active tab ID. */
+    activeTabId: string | null;
+  };
+
+  // Browsing runtime state (global, not per-tab)
+  browsing: {
+    /** Unique identifier for the current browser process lifetime. */
+    sessionId: string;
+    history: HistoryEntry[];
+    contextSelectionMode: boolean;
+    selectedElements: SelectedElement[];
+    hoveredElement: SelectedElement | null;
+  };
+
+  // Browser state (deprecated — use contentTabs + browsing)
   browser: {
     tabs: Record<string, TabState>;
     activeTabId: string | null;
@@ -1245,6 +1320,27 @@ export type KartonContract = {
         /** Cancel an HTTP Basic Auth request */
         cancel: (requestId: string) => Promise<void>;
       };
+      /** Create a new user-controlled terminal tab. */
+      createTerminal: (
+        cwd?: string,
+        agentInstanceId?: string | null,
+      ) => Promise<void>;
+      /** Write keystroke data to a terminal's PTY. */
+      terminalInput: (terminalId: string, data: string) => Promise<void>;
+      /** Resize a terminal's PTY dimensions. */
+      terminalResize: (
+        terminalId: string,
+        cols: number,
+        rows: number,
+      ) => Promise<void>;
+      /** Snapshot the backend-owned terminal presentation state. */
+      getTerminalSnapshot: (terminalId: string) => Promise<{
+        state: string | null;
+        baseOffset: number;
+        endOffset: number;
+        cols: number;
+        rows: number;
+      }>;
     };
     downloads: {
       /** Mark all current downloads as seen (updates lastSeenAt timestamp) */
@@ -1396,6 +1492,21 @@ export const defaultState: KartonContract['state'] = {
     },
   },
   notifications: [],
+  terminals: {
+    outputBuffers: {},
+    outputBufferOffsets: {},
+  },
+  contentTabs: {
+    tabs: {},
+    activeTabId: null,
+  },
+  browsing: {
+    sessionId: '',
+    history: [],
+    contextSelectionMode: false,
+    selectedElements: [],
+    hoveredElement: null,
+  },
   browser: {
     tabs: {},
     activeTabId: null,

@@ -98,10 +98,10 @@ export const MessageUser = memo(
     const slashCommands = useKartonState((s) => s.skills);
 
     const elementSelectionActive = useKartonState(
-      (s) => s.browser.contextSelectionMode,
+      (s) => s.browsing.contextSelectionMode,
     );
     const selectedElementsFromWebcontents = useKartonState(
-      (s) => s.browser.selectedElements,
+      (s) => s.browsing.selectedElements,
     );
     const setElementSelectionActiveProc = useKartonProcedure(
       (p) => p.browser.contextSelection.setActive,
@@ -490,8 +490,8 @@ export const MessageUser = memo(
     ]);
 
     // Check if on internal page (for element selector)
-    const activeTabId = useKartonState((s) => s.browser.activeTabId);
-    const tabs = useKartonState((s) => s.browser.tabs);
+    const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+    const tabs = useKartonState((s) => s.contentTabs.tabs);
     const activeTab = useMemo(() => {
       if (!activeTabId) return null;
       return tabs[activeTabId];

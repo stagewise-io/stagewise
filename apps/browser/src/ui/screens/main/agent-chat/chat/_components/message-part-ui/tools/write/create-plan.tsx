@@ -141,7 +141,7 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
   const createTab = useKartonProcedure((p) => p.browser.createTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
-  const tabs = useKartonState((s) => s.browser.tabs);
+  const tabs = useKartonState((s) => s.contentTabs.tabs);
 
   // Implement: send a synthetic /implement message to the agent
   const handleImplement = useSendImplement();

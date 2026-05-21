@@ -65,6 +65,8 @@ export const browserTabSnapshotSchema = z.object({
     .nullable()
     .optional(),
   lastFocusedAt: z.number().optional(),
+  /** Agent instance this tab is assigned to, or null if globally visible. */
+  agentInstanceId: z.string().nullable().optional(),
 });
 
 export type BrowserTabSnapshot = z.infer<typeof browserTabSnapshotSchema>;

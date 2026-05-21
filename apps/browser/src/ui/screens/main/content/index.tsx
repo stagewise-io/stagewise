@@ -33,7 +33,7 @@ import {
   SortableTabsList,
   type SortableTabItem,
 } from '@stagewise/stage-ui/components/sortable-tabs';
-import { Button } from '@stagewise/stage-ui/components/button';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import {
   Tooltip,
@@ -45,7 +45,7 @@ import {
   IconPinTackOutline18,
   IconPinTackSlashOutline18,
 } from 'nucleo-ui-outline-18';
-import { GlobePlusIcon } from '../_components/globe-plus-icon';
+import { NewTabButtons } from '../_components/new-tab-buttons';
 import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 import { HotkeyActions } from '@shared/hotkeys';
 
@@ -95,8 +95,10 @@ function TabPinIcon({
     (p) => p.browser.setTabAgentInstance,
   );
 
-  // No agent open → just show favicon, no pin toggle
-  if (!openAgent) return <TabFavicon tabState={tab} />;
+  // No agent open → show icon only, no pin toggle
+  if (!openAgent) {
+    return <TabFavicon tabState={tab} />;
+  }
 
   const isAttachedToCurrentAgent = tab.agentInstanceId === openAgent;
 
@@ -109,35 +111,45 @@ function TabPinIcon({
 
   return (
     <div className="relative size-full">
-      {/* Favicon — hidden on group-hover */}
+      {/* Icon — hidden on group-hover */}
       <span className="flex size-full items-center justify-center group-hover:opacity-0">
         <TabFavicon tabState={tab} />
       </span>
-      {/* Pin toggle — replaces favicon on group-hover */}
-      <span
-        role="button"
-        tabIndex={0}
-        title={isAttachedToCurrentAgent ? 'Unpin' : 'Pin to agent'}
-        aria-label={
-          isAttachedToCurrentAgent
-            ? 'Unpin tab (make global)'
-            : 'Pin tab to current agent'
-        }
-        className="absolute inset-0 m-0 block flex size-full items-center justify-center p-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={handleToggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            handleToggle(e);
+      {/* Pin toggle — replaces icon on group-hover.
+          Rendered as <div> instead of <Button> because it sits inside
+          TabsBase.Tab which already renders a <button>. */}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label={isAttachedToCurrentAgent ? 'Pin globally' : 'Unpin'}
+              className={cn(
+                buttonVariants({ variant: 'ghost', size: 'icon-2xs' }),
+                'absolute inset-0 size-full text-subtle-foreground opacity-0 group-hover:opacity-100',
+              )}
+              onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
+              onClick={handleToggle}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleToggle(e);
+                }
+              }}
+            >
+              {isAttachedToCurrentAgent ? (
+                <IconPinTackOutline18 className="size-3.5" />
+              ) : (
+                <IconPinTackSlashOutline18 className="size-3.5" />
+              )}
+            </div>
           }
-        }}
-      >
-        {isAttachedToCurrentAgent ? (
-          <IconPinTackOutline18 className="size-3.5" />
-        ) : (
-          <IconPinTackSlashOutline18 className="size-3.5" />
-        )}
-      </span>
+        />
+        <TooltipContent side="bottom">
+          {isAttachedToCurrentAgent ? 'Pin globally' : 'Unpin'}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -181,9 +193,9 @@ export function MainSection({
   onPendingOmniboxFocusHandled: (requestId: number) => void;
 }) {
   const panelRef = useRef<ImperativePanelHandle>(null);
-  const tabs = useKartonState((s) => s.browser.tabs);
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
-  const activeTabIdRef = useRef(activeTabId);
+  const tabs = useKartonState((s) => s.contentTabs.tabs);
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const createTerminal = useKartonProcedure((p) => p.browser.createTerminal);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const reorderTabs = useKartonProcedure((p) => p.browser.reorderTabs);
@@ -194,9 +206,6 @@ export function MainSection({
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
 
-  useEffect(() => {
-    activeTabIdRef.current = activeTabId;
-  }, [activeTabId]);
   // Persisted panel size survives mount/unmount (conditional rendering).
   const storedSizeRef = useRef(readContentSize());
   // Block onResize→persist during mount-time layout and programmatic restore.
@@ -231,8 +240,18 @@ export function MainSection({
     (s) => s.browser.lastActiveTabPerAgent,
   );
 
-  // When switching agents, move away from agent-exclusive tabs
+  // When switching agents, move away from agent-exclusive tabs.
+  // Ref-based reads prevent stale closures so the effect always sees
+  // current Karton state even when lazily-created tabs land between
+  // the agent switch and the next render.
   const prevOpenAgentRef = useRef<string | null>(null);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
+  const lastActiveTabPerAgentRef = useRef(lastActiveTabPerAgent);
+  lastActiveTabPerAgentRef.current = lastActiveTabPerAgent;
+
   useEffect(() => {
     const prevAgent = prevOpenAgentRef.current;
     prevOpenAgentRef.current = openAgent;
@@ -241,32 +260,36 @@ export function MainSection({
     if (prevAgent === openAgent) return;
     if (!openAgent) return;
 
+    const curTabs = tabsRef.current;
+    const curActiveId = activeTabIdRef.current;
+    const curLastActive = lastActiveTabPerAgentRef.current;
+
     // Bail only if the current tab is explicitly for this agent.
     // A global tab is "visible" everywhere but we still want to
     // switch to a remembered agent-specific tab when available.
-    if (activeTabId && tabs[activeTabId]) {
-      const currentTab = tabs[activeTabId];
+    if (curActiveId && curTabs[curActiveId]) {
+      const currentTab = curTabs[curActiveId];
       if (currentTab.agentInstanceId === openAgent) return;
     }
 
     // Need to switch — collect visible tab IDs for the new agent
-    const visibleIds = Object.keys(tabs).filter((id) => {
-      const t = tabs[id];
+    const visibleIds = Object.keys(curTabs).filter((id) => {
+      const t = curTabs[id];
       return (
         t && (t.agentInstanceId === null || t.agentInstanceId === openAgent)
       );
     });
 
     // Prefer previously active tab for this agent
-    const prevActive = lastActiveTabPerAgent[openAgent];
-    if (prevActive && tabs[prevActive] && visibleIds.includes(prevActive)) {
+    const prevActive = curLastActive[openAgent];
+    if (prevActive && curTabs[prevActive] && visibleIds.includes(prevActive)) {
       switchTab(prevActive);
       return;
     }
 
     // Prefer any agent-specific tab
     const agentTab = visibleIds.find(
-      (id) => tabs[id]?.agentInstanceId === openAgent,
+      (id) => curTabs[id]?.agentInstanceId === openAgent,
     );
     if (agentTab) {
       switchTab(agentTab);
@@ -275,7 +298,7 @@ export function MainSection({
 
     // Prefer any global tab
     const globalTab = visibleIds.find(
-      (id) => tabs[id]?.agentInstanceId === null,
+      (id) => curTabs[id]?.agentInstanceId === null,
     );
     if (globalTab) {
       switchTab(globalTab);
@@ -284,7 +307,7 @@ export function MainSection({
 
     // No visible tabs for this agent — do nothing;
     // effectiveActiveTabId derived below will show empty state.
-  }, [openAgent]);
+  }, [openAgent, switchTab]);
 
   // ---------------------------------------------------------------------------
   // Optimistic tab order
@@ -293,25 +316,18 @@ export function MainSection({
   // ---------------------------------------------------------------------------
 
   const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
-    (s) => Object.keys(s.browser.tabs),
+    (s) => Object.keys(s.contentTabs.tabs),
     (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
   );
   const serverTabIds = useKartonState(tabIdsSelector);
   const [optimisticTabIds, setOptimisticTabIds] =
     useState<string[]>(serverTabIds);
 
-  // Sync when the server adds/removes tabs — sort global tabs first
+  // Sync when the server adds/removes/reorders tabs. The backend owns
+  // canonical tab order, including restored browser/terminal interleaving.
+  // Do not sort here — client-side grouping breaks persisted order.
   useEffect(() => {
-    const sorted = [...serverTabIds].sort((a, b) => {
-      const aGlobal = tabs[a]?.agentInstanceId === null;
-      const bGlobal = tabs[b]?.agentInstanceId === null;
-      if (aGlobal && !bGlobal) return -1;
-      if (!aGlobal && bGlobal) return 1;
-      return 0;
-    });
-    setOptimisticTabIds(sorted);
-    // tabs omitted from deps intentionally — only re-sort on add/remove
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setOptimisticTabIds(serverTabIds);
   }, [serverTabIds]);
 
   // Effective active tab ID: null when the real activeTabId belongs to a
@@ -336,80 +352,61 @@ export function MainSection({
     });
   }, [optimisticTabIds, tabs, openAgent]);
 
-  // ---------------------------------------------------------------------------
-  // Detect new tabs and agentInstanceId changes — move to end of their group
-  // ---------------------------------------------------------------------------
-  const prevTabsRef = useRef(tabs);
-  useEffect(() => {
-    const prev = prevTabsRef.current;
-    const idsToMove = new Set<string>();
+  const replaceReorderedSlots = useCallback(
+    (newItems: SortableTabItem[], shouldReplace: (id: string) => boolean) => {
+      const replacementIds = newItems.map((t) => t.id);
+      const replacementSet = new Set(replacementIds);
+      let replacementIndex = 0;
 
-    for (const id of Object.keys(tabs)) {
-      if (!prev[id]) {
-        // New tab — move to end of its group
-        idsToMove.add(id);
-      } else if (prev[id]?.agentInstanceId !== tabs[id]?.agentInstanceId) {
-        // Pin/unpin toggled — move to end of its new group
-        idsToMove.add(id);
-      }
-    }
-
-    prevTabsRef.current = tabs;
-
-    if (idsToMove.size === 0) return;
-
-    setOptimisticTabIds((prevIds) => {
-      // Preserve existing order for non-moved tabs, split by group
-      const globalIds = prevIds.filter(
-        (id) => tabs[id]?.agentInstanceId === null && !idsToMove.has(id),
-      );
-      const agentIds = prevIds.filter(
-        (id) => tabs[id]?.agentInstanceId !== null && !idsToMove.has(id),
-      );
-      // Moved items at end of their respective groups
-      const movedGlobal: string[] = [];
-      const movedAgent: string[] = [];
-      idsToMove.forEach((id) => {
-        if (tabs[id]?.agentInstanceId === null) {
-          movedGlobal.push(id);
-        } else {
-          movedAgent.push(id);
-        }
+      const nextIds = optimisticTabIds.map((id) => {
+        if (!shouldReplace(id)) return id;
+        return replacementIds[replacementIndex++] ?? id;
       });
-      return [...globalIds, ...movedGlobal, ...agentIds, ...movedAgent];
-    });
-  }, [tabs]);
 
-  // Per-group reorder handlers — each DndContext isolated, no cross-group drag
-  const handleReorderGlobal = useCallback(
-    (newItems: SortableTabItem[]) => {
-      const newOrder = newItems.map((t) => t.id);
-      const agentIds = optimisticTabIds.filter(
-        (id) => tabs[id]?.agentInstanceId !== null,
+      // If the rendered group did not occupy the same number of slots as the
+      // reordered result, fall back to preserving untouched ids and appending
+      // any missing reordered ids. This should not happen during normal DnD,
+      // but avoids silently dropping tabs on stale state.
+      const missingReplacementIds = replacementIds.filter(
+        (id) => !nextIds.includes(id),
       );
-      const newFullIds = [...newOrder, ...agentIds];
+      const dedupedIds = nextIds.filter(
+        (id, index) => !replacementSet.has(id) || nextIds.indexOf(id) === index,
+      );
+      const newFullIds = [...dedupedIds, ...missingReplacementIds];
+
       setOptimisticTabIds(newFullIds);
       reorderTabs(newFullIds);
     },
-    [optimisticTabIds, tabs, reorderTabs],
+    [optimisticTabIds, reorderTabs],
+  );
+
+  // Per-group reorder handlers — each DndContext isolated, no cross-group drag.
+  // Only replace the dragged group's existing slots. Never rebuild as
+  // `globals + agents`; that mutates unrelated tab order and pushes terminals.
+  const handleReorderGlobal = useCallback(
+    (newItems: SortableTabItem[]) => {
+      replaceReorderedSlots(
+        newItems,
+        (id) => tabs[id]?.agentInstanceId === null,
+      );
+    },
+    [replaceReorderedSlots, tabs],
   );
 
   const handleReorderAgent = useCallback(
     (newItems: SortableTabItem[]) => {
-      const newOrder = newItems.map((t) => t.id);
-      const newAgentSet = new Set(newOrder);
-      const globalIds = optimisticTabIds.filter(
-        (id) => tabs[id]?.agentInstanceId === null,
+      const reorderedIds = new Set(newItems.map((t) => t.id));
+      const agentId = newItems.find((t) => tabs[t.id])
+        ? tabs[newItems.find((t) => tabs[t.id])!.id]?.agentInstanceId
+        : openAgent;
+
+      replaceReorderedSlots(
+        newItems,
+        (id) => reorderedIds.has(id) || tabs[id]?.agentInstanceId === agentId,
       );
-      // Preserve other agents' tabs that weren't part of this reorder.
-      const otherAgentIds = optimisticTabIds.filter(
-        (id) => tabs[id]?.agentInstanceId !== null && !newAgentSet.has(id),
-      );
-      const newFullIds = [...globalIds, ...otherAgentIds, ...newOrder];
-      setOptimisticTabIds(newFullIds);
-      reorderTabs(newFullIds);
     },
-    [optimisticTabIds, tabs, reorderTabs],
+    [openAgent, replaceReorderedSlots, tabs],
   );
 
   // ---------------------------------------------------------------------------
@@ -438,14 +435,17 @@ export function MainSection({
             removeTabUiState(id);
           },
           actions:
-            tab.isPlayingAudio || tab.isMuted ? (
+            tab.type !== 'terminal' && (tab.isPlayingAudio || tab.isMuted) ? (
               <AudioMuteButton tab={tab} />
             ) : undefined,
-          wrapTrigger: (inner: ReactElement) => (
-            <WithTabPreviewCard tabState={tab} activeTabId={activeTabId}>
-              {inner}
-            </WithTabPreviewCard>
-          ),
+          wrapTrigger: (inner: ReactElement) =>
+            tab.type === 'terminal' ? (
+              inner
+            ) : (
+              <WithTabPreviewCard tabState={tab} activeTabId={activeTabId}>
+                {inner}
+              </WithTabPreviewCard>
+            ),
         };
       })
       .filter((item): item is SortableTabItem => item !== null);
@@ -605,7 +605,7 @@ export function MainSection({
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 flex-row items-stretch gap-1 bg-background py-1.5 pr-10 pl-1">
+        <div className="flex shrink-0 flex-row items-stretch gap-1 border-derived-strong border-b bg-background py-1.5 pr-10 pl-1">
           <SortableTabs
             value={effectiveActiveTabId ?? ''}
             onValueChange={(id) => {
@@ -640,25 +640,13 @@ export function MainSection({
               />
             )}
           </SortableTabs>
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Open new browser tab"
-                className="size-7 shrink-0 rounded-md"
-                onClick={onCreateTab}
-              >
-                <GlobePlusIcon className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span className="flex items-center gap-1.5">
-                <span>Open browsing tab</span>
-                <HotkeyCombo action={HotkeyActions.NEW_TAB} size="xs" />
-              </span>
-            </TooltipContent>
-          </Tooltip>
+          <NewTabButtons
+            buttonClassName="size-7"
+            onCreateBrowserTab={onCreateTab}
+            onCreateTerminalTab={() =>
+              void createTerminal(undefined, openAgent)
+            }
+          />
         </div>
         {/* Content area with per-tab UI */}
         <div className="relative flex size-full flex-col">

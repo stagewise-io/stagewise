@@ -215,7 +215,7 @@ export const SharedAgentContextMenuHost = memo(
                   ) : (
                     <IconPinTackOutline18 className="size-3.5 shrink-0" />
                   )}
-                  <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+                  <span>{isPinned ? 'Pin globally' : 'Unpin'}</span>
                 </AgentMenuItem>
               )}
               {canDelete !== false && (

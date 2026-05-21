@@ -107,6 +107,22 @@ export function computeBrowserChanges(
         attrs.newErrors = String(currErrors - prevErrors);
       changes.push({ type: 'tab-console', attributes: attrs });
     }
+
+    // Agent assignment change
+    const prevAgentId = prev.agentInstanceId ?? null;
+    const currAgentId = curr.agentInstanceId ?? null;
+    if (prevAgentId !== currAgentId) {
+      const attrs: Record<string, string> = { tabId: id };
+      if (currAgentId !== null) attrs.to = currAgentId;
+      if (prevAgentId !== null) attrs.from = prevAgentId;
+      if (prevAgentId === null && currAgentId !== null) {
+        changes.push({ type: 'tab-assigned', attributes: attrs });
+      } else if (prevAgentId !== null && currAgentId === null) {
+        changes.push({ type: 'tab-unassigned', attributes: attrs });
+      } else {
+        changes.push({ type: 'tab-reassigned', attributes: attrs });
+      }
+    }
   }
 
   // Active tab change
