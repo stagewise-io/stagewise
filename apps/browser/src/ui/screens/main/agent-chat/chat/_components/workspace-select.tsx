@@ -1,4 +1,6 @@
 import type { SelectItem } from '@stagewise/stage-ui/components/select';
+import type { WorkspaceGitAction } from '@shared/karton-contracts/ui/shared-types';
+import type { Patch } from 'immer';
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
 import {
   Combobox,
@@ -76,6 +78,7 @@ import {
   useState,
 } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { applyWorkspaceGitActionPreferences } from './workspace-action-preferences';
 
 const EMPTY_SKILLS: string[] = [];
 
@@ -1034,11 +1037,7 @@ function WorkspacePreviewCardContent({
 // with four mutually-exclusive options (radio-style, first preselected).
 //
 
-export type WorkspaceAction =
-  | 'create-worktree'
-  | 'create-branch'
-  | 'switch-branch'
-  | 'switch-worktree';
+export type WorkspaceAction = WorkspaceGitAction;
 
 export type WorkspaceActionConfig = {
   selectedAction: WorkspaceAction;
@@ -1623,14 +1622,30 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     () => getDefaultBranchValue(branchesResult, gitRef),
     [branchesResult, gitRef],
   );
+  const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
+  const generalWorkspaceGitActionPreference = useKartonState(
+    (s) => s.preferences.agent.workspaceGitActionPreferences.general,
+  );
+  const repositoryWorkspaceGitActionPreference = useKartonState((s) =>
+    mount.git?.repositoryId
+      ? s.preferences.agent.workspaceGitActionPreferences.repositories[
+          mount.git.repositoryId
+        ]
+      : undefined,
+  );
 
   const [open, setOpen] = useState(false);
   const [localConfig, setLocalConfig] = useState(() =>
-    createDefaultWorkspaceActionConfig(
+    applyWorkspaceGitActionPreferences(
+      createDefaultWorkspaceActionConfig(
+        sourceBranchItems,
+        worktreeItems,
+        checkoutBranchItems,
+        defaultBranch,
+      ),
       sourceBranchItems,
-      worktreeItems,
-      checkoutBranchItems,
-      defaultBranch,
+      generalWorkspaceGitActionPreference,
+      repositoryWorkspaceGitActionPreference,
     ),
   );
   const config = controlledConfig ?? localConfig;
@@ -1653,11 +1668,16 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   useEffect(() => {
     if (!gitDataLoaded) return;
 
-    const defaults = createDefaultWorkspaceActionConfig(
+    const defaults = applyWorkspaceGitActionPreferences(
+      createDefaultWorkspaceActionConfig(
+        sourceBranchItems,
+        worktreeItems,
+        checkoutBranchItems,
+        defaultBranch,
+      ),
       sourceBranchItems,
-      worktreeItems,
-      checkoutBranchItems,
-      defaultBranch,
+      generalWorkspaceGitActionPreference,
+      repositoryWorkspaceGitActionPreference,
     );
     const hydratedConfig = hydrateWorkspaceActionConfigWithDefaults(
       config,
@@ -1674,9 +1694,11 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     checkoutBranchItems,
     config,
     defaultBranch,
+    generalWorkspaceGitActionPreference,
     gitDataLoaded,
     mount,
     onConfigChange,
+    repositoryWorkspaceGitActionPreference,
     sourceBranchItems,
     worktreeItems,
   ]);
@@ -1689,6 +1711,83 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       }
     },
     [gitDataLoaded, refreshGitData],
+  );
+
+  const persistWorkspaceGitActionPreference = useCallback(
+    (next: WorkspaceAction, partial: Partial<WorkspaceActionConfig>) => {
+      const repositoryId = mount.git?.repositoryId;
+      const patches: Patch[] = [
+        {
+          op: 'add',
+          path: [
+            'agent',
+            'workspaceGitActionPreferences',
+            'general',
+            'selectedAction',
+          ],
+          value: next,
+        },
+      ];
+
+      if (repositoryId) {
+        if (!repositoryWorkspaceGitActionPreference) {
+          patches.push({
+            op: 'add',
+            path: [
+              'agent',
+              'workspaceGitActionPreferences',
+              'repositories',
+              repositoryId,
+            ],
+            value: {},
+          });
+        }
+        patches.push({
+          op: 'add',
+          path: [
+            'agent',
+            'workspaceGitActionPreferences',
+            'repositories',
+            repositoryId,
+            'selectedAction',
+          ],
+          value: next,
+        });
+        if (typeof partial.createWorktreeFrom === 'string') {
+          patches.push({
+            op: 'add',
+            path: [
+              'agent',
+              'workspaceGitActionPreferences',
+              'repositories',
+              repositoryId,
+              'createWorktreeFrom',
+            ],
+            value: partial.createWorktreeFrom,
+          });
+        }
+        if (typeof partial.createBranchFrom === 'string') {
+          patches.push({
+            op: 'add',
+            path: [
+              'agent',
+              'workspaceGitActionPreferences',
+              'repositories',
+              repositoryId,
+              'createBranchFrom',
+            ],
+            value: partial.createBranchFrom,
+          });
+        }
+      }
+
+      void preferencesUpdate(patches);
+    },
+    [
+      mount.git?.repositoryId,
+      preferencesUpdate,
+      repositoryWorkspaceGitActionPreference,
+    ],
   );
 
   const handleActionUpdate = useCallback(
@@ -1705,6 +1804,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         return;
       }
       setActionError(null);
+      persistWorkspaceGitActionPreference(next, partial);
       if (onConfigChange) {
         onConfigChange(mount, nextConfig);
         setOpen(false);
@@ -1746,6 +1846,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       mount,
       mountWorkspace,
       onConfigChange,
+      persistWorkspaceGitActionPreference,
       refreshGitData,
       sourceBranchItems,
       switchWorkspaceGitBranch,
@@ -2417,8 +2518,50 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
   const listGitWorktreesByPath = useKartonProcedure(
     (p) => p.toolbox.listGitWorktreesByPath,
   );
+  const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
+  const workspaceGitActionGeneralPreference = useKartonState(
+    (s) => s.preferences.agent.workspaceGitActionPreferences.general,
+  );
   const fallbackBranchItems = useMemo(() => getBranchSelectItems(null), []);
   const fallbackWorktreeItems = useMemo(() => getWorktreeSelectItems(), []);
+
+  const createPreferredDefaultConfig = useCallback(
+    (
+      sourceBranchItems: SelectItem<string>[],
+      worktreeItems: SelectItem<string>[],
+      checkoutBranchItems: SelectItem<string>[] = sourceBranchItems,
+      defaultBranch?: string,
+    ) =>
+      applyWorkspaceGitActionPreferences(
+        createDefaultWorkspaceActionConfig(
+          sourceBranchItems,
+          worktreeItems,
+          checkoutBranchItems,
+          defaultBranch,
+        ),
+        sourceBranchItems,
+        workspaceGitActionGeneralPreference,
+      ),
+    [workspaceGitActionGeneralPreference],
+  );
+
+  const persistGeneralWorkspaceGitActionPreference = useCallback(
+    (selectedAction: WorkspaceAction) => {
+      void preferencesUpdate([
+        {
+          op: 'add',
+          path: [
+            'agent',
+            'workspaceGitActionPreferences',
+            'general',
+            'selectedAction',
+          ],
+          value: selectedAction,
+        },
+      ]);
+    },
+    [preferencesUpdate],
+  );
 
   const [open, setOpen] = useState(false);
   const [pathGitOptions, setPathGitOptions] = useState<
@@ -2445,7 +2588,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
     (rowKey: string): ConnectActionState => {
       const existing = pathStates.get(rowKey);
       if (existing) return existing;
-      const next = createDefaultWorkspaceActionConfig(
+      const next = createPreferredDefaultConfig(
         fallbackBranchItems,
         fallbackWorktreeItems,
       );
@@ -2457,7 +2600,12 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       });
       return next;
     },
-    [pathStates, fallbackBranchItems, fallbackWorktreeItems],
+    [
+      pathStates,
+      fallbackBranchItems,
+      fallbackWorktreeItems,
+      createPreferredDefaultConfig,
+    ],
   );
 
   const updateRowState = useCallback(
@@ -2466,7 +2614,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         const map = new Map(prev);
         const current =
           map.get(rowKey) ??
-          createDefaultWorkspaceActionConfig(
+          createPreferredDefaultConfig(
             fallbackBranchItems,
             fallbackWorktreeItems,
           );
@@ -2474,7 +2622,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         return map;
       });
     },
-    [fallbackBranchItems, fallbackWorktreeItems],
+    [fallbackBranchItems, fallbackWorktreeItems, createPreferredDefaultConfig],
   );
 
   const initializePathStates = useCallback(() => {
@@ -2487,7 +2635,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         if (!map.has(rowKey)) {
           map.set(
             rowKey,
-            createDefaultWorkspaceActionConfig(
+            createPreferredDefaultConfig(
               fallbackBranchItems,
               fallbackWorktreeItems,
             ),
@@ -2499,7 +2647,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       if (!map.has(CONNECT_NEW_KEY)) {
         map.set(
           CONNECT_NEW_KEY,
-          createDefaultWorkspaceActionConfig(
+          createPreferredDefaultConfig(
             fallbackBranchItems,
             fallbackWorktreeItems,
           ),
@@ -2509,7 +2657,12 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
 
       return changed ? map : prev;
     });
-  }, [fallbackBranchItems, fallbackWorktreeItems, recentPaths]);
+  }, [
+    fallbackBranchItems,
+    fallbackWorktreeItems,
+    recentPaths,
+    createPreferredDefaultConfig,
+  ]);
 
   const loadGitOptionsForPath = useCallback(
     async (
@@ -2584,7 +2737,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         const current = prev.get(rowKey);
         if (!current) return prev;
 
-        const defaults = createDefaultWorkspaceActionConfig(
+        const defaults = createPreferredDefaultConfig(
           sourceBranchItems,
           worktreeItems,
           checkoutBranchItems,
@@ -2627,7 +2780,12 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       });
       return options;
     },
-    [listGitBranchesByPath, listGitWorktreesByPath, pathGitOptions],
+    [
+      createPreferredDefaultConfig,
+      listGitBranchesByPath,
+      listGitWorktreesByPath,
+      pathGitOptions,
+    ],
   );
 
   const commitConnect = useCallback(
@@ -2646,6 +2804,9 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
           : rowKey.replace('workspace:', '');
       const gitOptions =
         path === undefined ? null : await loadGitOptionsForPath(path, rowKey);
+      if (path === undefined || gitOptions) {
+        persistGeneralWorkspaceGitActionPreference(state.selectedAction);
+      }
       const config =
         path === undefined
           ? state
@@ -2673,7 +2834,13 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
 
       setOpen(false);
     },
-    [loadGitOptionsForPath, onMount, pendingRowKey, track],
+    [
+      loadGitOptionsForPath,
+      onMount,
+      pendingRowKey,
+      persistGeneralWorkspaceGitActionPreference,
+      track,
+    ],
   );
 
   const handleOpenChange = useCallback(
@@ -2773,7 +2940,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
                   const rowKey = `workspace:${workspace.path}`;
                   const rowState =
                     pathStates.get(rowKey) ??
-                    createDefaultWorkspaceActionConfig(
+                    createPreferredDefaultConfig(
                       fallbackBranchItems,
                       fallbackWorktreeItems,
                     );
