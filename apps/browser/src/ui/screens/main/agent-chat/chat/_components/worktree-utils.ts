@@ -90,6 +90,15 @@ export function getDefaultBranchValue(
   return result?.defaultBranch ?? fallbackGitRef ?? 'main';
 }
 
+export function getCurrentBranchValue(
+  result: WorkspaceGitBranchesResult | null,
+  fallbackGitRef: string | null,
+): string {
+  return (
+    result?.current ?? fallbackGitRef ?? getDefaultBranchValue(result, null)
+  );
+}
+
 export function getBranchSelectItemsFromGit(
   result: WorkspaceGitBranchesResult | null,
   fallbackGitRef: string | null,

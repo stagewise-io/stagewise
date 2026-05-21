@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   generateWorktreeName,
+  getCurrentBranchValue,
   getDefaultBranchValue,
   WORKTREE_NAME_ADJECTIVES,
   WORKTREE_NAME_NOUNS,
@@ -64,6 +65,39 @@ describe('generateWorktreeName', () => {
     );
 
     expect(generateWorktreeName({ reservedNames })).toBeUndefined();
+  });
+});
+
+describe('getCurrentBranchValue', () => {
+  it('uses the backend current branch when available', () => {
+    expect(
+      getCurrentBranchValue(
+        { current: 'feature/login', defaultBranch: 'develop', branches: [] },
+        'develop',
+      ),
+    ).toBe('feature/login');
+  });
+
+  it('falls back to the mounted git ref when current branch is unavailable', () => {
+    expect(
+      getCurrentBranchValue(
+        { current: null, defaultBranch: 'main', branches: [] },
+        'develop',
+      ),
+    ).toBe('develop');
+  });
+
+  it('falls back to the default branch when no current branch or git ref exists', () => {
+    expect(
+      getCurrentBranchValue(
+        { current: null, defaultBranch: 'develop', branches: [] },
+        null,
+      ),
+    ).toBe('develop');
+  });
+
+  it('falls back to main when no branch data or git ref is available', () => {
+    expect(getCurrentBranchValue(null, null)).toBe('main');
   });
 });
 

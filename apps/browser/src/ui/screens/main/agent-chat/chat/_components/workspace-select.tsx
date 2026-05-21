@@ -13,6 +13,7 @@ import {
   generateWorktreeName,
   getBranchSelectItems,
   getBranchSelectItemsFromGit,
+  getCurrentBranchValue,
   getDefaultBranchValue,
   getWorktreeSelectItems,
   getWorktreeSelectItemsFromGit,
@@ -1300,6 +1301,7 @@ export function createDefaultWorkspaceActionConfig(
   worktreeItems: SelectItem<string>[],
   checkoutBranchItems: SelectItem<string>[] = sourceBranchItems,
   defaultBranch = 'main',
+  checkoutDefaultBranch = defaultBranch,
 ): WorkspaceActionConfig {
   const sourceBranchDefault =
     sourceBranchItems.find((item) => item.value === defaultBranch)?.value ??
@@ -1307,10 +1309,13 @@ export function createDefaultWorkspaceActionConfig(
     'main';
   const checkoutBranchDefault =
     checkoutBranchItems.find(
+      (item) => item.value === checkoutDefaultBranch && !item.disabled,
+    )?.value ??
+    checkoutBranchItems.find(
       (item) => item.value === defaultBranch && !item.disabled,
     )?.value ??
     checkoutBranchItems.find((item) => !item.disabled)?.value ??
-    defaultBranch;
+    checkoutDefaultBranch;
   const mainWorktreeDefault =
     worktreeItems.find((item) => item.value === defaultBranch)?.value ??
     worktreeItems[0]?.value ??
@@ -1362,6 +1367,10 @@ export function hydrateWorkspaceActionConfigWithDefaults(
   defaults: WorkspaceActionConfig,
   previousDefaultBranch = 'main',
 ): WorkspaceActionConfig {
+  // switchBranchTarget intentionally uses previousDefaultBranch too. Before
+  // live Git data loads, default checkout/source fallbacks are the same value;
+  // once live data arrives, a still-default switch target should hydrate to
+  // defaults.switchBranchTarget, while a user-selected target is preserved.
   return {
     ...config,
     createWorktreeFrom:
@@ -1622,6 +1631,10 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     () => getDefaultBranchValue(branchesResult, gitRef),
     [branchesResult, gitRef],
   );
+  const checkoutDefaultBranch = useMemo(
+    () => getCurrentBranchValue(branchesResult, gitRef),
+    [branchesResult, gitRef],
+  );
   const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
   const generalWorkspaceGitActionPreference = useKartonState(
     (s) => s.preferences.agent.workspaceGitActionPreferences.general,
@@ -1642,6 +1655,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         worktreeItems,
         checkoutBranchItems,
         defaultBranch,
+        checkoutDefaultBranch,
       ),
       sourceBranchItems,
       generalWorkspaceGitActionPreference,
@@ -1674,6 +1688,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         worktreeItems,
         checkoutBranchItems,
         defaultBranch,
+        checkoutDefaultBranch,
       ),
       sourceBranchItems,
       generalWorkspaceGitActionPreference,
@@ -1693,6 +1708,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   }, [
     checkoutBranchItems,
     config,
+    checkoutDefaultBranch,
     defaultBranch,
     generalWorkspaceGitActionPreference,
     gitDataLoaded,
@@ -2379,6 +2395,7 @@ type ConnectGitOptions = {
   checkoutBranchItems: SelectItem<string>[];
   worktreeItems: SelectItem<string>[];
   defaultBranch: string;
+  checkoutDefaultBranch: string;
 };
 
 type ConnectPathGitCapability = 'unknown' | 'loading' | 'git' | 'not-git';
@@ -2531,6 +2548,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       worktreeItems: SelectItem<string>[],
       checkoutBranchItems: SelectItem<string>[] = sourceBranchItems,
       defaultBranch?: string,
+      checkoutDefaultBranch?: string,
     ) =>
       applyWorkspaceGitActionPreferences(
         createDefaultWorkspaceActionConfig(
@@ -2538,6 +2556,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
           worktreeItems,
           checkoutBranchItems,
           defaultBranch,
+          checkoutDefaultBranch,
         ),
         sourceBranchItems,
         workspaceGitActionGeneralPreference,
@@ -2716,11 +2735,13 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       );
       const worktreeItems = getWorktreeSelectItemsFromGit(worktreesResult);
       const defaultBranch = getDefaultBranchValue(branchesResult, null);
+      const checkoutDefaultBranch = getCurrentBranchValue(branchesResult, null);
       const options = {
         sourceBranchItems,
         checkoutBranchItems,
         worktreeItems,
         defaultBranch,
+        checkoutDefaultBranch,
       };
       setPathGitOptions((prev) => {
         if (prev.has(workspacePath)) return prev;
@@ -2742,6 +2763,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
           worktreeItems,
           checkoutBranchItems,
           defaultBranch,
+          checkoutDefaultBranch,
         );
         const sourceBranchValues = new Set(
           sourceBranchItems.map((item) => item.value),
@@ -2818,6 +2840,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
                   gitOptions.worktreeItems,
                   gitOptions.checkoutBranchItems,
                   gitOptions.defaultBranch,
+                  gitOptions.checkoutDefaultBranch,
                 ),
               )
             : null;

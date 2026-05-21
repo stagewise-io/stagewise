@@ -43,6 +43,7 @@ import { applyWorkspaceGitActionPreferences } from './workspace-action-preferenc
 import {
   getBranchSelectItems,
   getBranchSelectItemsFromGit,
+  getCurrentBranchValue,
   getDefaultBranchValue,
   getWorktreeSelectItems,
   getWorktreeSelectItemsFromGit,
@@ -657,6 +658,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
           worktreeItems,
           checkoutBranchItems,
           getDefaultBranchValue(branchesResult, fallbackGitRef),
+          getCurrentBranchValue(branchesResult, fallbackGitRef),
         );
         const config = hydrateWorkspaceActionConfigWithDefaults(
           existingConfig,
