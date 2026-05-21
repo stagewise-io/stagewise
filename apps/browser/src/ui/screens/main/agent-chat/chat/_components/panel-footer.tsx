@@ -39,6 +39,7 @@ import {
   hydrateWorkspaceActionConfigWithDefaults,
   type WorkspaceActionConfig,
 } from './workspace-select';
+import { applyWorkspaceGitActionPreferences } from './workspace-action-preferences';
 import {
   getBranchSelectItems,
   getBranchSelectItemsFromGit,
@@ -1276,6 +1277,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     string | null
   >(null);
 
+  const workspaceGitActionPreferences = useKartonState(
+    (s) => s.preferences.agent.workspaceGitActionPreferences,
+  );
   const [workspaceActionConfigs, setWorkspaceActionConfigs] = useState<
     ReadonlyMap<string, WorkspaceActionConfig>
   >(EMPTY_WORKSPACE_ACTION_CONFIGS);
@@ -1318,11 +1322,17 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         }
 
         const gitRef = formatWorkspaceGitRef(mount.git);
+        const sourceBranchItems = getBranchSelectItems(gitRef);
         next.set(
           mount.prefix,
-          createDefaultWorkspaceActionConfig(
-            getBranchSelectItems(gitRef),
-            getWorktreeSelectItems(),
+          applyWorkspaceGitActionPreferences(
+            createDefaultWorkspaceActionConfig(
+              sourceBranchItems,
+              getWorktreeSelectItems(),
+            ),
+            sourceBranchItems,
+            workspaceGitActionPreferences.general,
+            workspaceGitActionPreferences.repositories[mount.git.repositoryId],
           ),
         );
         changed = true;
@@ -1331,7 +1341,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       if (next.size !== prev.size) changed = true;
       return changed ? next : prev;
     });
-  }, [historyIsEmpty, workspaceActionMountsKey]);
+  }, [historyIsEmpty, workspaceActionMountsKey, workspaceGitActionPreferences]);
 
   const handleWorkspaceActionConfigChange = useCallback(
     (mount: MountEntry, config: WorkspaceActionConfig) => {

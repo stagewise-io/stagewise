@@ -382,6 +382,49 @@ export type WorkspaceAgentSettings = z.infer<
   typeof workspaceAgentSettingsSchema
 >;
 
+export const workspaceGitActionSchema = z.enum([
+  'create-worktree',
+  'create-branch',
+  'switch-branch',
+  'switch-worktree',
+]);
+export type WorkspaceGitAction = z.infer<typeof workspaceGitActionSchema>;
+
+const defaultWorkspaceGitActionPreferences = {
+  general: {},
+  repositories: {},
+};
+
+const workspaceGitActionPreferenceSchema = z
+  .object({
+    selectedAction: workspaceGitActionSchema.optional(),
+  })
+  .default({})
+  .catch({});
+
+const workspaceGitRepositoryActionPreferenceSchema = z
+  .object({
+    selectedAction: workspaceGitActionSchema.optional(),
+    createWorktreeFrom: z.string().optional(),
+    createBranchFrom: z.string().optional(),
+  })
+  .default({})
+  .catch({});
+
+export const workspaceGitActionPreferencesSchema = z
+  .object({
+    general: workspaceGitActionPreferenceSchema,
+    repositories: z
+      .record(z.string(), workspaceGitRepositoryActionPreferenceSchema)
+      .default({}),
+  })
+  .default(defaultWorkspaceGitActionPreferences)
+  .catch(defaultWorkspaceGitActionPreferences);
+
+export type WorkspaceGitActionPreferences = z.infer<
+  typeof workspaceGitActionPreferencesSchema
+>;
+
 /** Controls whether tool calls (shell, sandbox) require user approval */
 export const toolApprovalModeSchema = z.enum([
   'alwaysAsk',
@@ -480,11 +523,14 @@ export const userPreferencesSchema = z.object({
       disabledModelIds: z.array(z.string()).default([]),
       /** Plugin IDs the user has chosen to disable */
       disabledPluginIds: z.array(z.string()).default([]),
+      /** Last workspace Git action choices used to seed future selectors */
+      workspaceGitActionPreferences: workspaceGitActionPreferencesSchema,
     })
     .default({
       workspaceSettings: {},
       disabledModelIds: [],
       disabledPluginIds: [],
+      workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
     }),
   /** LLM provider endpoint configurations (API keys, custom URLs) */
   providerConfigs: providerConfigsSchema.default({
@@ -588,6 +634,7 @@ export const defaultUserPreferences: UserPreferences = {
       'gemini-3-flash-preview',
     ],
     disabledPluginIds: [],
+    workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
   },
   providerConfigs: {
     anthropic: { mode: 'stagewise' },

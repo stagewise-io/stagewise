@@ -44,3 +44,68 @@ describe('userPreferencesSchema sidebar defaults', () => {
     });
   });
 });
+
+describe('userPreferencesSchema workspace Git action defaults', () => {
+  it('defaults workspace Git action preferences when missing', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceSettings: {},
+        disabledModelIds: [],
+        disabledPluginIds: [],
+      },
+    });
+
+    expect(parsed.agent.workspaceGitActionPreferences).toEqual({
+      general: {},
+      repositories: {},
+    });
+  });
+
+  it('preserves valid workspace Git action preferences', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceGitActionPreferences: {
+          general: { selectedAction: 'create-branch' },
+          repositories: {
+            '/repo/.git': {
+              selectedAction: 'create-worktree',
+              createWorktreeFrom: 'develop',
+              createBranchFrom: 'release',
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.workspaceGitActionPreferences).toEqual({
+      general: { selectedAction: 'create-branch' },
+      repositories: {
+        '/repo/.git': {
+          selectedAction: 'create-worktree',
+          createWorktreeFrom: 'develop',
+          createBranchFrom: 'release',
+        },
+      },
+    });
+  });
+
+  it('defaults invalid workspace Git action preference values', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceGitActionPreferences: {
+          general: { selectedAction: 'invalid-action' },
+          repositories: {
+            '/repo/.git': { selectedAction: 'invalid-action' },
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.workspaceGitActionPreferences).toEqual({
+      general: {},
+      repositories: {
+        '/repo/.git': {},
+      },
+    });
+  });
+});
