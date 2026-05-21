@@ -44,9 +44,9 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
   const [_isKeyboardInteraction, setIsKeyboardInteraction] = useState(false);
 
   const isSearchBarActive = useKartonState(
-    (s) => s.browser.tabs[tabId]?.isSearchBarActive ?? false,
+    (s) => s.contentTabs.tabs[tabId]?.isSearchBarActive ?? false,
   );
-  const tabSearch = useKartonState((s) => s.browser.tabs[tabId]?.search);
+  const tabSearch = useKartonState((s) => s.contentTabs.tabs[tabId]?.search);
 
   const startSearch = useKartonProcedure((p) => p.browser.searchInPage.start);
   const updateSearch = useKartonProcedure(

@@ -2,6 +2,11 @@ import { forwardRef, memo, useCallback } from 'react';
 import { cn } from '@ui/utils';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
+import {
   type SharedAgentContextMenuState,
   buildAgentContextMenuHandler,
 } from '../../../_components/shared-agent-context-menu';
@@ -178,31 +183,39 @@ export const AgentCard = memo(
                 </div>
               ) : null}
               {onTogglePinned ? (
-                <button
-                  type="button"
-                  data-no-dnd="true"
-                  aria-label={isPinned ? 'Unpin agent' : 'Pin agent'}
-                  title={isPinned ? 'Unpin agent' : 'Pin agent'}
-                  className={cn(
-                    'absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm',
-                    'text-muted-foreground/60 opacity-0 outline-none transition-[color,opacity]',
-                    'hover:text-foreground focus-visible:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100',
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onTogglePinned(id);
-                  }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                  }}
-                >
-                  {isPinned ? (
-                    <IconPinTackSlashOutline18 className="size-3.5" />
-                  ) : (
-                    <IconPinTackOutline18 className="size-3.5" />
-                  )}
-                </button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        data-no-dnd="true"
+                        aria-label={isPinned ? 'Pin globally' : 'Unpin'}
+                        className={cn(
+                          'absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm',
+                          'text-muted-foreground/60 opacity-0 outline-none transition-[color,opacity]',
+                          'hover:text-foreground focus-visible:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100',
+                        )}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onTogglePinned(id);
+                        }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        {isPinned ? (
+                          <IconPinTackSlashOutline18 className="size-3.5" />
+                        ) : (
+                          <IconPinTackOutline18 className="size-3.5" />
+                        )}
+                      </button>
+                    }
+                  />
+                  <TooltipContent side="bottom">
+                    {isPinned ? 'Pin globally' : 'Unpin'}
+                  </TooltipContent>
+                </Tooltip>
               ) : null}
             </div>
           );

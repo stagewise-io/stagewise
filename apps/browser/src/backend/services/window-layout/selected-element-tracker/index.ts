@@ -667,13 +667,13 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
       frameLocation: frameInfo.url,
       frameTitle: frameInfo.title,
       backendNodeId: this.currentHover.backendId,
-      // tabId will be filled by TabController
+      // tabId will be filled by BrowsingTabController
       stagewiseId: selectedElement.id || randomUUID(), // fallback if id missing
       nodeType: selectedElement.tagName, // Ensure nodeType is set for compatibility
       codeMetadata: selectedElement.codeMetadata || [], // Initialize empty code metadata if not present
     };
 
-    // Cache the parsed element (without tabId, as that's added by TabController)
+    // Cache the parsed element (without tabId, as that's added by BrowsingTabController)
     this.cacheParsedElement(cacheKey, enrichedElement);
 
     return enrichedElement;
@@ -692,7 +692,7 @@ export class SelectedElementTracker extends EventEmitter<ElementSelectorEventMap
       }
     }
 
-    // Store element without tabId (it's added by TabController and may vary)
+    // Store element without tabId (it's added by BrowsingTabController and may vary)
     const { tabId: _tabId, ...elementWithoutTabId } = element;
     this.parsedElementCache.set(
       cacheKey,

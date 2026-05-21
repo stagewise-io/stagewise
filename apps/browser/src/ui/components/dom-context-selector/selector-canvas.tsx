@@ -10,7 +10,7 @@ import { useEventListener } from '@ui/hooks/use-event-listener';
  */
 export function DOMContextSelector() {
   const contextSelectionActive = useKartonState(
-    (s) => s.browser.contextSelectionMode,
+    (s) => s.browsing.contextSelectionMode,
   );
   const viewportSize = useKartonState((s) => s.browser.viewportSize);
 

@@ -19,7 +19,7 @@ export function BrowserTabHotkeys({
   onFocusUrlBar: () => void;
   onFocusSearchBar: () => void;
 }) {
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const activeTabIdRef = useRef(activeTabId);
   const { tabUiState } = useTabUIState();
   const focusedPanel = activeTabId
@@ -45,7 +45,12 @@ export function BrowserTabHotkeys({
   );
 
   const currentZoomPercentage = useKartonState((s) =>
-    activeTabId ? s.browser.tabs[activeTabId]?.zoomPercentage : 100,
+    activeTabId ? s.contentTabs.tabs[activeTabId]?.zoomPercentage : 100,
+  );
+
+  // Browser-specific hotkeys are no-ops for terminal tabs.
+  const isTerminalTab = useKartonState((s) =>
+    activeTabId ? s.contentTabs.tabs[activeTabId]?.type === 'terminal' : false,
   );
 
   useEffect(() => {
@@ -55,7 +60,7 @@ export function BrowserTabHotkeys({
   // Zoom helpers
   useHotKeyListener(() => {
     if (focusedPanel === 'tab-content') {
-      if (!activeTabId || !currentZoomPercentage) return;
+      if (!activeTabId || !currentZoomPercentage || isTerminalTab) return;
       if (currentZoomPercentage >= 500) return;
       setZoomPercentage(currentZoomPercentage + 10, activeTabId);
     } else {
@@ -69,7 +74,7 @@ export function BrowserTabHotkeys({
 
   useHotKeyListener(() => {
     if (focusedPanel === 'tab-content') {
-      if (!activeTabId || !currentZoomPercentage) return;
+      if (!activeTabId || !currentZoomPercentage || isTerminalTab) return;
       if (currentZoomPercentage <= 50) return;
       setZoomPercentage(currentZoomPercentage - 10, activeTabId);
     } else {
@@ -83,7 +88,7 @@ export function BrowserTabHotkeys({
 
   useHotKeyListener(() => {
     if (focusedPanel === 'tab-content') {
-      if (!activeTabId) return;
+      if (!activeTabId || isTerminalTab) return;
       setZoomPercentage(100, activeTabId);
     } else {
       if (uiZoomPercentage === 100) return;
@@ -96,6 +101,7 @@ export function BrowserTabHotkeys({
 
   // URL bar (Mod+Alt+L): always focus the omnibox.
   useHotKeyListener(async () => {
+    if (isTerminalTab) return;
     const targetTabId = activeTabId;
     try {
       await togglePanelKeyboardFocus('stagewise-ui');
@@ -108,41 +114,42 @@ export function BrowserTabHotkeys({
 
   // Search bar
   useHotKeyListener(() => {
+    if (isTerminalTab) return;
     togglePanelKeyboardFocus('stagewise-ui');
     onFocusSearchBar();
   }, HotkeyActions.FIND_IN_PAGE);
 
   // History navigation
   useHotKeyListener(() => {
-    if (!activeTabId) return;
+    if (!activeTabId || isTerminalTab) return;
     goBack(activeTabId);
   }, HotkeyActions.HISTORY_BACK);
 
   useHotKeyListener(() => {
-    if (!activeTabId) return;
+    if (!activeTabId || isTerminalTab) return;
     goForward(activeTabId);
   }, HotkeyActions.HISTORY_FORWARD);
 
   // Page reload
   useHotKeyListener(() => {
-    if (!activeTabId) return;
+    if (!activeTabId || isTerminalTab) return;
     reload(activeTabId);
   }, HotkeyActions.RELOAD);
 
   useHotKeyListener(() => {
-    if (!activeTabId) return;
+    if (!activeTabId || isTerminalTab) return;
     reload(activeTabId);
   }, HotkeyActions.HARD_RELOAD);
 
   // Dev tools
   useHotKeyListener(() => {
-    if (!activeTabId) return;
+    if (!activeTabId || isTerminalTab) return;
     toggleDevTools(activeTabId);
   }, HotkeyActions.DEV_TOOLS);
 
   // Downloads
   useHotKeyListener(() => {
-    if (!activeTabId) return;
+    if (!activeTabId || isTerminalTab) return;
     goto('stagewise://internal/downloads', activeTabId);
   }, HotkeyActions.DOWNLOADS);
 

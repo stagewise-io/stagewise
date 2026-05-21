@@ -32,8 +32,8 @@ export function AgentHotkeyBindings({
   );
 
   // -- Tab management (per-agent) ---------------------------------------
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
-  const tabs = useKartonState((s) => s.browser.tabs);
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const tabs = useKartonState((s) => s.contentTabs.tabs);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const { removeTabUiState } = useTabUIState();

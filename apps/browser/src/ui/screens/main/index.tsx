@@ -12,15 +12,7 @@ import { Sidebar } from './sidebar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { OpenAgentProvider, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { HotkeyActions } from '@shared/hotkeys';
-import { Button } from '@stagewise/stage-ui/components/button';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@stagewise/stage-ui/components/tooltip';
-import { GlobePlusIcon } from './_components/globe-plus-icon';
-import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { NewTabButtons } from './_components/new-tab-buttons';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
 import { useAutoSelectFirstAgent } from '@ui/hooks/use-auto-select-agent';
@@ -64,8 +56,8 @@ export function DefaultLayout({ show }: { show: boolean }) {
 function DefaultLayoutInner({ show }: { show: boolean }) {
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
-  const tabs = useKartonState((s) => s.browser.tabs);
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const tabs = useKartonState((s) => s.contentTabs.tabs);
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const [openAgent] = useOpenAgent();
   const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
@@ -79,6 +71,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   }, [tabs, openAgent]);
 
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const createTerminal = useKartonProcedure((p) => p.browser.createTerminal);
   // content panel visible when there are visible tabs AND it's not collapsed
   const showContent = hasVisibleTabs && !contentCollapsed;
 
@@ -155,6 +148,11 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
     setPendingOmniboxFocusRequest(null);
   }, []);
 
+  const handleOpenTerminal = useCallback(() => {
+    if (contentCollapsed) setContentCollapsed(false);
+    void createTerminal(undefined, openAgent);
+  }, [createTerminal, openAgent, contentCollapsed, setContentCollapsed]);
+
   // Headless: keeps `openAgent` valid regardless of whether the sidebar
   // (which used to own this effect) is mounted.
   useAutoSelectFirstAgent();
@@ -189,33 +187,20 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
             order={1}
             defaultSize={65}
             className={cn(
-              'relative h-full overflow-hidden rounded-l-xl ring-1 ring-derived-subtle',
+              'relative h-full overflow-hidden ring-1 ring-derived-subtle',
+              !sidebarCollapsed && 'rounded-l-xl',
               !isMacOs && 'mt-px',
             )}
           >
             {/* Top-right action button: content toggle when tabs visible, globe when none */}
-            <div className="app-no-drag absolute top-1 right-1 z-20">
+            <div className="app-no-drag absolute top-1 right-2 z-20">
               {hasVisibleTabs ? (
                 <ContentToggleButton />
               ) : (
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Open new browser tab"
-                      onClick={handleCreateTab}
-                    >
-                      <GlobePlusIcon className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <span className="flex items-center gap-1.5">
-                      <span>Open browsing tab</span>
-                      <HotkeyCombo action={HotkeyActions.NEW_TAB} size="xs" />
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
+                <NewTabButtons
+                  onCreateBrowserTab={handleCreateTab}
+                  onCreateTerminalTab={handleOpenTerminal}
+                />
               )}
             </div>
             <ResizablePanelGroup

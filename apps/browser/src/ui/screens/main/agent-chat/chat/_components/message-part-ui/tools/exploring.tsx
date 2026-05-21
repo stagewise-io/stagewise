@@ -248,7 +248,7 @@ export const ExploringToolParts = memo(
       new Set(),
     );
     const isOnlyOnePart = useMemo(() => items.length === 1, [items]);
-    const activeTabs = useKartonState((s) => s.browser.tabs);
+    const activeTabs = useKartonState((s) => s.contentTabs.tabs);
     const plugins = useKartonState((s) => s.plugins);
 
     const partsMetadataRef = useRef(partsMetadata);

@@ -1,9 +1,9 @@
 /**
- * Monotonic tab ID counter — mimics Chrome's per-session integer tab IDs.
+ * Monotonic tab ID counter.
  *
- * IDs start at 1 and increment on each call to `generateTabId()`.
- * Unlike the old random-bytes approach, IDs are sequential, never collide,
- * and need no collision-check parameter.
+ * IDs use a non-integer prefix (`tab-1`, `tab-2`, …).  Do not return bare
+ * numeric strings: object key enumeration always sorts integer-like keys
+ * before normal string keys, which destroys mixed browser/terminal tab order.
  *
  * `resetTabIdCounter()` must be called exactly once at cold start
  * (i.e. in the `WindowLayoutService` constructor).
@@ -12,12 +12,11 @@
 let nextTabId = 1;
 
 /**
- * Returns the next tab ID as a string (e.g. `"1"`, `"2"`, …).
- * The string representation keeps the rest of the codebase unchanged
- * since `browserTabSnapshotSchema.id` is typed as `z.string()`.
+ * Returns the next tab ID as a non-integer string (e.g. `"tab-1"`,
+ * `"tab-2"`, …).
  */
 export function generateTabId(): string {
-  return String(nextTabId++);
+  return `tab-${nextTabId++}`;
 }
 
 /**

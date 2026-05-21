@@ -44,8 +44,7 @@ import {
   type SearchUtilsConfig,
   createSearchUtils,
 } from './utils/search-utils';
-import { TabErrorHandler, type SubframeError } from './tab-error-handler';
-export type { SubframeError } from './tab-error-handler';
+import { TabErrorHandler } from './tab-error-handler';
 import { TabPermissionHandler } from './tab-permission-handler';
 import { SessionPermissionRegistry } from './tab-permission-handler/session-registry';
 import { TabAuthenticationHandler } from './tab-authentication-handler';
@@ -73,8 +72,6 @@ export interface TabState {
     /** Whether an error page is currently displayed */
     isErrorPageDisplayed?: boolean;
   } | null;
-  /** Subframe errors that occurred on the current page */
-  subframeErrors: SubframeError[];
   navigationHistory: {
     canGoBack: boolean;
     canGoForward: boolean;
@@ -154,7 +151,7 @@ export interface TabControllerEventMap {
   devtoolsClosed: [tabId: string];
 }
 
-export class TabController extends EventEmitter<TabControllerEventMap> {
+export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
   public readonly id: string;
   private readonly parentWindow: BaseWindow;
   private webContentsView: WebContentsView;
@@ -376,7 +373,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       isMuted: this.webContentsView.webContents.audioMuted,
       colorScheme: 'system',
       error: null,
-      subframeErrors: [],
       navigationHistory: {
         canGoBack: false,
         canGoForward: false,
@@ -2377,9 +2373,6 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
           } else {
             this.updateState({ error: null });
           }
-        },
-        onSubframeErrorsUpdate: (errors) => {
-          this.updateState({ subframeErrors: errors });
         },
         onDisplayUrlUpdate: (url) => {
           // Update the URL shown in UI to the failed URL, not the error page URL

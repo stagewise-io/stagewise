@@ -6,9 +6,8 @@ import {
 } from '@shared/hotkeys';
 import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
-import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { useAgentSwitcher } from '@ui/hooks/use-open-chat';
-import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSidebarCollapsed } from './sidebar-collapsed-context';
 import { useCommandCenter } from '../command-center';
@@ -30,7 +29,7 @@ function getVisibleAgentIds() {
 
 /**
  * Global hotkeys — always mounted. Covers UI chrome toggles, agent
- * switching, and window-level actions. No dependency on browser tabs.
+ * switching, and window-level actions.
  */
 export function GlobalHotkeyBindings() {
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
@@ -221,26 +220,6 @@ export function GlobalHotkeyBindings() {
   useHotKeyListener(
     () => toggleSidebar(),
     HotkeyActions.TOGGLE_SIDEBAR,
-    globalHotkeysEnabled,
-  );
-
-  // -- Close window (Mod+Shift+W) ---------------------------------------
-  const tabs = useKartonState((s) => s.browser.tabs);
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
-  const closeTab = useKartonProcedure((p) => p.browser.closeTab);
-  const { removeTabUiState } = useTabUIState();
-
-  useHotKeyListener(
-    () => {
-      if (!activeTabId) return;
-      const ids = Object.keys(tabs).filter((id) => id !== activeTabId);
-      void Promise.allSettled(ids.map((id) => closeTab(id))).then((results) => {
-        for (let i = 0; i < results.length; i++) {
-          if (results[i]!.status === 'fulfilled') removeTabUiState(ids[i]!);
-        }
-      });
-    },
-    HotkeyActions.CLOSE_WINDOW,
     globalHotkeysEnabled,
   );
 

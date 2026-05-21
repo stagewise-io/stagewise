@@ -95,7 +95,7 @@ export function StatusCard() {
   const createTab = useKartonProcedure((p) => p.browser.createTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
-  const tabs = useKartonState((s) => s.browser.tabs);
+  const tabs = useKartonState((s) => s.contentTabs.tabs);
 
   const messageQueue = useKartonState((s) =>
     openAgentId

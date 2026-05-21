@@ -26,7 +26,7 @@ export const ReadConsoleLogsToolPart = ({
   disableShimmer?: boolean;
   isLastPart?: boolean;
 }) => {
-  const activeTabs = useKartonState((s) => s.browser.tabs);
+  const activeTabs = useKartonState((s) => s.contentTabs.tabs);
 
   const streaming = useMemo(() => {
     return part.state === 'input-streaming' || part.state === 'input-available';

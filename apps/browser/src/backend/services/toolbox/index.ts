@@ -10,6 +10,7 @@ import type { FilePickerService } from '@/services/file-picker';
 import type { UserExperienceService } from '@/services/experience';
 import { SandboxService } from '../sandbox';
 import { ShellService, type DetectedShell } from './services/shell';
+import { TerminalService } from '@/services/terminal';
 import {
   FULL_PERMISSIONS,
   NON_WORKSPACE_PREFIXES,
@@ -100,6 +101,7 @@ import {
   type StagewiseToolSet,
   type QuestionAnswerValue,
 } from '@shared/karton-contracts/ui/agent/tools/types';
+import type { TabState } from '@shared/karton-contracts/ui';
 import type { BrowserSnapshot, WorkspaceSnapshot } from './types';
 import type {
   EnvironmentSnapshot,
@@ -169,6 +171,7 @@ export class ToolboxService extends DisposableService {
 
   private sandboxService: SandboxService | null = null;
   private shellService: ShellService | null = null;
+  private terminalService: TerminalService | null = null;
   /**
    * Injected lazily via `setModelProviderService` because `ModelProviderService`
    * is constructed later in `main.ts` (after `preferencesService`) and has a
@@ -1228,18 +1231,24 @@ export class ToolboxService extends DisposableService {
   }
 
   public getBrowserSnapshot(agentInstanceId: string): BrowserSnapshot {
-    const browser = this.uiKarton.state.browser;
+    const contentTabs = this.uiKarton.state.contentTabs;
 
     // Filter: only global tabs (null) and tabs assigned to this agent
     const isTabVisible = (tab: { agentInstanceId: string | null }) =>
       tab.agentInstanceId === null || tab.agentInstanceId === agentInstanceId;
 
+    // Terminal tabs are excluded from the browser snapshot
+    const isTerminalTab = (tab: { type?: 'browser' | 'terminal' }) =>
+      tab.type === 'terminal';
+
     const activeTab =
-      browser.activeTabId && browser.tabs[browser.activeTabId]
-        ? browser.tabs[browser.activeTabId]
+      contentTabs.activeTabId && contentTabs.tabs[contentTabs.activeTabId]
+        ? contentTabs.tabs[contentTabs.activeTabId]
         : null;
 
-    const visibleTabs = Object.values(browser.tabs).filter(isTabVisible);
+    const visibleTabs = (Object.values(contentTabs.tabs) as TabState[])
+      .filter((tab) => !isTerminalTab(tab))
+      .filter(isTabVisible);
 
     const allTabs = visibleTabs
       .sort((a, b) => b.lastFocusedAt - a.lastFocusedAt)
@@ -1259,7 +1268,9 @@ export class ToolboxService extends DisposableService {
 
     // Only show active tab if it's visible to this agent
     const activeTabVisible =
-      activeTab && isTabVisible(activeTab) ? activeTab : null;
+      activeTab && isTabVisible(activeTab) && !isTerminalTab(activeTab)
+        ? activeTab
+        : null;
 
     return {
       activeTab: activeTabVisible
@@ -1368,6 +1379,7 @@ export class ToolboxService extends DisposableService {
           consoleLogCount: t.consoleLogCount,
           error: t.error,
           lastFocusedAt: t.lastFocusedAt,
+          agentInstanceId: t.agentInstanceId,
         })),
         activeTabId: browserState.activeTab?.id ?? null,
       },
@@ -1985,6 +1997,49 @@ export class ToolboxService extends DisposableService {
       resolvedEnv,
     );
 
+    // Create TerminalService for user-controllable terminal tabs.
+    // Requires a detected shell — if no shell is available, terminal
+    // creation will silently fail (procedure handler not registered).
+    const terminalEnv =
+      resolvedEnv ??
+      Object.fromEntries(
+        Object.entries(process.env).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      );
+    if (this.detectedShell) {
+      this.terminalService = new TerminalService(
+        this.logger,
+        this.uiKarton,
+        this.detectedShell,
+        terminalEnv,
+      );
+      this.terminalService.initialize();
+      // Restore PTYs for terminal tabs persisted in loadTabState.
+      this.terminalService.restoreFromState();
+      // Wire terminal lifecycle so active-tab management stays
+      // centralized in WindowLayoutService.
+      this.windowLayoutService.setOnCloseTerminal((terminalId) => {
+        this.terminalService?.handleCloseTerminal(terminalId);
+      });
+      this.terminalService.setOnTerminalTabCreated((terminalId) => {
+        this.windowLayoutService.activateTerminalTab(terminalId);
+      });
+      this.terminalService.setOnTerminalTabRemoved((terminalId) => {
+        this.windowLayoutService.handleTerminalTabExited(terminalId);
+      });
+      this.windowLayoutService.setOnBeforeSaveTabState(() => {
+        this.terminalService?.syncTerminalCwds();
+      });
+      // Wire deferred terminal restoration — when WindowLayoutService
+      // creates a restored terminal tab, spawn its PTY on-demand.
+      this.windowLayoutService.setOnDeferredTerminalRestored(
+        (terminalId, cwd) => {
+          this.terminalService?.restoreTerminal(terminalId, cwd);
+        },
+      );
+    }
+
     // Use arrow function to preserve `this` binding when called as callback
     this.authService.registerAuthStateChangeCallback(() =>
       this.refreshApiClient(),
@@ -2320,6 +2375,10 @@ export class ToolboxService extends DisposableService {
 
     await this.sandboxService?.teardown();
     this.sandboxService = null;
+
+    // User-terminal teardown — kills all terminal PTY processes.
+    await this.terminalService?.teardown();
+    this.terminalService = null;
 
     // Shell teardown last — kills all live PTY processes synchronously.
     // Ordering matters: downstream services may still hold references to

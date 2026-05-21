@@ -39,7 +39,16 @@ importers:
       '@streamdown/math':
         specifier: ^1.0.2
         version: 1.0.2(react@19.2.3)
+      '@xterm/addon-fit':
+        specifier: ^0.11.0
+        version: 0.11.0
+      '@xterm/addon-webgl':
+        specifier: ^0.19.0
+        version: 0.19.0
       '@xterm/headless':
+        specifier: ^6.0.0
+        version: 6.0.0
+      '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
       better-auth:
@@ -51,6 +60,9 @@ importers:
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
+      nucleo-ui-outline-12:
+        specifier: ^1.4.1
+        version: 1.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       tsx:
         specifier: ^4.20.3
         version: 4.21.0
@@ -188,7 +200,19 @@ importers:
       '@vscode/tree-sitter-wasm':
         specifier: ^0.3.0
         version: 0.3.1
+      '@xterm/addon-fit':
+        specifier: ^0.11.0
+        version: 0.11.0
+      '@xterm/addon-serialize':
+        specifier: ^0.14.0
+        version: 0.14.0
+      '@xterm/addon-webgl':
+        specifier: ^0.19.0
+        version: 0.19.0
       '@xterm/headless':
+        specifier: ^6.0.0
+        version: 6.0.0
+      '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
       chokidar:
@@ -218,6 +242,9 @@ importers:
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
+      nucleo-ui-outline-12:
+        specifier: ^1.4.1
+        version: 1.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       pdfjs-dist:
         specifier: ^5.7.284
         version: 5.7.284
@@ -5272,8 +5299,20 @@ packages:
     engines: {node: '>=10.0.0'}
     deprecated: this version has critical issues, please update to the latest version
 
+  '@xterm/addon-fit@0.11.0':
+    resolution: {integrity: sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==}
+
+  '@xterm/addon-serialize@0.14.0':
+    resolution: {integrity: sha512-uteyTU1EkrQa2Ux6P/uFl2fzmXI46jy5uoQMKEOM0fKTyiW7cSn0WrFenHm5vO5uEXX/GpwW/FgILvv3r0WbkA==}
+
+  '@xterm/addon-webgl@0.19.0':
+    resolution: {integrity: sha512-b3fMOsyLVuCeNJWxolACEUED0vm7qC0cy4wRvf3oURSzDTYVQiGPhTnhWZwIHdvC48Y+oLhvYXnY4XDXPoJo6A==}
+
   '@xterm/headless@6.0.0':
     resolution: {integrity: sha512-5Yj1QINYCyzrZtf8OFIHi47iQtI+0qYFPHmouEfG8dHNxbZ9Tb9YGSuLcsEwj9Z+OL75GJqPyJbyoFer80a2Hw==}
+
+  '@xterm/xterm@6.0.0':
+    resolution: {integrity: sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==}
 
   '@xtuc/ieee754@1.2.0':
     resolution: {integrity: sha512-DX8nKgqcGwsc0eJSqYt5lwP4DH5FlHnmuWWBRy7X0NcaGR0ZtuyeESgMwTYVEtxmsNGY+qit4QYT/MIYTOTPeA==}
@@ -8958,6 +8997,12 @@ packages:
 
   nucleo-ui-fill-duo-18@1.4.0:
     resolution: {integrity: sha512-iTkAV2XIYzjiWaE+mg71xwmDgH7/bMYLceMuNcSOzn/SMRt0FoI7Te2e98xlG5p4g21tbxjslmXPu3aH6Phenw==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
+  nucleo-ui-outline-12@1.4.1:
+    resolution: {integrity: sha512-lwSOZgIbP1y4ZOzNRmeAEqWdd2pbxwVlN78cjS8SX/0IdXeFbrMMB4ZnYUBnoQvtG+C81TJ0R7MN3qbPgm8yZw==}
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
@@ -16209,7 +16254,15 @@ snapshots:
 
   '@xmldom/xmldom@0.8.11': {}
 
+  '@xterm/addon-fit@0.11.0': {}
+
+  '@xterm/addon-serialize@0.14.0': {}
+
+  '@xterm/addon-webgl@0.19.0': {}
+
   '@xterm/headless@6.0.0': {}
+
+  '@xterm/xterm@6.0.0': {}
 
   '@xtuc/ieee754@1.2.0': {}
 
@@ -20516,6 +20569,12 @@ snapshots:
       tslib: 2.8.1
 
   nucleo-ui-fill-duo-18@1.4.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      tslib: 2.8.1
+
+  nucleo-ui-outline-12@1.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)

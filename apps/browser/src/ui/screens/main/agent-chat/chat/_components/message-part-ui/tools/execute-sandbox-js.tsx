@@ -48,7 +48,7 @@ export const ExecuteSandboxJsToolPart = ({
 }) => {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [resultExpanded, setResultExpanded] = useState(true);
-  const activeTabs = useKartonState((s) => s.browser.tabs);
+  const activeTabs = useKartonState((s) => s.contentTabs.tabs);
   const [openAgentId] = useOpenAgent();
 
   const streaming = useMemo(() => {

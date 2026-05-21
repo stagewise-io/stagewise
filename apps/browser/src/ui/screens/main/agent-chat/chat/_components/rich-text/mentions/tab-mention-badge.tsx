@@ -71,9 +71,9 @@ export function TabMentionBadge({
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
 
-  const liveBrowserSessionId = useKartonState((s) => s.browser.sessionId);
+  const liveBrowserSessionId = useKartonState((s) => s.browsing.sessionId);
   const liveTab = useKartonState((s) =>
-    tabId ? (s.browser.tabs[tabId] ?? null) : null,
+    tabId ? (s.contentTabs.tabs[tabId] ?? null) : null,
   );
 
   const isStaleSession =

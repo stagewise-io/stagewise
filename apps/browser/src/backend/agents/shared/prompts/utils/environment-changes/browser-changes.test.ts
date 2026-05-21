@@ -3,10 +3,21 @@ import type { BrowserSnapshot } from '@shared/karton-contracts/ui/agent/metadata
 import { computeBrowserChanges } from './browser-changes';
 
 function makeBrowser(
-  tabs: { id: string; url: string; title: string }[],
+  tabs: {
+    id: string;
+    url: string;
+    title: string;
+    agentInstanceId?: string | null;
+  }[],
   activeTabId: string | null = null,
 ): BrowserSnapshot {
-  return { tabs, activeTabId };
+  return {
+    tabs: tabs.map((t) => ({
+      ...t,
+      agentInstanceId: t.agentInstanceId ?? null,
+    })),
+    activeTabId,
+  };
 }
 
 function types(entries: ReturnType<typeof computeBrowserChanges>): string[] {
@@ -220,6 +231,64 @@ describe('computeBrowserChanges', () => {
     const current = makeBrowser([]);
     const result = computeBrowserChanges(previous, current, 'sess-1', 'sess-2');
     expect(types(result)).toEqual(['browser-restarted']);
+  });
+
+  // ── tab assignment ───────────────────────────────────────────────────────
+
+  it('detects tab assigned from global to per-agent', () => {
+    const previous = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: null },
+    ]);
+    const current = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: 'agent-1' },
+    ]);
+    const result = computeBrowserChanges(previous, current);
+    expect(types(result)).toContain('tab-assigned');
+    expect(attrs(result, 'tab-assigned')).toEqual({
+      tabId: '1',
+      to: 'agent-1',
+    });
+  });
+
+  it('detects tab unassigned from per-agent back to global', () => {
+    const previous = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: 'agent-1' },
+    ]);
+    const current = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: null },
+    ]);
+    const result = computeBrowserChanges(previous, current);
+    expect(types(result)).toContain('tab-unassigned');
+    expect(attrs(result, 'tab-unassigned')).toEqual({
+      tabId: '1',
+      from: 'agent-1',
+    });
+  });
+
+  it('detects tab reassigned between agents', () => {
+    const previous = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: 'agent-1' },
+    ]);
+    const current = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: 'agent-2' },
+    ]);
+    const result = computeBrowserChanges(previous, current);
+    expect(types(result)).toContain('tab-reassigned');
+    expect(attrs(result, 'tab-reassigned')).toEqual({
+      tabId: '1',
+      from: 'agent-1',
+      to: 'agent-2',
+    });
+  });
+
+  it('does not emit assignment change when agentInstanceId unchanged', () => {
+    const snap = makeBrowser([
+      { id: '1', url: 'https://a.com', title: 'A', agentInstanceId: 'agent-1' },
+    ]);
+    const result = computeBrowserChanges(snap, snap);
+    expect(types(result)).not.toContain('tab-assigned');
+    expect(types(result)).not.toContain('tab-unassigned');
+    expect(types(result)).not.toContain('tab-reassigned');
   });
 
   // ── combined ──────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ export function useElementSelectionWatcher(
   const { isActive, onNewElement } = options;
 
   const selectedElementsFromWebcontents = useKartonState(
-    (s) => s.browser.selectedElements,
+    (s) => s.browsing.selectedElements,
   );
 
   const prevSelectedElementsRef = useRef(selectedElementsFromWebcontents);

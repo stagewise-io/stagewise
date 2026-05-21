@@ -1,5 +1,8 @@
 import type { TabState } from '@shared/karton-contracts/ui';
-import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
+import {
+  IconEarthOutline18,
+  IconSquareTerminalOutline18,
+} from 'nucleo-ui-outline-18';
 import { Logo } from '@ui/components/ui/logo';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
@@ -38,7 +41,11 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
       ) : tabState?.isLoading ? (
         <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
       ) : shouldShowFallback ? (
-        <IconGlobe2Fill18 className="size-4 text-muted-foreground" />
+        tabState?.type === 'terminal' ? (
+          <IconSquareTerminalOutline18 className="size-4 text-muted-foreground" />
+        ) : (
+          <IconEarthOutline18 className="size-4 text-muted-foreground" />
+        )
       ) : (
         <img
           src={faviconUrl}

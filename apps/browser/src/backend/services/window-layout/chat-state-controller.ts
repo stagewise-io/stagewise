@@ -1,12 +1,15 @@
 import type { KartonService } from '../karton';
-import type { TabController } from './tab-controller';
+import type { BrowsingTabController } from './browsing-tab-controller';
 import type { SelectedElement } from '@shared/selected-elements';
 
 export class ChatStateController {
   private uiKarton: KartonService;
-  private tabs: Record<string, TabController>;
+  private tabs: Record<string, BrowsingTabController>;
 
-  constructor(uiKarton: KartonService, tabs: Record<string, TabController>) {
+  constructor(
+    uiKarton: KartonService,
+    tabs: Record<string, BrowsingTabController>,
+  ) {
     this.uiKarton = uiKarton;
     this.tabs = tabs;
   }
@@ -15,7 +18,7 @@ export class ChatStateController {
    * Update the tabs reference when tabs are added or removed.
    * This is called by WindowLayoutService to keep the reference in sync.
    */
-  public updateTabsReference(tabs: Record<string, TabController>) {
+  public updateTabsReference(tabs: Record<string, BrowsingTabController>) {
     this.tabs = tabs;
   }
 
@@ -26,9 +29,10 @@ export class ChatStateController {
    */
   public addElement(element: SelectedElement): void {
     this.uiKarton.setState((draft) => {
-      if (!draft.browser.selectedElements) draft.browser.selectedElements = [];
+      if (!draft.browsing.selectedElements)
+        draft.browsing.selectedElements = [];
 
-      const elements = draft.browser.selectedElements;
+      const elements = draft.browsing.selectedElements;
       // Add if not exists
       if (!elements.some((e) => e.stagewiseId === element.stagewiseId))
         elements.push(element);
@@ -42,7 +46,7 @@ export class ChatStateController {
    */
   public removeElement(elementId: string): void {
     this.uiKarton.setState((draft) => {
-      draft.browser.selectedElements = draft.browser.selectedElements.filter(
+      draft.browsing.selectedElements = draft.browsing.selectedElements.filter(
         (e) => e.stagewiseId !== elementId,
       );
     });
@@ -54,7 +58,7 @@ export class ChatStateController {
    */
   public clearElements(): void {
     this.uiKarton.setState((draft) => {
-      draft.browser.selectedElements = [];
+      draft.browsing.selectedElements = [];
     });
     this.broadcastSelectionUpdate();
   }
@@ -65,7 +69,7 @@ export class ChatStateController {
    */
   public restoreElements(elements: SelectedElement[]): void {
     this.uiKarton.setState((draft) => {
-      draft.browser.selectedElements = [...elements];
+      draft.browsing.selectedElements = [...elements];
     });
     this.broadcastSelectionUpdate();
   }

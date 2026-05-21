@@ -292,16 +292,16 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [openAgent]);
 
   const activeTabUrl = useKartonState((s) => {
-    const tabId = s.browser.activeTabId;
-    return tabId ? (s.browser.tabs[tabId]?.url ?? null) : null;
+    const tabId = s.contentTabs.activeTabId;
+    return tabId ? (s.contentTabs.tabs[tabId]?.url ?? null) : null;
   });
 
   // Element selection state from Karton
   const selectionModeActive = useKartonState(
-    (s) => s.browser.contextSelectionMode,
+    (s) => s.browsing.contextSelectionMode,
   );
 
-  const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
 
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
@@ -356,8 +356,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const searchMentionFiles = useKartonProcedure(
     (p) => p.toolbox.searchMentionFiles,
   );
-  const mentionTabs = useKartonState((s) => s.browser.tabs);
-  const mentionActiveTabId = useKartonState((s) => s.browser.activeTabId);
+  const mentionTabs = useKartonState((s) => s.contentTabs.tabs);
+  const mentionActiveTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const mentionMounts = useKartonState((s) =>
     openAgent
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
@@ -427,7 +427,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   // read the latest value without adding the list to the callback deps.
   const selectedElementsStateRef = useRef<readonly unknown[]>([]);
   const selectedElementsState = useKartonState(
-    (s) => s.browser.selectedElements,
+    (s) => s.browsing.selectedElements,
   );
   selectedElementsStateRef.current = selectedElementsState ?? [];
 
