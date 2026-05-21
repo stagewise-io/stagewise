@@ -58,8 +58,17 @@ export function domCodeToElectronKeyCode(code: string, key: string): string {
   // Check if it's a special key
   if (specialKeys[code]) return specialKeys[code];
 
-  // For regular character keys (KeyA, KeyB, etc.), use the key property
-  // which gives us the actual character
+  // Hotkeys are defined against physical DOM codes (KeyA, Digit1, etc.).
+  // With Alt/Option, `key` can become a layout-specific symbol (e.g.
+  // Option+L => "¬", Option+B => "∫"), which would synthesize the wrong
+  // KeyboardEvent code in the UI process. Prefer the physical code for
+  // letter/digit keys so tunneled app shortcuts still match.
+  if (code.startsWith('Key')) return code.substring(3);
+  if (code.startsWith('Digit')) return code.substring(5);
+
+  // For regular character keys that are not represented by a physical
+  // letter/digit code, use the key property which gives us the actual
+  // character.
   if (key.length === 1) return key;
 
   // For modifier keys, we don't need to send them as keyCode
@@ -71,9 +80,6 @@ export function domCodeToElectronKeyCode(code: string, key: string): string {
     code.startsWith('Shift')
   )
     return key;
-
-  // Fallback: try to extract from code (e.g., "KeyA" -> "A")
-  if (code.startsWith('Key')) return code.substring(3);
 
   // Last resort: use the key as-is
   return key;

@@ -67,7 +67,7 @@ export const Omnibox = ({
   //   keeps UI in foreground until the URL actually changes
   const [navigationPending, setNavigationPending] = useState(false);
 
-  // Expose focus method via ref (called by hotkey CMD+L)
+  // Expose focus method via ref (called by hotkey Cmd+Option+L)
   useImperativeHandle(
     ref,
     () => ({

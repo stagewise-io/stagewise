@@ -165,17 +165,36 @@ function persistContentSize(size: number) {
   }
 }
 
-export function MainSection() {
+export function MainSection({
+  onCreateTab,
+  pendingOmniboxFocusRequest,
+  onPendingOmniboxFocusHandled,
+}: {
+  onCreateTab: () => void;
+  pendingOmniboxFocusRequest: {
+    id: number;
+    fromTabId: string | null;
+    targetTabId: string;
+  } | null;
+  onPendingOmniboxFocusHandled: (requestId: number) => void;
+}) {
   const panelRef = useRef<ImperativePanelHandle>(null);
   const tabs = useKartonState((s) => s.browser.tabs);
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const activeTabIdRef = useRef(activeTabId);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const reorderTabs = useKartonProcedure((p) => p.browser.reorderTabs);
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
 
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
+
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
   // Persisted panel size survives mount/unmount (conditional rendering).
   const storedSizeRef = useRef(readContentSize());
   // Block onResize→persist during mount-time layout and programmatic restore.
@@ -442,10 +461,6 @@ export function MainSection() {
   // ---------------------------------------------------------------------------
   const tabContentRefs = useRef<Record<string, PerTabContentRef | null>>({});
 
-  const handleGlobeClick = useCallback(() => {
-    createTab(undefined, undefined, openAgent);
-  }, [createTab, openAgent]);
-
   const handleFocusUrlBar = useCallback(() => {
     if (activeTabId) {
       tabContentRefs.current[activeTabId]?.focusOmnibox();
@@ -457,6 +472,63 @@ export function MainSection() {
       tabContentRefs.current[activeTabId]?.focusSearchBar();
     }
   }, [activeTabId]);
+
+  useEffect(() => {
+    if (!pendingOmniboxFocusRequest || !activeTabId) return;
+
+    const { id: requestId, targetTabId } = pendingOmniboxFocusRequest;
+    if (activeTabId !== targetTabId) return;
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const tryFocus = async () => {
+      if (cancelled) return true;
+
+      const ref = tabContentRefs.current[activeTabId];
+      if (!ref) return false;
+
+      // Ensure the UI view owns keyboard focus before the omnibox focuses its
+      // DOM input. If the chat input was focused, focusing the omnibox first can
+      // race with the async panel-focus handoff and let TipTap reclaim focus.
+      try {
+        await togglePanelKeyboardFocus('stagewise-ui');
+      } catch {
+        // Still focus the omnibox if the panel-focus handoff fails.
+      }
+      if (cancelled) return true;
+      if (activeTabIdRef.current !== targetTabId) return false;
+      if (tabContentRefs.current[targetTabId] !== ref) return false;
+
+      ref.focusOmnibox();
+      onPendingOmniboxFocusHandled(requestId);
+      return true;
+    };
+
+    const scheduleRetry = () => {
+      timeoutId = setTimeout(() => {
+        void tryFocus().then((focused) => {
+          if (focused || cancelled) return;
+          scheduleRetry();
+        });
+      }, 50);
+    };
+
+    void tryFocus().then((focused) => {
+      if (focused || cancelled) return;
+      scheduleRetry();
+    });
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
+  }, [
+    activeTabId,
+    pendingOmniboxFocusRequest,
+    togglePanelKeyboardFocus,
+    onPendingOmniboxFocusHandled,
+  ]);
 
   const handleTabFocused = useCallback(
     (event: CustomEvent<string>) => {
@@ -570,7 +642,7 @@ export function MainSection() {
                 size="icon-sm"
                 aria-label="Open new browser tab"
                 className="size-7 shrink-0 rounded-md"
-                onClick={handleGlobeClick}
+                onClick={onCreateTab}
               >
                 <GlobePlusIcon className="size-4" />
               </Button>

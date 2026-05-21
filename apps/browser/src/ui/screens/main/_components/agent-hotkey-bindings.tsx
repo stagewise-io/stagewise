@@ -11,7 +11,11 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
  * to the current agent and content-panel toggling. Handlers are no-ops
  * when there is no active browser tab.
  */
-export function AgentHotkeyBindings() {
+export function AgentHotkeyBindings({
+  onCreateTab,
+}: {
+  onCreateTab: () => void;
+}) {
   // -- Content panel toggle (Mod+Alt+B) ----------------------------------
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
     useContentCollapsed();
@@ -23,7 +27,6 @@ export function AgentHotkeyBindings() {
   // -- Tab management (per-agent) ---------------------------------------
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const tabs = useKartonState((s) => s.browser.tabs);
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const { removeTabUiState } = useTabUIState();
@@ -32,7 +35,7 @@ export function AgentHotkeyBindings() {
   const [openAgent] = useOpenAgent();
   useHotKeyListener(() => {
     if (contentCollapsed) setContentCollapsed(false);
-    createTab(undefined, undefined, openAgent);
+    onCreateTab();
   }, HotkeyActions.NEW_TAB);
 
   // Mod+W: close active tab

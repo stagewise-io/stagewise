@@ -4,6 +4,7 @@ import type { SelectedElement } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import { generateTabId, resetTabIdCounter } from './tab-id';
 import { getBrowserSessionId } from './browser-session';
+import { getElectronHotkeyPlatform } from '@/utils/electron-platform';
 import type { KartonService } from '../karton';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -841,7 +842,8 @@ export class WindowLayoutService extends DisposableService {
     setActive?: boolean,
     agentInstanceId?: string | null,
     sourceTabId?: string,
-  ) => {
+    onCreated?: (tabId: string | undefined) => void,
+  ): Promise<string | undefined> => {
     // If no URL is provided, check user's new tab page preference
     let targetUrl = url;
 
@@ -862,31 +864,40 @@ export class WindowLayoutService extends DisposableService {
       }
     }
 
-    // For internal pages, check if a non-active tab with the same URL already
-    // exists AND is visible to the requesting agent (global or matching).
-    // If the active tab already has this URL, we still create a new tab.
-    if (targetUrl?.startsWith('stagewise://')) {
-      const existingTab = Object.entries(this.tabs).find(([id, tab]) => {
-        if (id === this.activeTabId) return false;
-        if (tab.getState().url !== targetUrl) return false;
-        const tabAgent = tab.getState().agentInstanceId;
-        return tabAgent === null || tabAgent === (agentInstanceId ?? null);
-      });
+    let createdTabId: string | undefined;
 
-      if (existingTab) {
-        const [existingTabId] = existingTab;
-        await this.handleSwitchTab(existingTabId);
-        return;
+    try {
+      // For internal pages, check if a non-active tab with the same URL already
+      // exists AND is visible to the requesting agent (global or matching).
+      // If the active tab already has this URL, we still create a new tab.
+      if (targetUrl?.startsWith('stagewise://')) {
+        const existingTab = Object.entries(this.tabs).find(([id, tab]) => {
+          if (id === this.activeTabId) return false;
+          if (tab.getState().url !== targetUrl) return false;
+          const tabAgent = tab.getState().agentInstanceId;
+          return tabAgent === null || tabAgent === (agentInstanceId ?? null);
+        });
+
+        if (existingTab) {
+          const [existingTabId] = existingTab;
+          if (setActive ?? true) await this.handleSwitchTab(existingTabId);
+          createdTabId = existingTabId;
+          return existingTabId;
+        }
       }
-    }
 
-    await this.createTab(
-      targetUrl,
-      setActive ?? true,
-      sourceTabId,
-      agentInstanceId,
-    );
-    this.saveTabState();
+      const tabId = await this.createTab(
+        targetUrl,
+        setActive ?? true,
+        sourceTabId,
+        agentInstanceId,
+      );
+      this.saveTabState();
+      createdTabId = tabId;
+      return tabId;
+    } finally {
+      onCreated?.(createdTabId);
+    }
   };
 
   private async createTab(
@@ -940,7 +951,10 @@ export class WindowLayoutService extends DisposableService {
 
     tab.on('handleKeyDown', (keyDownEvent) => {
       if (id !== this.activeTabId) return;
-      const def = getHotkeyDefinitionForEvent(keyDownEvent as KeyboardEvent);
+      const def = getHotkeyDefinitionForEvent(
+        keyDownEvent as KeyboardEvent,
+        getElectronHotkeyPlatform(),
+      );
       if (def) this.uiController?.forwardKeyDownEvent(keyDownEvent);
     });
 

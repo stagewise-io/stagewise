@@ -3,6 +3,7 @@ import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { produceWithPatches, enablePatches } from 'immer';
+import { useEffect, useRef } from 'react';
 
 enablePatches();
 
@@ -19,6 +20,7 @@ export function BrowserTabHotkeys({
   onFocusSearchBar: () => void;
 }) {
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
+  const activeTabIdRef = useRef(activeTabId);
   const { tabUiState } = useTabUIState();
   const focusedPanel = activeTabId
     ? (tabUiState[activeTabId]?.focusedPanel ?? 'stagewise-ui')
@@ -45,6 +47,10 @@ export function BrowserTabHotkeys({
   const currentZoomPercentage = useKartonState((s) =>
     activeTabId ? s.browser.tabs[activeTabId]?.zoomPercentage : 100,
   );
+
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
 
   // Zoom helpers
   useHotKeyListener(() => {
@@ -88,14 +94,16 @@ export function BrowserTabHotkeys({
     }
   }, HotkeyActions.ZOOM_RESET);
 
-  // URL bar (Mod+Alt+L): toggle between omnibox focus and tab content.
-  useHotKeyListener(() => {
-    if (focusedPanel === 'stagewise-ui') {
-      togglePanelKeyboardFocus('tab-content');
-    } else {
-      togglePanelKeyboardFocus('stagewise-ui');
-      onFocusUrlBar();
+  // URL bar (Mod+Alt+L): always focus the omnibox.
+  useHotKeyListener(async () => {
+    const targetTabId = activeTabId;
+    try {
+      await togglePanelKeyboardFocus('stagewise-ui');
+    } catch {
+      // Still focus the omnibox if the panel-focus handoff fails.
     }
+    if (activeTabIdRef.current !== targetTabId) return;
+    onFocusUrlBar();
   }, HotkeyActions.FOCUS_URL_BAR);
 
   // Search bar
