@@ -50,6 +50,16 @@ import {
   type ActiveAgentCardData,
   type MergedAgentEntry,
 } from '../../_lib/agent-list-model';
+import {
+  AGENT_TITLE_RENAMED_EVENT,
+  dispatchAgentTitleRenamed,
+  isAgentTitleRenamedEvent,
+} from '../../_lib/agent-title-renamed-event';
+import {
+  AGENT_DELETED_EVENT,
+  dispatchAgentDeleted,
+  isAgentDeletedEvent,
+} from '../../_lib/agent-deleted-event';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -205,8 +215,8 @@ function getGroupLabel(timestamp: number): GroupLabel {
   if (diffDays < 0) return 'Today'; // clock skew
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return 'Last 7 days';
-  if (diffDays < 30) return 'Last 30 days';
+  if (diffDays <= 7) return 'Last 7 days';
+  if (diffDays <= 30) return 'Last 30 days';
   return 'Older';
 }
 
@@ -526,8 +536,15 @@ export function AgentsList() {
     [resumeAgent, setOpenAgent, setLastOpenAgentId],
   );
 
+  const isAgentWorking = useCallback(
+    (id: string) => agents.some((agent) => agent.id === id && agent.isWorking),
+    [agents],
+  );
+
   const handleDelete = useCallback(
     (id: string) => {
+      if (isAgentWorking(id)) return;
+
       addPendingRemoval(id);
       // After the backend confirms deletion, refetch so the history list
       // drops the entry. Keep the id in pendingRemovals until the refetch
@@ -535,6 +552,7 @@ export function AgentsList() {
       // a flicker where the stale cached entry briefly reappears.
       deleteAgent(id)
         .then(() => {
+          dispatchAgentDeleted({ agentId: id });
           getAgentsHistoryList(0, fetchLimitRef.current)
             .then((entries) => {
               setHistoryList(entries);
@@ -558,12 +576,19 @@ export function AgentsList() {
       deleteAgent,
       removePendingRemoval,
       getAgentsHistoryList,
+      isAgentWorking,
     ],
   );
 
   const handleRename = useCallback(
     (id: string, newTitle: string) => {
-      void setAgentTitle(id, newTitle);
+      setAgentTitle(id, newTitle)
+        .then(() => {
+          dispatchAgentTitleRenamed({ agentId: id, title: newTitle });
+        })
+        .catch((err) => {
+          console.error('Failed to rename agent:', err);
+        });
     },
     [setAgentTitle],
   );
@@ -576,6 +601,47 @@ export function AgentsList() {
   const [pinnedHistoryList, setPinnedHistoryList] = useState<
     AgentHistoryEntry[]
   >([]);
+
+  useEffect(() => {
+    const patchTitle = (
+      entry: AgentHistoryEntry,
+      agentId: string,
+      title: string,
+    ) => (entry.id === agentId ? { ...entry, title } : entry);
+
+    const removeDeletedAgent = (
+      entries: AgentHistoryEntry[],
+      agentId: string,
+    ) => entries.filter((entry) => entry.id !== agentId);
+
+    const handleAgentTitleRenamed = (event: Event) => {
+      if (!isAgentTitleRenamedEvent(event)) return;
+      const { agentId, title } = event.detail;
+      setHistoryList((current) =>
+        current.map((entry) => patchTitle(entry, agentId, title)),
+      );
+      setPinnedHistoryList((current) =>
+        current.map((entry) => patchTitle(entry, agentId, title)),
+      );
+    };
+
+    const handleAgentDeleted = (event: Event) => {
+      if (!isAgentDeletedEvent(event)) return;
+      const { agentId } = event.detail;
+      setHistoryList((current) => removeDeletedAgent(current, agentId));
+      setPinnedHistoryList((current) => removeDeletedAgent(current, agentId));
+    };
+
+    window.addEventListener(AGENT_TITLE_RENAMED_EVENT, handleAgentTitleRenamed);
+    window.addEventListener(AGENT_DELETED_EVENT, handleAgentDeleted);
+    return () => {
+      window.removeEventListener(
+        AGENT_TITLE_RENAMED_EVENT,
+        handleAgentTitleRenamed,
+      );
+      window.removeEventListener(AGENT_DELETED_EVENT, handleAgentDeleted);
+    };
+  }, []);
 
   const activeAgentIds = useKartonState(
     useComparingSelector(
@@ -625,23 +691,7 @@ export function AgentsList() {
       return;
     }
     prevPendingSizeRef.current = pendingRemovals.size;
-    // Check against both active and history IDs — history-only agents
-    // would otherwise be treated as confirmed too early since they're
-    // never in the active `agents` array.
-    const currentIds = new Set([
-      ...agents.map((a) => a.id),
-      ...historyList.map((e) => e.id),
-    ]);
-    pendingRemovals.forEach((id) => {
-      if (!currentIds.has(id)) removePendingRemoval(id);
-    });
-  }, [
-    agents,
-    historyList,
-    pendingRemovals,
-    removePendingRemoval,
-    getAgentsHistoryList,
-  ]);
+  }, [pendingRemovals, getAgentsHistoryList]);
 
   // =========================================================================
   // Merged list: active + history, sorted newest-first by lastMessageAt.
@@ -1053,15 +1103,17 @@ export function AgentsList() {
   } | null>(null);
   const handleCtxDeleteRequest = useCallback(
     (id: string, x: number, y: number) => {
+      if (isAgentWorking(id)) return;
+
       setCtxDelete({ id, x, y });
     },
-    [],
+    [isAgentWorking],
   );
   const handleCtxDeleteConfirm = useCallback(() => {
     const id = ctxDelete?.id;
     setCtxDelete(null);
-    if (id) handleDelete(id);
-  }, [ctxDelete, handleDelete]);
+    if (id && !isAgentWorking(id)) handleDelete(id);
+  }, [ctxDelete, handleDelete, isAgentWorking]);
 
   // =========================================================================
   // Render

@@ -5,6 +5,7 @@ import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useCallback } from 'react';
 import { useContentCollapsed } from './content-collapsed-context';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useCommandCenter } from '../command-center';
 
 /**
  * Agent-scoped hotkeys — always mounted. Handles tab management attached
@@ -19,10 +20,16 @@ export function AgentHotkeyBindings({
   // -- Content panel toggle (Mod+Alt+B) ----------------------------------
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
     useContentCollapsed();
+  const { isOpen: isCommandCenterOpen } = useCommandCenter();
+  const agentHotkeysEnabled = !isCommandCenterOpen;
 
-  useHotKeyListener(() => {
-    setContentCollapsed(!contentCollapsed);
-  }, HotkeyActions.TOGGLE_CONTENT_PANEL);
+  useHotKeyListener(
+    () => {
+      setContentCollapsed(!contentCollapsed);
+    },
+    HotkeyActions.TOGGLE_CONTENT_PANEL,
+    agentHotkeysEnabled,
+  );
 
   // -- Tab management (per-agent) ---------------------------------------
   const activeTabId = useKartonState((s) => s.browser.activeTabId);
@@ -33,17 +40,25 @@ export function AgentHotkeyBindings({
 
   // Mod+T: new tab (attached to current agent, opens content panel)
   const [openAgent] = useOpenAgent();
-  useHotKeyListener(() => {
-    if (contentCollapsed) setContentCollapsed(false);
-    onCreateTab();
-  }, HotkeyActions.NEW_TAB);
+  useHotKeyListener(
+    () => {
+      if (contentCollapsed) setContentCollapsed(false);
+      onCreateTab();
+    },
+    HotkeyActions.NEW_TAB,
+    agentHotkeysEnabled,
+  );
 
   // Mod+W: close active tab
-  useHotKeyListener(() => {
-    if (!activeTabId) return;
-    closeTab(activeTabId);
-    removeTabUiState(activeTabId);
-  }, HotkeyActions.CLOSE_TAB);
+  useHotKeyListener(
+    () => {
+      if (!activeTabId) return;
+      closeTab(activeTabId);
+      removeTabUiState(activeTabId);
+    },
+    HotkeyActions.CLOSE_TAB,
+    agentHotkeysEnabled,
+  );
 
   // -- Content panel tab navigation (Mod+Alt+PageDown / Mod+Alt+PageUp) --
   // Only tabs visible for the current agent (global + agent-attached).
@@ -75,19 +90,63 @@ export function AgentHotkeyBindings({
     [visibleTabIds, activeTabId, switchTab],
   );
 
-  useHotKeyListener(() => cycleTab('next'), HotkeyActions.NEXT_TAB);
-  useHotKeyListener(() => cycleTab('previous'), HotkeyActions.PREV_TAB);
+  useHotKeyListener(
+    () => cycleTab('next'),
+    HotkeyActions.NEXT_TAB,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => cycleTab('previous'),
+    HotkeyActions.PREV_TAB,
+    agentHotkeysEnabled,
+  );
 
   // -- Agent-scoped tab focus (Mod+Alt+1-9) -----------------------------
-  useHotKeyListener(() => switchToTabByIndex(0), HotkeyActions.FOCUS_TAB_1);
-  useHotKeyListener(() => switchToTabByIndex(1), HotkeyActions.FOCUS_TAB_2);
-  useHotKeyListener(() => switchToTabByIndex(2), HotkeyActions.FOCUS_TAB_3);
-  useHotKeyListener(() => switchToTabByIndex(3), HotkeyActions.FOCUS_TAB_4);
-  useHotKeyListener(() => switchToTabByIndex(4), HotkeyActions.FOCUS_TAB_5);
-  useHotKeyListener(() => switchToTabByIndex(5), HotkeyActions.FOCUS_TAB_6);
-  useHotKeyListener(() => switchToTabByIndex(6), HotkeyActions.FOCUS_TAB_7);
-  useHotKeyListener(() => switchToTabByIndex(7), HotkeyActions.FOCUS_TAB_8);
-  useHotKeyListener(() => switchToTabByIndex(8), HotkeyActions.FOCUS_TAB_9);
+  useHotKeyListener(
+    () => switchToTabByIndex(0),
+    HotkeyActions.FOCUS_TAB_1,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(1),
+    HotkeyActions.FOCUS_TAB_2,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(2),
+    HotkeyActions.FOCUS_TAB_3,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(3),
+    HotkeyActions.FOCUS_TAB_4,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(4),
+    HotkeyActions.FOCUS_TAB_5,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(5),
+    HotkeyActions.FOCUS_TAB_6,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(6),
+    HotkeyActions.FOCUS_TAB_7,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(7),
+    HotkeyActions.FOCUS_TAB_8,
+    agentHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => switchToTabByIndex(8),
+    HotkeyActions.FOCUS_TAB_9,
+    agentHotkeysEnabled,
+  );
 
   // TOGGLE_CONTEXT_SELECTOR (Mod+I) is handled inline in panel-footer.tsx
   // because it depends on local chat-input state. It guards on content

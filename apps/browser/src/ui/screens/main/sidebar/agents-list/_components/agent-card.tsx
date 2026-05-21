@@ -9,7 +9,7 @@ import {
   IconPinTackOutline18,
   IconPinTackSlashOutline18,
 } from 'nucleo-ui-outline-18';
-import { useInlineTitleEdit } from './use-inline-title-edit';
+import { useInlineTitleEdit } from '../../../_lib/use-inline-title-edit';
 
 function compactTimeAgo(timestamp: number): string {
   const diffSec = Math.floor((Date.now() - timestamp) / 1000);
@@ -23,7 +23,7 @@ function compactTimeAgo(timestamp: number): string {
   const diffWeek = Math.floor(diffDay / 7);
   if (diffWeek < 5) return `${diffWeek}w`;
   const diffMonth = Math.floor(diffDay / 30);
-  if (diffMonth < 12) return `${diffMonth}mo`;
+  if (diffDay < 365) return `${diffMonth}mo`;
   return `${Math.floor(diffDay / 365)}y`;
 }
 
@@ -115,6 +115,7 @@ export const AgentCard = memo(
           startEditing,
           isPinned,
           onTogglePinned,
+          !isWorking,
         )}
         onClick={() => onClick(id)}
         onMouseEnter={onMouseEnter}
@@ -234,7 +235,16 @@ export const AgentCard = memo(
               onPaste={(e) => {
                 e.preventDefault();
                 const text = e.clipboardData.getData('text/plain');
-                document.execCommand('insertText', false, text);
+                const selection = window.getSelection();
+                if (!selection?.rangeCount) return;
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const textNode = document.createTextNode(text);
+                range.insertNode(textNode);
+                range.setStartAfter(textNode);
+                range.setEndAfter(textNode);
+                selection.removeAllRanges();
+                selection.addRange(range);
               }}
             >
               {displayTitle}

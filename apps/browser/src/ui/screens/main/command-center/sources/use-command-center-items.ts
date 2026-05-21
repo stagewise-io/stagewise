@@ -12,11 +12,22 @@ const GLOBAL_LIMIT = 30;
 export function useCommandCenterItems({
   query,
   mode,
+  optimisticAgentTitles,
+  optimisticPinnedAgentIds,
+  pendingRemovalAgentIds,
 }: {
   query: string;
   mode: CommandCenterMode;
+  optimisticAgentTitles?: Readonly<Record<string, string>>;
+  optimisticPinnedAgentIds?: string[] | null;
+  pendingRemovalAgentIds?: ReadonlySet<string>;
 }) {
-  const agents = useAgentCommandItems(query);
+  const agents = useAgentCommandItems(query, {
+    optimisticAgentTitles,
+    optimisticPinnedAgentIds,
+    pendingRemovalAgentIds,
+    enabled: mode === 'global' || mode === 'agents',
+  });
   const tabs = useTabCommandItems(query);
   const settings = useSettingsCommandItems(query);
 
@@ -33,5 +44,7 @@ export function useCommandCenterItems({
   return {
     items,
     isLoading: agents.isLoading,
+    rawAgentTitles: agents.rawAgentTitles,
+    refreshAgentHistory: agents.refreshHistoryList,
   };
 }

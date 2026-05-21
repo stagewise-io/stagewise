@@ -104,7 +104,6 @@
     "@streamdown/math": "^1.0.2",
     "@xterm/headless": "^6.0.0",
     "better-auth": "^1.6.10",
-    "framer-motion": "^12.38.0",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
     "tsx": "^4.20.3"

@@ -7,7 +7,7 @@ import {
   IconNoteFillDuo18,
   IconSpace3dFillDuo18,
 } from 'nucleo-ui-fill-duo-18';
-import { IconKeyOutline18, IconServerOutline18 } from 'nucleo-ui-outline-18';
+import { IconKey2Outline18, IconServerOutline18 } from 'nucleo-ui-outline-18';
 import type { SettingCommandItem } from '../command-center-model';
 import {
   commandCenterSettings,
@@ -21,7 +21,7 @@ function iconForSetting(setting: CommandCenterSettingDefinition) {
     case 'models':
       return <IconBrainNodesFillDuo18 className={className} />;
     case 'key':
-      return <IconKeyOutline18 className={className} />;
+      return <IconKey2Outline18 className={className} />;
     case 'provider':
       return <IconServerOutline18 className={className} />;
     case 'context':

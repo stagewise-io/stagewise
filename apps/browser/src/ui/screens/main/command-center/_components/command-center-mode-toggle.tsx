@@ -1,10 +1,10 @@
 import {
-  IconArrowRightToLineOutline18,
   IconEarthSearchOutline18,
   IconGear3Outline18,
   IconMsgWritingOutline18,
 } from 'nucleo-ui-outline-18';
 import type { ComponentType } from 'react';
+import { ShortcutKey } from '@stagewise/stage-ui/components/shortcut-key';
 import { cn } from '@ui/utils';
 import type { CommandCenterMode } from '../command-center-model';
 
@@ -30,38 +30,6 @@ export function CommandCenterModeToggle({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 text-xs">
-      <style>{`
-        @keyframes command-center-label-reveal-mask {
-          0%, 80% {
-            mask-image: linear-gradient(
-              to right,
-              black 0px,
-              black calc(100% - 14px),
-              transparent 100%
-            );
-          }
-          100% {
-            mask-image: linear-gradient(
-              to right,
-              black 0%,
-              black 0%,
-              black 100%,
-              black 100%
-            );
-          }
-        }
-
-        @keyframes command-center-label-conceal-mask {
-          0%, 100% {
-            mask-image: linear-gradient(
-              to right,
-              black 0px,
-              black calc(100% - 14px),
-              transparent 100%
-            );
-          }
-        }
-      `}</style>
       {modes.map(({ mode: value, label, Icon }) => {
         const isActive = value === mode;
 
@@ -83,7 +51,7 @@ export function CommandCenterModeToggle({
                 <Icon className="size-4" />
               </span>
             ) : (
-              <span className="relative z-10 shrink-0 bg-background">
+              <span className="relative z-10 shrink-0 bg-background px-1">
                 {label}
               </span>
             )}
@@ -91,7 +59,13 @@ export function CommandCenterModeToggle({
           </button>
         );
       })}
-      <IconArrowRightToLineOutline18 className="size-4 shrink-0 text-subtle-foreground" />
+      <ShortcutKey
+        aria-label="Press Tab to cycle command center modes"
+        className="shrink-0"
+        size="xs"
+      >
+        Tab
+      </ShortcutKey>
     </div>
   );
 }

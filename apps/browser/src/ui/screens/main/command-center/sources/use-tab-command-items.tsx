@@ -14,8 +14,10 @@ function tabsEqual(a: TabCommandItem[], b: TabCommandItem[]) {
       ai.tabId !== bi.tabId ||
       ai.title !== bi.title ||
       ai.url !== bi.url ||
+      ai.agentInstanceId !== bi.agentInstanceId ||
       ai.screenshot !== bi.screenshot ||
       ai.isActive !== bi.isActive ||
+      ai.isPinned !== bi.isPinned ||
       ai.lastFocusedAt !== bi.lastFocusedAt ||
       ai.faviconUrls.length !== bi.faviconUrls.length ||
       ai.faviconUrls.some((url, index) => url !== bi.faviconUrls[index])
@@ -54,9 +56,13 @@ export function useTabCommandItems(query: string) {
           ),
           tabId: tab.id,
           url: tab.url,
+          agentInstanceId: tab.agentInstanceId,
           faviconUrls: tab.faviconUrls,
           screenshot: tab.screenshot,
           isActive: tab.id === activeTabId,
+          // In tab UI, the pin icon means “keep global”. Global tabs have no
+          // agent owner; agent-owned tabs are visually unpinned/scoped.
+          isPinned: tab.agentInstanceId === null,
           lastFocusedAt: tab.lastFocusedAt,
         };
       });
