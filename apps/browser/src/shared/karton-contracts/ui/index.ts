@@ -915,7 +915,7 @@ export type KartonContract = {
         url?: string,
         setActive?: boolean,
         agentInstanceId?: string | null,
-      ) => Promise<void>;
+      ) => Promise<string | undefined>;
       closeTab: (tabId: string) => Promise<void>;
       switchTab: (tabId: string) => Promise<void>;
       reorderTabs: (tabIds: string[]) => Promise<void>;

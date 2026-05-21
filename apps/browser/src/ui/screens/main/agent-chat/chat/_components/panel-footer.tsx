@@ -710,20 +710,24 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   useEffect(() => {
     if (chatInputActive) {
-      // Wait for the next tick to ensure the input is mounted
-      setTimeout(() => {
+      // Wait for the next tick to ensure the input is mounted. Guard against
+      // stale scheduled focus calls: external focus handoffs (omnibox/search)
+      // can deactivate the chat before this timeout runs.
+      const timeoutId = setTimeout(() => {
+        if (!chatInputActiveRef.current) return;
         chatInputRef.current?.focus();
       }, 0);
-    } else {
-      // Don't automatically deactivate element selection here
-      // Element selection can be controlled by other components (inline edit mode)
-      // It will be deactivated explicitly when needed (Escape key, send message, agent working, panel closed)
-      if (skipNextInactiveBlurRef.current) {
-        skipNextInactiveBlurRef.current = false;
-        return;
-      }
-      chatInputRef.current?.blur();
+      return () => clearTimeout(timeoutId);
     }
+
+    // Don't automatically deactivate element selection here
+    // Element selection can be controlled by other components (inline edit mode)
+    // It will be deactivated explicitly when needed (Escape key, send message, agent working, panel closed)
+    if (skipNextInactiveBlurRef.current) {
+      skipNextInactiveBlurRef.current = false;
+      return;
+    }
+    chatInputRef.current?.blur();
   }, [chatInputActive]);
 
   const onInputFocus = useCallback(() => {
@@ -836,16 +840,21 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     HotkeyActions.TOGGLE_CONTEXT_SELECTOR,
   );
 
-  // Cmd+L: toggle chat input focus.
+  // Cmd+L: focus chat input. One-way command; Escape/external focus
+  // paths handle deactivation.
   useHotKeyListener(
-    useCallback(() => {
-      if (chatInputActive) {
-        window.dispatchEvent(new Event('sidebar-chat-panel-closed'));
-      } else {
-        window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+    useCallback(async () => {
+      chatInputActiveRef.current = true;
+      if (!chatInputActive) setChatInputActive(true);
+      try {
+        await togglePanelKeyboardFocus('stagewise-ui');
+      } catch {
+        // Still focus the chat input if the panel-focus handoff fails.
       }
-    }, [chatInputActive]),
-    HotkeyActions.TOGGLE_CHAT_FOCUS,
+      if (!chatInputActiveRef.current) return;
+      chatInputRef.current?.focus();
+    }, [chatInputActive, setChatInputActive, togglePanelKeyboardFocus]),
+    HotkeyActions.FOCUS_CHAT_INPUT,
   );
 
   useEventListener(

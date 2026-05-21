@@ -11,7 +11,7 @@ import { cn } from '@ui/utils';
 import { Sidebar } from './sidebar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { OpenAgentProvider, useOpenAgent } from '@ui/hooks/use-open-chat';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
@@ -56,6 +56,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const tabs = useKartonState((s) => s.browser.tabs);
+  const activeTabId = useKartonState((s) => s.browser.activeTabId);
   const [openAgent] = useOpenAgent();
   const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
@@ -72,10 +73,78 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   // content panel visible when there are visible tabs AND it's not collapsed
   const showContent = hasVisibleTabs && !contentCollapsed;
 
-  const handleOpenTab = useCallback(() => {
+  const pendingOmniboxFocusRequestIdRef = useRef(0);
+  const pendingOmniboxFocusExpiryRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const pendingOmniboxFocusRequestRef = useRef<{
+    id: number;
+    fromTabId: string | null;
+    targetTabId: string;
+  } | null>(null);
+  const [pendingOmniboxFocusRequest, setPendingOmniboxFocusRequest] = useState<{
+    id: number;
+    fromTabId: string | null;
+    targetTabId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    pendingOmniboxFocusRequestRef.current = pendingOmniboxFocusRequest;
+  }, [pendingOmniboxFocusRequest]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingOmniboxFocusExpiryRef.current !== null)
+        clearTimeout(pendingOmniboxFocusExpiryRef.current);
+    };
+  }, []);
+
+  const handleCreateTab = useCallback(() => {
     if (contentCollapsed) setContentCollapsed(false);
-    createTab(undefined, undefined, openAgent);
-  }, [createTab, openAgent, contentCollapsed, setContentCollapsed]);
+
+    const requestId = ++pendingOmniboxFocusRequestIdRef.current;
+    if (pendingOmniboxFocusExpiryRef.current !== null) {
+      clearTimeout(pendingOmniboxFocusExpiryRef.current);
+      pendingOmniboxFocusExpiryRef.current = null;
+    }
+    setPendingOmniboxFocusRequest(null);
+
+    void createTab(undefined, undefined, openAgent).then((targetTabId) => {
+      if (requestId !== pendingOmniboxFocusRequestIdRef.current) return;
+      if (!targetTabId) return;
+
+      setPendingOmniboxFocusRequest({
+        id: requestId,
+        fromTabId: activeTabId ?? null,
+        targetTabId,
+      });
+
+      pendingOmniboxFocusExpiryRef.current = setTimeout(() => {
+        setPendingOmniboxFocusRequest((request) =>
+          request?.id === requestId ? null : request,
+        );
+        pendingOmniboxFocusExpiryRef.current = null;
+      }, 5000);
+    });
+  }, [
+    activeTabId,
+    createTab,
+    openAgent,
+    contentCollapsed,
+    setContentCollapsed,
+  ]);
+
+  const handlePendingOmniboxFocusHandled = useCallback((requestId: number) => {
+    if (pendingOmniboxFocusRequestRef.current?.id !== requestId) return;
+
+    if (pendingOmniboxFocusExpiryRef.current !== null) {
+      clearTimeout(pendingOmniboxFocusExpiryRef.current);
+      pendingOmniboxFocusExpiryRef.current = null;
+    }
+
+    pendingOmniboxFocusRequestRef.current = null;
+    setPendingOmniboxFocusRequest(null);
+  }, []);
 
   // Headless: keeps `openAgent` valid regardless of whether the sidebar
   // (which used to own this effect) is mounted.
@@ -84,7 +153,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   return (
     <>
       {show && <GlobalHotkeyBindings />}
-      {show && <AgentHotkeyBindings />}
+      {show && <AgentHotkeyBindings onCreateTab={handleCreateTab} />}
       <div
         className={cn(
           'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
@@ -124,7 +193,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
                       variant="ghost"
                       size="icon-sm"
                       aria-label="Open new browser tab"
-                      onClick={handleOpenTab}
+                      onClick={handleCreateTab}
                     >
                       <GlobePlusIcon className="size-4" />
                     </Button>
@@ -142,7 +211,13 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
               {showContent && (
                 <>
                   <ResizableHandle />
-                  <MainSection />
+                  <MainSection
+                    onCreateTab={handleCreateTab}
+                    pendingOmniboxFocusRequest={pendingOmniboxFocusRequest}
+                    onPendingOmniboxFocusHandled={
+                      handlePendingOmniboxFocusHandled
+                    }
+                  />
                 </>
               )}
             </ResizablePanelGroup>

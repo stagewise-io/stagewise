@@ -25,7 +25,7 @@ export enum HotkeyActions {
   // Stagewise specific
   TOGGLE_CONTEXT_SELECTOR = 'toggle_context_selector',
   TOGGLE_SIDEBAR = 'toggle_sidebar',
-  TOGGLE_CHAT_FOCUS = 'toggle_chat_focus',
+  FOCUS_CHAT_INPUT = 'focus_chat_input',
   NEW_CHAT = 'new_chat',
   DOWNLOADS = 'downloads',
 
@@ -102,7 +102,8 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+B',
     captureDominantly: true,
   },
-  [HotkeyActions.TOGGLE_CHAT_FOCUS]: {
+  // Focus the chat input. One-way focus command; does not toggle away.
+  [HotkeyActions.FOCUS_CHAT_INPUT]: {
     accelerator: 'Mod+L',
     captureDominantly: true,
   },

@@ -145,6 +145,8 @@ export interface UIControllerEventMap {
     url?: string,
     setActive?: boolean,
     agentInstanceId?: string | null,
+    sourceTabId?: string,
+    onCreated?: (tabId: string | undefined) => void,
   ];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
@@ -679,8 +681,33 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         url?: string,
         setActive?: boolean,
         agentInstanceId?: string | null,
-      ) => {
-        this.emit('createTab', url, setActive, agentInstanceId);
+      ): Promise<string | undefined> => {
+        return await new Promise((resolve) => {
+          let settled = false;
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          const finish = (tabId: string | undefined) => {
+            if (settled) return;
+            settled = true;
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
+            resolve(tabId);
+          };
+
+          timeoutId = setTimeout(() => finish(undefined), 5000);
+
+          try {
+            const handled = this.emit(
+              'createTab',
+              url,
+              setActive,
+              agentInstanceId,
+              undefined,
+              finish,
+            );
+            if (!handled) finish(undefined);
+          } catch {
+            finish(undefined);
+          }
+        });
       },
     );
     this.uiKarton.registerServerProcedureHandler(

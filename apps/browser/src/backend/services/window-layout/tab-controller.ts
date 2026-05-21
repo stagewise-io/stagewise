@@ -24,6 +24,7 @@ import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { SelectedElement } from '@shared/selected-elements';
 import { SelectedElementTracker } from './selected-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
+import { getElectronHotkeyPlatform } from '@/utils/electron-platform';
 import { fileURLToPath } from 'node:url';
 import {
   PageTransition,
@@ -1511,7 +1512,10 @@ export class TabController extends EventEmitter<TabControllerEventMap> {
       wc.devToolsWebContents?.addListener('input-event', (_e, input) => {
         const domEvent = electronInputToDomKeyboardEvent(input as Input);
         if (input.type === 'keyDown' || input.type === 'rawKeyDown') {
-          const hotkeyDef = getHotkeyDefinitionForEvent(domEvent);
+          const hotkeyDef = getHotkeyDefinitionForEvent(
+            domEvent,
+            getElectronHotkeyPlatform(),
+          );
           if (hotkeyDef?.captureDominantly)
             this.emit('handleKeyDown', domEvent);
         }
