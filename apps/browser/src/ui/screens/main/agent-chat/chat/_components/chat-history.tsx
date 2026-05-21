@@ -47,17 +47,58 @@ const CHAT_FADE = 16;
 // Stable empty array to avoid infinite re-renders with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
 
+type WorkspacePreparationKind = 'worktree' | 'branch';
+
+type LoadingIndicatorState =
+  | { kind: 'working' }
+  | { kind: 'preparing-worktree' }
+  | { kind: 'preparing-branch' };
+
+type DisplayMessage = AgentMessage & {
+  _optimistic?: boolean;
+  _clientId?: string;
+};
+
 // Extended type for optimistic messages (includes flag for UI distinction)
-type OptimisticMessage = AgentMessage & {
+type OptimisticMessage = DisplayMessage & {
   _optimistic?: boolean;
   _clientId: string; // Client-generated ID for matching
 };
+
+function getLoadingIndicatorLabel(indicator: LoadingIndicatorState): string {
+  switch (indicator.kind) {
+    case 'preparing-worktree':
+      return 'Preparing worktree...';
+    case 'preparing-branch':
+      return 'Preparing branch...';
+    case 'working':
+      return 'Working...';
+  }
+}
+
+function getLoadingIndicatorVariant(
+  indicator: LoadingIndicatorState,
+): 'working' | 'worktree' | 'branch' {
+  switch (indicator.kind) {
+    case 'preparing-worktree':
+      return 'worktree';
+    case 'preparing-branch':
+      return 'branch';
+    case 'working':
+      return 'working';
+  }
+}
 
 // Custom event types for optimistic messaging
 declare global {
   interface WindowEventMap {
     'chat-message-sent': CustomEvent<{ message: AgentMessage }>;
     'chat-message-failed': CustomEvent<{ clientId: string }>;
+    'chat-workspace-preparation-started': CustomEvent<{
+      clientId: string;
+      kind: 'worktree' | 'branch';
+    }>;
+    'chat-workspace-preparation-finished': CustomEvent<{ clientId: string }>;
     'chat-message-edited': CustomEvent<{
       replacedMessageId: string;
       newMessage: AgentMessage;
@@ -395,11 +436,20 @@ export const ChatHistory = () => {
   const [replacedMessageId, setReplacedMessageId] = useState<string | null>(
     null,
   );
+  const [workspacePreparation, setWorkspacePreparation] = useState<{
+    clientId: string;
+    kind: WorkspacePreparationKind;
+  } | null>(null);
+
+  // Bridge the gap between optimistic message removal and isWorking becoming true.
+  // Set when an optimistic message is sent, cleared when isWorking flips to true.
+  const pendingWorkingRef = useRef(false);
 
   // Clear optimistic state when switching agents
   useEffect(() => {
     setOptimisticMessages([]);
     setReplacedMessageId(null);
+    setWorkspacePreparation(null);
     pendingWorkingRef.current = false;
   }, [openAgent]);
 
@@ -445,8 +495,8 @@ export const ChatHistory = () => {
 
   // Merge server messages with optimistic messages for display
   // For edit mode: filter out the replaced message and all messages after it
-  const filteredMessages = useMemo(() => {
-    let displayMessages = serverMessages;
+  const filteredMessages = useMemo<DisplayMessage[]>(() => {
+    let displayMessages: DisplayMessage[] = serverMessages;
 
     // If a message is being replaced (edit mode), hide it and all subsequent messages
     if (replacedMessageId !== null) {
@@ -458,9 +508,28 @@ export const ChatHistory = () => {
         displayMessages = displayMessages.slice(0, replaceIndex);
     }
 
-    // Append optimistic messages
-    if (optimisticMessages.length > 0)
-      return [...displayMessages, ...optimisticMessages];
+    // Append optimistic messages that have not already appeared in server
+    // history. This avoids a one-render duplicate message frame when the
+    // backend confirms the optimistic first message, which otherwise makes
+    // Virtuoso briefly reflow the last-user spacer before reconciliation
+    // removes the optimistic copy in a layout effect.
+    if (optimisticMessages.length > 0) {
+      if (replacedMessageId !== null) {
+        displayMessages = [...displayMessages, ...optimisticMessages];
+      } else {
+        const serverUserTexts = new Set(
+          displayMessages
+            .filter((m) => m.role === 'user')
+            .map((m) => getMessageTextContent(m)),
+        );
+        const pendingOptimisticMessages = optimisticMessages.filter(
+          (message) => !serverUserTexts.has(getMessageTextContent(message)),
+        );
+
+        if (pendingOptimisticMessages.length > 0)
+          displayMessages = [...displayMessages, ...pendingOptimisticMessages];
+      }
+    }
 
     return displayMessages;
   }, [serverMessages, optimisticMessages, replacedMessageId]);
@@ -558,10 +627,6 @@ export const ChatHistory = () => {
   const pendingAutoScrollRef = useRef(false);
   const prevMessagesLengthRef = useRef(filteredMessages.length);
 
-  // Bridge the gap between optimistic message removal and isWorking becoming true.
-  // Set when an optimistic message is sent, cleared when isWorking flips to true.
-  const pendingWorkingRef = useRef(false);
-
   // Listen for message-sent event with message data - add to optimistic state immediately
   useEffect(() => {
     const handleMessageSent = (e: CustomEvent<{ message: AgentMessage }>) => {
@@ -583,7 +648,24 @@ export const ChatHistory = () => {
         prev.filter((m) => m._clientId !== e.detail.clientId),
       );
       setReplacedMessageId(null);
+      setWorkspacePreparation((current) =>
+        current?.clientId === e.detail.clientId ? null : current,
+      );
       pendingWorkingRef.current = false;
+    };
+
+    const handleWorkspacePreparationStarted = (
+      e: CustomEvent<{ clientId: string; kind: WorkspacePreparationKind }>,
+    ) => {
+      setWorkspacePreparation(e.detail);
+    };
+
+    const handleWorkspacePreparationFinished = (
+      e: CustomEvent<{ clientId: string }>,
+    ) => {
+      setWorkspacePreparation((current) =>
+        current?.clientId === e.detail.clientId ? null : current,
+      );
     };
 
     const handleMessageEdited = (
@@ -608,10 +690,26 @@ export const ChatHistory = () => {
 
     window.addEventListener('chat-message-sent', handleMessageSent);
     window.addEventListener('chat-message-failed', handleMessageFailed);
+    window.addEventListener(
+      'chat-workspace-preparation-started',
+      handleWorkspacePreparationStarted,
+    );
+    window.addEventListener(
+      'chat-workspace-preparation-finished',
+      handleWorkspacePreparationFinished,
+    );
     window.addEventListener('chat-message-edited', handleMessageEdited);
     return () => {
       window.removeEventListener('chat-message-sent', handleMessageSent);
       window.removeEventListener('chat-message-failed', handleMessageFailed);
+      window.removeEventListener(
+        'chat-workspace-preparation-started',
+        handleWorkspacePreparationStarted,
+      );
+      window.removeEventListener(
+        'chat-workspace-preparation-finished',
+        handleWorkspacePreparationFinished,
+      );
       window.removeEventListener('chat-message-edited', handleMessageEdited);
     };
   }, []);
@@ -652,28 +750,39 @@ export const ChatHistory = () => {
     }
   }, [error, forceEnableAutoScroll, scrollToBottom]);
 
-  // Clear pending-working bridge once isWorking catches up
-  if (isWorking) pendingWorkingRef.current = false;
+  // Clear pending-working bridge once isWorking catches up.
+  useEffect(() => {
+    if (isWorking) pendingWorkingRef.current = false;
+  }, [isWorking]);
 
-  // Show "Working..." after user message or empty assistant message.
-  // Also show immediately for optimistic user messages before isWorking flips.
-  const showWorkingIndicator = useMemo(() => {
+  // Show preparation / working state after user message or empty assistant
+  // message. Also show immediately for optimistic user messages before
+  // isWorking flips.
+  const loadingIndicator = useMemo<LoadingIndicatorState | null>(() => {
     const lastMessage = filteredMessages[filteredMessages.length - 1];
-    if (!lastMessage) return false;
-    const isOptimistic =
-      (lastMessage as OptimisticMessage)._optimistic === true;
+    if (!lastMessage) return null;
+    const optimisticClientId = lastMessage._clientId;
+    const isOptimistic = lastMessage._optimistic === true;
+    if (isOptimistic && workspacePreparation) {
+      if (workspacePreparation.clientId === optimisticClientId) {
+        return workspacePreparation.kind === 'worktree'
+          ? { kind: 'preparing-worktree' }
+          : { kind: 'preparing-branch' };
+      }
+    }
+
     const isPendingWorking = pendingWorkingRef.current;
     if (lastMessage.role === 'user' && (isOptimistic || isPendingWorking))
-      return true;
-    if (!isWorking) return false;
-    if (lastMessage.role === 'user') return true;
+      return { kind: 'working' };
+    if (!isWorking) return null;
+    if (lastMessage.role === 'user') return { kind: 'working' };
     if (
       lastMessage.role === 'assistant' &&
       isEmptyAssistantMessage(lastMessage)
     )
-      return true;
-    return false;
-  }, [isWorking, filteredMessages]);
+      return { kind: 'working' };
+    return null;
+  }, [isWorking, filteredMessages, workspacePreparation]);
 
   // Show between-steps indicator inside the last assistant message
   const showBetweenStepsIndicator = useMemo(() => {
@@ -704,8 +813,8 @@ export const ChatHistory = () => {
   lastUserMsgIndexRef.current = lastUserMsgIndex;
   const hasFileModsAfterMapRef = useRef(hasFileModsAfterMap);
   hasFileModsAfterMapRef.current = hasFileModsAfterMap;
-  const showWorkingIndicatorRef = useRef(showWorkingIndicator);
-  showWorkingIndicatorRef.current = showWorkingIndicator;
+  const loadingIndicatorRef = useRef(loadingIndicator);
+  loadingIndicatorRef.current = loadingIndicator;
   const showBetweenStepsIndicatorRef = useRef(showBetweenStepsIndicator);
   showBetweenStepsIndicatorRef.current = showBetweenStepsIndicator;
   const canRetryRef = useRef(false); // updated below after canRetry is defined
@@ -749,7 +858,7 @@ export const ChatHistory = () => {
 
   // Render individual message item.
   // All frequently-changing values (filteredMessages, isWorking, error,
-  // showWorkingIndicator, etc.) are read from refs at call time so the
+  // loadingIndicator, etc.) are read from refs at call time so the
   // callback identity stays stable during streaming.  Virtuoso only
   // re-invokes this for items whose `data[index]` reference changed.
   // --- Element cache for settled messages ---
@@ -761,6 +870,7 @@ export const ChatHistory = () => {
   const userMsgIdsInCacheRef = useRef(new Set<string>());
   const cacheGenRef = useRef(0);
   const prevIsWorkingCacheRef = useRef(isWorking);
+  const prevLoadingIndicatorKindRef = useRef(loadingIndicator?.kind ?? null);
   const prevStructuralDepsRef = useRef({
     msgLen: filteredMessages.length,
     paddingRight,
@@ -777,29 +887,47 @@ export const ChatHistory = () => {
       prev.msgLen !== filteredMessages.length ||
       prev.paddingRight !== paddingRight ||
       prev.openAgent !== openAgent;
+    const loadingIndicatorKind = loadingIndicator?.kind ?? null;
     const isWorkingChange = prevIsWorkingCacheRef.current !== isWorking;
+    const loadingIndicatorChange =
+      prevLoadingIndicatorKindRef.current !== loadingIndicatorKind;
     prevStructuralDepsRef.current = {
       msgLen: filteredMessages.length,
       paddingRight,
       openAgent,
     };
     prevIsWorkingCacheRef.current = isWorking;
+    prevLoadingIndicatorKindRef.current = loadingIndicatorKind;
 
     if (structuralChange) {
       elementCacheRef.current.clear();
       userMsgIdsInCacheRef.current.clear();
     } else if (isWorkingChange) {
-      // Only user messages need re-rendering (canEdit depends on
-      // isWorking).  Assistant messages with expensive DiffPreview /
-      // CodeBlock subtrees stay cached.
+      // All cached user messages need re-rendering because MessageUser
+      // receives isWorking and editability can change.
       userMsgIdsInCacheRef.current.forEach((id) => {
         elementCacheRef.current.delete(id);
       });
       userMsgIdsInCacheRef.current.clear();
+    } else if (loadingIndicatorChange) {
+      // Only the last user item can host the loading indicator.
+      const lastUserMessage = [...filteredMessages]
+        .reverse()
+        .find((message) => message.role === 'user');
+      if (lastUserMessage) {
+        elementCacheRef.current.delete(lastUserMessage.id);
+        userMsgIdsInCacheRef.current.delete(lastUserMessage.id);
+      }
     }
 
     return ++cacheGenRef.current;
-  }, [filteredMessages.length, paddingRight, openAgent, isWorking]);
+  }, [
+    filteredMessages.length,
+    paddingRight,
+    openAgent,
+    isWorking,
+    loadingIndicator?.kind,
+  ]);
   // Keep the gen ref in sync (unused directly, but ensures the dep is used)
   cacheGenRef.current = cacheGen;
 
@@ -822,7 +950,7 @@ export const ChatHistory = () => {
         isLastMessage && message.role === 'assistant';
       const curIsWorking = isWorkingRef.current ?? false;
       const curError = errorRef.current;
-      const curShowWorking = showWorkingIndicatorRef.current;
+      const curLoadingIndicator = loadingIndicatorRef.current;
       const curShowBetweenSteps = showBetweenStepsIndicatorRef.current;
       const curCanRetry = canRetryRef.current;
       const curHasFileMods = hasFileModsAfterMapRef.current;
@@ -894,7 +1022,12 @@ export const ChatHistory = () => {
           >
             <div className="pl-6" style={{ paddingRight }}>
               {messageComponent}
-              {curShowWorking && <MessageLoading />}
+              {curLoadingIndicator && (
+                <MessageLoading
+                  label={getLoadingIndicatorLabel(curLoadingIndicator)}
+                  variant={getLoadingIndicatorVariant(curLoadingIndicator)}
+                />
+              )}
               {curError && isLastMessage && openAgent && (
                 <MessageRuntimeError
                   agentInstanceId={openAgent}
@@ -924,7 +1057,12 @@ export const ChatHistory = () => {
                   Error card and loading indicator live INSIDE the spacer (same pattern
                   as the assistant branch) so they don't overflow the measured area. */}
               <div ref={lastAssistantMessageRef} className="overflow-hidden">
-                {curShowWorking && <MessageLoading />}
+                {curLoadingIndicator && (
+                  <MessageLoading
+                    label={getLoadingIndicatorLabel(curLoadingIndicator)}
+                    variant={getLoadingIndicatorVariant(curLoadingIndicator)}
+                  />
+                )}
                 {curError && isLastMessage && openAgent && (
                   <MessageRuntimeError
                     agentInstanceId={openAgent}
