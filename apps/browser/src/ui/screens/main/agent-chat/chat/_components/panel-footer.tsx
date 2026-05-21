@@ -7,6 +7,8 @@ import { useDragDrop } from '@ui/hooks/use-drag-drop';
 import { useElementSelectionWatcher } from '@ui/hooks/use-element-selection-watcher';
 import { cn, generateId, collectUserMessageMetadata } from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';
+import { COMMAND_CENTER_FOCUS_REQUESTED_EVENT } from '../../../_lib/command-center-focus-event';
+import { useCommandCenter } from '../../../command-center';
 import {
   useCallback,
   useMemo,
@@ -64,6 +66,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [registerDraftGetter]);
 
   const [openAgent] = useOpenAgent();
+  const { isOpen: isCommandCenterOpen } = useCommandCenter();
 
   const isWorking = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.isWorking || false : false,
@@ -709,6 +712,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const wasActiveBeforeAppBlurRef = useRef(false);
 
   useEffect(() => {
+    if (isCommandCenterOpen) return;
+
     if (chatInputActive) {
       // Wait for the next tick to ensure the input is mounted. Guard against
       // stale scheduled focus calls: external focus handoffs (omnibox/search)
@@ -728,7 +733,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       return;
     }
     chatInputRef.current?.blur();
-  }, [chatInputActive]);
+  }, [chatInputActive, isCommandCenterOpen]);
 
   const onInputFocus = useCallback(() => {
     // Cancel any active message edits when main chat input is focused
@@ -810,6 +815,16 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   useEventListener(
     'sidebar-agent-search-focus-requested',
+    deactivateChatInputForExternalFocus,
+  );
+
+  useEffect(() => {
+    if (!isCommandCenterOpen) return;
+    deactivateChatInputForExternalFocus();
+  }, [deactivateChatInputForExternalFocus, isCommandCenterOpen]);
+
+  useEventListener(
+    COMMAND_CENTER_FOCUS_REQUESTED_EVENT,
     deactivateChatInputForExternalFocus,
   );
 

@@ -162,7 +162,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
       {show && <GlobalHotkeyBindings />}
       {show && <AgentHotkeyBindings onCreateTab={handleCreateTab} />}
       {show && <CommandCenterHotkeys />}
-      <CommandCenter />
+      {show && <CommandCenter />}
       <div
         className={cn(
           'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',

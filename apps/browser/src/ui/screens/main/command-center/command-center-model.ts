@@ -38,7 +38,9 @@ export type AgentCommandItem = CommandCenterItemBase & {
   isLive: boolean;
   isWorking: boolean;
   isWaitingForUser: boolean;
+  hasError: boolean;
   unread: boolean;
+  isPinned: boolean;
   lastMessageAt: number;
 };
 
@@ -47,9 +49,11 @@ export type TabCommandItem = CommandCenterItemBase & {
   mode: 'browser';
   tabId: string;
   url: string;
+  agentInstanceId: string | null;
   faviconUrls: string[];
   screenshot: string | null;
   isActive: boolean;
+  isPinned: boolean;
   lastFocusedAt: number;
 };
 
@@ -73,6 +77,7 @@ export type CommandCenterOpenOptions = {
   initialQuery?: string;
   initialMode?: CommandCenterMode;
   selectFirst?: boolean;
+  restoreFocusOnClose?: boolean;
 };
 
 export type CommandCenterSourceResult<T extends CommandCenterItem> = {

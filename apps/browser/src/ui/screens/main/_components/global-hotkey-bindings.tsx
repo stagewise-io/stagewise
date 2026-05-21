@@ -10,6 +10,7 @@ import { useAgentSwitcher } from '@ui/hooks/use-open-chat';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSidebarCollapsed } from './sidebar-collapsed-context';
+import { useCommandCenter } from '../command-center';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,6 +32,9 @@ function getVisibleAgentIds() {
  * switching, and window-level actions. No dependency on browser tabs.
  */
 export function GlobalHotkeyBindings() {
+  const { isOpen: isCommandCenterOpen } = useCommandCenter();
+  const globalHotkeysEnabled = !isCommandCenterOpen;
+
   // -- Agent switching --------------------------------------------------
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const resumeAgentRef = useRef(resumeAgent);
@@ -71,6 +75,8 @@ export function GlobalHotkeyBindings() {
   // because we need to track the held Control key for commit-on-release
   // of the Ctrl+Tab cycling mode.
   useEffect(() => {
+    if (!globalHotkeysEnabled) return;
+
     const nextDef = hotkeyDefinitions[HotkeyActions.NEXT_AGENT];
     const prevDef = hotkeyDefinitions[HotkeyActions.PREV_AGENT];
     const handleCycleKeyDown = (event: KeyboardEvent) => {
@@ -95,7 +101,7 @@ export function GlobalHotkeyBindings() {
     window.addEventListener('keydown', handleCycleKeyDown, true);
     return () =>
       window.removeEventListener('keydown', handleCycleKeyDown, true);
-  }, [handleAgentCycle, platform, switchAgentImmediate]);
+  }, [globalHotkeysEnabled, handleAgentCycle, platform, switchAgentImmediate]);
 
   const commitCycle = useCallback(() => {
     hasActiveCycleRef.current = false;
@@ -109,6 +115,13 @@ export function GlobalHotkeyBindings() {
   }, [cancelAgentCycle]);
 
   useEffect(() => {
+    if (!globalHotkeysEnabled) {
+      if (hasActiveCycleRef.current || isCyclingAgentsRef.current) {
+        cancelCycle();
+      }
+      return;
+    }
+
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.key !== 'Control') return;
       if (!hasActiveCycleRef.current && !isCyclingAgentsRef.current) return;
@@ -135,7 +148,7 @@ export function GlobalHotkeyBindings() {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [cancelCycle, commitCycle]);
+  }, [cancelCycle, commitCycle, globalHotkeysEnabled]);
 
   const focusAgentByIndex = useCallback(
     (index: number) => {
@@ -148,19 +161,59 @@ export function GlobalHotkeyBindings() {
     [focusAgentFromHotkey],
   );
 
-  useHotKeyListener(() => focusAgentByIndex(0), HotkeyActions.FOCUS_AGENT_1);
-  useHotKeyListener(() => focusAgentByIndex(1), HotkeyActions.FOCUS_AGENT_2);
-  useHotKeyListener(() => focusAgentByIndex(2), HotkeyActions.FOCUS_AGENT_3);
-  useHotKeyListener(() => focusAgentByIndex(3), HotkeyActions.FOCUS_AGENT_4);
-  useHotKeyListener(() => focusAgentByIndex(4), HotkeyActions.FOCUS_AGENT_5);
-  useHotKeyListener(() => focusAgentByIndex(5), HotkeyActions.FOCUS_AGENT_6);
-  useHotKeyListener(() => focusAgentByIndex(6), HotkeyActions.FOCUS_AGENT_7);
-  useHotKeyListener(() => focusAgentByIndex(7), HotkeyActions.FOCUS_AGENT_8);
-  useHotKeyListener(() => focusAgentByIndex(8), HotkeyActions.FOCUS_AGENT_LAST);
+  useHotKeyListener(
+    () => focusAgentByIndex(0),
+    HotkeyActions.FOCUS_AGENT_1,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(1),
+    HotkeyActions.FOCUS_AGENT_2,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(2),
+    HotkeyActions.FOCUS_AGENT_3,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(3),
+    HotkeyActions.FOCUS_AGENT_4,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(4),
+    HotkeyActions.FOCUS_AGENT_5,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(5),
+    HotkeyActions.FOCUS_AGENT_6,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(6),
+    HotkeyActions.FOCUS_AGENT_7,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(7),
+    HotkeyActions.FOCUS_AGENT_8,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    () => focusAgentByIndex(8),
+    HotkeyActions.FOCUS_AGENT_LAST,
+    globalHotkeysEnabled,
+  );
 
   // -- Sidebar toggle (Mod+B) -------------------------------------------
   const { toggle: toggleSidebar } = useSidebarCollapsed();
-  useHotKeyListener(() => toggleSidebar(), HotkeyActions.TOGGLE_SIDEBAR);
+  useHotKeyListener(
+    () => toggleSidebar(),
+    HotkeyActions.TOGGLE_SIDEBAR,
+    globalHotkeysEnabled,
+  );
 
   // -- Close window (Mod+Shift+W) ---------------------------------------
   const tabs = useKartonState((s) => s.browser.tabs);
@@ -168,15 +221,19 @@ export function GlobalHotkeyBindings() {
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const { removeTabUiState } = useTabUIState();
 
-  useHotKeyListener(() => {
-    if (!activeTabId) return;
-    const ids = Object.keys(tabs).filter((id) => id !== activeTabId);
-    void Promise.allSettled(ids.map((id) => closeTab(id))).then((results) => {
-      for (let i = 0; i < results.length; i++) {
-        if (results[i]!.status === 'fulfilled') removeTabUiState(ids[i]!);
-      }
-    });
-  }, HotkeyActions.CLOSE_WINDOW);
+  useHotKeyListener(
+    () => {
+      if (!activeTabId) return;
+      const ids = Object.keys(tabs).filter((id) => id !== activeTabId);
+      void Promise.allSettled(ids.map((id) => closeTab(id))).then((results) => {
+        for (let i = 0; i < results.length; i++) {
+          if (results[i]!.status === 'fulfilled') removeTabUiState(ids[i]!);
+        }
+      });
+    },
+    HotkeyActions.CLOSE_WINDOW,
+    globalHotkeysEnabled,
+  );
 
   // TODO: lift NEW_CHAT handler from sidebar/agents-list here.
 

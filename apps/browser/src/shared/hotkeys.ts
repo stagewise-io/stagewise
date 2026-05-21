@@ -1,5 +1,25 @@
 export type Platform = 'mac' | 'windows' | 'linux';
 
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    platform?: string;
+  };
+};
+
+function platformFromString(value: string | undefined): Platform | null {
+  const normalized = value?.toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes('mac')) return 'mac';
+  if (normalized.includes('win')) return 'windows';
+  return null;
+}
+
+declare const process:
+  | {
+      platform?: string;
+    }
+  | undefined;
+
 /**
  * Declarative hotkey definition using accelerator syntax.
  * Follows industry standards (Electron, VS Code, Chrome).
@@ -27,6 +47,10 @@ export enum HotkeyActions {
   TOGGLE_SIDEBAR = 'toggle_sidebar',
   FOCUS_CHAT_INPUT = 'focus_chat_input',
   OPEN_COMMAND_CENTER = 'open_command_center',
+  COMMAND_CENTER_RENAME_AGENT = 'command_center_rename_agent',
+  COMMAND_CENTER_TOGGLE_AGENT_PIN = 'command_center_toggle_agent_pin',
+  COMMAND_CENTER_COPY_TAB_URL = 'command_center_copy_tab_url',
+  COMMAND_CENTER_DELETE_AGENT = 'command_center_delete_agent',
   NEW_CHAT = 'new_chat',
   DOWNLOADS = 'downloads',
 
@@ -110,7 +134,25 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.OPEN_COMMAND_CENTER]: {
     accelerator: 'Mod+K',
-    captureDominantly: true,
+    captureDominantly: false,
+  },
+  [HotkeyActions.COMMAND_CENTER_RENAME_AGENT]: {
+    accelerator: 'Mod+E',
+    captureDominantly: false,
+  },
+  [HotkeyActions.COMMAND_CENTER_TOGGLE_AGENT_PIN]: {
+    accelerator: 'Ctrl+Shift+P',
+    mac: 'Mod+P',
+    captureDominantly: false,
+  },
+  [HotkeyActions.COMMAND_CENTER_COPY_TAB_URL]: {
+    accelerator: 'Mod+C',
+    captureDominantly: false,
+  },
+  [HotkeyActions.COMMAND_CENTER_DELETE_AGENT]: {
+    accelerator: 'Ctrl+Shift+D',
+    mac: 'Mod+D',
+    captureDominantly: false,
   },
   [HotkeyActions.NEW_CHAT]: {
     accelerator: 'Mod+N',
@@ -310,25 +352,26 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
 };
 
-type NavigatorWithUserAgentData = Navigator & {
-  userAgentData?: {
-    platform?: string;
-  };
-};
-
 /**
- * Detects the current platform based on navigator.
+ * Detects the current platform based on browser or Electron runtime data.
  */
 export function getCurrentPlatform(): Platform {
-  if (typeof navigator === 'undefined') return 'linux';
+  if (typeof navigator !== 'undefined') {
+    const nav = navigator as NavigatorWithUserAgentData;
+    const userAgentDataPlatform = platformFromString(
+      nav.userAgentData?.platform,
+    );
+    if (userAgentDataPlatform) return userAgentDataPlatform;
 
-  const { userAgentData } = navigator as NavigatorWithUserAgentData;
-  const platform = userAgentData?.platform ?? '';
-  const userAgent = navigator.userAgent ?? '';
-  const platformInfo = `${platform} ${userAgent}`.toLowerCase();
+    const userAgentPlatform = platformFromString(navigator.userAgent);
+    if (userAgentPlatform) return userAgentPlatform;
+  }
 
-  if (platformInfo.includes('mac')) return 'mac';
-  if (platformInfo.includes('win')) return 'windows';
+  if (typeof process !== 'undefined') {
+    if (process.platform === 'darwin') return 'mac';
+    if (process.platform === 'win32') return 'windows';
+  }
+
   return 'linux';
 }
 

@@ -110,8 +110,14 @@ export const WebContentsBoundsSyncer = () => {
 
         const isOmniboxModalActive =
           document.querySelector('[data-omnibox-modal-active]') !== null;
+        const isCommandCenterModalActive =
+          document.querySelector('[data-command-center-modal-active]') !== null;
 
-        if (!isElementSelectorOverlay && !isOmniboxModalActive) {
+        if (
+          !isElementSelectorOverlay &&
+          !isOmniboxModalActive &&
+          !isCommandCenterModalActive
+        ) {
           const hoverContainer = elementAtPoint.closest(
             '[id^="dev-app-preview-container-"]',
           );
@@ -183,6 +189,7 @@ export const WebContentsBoundsSyncer = () => {
     // and re-evaluate hover state when exclusion attributes change. ---
     const exclusionAttributes = [
       'data-omnibox-modal-active',
+      'data-command-center-modal-active',
       'data-element-selector-overlay',
     ];
     const mutationObserver = new MutationObserver((mutations) => {

@@ -8,7 +8,13 @@ export function CommandCenterOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="app-no-drag fixed inset-0 z-100 flex items-start justify-center bg-overlay/55 p-6">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command center"
+      data-command-center-modal-root=""
+      className="app-no-drag fixed inset-0 z-100 flex items-start justify-center bg-overlay/55 p-6"
+    >
       <button
         type="button"
         aria-label="Close command center"

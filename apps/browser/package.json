@@ -40,7 +40,6 @@
     "electron-squirrel-startup": "^1.0.1",
     "electron-unhandled": "^5.0.0",
     "fossil-delta": "^2.0.0",
-    "framer-motion": "^12.38.0",
     "fzy.js": "^0.4.1",
     "gray-matter": "^4.0.3",
     "immer": "^10.2.0",

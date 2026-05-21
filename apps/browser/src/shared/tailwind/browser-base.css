@@ -104,6 +104,48 @@
   @apply scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-muted-foreground/10;
 }
 
+@keyframes command-center-label-reveal-mask {
+  0%, 80% {
+    mask-image: linear-gradient(
+      to right,
+      black 0px,
+      black calc(100% - 14px),
+      transparent 100%
+    );
+  }
+
+  100% {
+    mask-image: linear-gradient(
+      to right,
+      black 0%,
+      black 0%,
+      black 100%,
+      black 100%
+    );
+  }
+}
+
+@keyframes command-center-label-conceal-mask {
+  0% {
+    mask-image: linear-gradient(
+      to right,
+      black 0%,
+      black 0%,
+      black 100%,
+      black 100%
+    );
+  }
+
+  20%, 100% {
+    mask-image: linear-gradient(
+      to right,
+      black 0px,
+      black calc(100% - 14px),
+      transparent 100%
+    );
+  }
+}
+
 /* For Virtuoso container to avoid flickering due to layout shifts */
 @utility virtuoso-contain {
   & [data-item-index] {

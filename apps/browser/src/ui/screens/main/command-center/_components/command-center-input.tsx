@@ -10,9 +10,11 @@ export const CommandCenterInput = forwardRef<
     mode: CommandCenterMode;
     onQueryChange: (query: string) => void;
     onModeChange: (mode: CommandCenterMode) => void;
+    onBlur: (input: HTMLInputElement) => void;
+    onSelectionChange: (input: HTMLInputElement) => void;
   }
 >(function CommandCenterInput(
-  { query, mode, onQueryChange, onModeChange },
+  { query, mode, onBlur, onQueryChange, onModeChange, onSelectionChange },
   ref,
 ) {
   return (
@@ -21,7 +23,12 @@ export const CommandCenterInput = forwardRef<
       <input
         ref={ref}
         value={query}
+        onBlur={(event) => onBlur(event.currentTarget)}
         onChange={(event) => onQueryChange(event.target.value)}
+        onFocus={(event) => onSelectionChange(event.currentTarget)}
+        onKeyUp={(event) => onSelectionChange(event.currentTarget)}
+        onPointerUp={(event) => onSelectionChange(event.currentTarget)}
+        onSelect={(event) => onSelectionChange(event.currentTarget)}
         placeholder="Search agents, tabs, settings…"
         className="min-w-0 flex-1 bg-transparent text-foreground text-sm outline-none placeholder:text-subtle-foreground"
       />

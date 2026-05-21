@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useComparingSelector,
   useKartonProcedure,
@@ -15,8 +15,16 @@ import {
 } from '../../_lib/agent-list-model';
 import type { AgentCommandItem } from '../command-center-model';
 import { filterAndRankCommandCenterItems } from '../command-center-search';
+import { getToolActivityLabel } from '../../sidebar/agents-list/_utils/tool-label';
+import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
 
 const AGENT_HISTORY_LIMIT = 30;
+const AGENT_HISTORY_QUERY_DEBOUNCE_MS = 150;
+
+function stringArraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
 
 function agentHistoryEntriesEqual(
   a: AgentHistoryEntry[],
@@ -45,37 +53,65 @@ function deriveActivityText(
 ): { text: string; isUserInput: boolean } {
   for (let i = history.length - 1; i >= 0; i--) {
     const msg = history[i]!;
-    if (msg.role === 'assistant') {
-      for (let j = msg.parts.length - 1; j >= 0; j--) {
-        const part = msg.parts[j]!;
-        if (part.type === 'reasoning')
-          return { text: 'Thinking…', isUserInput: false };
-        if (part.type === 'text' && part.text?.trim()) {
-          return {
-            text: part.text.trim().split(/\s+/).slice(0, 10).join(' '),
-            isUserInput: false,
-          };
-        }
+    if (msg.role !== 'assistant') continue;
+
+    for (let j = msg.parts.length - 1; j >= 0; j--) {
+      const part = msg.parts[j]!;
+      if (part.type === 'reasoning')
+        return { text: 'Thinking…', isUserInput: false };
+      if (part.type === 'text') {
+        const snippet = firstWords(part.text ?? '', 10);
+        if (snippet) return { text: snippet, isUserInput: false };
+        continue;
+      }
+      if (part.type.startsWith('tool-')) {
+        return {
+          text:
+            firstWords(part.text ?? '', 10) || getToolActivityLabel(part.type),
+          isUserInput: false,
+        };
       }
     }
-    if (msg.role === 'user') {
-      for (let j = msg.parts.length - 1; j >= 0; j--) {
-        const part = msg.parts[j]!;
-        if (part.type === 'text' && part.text?.trim()) {
-          return {
-            text: part.text.trim().split(/\s+/).slice(0, 10).join(' '),
-            isUserInput: true,
-          };
-        }
-      }
-    }
+    break;
   }
 
-  if (inputState.trim()) return { text: inputState.trim(), isUserInput: true };
+  if (inputState) {
+    const draftText = extractTipTapText(inputState).trim();
+    const snippet = firstWords(draftText, 10, false);
+    if (snippet) return { text: snippet, isUserInput: true };
+  }
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i]!;
+    if (msg.role !== 'user') continue;
+
+    for (let j = msg.parts.length - 1; j >= 0; j--) {
+      const part = msg.parts[j]!;
+      if (part.type === 'text') {
+        const snippet = firstWords(part.text ?? '', 10);
+        if (snippet) return { text: snippet, isUserInput: true };
+      }
+    }
+    break;
+  }
+
   return { text: '', isUserInput: false };
 }
 
-export function useAgentCommandItems(query: string) {
+export function useAgentCommandItems(
+  query: string,
+  {
+    optimisticAgentTitles,
+    optimisticPinnedAgentIds,
+    pendingRemovalAgentIds,
+    enabled = true,
+  }: {
+    optimisticAgentTitles?: Readonly<Record<string, string>>;
+    optimisticPinnedAgentIds?: string[] | null;
+    pendingRemovalAgentIds?: ReadonlySet<string>;
+    enabled?: boolean;
+  } = {},
+) {
   const getAgentsHistoryList = useKartonProcedure(
     (p) => p.agents.getAgentsHistoryList,
   );
@@ -84,6 +120,15 @@ export function useAgentCommandItems(query: string) {
   const pendingRemovals = useRef<ReadonlySet<string>>(new Set());
   const [historyList, setHistoryList] = useState<AgentHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [debouncedHistoryQuery, setDebouncedHistoryQuery] = useState(query);
+  const wasEnabledRef = useRef(enabled);
+
+  const pinnedAgentIds = useKartonState(
+    useComparingSelector(
+      (s) => s.preferences.sidebar.pinnedAgentIds,
+      stringArraysEqual,
+    ),
+  );
 
   const agents = useKartonState(
     useComparingSelector(
@@ -144,10 +189,50 @@ export function useAgentCommandItems(query: string) {
   );
 
   useEffect(() => {
+    const wasEnabled = wasEnabledRef.current;
+    wasEnabledRef.current = enabled;
+
+    if (!enabled) return;
+    if (!wasEnabled) setDebouncedHistoryQuery(query);
+
+    const timeout = window.setTimeout(() => {
+      setDebouncedHistoryQuery(query);
+    }, AGENT_HISTORY_QUERY_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [enabled, query]);
+
+  const refreshHistoryList = useCallback(async () => {
+    if (!enabled) return;
+    const entries = await getAgentsHistoryListRef.current(
+      0,
+      AGENT_HISTORY_LIMIT,
+      query.trim() || undefined,
+    );
+    setHistoryList((prev) =>
+      agentHistoryEntriesEqual(prev, entries) ? prev : entries,
+    );
+  }, [enabled, query]);
+
+  useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (debouncedHistoryQuery !== query) {
+      setIsLoading(true);
+      return;
+    }
+
     let cancelled = false;
     setIsLoading(true);
     getAgentsHistoryListRef
-      .current(0, AGENT_HISTORY_LIMIT, query.trim() || undefined)
+      .current(
+        0,
+        AGENT_HISTORY_LIMIT,
+        debouncedHistoryQuery.trim() || undefined,
+      )
       .then((entries) => {
         if (cancelled) return;
         setHistoryList((prev) =>
@@ -164,35 +249,68 @@ export function useAgentCommandItems(query: string) {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [debouncedHistoryQuery, enabled]);
+
+  const mergedAgents = useMemo(
+    () =>
+      enabled
+        ? mergeAgentEntries({
+            activeAgents: agents,
+            historyList,
+            pendingRemovals: pendingRemovalAgentIds ?? pendingRemovals.current,
+          })
+        : [],
+    [agents, enabled, historyList, pendingRemovalAgentIds],
+  );
+
+  const rawAgentTitles = useMemo(
+    () =>
+      Object.fromEntries(
+        mergedAgents.map((agent) => [
+          agent.id,
+          agent.title || 'Untitled Agent',
+        ]),
+      ),
+    [mergedAgents],
+  );
 
   const items = useMemo<AgentCommandItem[]>(() => {
-    const merged = mergeAgentEntries({
-      activeAgents: agents,
-      historyList,
-      pendingRemovals: pendingRemovals.current,
-    });
+    const pinnedAgentIdSet = new Set(
+      optimisticPinnedAgentIds ?? pinnedAgentIds,
+    );
 
     return filterAndRankCommandCenterItems(
-      merged.map(
+      mergedAgents.map(
         (agent): AgentCommandItem => ({
           id: `agent:${agent.id}`,
           kind: 'agent',
           mode: 'agents',
-          title: agent.title || 'Untitled Agent',
+          title:
+            optimisticAgentTitles?.[agent.id] ??
+            agent.title ??
+            'Untitled Agent',
           subtitle: agent.activityText || `${agent.messageCount} messages`,
           keywords: ['agent', agent.isLive ? 'active' : 'history'],
           agentId: agent.id,
           isLive: agent.isLive,
           isWorking: agent.isWorking,
           isWaitingForUser: agent.isWaitingForUser,
+          hasError: agent.hasError,
           unread: agent.unread,
+          isPinned: pinnedAgentIdSet.has(agent.id),
           lastMessageAt: agent.lastMessageAt,
         }),
       ),
       query,
     );
-  }, [agents, historyList, query]);
+  }, [
+    mergedAgents,
+    optimisticAgentTitles,
+    optimisticPinnedAgentIds,
+    pendingRemovalAgentIds,
+    pinnedAgentIds,
+    query,
+  ]);
 
-  return { items, isLoading };
+  return { items, isLoading, rawAgentTitles, refreshHistoryList };
 }

@@ -16,6 +16,7 @@ type CommandCenterContextValue = {
   query: string;
   mode: CommandCenterMode;
   selectFirstOnOpen: boolean;
+  restoreFocusOnClose: boolean;
   open: (options?: CommandCenterOpenOptions) => void;
   close: () => void;
   toggle: (options?: CommandCenterOpenOptions) => void;
@@ -32,11 +33,13 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<CommandCenterMode>('global');
   const [selectFirstOnOpen, setSelectFirstOnOpen] = useState(true);
+  const [restoreFocusOnClose, setRestoreFocusOnClose] = useState(false);
 
   const open = useCallback((options?: CommandCenterOpenOptions) => {
     setQuery(options?.initialQuery ?? '');
     setMode(options?.initialMode ?? 'global');
     setSelectFirstOnOpen(options?.selectFirst ?? true);
+    setRestoreFocusOnClose(options?.restoreFocusOnClose ?? false);
     setIsOpen(true);
   }, []);
 
@@ -45,6 +48,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     setQuery('');
     setMode('global');
     setSelectFirstOnOpen(true);
+    setRestoreFocusOnClose(false);
   }, []);
 
   const toggle = useCallback(
@@ -61,13 +65,23 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
       query,
       mode,
       selectFirstOnOpen,
+      restoreFocusOnClose,
       open,
       close,
       toggle,
       setQuery,
       setMode,
     }),
-    [close, isOpen, mode, open, query, selectFirstOnOpen, toggle],
+    [
+      close,
+      isOpen,
+      mode,
+      open,
+      query,
+      restoreFocusOnClose,
+      selectFirstOnOpen,
+      toggle,
+    ],
   );
 
   return (

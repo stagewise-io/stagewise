@@ -37,6 +37,7 @@ export interface AgentContextMenuTarget {
   rename: () => void;
   isPinned?: boolean;
   togglePinned?: (id: string) => void;
+  canDelete?: boolean;
 }
 
 export interface SharedAgentContextMenuState {
@@ -74,6 +75,7 @@ export function buildAgentContextMenuHandler(
   rename: () => void,
   isPinned?: boolean,
   togglePinned?: (id: string) => void,
+  canDelete?: boolean,
 ): (e: React.MouseEvent) => void {
   return (e) => {
     e.preventDefault();
@@ -86,6 +88,7 @@ export function buildAgentContextMenuHandler(
       rename,
       isPinned,
       togglePinned,
+      canDelete,
     });
   };
 }
@@ -166,7 +169,8 @@ export const SharedAgentContextMenuHost = memo(
     );
 
     if (!activeTarget) return null;
-    const { agentId, showDev, rename, isPinned, togglePinned } = activeTarget;
+    const { agentId, showDev, rename, isPinned, togglePinned, canDelete } =
+      activeTarget;
 
     return (
       <MenuBase.Root open={open} onOpenChange={handleOpenChange}>
@@ -214,15 +218,17 @@ export const SharedAgentContextMenuHost = memo(
                   <span>{isPinned ? 'Unpin' : 'Pin'}</span>
                 </AgentMenuItem>
               )}
-              <AgentMenuItem
-                onClick={() => {
-                  onDeleteRequest(agentId, anchorX, anchorY);
-                  onClose();
-                }}
-              >
-                <IconTrash2Outline24 className="size-3.5 shrink-0" />
-                <span>Permanently delete</span>
-              </AgentMenuItem>
+              {canDelete !== false && (
+                <AgentMenuItem
+                  onClick={() => {
+                    onDeleteRequest(agentId, anchorX, anchorY);
+                    onClose();
+                  }}
+                >
+                  <IconTrash2Outline24 className="size-3.5 shrink-0" />
+                  <span>Permanently delete</span>
+                </AgentMenuItem>
+              )}
               {showDev && (
                 <>
                   <div className="my-0.5 h-px w-full bg-border-subtle" />

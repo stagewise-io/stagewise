@@ -4,7 +4,6 @@ import {
   and,
   notInArray,
   inArray,
-  ilike,
   desc,
   isNull,
   eq,
@@ -114,7 +113,9 @@ export class AgentPersistenceDB {
           notInArray(schema.agentInstances.id, excludeIds),
           isNull(schema.agentInstances.parentAgentInstanceId),
           eq(schema.agentInstances.type, AgentTypes.CHAT),
-          titleLike ? ilike(schema.agentInstances.title, titleLike) : undefined,
+          titleLike
+            ? sql`lower(${schema.agentInstances.title}) like lower(${titleLike})`
+            : undefined,
         ),
       );
 
