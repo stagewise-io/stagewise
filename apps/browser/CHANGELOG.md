@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha096 (2026-05-21)
+
+### Bug Fixes
+
+* fix app-focus-behaviour on webcontents (525aa10)
+
 ## 1.0.0-alpha095 (2026-05-20)
 
 ### Features
