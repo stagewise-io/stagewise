@@ -1680,6 +1680,11 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   ]);
 
   useEffect(() => {
+    if (!mount.git || gitDataLoaded) return;
+    void refreshGitData();
+  }, [gitDataLoaded, mount.git, refreshGitData]);
+
+  useEffect(() => {
     if (!gitDataLoaded) return;
 
     const defaults = applyWorkspaceGitActionPreferences(
@@ -1694,9 +1699,11 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       generalWorkspaceGitActionPreference,
       repositoryWorkspaceGitActionPreference,
     );
+    const previousDefaultBranch = getCurrentBranchValue(null, gitRef);
     const hydratedConfig = hydrateWorkspaceActionConfigWithDefaults(
       config,
       defaults,
+      previousDefaultBranch,
     );
     if (workspaceActionConfigsEqual(config, hydratedConfig)) return;
 
@@ -1712,6 +1719,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     defaultBranch,
     generalWorkspaceGitActionPreference,
     gitDataLoaded,
+    gitRef,
     mount,
     onConfigChange,
     repositoryWorkspaceGitActionPreference,

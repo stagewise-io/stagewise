@@ -118,7 +118,7 @@ function WorkspaceActionErrorMessage({ message }: { message: string }) {
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" align="start">
-        <div className="max-h-48 max-w-80 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed">
+        <div className="scrollbar-subtle max-h-48 max-w-80 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed">
           {displayMessage}
         </div>
       </TooltipContent>
@@ -126,13 +126,35 @@ function WorkspaceActionErrorMessage({ message }: { message: string }) {
   );
 }
 
+function isNoopWorkspaceAction(
+  mount: MountEntry,
+  config: WorkspaceActionConfig,
+  options?: { currentBranch?: string | null },
+): boolean {
+  switch (config.selectedAction) {
+    case 'switch-branch':
+      return (
+        typeof options?.currentBranch === 'string' &&
+        config.switchBranchTarget === options.currentBranch
+      );
+    case 'switch-worktree':
+      return config.switchWorktreeTarget === mount.path;
+    case 'create-worktree':
+    case 'create-branch':
+      return false;
+  }
+}
+
 function getPendingWorkspacePreparationKind(
+  mounts: readonly MountEntry[],
   configs: ReadonlyMap<string, WorkspaceActionConfig>,
 ): 'worktree' | 'branch' | null {
   let preparationKind: 'worktree' | 'branch' | null = null;
 
-  configs.forEach((config) => {
-    if (preparationKind === 'worktree') return;
+  for (const mount of mounts) {
+    const config = configs.get(mount.prefix);
+    if (!config || isNoopWorkspaceAction(mount, config)) continue;
+    if (preparationKind === 'worktree') break;
 
     switch (config.selectedAction) {
       case 'create-worktree':
@@ -144,7 +166,7 @@ function getPendingWorkspacePreparationKind(
         preparationKind = 'branch';
         break;
     }
-  });
+  }
 
   return preparationKind;
 }
@@ -680,6 +702,18 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       const existingConfig = configs.get(mount.prefix);
       if (!existingConfig) continue;
 
+      if (isNoopWorkspaceAction(mount, existingConfig)) {
+        configs.delete(mount.prefix);
+        const nextConfigs =
+          configs.size === 0
+            ? EMPTY_WORKSPACE_ACTION_CONFIGS
+            : new Map(configs);
+        workspaceActionConfigsRef.current = nextConfigs;
+        setWorkspaceActionConfigs(nextConfigs);
+        configs = new Map(nextConfigs);
+        continue;
+      }
+
       try {
         const fallbackGitRef = formatWorkspaceGitRef(mount.git);
         const [branchesResult, worktreesResult] = await Promise.all([
@@ -707,7 +741,24 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         const config = hydrateWorkspaceActionConfigWithDefaults(
           existingConfig,
           defaults,
+          getCurrentBranchValue(null, fallbackGitRef),
         );
+
+        if (
+          isNoopWorkspaceAction(mount, config, {
+            currentBranch: branchesResult?.current ?? null,
+          })
+        ) {
+          configs.delete(mount.prefix);
+          const nextConfigs =
+            configs.size === 0
+              ? EMPTY_WORKSPACE_ACTION_CONFIGS
+              : new Map(configs);
+          workspaceActionConfigsRef.current = nextConfigs;
+          setWorkspaceActionConfigs(nextConfigs);
+          configs = new Map(nextConfigs);
+          continue;
+        }
 
         const result = await executeWorkspaceGitAction({
           agentInstanceId: openAgent,
@@ -829,7 +880,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
     const workspacePreparationKind =
       openAgent && historyRef.current.length === 0
-        ? getPendingWorkspacePreparationKind(workspaceActionConfigsRef.current)
+        ? getPendingWorkspacePreparationKind(
+            mountsRef.current,
+            workspaceActionConfigsRef.current,
+          )
         : null;
     if (didDispatchOptimisticMessage && workspacePreparationKind) {
       window.dispatchEvent(
