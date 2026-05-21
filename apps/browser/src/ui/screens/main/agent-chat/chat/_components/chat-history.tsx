@@ -63,6 +63,8 @@ type DisplayMessage = AgentMessage & {
 type OptimisticMessage = DisplayMessage & {
   _optimistic?: boolean;
   _clientId: string; // Client-generated ID for matching
+  _serverUserCountAtSend?: number;
+  _replacedMessageId?: string;
 };
 
 function getLoadingIndicatorLabel(indicator: LoadingIndicatorState): string {
@@ -110,12 +112,33 @@ declare global {
   }
 }
 
-// Helper to extract text content from a message for matching
-function getMessageTextContent(message: AgentMessage): string {
-  return message.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('');
+function isOptimisticMessageConfirmed(
+  optimisticMessage: OptimisticMessage,
+  serverMessages: AgentMessage[],
+  serverUserMessages: AgentMessage[],
+): boolean {
+  if (
+    serverUserMessages.some(
+      (serverMessage) => serverMessage.id === optimisticMessage._clientId,
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    optimisticMessage._replacedMessageId !== undefined &&
+    !serverMessages.some(
+      (serverMessage) =>
+        serverMessage.id === optimisticMessage._replacedMessageId,
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    optimisticMessage._serverUserCountAtSend !== undefined &&
+    serverUserMessages.length > optimisticMessage._serverUserCountAtSend
+  );
 }
 
 export const ChatHistory = () => {
@@ -453,8 +476,11 @@ export const ChatHistory = () => {
     pendingWorkingRef.current = false;
   }, [openAgent]);
 
-  // Reconciliation: Remove optimistic messages that have been confirmed by server
-  // We match by text content since server generates new IDs
+  // Reconciliation: Remove optimistic messages that have been confirmed by server.
+  // The backend normally generates new IDs, so match by ID only as a fast path
+  // and otherwise use structural confirmation: server user-count progression
+  // for new messages, or replaced-message removal for edits. Text content and
+  // timestamps are not unique enough for confirmation.
   // useLayoutEffect ensures reconciliation runs BEFORE paint, preventing
   // a frame where both optimistic and server-confirmed messages are visible
   useLayoutEffect(() => {
@@ -466,15 +492,11 @@ export const ChatHistory = () => {
       (m) => m.role === 'user' && m.id !== replacedMessageId,
     );
 
-    // Check each optimistic message to see if it's been confirmed
+    // Check each optimistic message to see if it's been confirmed.
     const confirmedClientIds: string[] = [];
     for (const opt of optimisticMessages) {
-      const optText = getMessageTextContent(opt);
-      // Find a server message with matching text content
-      const isConfirmed = serverUserMessages.some(
-        (server) => getMessageTextContent(server) === optText,
-      );
-      if (isConfirmed) confirmedClientIds.push(opt._clientId);
+      if (isOptimisticMessageConfirmed(opt, serverMessages, serverUserMessages))
+        confirmedClientIds.push(opt._clientId);
     }
 
     // Remove confirmed messages from optimistic state
@@ -517,13 +539,16 @@ export const ChatHistory = () => {
       if (replacedMessageId !== null) {
         displayMessages = [...displayMessages, ...optimisticMessages];
       } else {
-        const serverUserTexts = new Set(
-          displayMessages
-            .filter((m) => m.role === 'user')
-            .map((m) => getMessageTextContent(m)),
+        const serverUserMessages = displayMessages.filter(
+          (m) => m.role === 'user',
         );
         const pendingOptimisticMessages = optimisticMessages.filter(
-          (message) => !serverUserTexts.has(getMessageTextContent(message)),
+          (message) =>
+            !isOptimisticMessageConfirmed(
+              message,
+              displayMessages,
+              serverUserMessages,
+            ),
         );
 
         if (pendingOptimisticMessages.length > 0)
@@ -626,18 +651,26 @@ export const ChatHistory = () => {
   // Track when user sends a message - we'll enable auto-scroll once the message is in DOM
   const pendingAutoScrollRef = useRef(false);
   const prevMessagesLengthRef = useRef(filteredMessages.length);
+  const serverUserMessageCountRef = useRef(0);
+  serverUserMessageCountRef.current = serverMessages.filter(
+    (message) => message.role === 'user',
+  ).length;
 
   // Listen for message-sent event with message data - add to optimistic state immediately
   useEffect(() => {
     const handleMessageSent = (e: CustomEvent<{ message: AgentMessage }>) => {
       const message = e.detail.message;
-      // Add to optimistic messages immediately for instant rendering
-      const optimisticMsg: OptimisticMessage = {
-        ...message,
-        _optimistic: true,
-        _clientId: message.id, // Use original ID as client ID for matching
-      };
-      setOptimisticMessages((prev) => [...prev, optimisticMsg]);
+      // Add to optimistic messages immediately for instant rendering.
+      setOptimisticMessages((prev) => [
+        ...prev,
+        {
+          ...message,
+          _optimistic: true,
+          _clientId: message.id, // Use original ID as client ID for matching
+          _serverUserCountAtSend:
+            serverUserMessageCountRef.current + prev.length,
+        },
+      ]);
       pendingAutoScrollRef.current = true;
       pendingWorkingRef.current = true;
     };
@@ -682,6 +715,7 @@ export const ChatHistory = () => {
         id: replaceId,
         _optimistic: true,
         _clientId: newMessage.id,
+        _replacedMessageId: replaceId,
       };
       setOptimisticMessages((prev) => [...prev, optimisticMsg]);
       pendingAutoScrollRef.current = true;
