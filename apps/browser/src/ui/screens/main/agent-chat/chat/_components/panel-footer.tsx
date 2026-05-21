@@ -81,6 +81,29 @@ function getWorkspaceDisplayName(mount: MountEntry): string {
   return mount.path.split(/[\\/]/).filter(Boolean).at(-1) ?? mount.path;
 }
 
+function getPendingWorkspacePreparationKind(
+  configs: ReadonlyMap<string, WorkspaceActionConfig>,
+): 'worktree' | 'branch' | null {
+  let preparationKind: 'worktree' | 'branch' | null = null;
+
+  configs.forEach((config) => {
+    if (preparationKind === 'worktree') return;
+
+    switch (config.selectedAction) {
+      case 'create-worktree':
+      case 'switch-worktree':
+        preparationKind = 'worktree';
+        break;
+      case 'create-branch':
+      case 'switch-branch':
+        preparationKind = 'branch';
+        break;
+    }
+  });
+
+  return preparationKind;
+}
+
 export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const { registerDraftGetter } = useChatDraft();
@@ -695,13 +718,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const handleSubmit = useCallback(async () => {
     if (!canSendMessageRef.current) return;
 
-    const workspaceActionResult = await executePendingWorkspaceActions();
-    if (!workspaceActionResult.ok) {
-      setWorkspaceActionError(workspaceActionResult.message);
-      return;
-    }
-    setWorkspaceActionError(null);
-
     // Read frequently-changing values from refs at call time
     const currentLocalInputState = localInputStateRef.current;
     const currentFileAttachments = fileAttachmentsRef.current;
@@ -758,12 +774,61 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     // Dispatch event with message data for optimistic rendering
     // Only dispatch when agent is NOT working - if working, the backend
     // will queue the message instead of adding to history immediately
-    if (!isWorkingRef.current)
+    const didDispatchOptimisticMessage = !isWorkingRef.current;
+    if (didDispatchOptimisticMessage)
       window.dispatchEvent(
         new CustomEvent('chat-message-sent', { detail: { message } }),
       );
 
+    const workspacePreparationKind =
+      openAgent && historyRef.current.length === 0
+        ? getPendingWorkspacePreparationKind(workspaceActionConfigsRef.current)
+        : null;
+    if (didDispatchOptimisticMessage && workspacePreparationKind) {
+      window.dispatchEvent(
+        new CustomEvent('chat-workspace-preparation-started', {
+          detail: {
+            clientId: message.id,
+            kind: workspacePreparationKind,
+          },
+        }),
+      );
+    }
+
+    const finishWorkspacePreparation = () => {
+      if (!didDispatchOptimisticMessage || !workspacePreparationKind) return;
+      window.dispatchEvent(
+        new CustomEvent('chat-workspace-preparation-finished', {
+          detail: { clientId: message.id },
+        }),
+      );
+    };
+
     try {
+      const workspaceActionResult = await executePendingWorkspaceActions();
+      finishWorkspacePreparation();
+      if (!workspaceActionResult.ok) {
+        // Restore input on workspace preparation failure.
+        localInputStateRef.current = previousContent;
+        setLocalInputState(previousContent);
+        setCanSendMessage(true);
+        if (openAgent)
+          void setChatInputState(openAgent, JSON.stringify(previousContent));
+        if (didDispatchOptimisticMessage) {
+          window.dispatchEvent(
+            new CustomEvent('chat-message-failed', {
+              detail: { clientId: message.id },
+            }),
+          );
+        }
+        setWorkspaceActionError(workspaceActionResult.message);
+        setTimeout(() => {
+          chatInputRef.current?.focus();
+        }, 0);
+        return;
+      }
+      setWorkspaceActionError(null);
+
       if (openAgent) {
         if (currentPendingQuestionId) {
           // Atomic: queue message + resolve question in a single backend call.
@@ -784,15 +849,18 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         chatInputRef.current?.focus();
       }, 0);
     } catch (error) {
+      finishWorkspacePreparation();
       // Restore input on failure
       localInputStateRef.current = previousContent;
       setLocalInputState(previousContent);
       // Remove the optimistic message on failure
-      window.dispatchEvent(
-        new CustomEvent('chat-message-failed', {
-          detail: { clientId: message.id },
-        }),
-      );
+      if (didDispatchOptimisticMessage) {
+        window.dispatchEvent(
+          new CustomEvent('chat-message-failed', {
+            detail: { clientId: message.id },
+          }),
+        );
+      }
       console.error('Failed to send message:', error);
       posthog.captureException(
         error instanceof Error ? error : new Error(String(error)),
