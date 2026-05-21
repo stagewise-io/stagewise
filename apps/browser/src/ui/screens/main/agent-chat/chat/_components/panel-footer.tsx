@@ -802,6 +802,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
     // Save for restore on error
     const previousContent = currentLocalInputState;
+    const previousFileAttachments = currentFileAttachments;
 
     clearAll();
     stopContextSelector();
@@ -857,6 +858,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         // Restore input on workspace preparation failure.
         localInputStateRef.current = previousContent;
         setLocalInputState(previousContent);
+        setFileAttachments(previousFileAttachments);
         setCanSendMessage(true);
         if (openAgent)
           void setChatInputState(openAgent, JSON.stringify(previousContent));
@@ -899,6 +901,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       // Restore input on failure
       localInputStateRef.current = previousContent;
       setLocalInputState(previousContent);
+      setFileAttachments(previousFileAttachments);
       // Remove the optimistic message on failure
       if (didDispatchOptimisticMessage) {
         window.dispatchEvent(
@@ -921,6 +924,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     stopContextSelector,
     interruptQuestionWithMessage,
     executePendingWorkspaceActions,
+    setFileAttachments,
   ]);
 
   // Quantize to nearest 1 000 tokens so the value only changes when
