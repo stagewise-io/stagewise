@@ -26,6 +26,7 @@ import {
 } from '../_components/sidebar-collapsed-context';
 import { NotificationBanners } from '../agent-chat/chat/_components/notification-banners';
 import { UsageWarningBadge } from '../agent-chat/chat/_components/usage-warning-badge';
+import { WorktreeCleanupBadge } from './worktree-cleanup-badge';
 
 // Read the persisted collapsed state *once* at module eval so we can seed
 // `defaultSize` on first render. Without this the panel mounts expanded
@@ -115,6 +116,7 @@ export function Sidebar() {
 
           <div className="mt-8 flex shrink-0 flex-col gap-2">
             <NotificationBanners />
+            <WorktreeCleanupBadge />
             <UsageWarningBadge />
           </div>
 

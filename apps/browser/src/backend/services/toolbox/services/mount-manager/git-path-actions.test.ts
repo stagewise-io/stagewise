@@ -102,6 +102,14 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     saveRecentlyOpenedWorkspace: vi.fn(),
   } as unknown as UserExperienceService;
 
+  const preferencesService = {
+    get: vi.fn(() => ({
+      agent: { workspaceGitCleanup: { dismissedCandidates: {} } },
+    })),
+    snoozeWorkspaceGitCleanupCandidates: vi.fn(),
+    pruneWorkspaceGitCleanupSnoozes: vi.fn(),
+  };
+
   const service = new MountManagerService(
     { warn: vi.fn() } as unknown as Logger,
     {} as FilePickerService,
@@ -109,6 +117,7 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     uiKarton,
     { capture: vi.fn() } as unknown as TelemetryService,
     gitService,
+    preferencesService as never,
   );
 
   return { service, procedureHandlers, state, gitService };
@@ -180,6 +189,28 @@ describe('MountManagerService path-based Git actions', () => {
       current: 'main',
     });
     expect(gitService.listBranches).toHaveBeenCalledWith(worktreePath);
+  });
+
+  it('discovers managed worktrees with slash branch paths', async () => {
+    const repoHash = `repo-hash-${Date.now()}-${Math.random()}`;
+    const worktreePath = path.join(
+      getWorktreesDir(),
+      repoHash,
+      'feature',
+      'login',
+    );
+    await fs.mkdir(worktreePath, { recursive: true });
+    await fs.writeFile(path.join(worktreePath, '.git'), 'gitdir: mock');
+
+    const { service } = createHarness();
+    const listManagedWorktreePaths = Reflect.get(
+      service,
+      'listManagedWorktreePaths',
+    ) as () => Promise<string[]>;
+
+    await expect(listManagedWorktreePaths.call(service)).resolves.toContain(
+      worktreePath,
+    );
   });
 
   it('rejects an unrelated arbitrary path', async () => {

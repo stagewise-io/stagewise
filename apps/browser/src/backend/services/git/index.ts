@@ -14,10 +14,12 @@ import type {
   GitCreateWorktreeOptions,
   GitCreateWorktreeResult,
   GitMutationResult,
+  GitMergedTargetResult,
   GitRepositoryInfo,
   GitServiceDeps,
   GitStatusSummary,
   GitStrictCommandResult,
+  GitWorktreeRemoveResult,
   GitStrictCommandRunner,
   GitWorktreeInfo,
   GitWorktreeListResult,
@@ -34,6 +36,7 @@ export type {
   GitCreateWorktreeOptions,
   GitCreateWorktreeResult,
   GitMutationResult,
+  GitMergedTargetResult,
   GitRepositoryInfo,
   GitServiceDeps,
   GitStatusSummary,
@@ -354,6 +357,65 @@ export class GitService extends DisposableService {
       const info = this.parseWorktreeEntry(entry, index === 0);
       return info ? [info] : [];
     });
+  }
+
+  public async getWorktreeStatus(
+    workspacePath: string,
+  ): Promise<GitStatusSummary | null> {
+    return this.getStatusSummary(workspacePath);
+  }
+
+  public async findMergedTarget(
+    workspacePath: string,
+    branchName: string,
+  ): Promise<GitMergedTargetResult> {
+    const branches = await this.listBranches(workspacePath);
+    if (!branches) return { merged: false, target: null };
+
+    const availableBranches = new Set(
+      branches.branches.map((branch) => branch.name),
+    );
+    const candidateTargets = [
+      branches.defaultBranch,
+      'main',
+      'master',
+      'develop',
+      'dev',
+    ].filter(
+      (branch): branch is string =>
+        typeof branch === 'string' &&
+        branch !== branchName &&
+        availableBranches.has(branch),
+    );
+
+    for (const target of Array.from(new Set(candidateTargets))) {
+      const result = await this.runGitStrict(workspacePath, [
+        'merge-base',
+        '--is-ancestor',
+        branchName,
+        target,
+      ]);
+      if (result.exitCode === 0) return { merged: true, target };
+    }
+
+    return { merged: false, target: null };
+  }
+
+  public async removeWorktree(
+    workspacePath: string,
+  ): Promise<GitWorktreeRemoveResult> {
+    const repositoryInfo = await this.getRepositoryInfo(workspacePath);
+    const cwd = repositoryInfo?.repoRoot ?? workspacePath;
+    const result = await this.runGitStrict(cwd, [
+      'worktree',
+      'remove',
+      workspacePath,
+    ]);
+    if (result.exitCode === 0) return { ok: true };
+    return {
+      ok: false,
+      message: result.stderr || `Failed to remove worktree ${workspacePath}.`,
+    };
   }
 
   public async switchBranch(

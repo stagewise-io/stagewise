@@ -106,6 +106,35 @@ export type WorkspaceGitWorktreesResult = {
   worktrees: WorkspaceGitWorktreeInfo[];
 };
 
+export type WorkspaceGitCleanupCandidate = {
+  path: string;
+  branch: string | null;
+  headSha: string | null;
+  repositoryId: string;
+  repoRoot: string;
+  lastUsedAt: number | null;
+  mergedInto: string;
+  status: {
+    dirty: false;
+    stagedCount: 0;
+    unstagedCount: 0;
+    untrackedCount: 0;
+  };
+};
+
+export type WorkspaceGitCleanupResult = {
+  removed: Array<{ path: string; branch: string | null }>;
+  failed: Array<{ path: string; message: string }>;
+};
+
+export type WorkspaceGitCleanupState = {
+  checkedAt: number | null;
+  dismissed: boolean;
+  cleaning: boolean;
+  candidates: WorkspaceGitCleanupCandidate[];
+  lastResult: WorkspaceGitCleanupResult | null;
+};
+
 export type WorkspaceGitFailureReason =
   | 'not-git-repo'
   | 'branch-not-found'
@@ -589,6 +618,7 @@ export type AppState = {
       };
     };
   };
+  workspaceGitCleanup: WorkspaceGitCleanupState;
   toolbox: {
     [agentInstanceId: string]: {
       workspace: {
@@ -898,6 +928,10 @@ export type KartonContract = {
         workspacePath: string,
         options: WorkspaceGitCreateWorktreeOptions,
       ) => Promise<WorkspaceGitCreateWorktreeResult>;
+      dismissWorkspaceGitCleanupPrompt: () => Promise<void>;
+      cleanWorkspaceGitWorktrees: (
+        paths: string[],
+      ) => Promise<WorkspaceGitCleanupResult>;
       listWorkspaceGitBranches: (
         agentInstanceId: string,
         mountPrefix: string,
@@ -1326,6 +1360,13 @@ export const defaultState: KartonContract['state'] = {
     },
   },
   agents: { instances: {} },
+  workspaceGitCleanup: {
+    checkedAt: null,
+    dismissed: false,
+    cleaning: false,
+    candidates: [],
+    lastResult: null,
+  },
   toolbox: {},
   userAccount: {
     status: 'unauthenticated',

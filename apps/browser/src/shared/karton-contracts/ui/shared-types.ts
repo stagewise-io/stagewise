@@ -425,6 +425,38 @@ export type WorkspaceGitActionPreferences = z.infer<
   typeof workspaceGitActionPreferencesSchema
 >;
 
+const defaultWorkspaceGitCleanupPreferences = {
+  dismissedCandidates: {},
+};
+
+const workspaceGitCleanupPreferencesSchema = z
+  .object({
+    dismissedCandidates: z
+      .preprocess(
+        (value) => {
+          if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return {};
+          }
+
+          return Object.fromEntries(
+            Object.entries(value).filter(([, entry]) => {
+              return (
+                entry &&
+                typeof entry === 'object' &&
+                !Array.isArray(entry) &&
+                typeof (entry as { dismissedAt?: unknown }).dismissedAt ===
+                  'number'
+              );
+            }),
+          );
+        },
+        z.record(z.string(), z.object({ dismissedAt: z.number() })),
+      )
+      .default({}),
+  })
+  .default(defaultWorkspaceGitCleanupPreferences)
+  .catch(defaultWorkspaceGitCleanupPreferences);
+
 /** Controls whether tool calls (shell, sandbox) require user approval */
 export const toolApprovalModeSchema = z.enum([
   'alwaysAsk',
@@ -525,12 +557,15 @@ export const userPreferencesSchema = z.object({
       disabledPluginIds: z.array(z.string()).default([]),
       /** Last workspace Git action choices used to seed future selectors */
       workspaceGitActionPreferences: workspaceGitActionPreferencesSchema,
+      /** Snoozed worktree cleanup candidates keyed by worktree path */
+      workspaceGitCleanup: workspaceGitCleanupPreferencesSchema,
     })
     .default({
       workspaceSettings: {},
       disabledModelIds: [],
       disabledPluginIds: [],
       workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
+      workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
     }),
   /** LLM provider endpoint configurations (API keys, custom URLs) */
   providerConfigs: providerConfigsSchema.default({
@@ -635,6 +670,7 @@ export const defaultUserPreferences: UserPreferences = {
     ],
     disabledPluginIds: [],
     workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
+    workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
   },
   providerConfigs: {
     anthropic: { mode: 'stagewise' },
