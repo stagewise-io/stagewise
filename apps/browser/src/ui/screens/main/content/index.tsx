@@ -28,6 +28,7 @@ import {
 } from './_components/per-tab-content';
 import { TabFavicon } from './_components/tab-favicon';
 import { WithTabPreviewCard } from './_components/with-tab-preview-card';
+import { WithTerminalTabPreviewCard } from './_components/with-terminal-tab-preview-card';
 import {
   SortableTabs,
   SortableTabsList,
@@ -194,6 +195,8 @@ export function MainSection({
 }) {
   const panelRef = useRef<ImperativePanelHandle>(null);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
+  const globalOrder = useKartonState((s) => s.contentTabs.globalOrder);
+  const agentOrders = useKartonState((s) => s.contentTabs.agentOrders);
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const createTerminal = useKartonProcedure((p) => p.browser.createTerminal);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
@@ -247,6 +250,10 @@ export function MainSection({
   const prevOpenAgentRef = useRef<string | null>(null);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+  const globalOrderRef = useRef(globalOrder);
+  globalOrderRef.current = globalOrder;
+  const agentOrdersRef = useRef(agentOrders);
+  agentOrdersRef.current = agentOrders;
   const activeTabIdRef = useRef(activeTabId);
   activeTabIdRef.current = activeTabId;
   const lastActiveTabPerAgentRef = useRef(lastActiveTabPerAgent);
@@ -263,6 +270,8 @@ export function MainSection({
     const curTabs = tabsRef.current;
     const curActiveId = activeTabIdRef.current;
     const curLastActive = lastActiveTabPerAgentRef.current;
+    const curGlobalOrder = globalOrderRef.current;
+    const curAgentOrders = agentOrdersRef.current;
 
     // Bail only if the current tab is explicitly for this agent.
     // A global tab is "visible" everywhere but we still want to
@@ -273,12 +282,12 @@ export function MainSection({
     }
 
     // Need to switch — collect visible tab IDs for the new agent
-    const visibleIds = Object.keys(curTabs).filter((id) => {
-      const t = curTabs[id];
-      return (
-        t && (t.agentInstanceId === null || t.agentInstanceId === openAgent)
-      );
-    });
+    const visibleIds = [
+      ...curGlobalOrder.filter((id) => curTabs[id]?.agentInstanceId === null),
+      ...(openAgent ? (curAgentOrders[openAgent] ?? []) : []).filter(
+        (id) => curTabs[id]?.agentInstanceId === openAgent,
+      ),
+    ];
 
     // Prefer previously active tab for this agent
     const prevActive = curLastActive[openAgent];
@@ -307,7 +316,7 @@ export function MainSection({
 
     // No visible tabs for this agent — do nothing;
     // effectiveActiveTabId derived below will show empty state.
-  }, [openAgent, switchTab]);
+  }, [openAgent, switchTab, globalOrder, agentOrders]);
 
   // ---------------------------------------------------------------------------
   // Optimistic tab order
@@ -316,7 +325,12 @@ export function MainSection({
   // ---------------------------------------------------------------------------
 
   const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
-    (s) => Object.keys(s.contentTabs.tabs),
+    (s) => [
+      ...s.contentTabs.globalOrder,
+      ...Object.keys(s.contentTabs.agentOrders)
+        .sort()
+        .flatMap((agentId) => s.contentTabs.agentOrders[agentId] ?? []),
+    ],
     (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
   );
   const serverTabIds = useKartonState(tabIdsSelector);
@@ -324,8 +338,7 @@ export function MainSection({
     useState<string[]>(serverTabIds);
 
   // Sync when the server adds/removes/reorders tabs. The backend owns
-  // canonical tab order, including restored browser/terminal interleaving.
-  // Do not sort here — client-side grouping breaks persisted order.
+  // canonical tab order via explicit global/per-agent order arrays.
   useEffect(() => {
     setOptimisticTabIds(serverTabIds);
   }, [serverTabIds]);
@@ -382,8 +395,8 @@ export function MainSection({
   );
 
   // Per-group reorder handlers — each DndContext isolated, no cross-group drag.
-  // Only replace the dragged group's existing slots. Never rebuild as
-  // `globals + agents`; that mutates unrelated tab order and pushes terminals.
+  // Only replace the dragged group's existing slots. The backend writes the
+  // result into explicit global/per-agent order arrays.
   const handleReorderGlobal = useCallback(
     (newItems: SortableTabItem[]) => {
       replaceReorderedSlots(
@@ -440,7 +453,12 @@ export function MainSection({
             ) : undefined,
           wrapTrigger: (inner: ReactElement) =>
             tab.type === 'terminal' ? (
-              inner
+              <WithTerminalTabPreviewCard
+                tabState={tab}
+                activeTabId={activeTabId}
+              >
+                {inner}
+              </WithTerminalTabPreviewCard>
             ) : (
               <WithTabPreviewCard tabState={tab} activeTabId={activeTabId}>
                 {inner}

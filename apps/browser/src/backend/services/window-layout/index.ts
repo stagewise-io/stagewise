@@ -1,6 +1,6 @@
 import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import path from 'node:path';
-import type { SelectedElement, TabState } from '@shared/karton-contracts/ui';
+import type { AppState, SelectedElement } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import { generateTabId, resetTabIdCounter } from './tab-id';
 import { getBrowserSessionId } from './browser-session';
@@ -176,6 +176,113 @@ export class WindowLayoutService extends DisposableService {
     this.onDeferredTerminalRestored = fn;
   }
 
+  private getTabOrderForAgent(
+    contentTabs: AppState['contentTabs'] = this.uiKarton.state.contentTabs,
+    agentInstanceId: string | null = this.uiKarton.state.browser
+      .lastOpenAgentId ?? null,
+  ): string[] {
+    const globalIds = contentTabs.globalOrder.filter((id) => {
+      const tab = contentTabs.tabs[id];
+      return tab && tab.agentInstanceId === null;
+    });
+    const agentIds = agentInstanceId
+      ? (contentTabs.agentOrders[agentInstanceId] ?? []).filter((id) => {
+          const tab = contentTabs.tabs[id];
+          return tab && tab.agentInstanceId === agentInstanceId;
+        })
+      : [];
+    return [...globalIds, ...agentIds];
+  }
+
+  private getAllOrderedTabIds(
+    contentTabs: AppState['contentTabs'] = this.uiKarton.state.contentTabs,
+  ): string[] {
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+    const pushIfValid = (id: string) => {
+      if (seen.has(id)) return;
+      if (!contentTabs.tabs[id]) return;
+      seen.add(id);
+      orderedIds.push(id);
+    };
+
+    for (const id of contentTabs.globalOrder) pushIfValid(id);
+    for (const agentId of Object.keys(contentTabs.agentOrders).sort()) {
+      for (const id of contentTabs.agentOrders[agentId] ?? []) {
+        pushIfValid(id);
+      }
+    }
+    for (const id of Object.keys(contentTabs.tabs).sort()) pushIfValid(id);
+    return orderedIds;
+  }
+
+  private cleanupTabOrders(
+    contentTabs: AppState['contentTabs'],
+    removedTabId?: string,
+  ): void {
+    const seen = new Set<string>();
+    contentTabs.globalOrder = contentTabs.globalOrder.filter((id) => {
+      if (id === removedTabId || seen.has(id)) return false;
+      const tab = contentTabs.tabs[id];
+      if (!tab || tab.agentInstanceId !== null) return false;
+      seen.add(id);
+      return true;
+    });
+
+    for (const agentId of Object.keys(contentTabs.agentOrders)) {
+      const agentSeen = new Set<string>();
+      contentTabs.agentOrders[agentId] = contentTabs.agentOrders[
+        agentId
+      ]!.filter((id) => {
+        if (id === removedTabId || agentSeen.has(id)) return false;
+        const tab = contentTabs.tabs[id];
+        if (!tab || tab.agentInstanceId !== agentId) return false;
+        agentSeen.add(id);
+        return true;
+      });
+      if (contentTabs.agentOrders[agentId]!.length === 0) {
+        delete contentTabs.agentOrders[agentId];
+      }
+    }
+  }
+
+  private removeFromTabOrders(
+    contentTabs: AppState['contentTabs'],
+    tabId: string,
+  ): void {
+    this.cleanupTabOrders(contentTabs, tabId);
+  }
+
+  private addToTabOrder(
+    contentTabs: AppState['contentTabs'],
+    tabId: string,
+    agentInstanceId: string | null,
+    index?: number,
+  ): void {
+    this.removeFromTabOrders(contentTabs, tabId);
+    let order = contentTabs.globalOrder;
+    if (agentInstanceId) {
+      contentTabs.agentOrders[agentInstanceId] ??= [];
+      order = contentTabs.agentOrders[agentInstanceId];
+    }
+    const insertIndex = Math.max(
+      0,
+      Math.min(index ?? order.length, order.length),
+    );
+    order.splice(insertIndex, 0, tabId);
+  }
+
+  private getTabOrderIndex(
+    contentTabs: AppState['contentTabs'],
+    tabId: string,
+    agentInstanceId: string | null,
+  ): number {
+    const order = agentInstanceId
+      ? (contentTabs.agentOrders[agentInstanceId] ?? [])
+      : contentTabs.globalOrder;
+    return order.indexOf(tabId);
+  }
+
   /** Called by TerminalService after inserting a terminal tab into
    *  contentTabs.  Routes activation through handleSwitchTab so the
    *  previous browser tab's Electron WebContentsView is hidden,
@@ -211,7 +318,6 @@ export class WindowLayoutService extends DisposableService {
     const visible = allIds.filter((id) => {
       const kt = tabs[id];
       if (!kt) return false;
-      if (kt.type === 'terminal') return true;
       const aid = kt.agentInstanceId;
       return aid === null || aid === agentFilter;
     });
@@ -239,8 +345,11 @@ export class WindowLayoutService extends DisposableService {
       return;
     }
 
-    const remainingIds = Object.keys(this.uiKarton.state.contentTabs.tabs);
     const lastOpenAgent = this.uiKarton.state.browser.lastOpenAgentId;
+    const remainingIds = this.getTabOrderForAgent(
+      this.uiKarton.state.contentTabs,
+      lastOpenAgent,
+    );
     const nextTabId = this.pickNextVisibleTab(remainingIds, lastOpenAgent);
 
     if (nextTabId) {
@@ -1176,29 +1285,13 @@ export class WindowLayoutService extends DisposableService {
       }
     });
 
-    // Insert after source tab when opened from another tab, otherwise append to end
-    const shouldInsertAfterSource = !!sourceTabId && !!this.tabs[sourceTabId];
-
-    if (shouldInsertAfterSource) {
-      // Insert new tab right after the source tab by reconstructing the tabs object
-      const newTabs: Record<string, BrowsingTabController> = {};
-      for (const [existingId, existingTab] of Object.entries(this.tabs)) {
-        newTabs[existingId] = existingTab;
-        if (existingId === sourceTabId) {
-          // Insert new tab right after source
-          newTabs[id] = tab;
-        }
-      }
-      this.tabs = newTabs;
-    } else {
-      // Append to end (default behavior for UI-created tabs)
-      this.tabs[id] = tab;
-    }
+    this.tabs[id] = tab;
 
     // Update ChatStateController tabs reference
     this.chatStateController?.updateTabsReference(this.tabs);
 
-    // Initialize state in Karton with proper ordering
+    // Initialize state in Karton. Tab order is explicit in contentTabs
+    // instead of being derived from object-key insertion order.
     this.uiKarton.setState((draft) => {
       // tab.getState() returns BrowsingTabController's local TabState
       // (no cwd).  Karton's TabState requires cwd — supply empty string
@@ -1208,24 +1301,27 @@ export class WindowLayoutService extends DisposableService {
         cwd: '',
         ...tab.getState(),
       };
+      const tabAgentInstanceId = newTabState.agentInstanceId ?? null;
+      draft.contentTabs.tabs[id] = newTabState;
 
-      if (shouldInsertAfterSource && sourceTabId) {
-        // Reconstruct tabs object to maintain order
-        const newBrowserTabs: typeof draft.contentTabs.tabs = {};
-        for (const [existingId, existingState] of Object.entries(
-          draft.contentTabs.tabs,
-        )) {
-          newBrowserTabs[existingId] = existingState;
-          if (existingId === sourceTabId) {
-            // Insert new tab right after source
-            newBrowserTabs[id] = newTabState;
-          }
-        }
-        draft.contentTabs.tabs = newBrowserTabs;
-      } else {
-        // Append to end (default behavior)
-        draft.contentTabs.tabs[id] = newTabState;
-      }
+      const sourceTab = sourceTabId
+        ? draft.contentTabs.tabs[sourceTabId]
+        : undefined;
+      const shouldInsertAfterSource =
+        sourceTab?.agentInstanceId === tabAgentInstanceId;
+      const sourceIndex = shouldInsertAfterSource
+        ? this.getTabOrderIndex(
+            draft.contentTabs,
+            sourceTabId!,
+            tabAgentInstanceId,
+          )
+        : -1;
+      this.addToTabOrder(
+        draft.contentTabs,
+        id,
+        tabAgentInstanceId,
+        sourceIndex >= 0 ? sourceIndex + 1 : undefined,
+      );
     });
 
     // Initially hide
@@ -1268,7 +1364,10 @@ export class WindowLayoutService extends DisposableService {
       const closedAgentInstanceId = kartonTab?.agentInstanceId ?? null;
       this.onCloseTerminal?.(tabId);
       if (wasActive) {
-        const remainingIds = Object.keys(this.uiKarton.state.contentTabs.tabs);
+        const remainingIds = this.getTabOrderForAgent(
+          this.uiKarton.state.contentTabs,
+          closedAgentInstanceId,
+        );
         const nextTabId = this.pickNextVisibleTab(
           remainingIds,
           closedAgentInstanceId,
@@ -1291,15 +1390,16 @@ export class WindowLayoutService extends DisposableService {
     }
 
     if (tab) {
-      // Get tab order before deletion to determine next/previous tab.
-      // Use contentTabs.tabs (not this.tabs) so terminal tabs are included
-      // in positional calculations.
-      const tabIdsBeforeDeletion = Object.keys(
-        this.uiKarton.state.contentTabs.tabs,
-      );
-      const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
       const isActiveTab = this.activeTabId === tabId;
       const closedAgentInstanceId = tab.getState().agentInstanceId;
+      // Get tab order before deletion to determine next/previous tab.
+      // Use the shared content-tab order so terminal tabs are included
+      // in positional calculations.
+      const tabIdsBeforeDeletion = this.getTabOrderForAgent(
+        this.uiKarton.state.contentTabs,
+        closedAgentInstanceId,
+      );
+      const currentIndex = tabIdsBeforeDeletion.indexOf(tabId);
 
       // Check if webContents is already destroyed (e.g., crash, external closure)
       const webContents = tab.getViewContainer().webContents;
@@ -1324,9 +1424,9 @@ export class WindowLayoutService extends DisposableService {
       // so we don't switch to a tab the UI will hide, leaving empty content.
       let nextTabId: string | undefined;
       if (isActiveTab) {
-        const allRemainingIds = Object.keys(
-          this.uiKarton.state.contentTabs.tabs,
-        ).filter((id) => id !== tabId);
+        const allRemainingIds = tabIdsBeforeDeletion.filter(
+          (id) => id !== tabId,
+        );
         nextTabId = this.pickNextVisibleTab(
           allRemainingIds,
           closedAgentInstanceId,
@@ -1354,6 +1454,7 @@ export class WindowLayoutService extends DisposableService {
       const newTab = nextTabId ? this.tabs[nextTabId] : undefined;
       this.uiKarton.setState((draft) => {
         delete draft.contentTabs.tabs[tabId];
+        this.removeFromTabOrders(draft.contentTabs, tabId);
         if (isActiveTab) {
           draft.contentTabs.activeTabId = nextTabId ?? null;
           if (newTab) {
@@ -1487,40 +1588,43 @@ export class WindowLayoutService extends DisposableService {
 
   private handleReorderTabs = async (tabIds: string[]) => {
     const kartonTabs = this.uiKarton.state.contentTabs.tabs;
-
-    // Validate: browser tab IDs must exist in this.tabs; terminal tab IDs
-    // must exist in Karton state (they have no BrowsingTabController).
-    const validTabIds = tabIds.filter(
-      (id) => this.tabs[id] || kartonTabs[id]?.type === 'terminal',
-    );
+    const validTabIds = tabIds.filter((id) => Boolean(kartonTabs[id]));
     if (validTabIds.length !== tabIds.length) {
       this.logger.warn(
         '[WindowLayoutService] Some tab IDs in reorder request are invalid',
       );
     }
 
-    // Reorder internal browser-tabs record (terminal tabs don't go here).
-    const newTabs: Record<string, BrowsingTabController> = {};
-    for (const id of validTabIds) {
-      if (this.tabs[id]) {
-        newTabs[id] = this.tabs[id]!;
-      }
-    }
-    this.tabs = newTabs;
-
-    // Update ChatStateController tabs reference
-    this.chatStateController?.updateTabsReference(this.tabs);
-
-    // Rebuild Karton contentTabs.tabs in the new order.
-    // Preserve terminal tab entries (no BrowsingTabController) alongside browser tabs.
     this.uiKarton.setState((draft) => {
-      const newContentTabs: typeof draft.contentTabs.tabs = {};
-      for (const id of validTabIds) {
-        if (draft.contentTabs.tabs[id]) {
-          newContentTabs[id] = draft.contentTabs.tabs[id]!;
-        }
+      const validSet = new Set(validTabIds);
+      const groupedIds = validTabIds.reduce(
+        (acc, id) => {
+          const tab = draft.contentTabs.tabs[id];
+          if (!tab) return acc;
+          if (tab.agentInstanceId === null) {
+            acc.global.push(id);
+          } else {
+            acc.agents[tab.agentInstanceId] ??= [];
+            acc.agents[tab.agentInstanceId]!.push(id);
+          }
+          return acc;
+        },
+        { global: [] as string[], agents: {} as Record<string, string[]> },
+      );
+
+      draft.contentTabs.globalOrder = [
+        ...groupedIds.global,
+        ...draft.contentTabs.globalOrder.filter((id) => !validSet.has(id)),
+      ];
+      for (const [agentId, reorderedIds] of Object.entries(groupedIds.agents)) {
+        draft.contentTabs.agentOrders[agentId] = [
+          ...reorderedIds,
+          ...(draft.contentTabs.agentOrders[agentId] ?? []).filter(
+            (id) => !validSet.has(id),
+          ),
+        ];
       }
-      draft.contentTabs.tabs = newContentTabs;
+      this.cleanupTabOrders(draft.contentTabs);
     });
 
     this.saveTabState();
@@ -1864,37 +1968,36 @@ export class WindowLayoutService extends DisposableService {
     tabId: string,
     agentInstanceId: string | null,
   ) => {
-    // Terminal tab path: no BrowsingTabController, update Karton state directly.
-    const terminalTab = this.uiKarton.state.contentTabs.tabs[tabId];
-    if (terminalTab?.type === 'terminal') {
-      const oldAgentId = terminalTab.agentInstanceId;
-      this.uiKarton.setState((draft) => {
-        const t = draft.contentTabs.tabs[tabId];
-        if (t) t.agentInstanceId = agentInstanceId;
-      });
-      if (oldAgentId && this.lastActiveTabPerAgent[oldAgentId] === tabId) {
-        delete this.lastActiveTabPerAgent[oldAgentId];
-      }
-      if (agentInstanceId) {
-        this.lastActiveTabPerAgent[agentInstanceId] = tabId;
-      }
-      this.saveTabState();
-      return;
-    }
+    const contentTab = this.uiKarton.state.contentTabs.tabs[tabId];
+    const oldAgentId = contentTab?.agentInstanceId ?? null;
+    const isPinningGlobally = oldAgentId !== null && agentInstanceId === null;
+    const isUnpinningToAgent = oldAgentId === null && agentInstanceId !== null;
 
-    // Browser tab path (existing)
-    const tab = this.tabs[tabId];
-    if (!tab) {
+    if (!contentTab) {
       this.logger.warn(
         `[WindowLayoutService] setTabAgentInstance: tab ${tabId} not found`,
       );
       return;
     }
-    // Capture old agent before reassignment so we can clean up the stale
-    // last-active-tab entry. The current code only cleaned up on unpin,
-    // which left dangling pointers when re-pinning tab A→B.
-    const oldAgentId = tab.getState().agentInstanceId;
-    tab.setAgentInstance(agentInstanceId);
+
+    const tab = this.tabs[tabId];
+    if (contentTab.type !== 'terminal') {
+      tab?.setAgentInstance(agentInstanceId);
+    }
+
+    this.uiKarton.setState((draft) => {
+      const t = draft.contentTabs.tabs[tabId];
+      if (!t) return;
+      t.agentInstanceId = agentInstanceId;
+
+      if (isPinningGlobally) {
+        this.addToTabOrder(draft.contentTabs, tabId, null);
+      } else if (isUnpinningToAgent && agentInstanceId) {
+        this.addToTabOrder(draft.contentTabs, tabId, agentInstanceId, 0);
+      } else {
+        this.addToTabOrder(draft.contentTabs, tabId, agentInstanceId);
+      }
+    });
 
     // Remove old agent's last-active-tab entry if it points to this tab.
     if (oldAgentId && this.lastActiveTabPerAgent[oldAgentId] === tabId) {
@@ -1956,29 +2059,12 @@ export class WindowLayoutService extends DisposableService {
     if (restoredOrder.length === 0) return;
 
     this.uiKarton.setState((draft) => {
-      const restoredSet = new Set(restoredOrder);
-      const existingTabs: typeof draft.contentTabs.tabs = {};
-      for (const [id, tab] of Object.entries(draft.contentTabs.tabs)) {
-        if (!restoredSet.has(id)) existingTabs[id] = tab;
-      }
       for (const id of restoredOrder) {
         const tab = draft.contentTabs.tabs[id];
-        if (tab) existingTabs[id] = tab;
+        if (!tab) continue;
+        this.addToTabOrder(draft.contentTabs, id, tab.agentInstanceId);
       }
-      draft.contentTabs.tabs = existingTabs;
     });
-
-    const restoredSet = new Set(restoredOrder);
-    const existingBrowserTabs: Record<string, BrowsingTabController> = {};
-    for (const [id, tab] of Object.entries(this.tabs)) {
-      if (!restoredSet.has(id)) existingBrowserTabs[id] = tab;
-    }
-    for (const id of restoredOrder) {
-      const tab = this.tabs[id];
-      if (tab) existingBrowserTabs[id] = tab;
-    }
-    this.tabs = existingBrowserTabs;
-    this.chatStateController?.updateTabsReference(this.tabs);
   }
 
   private handleSetLastOpenAgentId = async (agentInstanceId: string | null) => {
@@ -2010,13 +2096,10 @@ export class WindowLayoutService extends DisposableService {
       return;
     }
 
-    const visibleIds = Object.keys(tabs).filter((id) => {
-      const t = tabs[id];
-      return (
-        t &&
-        (t.agentInstanceId === null || t.agentInstanceId === agentInstanceId)
-      );
-    });
+    const visibleIds = this.getTabOrderForAgent(
+      this.uiKarton.state.contentTabs,
+      agentInstanceId,
+    );
 
     if (visibleIds.length === 0) return;
 
@@ -2497,11 +2580,11 @@ export class WindowLayoutService extends DisposableService {
       // TerminalService to refresh live PTY cwd values into Karton before
       // reading contentTabs.tabs for persistence.
       this.onBeforeSaveTabState?.();
-      // contentTabs.tabs key order matches the UI tab bar order (rebuilt
-      // on every reorder), so deriving allIds directly preserves the exact
-      // UI layout including browser/terminal interleaving.
-      const contentTabsTabs = this.uiKarton.state.contentTabs.tabs;
-      const allIds = Object.keys(contentTabsTabs);
+      // Persist from the explicit global/per-agent order arrays, not object
+      // key order. Object order is no longer part of tab semantics.
+      const contentTabs = this.uiKarton.state.contentTabs;
+      const contentTabsTabs = contentTabs.tabs;
+      const allIds = this.getAllOrderedTabIds(contentTabs);
       const activeId = this.uiKarton.state.contentTabs.activeTabId;
       const activeIndex = activeId ? allIds.indexOf(activeId) : -1;
       const state: PersistedTabState = {
@@ -2609,28 +2692,18 @@ export class WindowLayoutService extends DisposableService {
     }
 
     // createTab() and terminal insertion mutate contentTabs independently;
-    // explicitly rebuild the record in persisted order so mixed browser /
+    // explicitly rebuild the explicit order arrays so mixed browser /
     // terminal ordering survives restart.
     const visibleOrder = visibleTabs
       .map((savedTab) => restoredIds.get(savedTab))
       .filter((id): id is string => Boolean(id));
     this.uiKarton.setState((draft) => {
-      const orderedTabs: Record<string, TabState> = {};
       for (const id of visibleOrder) {
         const tab = draft.contentTabs.tabs[id];
-        if (tab) orderedTabs[id] = tab;
+        if (!tab) continue;
+        this.addToTabOrder(draft.contentTabs, id, tab.agentInstanceId);
       }
-      draft.contentTabs.tabs = orderedTabs;
     });
-
-    // Keep internal browser-tab order aligned with the UI/Karton order.
-    const orderedBrowserTabs: Record<string, BrowsingTabController> = {};
-    for (const id of visibleOrder) {
-      const tab = this.tabs[id];
-      if (tab) orderedBrowserTabs[id] = tab;
-    }
-    this.tabs = orderedBrowserTabs;
-    this.chatStateController?.updateTabsReference(this.tabs);
 
     // Activate the tab at the saved index (only if it was among the visible tabs)
     if (state.activeTabIndex >= 0 && state.activeTabIndex < state.tabs.length) {

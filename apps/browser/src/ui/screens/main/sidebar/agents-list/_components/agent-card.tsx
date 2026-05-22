@@ -189,7 +189,7 @@ export const AgentCard = memo(
                       <button
                         type="button"
                         data-no-dnd="true"
-                        aria-label={isPinned ? 'Pin globally' : 'Unpin'}
+                        aria-label={isPinned ? 'Unpin' : 'Pin globally'}
                         className={cn(
                           'absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm',
                           'text-muted-foreground/60 opacity-0 outline-none transition-[color,opacity]',
@@ -213,7 +213,7 @@ export const AgentCard = memo(
                     }
                   />
                   <TooltipContent side="bottom">
-                    {isPinned ? 'Pin globally' : 'Unpin'}
+                    {isPinned ? 'Unpin' : 'Pin globally'}
                   </TooltipContent>
                 </Tooltip>
               ) : null}

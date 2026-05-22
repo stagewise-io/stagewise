@@ -502,6 +502,7 @@ export type TabState = {
   /** ── Terminal-specific fields (present when type === 'terminal') ── */
   /** Working directory the PTY was spawned in. Always set for terminal tabs. */
   cwd: string;
+  terminalRunningProcess?: string | null;
   createdAt?: number;
   exited?: boolean;
   exitCode?: number | null;
@@ -520,6 +521,7 @@ export function getTerminalTabDefaults(): Omit<
     type: 'terminal' as const,
     url: '',
     cwd: '',
+    terminalRunningProcess: null,
     faviconUrls: [],
     agentInstanceId: null as string | null,
     isLoading: false,
@@ -777,8 +779,12 @@ export type AppState = {
 
   // Unified content tabs (browser + terminal + future tab types)
   contentTabs: {
-    /** All tabs keyed by ID, discriminated by `type` field. */
+    /** All tab metadata keyed by ID, discriminated by `type` field. */
     tabs: Record<string, TabState>;
+    /** Ordered global tab IDs, visible for every agent. */
+    globalOrder: string[];
+    /** Ordered per-agent tab IDs, keyed by agent instance ID. */
+    agentOrders: Record<string, string[]>;
     /** Currently active tab ID. */
     activeTabId: string | null;
   };
@@ -1498,6 +1504,8 @@ export const defaultState: KartonContract['state'] = {
   },
   contentTabs: {
     tabs: {},
+    globalOrder: [],
+    agentOrders: {},
     activeTabId: null,
   },
   browsing: {

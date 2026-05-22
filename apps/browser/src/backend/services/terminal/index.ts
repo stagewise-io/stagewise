@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import type { Terminal as IHeadlessTerminal } from '@xterm/headless';
 import xtermHeadless from '@xterm/headless';
 import { SerializeAddon } from '@xterm/addon-serialize';
@@ -13,6 +14,9 @@ const HeadlessTerminal = xtermHeadless.Terminal as new (options: {
   rows: number;
   scrollback: number;
   allowProposedApi: boolean;
+  theme?: {
+    background?: string;
+  };
 }) => IHeadlessTerminal;
 import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
@@ -39,7 +43,15 @@ interface UserTerminalSession {
    *  been parsed. Snapshots must await this to avoid claiming an
    *  endOffset that the presentation model has not rendered yet. */
   headlessReady: Promise<void>;
+  lastMetadataRefreshAt: number;
 }
+
+type TerminalProcessInfo = {
+  pid: number;
+  parentPid: number;
+  command: string;
+  state: string;
+};
 
 /** Maximum size of the output buffer before the oldest half is
  *  trimmed. Prevents unbounded Karton state growth. */
@@ -56,20 +68,132 @@ const OSC_TITLE_RE = /^\x1b\]([012]);([^\x07\x1b]*?)(\x07|\x1b\\)/;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
 const OSC_CWD_RE = /^\x1b\]7;(file:\/\/[^\x07\x1b]*?)(\x07|\x1b\\)/;
 
+/** Regex matching OSC 11 background color queries: ESC ] 11 ; ? BEL | ST. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+const OSC_BACKGROUND_QUERY_RE = /^\x1b\]11;\?(\x07|\x1b\\)/;
+
+const TERMINAL_BACKGROUND_BY_THEME = {
+  light: '#fdfcfc',
+  dark: '#1e1e1d',
+} as const;
+
+const MAX_PARTIAL_OSC_LENGTH = 4096;
+
 function cwdFromOsc7Uri(uri: string): string | null {
   try {
     const parsed = new URL(uri);
     if (parsed.protocol !== 'file:') return null;
+    if (process.platform === 'win32') {
+      return fileURLToPath(parsed) || null;
+    }
     return decodeURIComponent(parsed.pathname) || null;
   } catch {
     return null;
   }
 }
 
+function hexColorToOscRgb(color: string): string {
+  const normalized = color.replace(/^#/, '');
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((part) => part + part)
+          .join('')
+      : normalized;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(expanded)) {
+    return 'rgb:0000/0000/0000';
+  }
+
+  const r = expanded.slice(0, 2);
+  const g = expanded.slice(2, 4);
+  const b = expanded.slice(4, 6);
+  return `rgb:${r}${r}/${g}${g}/${b}${b}`;
+}
+
+function buildOsc11Response(background: string): string {
+  return `\x1b]11;${hexColorToOscRgb(background)}\x07`;
+}
+
+function isPartialOscSequence(tail: string): boolean {
+  const startsOsc = tail.startsWith('\x1b]');
+  const hasTerminatingBel = tail.includes('\x07');
+  const hasTerminatingSt = tail.includes('\x1b\\');
+
+  return (
+    (startsOsc && !hasTerminatingBel && !hasTerminatingSt) ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+    /^\x1b\]([012]);([^\x07\x1b]*)$/.test(tail) ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+    /^\x1b\]7;(file:\/\/[^\x07\x1b]*)$/.test(tail) ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+    /^\x1b\]11;\??$/.test(tail) ||
+    tail === '\x1b' ||
+    tail === '\x1b]' ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+    /^\x1b\]([012]|7|11)$/.test(tail)
+  );
+}
+
+function commandName(command: string): string {
+  const normalized = command.replace(/\/$/, '');
+  return normalized.split('/').pop() || normalized;
+}
+
+function readProcessList(): TerminalProcessInfo[] {
+  if (process.platform !== 'darwin' && process.platform !== 'linux') {
+    return [];
+  }
+
+  try {
+    const output = execFileSync('ps', ['-axo', 'pid=,ppid=,stat=,comm='], {
+      encoding: 'utf8',
+      timeout: 500,
+    });
+
+    return output
+      .split('\n')
+      .map((line): TerminalProcessInfo | null => {
+        const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$/.exec(line);
+        if (!match) return null;
+        return {
+          pid: Number.parseInt(match[1]!, 10),
+          parentPid: Number.parseInt(match[2]!, 10),
+          state: match[3]!,
+          command: commandName(match[4]!),
+        };
+      })
+      .filter((entry): entry is TerminalProcessInfo => Boolean(entry));
+  } catch {
+    return [];
+  }
+}
+
+function findForegroundProcess(shellPid: number): TerminalProcessInfo | null {
+  const processes = readProcessList();
+  if (processes.length === 0) return null;
+
+  const childrenByParent = new Map<number, TerminalProcessInfo[]>();
+  for (const processInfo of processes) {
+    const children = childrenByParent.get(processInfo.parentPid) ?? [];
+    children.push(processInfo);
+    childrenByParent.set(processInfo.parentPid, children);
+  }
+
+  const directChildren = childrenByParent.get(shellPid) ?? [];
+  return (
+    directChildren
+      .filter((child) => !child.state.includes('Z'))
+      .sort((a, b) => b.pid - a.pid)[0] ?? null
+  );
+}
+
 /**
  * Process raw PTY data through the OSC pipeline:
  *  - Strips complete OSC 0/1/2 title sequences from the output.
  *  - Strips complete OSC 7 cwd sequences from the output.
+ *  - Responds to OSC 11 background color queries from terminal apps.
  *  - Calls callbacks for extracted title/cwd metadata.
  *  - Returns clean output and a carried-over partial-sequence buffer.
  */
@@ -78,6 +202,7 @@ function processOscData(
   prevOscBuffer: string,
   onTitle: (title: string) => void,
   onCwd: (cwd: string) => void,
+  onBackgroundQuery: () => void,
 ): { output: string; oscBuffer: string } {
   let combined = prevOscBuffer + chunk;
   let output = '';
@@ -108,17 +233,22 @@ function processOscData(
       continue;
     }
 
-    if (
-      // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
-      /^\x1b\]([012]);([^\x07\x1b]*)$/.test(tail) ||
-      // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
-      /^\x1b\]7;(file:\/\/[^\x07\x1b]*)$/.test(tail) ||
-      tail === '\x1b' ||
-      tail === '\x1b]' ||
-      // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
-      /^\x1b\]([012]|7)$/.test(tail)
-    ) {
-      return { output, oscBuffer: tail };
+    const backgroundQueryMatch = OSC_BACKGROUND_QUERY_RE.exec(tail);
+    if (backgroundQueryMatch) {
+      onBackgroundQuery();
+      combined = tail.slice(backgroundQueryMatch[0].length);
+      continue;
+    }
+
+    if (isPartialOscSequence(tail)) {
+      if (tail.length <= MAX_PARTIAL_OSC_LENGTH) {
+        return { output, oscBuffer: tail };
+      }
+
+      // Treat oversized unterminated OSC sequences as malformed.
+      // Otherwise a broken prefix can keep absorbing later normal PTY
+      // bytes into oscBuffer and suppress all terminal rendering.
+      return { output, oscBuffer: '' };
     }
 
     const nextEsc = tail.indexOf('\x1b', 1);
@@ -193,13 +323,20 @@ export class TerminalService extends DisposableService {
     logger: Logger,
     uiKarton: KartonService,
     shell: DetectedShell,
-    resolvedEnv: Record<string, string>,
+    resolvedEnv: Record<string, string> | null | undefined,
   ) {
     super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.shell = shell;
-    this.resolvedEnv = resolvedEnv;
+    this.resolvedEnv = Object.fromEntries(
+      Object.entries(process.env).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
+    );
+    if (resolvedEnv) {
+      Object.assign(this.resolvedEnv, resolvedEnv);
+    }
   }
 
   // ─── Initialisation ──────────────────────────────────────────
@@ -220,7 +357,13 @@ export class TerminalService extends DisposableService {
       delete draft.terminals.outputBuffers[terminalId];
       delete draft.terminals.outputBufferOffsets[terminalId];
     });
-    this.createPty(terminalId, cwd);
+    const actualCwd = this.createPty(terminalId, cwd);
+    if (!actualCwd) return;
+    this.uiKarton.setState((draft) => {
+      const tab = draft.contentTabs.tabs[terminalId];
+      if (tab?.type === 'terminal') tab.cwd = actualCwd;
+    });
+    this.updateTerminalMetadata(terminalId, true);
   }
 
   /** Scan persisted terminal tabs in contentTabs and spawn PTYs for
@@ -243,7 +386,13 @@ export class TerminalService extends DisposableService {
       });
       // tab.cwd is always set (required field), but guard against
       // empty-string edge case from legacy persisted state.
-      this.createPty(id, tab.cwd);
+      const actualCwd = this.createPty(id, tab.cwd);
+      if (!actualCwd) continue;
+      this.uiKarton.setState((draft) => {
+        const restoredTab = draft.contentTabs.tabs[id];
+        if (restoredTab?.type === 'terminal') restoredTab.cwd = actualCwd;
+      });
+      this.updateTerminalMetadata(id, true);
     }
   }
 
@@ -369,7 +518,8 @@ export class TerminalService extends DisposableService {
       : 'Terminal';
     const createdAt = Date.now();
 
-    this.createPty(terminalId, resolvedCwd);
+    const actualCwd = this.createPty(terminalId, resolvedCwd);
+    if (!actualCwd) return;
 
     // Insert the tab into contentTabs but do NOT set activeTabId here.
     // WindowLayoutService owns all active-tab transitions — it needs to
@@ -377,20 +527,29 @@ export class TerminalService extends DisposableService {
     // this.activeTabId.  We fire onTerminalTabCreated so it can call
     // handleSwitchTab(terminalId) through the proper path.
     this.uiKarton.setState((draft) => {
+      const tabAgentInstanceId = agentInstanceId ?? null;
       draft.contentTabs.tabs[terminalId] = {
         ...getTerminalTabDefaults(),
         id: terminalId,
         title,
-        agentInstanceId: agentInstanceId ?? null,
-        cwd: resolvedCwd,
+        agentInstanceId: tabAgentInstanceId,
+        cwd: actualCwd,
         createdAt,
         lastFocusedAt: createdAt,
       };
+      if (tabAgentInstanceId) {
+        draft.contentTabs.agentOrders[tabAgentInstanceId] ??= [];
+        const order = draft.contentTabs.agentOrders[tabAgentInstanceId];
+        if (!order.includes(terminalId)) order.push(terminalId);
+      } else if (!draft.contentTabs.globalOrder.includes(terminalId)) {
+        draft.contentTabs.globalOrder.push(terminalId);
+      }
     });
+    this.updateTerminalMetadata(terminalId, true);
     this.onTerminalTabCreated?.(terminalId);
 
     this.logger.info(
-      `[TerminalService] Created terminal ${terminalId} in ${resolvedCwd}`,
+      `[TerminalService] Created terminal ${terminalId} in ${actualCwd}`,
     );
   }
 
@@ -405,7 +564,14 @@ export class TerminalService extends DisposableService {
         return mounts[0].path;
       }
     }
-    return process.env.HOME ?? process.cwd();
+    return this.getUserHomeDirectory() ?? process.cwd();
+  }
+
+  private getUserHomeDirectory(): string | undefined {
+    if (process.platform === 'win32') {
+      return process.env.USERPROFILE ?? process.env.HOME;
+    }
+    return process.env.HOME ?? process.env.USERPROFILE;
   }
 
   private readProcessCwd(pid: number): string | null {
@@ -438,34 +604,125 @@ export class TerminalService extends DisposableService {
     return null;
   }
 
+  private getTerminalBackgroundColor(): string {
+    const theme = this.uiKarton.state.systemTheme;
+    return TERMINAL_BACKGROUND_BY_THEME[theme];
+  }
+
+  private updateTerminalMetadata(terminalId: string, force = false): void {
+    const session = this.sessions.get(terminalId);
+    if (!session) return;
+
+    const now = Date.now();
+    if (!force && now - session.lastMetadataRefreshAt < 1000) return;
+    session.lastMetadataRefreshAt = now;
+
+    const runningProcess = findForegroundProcess(session.pty.pid);
+    const cwd = this.readProcessCwd(runningProcess?.pid ?? session.pty.pid);
+
+    this.uiKarton.setState((draft) => {
+      const tab = draft.contentTabs.tabs[terminalId];
+      if (!tab || tab.type !== 'terminal') return;
+      if (cwd) tab.cwd = cwd;
+      tab.terminalRunningProcess = runningProcess?.command ?? null;
+    });
+  }
+
+  private isUsableDirectory(path: string): boolean {
+    try {
+      return fs.statSync(path).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  private resolveSafePtyCwd(requestedCwd: string): string {
+    const candidates = [
+      requestedCwd,
+      this.getUserHomeDirectory(),
+      process.cwd(),
+    ].filter((candidate): candidate is string => Boolean(candidate));
+
+    for (const candidate of candidates) {
+      if (this.isUsableDirectory(candidate)) return candidate;
+    }
+
+    return process.cwd();
+  }
+
   /** Spawn a PTY and wire up onData / onExit for an existing terminal
    *  tab.  Shared by handleCreateTerminal and restoreFromState.
-   *  Guards against empty cwd — node-pty silently falls back to
-   *  process.cwd() (Electron app directory) when given ''. */
-  private createPty(terminalId: string, cwd: string): void {
-    const resolvedCwd = cwd || process.env.HOME || process.cwd();
-    const spawnArgs: string[] = ['-i'];
+   *  Guards against empty, stale, or deleted cwd values — node-pty can
+   *  throw when cwd is invalid, which must not abort terminal creation. */
+  private createPty(terminalId: string, cwd: string): string | null {
+    const requestedCwd = cwd || this.getUserHomeDirectory() || process.cwd();
+    const resolvedCwd = this.resolveSafePtyCwd(requestedCwd);
+    const spawnArgs: string[] =
+      this.shell.type === 'powershell' ? ['-NoExit'] : ['-i'];
     if (this.shell.type === 'bash') {
       spawnArgs.push('--norc');
     }
 
-    const ptyProcess = pty.spawn(this.shell.path, spawnArgs, {
-      name: 'xterm-256color',
-      cols: DEFAULT_TERMINAL_COLS,
-      rows: DEFAULT_TERMINAL_ROWS,
-      cwd: resolvedCwd,
-      env: {
-        ...this.resolvedEnv,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-      },
-    });
+    const spawnAtCwd = (spawnCwd: string) =>
+      pty.spawn(this.shell.path, spawnArgs, {
+        name: 'xterm-256color',
+        cols: DEFAULT_TERMINAL_COLS,
+        rows: DEFAULT_TERMINAL_ROWS,
+        cwd: spawnCwd,
+        env: {
+          ...this.resolvedEnv,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+        },
+      });
+
+    if (resolvedCwd !== requestedCwd) {
+      this.logger.warn(
+        `[TerminalService] Falling back from unavailable cwd ${requestedCwd} to ${resolvedCwd}`,
+      );
+    }
+
+    let ptyProcess: pty.IPty;
+    let actualCwd = resolvedCwd;
+    try {
+      ptyProcess = spawnAtCwd(resolvedCwd);
+    } catch (error) {
+      const fallbackCwd = this.resolveSafePtyCwd(
+        this.getUserHomeDirectory() || process.cwd(),
+      );
+      if (fallbackCwd === resolvedCwd) {
+        this.logger.error(
+          `[TerminalService] Failed to spawn terminal ${terminalId} in ${resolvedCwd}`,
+          error,
+        );
+        return null;
+      }
+
+      this.logger.warn(
+        `[TerminalService] Failed to spawn terminal ${terminalId} in ${resolvedCwd}; retrying in ${fallbackCwd}`,
+        error,
+      );
+
+      try {
+        ptyProcess = spawnAtCwd(fallbackCwd);
+        actualCwd = fallbackCwd;
+      } catch (fallbackError) {
+        this.logger.error(
+          `[TerminalService] Failed to spawn terminal ${terminalId} in fallback cwd ${fallbackCwd}`,
+          fallbackError,
+        );
+        return null;
+      }
+    }
 
     const headless = new HeadlessTerminal({
       cols: DEFAULT_TERMINAL_COLS,
       rows: DEFAULT_TERMINAL_ROWS,
       scrollback: 5000,
       allowProposedApi: true,
+      theme: {
+        background: this.getTerminalBackgroundColor(),
+      },
     });
     const serializeAddon = new SerializeAddon();
     headless.loadAddon(serializeAddon);
@@ -477,6 +734,7 @@ export class TerminalService extends DisposableService {
       headless,
       serializeAddon,
       headlessReady: Promise.resolve(),
+      lastMetadataRefreshAt: 0,
     };
 
     this.sessions.set(terminalId, session);
@@ -484,6 +742,8 @@ export class TerminalService extends DisposableService {
     ptyProcess.onData((data: string) => {
       const curSession = this.sessions.get(terminalId);
       if (!curSession || this.disposed) return;
+
+      this.updateTerminalMetadata(terminalId);
 
       const { output, oscBuffer } = processOscData(
         data,
@@ -503,6 +763,11 @@ export class TerminalService extends DisposableService {
               tab.cwd = cwd;
             }
           });
+        },
+        () => {
+          curSession.pty.write(
+            buildOsc11Response(this.getTerminalBackgroundColor()),
+          );
         },
       );
 
@@ -551,6 +816,8 @@ export class TerminalService extends DisposableService {
       );
       this.onPtyExit(terminalId);
     });
+
+    return actualCwd;
   }
 
   /** Kill the PTY and clean up session state. */
@@ -585,6 +852,17 @@ export class TerminalService extends DisposableService {
     // centralized in one service.
     this.uiKarton.setState((draft) => {
       delete draft.contentTabs.tabs[terminalId];
+      draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
+        (id) => id !== terminalId,
+      );
+      for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
+        draft.contentTabs.agentOrders[agentId] = draft.contentTabs.agentOrders[
+          agentId
+        ]!.filter((id) => id !== terminalId);
+        if (draft.contentTabs.agentOrders[agentId]!.length === 0) {
+          delete draft.contentTabs.agentOrders[agentId];
+        }
+      }
       delete draft.terminals.outputBuffers[terminalId];
       delete draft.terminals.outputBufferOffsets[terminalId];
     });
@@ -606,6 +884,17 @@ export class TerminalService extends DisposableService {
 
     this.uiKarton.setState((draft) => {
       delete draft.contentTabs.tabs[terminalId];
+      draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
+        (id) => id !== terminalId,
+      );
+      for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
+        draft.contentTabs.agentOrders[agentId] = draft.contentTabs.agentOrders[
+          agentId
+        ]!.filter((id) => id !== terminalId);
+        if (draft.contentTabs.agentOrders[agentId]!.length === 0) {
+          delete draft.contentTabs.agentOrders[agentId];
+        }
+      }
       delete draft.terminals.outputBuffers[terminalId];
       delete draft.terminals.outputBufferOffsets[terminalId];
     });
