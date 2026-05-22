@@ -79,6 +79,33 @@ const TERMINAL_BACKGROUND_BY_THEME = {
 
 const MAX_PARTIAL_OSC_LENGTH = 4096;
 
+const POWERSHELL_TERMINAL_INTEGRATION = `
+if ((Test-Path variable:global:__StagewiseTerminalState) -and $null -ne $Global:__StagewiseTerminalState.OriginalPrompt) {
+  return
+}
+if ($ExecutionContext.SessionState.LanguageMode -ne "FullLanguage") {
+  return
+}
+$Global:__StagewiseTerminalState = @{
+  OriginalPrompt = $function:Prompt
+}
+function Global:__StagewiseTerminalFileUri([string]$Path) {
+  return ([System.Uri]::new($Path)).AbsoluteUri
+}
+function Global:__StagewiseTerminalEmitMetadata() {
+  try {
+    $Cwd = (Get-Location).ProviderPath
+    [Console]::Write("$([char]0x1b)]7;$(__StagewiseTerminalFileUri $Cwd)\`a")
+  } catch {}
+}
+function Global:Prompt() {
+  Set-StrictMode -Off
+  __StagewiseTerminalEmitMetadata
+  return $Global:__StagewiseTerminalState.OriginalPrompt.Invoke()
+}
+__StagewiseTerminalEmitMetadata
+`.trim();
+
 function cwdFromOsc7Uri(uri: string): string | null {
   try {
     const parsed = new URL(uri);
@@ -137,8 +164,35 @@ function isPartialOscSequence(tail: string): boolean {
 }
 
 function commandName(command: string): string {
-  const normalized = command.replace(/\/$/, '');
-  return normalized.split('/').pop() || normalized;
+  const normalized = command.replace(/[\\/]$/, '');
+  return normalized.split(/[\\/]/).pop() || normalized;
+}
+
+function shellDisplayName(shell: DetectedShell): string {
+  if (shell.type === 'powershell') return 'PowerShell';
+  return shell.type.charAt(0).toUpperCase() + shell.type.slice(1);
+}
+
+function isShellExecutableTitle(title: string, shell: DetectedShell): boolean {
+  const normalizedTitle = title.trim().replace(/\\/g, '/').toLowerCase();
+  const normalizedShellPath = shell.path
+    .trim()
+    .replace(/\\/g, '/')
+    .toLowerCase();
+  if (!normalizedTitle) return false;
+  if (normalizedTitle === normalizedShellPath) return true;
+
+  const titleCommand = commandName(normalizedTitle);
+  const shellCommand = commandName(normalizedShellPath);
+  if (titleCommand !== shellCommand) return false;
+
+  if (shell.type === 'powershell') {
+    return ['powershell', 'powershell.exe', 'pwsh', 'pwsh.exe'].includes(
+      titleCommand,
+    );
+  }
+
+  return false;
 }
 
 function readProcessList(): TerminalProcessInfo[] {
@@ -309,12 +363,20 @@ export class TerminalService extends DisposableService {
   public syncTerminalCwds(): void {
     for (const [terminalId, session] of this.sessions) {
       const cwd = this.readProcessCwd(session.pty.pid);
-      if (!cwd) continue;
       const tab = this.uiKarton.state.contentTabs.tabs[terminalId];
-      if (tab?.type !== 'terminal' || tab.cwd === cwd) continue;
+      if (tab?.type !== 'terminal') continue;
+
+      const shouldNormalizeTitle = isShellExecutableTitle(
+        tab.title,
+        this.shell,
+      );
+      if ((!cwd || tab.cwd === cwd) && !shouldNormalizeTitle) continue;
+
       this.uiKarton.setState((draft) => {
         const draftTab = draft.contentTabs.tabs[terminalId];
-        if (draftTab?.type === 'terminal') draftTab.cwd = cwd;
+        if (draftTab?.type !== 'terminal') return;
+        if (cwd) draftTab.cwd = cwd;
+        if (shouldNormalizeTitle) draftTab.title = shellDisplayName(this.shell);
       });
     }
   }
@@ -361,7 +423,12 @@ export class TerminalService extends DisposableService {
     if (!actualCwd) return;
     this.uiKarton.setState((draft) => {
       const tab = draft.contentTabs.tabs[terminalId];
-      if (tab?.type === 'terminal') tab.cwd = actualCwd;
+      if (tab?.type === 'terminal') {
+        tab.cwd = actualCwd;
+        if (isShellExecutableTitle(tab.title, this.shell)) {
+          tab.title = shellDisplayName(this.shell);
+        }
+      }
     });
     this.updateTerminalMetadata(terminalId, true);
   }
@@ -390,7 +457,12 @@ export class TerminalService extends DisposableService {
       if (!actualCwd) continue;
       this.uiKarton.setState((draft) => {
         const restoredTab = draft.contentTabs.tabs[id];
-        if (restoredTab?.type === 'terminal') restoredTab.cwd = actualCwd;
+        if (restoredTab?.type === 'terminal') {
+          restoredTab.cwd = actualCwd;
+          if (isShellExecutableTitle(restoredTab.title, this.shell)) {
+            restoredTab.title = shellDisplayName(this.shell);
+          }
+        }
       });
       this.updateTerminalMetadata(id, true);
     }
@@ -513,9 +585,7 @@ export class TerminalService extends DisposableService {
     const resolvedCwd = cwd ?? this.resolveDefaultCwd(agentInstanceId);
     this.terminalCounter++;
     const terminalId = `term-${this.terminalCounter}`;
-    const title = this.shell?.type
-      ? this.shell.type.charAt(0).toUpperCase() + this.shell.type.slice(1)
-      : 'Terminal';
+    const title = shellDisplayName(this.shell);
     const createdAt = Date.now();
 
     const actualCwd = this.createPty(terminalId, resolvedCwd);
@@ -658,7 +728,9 @@ export class TerminalService extends DisposableService {
     const requestedCwd = cwd || this.getUserHomeDirectory() || process.cwd();
     const resolvedCwd = this.resolveSafePtyCwd(requestedCwd);
     const spawnArgs: string[] =
-      this.shell.type === 'powershell' ? ['-NoExit'] : ['-i'];
+      this.shell.type === 'powershell'
+        ? ['-NoExit', '-Command', POWERSHELL_TERMINAL_INTEGRATION]
+        : ['-i'];
     if (this.shell.type === 'bash') {
       spawnArgs.push('--norc');
     }
@@ -749,6 +821,7 @@ export class TerminalService extends DisposableService {
         data,
         curSession.oscBuffer,
         (title) => {
+          if (isShellExecutableTitle(title, this.shell)) return;
           this.uiKarton.setState((draft) => {
             const tab = draft.contentTabs.tabs[terminalId];
             if (tab && tab.type === 'terminal') {
