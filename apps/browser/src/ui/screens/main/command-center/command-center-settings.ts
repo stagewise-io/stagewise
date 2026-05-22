@@ -1,8 +1,4 @@
-import {
-  DOWNLOADS_PAGE_URL,
-  HISTORY_PAGE_URL,
-  SETTINGS_PAGE_URL,
-} from '@shared/internal-urls';
+import { HISTORY_PAGE_URL, SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import type { SettingCommandItem } from './command-center-model';
 
 export type CommandCenterSettingDefinition = Omit<
@@ -17,8 +13,7 @@ export type CommandCenterSettingDefinition = Omit<
     | 'context'
     | 'plugins'
     | 'browser'
-    | 'history'
-    | 'downloads';
+    | 'history';
 };
 
 export const commandCenterSettings: CommandCenterSettingDefinition[] = [
@@ -95,13 +90,5 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     keywords: ['history', 'visited', 'pages'],
     url: HISTORY_PAGE_URL,
     iconName: 'history',
-  },
-  {
-    id: 'setting:downloads',
-    title: 'Downloads',
-    subtitle: 'Open downloaded files',
-    keywords: ['downloads', 'files'],
-    url: DOWNLOADS_PAGE_URL,
-    iconName: 'downloads',
   },
 ];

@@ -24,7 +24,6 @@ import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { WebDataService } from './services/webdata';
-import { DownloadsService } from './services/download-manager';
 import { DiffHistoryService } from './services/diff-history';
 import { AutoUpdateService } from './services/auto-update';
 import { LocalPortsScannerService } from './services/local-ports-scanner';
@@ -37,7 +36,6 @@ import { GitService } from './services/git';
 import { CredentialsService } from './services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { ModelProviderService } from './agents/model-provider';
-import { wireDownloads } from './wiring/downloads-wiring';
 import { wirePagesStateSync } from './wiring/pages-state-sync';
 import { wirePagesHandlers } from './wiring/pages-handler-wiring';
 import {
@@ -112,19 +110,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   );
   const faviconService = await FaviconService.create(logger);
 
-  // Create DownloadsService to track active downloads for pause/resume/cancel
-  const downloadsService = await DownloadsService.create(
-    logger,
-    historyService,
-    telemetryService,
-  );
-
   // Create PagesService early so it can be passed to WindowLayoutService
   const pagesService = await PagesService.create(
     logger,
     historyService,
     faviconService,
-    downloadsService,
     webDataService,
     telemetryService,
   );
@@ -167,16 +157,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   // Connect PreferencesService to Karton for reactive sync
   preferencesService.connectKarton(uiKarton, pagesService);
-
-  // Wire downloads UI state, procedure handlers, and pages-api integration
-  wireDownloads({
-    uiKarton,
-    downloadsService,
-    historyService,
-    pagesService,
-    logger,
-    telemetryService,
-  });
 
   // Create OmniboxSuggestionsService for omnibox autocomplete
   const _omniboxSuggestionsService = await OmniboxSuggestionsService.create(

@@ -7,19 +7,23 @@ import {
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import {
-  IconConnection2FillDuo18,
-  IconCameraFillDuo18,
-  IconMicrophone3FillDuo18,
-  IconHardDriveFillDuo18,
-  IconLocation2FillDuo18,
-  IconBellDotFillDuo18,
-  IconPresentationScreenVideoFillDuo18,
-  IconClipboardContentFillDuo18,
-  IconMusicFillDuo18,
-  IconMsgSleepFillDuo18,
-  IconDatabaseSearchFillDuo18,
-  IconSpeakerFillDuo18,
-} from 'nucleo-ui-fill-duo-18';
+  IconCameraOutline18,
+  IconMicrophone3Outline18,
+  IconHardDriveOutline18,
+  IconLocation2Outline18,
+  IconBellDotOutline18,
+  IconPresentationScreenVideoOutline18,
+  IconClipboardContentOutline18,
+  IconMusicOutline18,
+  IconMsgSleepOutline18,
+  IconDatabaseSearchOutline18,
+  IconSpeakerOutline18,
+  IconConnection2Outline18,
+  IconCheckOutline18,
+  IconBanOutline18,
+} from 'nucleo-ui-outline-18';
+import { IconBluetoothOutline24 } from 'nucleo-core-outline-24';
+import { IconUsbOutline24 } from 'nucleo-core-outline-24';
 import {
   Popover,
   PopoverTrigger,
@@ -44,13 +48,6 @@ import type {
 
 const EMPTY_PERMISSION_REQUESTS: PermissionRequest[] = [];
 
-import {
-  IconCheckFill18,
-  IconBanFill18,
-  IconXmarkFill18,
-} from 'nucleo-ui-fill-18';
-import { IconBluetoothOutline24 } from 'nucleo-core-outline-24';
-import { IconUsbFill24 } from 'nucleo-core-fill-24';
 import TimeAgo from 'react-timeago';
 
 // ============================================================================
@@ -88,37 +85,37 @@ function PermissionIcon({
 
   switch (type) {
     case 'camera':
-      return <IconCameraFillDuo18 className={cn} />;
+      return <IconCameraOutline18 className={cn} />;
     case 'microphone':
-      return <IconMicrophone3FillDuo18 className={cn} />;
+      return <IconMicrophone3Outline18 className={cn} />;
     case 'bluetooth':
     case 'bluetooth-pairing':
       return <IconBluetoothOutline24 className={cn} />;
     case 'usb':
-      return <IconUsbFill24 className={cn} />;
+      return <IconUsbOutline24 className={cn} />;
     case 'hid':
-      return <IconHardDriveFillDuo18 className={cn} />;
+      return <IconHardDriveOutline18 className={cn} />;
     case 'serial':
-      return <IconDatabaseSearchFillDuo18 className={cn} />;
+      return <IconDatabaseSearchOutline18 className={cn} />;
     case 'geolocation':
-      return <IconLocation2FillDuo18 className={cn} />;
+      return <IconLocation2Outline18 className={cn} />;
     case 'notifications':
-      return <IconBellDotFillDuo18 className={cn} />;
+      return <IconBellDotOutline18 className={cn} />;
     case 'fullscreen':
     case 'display-capture':
-      return <IconPresentationScreenVideoFillDuo18 className={cn} />;
+      return <IconPresentationScreenVideoOutline18 className={cn} />;
     case 'clipboard-read':
-      return <IconClipboardContentFillDuo18 className={cn} />;
+      return <IconClipboardContentOutline18 className={cn} />;
     case 'midi':
-      return <IconMusicFillDuo18 className={cn} />;
+      return <IconMusicOutline18 className={cn} />;
     case 'idle-detection':
-      return <IconMsgSleepFillDuo18 className={cn} />;
+      return <IconMsgSleepOutline18 className={cn} />;
     case 'speaker-selection':
-      return <IconSpeakerFillDuo18 className={cn} />;
+      return <IconSpeakerOutline18 className={cn} />;
     case 'storage-access':
-      return <IconHardDriveFillDuo18 className={cn} />;
+      return <IconHardDriveOutline18 className={cn} />;
     default:
-      return <IconConnection2FillDuo18 className={cn} />;
+      return <IconConnection2Outline18 className={cn} />;
   }
 }
 
@@ -240,14 +237,12 @@ function getDevicesFromRequest(
 function PermissionRequestRow({
   request,
   onAccept,
-  onReject,
   onAlwaysAllow,
   onAlwaysBlock,
   onSelectDevice,
 }: {
   request: PermissionRequest;
   onAccept: (requestId: string) => void;
-  onReject: (requestId: string) => void;
   onAlwaysAllow: (requestId: string) => void;
   onAlwaysBlock: (requestId: string) => void;
   onSelectDevice: (requestId: string, deviceId: string) => void;
@@ -300,12 +295,12 @@ function PermissionRequestRow({
   const canAct = isSimple || !!selectedDevice;
 
   return (
-    <div className="relative flex shrink-0 flex-col items-stretch gap-2 py-2">
+    <div className="relative flex shrink-0 flex-col items-stretch gap-0.5 py-1.5">
       {/* Pulsing bg for new requests */}
       {showPulse && (
         <div className="pointer-events-none absolute inset-0 -mx-1 animate-pulse-full rounded-lg bg-primary/10" />
       )}
-      {/* Header: icons + timestamp + close button */}
+      {/* Header: icons + timestamp */}
       <div className="flex w-full flex-row items-center justify-start gap-2">
         <div className="flex flex-row gap-1">
           {icons.map((icon) => (
@@ -315,14 +310,6 @@ function PermissionRequestRow({
         <span className="text-muted-foreground text-xs">
           <TimeAgo date={request.timestamp} />
         </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="absolute right-1"
-          onClick={() => onReject(request.id)}
-        >
-          <IconXmarkFill18 className="size-3" />
-        </Button>
       </div>
 
       {/* Content: description + device select */}
@@ -380,10 +367,10 @@ function PermissionRequestRow({
             disabled={!canAct}
             onClick={handleAccept}
           >
-            <IconCheckFill18 className="size-3" /> Allow
+            <IconCheckOutline18 className="size-3" /> Allow
           </Button>
           <Button variant="secondary" size="xs" onClick={handleAlwaysBlock}>
-            <IconBanFill18 className="size-3" /> Block
+            <IconBanOutline18 className="size-3" /> Block
           </Button>
         </div>
       ) : (
@@ -394,7 +381,7 @@ function PermissionRequestRow({
             disabled={!canAct}
             onClick={handleAccept}
           >
-            <IconCheckFill18 className="size-3" /> Allow
+            <IconCheckOutline18 className="size-3" /> Allow
           </Button>
           <Button
             variant="secondary"
@@ -402,10 +389,10 @@ function PermissionRequestRow({
             disabled={!canAct}
             onClick={handleAlwaysAllow}
           >
-            <IconCheckFill18 className="size-3" /> Always
+            <IconCheckOutline18 className="size-3" /> Always
           </Button>
           <Button variant="secondary" size="xs" onClick={handleAlwaysBlock}>
-            <IconBanFill18 className="size-3" /> Block
+            <IconBanOutline18 className="size-3" /> Block
           </Button>
         </div>
       )}
@@ -432,9 +419,6 @@ export function ResourceRequestsControlButton({
 
   const acceptPermission = useKartonProcedure(
     (p) => p.browser.permissions.accept,
-  );
-  const rejectPermission = useKartonProcedure(
-    (p) => p.browser.permissions.reject,
   );
   const alwaysAllowPermission = useKartonProcedure(
     (p) => p.browser.permissions.alwaysAllow,
@@ -553,11 +537,6 @@ export function ResourceRequestsControlButton({
     [acceptPermission],
   );
 
-  const handleReject = useCallback(
-    (requestId: string) => void rejectPermission(requestId),
-    [rejectPermission],
-  );
-
   const handleAlwaysAllow = useCallback(
     (requestId: string) => void alwaysAllowPermission(requestId),
     [alwaysAllowPermission],
@@ -606,7 +585,7 @@ export function ResourceRequestsControlButton({
                 <Button
                   variant="ghost"
                   size="md"
-                  className={`flex h-8 w-[calc-size(auto,size)] flex-row items-center gap-2 overflow-hidden rounded-full bg-surface-1 hover:bg-surface-1/80`}
+                  className="flex h-8 w-[calc-size(auto,size)] flex-row items-center gap-1 overflow-hidden px-2"
                 >
                   {urgentRequests && (
                     <div className="pointer-events-none absolute size-full animate-pulse-full bg-primary/10" />
@@ -628,7 +607,7 @@ export function ResourceRequestsControlButton({
       </Tooltip>
 
       <PopoverContent
-        className="w-84 rounded-xl p-3"
+        className="w-80 rounded-lg p-2"
         onMouseEnter={handlePopoverMouseEnter}
         onMouseLeave={handlePopoverMouseLeave}
       >
@@ -652,7 +631,6 @@ export function ResourceRequestsControlButton({
                   key={request.id}
                   request={request}
                   onAccept={handleAccept}
-                  onReject={handleReject}
                   onAlwaysAllow={handleAlwaysAllow}
                   onAlwaysBlock={handleAlwaysBlock}
                   onSelectDevice={handleSelectDevice}

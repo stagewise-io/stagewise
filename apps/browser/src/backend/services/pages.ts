@@ -2,7 +2,7 @@ import { net, session, shell } from 'electron';
 import type { Logger } from './logger';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { inferMimeType } from '@shared/mime-utils';
 import {
@@ -30,7 +30,6 @@ import type { CodingPlanId } from '@shared/coding-plans';
 import type { OnboardingAuthCompletion } from './experience';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
-import type { DownloadsService } from './download-manager';
 import type { WebDataService } from './webdata';
 import type { UserExperienceService } from './experience';
 import type {
@@ -39,10 +38,6 @@ import type {
   FaviconBitmapResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
-  DownloadsFilter,
-  DownloadResult,
-  ActiveDownloadInfo,
-  DownloadControlResult,
   PendingEditsResult,
   AddSearchEngineInput,
   ContextFilesResult,
@@ -70,13 +65,11 @@ export class PagesService extends DisposableService {
   private readonly logger: Logger;
   private readonly historyService: HistoryService;
   private readonly faviconService: FaviconService;
-  private readonly downloadsService?: DownloadsService;
   private readonly webDataService?: WebDataService;
   private kartonServer: KartonServer<PagesApiContract>;
   private transport: ElectronServerTransport;
   private portCloseListeners = new Map<MessagePortMain, () => void>();
   private openTabHandler?: (url: string, setActive?: boolean) => Promise<void>;
-  private markDownloadsSeenHandler?: () => Promise<void>;
   private onSearchEnginesChangeHandler?: () => Promise<void>;
   private getPendingEditsHandler?: (
     agentInstanceId: string,
@@ -134,7 +127,6 @@ export class PagesService extends DisposableService {
     logger: Logger,
     historyService: HistoryService,
     faviconService: FaviconService,
-    downloadsService: DownloadsService | undefined,
     webDataService: WebDataService | undefined,
     telemetryService: TelemetryService,
   ) {
@@ -142,7 +134,6 @@ export class PagesService extends DisposableService {
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
-    this.downloadsService = downloadsService;
     this.webDataService = webDataService;
     this.telemetryService = telemetryService;
 
@@ -165,20 +156,7 @@ export class PagesService extends DisposableService {
       );
     });
 
-    // Set up callback to push active downloads state changes
-    if (this.downloadsService) {
-      this.downloadsService.setOnActiveDownloadsChange(
-        (activeDownloads: Record<number, ActiveDownloadInfo>) => {
-          this.kartonServer.setState((draft) => {
-            draft.activeDownloads = activeDownloads;
-          });
-          this.logger.debug('[PagesService] Active downloads state updated', {
-            count: Object.keys(activeDownloads).length,
-          });
-        },
-      );
-    }
-
+    // Set up initial state
     this.logger.debug(
       '[PagesService] Karton server initialized with MessagePort transport',
     );
@@ -200,7 +178,6 @@ export class PagesService extends DisposableService {
     logger: Logger,
     historyService: HistoryService,
     faviconService: FaviconService,
-    downloadsService: DownloadsService | undefined,
     webDataService: WebDataService | undefined,
     telemetryService: TelemetryService,
   ): Promise<PagesService> {
@@ -208,7 +185,6 @@ export class PagesService extends DisposableService {
       logger,
       historyService,
       faviconService,
-      downloadsService,
       webDataService,
       telemetryService,
     );
@@ -417,333 +393,6 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
-      'getDownloads',
-      async (
-        _callingClientId: string,
-        filter: DownloadsFilter,
-      ): Promise<DownloadResult[]> => {
-        const downloadResults =
-          await this.historyService.queryDownloads(filter);
-
-        // Get active downloads for merging progress info
-        const activeDownloads =
-          this.downloadsService?.getActiveDownloads() ?? [];
-        const activeByGuid = new Map(
-          activeDownloads.map((d) => [`${d.id}`, d]),
-        );
-
-        // Enrich download results with filename, file existence, and active download info
-        return downloadResults.map((download) => {
-          // Extract filename from target path
-          const filename = path.basename(download.targetPath);
-
-          // Check if file exists on disk - use targetPath as that's where the file is
-          const fileExists = download.targetPath
-            ? existsSync(download.targetPath)
-            : false;
-
-          // Use guid (parsed as number) as id for consistency with DownloadManager
-          const id = Number.parseInt(download.guid, 10) || download.id;
-
-          // Check if this download is active and merge real-time progress
-          const activeDownload = activeByGuid.get(download.guid);
-          const isActive = !!activeDownload;
-
-          // Use active download values if available, otherwise use DB values
-          const receivedBytes =
-            activeDownload?.receivedBytes ?? download.receivedBytes;
-          const totalBytes = activeDownload?.totalBytes ?? download.totalBytes;
-          const state = activeDownload?.state ?? download.state;
-          const progress =
-            totalBytes > 0 ? Math.round((receivedBytes / totalBytes) * 100) : 0;
-
-          return {
-            ...download,
-            id,
-            filename,
-            fileExists,
-            receivedBytes,
-            totalBytes,
-            state,
-            isActive,
-            progress,
-            isPaused: activeDownload?.isPaused,
-            canResume: activeDownload?.canResume,
-          };
-        });
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getActiveDownloads',
-      async (_callingClientId: string): Promise<ActiveDownloadInfo[]> => {
-        if (!this.downloadsService) {
-          return [];
-        }
-
-        const activeDownloads = this.downloadsService.getActiveDownloads();
-        return activeDownloads.map((download) => ({
-          id: download.id,
-          state: download.state,
-          receivedBytes: download.receivedBytes,
-          totalBytes: download.totalBytes,
-          isPaused: download.isPaused,
-          canResume: download.canResume,
-          progress:
-            download.totalBytes > 0
-              ? Math.round((download.receivedBytes / download.totalBytes) * 100)
-              : 0,
-          filename: download.filename,
-          url: download.url,
-          targetPath: download.targetPath,
-          startTime: download.startTime,
-          currentSpeedKBps: download.currentSpeedKBps,
-          speedHistory: download.speedHistory,
-        }));
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'deleteDownload',
-      async (
-        _callingClientId: string,
-        downloadId: number,
-      ): Promise<DownloadControlResult> => {
-        try {
-          // Cancel active download if in progress
-          if (this.downloadsService) {
-            const activeDownload =
-              this.downloadsService.getActiveDownload(downloadId);
-            if (activeDownload) {
-              await this.downloadsService.cancelDownload(downloadId);
-              this.logger.info(
-                '[PagesService] Cancelled active download before deletion',
-                { id: downloadId },
-              );
-            }
-          }
-
-          // Check if this is the newest download for its filepath
-          // Only delete the file if it's the newest entry (no newer downloads with same path)
-          const { isNewest, targetPath } =
-            await this.historyService.isNewestDownloadForPath(`${downloadId}`);
-
-          // Also check if there's an active download with the same path
-          let hasActiveWithSamePath = false;
-          if (targetPath && this.downloadsService) {
-            const activeDownloads = this.downloadsService.getActiveDownloads();
-            hasActiveWithSamePath = activeDownloads.some(
-              (d) => d.targetPath === targetPath && d.id !== downloadId,
-            );
-          }
-
-          // Delete from database (using guid as the ID)
-          const deleted = await this.historyService.deleteDownloadByGuid(
-            `${downloadId}`,
-          );
-
-          // Only delete the file if this is the newest entry and no active downloads use it
-          const shouldDeleteFile = isNewest && !hasActiveWithSamePath;
-          if (shouldDeleteFile && targetPath && existsSync(targetPath)) {
-            try {
-              unlinkSync(targetPath);
-              this.logger.info('[PagesService] Deleted download file', {
-                path: targetPath,
-              });
-            } catch (fileError) {
-              this.logger.warn('[PagesService] Failed to delete file', {
-                path: targetPath,
-                error: fileError,
-              });
-              // Don't fail the operation if file deletion fails
-            }
-          } else if (
-            targetPath &&
-            existsSync(targetPath) &&
-            !shouldDeleteFile
-          ) {
-            this.logger.info(
-              '[PagesService] Skipped file deletion - newer download exists for path',
-              { path: targetPath, isNewest, hasActiveWithSamePath },
-            );
-          }
-
-          if (deleted) {
-            return { success: true };
-          }
-          return { success: false, error: 'Download not found' };
-        } catch (error) {
-          this.logger.error('[PagesService] Failed to delete download', error);
-          this.report(error as Error, 'deleteDownload');
-          return {
-            success: false,
-            error:
-              error instanceof Error ? error.message : 'Unknown error occurred',
-          };
-        }
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'openDownloadFile',
-      async (
-        _callingClientId: string,
-        filePath: string,
-      ): Promise<DownloadControlResult> => {
-        try {
-          if (!filePath) {
-            return { success: false, error: 'No file path provided' };
-          }
-
-          if (!existsSync(filePath)) {
-            return { success: false, error: 'File not found' };
-          }
-
-          // Open the file with the system default application
-          const errorMessage = await shell.openPath(filePath);
-          if (errorMessage) {
-            this.logger.warn('[PagesService] Failed to open file', {
-              path: filePath,
-              error: errorMessage,
-            });
-            return { success: false, error: errorMessage };
-          }
-
-          this.logger.debug('[PagesService] Opened file', { path: filePath });
-          return { success: true };
-        } catch (error) {
-          this.logger.error('[PagesService] Error opening file', error);
-          this.report(error as Error, 'openDownloadFile');
-          return {
-            success: false,
-            error:
-              error instanceof Error ? error.message : 'Unknown error occurred',
-          };
-        }
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'showDownloadInFolder',
-      async (
-        _callingClientId: string,
-        filePath: string,
-      ): Promise<DownloadControlResult> => {
-        try {
-          if (!filePath) {
-            return { success: false, error: 'No file path provided' };
-          }
-
-          if (!existsSync(filePath)) {
-            return { success: false, error: 'File not found' };
-          }
-
-          // Show the file in the system file manager (Finder/Explorer)
-          shell.showItemInFolder(filePath);
-
-          this.logger.debug('[PagesService] Showed file in folder', {
-            path: filePath,
-          });
-          return { success: true };
-        } catch (error) {
-          this.logger.error(
-            '[PagesService] Error showing file in folder',
-            error,
-          );
-          this.report(error as Error, 'showDownloadInFolder');
-          return {
-            success: false,
-            error:
-              error instanceof Error ? error.message : 'Unknown error occurred',
-          };
-        }
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'pauseDownload',
-      async (
-        _callingClientId: string,
-        downloadId: number,
-      ): Promise<DownloadControlResult> => {
-        if (!this.downloadsService) {
-          return {
-            success: false,
-            error: 'Download manager not available',
-          };
-        }
-
-        const paused = this.downloadsService.pauseDownload(downloadId);
-        if (paused) {
-          return { success: true };
-        }
-        return {
-          success: false,
-          error: 'Download not found or cannot be paused',
-        };
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'resumeDownload',
-      async (
-        _callingClientId: string,
-        downloadId: number,
-      ): Promise<DownloadControlResult> => {
-        if (!this.downloadsService) {
-          return {
-            success: false,
-            error: 'Download manager not available',
-          };
-        }
-
-        const resumed = this.downloadsService.resumeDownload(downloadId);
-        if (resumed) {
-          return { success: true };
-        }
-        return {
-          success: false,
-          error: 'Download not found or cannot be resumed',
-        };
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'cancelDownload',
-      async (
-        _callingClientId: string,
-        downloadId: number,
-      ): Promise<DownloadControlResult> => {
-        if (!this.downloadsService) {
-          return {
-            success: false,
-            error: 'Download manager not available',
-          };
-        }
-
-        const cancelled =
-          await this.downloadsService.cancelDownload(downloadId);
-        if (cancelled) {
-          return { success: true };
-        }
-        return { success: false, error: 'Download not found' };
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'markDownloadsSeen',
-      async (_callingClientId: string): Promise<void> => {
-        if (!this.markDownloadsSeenHandler) {
-          this.logger.warn(
-            '[PagesService] markDownloadsSeen called but no handler is set',
-          );
-          return;
-        }
-        await this.markDownloadsSeenHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
       'getFaviconBitmaps',
       async (
         _callingClientId: string,
@@ -842,7 +491,6 @@ export class PagesService extends DisposableService {
         this.logger.info('[PagesService] Clear browsing data requested', {
           history: options.history,
           favicons: options.favicons,
-          downloads: options.downloads,
           cookies: options.cookies,
           cache: options.cache,
           storage: options.storage,
@@ -871,12 +519,6 @@ export class PagesService extends DisposableService {
               result.historyEntriesCleared =
                 await this.historyService.clearAllData();
             }
-          }
-
-          // Clear downloads if requested
-          if (options.downloads) {
-            result.downloadsCleared =
-              await this.historyService.clearDownloads();
           }
 
           // Clear favicons if requested
@@ -964,7 +606,7 @@ export class PagesService extends DisposableService {
           // Run vacuum if requested (default true)
           if (options.vacuum !== false) {
             const vacuumPromises: Promise<void>[] = [];
-            if (options.history || options.downloads) {
+            if (options.history) {
               vacuumPromises.push(this.historyService.vacuum());
             }
             if (options.favicons) {
@@ -1293,13 +935,6 @@ export class PagesService extends DisposableService {
     handler: (url: string, setActive?: boolean) => Promise<void>,
   ): void {
     this.openTabHandler = handler;
-  }
-
-  /**
-   * Set the handler for marking downloads as seen. This should be called by main.ts.
-   */
-  public setMarkDownloadsSeenHandler(handler: () => Promise<void>): void {
-    this.markDownloadsSeenHandler = handler;
   }
 
   /**

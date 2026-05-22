@@ -58,7 +58,6 @@ export enum HotkeyActions {
   NEW_CHAT = 'new_chat',
   IMPLEMENT_CREATED_PLAN = 'implement_created_plan',
   STOP_AGENT = 'stop_agent',
-  DOWNLOADS = 'downloads',
 
   // Tab & window navigation
   NEW_TAB = 'new_tab',
@@ -187,10 +186,6 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.STOP_AGENT]: {
     accelerator: 'Ctrl+C',
     captureDominantly: true,
-  },
-  [HotkeyActions.DOWNLOADS]: {
-    accelerator: 'Mod+J',
-    captureDominantly: false,
   },
 
   // Tab & window navigation

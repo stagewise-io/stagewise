@@ -14,7 +14,6 @@ import { Route as InternalAppRouteRouteImport } from './routes/_internal-app/rou
 import { Route as PlanFilenameRouteImport } from './routes/plan/$filename'
 import { Route as DiffReviewAgentInstanceIdRouteImport } from './routes/diff-review/$agentInstanceId'
 import { Route as InternalAppHistoryRouteImport } from './routes/_internal-app/history'
-import { Route as InternalAppDownloadsRouteImport } from './routes/_internal-app/downloads'
 import { Route as InternalAppClearDataRouteImport } from './routes/_internal-app/clear-data'
 import { Route as InternalAppBrowsingSettingsRouteImport } from './routes/_internal-app/browsing-settings'
 import { Route as InternalAppAgentSettingsRouteImport } from './routes/_internal-app/agent-settings'
@@ -52,11 +51,6 @@ const DiffReviewAgentInstanceIdRoute =
 const InternalAppHistoryRoute = InternalAppHistoryRouteImport.update({
   id: '/history',
   path: '/history',
-  getParentRoute: () => InternalAppRouteRoute,
-} as any)
-const InternalAppDownloadsRoute = InternalAppDownloadsRouteImport.update({
-  id: '/downloads',
-  path: '/downloads',
   getParentRoute: () => InternalAppRouteRoute,
 } as any)
 const InternalAppClearDataRoute = InternalAppClearDataRouteImport.update({
@@ -143,7 +137,6 @@ export interface FileRoutesByFullPath {
   '/agent-settings': typeof InternalAppAgentSettingsRouteWithChildren
   '/browsing-settings': typeof InternalAppBrowsingSettingsRouteWithChildren
   '/clear-data': typeof InternalAppClearDataRoute
-  '/downloads': typeof InternalAppDownloadsRoute
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
@@ -163,7 +156,6 @@ export interface FileRoutesByTo {
   '/account': typeof InternalAppAccountRoute
   '/agent-settings': typeof InternalAppAgentSettingsRouteWithChildren
   '/clear-data': typeof InternalAppClearDataRoute
-  '/downloads': typeof InternalAppDownloadsRoute
   '/history': typeof InternalAppHistoryRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
@@ -185,7 +177,6 @@ export interface FileRoutesById {
   '/_internal-app/agent-settings': typeof InternalAppAgentSettingsRouteWithChildren
   '/_internal-app/browsing-settings': typeof InternalAppBrowsingSettingsRouteWithChildren
   '/_internal-app/clear-data': typeof InternalAppClearDataRoute
-  '/_internal-app/downloads': typeof InternalAppDownloadsRoute
   '/_internal-app/history': typeof InternalAppHistoryRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
@@ -208,7 +199,6 @@ export interface FileRouteTypes {
     | '/agent-settings'
     | '/browsing-settings'
     | '/clear-data'
-    | '/downloads'
     | '/history'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
@@ -228,7 +218,6 @@ export interface FileRouteTypes {
     | '/account'
     | '/agent-settings'
     | '/clear-data'
-    | '/downloads'
     | '/history'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
@@ -249,7 +238,6 @@ export interface FileRouteTypes {
     | '/_internal-app/agent-settings'
     | '/_internal-app/browsing-settings'
     | '/_internal-app/clear-data'
-    | '/_internal-app/downloads'
     | '/_internal-app/history'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
@@ -306,13 +294,6 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof InternalAppHistoryRouteImport
-      parentRoute: typeof InternalAppRouteRoute
-    }
-    '/_internal-app/downloads': {
-      id: '/_internal-app/downloads'
-      path: '/downloads'
-      fullPath: '/downloads'
-      preLoaderRoute: typeof InternalAppDownloadsRouteImport
       parentRoute: typeof InternalAppRouteRoute
     }
     '/_internal-app/clear-data': {
@@ -458,7 +439,6 @@ interface InternalAppRouteRouteChildren {
   InternalAppAgentSettingsRoute: typeof InternalAppAgentSettingsRouteWithChildren
   InternalAppBrowsingSettingsRoute: typeof InternalAppBrowsingSettingsRouteWithChildren
   InternalAppClearDataRoute: typeof InternalAppClearDataRoute
-  InternalAppDownloadsRoute: typeof InternalAppDownloadsRoute
   InternalAppHistoryRoute: typeof InternalAppHistoryRoute
 }
 
@@ -469,7 +449,6 @@ const InternalAppRouteRouteChildren: InternalAppRouteRouteChildren = {
   InternalAppBrowsingSettingsRoute:
     InternalAppBrowsingSettingsRouteWithChildren,
   InternalAppClearDataRoute: InternalAppClearDataRoute,
-  InternalAppDownloadsRoute: InternalAppDownloadsRoute,
   InternalAppHistoryRoute: InternalAppHistoryRoute,
 }
 
