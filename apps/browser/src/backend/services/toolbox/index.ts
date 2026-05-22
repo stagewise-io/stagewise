@@ -1037,7 +1037,7 @@ export class ToolboxService extends DisposableService {
         return executeSandboxJsTool(this.sandboxService!, agentInstanceId);
       case 'readConsoleLogs':
         if (!this.windowLayoutService) return null;
-        return readConsoleLogsTool(this.windowLayoutService);
+        return readConsoleLogsTool(this.windowLayoutService, agentInstanceId);
       case 'askUserQuestions':
         return askUserQuestionsTool(this.uiKarton, agentInstanceId);
       case 'executeShellCommand': {

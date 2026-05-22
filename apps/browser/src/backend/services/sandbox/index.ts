@@ -309,13 +309,35 @@ export class SandboxService extends DisposableService {
   ) {
     switch (msg.type) {
       case 'cdp': {
-        // Worker sandbox wants a CDP call — forward to the real debugger
+        // Worker sandbox wants a CDP call — forward to the real debugger.
+        // Target.createTarget is intercepted and routed through
+        // WindowLayoutService so the new tab is properly assigned to
+        // the creating agent.
         try {
-          const result = await this.windowLayoutService.sendCDP(
-            msg.tabId,
-            msg.method,
-            msg.params,
-          );
+          let result: unknown;
+          if (msg.method === 'Target.createTarget') {
+            const params = msg.params as Record<string, unknown> | undefined;
+            const url = params?.url as string | undefined;
+            const background = !!params?.background;
+            // `createTabForAgent` creates a full Stagewise tab (WebContentsView,
+            // controller, Karton state, etc.) and assigns it to the calling agent.
+            // The tab ID doubles as the CDP targetId so the sandbox can address
+            // the new tab with subsequent API.sendCDP calls.
+            // Respect `background: true` so background agents don't steal focus.
+            const tabId = await this.windowLayoutService.createTabForAgent(
+              url,
+              msg.agentId,
+              /* setActive= */ !background,
+            );
+            result = { targetId: tabId };
+          } else {
+            result = await this.windowLayoutService.sendCDP(
+              msg.tabId,
+              msg.method,
+              msg.params,
+              msg.agentId,
+            );
+          }
           this.safeSend(worker, { type: 'cdp-result', id: msg.id, result });
         } catch (err) {
           this.safeSend(worker, {

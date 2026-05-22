@@ -694,6 +694,20 @@ export class WindowLayoutService extends DisposableService {
   }
 
   /**
+   * Creates a new browser tab assigned to a specific agent instance.
+   * Called by SandboxService when an agent invokes Target.createTarget via CDP.
+   * The returned tab ID doubles as the CDP targetId so the sandbox worker can
+   * address the new tab with subsequent CDP commands.
+   */
+  public async createTabForAgent(
+    url: string | undefined,
+    agentInstanceId: string,
+    setActive = true,
+  ): Promise<string> {
+    return await this.createTab(url, setActive, undefined, agentInstanceId);
+  }
+
+  /**
    * Opens a URL in a new tab, or navigates the active tab if it's a new/default tab.
    * A tab is considered "new" if it's the only tab and is on the default URL (ui-main).
    */
@@ -2823,16 +2837,43 @@ export class WindowLayoutService extends DisposableService {
     return this.tabs[tabId] ?? null;
   }
 
+  /**
+   * Validates that the calling agent has access to the specified tab.
+   * Agents may only access global tabs (agentInstanceId === null) and tabs
+   * assigned to themselves. When `agentInstanceId` is undefined (internal
+   * calls without agent context), validation is skipped.
+   *
+   * @returns An error message string if access is denied, or null if allowed.
+   */
+  private validateTabAccess(
+    tabId: string,
+    agentInstanceId?: string,
+  ): string | null {
+    if (agentInstanceId === undefined) return null; // internal call, skip
+
+    const tab = this.tabs[tabId];
+    if (!tab) return null; // caller already handles missing tab
+
+    const tabAgentId = tab.getState().agentInstanceId;
+    if (tabAgentId !== null && tabAgentId !== agentInstanceId) {
+      return `Tab "${tabId}" is not accessible. Agents can only access global tabs and tabs assigned to them.`;
+    }
+    return null;
+  }
+
   public async sendCDP(
     tabId: string,
     method: string,
     params: any,
+    agentInstanceId?: string,
   ): Promise<any> {
     const tab = this.resolveTabById(tabId);
     if (!tab)
       throw new Error(
         `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       );
+
+    this.validateTabAccess(tabId, agentInstanceId);
 
     return await tab.sendCDP(method, params);
   }
@@ -2865,6 +2906,7 @@ export class WindowLayoutService extends DisposableService {
   public async executeConsoleScript(
     expression: string,
     tabId: string,
+    agentInstanceId?: string,
   ): Promise<{ success: boolean; result?: any; error?: string }> {
     const tab = this.resolveTabById(tabId);
 
@@ -2874,6 +2916,9 @@ export class WindowLayoutService extends DisposableService {
         error: `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       };
     }
+
+    const accessError = this.validateTabAccess(tabId, agentInstanceId);
+    if (accessError) return { success: false, error: accessError };
 
     return await tab.executeConsoleScript(expression);
   }
@@ -2888,6 +2933,7 @@ export class WindowLayoutService extends DisposableService {
   public getConsoleLogs(
     tabId: string,
     options?: GetConsoleLogsOptions,
+    agentInstanceId?: string,
   ): {
     success: boolean;
     logs?: ConsoleLogEntry[];
@@ -2902,6 +2948,9 @@ export class WindowLayoutService extends DisposableService {
         error: `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       };
     }
+
+    const accessError = this.validateTabAccess(tabId, agentInstanceId);
+    if (accessError) return { success: false, error: accessError };
 
     const logs = tab.getConsoleLogs(options);
     const totalCount = tab.getConsoleLogCount();
@@ -2919,7 +2968,10 @@ export class WindowLayoutService extends DisposableService {
    * @param tabId - The tab ID to clear logs for
    * @returns An object with success status or an error message
    */
-  public clearConsoleLogs(tabId: string): {
+  public clearConsoleLogs(
+    tabId: string,
+    agentInstanceId?: string,
+  ): {
     success: boolean;
     error?: string;
   } {
@@ -2931,6 +2983,9 @@ export class WindowLayoutService extends DisposableService {
         error: `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       };
     }
+
+    const accessError = this.validateTabAccess(tabId, agentInstanceId);
+    if (accessError) return { success: false, error: accessError };
 
     tab.clearConsoleLogs();
     return { success: true };
