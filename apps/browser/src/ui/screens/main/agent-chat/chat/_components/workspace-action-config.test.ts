@@ -60,7 +60,7 @@ describe('hydrateWorkspaceActionConfigWithDefaults', () => {
     ).toBe('feature/other');
   });
 
-  it('keeps source branch hydration tied to source branch defaults', () => {
+  it('updates untouched source branch placeholders to live defaults', () => {
     const hydrated = hydrateWorkspaceActionConfigWithDefaults(
       {
         ...defaults,
@@ -77,5 +77,39 @@ describe('hydrateWorkspaceActionConfigWithDefaults', () => {
 
     expect(hydrated.createWorktreeFrom).toBe('develop');
     expect(hydrated.createBranchFrom).toBe('develop');
+  });
+
+  it('preserves explicitly touched create-worktree source placeholders', () => {
+    expect(
+      hydrateWorkspaceActionConfigWithDefaults(
+        {
+          ...defaults,
+          createWorktreeFrom: 'main',
+          createWorktreeFromTouched: true,
+        },
+        {
+          ...defaults,
+          createWorktreeFrom: 'develop',
+        },
+        previousDefaults,
+      ).createWorktreeFrom,
+    ).toBe('main');
+  });
+
+  it('preserves explicitly touched create-branch source placeholders', () => {
+    expect(
+      hydrateWorkspaceActionConfigWithDefaults(
+        {
+          ...defaults,
+          createBranchFrom: 'main',
+          createBranchFromTouched: true,
+        },
+        {
+          ...defaults,
+          createBranchFrom: 'develop',
+        },
+        previousDefaults,
+      ).createBranchFrom,
+    ).toBe('main');
   });
 });

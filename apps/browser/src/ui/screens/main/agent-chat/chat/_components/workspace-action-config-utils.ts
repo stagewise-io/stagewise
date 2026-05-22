@@ -28,10 +28,12 @@ export function hydrateWorkspaceActionConfigWithDefaults(
   return {
     ...config,
     createWorktreeFrom:
+      config.createWorktreeFromTouched !== true &&
       config.createWorktreeFrom === previousDefaults.sourceBranch
         ? defaults.createWorktreeFrom
         : config.createWorktreeFrom,
     createBranchFrom:
+      config.createBranchFromTouched !== true &&
       config.createBranchFrom === previousDefaults.sourceBranch
         ? defaults.createBranchFrom
         : config.createBranchFrom,
