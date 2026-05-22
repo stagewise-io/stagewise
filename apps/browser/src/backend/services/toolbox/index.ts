@@ -1246,7 +1246,20 @@ export class ToolboxService extends DisposableService {
         ? contentTabs.tabs[contentTabs.activeTabId]
         : null;
 
-    const visibleTabs = (Object.values(contentTabs.tabs) as TabState[])
+    const orderedIds = [
+      ...contentTabs.globalOrder,
+      ...(contentTabs.agentOrders[agentInstanceId] ?? []),
+      ...Object.keys(contentTabs.tabs),
+    ];
+    const seen = new Set<string>();
+    const visibleTabs = orderedIds
+      .filter((id) => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((id) => contentTabs.tabs[id] as TabState | undefined)
+      .filter((tab): tab is TabState => Boolean(tab))
       .filter((tab) => !isTerminalTab(tab))
       .filter(isTabVisible);
 
@@ -2362,6 +2375,12 @@ export class ToolboxService extends DisposableService {
     this.unsubPreferenceSync = null;
 
     this.apiClient = null;
+
+    // Persist content tabs before any awaited teardown can consume the
+    // shutdown budget. Normal tab operations already save, but app shutdown
+    // can race the async terminal activation path and drop recently opened
+    // terminal tabs without this final synchronous flush.
+    this.windowLayoutService.persistTabStateNow();
 
     this.stopPlansWatcher();
     this.stopLogsWatcher();

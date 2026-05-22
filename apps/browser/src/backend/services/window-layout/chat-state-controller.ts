@@ -79,7 +79,7 @@ export class ChatStateController {
    * @returns Array of selected elements
    */
   public getSelectedElements(): SelectedElement[] {
-    return this.uiKarton.state.browser.selectedElements ?? [];
+    return this.uiKarton.state.browsing.selectedElements ?? [];
   }
 
   /**
@@ -88,7 +88,7 @@ export class ChatStateController {
    */
   private broadcastSelectionUpdate(): void {
     const state = this.uiKarton.state;
-    const allSelectedElements = state.browser.selectedElements;
+    const allSelectedElements = state.browsing.selectedElements;
 
     Object.values(this.tabs).forEach((tab) => {
       tab.updateContextSelection(allSelectedElements);

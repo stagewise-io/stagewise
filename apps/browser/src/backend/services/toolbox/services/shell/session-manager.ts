@@ -100,13 +100,27 @@ HISTSIZE=0 2>/dev/null
 HISTFILESIZE=0 2>/dev/null
 set +o history 2>/dev/null
 __stagewise_command_executed=0
+__stagewise_file_uri_path() {
+  local path="$1"
+  local encoded=''
+  local i ch hex
+  local LC_ALL=C
+  for (( i = 0; i < \${#path}; i++ )); do
+    ch="\${path:i:1}"
+    case "$ch" in
+      [A-Za-z0-9._~/-]) encoded+="$ch" ;;
+      *) hex=$(printf '%%%02X' "'$ch"); encoded+="$hex" ;;
+    esac
+  done
+  printf '%s' "$encoded"
+}
 __stagewise_prompt_command() {
   local exit_code=$?
   if [ "$__stagewise_command_executed" = "1" ]; then
     printf '\\033]133;D;%d\\007' "$exit_code"
     __stagewise_command_executed=0
   fi
-  printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$PWD"
+  printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
   printf '\\033]133;A\\007'
 }
 __stagewise_pre_exec() {
@@ -121,7 +135,7 @@ if [ -z "$PROMPT_COMMAND" ]; then
 else
   PROMPT_COMMAND="__stagewise_prompt_command;\${PROMPT_COMMAND}"
 fi
-printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$PWD"
+printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
 printf '\\033]133;A\\007'
 `.trim();
 
@@ -134,6 +148,20 @@ SAVEHIST=0 2>/dev/null
 unsetopt SHARE_HISTORY INC_APPEND_HISTORY APPEND_HISTORY 2>/dev/null
 PROMPT_EOL_MARK=''
 __stagewise_command_executed=0
+__stagewise_file_uri_path() {
+  local path="$1"
+  local encoded=''
+  local i ch hex
+  local LC_ALL=C
+  for (( i = 0; i < \${#path}; i++ )); do
+    ch="\${path:i:1}"
+    case "$ch" in
+      [A-Za-z0-9._~/-]) encoded+="$ch" ;;
+      *) hex=$(printf '%%%02X' "'$ch"); encoded+="$hex" ;;
+    esac
+  done
+  printf '%s' "$encoded"
+}
 autoload -Uz add-zsh-hook 2>/dev/null
 __stagewise_precmd() {
   local exit_code=$?
@@ -141,7 +169,7 @@ __stagewise_precmd() {
     printf '\\033]133;D;%d\\007' "$exit_code"
     __stagewise_command_executed=0
   fi
-  printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$PWD"
+  printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
   printf '\\033]133;A\\007'
 }
 __stagewise_preexec() {
@@ -156,7 +184,7 @@ else
   precmd_functions+=(__stagewise_precmd)
   preexec_functions+=(__stagewise_preexec)
 fi
-printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$PWD"
+printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
 printf '\\033]133;A\\007'
 `.trim();
 
