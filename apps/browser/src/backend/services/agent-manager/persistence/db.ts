@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { drizzle } from 'drizzle-orm/libsql/driver';
 import * as schema from './schema';
 import {
@@ -23,6 +25,86 @@ import {
 } from '@shared/karton-contracts/ui/agent';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import { getAgentDbPath } from '@/utils/paths';
+
+type WorkspaceUsageRow = {
+  lastMessageAt: Date;
+  mountedWorkspaces?: Array<{ path: string }> | null;
+};
+
+type ResolveWorkspaceUsagePath = (workspacePath: string) => Promise<string>;
+
+async function resolveWorkspaceUsagePath(
+  workspacePath: string,
+): Promise<string> {
+  try {
+    return await fs.realpath(workspacePath);
+  } catch {
+    return path.resolve(workspacePath);
+  }
+}
+
+async function getWorkspaceUsageLookupKeys(
+  workspacePath: string,
+  resolveUsagePath: ResolveWorkspaceUsagePath,
+): Promise<string[]> {
+  const resolvedPath = await resolveUsagePath(workspacePath);
+  return resolvedPath === workspacePath
+    ? [workspacePath]
+    : [workspacePath, resolvedPath];
+}
+
+export async function collectWorkspaceLastUsedAtByPath(
+  workspacePaths: string[],
+  rows: WorkspaceUsageRow[],
+  resolveUsagePath: ResolveWorkspaceUsagePath = resolveWorkspaceUsagePath,
+): Promise<Map<string, number>> {
+  const uniquePaths = Array.from(new Set(workspacePaths));
+  if (uniquePaths.length === 0) return new Map();
+
+  const targetPathsByLookupKey = new Map<string, string[]>();
+  for (const workspacePath of uniquePaths) {
+    const lookupKeys = await getWorkspaceUsageLookupKeys(
+      workspacePath,
+      resolveUsagePath,
+    );
+    for (const lookupKey of lookupKeys) {
+      targetPathsByLookupKey.set(lookupKey, [
+        ...(targetPathsByLookupKey.get(lookupKey) ?? []),
+        workspacePath,
+      ]);
+    }
+  }
+
+  const usage = new Map<string, number>();
+  const resolvedWorkspacePathCache = new Map<string, string[]>();
+  for (const row of rows) {
+    for (const workspace of row.mountedWorkspaces ?? []) {
+      let lookupKeys = resolvedWorkspacePathCache.get(workspace.path);
+      if (!lookupKeys) {
+        lookupKeys = await getWorkspaceUsageLookupKeys(
+          workspace.path,
+          resolveUsagePath,
+        );
+        resolvedWorkspacePathCache.set(workspace.path, lookupKeys);
+      }
+
+      const matchedTargetPaths = new Set<string>();
+      for (const lookupKey of lookupKeys) {
+        for (const targetPath of targetPathsByLookupKey.get(lookupKey) ?? []) {
+          matchedTargetPaths.add(targetPath);
+        }
+      }
+      if (matchedTargetPaths.size === 0) continue;
+
+      const timestamp = row.lastMessageAt.getTime();
+      for (const targetPath of matchedTargetPaths) {
+        usage.set(targetPath, Math.max(usage.get(targetPath) ?? 0, timestamp));
+      }
+    }
+  }
+
+  return usage;
+}
 
 export class AgentPersistenceDB {
   private _dbDriver: Client;
@@ -443,8 +525,6 @@ export class AgentPersistenceDB {
     const uniquePaths = Array.from(new Set(workspacePaths));
     if (uniquePaths.length === 0) return new Map();
 
-    const targetPaths = new Set(uniquePaths);
-    const usage = new Map<string, number>();
     const rows = await this._db
       .select({
         lastMessageAt: schema.agentInstances.lastMessageAt,
@@ -464,18 +544,7 @@ export class AgentPersistenceDB {
         return null;
       });
 
-    for (const row of rows ?? []) {
-      for (const workspace of row.mountedWorkspaces ?? []) {
-        if (!targetPaths.has(workspace.path)) continue;
-        const timestamp = row.lastMessageAt.getTime();
-        usage.set(
-          workspace.path,
-          Math.max(usage.get(workspace.path) ?? 0, timestamp),
-        );
-      }
-    }
-
-    return usage;
+    return collectWorkspaceLastUsedAtByPath(uniquePaths, rows ?? []);
   }
 
   /**

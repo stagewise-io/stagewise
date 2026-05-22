@@ -1,5 +1,5 @@
+import { execFileSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
-import { execSync } from 'node:child_process';
 import path from 'node:path';
 import type { DetectedShell, ShellType } from './types.ts';
 
@@ -48,7 +48,7 @@ function tryCandidate(shellPath: string): DetectedShell | null {
 function whereLookup(binary: string): string | null {
   try {
     return (
-      execSync(`where ${binary}`, {
+      execFileSync('where', [binary], {
         encoding: 'utf-8',
         timeout: 5_000,
         stdio: ['ignore', 'pipe', 'ignore'],

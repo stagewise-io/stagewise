@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockHomeDir = path.join(os.tmpdir(), 'mock-home');
+let mockHomeDir = path.join(os.tmpdir(), 'mount-manager-mock-home');
 
 vi.mock('electron', () => ({
   app: {
@@ -20,6 +20,16 @@ import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import type { UserExperienceService } from '@/services/experience';
 import { getWorktreesDir } from '@/utils/paths';
+
+beforeEach(async () => {
+  mockHomeDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'mount-manager-mock-home-'),
+  );
+});
+
+afterEach(async () => {
+  await fs.rm(mockHomeDir, { recursive: true, force: true });
+});
 
 function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
   const procedureHandlers = new Map<string, (...args: unknown[]) => unknown>();
@@ -202,6 +212,7 @@ describe('MountManagerService path-based Git actions', () => {
     await fs.mkdir(worktreePath, { recursive: true });
     await fs.writeFile(path.join(worktreePath, '.git'), 'gitdir: mock');
 
+    const expectedWorktreePath = await fs.realpath(worktreePath);
     const { service } = createHarness();
     const listManagedWorktreePaths = Reflect.get(
       service,
@@ -209,7 +220,7 @@ describe('MountManagerService path-based Git actions', () => {
     ) as () => Promise<string[]>;
 
     await expect(listManagedWorktreePaths.call(service)).resolves.toContain(
-      worktreePath,
+      expectedWorktreePath,
     );
   });
 

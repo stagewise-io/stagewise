@@ -76,6 +76,23 @@ describe('applyWorkspaceGitActionPreferences', () => {
     expect(config.createBranchFrom).toBe('main');
   });
 
+  it('falls back to an available branch when defaults are stale', () => {
+    const config = applyWorkspaceGitActionPreferences(
+      {
+        ...defaults,
+        createWorktreeFrom: 'deleted',
+        createBranchFrom: 'missing',
+      },
+      [
+        { value: 'develop', label: 'develop' },
+        { value: 'release', label: 'release' },
+      ],
+    );
+
+    expect(config.createWorktreeFrom).toBe('develop');
+    expect(config.createBranchFrom).toBe('develop');
+  });
+
   it('preserves freshly generated names from defaults', () => {
     const config = applyWorkspaceGitActionPreferences(
       defaults,

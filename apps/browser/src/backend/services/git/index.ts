@@ -542,7 +542,15 @@ export class GitService extends DisposableService {
       );
     }
 
-    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    try {
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `Failed to create worktree directory: ${error.message}`
+          : 'Failed to create worktree directory.';
+      return this.failure('worktree-create-failed', message);
+    }
 
     const result = await this.runGitStrict(workspacePath, [
       'worktree',

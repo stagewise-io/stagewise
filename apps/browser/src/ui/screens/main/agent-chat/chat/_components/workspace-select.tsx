@@ -80,6 +80,7 @@ import {
 } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { applyWorkspaceGitActionPreferences } from './workspace-action-preferences';
+import { hydrateWorkspaceActionConfigWithDefaults } from './workspace-action-config-utils';
 
 const EMPTY_SKILLS: string[] = [];
 
@@ -1047,6 +1048,7 @@ export type WorkspaceActionConfig = {
   createWorktreeFrom: string;
   createBranchFrom: string;
   switchBranchTarget: string;
+  switchBranchTargetTouched?: boolean;
   switchWorktreeTarget: string;
 };
 
@@ -1358,40 +1360,10 @@ function workspaceActionConfigsEqual(
     a.createWorktreeFrom === b.createWorktreeFrom &&
     a.createBranchFrom === b.createBranchFrom &&
     a.switchBranchTarget === b.switchBranchTarget &&
+    Boolean(a.switchBranchTargetTouched) ===
+      Boolean(b.switchBranchTargetTouched) &&
     a.switchWorktreeTarget === b.switchWorktreeTarget
   );
-}
-
-export function hydrateWorkspaceActionConfigWithDefaults(
-  config: WorkspaceActionConfig,
-  defaults: WorkspaceActionConfig,
-  previousDefaults: {
-    branch: string;
-    worktree: string;
-  } = { branch: 'main', worktree: 'main' },
-): WorkspaceActionConfig {
-  // Branch fields and worktree fields have different placeholder defaults
-  // before live Git data loads. Branch values may start from the mounted Git
-  // ref, while switchWorktreeTarget starts from the fallback worktree list.
-  return {
-    ...config,
-    createWorktreeFrom:
-      config.createWorktreeFrom === previousDefaults.branch
-        ? defaults.createWorktreeFrom
-        : config.createWorktreeFrom,
-    createBranchFrom:
-      config.createBranchFrom === previousDefaults.branch
-        ? defaults.createBranchFrom
-        : config.createBranchFrom,
-    switchBranchTarget:
-      config.switchBranchTarget === previousDefaults.branch
-        ? defaults.switchBranchTarget
-        : config.switchBranchTarget,
-    switchWorktreeTarget:
-      config.switchWorktreeTarget === previousDefaults.worktree
-        ? defaults.switchWorktreeTarget
-        : config.switchWorktreeTarget,
-  };
 }
 
 type WorkspaceActionPickerContentProps = {
@@ -1556,7 +1528,10 @@ function WorkspaceActionPickerContent({
           items={checkoutBranchItems}
           value={config.switchBranchTarget}
           onValueChange={(next) =>
-            onUpdateAction('switch-branch', { switchBranchTarget: next })
+            onUpdateAction('switch-branch', {
+              switchBranchTarget: next,
+              switchBranchTargetTouched: true,
+            })
           }
           portalContainer={branchSelectPortalContainer}
         />
@@ -1701,14 +1676,17 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       generalWorkspaceGitActionPreference,
       repositoryWorkspaceGitActionPreference,
     );
-    const previousBranchDefault = getCurrentBranchValue(null, gitRef);
+    const previousCurrentBranchDefault = getCurrentBranchValue(null, gitRef);
+    const previousDefaultBranchDefault = getDefaultBranchValue(null, gitRef);
     const previousWorktreeDefault =
       getWorktreeSelectItems()[0]?.value ?? 'main';
     const hydratedConfig = hydrateWorkspaceActionConfigWithDefaults(
       config,
       defaults,
       {
-        branch: previousBranchDefault,
+        sourceBranch: previousCurrentBranchDefault,
+        checkoutBranch: previousCurrentBranchDefault,
+        defaultBranch: previousDefaultBranchDefault,
         worktree: previousWorktreeDefault,
       },
     );
@@ -2790,6 +2768,12 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         const hydrated = hydrateWorkspaceActionConfigWithDefaults(
           current,
           defaults,
+          {
+            sourceBranch: 'main',
+            checkoutBranch: 'main',
+            defaultBranch: 'main',
+            worktree: getWorktreeSelectItems()[0]?.value ?? 'main',
+          },
         );
         const next = new Map(prev);
         next.set(rowKey, {
@@ -2857,6 +2841,12 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
                   gitOptions.defaultBranch,
                   gitOptions.checkoutDefaultBranch,
                 ),
+                {
+                  sourceBranch: 'main',
+                  checkoutBranch: 'main',
+                  defaultBranch: 'main',
+                  worktree: getWorktreeSelectItems()[0]?.value ?? 'main',
+                },
               )
             : null;
 
@@ -3232,13 +3222,15 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
         });
         const mountPromise = mountWorkspace(openAgent);
         void trackMountOutcome(mountPromise, 'picker').then((didMount) => {
-          if (didMount) return;
+          if (didMount) {
+            onWorkspaceChange?.();
+            return;
+          }
           pendingConnectActionConfigsRef.current =
             pendingConnectActionConfigsRef.current.filter(
               (pending) => pending.id !== pendingId,
             );
         });
-        onWorkspaceChange?.();
         return { ok: true };
       }
 
@@ -3258,14 +3250,17 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
         }
         void trackMountOutcome(mountPromise, 'recent-workspace').then(
           (didMount) => {
-            if (didMount || !config) return;
+            if (didMount) {
+              onWorkspaceChange?.();
+              return;
+            }
+            if (!config) return;
             pendingConnectActionConfigsRef.current =
               pendingConnectActionConfigsRef.current.filter(
                 (pending) => pending.id !== pendingId,
               );
           },
         );
-        onWorkspaceChange?.();
         return { ok: true };
       }
 
