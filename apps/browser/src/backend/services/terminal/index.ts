@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { Terminal as IHeadlessTerminal } from '@xterm/headless';
 import xtermHeadless from '@xterm/headless';
@@ -634,14 +635,11 @@ export class TerminalService extends DisposableService {
         return mounts[0].path;
       }
     }
-    return this.getUserHomeDirectory() ?? process.cwd();
+    return this.getUserHomeDirectory();
   }
 
-  private getUserHomeDirectory(): string | undefined {
-    if (process.platform === 'win32') {
-      return process.env.USERPROFILE ?? process.env.HOME;
-    }
-    return process.env.HOME ?? process.env.USERPROFILE;
+  private getUserHomeDirectory(): string {
+    return homedir();
   }
 
   private readProcessCwd(pid: number): string | null {
@@ -717,6 +715,9 @@ export class TerminalService extends DisposableService {
       if (this.isUsableDirectory(candidate)) return candidate;
     }
 
+    const home = this.getUserHomeDirectory();
+    if (this.isUsableDirectory(home)) return home;
+
     return process.cwd();
   }
 
@@ -725,7 +726,7 @@ export class TerminalService extends DisposableService {
    *  Guards against empty, stale, or deleted cwd values — node-pty can
    *  throw when cwd is invalid, which must not abort terminal creation. */
   private createPty(terminalId: string, cwd: string): string | null {
-    const requestedCwd = cwd || this.getUserHomeDirectory() || process.cwd();
+    const requestedCwd = cwd || this.getUserHomeDirectory();
     const resolvedCwd = this.resolveSafePtyCwd(requestedCwd);
     const spawnArgs: string[] =
       this.shell.type === 'powershell'
@@ -759,9 +760,7 @@ export class TerminalService extends DisposableService {
     try {
       ptyProcess = spawnAtCwd(resolvedCwd);
     } catch (error) {
-      const fallbackCwd = this.resolveSafePtyCwd(
-        this.getUserHomeDirectory() || process.cwd(),
-      );
+      const fallbackCwd = this.resolveSafePtyCwd(this.getUserHomeDirectory());
       if (fallbackCwd === resolvedCwd) {
         this.logger.error(
           `[TerminalService] Failed to spawn terminal ${terminalId} in ${resolvedCwd}`,
