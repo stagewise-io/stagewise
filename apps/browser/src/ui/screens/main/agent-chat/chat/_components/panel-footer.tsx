@@ -741,7 +741,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         const config = hydrateWorkspaceActionConfigWithDefaults(
           existingConfig,
           defaults,
-          getCurrentBranchValue(null, fallbackGitRef),
+          {
+            branch: getCurrentBranchValue(null, fallbackGitRef),
+            worktree: getWorktreeSelectItems()[0]?.value ?? 'main',
+          },
         );
 
         if (

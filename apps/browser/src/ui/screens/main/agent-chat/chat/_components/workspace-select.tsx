@@ -1365,28 +1365,30 @@ function workspaceActionConfigsEqual(
 export function hydrateWorkspaceActionConfigWithDefaults(
   config: WorkspaceActionConfig,
   defaults: WorkspaceActionConfig,
-  previousDefaultBranch = 'main',
+  previousDefaults: {
+    branch: string;
+    worktree: string;
+  } = { branch: 'main', worktree: 'main' },
 ): WorkspaceActionConfig {
-  // switchBranchTarget intentionally uses previousDefaultBranch too. Before
-  // live Git data loads, default checkout/source fallbacks are the same value;
-  // once live data arrives, a still-default switch target should hydrate to
-  // defaults.switchBranchTarget, while a user-selected target is preserved.
+  // Branch fields and worktree fields have different placeholder defaults
+  // before live Git data loads. Branch values may start from the mounted Git
+  // ref, while switchWorktreeTarget starts from the fallback worktree list.
   return {
     ...config,
     createWorktreeFrom:
-      config.createWorktreeFrom === previousDefaultBranch
+      config.createWorktreeFrom === previousDefaults.branch
         ? defaults.createWorktreeFrom
         : config.createWorktreeFrom,
     createBranchFrom:
-      config.createBranchFrom === previousDefaultBranch
+      config.createBranchFrom === previousDefaults.branch
         ? defaults.createBranchFrom
         : config.createBranchFrom,
     switchBranchTarget:
-      config.switchBranchTarget === previousDefaultBranch
+      config.switchBranchTarget === previousDefaults.branch
         ? defaults.switchBranchTarget
         : config.switchBranchTarget,
     switchWorktreeTarget:
-      config.switchWorktreeTarget === previousDefaultBranch
+      config.switchWorktreeTarget === previousDefaults.worktree
         ? defaults.switchWorktreeTarget
         : config.switchWorktreeTarget,
   };
@@ -1699,11 +1701,16 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       generalWorkspaceGitActionPreference,
       repositoryWorkspaceGitActionPreference,
     );
-    const previousDefaultBranch = getCurrentBranchValue(null, gitRef);
+    const previousBranchDefault = getCurrentBranchValue(null, gitRef);
+    const previousWorktreeDefault =
+      getWorktreeSelectItems()[0]?.value ?? 'main';
     const hydratedConfig = hydrateWorkspaceActionConfigWithDefaults(
       config,
       defaults,
-      previousDefaultBranch,
+      {
+        branch: previousBranchDefault,
+        worktree: previousWorktreeDefault,
+      },
     );
     if (workspaceActionConfigsEqual(config, hydratedConfig)) return;
 
