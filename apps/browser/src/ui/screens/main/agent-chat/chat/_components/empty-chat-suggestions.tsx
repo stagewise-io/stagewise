@@ -28,6 +28,7 @@ import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
  * next-most-recent into view.
  */
 const RECENT_WORKSPACE_LIMIT = 3;
+const CHAT_INPUT_FOCUS_REQUESTED_EVENT = 'chat-input-focus-requested';
 
 export interface EmptyChatSuggestionsProps {
   removedSuggestionIds: Set<string>;
@@ -74,6 +75,7 @@ export const EmptyChatSuggestions = memo(function EmptyChatSuggestions({
       try {
         await mountWorkspace(openAgent, path);
         track('workspace-connect-finished');
+        window.dispatchEvent(new Event(CHAT_INPUT_FOCUS_REQUESTED_EVENT));
       } catch {
         track('workspace-connect-failed', { source: 'recent-workspace' });
       }

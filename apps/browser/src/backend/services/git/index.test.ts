@@ -1,8 +1,10 @@
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockHomeDir = path.join(os.tmpdir(), 'mock-home');
+let mockHomeDir = path.join(os.tmpdir(), 'git-service-mock-home');
+let mockElectronHomeDir = mockHomeDir;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -11,7 +13,9 @@ function escapeRegExp(value: string): string {
 vi.mock('electron', () => ({
   app: {
     getPath: (name: string) =>
-      name === 'home' ? mockHomeDir : path.join(os.tmpdir(), `mock-${name}`),
+      name === 'home'
+        ? mockElectronHomeDir
+        : path.join(os.tmpdir(), `mock-${name}`),
   },
 }));
 
@@ -22,6 +26,17 @@ import {
 } from './index';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
+
+beforeEach(async () => {
+  mockHomeDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'git-service-mock-home-'),
+  );
+  mockElectronHomeDir = mockHomeDir;
+});
+
+afterEach(async () => {
+  await fs.rm(mockHomeDir, { recursive: true, force: true });
+});
 
 const logger = {
   debug: vi.fn(),
@@ -478,6 +493,28 @@ describe('GitService', () => {
         `^worktree add -b feature/login ${expectedWorktreePathPattern}${escapeRegExp(path.sep)}[a-f0-9]{12}${escapeRegExp(path.sep)}feature${escapeRegExp(path.sep)}login main$`,
       ),
     );
+  });
+
+  it('returns structured failure when creating the worktree directory fails', async () => {
+    const mkdirSpy = vi
+      .spyOn(fs, 'mkdir')
+      .mockRejectedValueOnce(new Error('mkdir failed'));
+    const { service } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+    });
+
+    const result = await service.createWorktree('/repo', {
+      worktreeName: 'new-work',
+      sourceBranch: 'main',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'worktree-create-failed',
+      message: 'Failed to create worktree directory: mkdir failed',
+    });
+    expect(mkdirSpy).toHaveBeenCalledOnce();
   });
 
   it('detects a branch merged into the default branch', async () => {

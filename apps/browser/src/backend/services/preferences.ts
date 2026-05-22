@@ -89,6 +89,7 @@ export class PreferencesService extends DisposableService {
 
   private preferences: UserPreferences = defaultUserPreferences;
   private listeners: PreferencesListener[] = [];
+  private preferenceWriteQueue = Promise.resolve();
 
   private constructor(logger: Logger) {
     super();
@@ -387,12 +388,10 @@ export class PreferencesService extends DisposableService {
     this.pagesService.syncPreferencesState(structuredClone(this.preferences));
   }
 
-  private async save(): Promise<void> {
-    await writePersistedData(
-      'preferences',
-      userPreferencesSchema,
-      this.preferences,
-    );
+  private async save(
+    preferences: UserPreferences = this.preferences,
+  ): Promise<void> {
+    await writePersistedData('preferences', userPreferencesSchema, preferences);
     this.logger.debug('[PreferencesService] Saved preferences to disk');
   }
 
@@ -404,13 +403,25 @@ export class PreferencesService extends DisposableService {
     return structuredClone(this.preferences);
   }
 
+  private async enqueuePreferenceWrite<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const next = this.preferenceWriteQueue.then(operation, operation);
+    this.preferenceWriteQueue = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
+  }
+
   private async replacePreferences(
     nextPreferences: UserPreferences,
   ): Promise<void> {
+    const parsed = userPreferencesSchema.parse(nextPreferences);
     const oldPrefs = structuredClone(this.preferences);
-    this.preferences = userPreferencesSchema.parse(nextPreferences);
 
-    await this.save();
+    await this.save(parsed);
+    this.preferences = parsed;
     this.syncToKarton();
     this.notifyListeners(this.preferences, oldPrefs);
   }
@@ -428,10 +439,12 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
     this.logger.debug('[PreferencesService] Applying patches...', { patches });
 
-    // Apply patches using Immer
-    const patched = applyPatches(this.preferences, patches);
+    await this.enqueuePreferenceWrite(async () => {
+      // Apply patches using Immer
+      const patched = applyPatches(this.preferences, patches);
 
-    await this.replacePreferences(patched);
+      await this.replacePreferences(patched);
+    });
 
     this.logger.debug('[PreferencesService] Patches applied successfully');
   }
@@ -443,18 +456,20 @@ export class PreferencesService extends DisposableService {
     const uniquePaths = Array.from(new Set(paths));
     if (uniquePaths.length === 0) return;
 
-    const nextPreferences = structuredClone(this.preferences);
-    const dismissedCandidates = {
-      ...nextPreferences.agent.workspaceGitCleanup.dismissedCandidates,
-    };
-    const dismissedAt = Date.now();
-    for (const path of uniquePaths) {
-      dismissedCandidates[path] = { dismissedAt };
-    }
-    nextPreferences.agent.workspaceGitCleanup.dismissedCandidates =
-      dismissedCandidates;
+    await this.enqueuePreferenceWrite(async () => {
+      const nextPreferences = structuredClone(this.preferences);
+      const dismissedCandidates = {
+        ...nextPreferences.agent.workspaceGitCleanup.dismissedCandidates,
+      };
+      const dismissedAt = Date.now();
+      for (const path of uniquePaths) {
+        dismissedCandidates[path] = { dismissedAt };
+      }
+      nextPreferences.agent.workspaceGitCleanup.dismissedCandidates =
+        dismissedCandidates;
 
-    await this.replacePreferences(nextPreferences);
+      await this.replacePreferences(nextPreferences);
+    });
   }
 
   public async pruneWorkspaceGitCleanupSnoozes(
@@ -464,31 +479,34 @@ export class PreferencesService extends DisposableService {
   ): Promise<void> {
     this.assertNotDisposed();
     const activeCandidatePathSet = new Set(activeCandidatePaths);
-    const dismissedCandidates =
-      this.preferences.agent.workspaceGitCleanup.dismissedCandidates;
-    const nextDismissedCandidates: typeof dismissedCandidates = {};
 
-    for (const [path, value] of Object.entries(dismissedCandidates)) {
-      if (!activeCandidatePathSet.has(path)) continue;
-      if (now - value.dismissedAt >= maxAgeMs) continue;
-      nextDismissedCandidates[path] = value;
-    }
+    await this.enqueuePreferenceWrite(async () => {
+      const dismissedCandidates =
+        this.preferences.agent.workspaceGitCleanup.dismissedCandidates;
+      const nextDismissedCandidates: typeof dismissedCandidates = {};
 
-    if (
-      Object.keys(nextDismissedCandidates).length ===
-        Object.keys(dismissedCandidates).length &&
-      Object.entries(nextDismissedCandidates).every(
-        ([path, value]) => dismissedCandidates[path] === value,
-      )
-    ) {
-      return;
-    }
+      for (const [path, value] of Object.entries(dismissedCandidates)) {
+        if (!activeCandidatePathSet.has(path)) continue;
+        if (now - value.dismissedAt >= maxAgeMs) continue;
+        nextDismissedCandidates[path] = value;
+      }
 
-    const nextPreferences = structuredClone(this.preferences);
-    nextPreferences.agent.workspaceGitCleanup.dismissedCandidates =
-      nextDismissedCandidates;
+      if (
+        Object.keys(nextDismissedCandidates).length ===
+          Object.keys(dismissedCandidates).length &&
+        Object.entries(nextDismissedCandidates).every(
+          ([path, value]) => dismissedCandidates[path] === value,
+        )
+      ) {
+        return;
+      }
 
-    await this.replacePreferences(nextPreferences);
+      const nextPreferences = structuredClone(this.preferences);
+      nextPreferences.agent.workspaceGitCleanup.dismissedCandidates =
+        nextDismissedCandidates;
+
+      await this.replacePreferences(nextPreferences);
+    });
   }
 
   /**

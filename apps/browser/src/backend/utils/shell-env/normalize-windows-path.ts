@@ -12,9 +12,12 @@
  *    canonical `PATH`.
  */
 export function normalizeWindowsPath(env: Record<string, string>): void {
-  if (env.Path && !env.PATH) {
+  const hasPath = Object.hasOwn(env, 'Path');
+  const hasPATH = Object.hasOwn(env, 'PATH');
+
+  if (hasPath && !hasPATH) {
     env.PATH = env.Path;
-  } else if (env.Path && env.PATH && env.Path !== env.PATH) {
+  } else if (hasPath && hasPATH && env.Path !== env.PATH) {
     const seen = new Set<string>();
     env.PATH = `${env.PATH};${env.Path}`
       .split(';')

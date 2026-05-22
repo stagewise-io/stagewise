@@ -22,14 +22,12 @@ export function WorkspacePreviewSummary({
           <span className="truncate font-semibold text-foreground text-xs">
             {name}
           </span>
-          {mount.git && (
+          {mount.git && gitRef && (
             <>
               <IconCodeBranchOutline18 className="size-3 shrink-0 text-muted-foreground" />
-              {gitRef && (
-                <span className="max-w-24 truncate text-2xs text-subtle-foreground leading-normal">
-                  {gitRef}
-                </span>
-              )}
+              <span className="max-w-24 truncate text-2xs text-subtle-foreground leading-normal">
+                {gitRef}
+              </span>
             </>
           )}
         </div>

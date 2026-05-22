@@ -12,12 +12,15 @@ function firstAvailableWorkspaceActionValue(
   available: ReadonlySet<string>,
   fallback: string,
 ): string {
-  return (
-    candidates.find(
-      (candidate): candidate is string =>
-        typeof candidate === 'string' && available.has(candidate),
-    ) ?? fallback
+  const candidate = candidates.find(
+    (candidate): candidate is string =>
+      typeof candidate === 'string' && available.has(candidate),
   );
+
+  if (typeof candidate === 'string') return candidate;
+  if (available.has(fallback)) return fallback;
+
+  return available.values().next().value ?? fallback;
 }
 
 export function applyWorkspaceGitActionPreferences(

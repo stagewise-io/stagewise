@@ -160,8 +160,10 @@ export async function resolveShellEnv(
   switch (shell.type) {
     case 'bash':
     case 'zsh':
-    case 'sh':
       shellArgs = ['-ilc', command];
+      break;
+    case 'sh':
+      shellArgs = ['-c', command];
       break;
     case 'powershell':
       return null;

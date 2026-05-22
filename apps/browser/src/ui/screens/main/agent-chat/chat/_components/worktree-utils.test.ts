@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   generateWorktreeName,
+  getBranchSelectItemsFromGit,
   getCurrentBranchValue,
   getDefaultBranchValue,
   WORKTREE_NAME_ADJECTIVES,
@@ -98,6 +99,48 @@ describe('getCurrentBranchValue', () => {
 
   it('falls back to main when no branch data or git ref is available', () => {
     expect(getCurrentBranchValue(null, null)).toBe('main');
+  });
+});
+
+describe('getBranchSelectItemsFromGit', () => {
+  it('preserves the current ref when branch results omit it', () => {
+    expect(
+      getBranchSelectItemsFromGit(
+        {
+          current: 'detached-ref',
+          defaultBranch: 'main',
+          branches: [
+            {
+              name: 'main',
+              current: false,
+              checkedOut: false,
+            },
+          ],
+        },
+        null,
+        'source',
+      ).map((item) => item.value),
+    ).toEqual(['main', 'detached-ref']);
+  });
+
+  it('preserves the fallback ref when branch results omit it', () => {
+    expect(
+      getBranchSelectItemsFromGit(
+        {
+          current: null,
+          defaultBranch: 'main',
+          branches: [
+            {
+              name: 'main',
+              current: false,
+              checkedOut: false,
+            },
+          ],
+        },
+        'fallback-ref',
+        'source',
+      ).map((item) => item.value),
+    ).toEqual(['main', 'fallback-ref']);
   });
 });
 

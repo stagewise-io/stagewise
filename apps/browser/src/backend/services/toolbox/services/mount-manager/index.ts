@@ -765,12 +765,35 @@ export class MountManagerService extends DisposableService {
     const failed: WorkspaceGitCleanupResult['failed'] = [];
     let lastUsedByPath: Map<string, number>;
     try {
-      lastUsedByPath = await this.getWorkspaceLastUsedAtByPath(uniquePaths);
+      const usagePaths = Array.from(
+        new Set(
+          await Promise.all(
+            uniquePaths.map(async (workspacePath) => {
+              return (
+                (await this.resolveManagedWorktreePath(workspacePath)) ??
+                workspacePath
+              );
+            }),
+          ),
+        ),
+      );
+      lastUsedByPath = await this.getWorkspaceLastUsedAtByPath(usagePaths);
     } catch (error) {
       this.logger.warn(
         `[MountManager] Failed to resolve worktree cleanup usage data: ${error instanceof Error ? error.message : String(error)}`,
       );
-      lastUsedByPath = new Map();
+      const result = {
+        removed,
+        failed: uniquePaths.map((workspacePath) => ({
+          path: workspacePath,
+          message: 'Unable to verify worktree usage data.',
+        })),
+      } satisfies WorkspaceGitCleanupResult;
+      this.uiKarton.setState((draft) => {
+        draft.workspaceGitCleanup.cleaning = false;
+        draft.workspaceGitCleanup.lastResult = result;
+      });
+      return result;
     }
 
     for (const workspacePath of uniquePaths) {
@@ -787,11 +810,11 @@ export class MountManagerService extends DisposableService {
           continue;
         }
 
-        const result = await this.gitService.removeWorktree(workspacePath);
+        const result = await this.gitService.removeWorktree(candidate.path);
         if (result.ok) {
-          removed.push({ path: workspacePath, branch: candidate.branch });
+          removed.push({ path: candidate.path, branch: candidate.branch });
         } else {
-          failed.push({ path: workspacePath, message: result.message });
+          failed.push({ path: candidate.path, message: result.message });
         }
       } catch (error) {
         failed.push({
@@ -868,7 +891,9 @@ export class MountManagerService extends DisposableService {
         if (!stat.isDirectory() || stat.isSymbolicLink()) return;
 
         await fs.lstat(path.join(directoryPath, '.git'));
-        paths.push(directoryPath);
+        const resolvedPath =
+          await this.resolveManagedWorktreePath(directoryPath);
+        if (resolvedPath) paths.push(resolvedPath);
         return;
       } catch {
         // No .git entry at this level, or the directory is not readable.
@@ -900,24 +925,37 @@ export class MountManagerService extends DisposableService {
     workspacePath: string,
     lastUsedByPath: ReadonlyMap<string, number>,
   ): Promise<WorkspaceGitCleanupCandidate | null> {
-    if (!(await this.isManagedWorktreePath(workspacePath))) return null;
-    if (this.isCurrentlyMounted(workspacePath)) return null;
+    const resolvedWorkspacePath =
+      await this.resolveManagedWorktreePath(workspacePath);
+    if (!resolvedWorkspacePath) return null;
+    if (await this.isCurrentlyMounted(resolvedWorkspacePath)) return null;
 
-    const summary =
-      await this.gitService.getMountedWorkspaceSummary(workspacePath);
+    const summary = await this.gitService.getMountedWorkspaceSummary(
+      resolvedWorkspacePath,
+    );
     if (!summary?.isWorktree || !summary.branch) return null;
 
-    const worktrees = await this.gitService.listWorktrees(workspacePath);
-    const currentWorktree = worktrees.find(
-      (worktree) => worktree.path === workspacePath,
+    const worktrees = await this.gitService.listWorktrees(
+      resolvedWorkspacePath,
     );
+    let currentWorktree = null;
+    for (const worktree of worktrees) {
+      const resolvedWorktreePath =
+        (await safeRealpath(worktree.path)) ?? path.resolve(worktree.path);
+      if (resolvedWorktreePath === resolvedWorkspacePath) {
+        currentWorktree = worktree;
+        break;
+      }
+    }
     if (!currentWorktree || currentWorktree.isMainWorktree) return null;
     if (currentWorktree.isDetached || !currentWorktree.branch) return null;
 
-    const status = await this.gitService.getWorktreeStatus(workspacePath);
+    const status = await this.gitService.getWorktreeStatus(
+      resolvedWorkspacePath,
+    );
     if (!status || status.dirty) return null;
 
-    const lastUsedAt = lastUsedByPath.get(workspacePath) ?? null;
+    const lastUsedAt = lastUsedByPath.get(resolvedWorkspacePath) ?? null;
     if (
       lastUsedAt !== null &&
       Date.now() - lastUsedAt < WORKTREE_CLEANUP_UNUSED_MS
@@ -926,13 +964,13 @@ export class MountManagerService extends DisposableService {
     }
 
     const merged = await this.gitService.findMergedTarget(
-      workspacePath,
+      resolvedWorkspacePath,
       currentWorktree.branch,
     );
     if (!merged.merged || !merged.target) return null;
 
     return {
-      path: workspacePath,
+      path: resolvedWorkspacePath,
       branch: currentWorktree.branch,
       headSha: currentWorktree.headSha,
       repositoryId: summary.repositoryId,
@@ -948,24 +986,32 @@ export class MountManagerService extends DisposableService {
     };
   }
 
-  private async isManagedWorktreePath(workspacePath: string): Promise<boolean> {
+  private async resolveManagedWorktreePath(
+    workspacePath: string,
+  ): Promise<string | null> {
     const [worktreesDir, resolvedPath] = await Promise.all([
       safeRealpath(getWorktreesDir()),
       safeRealpath(workspacePath),
     ]);
-    if (!worktreesDir || !resolvedPath) return false;
+    if (!worktreesDir || !resolvedPath) return null;
     const relativeToWorktrees = path.relative(worktreesDir, resolvedPath);
-    return (
-      relativeToWorktrees.length > 0 &&
-      !relativeToWorktrees.startsWith('..') &&
-      !path.isAbsolute(relativeToWorktrees)
-    );
+    if (
+      relativeToWorktrees.length === 0 ||
+      relativeToWorktrees.startsWith('..') ||
+      path.isAbsolute(relativeToWorktrees)
+    ) {
+      return null;
+    }
+    return resolvedPath;
   }
 
-  private isCurrentlyMounted(workspacePath: string): boolean {
-    const normalizedPath = path.resolve(workspacePath);
+  private async isCurrentlyMounted(workspacePath: string): Promise<boolean> {
+    const normalizedPath =
+      (await safeRealpath(workspacePath)) ?? path.resolve(workspacePath);
     for (const mountedPath of this.workspacePathsPerMount.values()) {
-      if (path.resolve(mountedPath) === normalizedPath) return true;
+      const normalizedMountedPath =
+        (await safeRealpath(mountedPath)) ?? path.resolve(mountedPath);
+      if (normalizedMountedPath === normalizedPath) return true;
     }
     return false;
   }

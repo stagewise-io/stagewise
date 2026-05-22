@@ -106,15 +106,20 @@ export function getBranchSelectItemsFromGit(
 ): SelectItem<string>[] {
   if (!result) return getBranchSelectItems(fallbackGitRef);
 
-  const branches = result.branches.map((branch) => ({
+  const branches: SelectItem<string>[] = result.branches.map((branch) => ({
     value: branch.name,
     label: branch.name,
     disabled:
       intent === 'checkout-target' && branch.checkedOut && !branch.current,
   }));
+  const currentRef = result.current ?? fallbackGitRef;
+
+  if (currentRef && !branches.some((branch) => branch.value === currentRef)) {
+    branches.push({ value: currentRef, label: currentRef });
+  }
 
   if (branches.length > 0) return branches;
-  return getBranchSelectItems(result.current ?? fallbackGitRef);
+  return getBranchSelectItems(currentRef);
 }
 
 export function getWorktreeSelectItemsFromGit(

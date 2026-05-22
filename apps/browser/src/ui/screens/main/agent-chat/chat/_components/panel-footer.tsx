@@ -37,9 +37,9 @@ import {
   WorkspaceSelect,
   createDefaultWorkspaceActionConfig,
   executeWorkspaceGitAction,
-  hydrateWorkspaceActionConfigWithDefaults,
   type WorkspaceActionConfig,
 } from './workspace-select';
+import { hydrateWorkspaceActionConfigWithDefaults } from './workspace-action-config-utils';
 import { applyWorkspaceGitActionPreferences } from './workspace-action-preferences';
 import {
   getBranchSelectItems,
@@ -79,6 +79,7 @@ const EMPTY_WORKSPACE_ACTION_CONFIGS: ReadonlyMap<
   string,
   WorkspaceActionConfig
 > = new Map();
+const CHAT_INPUT_FOCUS_REQUESTED_EVENT = 'chat-input-focus-requested';
 
 function formatWorkspaceGitRef(git: MountEntry['git']): string | null {
   return git?.branch ?? git?.headSha?.slice(0, 7) ?? null;
@@ -738,11 +739,17 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
           getDefaultBranchValue(branchesResult, fallbackGitRef),
           getCurrentBranchValue(branchesResult, fallbackGitRef),
         );
+        const previousCurrentBranchDefault = getCurrentBranchValue(
+          null,
+          fallbackGitRef,
+        );
         const config = hydrateWorkspaceActionConfigWithDefaults(
           existingConfig,
           defaults,
           {
-            branch: getCurrentBranchValue(null, fallbackGitRef),
+            sourceBranch: previousCurrentBranchDefault,
+            checkoutBranch: previousCurrentBranchDefault,
+            defaultBranch: getDefaultBranchValue(null, fallbackGitRef),
             worktree: getWorktreeSelectItems()[0]?.value ?? 'main',
           },
         );
@@ -959,6 +966,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       localInputStateRef.current = previousContent;
       setLocalInputState(previousContent);
       setFileAttachments(previousFileAttachments);
+      setCanSendMessage(markdownText.trim().length > 0);
+      if (openAgent)
+        void setChatInputState(openAgent, JSON.stringify(previousContent));
       // Remove the optimistic message on failure
       if (didDispatchOptimisticMessage) {
         window.dispatchEvent(
@@ -1534,9 +1544,22 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     chatInputRef.current?.focus();
   }, []);
 
-  const handleWorkspaceChange = useCallback(() => {
-    chatInputRef.current?.focus();
+  const focusChatInputAfterWorkspaceChange = useCallback(() => {
+    chatInputActiveRef.current = true;
+    setChatInputActive(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        chatInputRef.current?.focus();
+      });
+    });
   }, []);
+
+  useEventListener(
+    CHAT_INPUT_FOCUS_REQUESTED_EVENT,
+    focusChatInputAfterWorkspaceChange,
+  );
+
+  const handleWorkspaceChange = focusChatInputAfterWorkspaceChange;
 
   if (!allowUserInput) return null;
 
