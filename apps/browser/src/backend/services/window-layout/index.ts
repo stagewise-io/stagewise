@@ -2873,7 +2873,8 @@ export class WindowLayoutService extends DisposableService {
         `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       );
 
-    this.validateTabAccess(tabId, agentInstanceId);
+    const accessError = this.validateTabAccess(tabId, agentInstanceId);
+    if (accessError) throw new Error(accessError);
 
     return await tab.sendCDP(method, params);
   }
@@ -2886,12 +2887,16 @@ export class WindowLayoutService extends DisposableService {
     tabId: string,
     event: string,
     callback: (params: unknown) => void,
+    agentInstanceId?: string,
   ): () => void {
     const tab = this.resolveTabById(tabId);
     if (!tab)
       throw new Error(
         `Tab not found: "${tabId}". Check browser-information for available tabs.`,
       );
+
+    const accessError = this.validateTabAccess(tabId, agentInstanceId);
+    if (accessError) throw new Error(accessError);
 
     return tab.subscribeCDPEvent(event, callback);
   }
