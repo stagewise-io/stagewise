@@ -16,9 +16,6 @@ export const SETTINGS_PAGE_URL =
 /** The history page URL */
 export const HISTORY_PAGE_URL = 'stagewise://internal/history';
 
-/** The downloads page URL */
-export const DOWNLOADS_PAGE_URL = 'stagewise://internal/downloads';
-
 /** The account page URL */
 export const ACCOUNT_PAGE_URL = 'stagewise://internal/account';
 

@@ -20,7 +20,6 @@ export const Route = createFileRoute('/_internal-app/clear-data')({
 type DataType =
   | 'history'
   | 'favicons'
-  | 'downloads'
   | 'cookies'
   | 'cache'
   | 'storage'
@@ -40,11 +39,6 @@ const dataOptions: DataOption[] = [
     id: 'history',
     label: 'Browsing history',
     description: 'URLs, visits, and search terms',
-  },
-  {
-    id: 'downloads',
-    label: 'Download history',
-    description: 'List of downloaded files (not the files themselves)',
   },
   {
     id: 'cookies',
@@ -92,7 +86,6 @@ function Page() {
   const [selectedTypes, setSelectedTypes] = useState<Set<DataType>>(
     new Set([
       'history',
-      'downloads',
       'cookies',
       'cache',
       'storage',
@@ -139,7 +132,6 @@ function Page() {
       const options = {
         history: selectedTypes.has('history'),
         favicons: selectedTypes.has('favicons'),
-        downloads: selectedTypes.has('downloads'),
         cookies: selectedTypes.has('cookies'),
         cache: selectedTypes.has('cache'),
         storage: selectedTypes.has('storage'),
@@ -164,11 +156,6 @@ function Page() {
         if (response.historyEntriesCleared) {
           clearedItems.push(
             `${response.historyEntriesCleared} history ${response.historyEntriesCleared === 1 ? 'entry' : 'entries'}`,
-          );
-        }
-        if (response.downloadsCleared) {
-          clearedItems.push(
-            `${response.downloadsCleared} download ${response.downloadsCleared === 1 ? 'entry' : 'entries'}`,
           );
         }
         if (response.faviconsCleared) {

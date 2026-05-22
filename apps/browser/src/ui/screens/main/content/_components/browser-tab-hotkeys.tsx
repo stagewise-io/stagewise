@@ -10,7 +10,7 @@ enablePatches();
 /**
  * Browser-tab–scoped hotkeys — mounted per content panel. Handles
  * per-tab web actions: history navigation, page reload, find, dev tools,
- * zoom, downloads, and URL bar focus.
+ * zoom, and URL bar focus.
  */
 export function BrowserTabHotkeys({
   onFocusUrlBar,
@@ -32,7 +32,6 @@ export function BrowserTabHotkeys({
   const goBack = useKartonProcedure((p) => p.browser.goBack);
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
-  const goto = useKartonProcedure((p) => p.browser.goto);
   const toggleDevTools = useKartonProcedure((p) => p.browser.devTools.toggle);
   const setZoomPercentage = useKartonProcedure(
     (p) => p.browser.setZoomPercentage,
@@ -147,11 +146,6 @@ export function BrowserTabHotkeys({
     toggleDevTools(activeTabId);
   }, HotkeyActions.DEV_TOOLS);
 
-  // Downloads
-  useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
-    goto('stagewise://internal/downloads', activeTabId);
-  }, HotkeyActions.DOWNLOADS);
 
   return null;
 }

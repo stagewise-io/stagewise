@@ -35,7 +35,7 @@ import {
   PermissionSetting,
   configurablePermissionTypes,
 } from './shared-types';
-import type { PageTransition, DownloadState } from '../pages-api/types';
+import type { PageTransition } from '../pages-api/types';
 import type { CodingPlanId } from '../../coding-plans';
 import type {
   AgentState,
@@ -44,16 +44,6 @@ import type {
   AgentMessage,
   StoredAgentPreview,
 } from './agent';
-
-/** Speed data point for download speed history */
-export type DownloadSpeedDataPoint = {
-  /** Unix timestamp in ms */
-  timestamp: number;
-  /** Speed in KB/s */
-  speedKBps: number;
-  /** Total bytes received at this point */
-  totalBytes: number;
-};
 
 export type WorkspaceGitSummary = {
   repositoryId: string;
@@ -168,30 +158,6 @@ export type WorkspaceGitCreateWorktreeOptions = {
   sourceBranch: string;
 };
 
-export type DownloadSummary = {
-  /** Download ID */
-  id: number;
-  /** Filename */
-  filename: string;
-  /** Progress percentage (0-100) */
-  progress: number;
-  /** Whether this is an active/running download */
-  isActive: boolean;
-  /** Download state */
-  state: DownloadState;
-  /** Whether the download is paused (only for active) */
-  isPaused?: boolean;
-  /** Target path on disk */
-  targetPath: string;
-  /** Download start time */
-  startTime: Date;
-  /** Download end time (for completed) */
-  endTime?: Date;
-  /** Current download speed in KB/s (only for active downloads) */
-  currentSpeedKBps?: number;
-  /** Speed history for graphing (up to 100 data points covering 10 minutes) */
-  speedHistory?: DownloadSpeedDataPoint[];
-};
 export type { UserMessageMetadata, ReactSelectedElementInfo };
 export type { SelectedElement } from '../../selected-elements';
 
@@ -267,14 +233,6 @@ export const onboardingStateSchema = z.object({
 });
 
 export type OnboardingState = z.infer<typeof onboardingStateSchema>;
-
-/** Schema for downloads state persisted data */
-export const downloadsStateSchema = z.object({
-  /** ISO timestamp when downloads were last marked as seen */
-  lastSeenAt: z.string().nullable(),
-});
-
-export type DownloadsState = z.infer<typeof downloadsStateSchema>;
 
 export const lastViewedChatsSchema = z.record(z.string(), z.number());
 
@@ -823,19 +781,6 @@ export type AppState = {
     lastOpenAgentId: string | null;
   };
 
-  // Downloads state for the control button
-  // Contains running downloads + recent finished downloads (up to 5 total)
-  downloads: {
-    /** List of downloads to display (running + recent finished) */
-    items: DownloadSummary[];
-    /** Number of currently active downloads */
-    activeCount: number;
-    /** Whether there are finished downloads the user hasn't seen yet */
-    hasUnseenDownloads: boolean;
-    /** Timestamp when downloads were last marked as seen (null if never) */
-    lastSeenAt: Date | null;
-  };
-
   // User preferences (synced from PreferencesService)
   preferences: UserPreferences;
 
@@ -1348,34 +1293,6 @@ export type KartonContract = {
         rows: number;
       }>;
     };
-    downloads: {
-      /** Mark all current downloads as seen (updates lastSeenAt timestamp) */
-      markSeen: () => Promise<void>;
-      /** Pause an active download */
-      pause: (
-        downloadId: number,
-      ) => Promise<{ success: boolean; error?: string }>;
-      /** Resume a paused download */
-      resume: (
-        downloadId: number,
-      ) => Promise<{ success: boolean; error?: string }>;
-      /** Cancel an active download */
-      cancel: (
-        downloadId: number,
-      ) => Promise<{ success: boolean; error?: string }>;
-      /** Open a downloaded file using the system default application */
-      openFile: (
-        filePath: string,
-      ) => Promise<{ success: boolean; error?: string }>;
-      /** Show a downloaded file in the system file manager (Finder/Explorer) */
-      showInFolder: (
-        filePath: string,
-      ) => Promise<{ success: boolean; error?: string }>;
-      /** Delete a download record and its file */
-      delete: (
-        downloadId: number,
-      ) => Promise<{ success: boolean; error?: string }>;
-    };
     preferences: {
       /** Update user preferences by applying Immer patches */
       update: (patches: Patch[]) => Promise<void>;
@@ -1526,12 +1443,6 @@ export const defaultState: KartonContract['state'] = {
     viewportSize: null,
     lastActiveTabPerAgent: {},
     lastOpenAgentId: null,
-  },
-  downloads: {
-    items: [],
-    activeCount: 0,
-    hasUnseenDownloads: false,
-    lastSeenAt: null,
   },
   preferences: defaultUserPreferences,
   searchEngines: [],

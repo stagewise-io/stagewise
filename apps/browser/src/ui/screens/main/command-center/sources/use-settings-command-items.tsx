@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import {
   IconBrainNodesFillDuo18,
-  IconDownloadFillDuo18,
   IconGear3FillDuo18,
   IconHistoryFillDuo18,
   IconNoteFillDuo18,
@@ -30,8 +29,6 @@ function iconForSetting(setting: CommandCenterSettingDefinition) {
       return <IconSpace3dFillDuo18 className={`${className} rotate-180`} />;
     case 'history':
       return <IconHistoryFillDuo18 className={className} />;
-    case 'downloads':
-      return <IconDownloadFillDuo18 className={className} />;
     case 'settings':
     case 'browser':
       return <IconGear3FillDuo18 className={className} />;

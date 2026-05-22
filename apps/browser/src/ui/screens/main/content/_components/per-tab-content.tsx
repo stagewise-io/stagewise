@@ -7,7 +7,6 @@ import { Omnibox, type OmniboxRef } from './omnibox';
 import { ZoomBar } from './control-buttons/zoom-bar';
 import { SearchBar, type SearchBarRef } from './control-buttons/search-bar';
 import { ResourceRequestsControlButton } from './control-buttons/resource-requests';
-import { DownloadsControlButton } from './control-buttons/downloads';
 import { DOMContextSelector } from '@ui/components/dom-context-selector/selector-canvas';
 import { WebContentsOverlay } from '@ui/components/web-contents-overlay';
 import { WebContentsOverlayProvider } from '@ui/contexts';
@@ -93,15 +92,11 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
               />
               <ZoomBar tabId={tabId} />
               <SearchBar tabId={tabId} ref={searchBarRef} />
+              {(tab?.permissionRequests?.length ?? 0) > 0 && (
+                <ResourceRequestsControlButton tabId={tabId} isActive={isActive} />
+              )}
               <div className="flex flex-row items-center gap-0.5">
-                <ResourceRequestsControlButton
-                  tabId={tabId}
-                  isActive={isActive}
-                />
-                <DownloadsControlButton isActive={isActive} />
-
                 {tab && <ColorSchemeWidget tab={tab} />}
-
                 {tab && <ChromeDevToolsWidget tab={tab} />}
               </div>
             </div>

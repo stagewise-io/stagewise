@@ -3,7 +3,6 @@ import { SidebarNav } from '@pages/components/sidebar-nav';
 import {
   IconHistoryFillDuo18,
   IconBroomFillDuo18,
-  IconDownloadFillDuo18,
   IconCircleInfoFillDuo18,
   IconBrainNodesFillDuo18,
   IconUserUpdateFillDuo18,
@@ -94,12 +93,6 @@ function Sidebar() {
               icon={<IconHistoryFillDuo18 className="size-4" />}
             >
               History
-            </SidebarNav.Item>
-            <SidebarNav.Item
-              to="/downloads"
-              icon={<IconDownloadFillDuo18 className="size-4" />}
-            >
-              Downloads
             </SidebarNav.Item>
             <SidebarNav.Item
               to="/clear-data"
