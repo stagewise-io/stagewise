@@ -13,7 +13,6 @@ import type {
   AddSearchEngineInput,
   AddSearchEngineResult,
   RemoveSearchEngineResult,
-  InspirationWebsite,
   ContextFilesResult,
   ExternalFileContentResult,
   CurrentUsageResponse,
@@ -174,11 +173,6 @@ export type PagesApiContract = {
     ) => Promise<AddSearchEngineResult>;
     /** Remove a custom search engine by ID */
     removeSearchEngine: (id: number) => Promise<RemoveSearchEngineResult>;
-    /** Fetch inspiration websites with pagination (results are cached) */
-    getInspirationWebsites: (params: {
-      offset: number;
-      limit: number;
-    }) => Promise<InspirationWebsite>;
     /** Set whether user has seen the onboarding flow */
     setHasSeenOnboardingFlow: (
       input:

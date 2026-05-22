@@ -45,7 +45,6 @@ import type {
   DownloadControlResult,
   PendingEditsResult,
   AddSearchEngineInput,
-  InspirationWebsite,
   ContextFilesResult,
   ExternalFileContentResult,
   CurrentUsageResponse,
@@ -1184,22 +1183,6 @@ export class PagesService extends DisposableService {
 
     // Home page procedure handlers
     this.kartonServer.registerServerProcedureHandler(
-      'getInspirationWebsites',
-      async (
-        _callingClientId: string,
-        params: { offset: number; limit: number },
-      ): Promise<InspirationWebsite> => {
-        if (!this.userExperienceService) {
-          this.logger.warn(
-            '[PagesService] getInspirationWebsites called but UserExperienceService not set',
-          );
-          return { websites: [], total: 0, seed: '' };
-        }
-        return this.userExperienceService.getInspirationWebsites(params);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
       'setHasSeenOnboardingFlow',
       async (
         _callingClientId: string,
@@ -1927,7 +1910,6 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('getSearchEngines');
     this.kartonServer.removeServerProcedureHandler('addSearchEngine');
     this.kartonServer.removeServerProcedureHandler('removeSearchEngine');
-    this.kartonServer.removeServerProcedureHandler('getInspirationWebsites');
     this.kartonServer.removeServerProcedureHandler('setHasSeenOnboardingFlow');
     this.kartonServer.removeServerProcedureHandler('trustCertificateAndReload');
     this.kartonServer.removeServerProcedureHandler('setGlobalConfig');
