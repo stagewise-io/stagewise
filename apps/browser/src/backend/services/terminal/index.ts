@@ -101,8 +101,9 @@ function Global:__StagewiseTerminalEmitMetadata() {
 }
 function Global:Prompt() {
   Set-StrictMode -Off
+  $PromptResult = $Global:__StagewiseTerminalState.OriginalPrompt.Invoke()
   __StagewiseTerminalEmitMetadata
-  return $Global:__StagewiseTerminalState.OriginalPrompt.Invoke()
+  return $PromptResult
 }
 __StagewiseTerminalEmitMetadata
 `.trim();
