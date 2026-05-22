@@ -14,12 +14,9 @@ import {
   onboardingStateSchema,
   type StoredExperienceData,
   type RecentlyOpenedWorkspace,
-  type InspirationWebsite,
 } from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
-import { type ApiClient, createApiClient } from '@stagewise/api-client';
-import { API_URL } from './auth/server-interop';
 import { DisposableService } from './disposable';
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import type { TelemetryService } from './telemetry';
@@ -42,16 +39,6 @@ export class UserExperienceService extends DisposableService {
   private readonly uiKarton: KartonService;
   private readonly telemetryService: TelemetryService;
   private readonly gitService: GitService;
-  private inspirationSeed = crypto.randomUUID();
-  private cachedInspirationWebsites: InspirationWebsite = {
-    websites: [],
-    total: 0,
-    seed: '',
-  };
-  private inspirationFetchInProgress: Promise<InspirationWebsite> | null = null;
-
-  private unAuthenticatedApiClient: ApiClient = createApiClient(API_URL);
-
   // Store bound callback reference for proper unregistration
   private readonly boundHandleServiceStateChange: () => void;
 
@@ -172,14 +159,6 @@ export class UserExperienceService extends DisposableService {
         await this.setHasSeenOnboardingFlow(value, auth);
       },
     );
-    this.uiKarton.registerServerProcedureHandler(
-      'userExperience.clearPendingOnboardingSuggestion',
-      async (_callingClientId: string) => {
-        this.uiKarton.setState((draft) => {
-          draft.userExperience.pendingOnboardingSuggestion = null;
-        });
-      },
-    );
   }
 
   protected onTeardown(): void {
@@ -197,9 +176,6 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.removeServerProcedureHandler(
       'userExperience.setHasSeenOnboardingFlow',
-    );
-    this.uiKarton.removeServerProcedureHandler(
-      'userExperience.clearPendingOnboardingSuggestion',
     );
     this.logger.debug('[UserExperienceService] Teardown complete');
   }
@@ -226,111 +202,6 @@ export class UserExperienceService extends DisposableService {
           draft.userExperience.storedExperienceData = storedExperienceData;
         });
       });
-    }
-  }
-
-  /**
-   * Get inspiration websites with pagination.
-   * Results are cached - will only fetch from API if we don't have enough cached data.
-   */
-  public async getInspirationWebsites(params: {
-    offset: number;
-    limit: number;
-  }): Promise<InspirationWebsite> {
-    const { offset, limit } = params;
-    const requestedEnd = offset + limit;
-    const cachedCount = this.cachedInspirationWebsites.websites.length;
-
-    // Check if we have enough cached data
-    // Note: We only check against total when we've actually fetched before (seed is set).
-    // Otherwise total=0 initial state would incorrectly match cachedCount=0.
-    const hasFetchedBefore = this.cachedInspirationWebsites.seed !== '';
-    if (
-      cachedCount >= requestedEnd ||
-      (hasFetchedBefore && cachedCount >= this.cachedInspirationWebsites.total)
-    ) {
-      // Return slice from cache
-      return {
-        websites: this.cachedInspirationWebsites.websites.slice(
-          offset,
-          requestedEnd,
-        ),
-        total: this.cachedInspirationWebsites.total,
-        seed: this.inspirationSeed,
-      };
-    }
-
-    // Need to fetch more - deduplicate concurrent requests
-    if (this.inspirationFetchInProgress) {
-      await this.inspirationFetchInProgress;
-      // After waiting, check cache again
-      return this.getInspirationWebsites(params);
-    }
-
-    // Fetch more websites from API
-    this.inspirationFetchInProgress = this.fetchMoreInspirationWebsites(
-      requestedEnd - cachedCount,
-    );
-    try {
-      await this.inspirationFetchInProgress;
-    } finally {
-      this.inspirationFetchInProgress = null;
-    }
-
-    // Return slice from updated cache
-    return {
-      websites: this.cachedInspirationWebsites.websites.slice(
-        offset,
-        requestedEnd,
-      ),
-      total: this.cachedInspirationWebsites.total,
-      seed: this.inspirationSeed,
-    };
-  }
-
-  /**
-   * Internal method to fetch more inspiration websites from API.
-   */
-  private async fetchMoreInspirationWebsites(
-    minCount: number,
-  ): Promise<InspirationWebsite> {
-    try {
-      const { data: response, error } =
-        await this.unAuthenticatedApiClient.v1.inspiration.get({
-          query: {
-            offset: String(this.cachedInspirationWebsites.websites.length),
-            limit: String(Math.max(minCount, 10)),
-            seed: this.inspirationSeed,
-          },
-        });
-
-      if (error || !response) {
-        throw new Error(
-          error ? String(error) : 'Empty response from inspiration API',
-        );
-      }
-
-      this.cachedInspirationWebsites = {
-        websites: [
-          ...this.cachedInspirationWebsites.websites,
-          ...response.websites,
-        ],
-        total: response.total,
-        seed: this.inspirationSeed,
-      };
-
-      this.logger.debug(
-        `[UserExperienceService] Fetched ${response.websites.length} inspiration websites, total cached: ${this.cachedInspirationWebsites.websites.length}`,
-      );
-
-      return this.cachedInspirationWebsites;
-    } catch (error) {
-      this.logger.error(
-        `[UserExperienceService] Failed to fetch inspiration websites: ${error}`,
-      );
-      this.report(error as Error, 'fetchInspirationWebsites');
-      // Return current cache even on error
-      return this.cachedInspirationWebsites;
     }
   }
 

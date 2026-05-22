@@ -239,19 +239,11 @@ export const ChatHistory = () => {
   );
 
   const { activeEditMessageId } = useMessageEditState();
-  const createTab = useKartonProcedure((s) => s.browser.createTab);
-  const sendUserMessage = useKartonProcedure((s) => s.agents.sendUserMessage);
   const track = useTrack();
   const retryLastUserMessage = useKartonProcedure(
     (s) => s.agents.retryLastUserMessage,
   );
-  const clearPendingOnboardingSuggestion = useKartonProcedure(
-    (s) => s.userExperience.clearPendingOnboardingSuggestion,
-  );
   const [openAgent] = useOpenAgent();
-  const pendingSuggestion = useKartonState(
-    (s) => s.userExperience.pendingOnboardingSuggestion,
-  );
   const isWorking = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.isWorking : false,
   );
@@ -266,25 +258,6 @@ export const ChatHistory = () => {
   const [removedSuggestionIds, setRemovedSuggestionIds] = useState<Set<string>>(
     new Set(),
   );
-
-  // Auto-start agent when a suggestion was selected during onboarding.
-  // Ref guard prevents StrictMode's double-invocation from sending twice.
-  const pendingSuggestionConsumedRef = useRef(false);
-  useEffect(() => {
-    if (!pendingSuggestion || !openAgent) return;
-    if (pendingSuggestionConsumedRef.current) return;
-    pendingSuggestionConsumedRef.current = true;
-    const { url, prompt } = pendingSuggestion;
-    void (async () => {
-      await createTab(url);
-      await sendUserMessage(openAgent, {
-        id: crypto.randomUUID(),
-        role: 'user',
-        parts: [{ type: 'text', text: prompt }],
-      });
-      await clearPendingOnboardingSuggestion();
-    })();
-  }, [pendingSuggestion, openAgent]);
 
   // Scroll listener for the top fade overlay. Attached to the scroller
   // element tracked above. `passive: true` because we never preventDefault.
