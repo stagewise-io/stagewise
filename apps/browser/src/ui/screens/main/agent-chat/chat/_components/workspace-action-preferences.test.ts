@@ -9,6 +9,11 @@ const sourceBranchItems: SelectItem<string>[] = [
   { value: 'release', label: 'release' },
 ];
 
+const worktreeItems: SelectItem<string>[] = [
+  { value: '/repo', label: 'stagewise' },
+  { value: '/repo/worktrees/test', label: 'test' },
+];
+
 const defaults: WorkspaceActionConfig = {
   selectedAction: 'create-worktree',
   worktreeNameLabel: 'fresh-worktree',
@@ -22,9 +27,14 @@ const defaults: WorkspaceActionConfig = {
 describe('applyWorkspaceGitActionPreferences', () => {
   it('applies general selected action preference', () => {
     expect(
-      applyWorkspaceGitActionPreferences(defaults, sourceBranchItems, {
-        selectedAction: 'create-branch',
-      }).selectedAction,
+      applyWorkspaceGitActionPreferences(
+        defaults,
+        sourceBranchItems,
+        worktreeItems,
+        {
+          selectedAction: 'create-branch',
+        },
+      ).selectedAction,
     ).toBe('create-branch');
   });
 
@@ -33,6 +43,7 @@ describe('applyWorkspaceGitActionPreferences', () => {
       applyWorkspaceGitActionPreferences(
         defaults,
         sourceBranchItems,
+        worktreeItems,
         { selectedAction: 'create-branch' },
         { selectedAction: 'switch-branch' },
       ).selectedAction,
@@ -44,6 +55,7 @@ describe('applyWorkspaceGitActionPreferences', () => {
       applyWorkspaceGitActionPreferences(
         defaults,
         sourceBranchItems,
+        worktreeItems,
         undefined,
         { createBranchFrom: 'develop' },
       ).createWorktreeFrom,
@@ -55,6 +67,7 @@ describe('applyWorkspaceGitActionPreferences', () => {
       applyWorkspaceGitActionPreferences(
         defaults,
         sourceBranchItems,
+        worktreeItems,
         undefined,
         { createWorktreeFrom: 'release' },
       ).createBranchFrom,
@@ -65,6 +78,7 @@ describe('applyWorkspaceGitActionPreferences', () => {
     const config = applyWorkspaceGitActionPreferences(
       defaults,
       sourceBranchItems,
+      worktreeItems,
       undefined,
       {
         createWorktreeFrom: 'deleted',
@@ -87,6 +101,7 @@ describe('applyWorkspaceGitActionPreferences', () => {
         { value: 'develop', label: 'develop' },
         { value: 'release', label: 'release' },
       ],
+      worktreeItems,
     );
 
     expect(config.createWorktreeFrom).toBe('develop');
@@ -97,6 +112,7 @@ describe('applyWorkspaceGitActionPreferences', () => {
     const config = applyWorkspaceGitActionPreferences(
       defaults,
       sourceBranchItems,
+      worktreeItems,
       { selectedAction: 'create-branch' },
       {
         selectedAction: 'create-worktree',
@@ -107,5 +123,41 @@ describe('applyWorkspaceGitActionPreferences', () => {
 
     expect(config.worktreeNameLabel).toBe('fresh-worktree');
     expect(config.branchNameLabel).toBe('fresh-branch');
+  });
+
+  it('applies available remembered worktree targets', () => {
+    const config = applyWorkspaceGitActionPreferences(
+      defaults,
+      sourceBranchItems,
+      worktreeItems,
+      undefined,
+      { switchWorktreeTarget: '/repo/worktrees/test' },
+    );
+
+    expect(config.switchWorktreeTarget).toBe('/repo/worktrees/test');
+  });
+
+  it('ignores remembered worktree targets that are unavailable', () => {
+    const config = applyWorkspaceGitActionPreferences(
+      defaults,
+      sourceBranchItems,
+      worktreeItems,
+      undefined,
+      { switchWorktreeTarget: '/repo/worktrees/deleted' },
+    );
+
+    expect(config.switchWorktreeTarget).toBe('/repo');
+  });
+
+  it('does not apply branch target preferences', () => {
+    const config = applyWorkspaceGitActionPreferences(
+      defaults,
+      sourceBranchItems,
+      worktreeItems,
+      undefined,
+      { switchWorktreeTarget: '/repo/worktrees/test' },
+    );
+
+    expect(config.switchBranchTarget).toBe('main');
   });
 });

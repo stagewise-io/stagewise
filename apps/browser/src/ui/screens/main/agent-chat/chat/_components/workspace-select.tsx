@@ -1046,7 +1046,9 @@ export type WorkspaceActionConfig = {
   worktreeNameLabel: string;
   branchNameLabel: string;
   createWorktreeFrom: string;
+  createWorktreeFromTouched?: boolean;
   createBranchFrom: string;
+  createBranchFromTouched?: boolean;
   switchBranchTarget: string;
   switchBranchTargetTouched?: boolean;
   switchWorktreeTarget: string;
@@ -1358,7 +1360,10 @@ function workspaceActionConfigsEqual(
     a.worktreeNameLabel === b.worktreeNameLabel &&
     a.branchNameLabel === b.branchNameLabel &&
     a.createWorktreeFrom === b.createWorktreeFrom &&
+    Boolean(a.createWorktreeFromTouched) ===
+      Boolean(b.createWorktreeFromTouched) &&
     a.createBranchFrom === b.createBranchFrom &&
+    Boolean(a.createBranchFromTouched) === Boolean(b.createBranchFromTouched) &&
     a.switchBranchTarget === b.switchBranchTarget &&
     Boolean(a.switchBranchTargetTouched) ===
       Boolean(b.switchBranchTargetTouched) &&
@@ -1473,7 +1478,10 @@ function WorkspaceActionPickerContent({
           items={sourceBranchItems}
           value={config.createWorktreeFrom}
           onValueChange={(next) =>
-            onUpdateAction('create-worktree', { createWorktreeFrom: next })
+            onUpdateAction('create-worktree', {
+              createWorktreeFrom: next,
+              createWorktreeFromTouched: true,
+            })
           }
           portalContainer={branchSelectPortalContainer}
         />
@@ -1513,7 +1521,10 @@ function WorkspaceActionPickerContent({
           items={sourceBranchItems}
           value={config.createBranchFrom}
           onValueChange={(next) =>
-            onUpdateAction('create-branch', { createBranchFrom: next })
+            onUpdateAction('create-branch', {
+              createBranchFrom: next,
+              createBranchFromTouched: true,
+            })
           }
           portalContainer={branchSelectPortalContainer}
         />
@@ -1635,6 +1646,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         checkoutDefaultBranch,
       ),
       sourceBranchItems,
+      worktreeItems,
       generalWorkspaceGitActionPreference,
       repositoryWorkspaceGitActionPreference,
     ),
@@ -1673,6 +1685,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         checkoutDefaultBranch,
       ),
       sourceBranchItems,
+      worktreeItems,
       generalWorkspaceGitActionPreference,
       repositoryWorkspaceGitActionPreference,
     );
@@ -1786,6 +1799,19 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
               'createBranchFrom',
             ],
             value: partial.createBranchFrom,
+          });
+        }
+        if (typeof partial.switchWorktreeTarget === 'string') {
+          patches.push({
+            op: 'add',
+            path: [
+              'agent',
+              'workspaceGitActionPreferences',
+              'repositories',
+              repositoryId,
+              'switchWorktreeTarget',
+            ],
+            value: partial.switchWorktreeTarget,
           });
         }
       }
@@ -2322,6 +2348,9 @@ function ActionBranchSelect({
                       value={item.value}
                       size="xs"
                       disabled={item.disabled}
+                      onClick={() => {
+                        if (isSelected) onValueChange(item.value);
+                      }}
                       // Selected item: already the current value, so a
                       // default cursor signals "no-op". Other rows are
                       // actionable — keep the pointer cursor.
@@ -2552,6 +2581,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
           checkoutDefaultBranch,
         ),
         sourceBranchItems,
+        worktreeItems,
         workspaceGitActionGeneralPreference,
       ),
     [workspaceGitActionGeneralPreference],
@@ -2826,6 +2856,9 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       const gitOptions =
         path === undefined ? null : await loadGitOptionsForPath(path, rowKey);
       if (path === undefined || gitOptions) {
+        // Path-based connect flows do not expose a stable repository ID here.
+        // Keep persistence limited to the general action preference to avoid
+        // leaking worktree paths across repositories.
         persistGeneralWorkspaceGitActionPreference(state.selectedAction);
       }
       const config =

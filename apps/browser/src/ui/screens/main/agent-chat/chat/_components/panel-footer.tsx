@@ -329,6 +329,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const listWorkspaceGitWorktrees = useKartonProcedure(
     (p) => p.toolbox.listWorkspaceGitWorktrees,
   );
+  const workspaceGitActionPreferences = useKartonState(
+    (s) => s.preferences.agent.workspaceGitActionPreferences,
+  );
   const mountWorkspace = useKartonProcedure((p) => p.toolbox.mountWorkspace);
   const unmountWorkspace = useKartonProcedure(
     (p) => p.toolbox.unmountWorkspace,
@@ -732,12 +735,18 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
           'checkout-target',
         );
         const worktreeItems = getWorktreeSelectItemsFromGit(worktreesResult);
-        const defaults = createDefaultWorkspaceActionConfig(
+        const defaults = applyWorkspaceGitActionPreferences(
+          createDefaultWorkspaceActionConfig(
+            sourceBranchItems,
+            worktreeItems,
+            checkoutBranchItems,
+            getDefaultBranchValue(branchesResult, fallbackGitRef),
+            getCurrentBranchValue(branchesResult, fallbackGitRef),
+          ),
           sourceBranchItems,
           worktreeItems,
-          checkoutBranchItems,
-          getDefaultBranchValue(branchesResult, fallbackGitRef),
-          getCurrentBranchValue(branchesResult, fallbackGitRef),
+          workspaceGitActionPreferences.general,
+          workspaceGitActionPreferences.repositories[mount.git.repositoryId],
         );
         const previousCurrentBranchDefault = getCurrentBranchValue(
           null,
@@ -820,6 +829,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     openAgent,
     switchWorkspaceGitBranch,
     unmountWorkspace,
+    workspaceGitActionPreferences,
   ]);
 
   const handleSubmit = useCallback(async () => {
@@ -1462,9 +1472,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     string | null
   >(null);
 
-  const workspaceGitActionPreferences = useKartonState(
-    (s) => s.preferences.agent.workspaceGitActionPreferences,
-  );
   const [workspaceActionConfigs, setWorkspaceActionConfigs] = useState<
     ReadonlyMap<string, WorkspaceActionConfig>
   >(EMPTY_WORKSPACE_ACTION_CONFIGS);
@@ -1508,14 +1515,16 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
         const gitRef = formatWorkspaceGitRef(mount.git);
         const sourceBranchItems = getBranchSelectItems(gitRef);
+        const worktreeItems = getWorktreeSelectItems();
         next.set(
           mount.prefix,
           applyWorkspaceGitActionPreferences(
             createDefaultWorkspaceActionConfig(
               sourceBranchItems,
-              getWorktreeSelectItems(),
+              worktreeItems,
             ),
             sourceBranchItems,
+            worktreeItems,
             workspaceGitActionPreferences.general,
             workspaceGitActionPreferences.repositories[mount.git.repositoryId],
           ),

@@ -128,6 +128,7 @@ describe('userPreferencesSchema workspace Git action defaults', () => {
               selectedAction: 'create-worktree',
               createWorktreeFrom: 'develop',
               createBranchFrom: 'release',
+              switchWorktreeTarget: '/repo/worktrees/test',
             },
           },
         },
@@ -141,6 +142,7 @@ describe('userPreferencesSchema workspace Git action defaults', () => {
           selectedAction: 'create-worktree',
           createWorktreeFrom: 'develop',
           createBranchFrom: 'release',
+          switchWorktreeTarget: '/repo/worktrees/test',
         },
       },
     });
