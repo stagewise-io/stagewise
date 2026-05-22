@@ -326,6 +326,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     userExperienceService,
     credentialsService,
     gitService,
+    preferencesService,
     detectedShell,
     resolvedEnvPromise,
   );
@@ -415,6 +416,13 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     processedImageCacheService,
   );
 
+  toolboxService.setWorkspaceLastUsedAtResolver(async (workspacePaths) => {
+    const db = await agentManagerService.getPersistenceDB();
+    return (
+      (await db?.getWorkspaceLastUsedAtByPath(workspacePaths)) ?? new Map()
+    );
+  });
+
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
   // workspace-md generating, search engines, global config, auth)
   await wirePagesStateSync({
@@ -457,6 +465,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   );
 
   logger.debug('[Main] Normal operation services bootstrapped');
+
+  void toolboxService
+    .scanWorkspaceGitCleanupCandidatesOnStartup()
+    .catch((error) => {
+      logger.warn(
+        `[Main] Failed to scan worktree cleanup candidates: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
 
   logger.debug('[Main] Startup complete');
 

@@ -437,6 +437,47 @@ export class AgentPersistenceDB {
     return results?.[0]?.mountedWorkspaces ?? null;
   }
 
+  public async getWorkspaceLastUsedAtByPath(
+    workspacePaths: string[],
+  ): Promise<Map<string, number>> {
+    const uniquePaths = Array.from(new Set(workspacePaths));
+    if (uniquePaths.length === 0) return new Map();
+
+    const targetPaths = new Set(uniquePaths);
+    const usage = new Map<string, number>();
+    const rows = await this._db
+      .select({
+        lastMessageAt: schema.agentInstances.lastMessageAt,
+        mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
+      })
+      .from(schema.agentInstances)
+      .where(
+        and(
+          isNull(schema.agentInstances.parentAgentInstanceId),
+          eq(schema.agentInstances.type, AgentTypes.CHAT),
+        ),
+      )
+      .catch((error) => {
+        this._logger.error(
+          `[AgentPersistenceDB] Failed to fetch workspace last-use data: ${error}`,
+        );
+        return null;
+      });
+
+    for (const row of rows ?? []) {
+      for (const workspace of row.mountedWorkspaces ?? []) {
+        if (!targetPaths.has(workspace.path)) continue;
+        const timestamp = row.lastMessageAt.getTime();
+        usage.set(
+          workspace.path,
+          Math.max(usage.get(workspace.path) ?? 0, timestamp),
+        );
+      }
+    }
+
+    return usage;
+  }
+
   /**
    * Updates just the title (and titleLockedByUser flag) of a persisted agent
    * without rehydrating it into memory. Used for renaming inactive history

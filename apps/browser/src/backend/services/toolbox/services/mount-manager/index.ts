@@ -11,9 +11,12 @@ import type { FilePickerService } from '@/services/file-picker';
 import type { KartonService } from '@/services/karton';
 import type { UserExperienceService } from '@/services/experience';
 import type { TelemetryService } from '@/services/telemetry';
+import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
 import type {
   MountedWorkspaceGitSummary,
+  WorkspaceGitCleanupCandidate,
+  WorkspaceGitCleanupResult,
   WorkspaceGitCreateBranchOptions,
   WorkspaceGitCreateWorktreeOptions,
   WorkspaceGitCreateWorktreeResult,
@@ -32,6 +35,11 @@ import {
 import { readAgentsMd } from '@/agents/shared/prompts/utils/read-agents-md';
 import { getSkills } from '@/agents/shared/prompts/utils/get-skills';
 import { getRipgrepBasePath, getWorktreesDir } from '@/utils/paths';
+
+const WORKTREE_CLEANUP_UNUSED_DAYS = 7;
+const WORKTREE_CLEANUP_UNUSED_MS =
+  WORKTREE_CLEANUP_UNUSED_DAYS * 24 * 60 * 60 * 1000;
+const WORKTREE_CLEANUP_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 
 type AgentInstanceId = string;
 type MountPrefix = string;
@@ -71,9 +79,13 @@ export class MountManagerService extends DisposableService {
   private readonly uiKarton: KartonService;
   private readonly telemetryService: TelemetryService;
   private readonly gitService: GitService;
+  private readonly preferencesService: PreferencesService;
   private readonly mentionSearch: MentionSearchService;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
   private onMountsChanged?: (agentInstanceId: string) => void;
+  private getWorkspaceLastUsedAtByPath: (
+    workspacePaths: string[],
+  ) => Promise<Map<string, number>> = async () => new Map();
 
   private agentMounts: Map<
     AgentInstanceId,
@@ -101,6 +113,7 @@ export class MountManagerService extends DisposableService {
     uiKarton: KartonService,
     telemetryService: TelemetryService,
     gitService: GitService,
+    preferencesService: PreferencesService,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ) {
     super();
@@ -110,6 +123,7 @@ export class MountManagerService extends DisposableService {
     this.uiKarton = uiKarton;
     this.telemetryService = telemetryService;
     this.gitService = gitService;
+    this.preferencesService = preferencesService;
     this.resolvedEnvPromise = resolvedEnvPromise ?? Promise.resolve(null);
 
     const searchCtx: MentionSearchContext = {
@@ -136,6 +150,7 @@ export class MountManagerService extends DisposableService {
     uiKarton: KartonService,
     telemetryService: TelemetryService,
     gitService: GitService,
+    preferencesService: PreferencesService,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ): Promise<MountManagerService> {
     const instance = new MountManagerService(
@@ -145,6 +160,7 @@ export class MountManagerService extends DisposableService {
       uiKarton,
       telemetryService,
       gitService,
+      preferencesService,
       resolvedEnvPromise,
     );
     await instance.initialize();
@@ -153,6 +169,12 @@ export class MountManagerService extends DisposableService {
 
   public setOnMountsChanged(cb: (agentInstanceId: string) => void) {
     this.onMountsChanged = cb;
+  }
+
+  public setWorkspaceLastUsedAtResolver(
+    resolver: (workspacePaths: string[]) => Promise<Map<string, number>>,
+  ): void {
+    this.getWorkspaceLastUsedAtByPath = resolver;
   }
 
   private async initialize(): Promise<void> {
@@ -326,6 +348,28 @@ export class MountManagerService extends DisposableService {
         );
         if (!mount) return this.notGitRepoCreateWorktreeResult();
         return this.createGitWorktreeByPath(mount.path, options);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.dismissWorkspaceGitCleanupPrompt',
+      async () => {
+        const paths = this.uiKarton.state.workspaceGitCleanup.candidates.map(
+          (candidate) => candidate.path,
+        );
+        await this.preferencesService.snoozeWorkspaceGitCleanupCandidates(
+          paths,
+        );
+        this.uiKarton.setState((draft) => {
+          draft.workspaceGitCleanup.dismissed = true;
+        });
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.cleanWorkspaceGitWorktrees',
+      async (_callingClientId: string, paths: string[]) => {
+        return this.cleanWorkspaceGitWorktrees(paths);
       },
     );
 
@@ -672,6 +716,260 @@ export class MountManagerService extends DisposableService {
     return new Set(this.workspacePathsPerMount.values());
   }
 
+  public async scanWorkspaceGitCleanupCandidatesOnStartup(): Promise<void> {
+    try {
+      const candidates = await this.getWorkspaceGitCleanupCandidates();
+      const now = Date.now();
+      const dismissedCandidates =
+        this.preferencesService.get().agent.workspaceGitCleanup
+          .dismissedCandidates;
+      const promptableCandidates = candidates.filter((candidate) => {
+        const dismissedAt = dismissedCandidates[candidate.path]?.dismissedAt;
+        return (
+          dismissedAt === undefined ||
+          now - dismissedAt >= WORKTREE_CLEANUP_DISMISS_MS
+        );
+      });
+      this.uiKarton.setState((draft) => {
+        draft.workspaceGitCleanup.checkedAt = now;
+        draft.workspaceGitCleanup.dismissed = promptableCandidates.length === 0;
+        draft.workspaceGitCleanup.cleaning = false;
+        draft.workspaceGitCleanup.candidates = promptableCandidates;
+        draft.workspaceGitCleanup.lastResult = null;
+      });
+      await this.preferencesService.pruneWorkspaceGitCleanupSnoozes(
+        candidates.map((candidate) => candidate.path),
+        WORKTREE_CLEANUP_DISMISS_MS,
+        now,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `[MountManager] Failed to scan worktree cleanup candidates: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      this.uiKarton.setState((draft) => {
+        draft.workspaceGitCleanup.checkedAt = Date.now();
+        draft.workspaceGitCleanup.cleaning = false;
+      });
+    }
+  }
+
+  private async cleanWorkspaceGitWorktrees(
+    paths: string[],
+  ): Promise<WorkspaceGitCleanupResult> {
+    const uniquePaths = Array.from(new Set(paths));
+    this.uiKarton.setState((draft) => {
+      draft.workspaceGitCleanup.cleaning = true;
+    });
+
+    const removed: WorkspaceGitCleanupResult['removed'] = [];
+    const failed: WorkspaceGitCleanupResult['failed'] = [];
+    let lastUsedByPath: Map<string, number>;
+    try {
+      lastUsedByPath = await this.getWorkspaceLastUsedAtByPath(uniquePaths);
+    } catch (error) {
+      this.logger.warn(
+        `[MountManager] Failed to resolve worktree cleanup usage data: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      lastUsedByPath = new Map();
+    }
+
+    for (const workspacePath of uniquePaths) {
+      try {
+        const candidate = await this.getCleanupCandidateForPath(
+          workspacePath,
+          lastUsedByPath,
+        );
+        if (!candidate) {
+          failed.push({
+            path: workspacePath,
+            message: 'Worktree is no longer safe to clean.',
+          });
+          continue;
+        }
+
+        const result = await this.gitService.removeWorktree(workspacePath);
+        if (result.ok) {
+          removed.push({ path: workspacePath, branch: candidate.branch });
+        } else {
+          failed.push({ path: workspacePath, message: result.message });
+        }
+      } catch (error) {
+        failed.push({
+          path: workspacePath,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Unexpected cleanup failure.',
+        });
+      }
+    }
+
+    const removedPaths = new Set(removed.map((item) => item.path));
+    const result = { removed, failed };
+    this.uiKarton.setState((draft) => {
+      draft.workspaceGitCleanup.cleaning = false;
+      draft.workspaceGitCleanup.lastResult = result;
+      draft.workspaceGitCleanup.candidates =
+        draft.workspaceGitCleanup.candidates.filter(
+          (candidate) => !removedPaths.has(candidate.path),
+        );
+      if (draft.workspaceGitCleanup.candidates.length === 0) {
+        draft.workspaceGitCleanup.dismissed = true;
+      }
+    });
+    try {
+      const remainingCleanupCandidates =
+        await this.getWorkspaceGitCleanupCandidates();
+      await this.preferencesService.pruneWorkspaceGitCleanupSnoozes(
+        remainingCleanupCandidates.map((candidate) => candidate.path),
+        WORKTREE_CLEANUP_DISMISS_MS,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `[MountManager] Failed to prune worktree cleanup snoozes after cleanup: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return result;
+  }
+
+  private async getWorkspaceGitCleanupCandidates(): Promise<
+    WorkspaceGitCleanupCandidate[]
+  > {
+    const paths = await this.listManagedWorktreePaths();
+    const lastUsedByPath = await this.getWorkspaceLastUsedAtByPath(paths);
+    const candidates: WorkspaceGitCleanupCandidate[] = [];
+
+    for (const workspacePath of paths) {
+      const candidate = await this.getCleanupCandidateForPath(
+        workspacePath,
+        lastUsedByPath,
+      );
+      if (candidate) candidates.push(candidate);
+    }
+
+    return candidates;
+  }
+
+  private async listManagedWorktreePaths(): Promise<string[]> {
+    const worktreesDir = getWorktreesDir();
+    let repoEntries: string[];
+    try {
+      repoEntries = await fs.readdir(worktreesDir);
+    } catch {
+      return [];
+    }
+
+    const paths: string[] = [];
+    const visitDirectory = async (directoryPath: string): Promise<void> => {
+      let directoryEntries: string[];
+      try {
+        const stat = await fs.lstat(directoryPath);
+        if (!stat.isDirectory() || stat.isSymbolicLink()) return;
+
+        await fs.lstat(path.join(directoryPath, '.git'));
+        paths.push(directoryPath);
+        return;
+      } catch {
+        // No .git entry at this level, or the directory is not readable.
+      }
+
+      try {
+        directoryEntries = await fs.readdir(directoryPath);
+      } catch {
+        return;
+      }
+
+      await Promise.all(
+        directoryEntries
+          .filter((entry) => entry !== '.git')
+          .map((entry) => visitDirectory(path.join(directoryPath, entry))),
+      );
+    };
+
+    await Promise.all(
+      repoEntries.map((repoEntry) =>
+        visitDirectory(path.join(worktreesDir, repoEntry)),
+      ),
+    );
+
+    return paths;
+  }
+
+  private async getCleanupCandidateForPath(
+    workspacePath: string,
+    lastUsedByPath: ReadonlyMap<string, number>,
+  ): Promise<WorkspaceGitCleanupCandidate | null> {
+    if (!(await this.isManagedWorktreePath(workspacePath))) return null;
+    if (this.isCurrentlyMounted(workspacePath)) return null;
+
+    const summary =
+      await this.gitService.getMountedWorkspaceSummary(workspacePath);
+    if (!summary?.isWorktree || !summary.branch) return null;
+
+    const worktrees = await this.gitService.listWorktrees(workspacePath);
+    const currentWorktree = worktrees.find(
+      (worktree) => worktree.path === workspacePath,
+    );
+    if (!currentWorktree || currentWorktree.isMainWorktree) return null;
+    if (currentWorktree.isDetached || !currentWorktree.branch) return null;
+
+    const status = await this.gitService.getWorktreeStatus(workspacePath);
+    if (!status || status.dirty) return null;
+
+    const lastUsedAt = lastUsedByPath.get(workspacePath) ?? null;
+    if (
+      lastUsedAt !== null &&
+      Date.now() - lastUsedAt < WORKTREE_CLEANUP_UNUSED_MS
+    ) {
+      return null;
+    }
+
+    const merged = await this.gitService.findMergedTarget(
+      workspacePath,
+      currentWorktree.branch,
+    );
+    if (!merged.merged || !merged.target) return null;
+
+    return {
+      path: workspacePath,
+      branch: currentWorktree.branch,
+      headSha: currentWorktree.headSha,
+      repositoryId: summary.repositoryId,
+      repoRoot: summary.repoRoot,
+      lastUsedAt,
+      mergedInto: merged.target,
+      status: {
+        dirty: false,
+        stagedCount: 0,
+        unstagedCount: 0,
+        untrackedCount: 0,
+      },
+    };
+  }
+
+  private async isManagedWorktreePath(workspacePath: string): Promise<boolean> {
+    const [worktreesDir, resolvedPath] = await Promise.all([
+      safeRealpath(getWorktreesDir()),
+      safeRealpath(workspacePath),
+    ]);
+    if (!worktreesDir || !resolvedPath) return false;
+    const relativeToWorktrees = path.relative(worktreesDir, resolvedPath);
+    return (
+      relativeToWorktrees.length > 0 &&
+      !relativeToWorktrees.startsWith('..') &&
+      !path.isAbsolute(relativeToWorktrees)
+    );
+  }
+
+  private isCurrentlyMounted(workspacePath: string): boolean {
+    const normalizedPath = path.resolve(workspacePath);
+    for (const mountedPath of this.workspacePathsPerMount.values()) {
+      if (path.resolve(mountedPath) === normalizedPath) return true;
+    }
+    return false;
+  }
+
   public getMountedRuntimes(agentInstanceId: string): MountedClientRuntimes {
     const mounts = this.agentMounts.get(agentInstanceId);
     const result: MountedClientRuntimes = new Map();
@@ -989,6 +1287,12 @@ export class MountManagerService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('toolbox.createGitBranchByPath');
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.createGitWorktreeByPath',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.dismissWorkspaceGitCleanupPrompt',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.cleanWorkspaceGitWorktrees',
     );
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.listWorkspaceGitBranches',

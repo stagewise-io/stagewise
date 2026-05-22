@@ -480,6 +480,61 @@ describe('GitService', () => {
     );
   });
 
+  it('detects a branch merged into the default branch', async () => {
+    const { service, mutationCalls } = await createGitService(
+      {
+        ...baseReadResponses,
+        'rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nfeature-a\ndef456\n`,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
+          'main\t\nfeature-a\t*',
+        'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
+      },
+      {
+        'merge-base --is-ancestor feature-a main': { exitCode: 0 },
+      },
+    );
+
+    await expect(
+      service.findMergedTarget('/repo', 'feature-a'),
+    ).resolves.toEqual({
+      merged: true,
+      target: 'main',
+    });
+    expect(mutationCalls).toContain('merge-base --is-ancestor feature-a main');
+  });
+
+  it('returns unmerged when no safe target contains the branch', async () => {
+    const { service } = await createGitService(
+      {
+        ...baseReadResponses,
+        'rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nfeature-a\ndef456\n`,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
+          'main\t\nfeature-a\t*',
+        'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
+      },
+      {
+        'merge-base --is-ancestor feature-a main': { exitCode: 1 },
+      },
+    );
+
+    await expect(
+      service.findMergedTarget('/repo', 'feature-a'),
+    ).resolves.toEqual({
+      merged: false,
+      target: null,
+    });
+  });
+
+  it('removes worktrees without force', async () => {
+    const { service, mutationCalls } =
+      await createGitService(baseReadResponses);
+
+    await expect(service.removeWorktree('/repo')).resolves.toEqual({
+      ok: true,
+    });
+    expect(mutationCalls).toContain('worktree remove /repo');
+  });
+
   it('returns structured worktree command failure', async () => {
     const { service } = await createGitService(
       {

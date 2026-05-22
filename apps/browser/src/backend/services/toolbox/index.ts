@@ -32,6 +32,7 @@ import type { TelemetryService } from '@/services/telemetry';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { SmartApprovalDeps } from './tools/shell/execute-shell-command';
 import type { CredentialsService } from '@/services/credentials';
+import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
@@ -182,6 +183,7 @@ export class ToolboxService extends DisposableService {
   private shellsRuntimes = new Map<string, ClientRuntimeNode>();
 
   private mountManagerService: MountManagerService | null = null;
+  private readonly preferencesService: PreferencesService;
   private unsubPreferenceSync: (() => void) | null = null;
 
   /** Cached API client - recreated when auth changes */
@@ -336,6 +338,19 @@ export class ToolboxService extends DisposableService {
     this.modelProviderService = service;
   }
 
+  public setWorkspaceLastUsedAtResolver(
+    resolver: (workspacePaths: string[]) => Promise<Map<string, number>>,
+  ): void {
+    this.mountManagerService?.setWorkspaceLastUsedAtResolver(resolver);
+  }
+
+  public scanWorkspaceGitCleanupCandidatesOnStartup(): Promise<void> {
+    return (
+      this.mountManagerService?.scanWorkspaceGitCleanupCandidatesOnStartup() ??
+      Promise.resolve()
+    );
+  }
+
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -347,6 +362,7 @@ export class ToolboxService extends DisposableService {
     userExperienceService: UserExperienceService,
     credentialsService: CredentialsService,
     gitService: GitService,
+    preferencesService: PreferencesService,
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
   ) {
@@ -361,6 +377,7 @@ export class ToolboxService extends DisposableService {
     this.userExperienceService = userExperienceService;
     this.credentialsService = credentialsService;
     this.gitService = gitService;
+    this.preferencesService = preferencesService;
     this.detectedShell = detectedShell;
     this.resolvedEnvPromise = resolvedEnvPromise;
   }
@@ -376,6 +393,7 @@ export class ToolboxService extends DisposableService {
     userExperienceService: UserExperienceService,
     credentialsService: CredentialsService,
     gitService: GitService,
+    preferencesService: PreferencesService,
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
   ): Promise<ToolboxService> {
@@ -390,6 +408,7 @@ export class ToolboxService extends DisposableService {
       userExperienceService,
       credentialsService,
       gitService,
+      preferencesService,
       detectedShell,
       resolvedEnvPromise,
     );
@@ -1871,6 +1890,7 @@ export class ToolboxService extends DisposableService {
       this.uiKarton,
       this.telemetryService,
       this.gitService,
+      this.preferencesService,
       this.resolvedEnvPromise,
     );
 

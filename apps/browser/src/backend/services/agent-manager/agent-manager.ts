@@ -197,6 +197,10 @@ export class AgentManagerService extends DisposableService {
    * Ensures the persistence DB is ready before performing operations.
    * Returns the DB instance or null if initialization failed.
    */
+  public async getPersistenceDB(): Promise<AgentPersistenceDB | null> {
+    return this.ensureDBReady();
+  }
+
   private async ensureDBReady(): Promise<AgentPersistenceDB | null> {
     await this.dbReadyPromise;
     return this.agentPersistenceDB;

@@ -404,6 +404,17 @@ export class PreferencesService extends DisposableService {
     return structuredClone(this.preferences);
   }
 
+  private async replacePreferences(
+    nextPreferences: UserPreferences,
+  ): Promise<void> {
+    const oldPrefs = structuredClone(this.preferences);
+    this.preferences = userPreferencesSchema.parse(nextPreferences);
+
+    await this.save();
+    this.syncToKarton();
+    this.notifyListeners(this.preferences, oldPrefs);
+  }
+
   /**
    * Update preferences by applying Immer patches.
    *
@@ -417,19 +428,67 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
     this.logger.debug('[PreferencesService] Applying patches...', { patches });
 
-    const oldPrefs = structuredClone(this.preferences);
-
     // Apply patches using Immer
     const patched = applyPatches(this.preferences, patches);
 
-    // Validate the result against the schema
-    this.preferences = userPreferencesSchema.parse(patched);
-
-    await this.save();
-    this.syncToKarton();
-    this.notifyListeners(this.preferences, oldPrefs);
+    await this.replacePreferences(patched);
 
     this.logger.debug('[PreferencesService] Patches applied successfully');
+  }
+
+  public async snoozeWorkspaceGitCleanupCandidates(
+    paths: string[],
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const uniquePaths = Array.from(new Set(paths));
+    if (uniquePaths.length === 0) return;
+
+    const nextPreferences = structuredClone(this.preferences);
+    const dismissedCandidates = {
+      ...nextPreferences.agent.workspaceGitCleanup.dismissedCandidates,
+    };
+    const dismissedAt = Date.now();
+    for (const path of uniquePaths) {
+      dismissedCandidates[path] = { dismissedAt };
+    }
+    nextPreferences.agent.workspaceGitCleanup.dismissedCandidates =
+      dismissedCandidates;
+
+    await this.replacePreferences(nextPreferences);
+  }
+
+  public async pruneWorkspaceGitCleanupSnoozes(
+    activeCandidatePaths: string[],
+    maxAgeMs: number,
+    now = Date.now(),
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const activeCandidatePathSet = new Set(activeCandidatePaths);
+    const dismissedCandidates =
+      this.preferences.agent.workspaceGitCleanup.dismissedCandidates;
+    const nextDismissedCandidates: typeof dismissedCandidates = {};
+
+    for (const [path, value] of Object.entries(dismissedCandidates)) {
+      if (!activeCandidatePathSet.has(path)) continue;
+      if (now - value.dismissedAt >= maxAgeMs) continue;
+      nextDismissedCandidates[path] = value;
+    }
+
+    if (
+      Object.keys(nextDismissedCandidates).length ===
+        Object.keys(dismissedCandidates).length &&
+      Object.entries(nextDismissedCandidates).every(
+        ([path, value]) => dismissedCandidates[path] === value,
+      )
+    ) {
+      return;
+    }
+
+    const nextPreferences = structuredClone(this.preferences);
+    nextPreferences.agent.workspaceGitCleanup.dismissedCandidates =
+      nextDismissedCandidates;
+
+    await this.replacePreferences(nextPreferences);
   }
 
   /**

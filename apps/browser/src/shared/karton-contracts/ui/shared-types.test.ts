@@ -45,6 +45,63 @@ describe('userPreferencesSchema sidebar defaults', () => {
   });
 });
 
+describe('userPreferencesSchema worktree cleanup snooze defaults', () => {
+  it('defaults worktree cleanup snoozes when missing', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceSettings: {},
+        disabledModelIds: [],
+        disabledPluginIds: [],
+        workspaceGitActionPreferences: { general: {}, repositories: {} },
+      },
+    });
+
+    expect(parsed.agent.workspaceGitCleanup).toEqual({
+      dismissedCandidates: {},
+    });
+  });
+
+  it('preserves valid worktree cleanup snoozes', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceGitCleanup: {
+          dismissedCandidates: {
+            '/worktree/a': { dismissedAt: 1710000000000 },
+            '/worktree/b': { dismissedAt: 1710000001000 },
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.workspaceGitCleanup).toEqual({
+      dismissedCandidates: {
+        '/worktree/a': { dismissedAt: 1710000000000 },
+        '/worktree/b': { dismissedAt: 1710000001000 },
+      },
+    });
+  });
+
+  it('sanitizes invalid worktree cleanup snooze entries', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceGitCleanup: {
+          dismissedCandidates: {
+            '/worktree/a': { dismissedAt: 1710000000000 },
+            '/worktree/b': { dismissedAt: 'invalid' },
+            '/worktree/c': null,
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.workspaceGitCleanup).toEqual({
+      dismissedCandidates: {
+        '/worktree/a': { dismissedAt: 1710000000000 },
+      },
+    });
+  });
+});
+
 describe('userPreferencesSchema workspace Git action defaults', () => {
   it('defaults workspace Git action preferences when missing', () => {
     const parsed = userPreferencesSchema.parse({

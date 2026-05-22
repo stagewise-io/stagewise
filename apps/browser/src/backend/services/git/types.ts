@@ -64,6 +64,15 @@ export type GitWorktreeListResult = {
   worktrees: Array<GitWorktreeInfo & { current: boolean }>;
 };
 
+export type GitMergedTargetResult = {
+  merged: boolean;
+  target: string | null;
+};
+
+export type GitWorktreeRemoveResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 export type GitActionFailureReason =
   | 'not-git-repo'
   | 'branch-not-found'
