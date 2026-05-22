@@ -598,6 +598,7 @@ export class SandboxService extends DisposableService {
                 params,
               });
             },
+            msg.agentId,
           );
           agentSubs.set(key, unsubscribe);
         } catch (err) {
