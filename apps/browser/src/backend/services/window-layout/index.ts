@@ -704,7 +704,16 @@ export class WindowLayoutService extends DisposableService {
     agentInstanceId: string,
     setActive = true,
   ): Promise<string> {
-    return await this.createTab(url, setActive, undefined, agentInstanceId);
+    const tabId = await this.createTab(
+      url,
+      setActive,
+      undefined,
+      agentInstanceId,
+    );
+    // Persist immediately so agent-created background tabs survive
+    // restarts even without a later saveTabState() trigger.
+    this.saveTabState();
+    return tabId;
   }
 
   /**
