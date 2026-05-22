@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-alpha097 (2026-05-22)
+
+### Features
+
+* add hotkey-controls to cmd-center (6911e8b)
+* add cmd-k control center (1390e10)
+
 ## 1.0.0-alpha096 (2026-05-21)
 
 ### Bug Fixes
