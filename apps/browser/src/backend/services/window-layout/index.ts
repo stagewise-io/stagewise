@@ -2570,6 +2570,13 @@ export class WindowLayoutService extends DisposableService {
   // Tab State Persistence
   // -------------------------------------------------------------------------
 
+  /** Flush tab persistence synchronously. Used during app shutdown so
+   *  terminal tabs created since the last tab switch are not lost if the
+   *  process exits before another normal persistence trigger fires. */
+  public persistTabStateNow(): void {
+    this.saveTabState();
+  }
+
   /** Persist open tabs and agent-tab associations so they survive restart.
    *  Reads contentTabs.tabs live from Karton state — terminal deletions
    *  performed by TerminalService (handleCloseTerminal, onPtyExit) are
