@@ -66,19 +66,23 @@ Returns logs in reverse chronological order (most recent first) with:
 - stackTrace: Stack trace (for errors)
 `;
 
-export const readConsoleLogs = (windowLayoutService: WindowLayoutService) => {
+export const readConsoleLogs = (
+  windowLayoutService: WindowLayoutService,
+  agentInstanceId: string,
+) => {
   return tool({
     description: DESCRIPTION,
     inputSchema: readConsoleLogsToolInputSchema,
     strict: false,
     execute: (params) =>
-      readConsoleLogsToolExecute(params, windowLayoutService),
+      readConsoleLogsToolExecute(params, windowLayoutService, agentInstanceId),
   });
 };
 
 async function readConsoleLogsToolExecute(
   params: ReadConsoleLogsToolInput,
   windowLayoutService: WindowLayoutService,
+  agentInstanceId: string,
 ) {
   try {
     // Wait for the specified delay before reading logs
@@ -88,11 +92,15 @@ async function readConsoleLogsToolExecute(
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
-    const result = windowLayoutService.getConsoleLogs(params.id, {
-      filter: params.filter,
-      limit: params.limit,
-      levels: params.levels,
-    });
+    const result = windowLayoutService.getConsoleLogs(
+      params.id,
+      {
+        filter: params.filter,
+        limit: params.limit,
+        levels: params.levels,
+      },
+      agentInstanceId,
+    );
 
     if (!result.success) {
       return {

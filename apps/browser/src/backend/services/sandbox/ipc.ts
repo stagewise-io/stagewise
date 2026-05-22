@@ -100,6 +100,7 @@ export type WorkerToMainMessage =
   | {
       type: 'cdp';
       id: string;
+      agentId: string;
       tabId: string;
       method: string;
       params?: Record<string, unknown>;

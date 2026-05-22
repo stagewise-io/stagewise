@@ -303,7 +303,7 @@ function getSandboxAPI(agentId: string) {
       const id = `${cdpReqId++}`;
       return new Promise((resolve, reject) => {
         pendingCdp.set(id, { resolve, reject });
-        ipc.send({ type: 'cdp', id, tabId, method, params });
+        ipc.send({ type: 'cdp', id, agentId, tabId, method, params });
       });
     },
     onCDPEvent(
