@@ -13,10 +13,16 @@ import {
   ComboboxItemIndicator,
   ComboboxList,
 } from '@stagewise/stage-ui/components/combobox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 import type { ModelId } from '@shared/available-models';
 import { IconBrainOutline18 } from 'nucleo-ui-outline-18';
 import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
 import { availableModels } from '@shared/available-models';
+import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
@@ -30,6 +36,8 @@ import {
 } from 'react';
 import { cn } from '@ui/utils';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 
 interface ModelOption {
   modelId: string;
@@ -151,6 +159,8 @@ export const ModelSelect = memo(function ModelSelect({
     return groups;
   }, [modelOptions]);
 
+  const [open, setOpen] = useState(false);
+
   // Search / filter state
   const [query, setQuery] = useState('');
 
@@ -179,6 +189,8 @@ export const ModelSelect = memo(function ModelSelect({
     if (!selectedModel) return 'Select model';
     return modelMap.get(selectedModel)?.displayName ?? selectedModel;
   }, [modelMap, selectedModel]);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Side-panel hover state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -240,34 +252,58 @@ export const ModelSelect = memo(function ModelSelect({
     [openAgent, setSelectedModel, onModelChange],
   );
 
-  const handleOpenChange = useCallback((open: boolean) => {
-    if (!open) {
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
       setHoveredModel(null);
       setQuery('');
     }
   }, []);
 
+  useHotKeyListener(
+    useCallback(() => {
+      setOpen(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          inputRef.current?.focus();
+        });
+      });
+    }, []),
+    HotkeyActions.OPEN_MODEL_SELECT,
+  );
+
   return (
     <Combobox
       value={selectedModel}
+      open={open}
       onValueChange={handleValueChange}
       onOpenChange={handleOpenChange}
       filter={null}
     >
-      <ComboboxBase.Trigger
-        className={cn(
-          'inline-flex min-w-0 max-w-full cursor-pointer items-center justify-between gap-1 rounded-lg p-0 font-normal text-xs shadow-none transition-colors',
-          'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
-          'has-disabled:pointer-events-none has-disabled:opacity-50',
-          'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
-          'h-4 w-auto',
-        )}
-      >
-        <span className="truncate">{selectedDisplayName}</span>
-        <ComboboxBase.Icon className="shrink-0">
-          <IconChevronDownFill18 className="size-3" />
-        </ComboboxBase.Icon>
-      </ComboboxBase.Trigger>
+      <Tooltip>
+        <TooltipTrigger>
+          <ComboboxBase.Trigger
+            className={cn(
+              'inline-flex min-w-0 max-w-full cursor-pointer items-center justify-between gap-1 rounded-lg p-0 font-normal text-xs shadow-none transition-colors',
+              'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
+              'has-disabled:pointer-events-none has-disabled:opacity-50',
+              'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
+              'h-4 w-auto',
+            )}
+          >
+            <span className="truncate">{selectedDisplayName}</span>
+            <ComboboxBase.Icon className="shrink-0">
+              <IconChevronDownFill18 className="size-3" />
+            </ComboboxBase.Icon>
+          </ComboboxBase.Trigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <span className="flex items-center gap-1.5">
+            <span>Switch model</span>
+            <HotkeyCombo action={HotkeyActions.OPEN_MODEL_SELECT} size="xs" />
+          </span>
+        </TooltipContent>
+      </Tooltip>
 
       <ComboboxBase.Portal>
         <ComboboxBase.Backdrop className="fixed inset-0 z-50" />
@@ -293,6 +329,7 @@ export const ModelSelect = memo(function ModelSelect({
             >
               <div className="mb-1 rounded-md">
                 <ComboboxInput
+                  ref={inputRef}
                   size="xs"
                   placeholder="Search…"
                   value={query}

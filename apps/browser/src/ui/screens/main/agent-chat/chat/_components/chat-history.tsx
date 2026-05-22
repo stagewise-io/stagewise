@@ -30,6 +30,14 @@ import type {
 import { isEmptyAssistantMessage, areAllPartsSettled } from './message-utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { calculateChatItemHeights } from '@ui/utils/calculate-chat-item-height';
+import { shouldNativeInputConsumeEvent } from '@shared/native-input-events';
+import { HotkeyActions } from '@shared/hotkeys';
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import {
+  CHAT_HISTORY_SCROLL_EVENT,
+  type ChatHistoryScrollDirection,
+} from '../_lib/chat-history-scroll-event';
+import { CHAT_EDIT_USER_MESSAGE_REQUESTED_EVENT } from '../_lib/chat-edit-user-message-event';
 
 // Top inset reserved for titlebar-level chrome (sidebar toggle, future
 // top-right buttons). Sits as a sibling spacer ABOVE Virtuoso so items can
@@ -43,6 +51,8 @@ const CHAT_TOP_INSET = 32;
 // first message stays fully crisp at scrollTop=0 and only starts fading
 // once the user actually scrolls.
 const CHAT_FADE = 16;
+const CHAT_PAGE_SCROLL_FACTOR = 0.6;
+const CHAT_PAGE_SCROLL_MIN = 120;
 
 // Stable empty array to avoid infinite re-renders with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -138,6 +148,34 @@ function isOptimisticMessageConfirmed(
   return (
     optimisticMessage._serverUserCountAtSend !== undefined &&
     serverUserMessages.length > optimisticMessage._serverUserCountAtSend
+  );
+}
+
+function getChatHistoryScrollDirectionFromEvent(
+  event: KeyboardEvent,
+): ChatHistoryScrollDirection | null {
+  if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+    if (event.key === 'PageUp') return 'up';
+    if (event.key === 'PageDown') return 'down';
+  }
+
+  if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
+    return null;
+
+  const key = event.key.toLowerCase();
+  if (key === 'u') return 'up';
+  if (key === 'd') return 'down';
+
+  return null;
+}
+
+function isEventFromEditableTarget(event: KeyboardEvent) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return false;
+
+  return (
+    target.isContentEditable ||
+    target.closest('input, textarea, select, [contenteditable="true"]') !== null
   );
 }
 
@@ -237,6 +275,55 @@ export const ChatHistory = () => {
     },
     [autoScrollRef],
   );
+
+  const scrollChatHistoryByPage = useCallback(
+    (direction: ChatHistoryScrollDirection) => {
+      if (!scroller) return;
+
+      const amount = Math.max(
+        CHAT_PAGE_SCROLL_MIN,
+        scroller.clientHeight * CHAT_PAGE_SCROLL_FACTOR,
+      );
+      scroller.scrollBy({
+        top: direction === 'up' ? -amount : amount,
+        behavior: 'smooth',
+      });
+    },
+    [scroller],
+  );
+
+  useEffect(() => {
+    const handleChatHistoryScroll = (
+      event: WindowEventMap[typeof CHAT_HISTORY_SCROLL_EVENT],
+    ) => {
+      scrollChatHistoryByPage(event.detail.direction);
+    };
+
+    window.addEventListener(CHAT_HISTORY_SCROLL_EVENT, handleChatHistoryScroll);
+    return () => {
+      window.removeEventListener(
+        CHAT_HISTORY_SCROLL_EVENT,
+        handleChatHistoryScroll,
+      );
+    };
+  }, [scrollChatHistoryByPage]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+
+      const direction = getChatHistoryScrollDirectionFromEvent(event);
+      if (!direction) return;
+      if (isEventFromEditableTarget(event)) return;
+      if (shouldNativeInputConsumeEvent(event)) return;
+
+      event.preventDefault();
+      scrollChatHistoryByPage(direction);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [scrollChatHistoryByPage]);
 
   const { activeEditMessageId } = useMessageEditState();
   const track = useTrack();
@@ -807,6 +894,49 @@ export const ChatHistory = () => {
 
     return -1;
   }, [filteredMessages]);
+
+  useHotKeyListener(
+    useCallback(() => {
+      if (isWorking) return;
+      const editableMessages = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-editable-user-message-id]',
+        ),
+      );
+      if (!scroller) return;
+      const scrollerRect = scroller.getBoundingClientRect();
+      const visibleTop = scrollerRect.top;
+      const visibleBottom = scrollerRect.bottom;
+
+      let nearestMessageId: string | undefined;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      for (const element of editableMessages) {
+        const rect = element.getBoundingClientRect();
+        if (
+          rect.bottom > visibleBottom ||
+          rect.bottom <= visibleTop ||
+          rect.top >= visibleBottom
+        )
+          continue;
+        const distance = visibleBottom - rect.bottom;
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestMessageId = element.dataset.editableUserMessageId;
+        }
+      }
+
+      if (!nearestMessageId) return;
+
+      window.dispatchEvent(
+        new CustomEvent(CHAT_EDIT_USER_MESSAGE_REQUESTED_EVENT, {
+          detail: { messageId: nearestMessageId },
+        }),
+      );
+    }, [isWorking, scroller]),
+    HotkeyActions.EDIT_NEAREST_USER_MESSAGE,
+    !activeEditMessageId,
+  );
 
   // --- Refs for itemContent stabilisation ---
   // These mirror frequently-changing derived values so that the

@@ -32,6 +32,13 @@
   --active-derived-l: -0.05;
   --active-derived-c: -0.005;
 
+  --shortcut-solid-derived-l: 0.06;
+  --shortcut-solid-derived-c: 0.011;
+  --shortcut-solid-hover-derived-l: 0.03;
+  --shortcut-solid-hover-derived-c: 0.008;
+  --shortcut-solid-active-derived-l: 0.01;
+  --shortcut-solid-active-derived-c: 0.006;
+
   --border-derived-subtle-l: -0.020;
   --border-derived-subtle-c: -0.003;
 
@@ -55,6 +62,13 @@
 
     --active-derived-l: 0.07;
     --active-derived-c: 0.001;
+
+    --shortcut-solid-derived-l: -0.06;
+    --shortcut-solid-derived-c: -0.011;
+    --shortcut-solid-hover-derived-l: -0.03;
+    --shortcut-solid-hover-derived-c: -0.008;
+    --shortcut-solid-active-derived-l: 0.01;
+    --shortcut-solid-active-derived-c: -0.006;
 
     --border-derived-subtle-l: 0.07;
     --border-derived-subtle-c: 0.012;
@@ -151,3 +165,17 @@
 @utility bg-derived-darker {
   background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l - 0.09) calc(c - 0.014) h);
 }
+
+/* stylelint-disable scss/at-rule-no-unknown -- Tailwind CSS v4 @utility directives. */
+@utility bg-shortcut-solid-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--shortcut-solid-derived-l)) calc(c + var(--shortcut-solid-derived-c)) h);
+}
+
+@utility bg-shortcut-solid-hover-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--shortcut-solid-hover-derived-l)) calc(c + var(--shortcut-solid-hover-derived-c)) h);
+}
+
+@utility bg-shortcut-solid-active-derived {
+  background-color: oklch(from var(--cm-bg-color, var(--color-border-subtle)) calc(l + var(--shortcut-solid-active-derived-l)) calc(c + var(--shortcut-solid-active-derived-c)) h);
+}
+/* stylelint-enable scss/at-rule-no-unknown */

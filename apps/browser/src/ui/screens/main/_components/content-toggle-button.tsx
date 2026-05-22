@@ -1,3 +1,4 @@
+import { HotkeyActions } from '@shared/hotkeys';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
@@ -8,6 +9,7 @@ import {
   IconSidebarRightHideOutline18,
   IconSidebarRightShowOutline18,
 } from 'nucleo-ui-outline-18';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { useContentCollapsed } from './content-collapsed-context';
 
 export function ContentToggleButton() {
@@ -28,7 +30,12 @@ export function ContentToggleButton() {
           <Icon className="size-4" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>
+        <span className="flex items-center gap-1.5">
+          <span>{label}</span>
+          <HotkeyCombo action={HotkeyActions.TOGGLE_CONTENT_PANEL} size="xs" />
+        </span>
+      </TooltipContent>
     </Tooltip>
   );
 }

@@ -19,7 +19,7 @@ function isEventFromCommandCenter(event: KeyboardEvent) {
 }
 
 export function useHotKeyListener(
-  action: () => void,
+  action: (event: KeyboardEvent) => unknown,
   hotKeyAction: HotkeyActions,
   enabled = true,
 ) {
@@ -34,12 +34,10 @@ export function useHotKeyListener(
         hotKeyAction !== HotkeyActions.OPEN_COMMAND_CENTER &&
         document.body.hasAttribute(commandCenterModalActiveAttribute)
       ) {
-        if (isMatchingHotkey) {
+        if (isMatchingHotkey && !isEventFromCommandCenter(ev)) {
           ev.preventDefault();
-          if (!isEventFromCommandCenter(ev)) {
-            ev.stopPropagation();
-            ev.stopImmediatePropagation();
-          }
+          ev.stopPropagation();
+          ev.stopImmediatePropagation();
         }
         return;
       }
@@ -53,8 +51,11 @@ export function useHotKeyListener(
 
       // The first matching hotkey action will be executed and abort further processing of other hotkey actions.
       if (isMatchingHotkey) {
-        action();
+        const handled = action(ev) !== false;
+        if (!handled) return;
+
         ev.stopPropagation();
+        ev.stopImmediatePropagation();
         ev.preventDefault();
       }
     },

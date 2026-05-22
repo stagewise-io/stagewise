@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
 
 export const ExecuteShellCommandToolPart = ({
   part,
@@ -339,7 +340,7 @@ export const ExecuteShellCommandToolPart = ({
           {isStdin ? (
             <>
               <span className="select-none text-subtle-foreground">→ </span>
-              {humanizeStdin(part.input?.stdin ?? '')}
+              <HumanizedStdin value={part.input?.stdin ?? ''} />
             </>
           ) : isKill ? (
             <>
@@ -483,10 +484,12 @@ const STDIN_SEQUENCES: [string, string][] = [
   ['\t', 'Tab'],
 ];
 
-const CONTROL_LABELS = new Set(STDIN_SEQUENCES.map(([, label]) => label));
+type StdinToken =
+  | { type: 'control'; value: string }
+  | { type: 'text'; value: string };
 
-function humanizeStdin(raw: string): string {
-  const tokens: string[] = [];
+function tokenizeStdin(raw: string): StdinToken[] {
+  const tokens: StdinToken[] = [];
   let printable = '';
   let i = 0;
 
@@ -495,10 +498,10 @@ function humanizeStdin(raw: string): string {
     for (const [pattern, label] of STDIN_SEQUENCES) {
       if (raw.startsWith(pattern, i)) {
         if (printable) {
-          tokens.push(printable);
+          tokens.push({ type: 'text', value: printable });
           printable = '';
         }
-        tokens.push(label);
+        tokens.push({ type: 'control', value: label });
         i += pattern.length;
         matched = true;
         break;
@@ -509,11 +512,32 @@ function humanizeStdin(raw: string): string {
       i++;
     }
   }
-  if (printable) tokens.push(printable);
-  if (tokens.length === 0) return raw || '(empty)';
+  if (printable) tokens.push({ type: 'text', value: printable });
+  return tokens;
+}
 
-  const allControl = tokens.every((t) => CONTROL_LABELS.has(t));
-  return allControl ? tokens.join(' ') : tokens.join('');
+function HumanizedStdin({ value }: { value: string }) {
+  const tokens = tokenizeStdin(value);
+  if (tokens.length === 0) return value || '(empty)';
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-0.5 align-middle">
+      {tokens.map((token, index) =>
+        token.type === 'control' ? (
+          <ShortcutCombo
+            key={`${token.value}-${index}`}
+            value={token.value}
+            size="xs"
+            variant="subtle"
+          />
+        ) : (
+          <span key={`${token.value}-${index}`} className="whitespace-pre-wrap">
+            {token.value}
+          </span>
+        ),
+      )}
+    </span>
+  );
 }
 
 function TruncatedCommandText({

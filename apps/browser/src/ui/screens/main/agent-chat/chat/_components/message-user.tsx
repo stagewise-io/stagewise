@@ -37,6 +37,10 @@ import type { AttachmentType } from './rich-text/attachments';
 import type { MentionContext } from './rich-text/mentions';
 import type { FileMentionItem } from './rich-text/mentions/types';
 import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+import {
+  CHAT_EDIT_USER_MESSAGE_REQUESTED_EVENT,
+  type ChatEditUserMessageRequestedEvent,
+} from '../_lib/chat-edit-user-message-event';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from 'nucleo-micro-bold';
@@ -440,6 +444,14 @@ export const MessageUser = memo(
       },
     );
 
+    useEventListener(
+      CHAT_EDIT_USER_MESSAGE_REQUESTED_EVENT,
+      (e: ChatEditUserMessageRequestedEvent) => {
+        if (isEditing && e.detail.messageId === editMessageId) return;
+        if (e.detail.messageId === editMessageId) handleStartEditing();
+      },
+    );
+
     // Handle textclip-expand during edit mode: replace the attachment node
     // with inline text and remove the file attachment from local state.
     // The blob file is intentionally NOT deleted — the user may cancel the edit.
@@ -626,6 +638,9 @@ export const MessageUser = memo(
                     canEdit &&
                     'group/chat-message-user cursor-pointer hover:bg-hover-derived active:bg-active-derived',
                 )}
+                data-editable-user-message-id={
+                  !isEditing && canEdit ? msg.id : undefined
+                }
                 onClick={!isEditing && canEdit ? handleStartEditing : undefined}
                 role={!isEditing && canEdit ? 'button' : undefined}
                 tabIndex={!isEditing && canEdit ? 0 : undefined}

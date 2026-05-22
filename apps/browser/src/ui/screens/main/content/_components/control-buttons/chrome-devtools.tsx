@@ -1,3 +1,4 @@
+import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { IconSquareCodeOutline18 } from 'nucleo-ui-outline-18';
 import type { TabState } from '@shared/karton-contracts/ui';
@@ -7,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 
 export function ChromeDevToolsWidget({ tab }: { tab: TabState }) {
   const toggleChromeDevTools = useKartonProcedure(
@@ -21,8 +23,8 @@ export function ChromeDevToolsWidget({ tab }: { tab: TabState }) {
           size="icon-sm"
           aria-label={
             tab.devTools.chromeOpen
-              ? 'Hide Chrome DevTools'
-              : 'Show Chrome DevTools'
+              ? 'Hide Stagewise DevTools'
+              : 'Show Stagewise DevTools'
           }
           onClick={() => toggleChromeDevTools(tab.id)}
           className={
@@ -33,7 +35,16 @@ export function ChromeDevToolsWidget({ tab }: { tab: TabState }) {
           <IconSquareCodeOutline18 className="size-4" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Show Chrome DevTools</TooltipContent>
+      <TooltipContent>
+        <span className="flex items-center gap-1.5">
+          <span>
+            {tab.devTools.chromeOpen
+              ? 'Hide Stagewise DevTools'
+              : 'Show Stagewise DevTools'}
+          </span>
+          <HotkeyCombo action={HotkeyActions.DEV_TOOLS} size="xs" />
+        </span>
+      </TooltipContent>
     </Tooltip>
   );
 }

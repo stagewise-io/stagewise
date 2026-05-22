@@ -75,6 +75,7 @@ import {
 } from 'react';
 import { XIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -103,6 +104,11 @@ export interface SortableTabItem {
    * Only rendered in the `"bar"` variant when provided.
    */
   onClose?: () => void;
+  /**
+   * Optional shortcut hint rendered in the close button tooltip.
+   * Bar variant only.
+   */
+  closeShortcut?: ReactNode;
   /**
    * Middle-click (auxclick) handler on the outer tab wrapper.
    * Bar variant only. Safe to combine with dnd-kit — the PointerSensor
@@ -184,6 +190,20 @@ function BarTriggerContent({
   isActive?: boolean;
 }) {
   const showClose = item.closeable !== false && !!item.onClose;
+  const closeButton = item.onClose ? (
+    <button
+      type="button"
+      aria-label="Close tab"
+      // Prevent dnd-kit's PointerSensor from activating on the close btn
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={item.onClose}
+      className={cn(
+        'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100',
+      )}
+    >
+      <XIcon className="size-3" />
+    </button>
+  ) : null;
 
   const el = (
     <div
@@ -219,19 +239,16 @@ function BarTriggerContent({
       {item.actions}
 
       {/* Close button — absolute overlay on the right, fades in on hover/active */}
-      {showClose && (
-        <button
-          type="button"
-          aria-label="Close tab"
-          // Prevent dnd-kit's PointerSensor from activating on the close btn
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={item.onClose}
-          className={cn(
-            'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground group-hover:opacity-100',
-          )}
-        >
-          <XIcon className="size-3" />
-        </button>
+      {showClose && closeButton && (
+        <Tooltip>
+          <TooltipTrigger>{closeButton}</TooltipTrigger>
+          <TooltipContent>
+            <span className="flex items-center gap-1.5">
+              <span>Close tab</span>
+              {item.closeShortcut}
+            </span>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );

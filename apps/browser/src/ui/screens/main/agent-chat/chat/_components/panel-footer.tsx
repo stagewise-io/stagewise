@@ -615,7 +615,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, []);
 
   const abortAgent = useCallback(async () => {
-    if (isEarlyAbortEligible()) {
+    const inputIsEmpty =
+      (chatInputRef.current?.getTextContent()?.trim().length ?? 0) === 0;
+
+    if (inputIsEmpty && isEarlyAbortEligible()) {
       const currentHistory = historyRef.current ?? [];
       for (let i = currentHistory.length - 1; i >= 0; i--) {
         if (currentHistory[i]?.role === 'user') {
@@ -639,16 +642,30 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   abortAgentRef.current = abortAgent;
   const stableAbortAgent = useCallback(() => abortAgentRef.current(), []);
 
+  const shouldPreserveNativeCopy = useCallback((event: KeyboardEvent) => {
+    if (event.key.toLowerCase() !== 'c' || !event.ctrlKey) return false;
+
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement
+    ) {
+      return target.selectionStart !== target.selectionEnd;
+    }
+
+    if (target instanceof HTMLElement && target.isContentEditable) {
+      const selection = window.getSelection();
+      return !!selection && !selection.isCollapsed;
+    }
+
+    const selection = window.getSelection();
+    return !!selection && !selection.isCollapsed;
+  }, []);
+
   const handleEscape = useCallback(() => {
     if (elementSelectionActive) stopContextSelector();
-    else if (
-      isWorkingRef.current &&
-      isEarlyAbortEligible() &&
-      (chatInputRef.current?.getTextContent()?.trim().length ?? 0) === 0
-    )
-      void abortAgentRef.current();
     else setChatInputActive(false);
-  }, [elementSelectionActive, stopContextSelector, isEarlyAbortEligible]);
+  }, [elementSelectionActive, stopContextSelector]);
 
   const isVerboseMode = useKartonState(
     (s) => s.appInfo.releaseChannel === 'dev',
@@ -1219,6 +1236,18 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       chatInputRef.current?.focus();
     }, [chatInputActive, setChatInputActive, togglePanelKeyboardFocus]),
     HotkeyActions.FOCUS_CHAT_INPUT,
+  );
+
+  useHotKeyListener(
+    useCallback(
+      (event: KeyboardEvent) => {
+        if (shouldPreserveNativeCopy(event)) return false;
+        void abortAgentRef.current();
+      },
+      [shouldPreserveNativeCopy],
+    ),
+    HotkeyActions.STOP_AGENT,
+    isWorking && !hasPendingQuestion,
   );
 
   useEventListener(

@@ -98,9 +98,9 @@ export const GetLintingDiagnosticsToolPart = ({
       content={
         <>
           {streaming && (
-            <pre className="overflow-x-hidden whitespace-pre font-mono text-muted-foreground text-xs opacity-75">
+            <div className="overflow-x-hidden text-muted-foreground text-xs opacity-75">
               Checking for issues...
-            </pre>
+            </div>
           )}
           {state === 'success' && hasDiagnostics && files.length > 0 && (
             <div className="flex flex-col gap-1">

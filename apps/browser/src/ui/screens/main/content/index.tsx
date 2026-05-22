@@ -34,6 +34,7 @@ import {
   type SortableTabItem,
 } from '@stagewise/stage-ui/components/sortable-tabs';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import {
   Tooltip,
   TooltipContent,
@@ -46,6 +47,7 @@ import {
 } from 'nucleo-ui-outline-18';
 import { GlobePlusIcon } from '../_components/globe-plus-icon';
 import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
+import { HotkeyActions } from '@shared/hotkeys';
 
 // ---------------------------------------------------------------------------
 // Local sub-component: audio mute toggle shown as an `actions` slot on tabs
@@ -426,6 +428,9 @@ export function MainSection({
             void closeTab(id);
             removeTabUiState(id);
           },
+          closeShortcut: (
+            <HotkeyCombo action={HotkeyActions.CLOSE_TAB} size="xs" />
+          ),
           onAuxClick: (e: React.MouseEvent) => {
             if (e.button !== 1) return;
             e.preventDefault();
@@ -647,7 +652,12 @@ export function MainSection({
                 <GlobePlusIcon className="size-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Open browsing tab</TooltipContent>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Open browsing tab</span>
+                <HotkeyCombo action={HotkeyActions.NEW_TAB} size="xs" />
+              </span>
+            </TooltipContent>
           </Tooltip>
         </div>
         {/* Content area with per-tab UI */}

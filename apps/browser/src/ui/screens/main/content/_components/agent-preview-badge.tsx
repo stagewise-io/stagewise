@@ -6,7 +6,7 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyActions } from '@shared/hotkeys';
-import { HotkeyComboText } from '@ui/components/hotkey-combo-text';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -40,15 +40,12 @@ export function AgentPreviewBadge({ onClick }: AgentPreviewBadgeProps) {
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <div className="flex flex-row items-center gap-1">
+          <div className="flex flex-row items-center gap-1.5">
             <span className="text-xs">Toggle chat panel</span>
-            <div className="pointer-events-none flex shrink-0 flex-row items-center gap-0 opacity-40">
-              <span className="font-mono text-muted-foreground text-xs">
-                <HotkeyComboText
-                  action={HotkeyActions.TOGGLE_CONTEXT_SELECTOR}
-                />
-              </span>
-            </div>
+            <HotkeyCombo
+              action={HotkeyActions.TOGGLE_CONTEXT_SELECTOR}
+              size="xs"
+            />
           </div>
         </TooltipContent>
       </Tooltip>

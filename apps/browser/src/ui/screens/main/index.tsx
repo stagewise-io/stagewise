@@ -12,6 +12,7 @@ import { Sidebar } from './sidebar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { OpenAgentProvider, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HotkeyActions } from '@shared/hotkeys';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
@@ -19,6 +20,7 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { GlobePlusIcon } from './_components/globe-plus-icon';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
 import { useAutoSelectFirstAgent } from '@ui/hooks/use-auto-select-agent';
@@ -207,7 +209,12 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
                       <GlobePlusIcon className="size-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Open browsing tab</TooltipContent>
+                  <TooltipContent>
+                    <span className="flex items-center gap-1.5">
+                      <span>Open browsing tab</span>
+                      <HotkeyCombo action={HotkeyActions.NEW_TAB} size="xs" />
+                    </span>
+                  </TooltipContent>
                 </Tooltip>
               )}
             </div>

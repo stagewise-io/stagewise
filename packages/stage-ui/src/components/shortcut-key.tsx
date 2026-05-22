@@ -17,19 +17,21 @@ const KEY_LABELS: Record<string, string> = {
   escape: 'Esc',
   return: '↵',
   shift: '⇧',
+  slash: '/',
   tab: '⇥',
 };
 
 const shortcutKeyVariants = cva(
-  'inline-flex items-center justify-center rounded border font-medium font-mono leading-none',
+  'inline-flex items-center justify-center rounded border font-medium font-mono text-current leading-none',
   {
     variants: {
       variant: {
-        chrome: 'border-foreground/10 bg-foreground/5 text-muted-foreground',
-        default: 'border-border-subtle bg-surface-2 text-muted-foreground',
-        subtle:
-          'border-border-subtle/70 bg-background/70 text-subtle-foreground',
-        surface: 'border-border-subtle bg-surface-1 text-muted-foreground',
+        chrome: 'border-transparent bg-foreground/5 text-muted-foreground',
+        default: 'border-derived bg-active-derived',
+        subtle: 'border-derived bg-active-derived opacity-80',
+        surface: 'border-derived-strong bg-active-derived',
+        solid:
+          'border-transparent bg-shortcut-solid-derived group-hover/button:bg-shortcut-solid-hover-derived group-focus-visible/button:bg-shortcut-solid-hover-derived group-active/button:bg-shortcut-solid-active-derived',
       },
       size: {
         xs: 'h-4 min-w-4 px-1 text-[10px]',
