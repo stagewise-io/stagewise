@@ -248,6 +248,12 @@ export interface SelectProps<
    * @default true
    */
   showItemIndicator?: boolean;
+
+  /**
+   * Whether to move keyboard highlight to the first item when the popup opens.
+   * @default false
+   */
+  highlightFirstItemOnOpen?: boolean;
 }
 
 // ============================================================================
@@ -320,9 +326,58 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
     onOpenChange,
     modal,
     showItemIndicator = true,
+    highlightFirstItemOnOpen = false,
   }: SelectProps<Value, Multiple>,
   ref: React.ForwardedRef<HTMLButtonElement>,
 ) {
+  const popupRef = React.useRef<HTMLDivElement>(null);
+  const wasOpenRef = React.useRef(open ?? defaultOpen ?? false);
+
+  const highlightFirstItem = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        popupRef.current?.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'ArrowDown',
+            code: 'ArrowDown',
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      });
+    });
+  }, []);
+
+  const handleOpenChange = React.useCallback(
+    (
+      nextOpen: boolean,
+      event: {
+        event: Event | React.SyntheticEvent | undefined;
+        reason: string;
+      },
+    ) => {
+      const wasOpen = wasOpenRef.current;
+      wasOpenRef.current = nextOpen;
+      onOpenChange?.(nextOpen, event);
+
+      if (highlightFirstItemOnOpen && nextOpen && !wasOpen) {
+        highlightFirstItem();
+      }
+    },
+    [highlightFirstItem, highlightFirstItemOnOpen, onOpenChange],
+  );
+
+  React.useEffect(() => {
+    if (open === undefined) return;
+
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
+
+    if (highlightFirstItemOnOpen && open && !wasOpen) {
+      highlightFirstItem();
+    }
+  }, [highlightFirstItem, highlightFirstItemOnOpen, open]);
+
   // Filter out separators to get actual items
   const actualItems = React.useMemo(
     () => items.filter((item): item is SelectItem<Value> => !isSeparator(item)),
@@ -456,7 +511,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
       name={name}
       open={open}
       defaultOpen={defaultOpen}
-      onOpenChange={onOpenChange as any}
+      onOpenChange={handleOpenChange as any}
       modal={modal}
       items={convertedItems as any}
     >
@@ -521,6 +576,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
           className="z-50"
         >
           <SelectBase.Popup
+            ref={popupRef}
             className={cn(
               'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
               'rounded-lg border border-derived bg-background p-1 shadow-lg',

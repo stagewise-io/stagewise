@@ -46,12 +46,18 @@ export enum HotkeyActions {
   TOGGLE_CONTEXT_SELECTOR = 'toggle_context_selector',
   TOGGLE_SIDEBAR = 'toggle_sidebar',
   FOCUS_CHAT_INPUT = 'focus_chat_input',
+  OPEN_SETTINGS = 'open_settings',
+  EDIT_NEAREST_USER_MESSAGE = 'edit_nearest_user_message',
+  OPEN_WORKSPACE_SELECT = 'open_workspace_select',
+  OPEN_MODEL_SELECT = 'open_model_select',
   OPEN_COMMAND_CENTER = 'open_command_center',
   COMMAND_CENTER_RENAME_AGENT = 'command_center_rename_agent',
   COMMAND_CENTER_TOGGLE_AGENT_PIN = 'command_center_toggle_agent_pin',
   COMMAND_CENTER_COPY_TAB_URL = 'command_center_copy_tab_url',
   COMMAND_CENTER_DELETE_AGENT = 'command_center_delete_agent',
   NEW_CHAT = 'new_chat',
+  IMPLEMENT_CREATED_PLAN = 'implement_created_plan',
+  STOP_AGENT = 'stop_agent',
   DOWNLOADS = 'downloads',
 
   // Tab & window navigation
@@ -132,6 +138,23 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+L',
     captureDominantly: true,
   },
+  [HotkeyActions.OPEN_SETTINGS]: {
+    accelerator: 'Mod+Comma',
+    captureDominantly: true,
+  },
+  [HotkeyActions.EDIT_NEAREST_USER_MESSAGE]: {
+    accelerator: 'Ctrl+Shift+E',
+    mac: 'Mod+Shift+I',
+    captureDominantly: true,
+  },
+  [HotkeyActions.OPEN_WORKSPACE_SELECT]: {
+    accelerator: 'Mod+O',
+    captureDominantly: true,
+  },
+  [HotkeyActions.OPEN_MODEL_SELECT]: {
+    accelerator: 'Mod+Slash',
+    captureDominantly: true,
+  },
   [HotkeyActions.OPEN_COMMAND_CENTER]: {
     accelerator: 'Mod+K',
     captureDominantly: false,
@@ -157,6 +180,14 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.NEW_CHAT]: {
     accelerator: 'Mod+N',
     captureDominantly: false,
+  },
+  [HotkeyActions.IMPLEMENT_CREATED_PLAN]: {
+    accelerator: 'Mod+Enter',
+    captureDominantly: true,
+  },
+  [HotkeyActions.STOP_AGENT]: {
+    accelerator: 'Ctrl+C',
+    captureDominantly: true,
   },
   [HotkeyActions.DOWNLOADS]: {
     accelerator: 'Mod+J',
@@ -327,9 +358,9 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
 
   // Dev tools
   [HotkeyActions.DEV_TOOLS]: {
-    accelerator: 'Ctrl+Shift+I', // Windows/Linux: Ctrl+Shift+I
+    accelerator: 'Ctrl+Shift+I',
     aliases: ['F12', 'Ctrl+Shift+J'],
-    mac: 'Mod+Alt+I', // Mac: Cmd+Opt+I
+    mac: 'Mod+Alt+I',
     macAliases: ['F12'],
     captureDominantly: true,
   },
@@ -597,6 +628,13 @@ const KEY_DISPLAY_NAMES: Record<string, { mac: string; default: string }> = {
   MINUS: { mac: '-', default: '-' },
   BRACKETLEFT: { mac: '[', default: '[' },
   BRACKETRIGHT: { mac: ']', default: ']' },
+  SEMICOLON: { mac: ';', default: ';' },
+  QUOTE: { mac: "'", default: "'" },
+  BACKQUOTE: { mac: '`', default: '`' },
+  BACKSLASH: { mac: '\\', default: '\\' },
+  COMMA: { mac: ',', default: ',' },
+  PERIOD: { mac: '.', default: '.' },
+  SLASH: { mac: '/', default: '/' },
 };
 
 /**

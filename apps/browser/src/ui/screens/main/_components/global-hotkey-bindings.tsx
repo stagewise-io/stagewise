@@ -4,6 +4,7 @@ import {
   HotkeyActions,
   isEventMatch,
 } from '@shared/hotkeys';
+import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useAgentSwitcher } from '@ui/hooks/use-open-chat';
@@ -204,6 +205,14 @@ export function GlobalHotkeyBindings() {
   useHotKeyListener(
     () => focusAgentByIndex(8),
     HotkeyActions.FOCUS_AGENT_LAST,
+    globalHotkeysEnabled,
+  );
+
+  // -- Settings (Mod+,) --------------------------------------------------
+  const createTab = useKartonProcedure((p) => p.browser.createTab);
+  useHotKeyListener(
+    () => createTab(SETTINGS_PAGE_URL, true),
+    HotkeyActions.OPEN_SETTINGS,
     globalHotkeysEnabled,
   );
 

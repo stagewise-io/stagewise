@@ -4,7 +4,7 @@ import {
   IconMagnifierMinusOutline18,
   IconMagnifierPlusOutline18,
 } from 'nucleo-ui-outline-18';
-import { HotkeyComboText } from '@ui/components/hotkey-combo-text';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import {
   Tooltip,
   TooltipContent,
@@ -116,9 +116,24 @@ export function ZoomBar({ tabId }: ZoomBarProps) {
       onMouseLeave={handleMouseLeave}
     >
       <div className="flex flex-row items-center gap-0">
-        <Button variant="ghost" size="icon-xs" onClick={zoomOut}>
-          <IconMagnifierMinusOutline18 className="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Zoom out"
+              onClick={zoomOut}
+            >
+              <IconMagnifierMinusOutline18 className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span className="flex items-center gap-1.5">
+              <span>Zoom out</span>
+              <HotkeyCombo action={HotkeyActions.ZOOM_OUT} size="xs" />
+            </span>
+          </TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger>
             <Button variant="ghost" size="xs" onClick={resetZoom}>
@@ -126,12 +141,30 @@ export function ZoomBar({ tabId }: ZoomBarProps) {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            Reset zoom <HotkeyComboText action={HotkeyActions.ZOOM_RESET} />
+            <span className="flex items-center gap-1.5">
+              <span>Reset zoom</span>
+              <HotkeyCombo action={HotkeyActions.ZOOM_RESET} size="xs" />
+            </span>
           </TooltipContent>
         </Tooltip>
-        <Button variant="ghost" size="icon-xs" onClick={zoomIn}>
-          <IconMagnifierPlusOutline18 className="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Zoom in"
+              onClick={zoomIn}
+            >
+              <IconMagnifierPlusOutline18 className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span className="flex items-center gap-1.5">
+              <span>Zoom in</span>
+              <HotkeyCombo action={HotkeyActions.ZOOM_IN} size="xs" />
+            </span>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );

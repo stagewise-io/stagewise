@@ -6,7 +6,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { HotkeyComboText } from '@ui/components/hotkey-combo-text';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { useKartonState } from '@ui/hooks/use-karton';
 import {
   IconSidebarLeftHideOutline18,
@@ -42,7 +42,10 @@ export function SidebarToggleButton() {
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {label} (<HotkeyComboText action={HotkeyActions.TOGGLE_SIDEBAR} />)
+        <span className="flex items-center gap-1.5">
+          <span>{label}</span>
+          <HotkeyCombo action={HotkeyActions.TOGGLE_SIDEBAR} size="xs" />
+        </span>
       </TooltipContent>
     </Tooltip>
   );

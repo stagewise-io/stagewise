@@ -10,6 +10,7 @@ import {
 } from '@shared/plan-parsing';
 import { getBaseName } from '@shared/path-utils';
 import { stripMountPrefix } from '@ui/utils';
+import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { memo, useMemo, useCallback, useState } from 'react';
@@ -20,6 +21,8 @@ import { cn } from '@ui/utils';
 import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
 import { usePlanPhase } from '@ui/hooks/use-plan-phase';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import {
   Tooltip,
   TooltipContent,
@@ -143,6 +146,12 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
   // Implement: send a synthetic /implement message to the agent
   const handleImplement = useSendImplement();
 
+  useHotKeyListener(
+    handleImplement,
+    HotkeyActions.IMPLEMENT_CREATED_PLAN,
+    phase === 'just-created',
+  );
+
   const handleOpenPlan = useCallback(() => {
     const baseUrl = `stagewise://internal/plan/${encodeURIComponent(filename)}`;
     const existingTab = Object.values(tabs).find((tab) =>
@@ -209,8 +218,20 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
           Open Plan
         </Button>
         {phase === 'just-created' && (
-          <Button variant="primary" size="xs" onClick={handleImplement}>
-            Implement
+          <Button
+            variant="primary"
+            size="xs"
+            className="pr-1"
+            onClick={handleImplement}
+          >
+            <span className="flex items-center gap-1.5">
+              <span>Implement</span>
+              <HotkeyCombo
+                action={HotkeyActions.IMPLEMENT_CREATED_PLAN}
+                size="xs"
+                variant="solid"
+              />
+            </span>
           </Button>
         )}
       </div>

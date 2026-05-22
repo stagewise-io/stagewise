@@ -50,8 +50,10 @@ import { CheckIcon, XIcon, Loader2Icon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { IdeLogo } from '@ui/components/ide-logo';
 import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@ui/utils';
+import { HotkeyActions } from '@shared/hotkeys';
 import { getBaseName } from '@shared/path-utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
@@ -1601,6 +1603,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   const [worktreesResult, setWorktreesResult] =
     useState<WorkspaceGitWorktreesResult | null>(null);
   const [gitDataLoaded, setGitDataLoaded] = useState(false);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   const sourceBranchItems = useMemo(
     () => getBranchSelectItemsFromGit(branchesResult, gitRef, 'source'),
@@ -1896,6 +1899,53 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     [handleActionUpdate],
   );
 
+  const handlePopupKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const isNextKey =
+        event.key === 'ArrowDown' ||
+        (event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key.toLowerCase() === 'n');
+      const isPreviousKey =
+        event.key === 'ArrowUp' ||
+        (event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key.toLowerCase() === 'p');
+
+      if (!isNextKey && !isPreviousKey) return;
+
+      const popup = popupRef.current;
+      if (!popup) return;
+
+      const items = Array.from(
+        popup.querySelectorAll<HTMLElement>('[role="radio"]'),
+      ).filter(
+        (item) =>
+          !(item instanceof HTMLButtonElement && item.disabled) &&
+          item.getAttribute('aria-disabled') !== 'true',
+      );
+      if (items.length === 0) return;
+
+      const activeElement = document.activeElement;
+      const currentIndex =
+        activeElement instanceof HTMLElement
+          ? items.indexOf(activeElement)
+          : -1;
+      const nextIndex = isNextKey
+        ? (currentIndex + 1) % items.length
+        : (currentIndex <= 0 ? items.length : currentIndex) - 1;
+
+      event.preventDefault();
+      event.stopPropagation();
+      items[nextIndex]?.focus();
+    },
+    [],
+  );
+
   const triggerSummary = useMemo<React.ReactNode>(() => {
     switch (config.selectedAction) {
       case 'create-worktree':
@@ -2012,7 +2062,9 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
           className="z-50"
         >
           <PopoverBase.Popup
+            ref={popupRef}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={handlePopupKeyDown}
             className={cn(
               // `group/rows` enables the cross-row "hover steals the
               // foreground color from the active row" behavior on
@@ -2470,6 +2522,7 @@ function ConnectInlineActionSelect({
       <PopoverTrigger>
         <button
           type="button"
+          data-connect-action-trigger=""
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           className={cn(
@@ -2514,15 +2567,17 @@ function ConnectInlineActionSelect({
               'data-ending-style:opacity-0 data-starting-style:opacity-0',
             )}
           >
-            <WorkspaceActionPickerContent
-              config={state}
-              sourceBranchItems={sourceBranchItems}
-              checkoutBranchItems={checkoutBranchItems}
-              worktreeItems={worktreeItems}
-              branchSelectPortalContainer={popupRef}
-              onCommit={handleSelect}
-              onUpdateAction={handleActionUpdate}
-            />
+            <div data-connect-action-popup="">
+              <WorkspaceActionPickerContent
+                config={state}
+                sourceBranchItems={sourceBranchItems}
+                checkoutBranchItems={checkoutBranchItems}
+                worktreeItems={worktreeItems}
+                branchSelectPortalContainer={popupRef}
+                onCommit={handleSelect}
+                onUpdateAction={handleActionUpdate}
+              />
+            </div>
           </PopoverBase.Popup>
         </PopoverBase.Positioner>
       </PopoverBase.Portal>
@@ -2617,6 +2672,8 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
   >(() => new Map());
   const [connectError, setConnectError] = useState<string | null>(null);
   const [pendingRowKey, setPendingRowKey] = useState<string | null>(null);
+  const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const recentListScrollRef = useRef<HTMLDivElement>(null);
   const { maskStyle: recentListMaskStyle } = useScrollFadeMask(
     recentListScrollRef,
@@ -2904,28 +2961,117 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
     ],
   );
 
+  const getConnectNavigationItems = useCallback(() => {
+    const popup = popupRef.current;
+    if (!popup) return [];
+
+    return Array.from(
+      popup.querySelectorAll<HTMLElement>(
+        '[data-connect-row], [data-connect-new-row]',
+      ),
+    ).filter(
+      (item) =>
+        !(item instanceof HTMLButtonElement && item.disabled) &&
+        item.getAttribute('aria-disabled') !== 'true',
+    );
+  }, []);
+
+  const focusFirstConnectItem = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        getConnectNavigationItems()[0]?.focus();
+      });
+    });
+  }, [getConnectNavigationItems]);
+
+  const openConnectPopover = useCallback(() => {
+    setOpen(true);
+    setConnectError(null);
+    initializePathStates();
+    for (const workspace of recentPaths) {
+      const rowKey = `workspace:${workspace.path}`;
+      void loadGitOptionsForPath(workspace.path, rowKey);
+    }
+    focusFirstConnectItem();
+  }, [
+    focusFirstConnectItem,
+    initializePathStates,
+    loadGitOptionsForPath,
+    recentPaths,
+  ]);
+
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      setOpen(next);
       if (next) {
-        setConnectError(null);
-        initializePathStates();
-        for (const workspace of recentPaths) {
-          const rowKey = `workspace:${workspace.path}`;
-          void loadGitOptionsForPath(workspace.path, rowKey);
-        }
+        openConnectPopover();
         return;
       }
 
+      setOpen(false);
       // Reset transient state on close so each open is a fresh
       // decision.
       setConnectError(null);
       setPendingRowKey(null);
+      setFocusedRowKey(null);
       setPathStates(new Map());
       setPathGitOptions(new Map());
       setPathGitCapability(new Map());
     },
-    [initializePathStates, loadGitOptionsForPath, recentPaths],
+    [openConnectPopover],
+  );
+
+  useHotKeyListener(
+    useCallback(() => {
+      openConnectPopover();
+    }, [openConnectPopover]),
+    HotkeyActions.OPEN_WORKSPACE_SELECT,
+  );
+
+  const handlePopupKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const isNextKey =
+        event.key === 'ArrowDown' ||
+        (event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key.toLowerCase() === 'n');
+      const isPreviousKey =
+        event.key === 'ArrowUp' ||
+        (event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key.toLowerCase() === 'p');
+
+      if (!isNextKey && !isPreviousKey) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest(
+          '[data-connect-action-trigger], [data-connect-action-popup]',
+        )
+      )
+        return;
+
+      const items = getConnectNavigationItems();
+      if (items.length === 0) return;
+
+      const activeElement = document.activeElement;
+      const currentIndex =
+        activeElement instanceof HTMLElement
+          ? items.indexOf(activeElement)
+          : -1;
+      const nextIndex = isNextKey
+        ? (currentIndex + 1) % items.length
+        : (currentIndex <= 0 ? items.length : currentIndex) - 1;
+
+      event.preventDefault();
+      event.stopPropagation();
+      items[nextIndex]?.focus();
+    },
+    [getConnectNavigationItems],
   );
 
   return (
@@ -2975,7 +3121,9 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
           className="z-50"
         >
           <PopoverBase.Popup
+            ref={popupRef}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={handlePopupKeyDown}
             className={cn(
               'group/connect-list flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-0 p-1',
               'rounded-lg bg-background ring-1 ring-border-subtle',
@@ -3014,12 +3162,15 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
                     gitOptions?.checkoutBranchItems ?? fallbackBranchItems;
                   const worktreeItems =
                     gitOptions?.worktreeItems ?? fallbackWorktreeItems;
+                  const showActionByDefault = index === 0 && !focusedRowKey;
+                  const showActionForFocus = focusedRowKey === rowKey;
                   return (
                     <div
                       key={rowKey}
                       role="button"
                       tabIndex={0}
                       data-connect-row=""
+                      onFocus={() => setFocusedRowKey(rowKey)}
                       onClick={(e) => {
                         e.stopPropagation();
                         // Parent-row click commits whichever action is
@@ -3050,9 +3201,12 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
                             'flex shrink-0 text-subtle-foreground transition-opacity group-hover/connect-row:text-muted-foreground',
                             'group-hover/connect-row:!pointer-events-auto group-hover/connect-row:!opacity-100',
                             'has-[[data-popup-open]]:!pointer-events-auto has-[[data-popup-open]]:!opacity-100',
-                            index === 0
-                              ? 'pointer-events-auto opacity-100 group-has-[[data-connect-row]:hover]/connect-list:pointer-events-none group-has-[[data-connect-row]:hover]/connect-list:opacity-0'
+                            showActionForFocus || showActionByDefault
+                              ? 'pointer-events-auto opacity-100'
                               : 'pointer-events-none opacity-0',
+                            showActionByDefault
+                              ? 'group-has-[[data-connect-row]:hover]/connect-list:pointer-events-none group-has-[[data-connect-row]:hover]/connect-list:opacity-0'
+                              : null,
                           )}
                         >
                           {gitCapability === 'git' && (
@@ -3094,6 +3248,8 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
 
             <button
               type="button"
+              data-connect-new-row=""
+              onFocus={() => setFocusedRowKey(CONNECT_NEW_KEY)}
               onClick={(e) => {
                 e.stopPropagation();
                 const state = getOrInitState(CONNECT_NEW_KEY);

@@ -16,6 +16,13 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { IconSearchContentOutline18 } from 'nucleo-ui-outline-18';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
+import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 
 export interface SearchBarRef {
   focus: () => void;
@@ -105,11 +112,6 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
       setPendingKeyboardFocus(false);
     }
   }, [pendingKeyboardFocus, shouldShow]);
-
-  const _handleMouseEnter = useCallback(() => {
-    // Mouse interaction should always use transitions
-    setIsKeyboardInteraction(false);
-  }, []);
 
   // Sync shouldShow with isSearchBarActive from backend
   useEffect(() => {
@@ -216,37 +218,70 @@ export function SearchBar({ tabId, ref }: SearchBarProps) {
       />
       {searchString.length > 0 && (
         <div className="flex flex-row items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            disabled={!tabSearch || tabSearch.resultsCount === 0}
-            onClick={() => previousSearchResult(tabId)}
-          >
-            <IconChevronLeft className="size-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Previous search result"
+                disabled={!tabSearch || tabSearch.resultsCount === 0}
+                onClick={() => previousSearchResult(tabId)}
+              >
+                <IconChevronLeft className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Previous match</span>
+                <HotkeyCombo action={HotkeyActions.FIND_PREV} size="xs" />
+              </span>
+            </TooltipContent>
+          </Tooltip>
           <span className="text-muted-foreground text-xs">
             {tabSearch?.activeMatchIndex ?? 0} / {tabSearch?.resultsCount ?? 0}
           </span>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Next search result"
+                disabled={!tabSearch || tabSearch.resultsCount === 0}
+                onClick={() => nextSearchResult(tabId)}
+              >
+                <IconChevronRight className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Next match</span>
+                <HotkeyCombo action={HotkeyActions.FIND_NEXT} size="xs" />
+              </span>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+      <Tooltip>
+        <TooltipTrigger>
           <Button
             variant="ghost"
             size="icon-xs"
-            disabled={!tabSearch || tabSearch.resultsCount === 0}
-            onClick={() => nextSearchResult(tabId)}
+            aria-label="Close search"
+            onClick={() => {
+              setShouldShow(false);
+              deactivateSearchBar();
+            }}
           >
-            <IconChevronRight className="size-3" />
+            <IconXmark className="size-3" />
           </Button>
-        </div>
-      )}
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        onClick={() => {
-          setShouldShow(false);
-          deactivateSearchBar();
-        }}
-      >
-        <IconXmark className="size-3" />
-      </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <span className="flex items-center gap-1.5">
+            <span>Close search</span>
+            <ShortcutCombo value="Esc" size="xs" />
+          </span>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

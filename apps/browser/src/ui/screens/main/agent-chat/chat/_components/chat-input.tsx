@@ -1,4 +1,6 @@
 import { useEditor, EditorContent, type Content } from '@tiptap/react';
+import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { EditorView } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { ModelSelect } from './model-select';
@@ -26,7 +28,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { HotkeyComboText } from '@ui/components/hotkey-combo-text';
+import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import {
   configureAttachmentExtensions,
   ALL_ATTACHMENT_NODE_NAMES,
@@ -41,11 +44,151 @@ import {
 import { SlashExtension, slashSkillsRef } from './rich-text/slash';
 import type { SkillDefinitionUI } from '@shared/skills';
 import { useState, memo } from 'react';
+import { useIsContainerScrollable } from '@ui/hooks/use-is-container-scrollable';
+import {
+  dispatchChatHistoryScroll,
+  type ChatHistoryScrollDirection,
+} from '../_lib/chat-history-scroll-event';
 // Re-export types for convenience
 export type { AttachmentAttributes, AttachmentType };
 
 /** Minimum paste length to auto-convert into a `.textclip` file attachment */
 const TEXT_CLIP_THRESHOLD = 100;
+const CHAT_INPUT_PAGE_SCROLL_FACTOR = 0.6;
+const CHAT_INPUT_PAGE_SCROLL_MIN = 120;
+const SLASH_CYCLE_BUILTIN_IDS = new Set([
+  'command:plan',
+  'command:preview',
+  'command:debug',
+  'command:learn',
+]);
+
+function isCtrlPageScrollEvent(event: KeyboardEvent) {
+  if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
+    return false;
+
+  const key = event.key.toLowerCase();
+  return key === 'u' || key === 'd';
+}
+
+function getChatHistoryScrollDirectionFromEvent(
+  event: KeyboardEvent,
+): ChatHistoryScrollDirection | null {
+  if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
+    return null;
+
+  const key = event.key.toLowerCase();
+  if (key === 'u') return 'up';
+  if (key === 'd') return 'down';
+
+  return null;
+}
+
+function isShiftTabSlashCycleEvent(event: KeyboardEvent) {
+  return (
+    event.key === 'Tab' &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
+  );
+}
+
+type SlashCycleItem = {
+  id: string;
+  label: string;
+};
+
+type LeadingSlashNode = {
+  from: number;
+  to: number;
+  deleteTo: number;
+  id: string;
+};
+
+function getSlashCycleItems(): SlashCycleItem[] {
+  return slashSkillsRef.current
+    .filter((skill) => SLASH_CYCLE_BUILTIN_IDS.has(skill.id))
+    .map((skill) => ({
+      id: skill.id,
+      label: skill.displayName,
+    }));
+}
+
+function isZeroWidthTextNode(node: ProseMirrorNode) {
+  if (!node.isText) return false;
+  return (node.text ?? '').replaceAll('\u200B', '').length === 0;
+}
+
+function findLeadingSlashNode(doc: ProseMirrorNode): LeadingSlashNode | null {
+  const firstBlock = doc.firstChild;
+  if (!firstBlock?.isTextblock) return null;
+
+  let offset = 0;
+  for (let i = 0; i < firstBlock.childCount; i++) {
+    const node = firstBlock.child(i);
+    const from = 1 + offset;
+
+    if (isZeroWidthTextNode(node)) {
+      offset += node.nodeSize;
+      continue;
+    }
+
+    if (node.type.name !== 'slash') return null;
+
+    const to = from + node.nodeSize;
+    const next = i + 1 < firstBlock.childCount ? firstBlock.child(i + 1) : null;
+    const deleteTo = next?.isText && next.text?.startsWith(' ') ? to + 1 : to;
+
+    return {
+      from,
+      to,
+      deleteTo,
+      id: String(node.attrs.id ?? ''),
+    };
+  }
+
+  return null;
+}
+
+function createSlashCycleFragment(
+  view: EditorView,
+  item: SlashCycleItem,
+): Fragment | null {
+  const slashType = view.state.schema.nodes.slash;
+  if (!slashType) return null;
+
+  return Fragment.fromArray([
+    slashType.create({ id: item.id, label: item.label }),
+    view.state.schema.text(' '),
+  ]);
+}
+
+function cycleLeadingSlashCommand(view: EditorView) {
+  const items = getSlashCycleItems();
+  const firstBlock = view.state.doc.firstChild;
+  if (items.length === 0 || !firstBlock?.isTextblock) return false;
+
+  const leadingSlash = findLeadingSlashNode(view.state.doc);
+  const currentIndex = leadingSlash
+    ? items.findIndex((item) => item.id === leadingSlash.id)
+    : -1;
+  const nextIndex = leadingSlash
+    ? (Math.max(0, currentIndex) + 1) % items.length
+    : 0;
+
+  const nextItem = items[nextIndex];
+  if (!nextItem) return false;
+
+  const fragment = createSlashCycleFragment(view, nextItem);
+  if (!fragment) return false;
+
+  const from = leadingSlash?.from ?? 1;
+  const to = leadingSlash?.deleteTo ?? from;
+  view.dispatch(view.state.tr.replaceWith(from, to, fragment).scrollIntoView());
+  view.focus();
+  return true;
+}
 
 export interface ChatInputProps {
   // Core controlled input
@@ -158,16 +301,12 @@ export const ChatInput = memo(function ChatInput({
   className,
   ref,
 }: ChatInputProps) {
-  const focusChatHotkeyText = HotkeyComboText({
-    action: HotkeyActions.TOGGLE_CONTEXT_SELECTOR,
-  });
-
   const shownPlaceholder = useRef('');
   useEffect(() => {
     shownPlaceholder.current =
       placeholder ??
       `Use / to plan and run commands. Use @ for context. ${hasQueuedMessages ? 'Press ↵ to send now' : ''}`;
-  }, [placeholder, focusChatHotkeyText, hasQueuedMessages]);
+  }, [placeholder, hasQueuedMessages]);
   const staticPlaceholderRef = useRef(() => shownPlaceholder.current);
 
   const [textContent, setTextContent] = useState<string>('');
@@ -184,6 +323,15 @@ export const ChatInput = memo(function ChatInput({
       setInternalValue(value);
     }
   }, [value]);
+
+  const inputScrollContainerRef = useRef<HTMLDivElement>(null);
+  const { canScrollUp, canScrollDown } = useIsContainerScrollable(
+    inputScrollContainerRef,
+  );
+  const canScrollUpRef = useRef(canScrollUp);
+  const canScrollDownRef = useRef(canScrollDown);
+  canScrollUpRef.current = canScrollUp;
+  canScrollDownRef.current = canScrollDown;
 
   // TipTap editor setup
   const editor = useEditor({
@@ -230,6 +378,47 @@ export const ChatInput = memo(function ChatInput({
         ),
       },
       handleKeyDown: (view, event) => {
+        if (isShiftTabSlashCycleEvent(event)) {
+          const hasSuggestionPopup = document.querySelector(
+            '.mention-suggestion-container, .slash-suggestion-container',
+          );
+          if (hasSuggestionPopup) return false;
+
+          if (cycleLeadingSlashCommand(view)) {
+            event.preventDefault();
+            return true;
+          }
+        }
+
+        const scrollDirection = getChatHistoryScrollDirectionFromEvent(event);
+        if (scrollDirection) {
+          const canInputScroll =
+            scrollDirection === 'up'
+              ? canScrollUpRef.current
+              : canScrollDownRef.current;
+          if (canInputScroll) {
+            if (!isCtrlPageScrollEvent(event)) return false;
+
+            const scroller = inputScrollContainerRef.current;
+            if (!scroller) return false;
+
+            const amount = Math.max(
+              CHAT_INPUT_PAGE_SCROLL_MIN,
+              scroller.clientHeight * CHAT_INPUT_PAGE_SCROLL_FACTOR,
+            );
+            scroller.scrollBy({
+              top: scrollDirection === 'up' ? -amount : amount,
+              behavior: 'smooth',
+            });
+            event.preventDefault();
+            return true;
+          }
+
+          event.preventDefault();
+          dispatchChatHistoryScroll(scrollDirection);
+          return true;
+        }
+
         // Handle Enter without Shift for submit
         if (event.key === 'Enter' && !event.shiftKey) {
           // Check DOM for actual popup presence — the boolean flags
@@ -567,6 +756,7 @@ export const ChatInput = memo(function ChatInput({
         )}
       >
         <EditorContent
+          ref={inputScrollContainerRef}
           editor={editor}
           className={cn(
             'h-full w-full',
@@ -721,17 +911,21 @@ export const ChatInputActions = memo(function ChatInputActions({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            {elementSelectionActive ? (
-              'Stop selecting elements (Esc)'
-            ) : (
-              <>
-                Add reference elements (
-                <HotkeyComboText
+            <span className="flex items-center gap-1.5">
+              <span>
+                {elementSelectionActive
+                  ? 'Stop selecting elements'
+                  : 'Add reference elements'}
+              </span>
+              {elementSelectionActive ? (
+                <ShortcutCombo value="Esc" size="xs" />
+              ) : (
+                <HotkeyCombo
                   action={HotkeyActions.TOGGLE_CONTEXT_SELECTOR}
+                  size="xs"
                 />
-                )
-              </>
-            )}
+              )}
+            </span>
           </TooltipContent>
         </Tooltip>
       )}
@@ -787,7 +981,12 @@ export const ChatInputActions = memo(function ChatInputActions({
                 <SquareIcon className="size-3 fill-current" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Stop agent</TooltipContent>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Stop agent</span>
+                <HotkeyCombo action={HotkeyActions.STOP_AGENT} size="xs" />
+              </span>
+            </TooltipContent>
           </Tooltip>
         )}
         {showSendButton && (

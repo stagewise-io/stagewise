@@ -31,6 +31,7 @@ import {
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { DOWNLOADS_PAGE_URL } from '@shared/internal-urls';
 import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { AreaChart, Area, ResponsiveContainer, XAxis } from 'recharts';
 
 function getDownloadStateLabel(state: DownloadState): string {
@@ -398,11 +399,16 @@ export function DownloadsControlButton({ isActive }: { isActive: boolean }) {
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {hasActiveDownloads
-            ? `${activeCount} download${activeCount > 1 ? 's' : ''} in progress`
-            : hasUnseenDownloads
-              ? 'New downloads available'
-              : 'Recent downloads'}
+          <span className="flex items-center gap-1.5">
+            <span>
+              {hasActiveDownloads
+                ? `${activeCount} download${activeCount > 1 ? 's' : ''} in progress`
+                : hasUnseenDownloads
+                  ? 'New downloads available'
+                  : 'Recent downloads'}
+            </span>
+            <HotkeyCombo action={HotkeyActions.DOWNLOADS} size="xs" />
+          </span>
         </TooltipContent>
       </Tooltip>
       <PopoverContent className="w-84 rounded-xl p-3">
