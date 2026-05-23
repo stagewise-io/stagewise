@@ -63,7 +63,12 @@ export function PerTerminalContent({
 
       const size = { cols: currentTerm.cols, rows: currentTerm.rows };
       const lastSize = lastSentSizeRef.current;
-      if (lastSize?.cols === size.cols && lastSize.rows === size.rows) return;
+      if (
+        lastSize &&
+        lastSize.cols === size.cols &&
+        lastSize.rows === size.rows
+      )
+        return;
 
       lastSentSizeRef.current = size;
       terminalResizeRef.current(terminalId, size.cols, size.rows);
@@ -182,7 +187,7 @@ export function PerTerminalContent({
       term.open(container);
       terminalRef.current = term;
 
-      term.onData((data) => {
+      term.onData((data: string) => {
         terminalInputRef.current(terminalId, data);
       });
 
