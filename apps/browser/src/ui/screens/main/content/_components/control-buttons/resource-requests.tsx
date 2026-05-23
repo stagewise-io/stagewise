@@ -243,7 +243,11 @@ function PermissionRequestRow({
   onAlwaysAllow: (requestId: string) => void;
   onBlock: (requestId: string) => void;
   onSelectDevice: (requestId: string, deviceId: string) => void;
-  onRespondToPairing: (requestId: string, confirmed: boolean) => void;
+  onRespondToPairing: (
+    requestId: string,
+    confirmed: boolean,
+    pin?: string,
+  ) => void;
 }) {
   const icons = getRequestIcons(request);
   const description = getRequestDescription(request);
@@ -266,6 +270,7 @@ function PermissionRequestRow({
       : null;
 
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [pairingPin, setPairingPin] = useState('');
   const [showPulse, setShowPulse] = useState(true);
 
   // Remove pulse animation after it completes
@@ -276,7 +281,11 @@ function PermissionRequestRow({
 
   const handleAccept = useCallback(() => {
     if (pairingRequest) {
-      onRespondToPairing(request.id, true);
+      onRespondToPairing(
+        request.id,
+        true,
+        pairingRequest.pairingKind === 'providePin' ? pairingPin : undefined,
+      );
     } else if (isSimple) {
       onAccept(request.id);
     } else if (selectedDevice) {
@@ -287,6 +296,7 @@ function PermissionRequestRow({
     isSimple,
     selectedDevice,
     pairingRequest,
+    pairingPin,
     onAccept,
     onSelectDevice,
     onRespondToPairing,
@@ -304,7 +314,13 @@ function PermissionRequestRow({
     }
   }, [request.id, pairingRequest, onBlock, onRespondToPairing]);
 
-  const canAct = isSimple || !!selectedDevice || !!pairingRequest;
+  const canAct =
+    isSimple ||
+    !!selectedDevice ||
+    (!!pairingRequest && pairingRequest.pairingKind !== 'providePin') ||
+    (!!pairingRequest &&
+      pairingRequest.pairingKind === 'providePin' &&
+      pairingPin.trim().length > 0);
 
   return (
     <div className="relative flex shrink-0 flex-col items-stretch gap-0.5 py-1.5">
@@ -356,6 +372,19 @@ function PermissionRequestRow({
                 }))}
               />
             )}
+          </div>
+        )}
+
+        {/* Bluetooth pairing PIN entry (providePin) */}
+        {pairingRequest?.pairingKind === 'providePin' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Enter pairing PIN"
+              value={pairingPin}
+              onChange={(e) => setPairingPin(e.target.value)}
+              className="h-7 w-full rounded-lg border border-derived bg-surface-1 px-2 font-mono text-foreground text-sm placeholder:text-subtle-foreground focus:outline-none focus:ring-1 focus:ring-derived-strong"
+            />
           </div>
         )}
 
@@ -569,8 +598,8 @@ export function ResourceRequestsControlButton({
   );
 
   const handleRespondToPairing = useCallback(
-    (requestId: string, confirmed: boolean) =>
-      void respondToPairing(requestId, confirmed),
+    (requestId: string, confirmed: boolean, pin?: string) =>
+      void respondToPairing(requestId, confirmed, pin),
     [respondToPairing],
   );
 
