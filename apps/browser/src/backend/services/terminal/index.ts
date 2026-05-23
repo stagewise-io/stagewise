@@ -729,13 +729,7 @@ export class TerminalService extends DisposableService {
   private createPty(terminalId: string, cwd: string): string | null {
     const requestedCwd = cwd || this.getUserHomeDirectory();
     const resolvedCwd = this.resolveSafePtyCwd(requestedCwd);
-    const spawnArgs: string[] =
-      this.shell.type === 'powershell'
-        ? ['-NoExit', '-Command', POWERSHELL_TERMINAL_INTEGRATION]
-        : ['-i'];
-    if (this.shell.type === 'bash') {
-      spawnArgs.push('--norc');
-    }
+    const spawnArgs: string[] = this.getSpawnArgs();
 
     const spawnAtCwd = (spawnCwd: string) =>
       pty.spawn(this.shell.path, spawnArgs, {
@@ -1019,6 +1013,16 @@ export class TerminalService extends DisposableService {
         err,
       );
     }
+  }
+
+  private getSpawnArgs(): string[] {
+    if (this.shell.type === 'powershell') {
+      return ['-NoExit', '-Command', POWERSHELL_TERMINAL_INTEGRATION];
+    }
+    if (process.platform === 'win32' && this.shell.type === 'bash') {
+      return ['--login', '-i'];
+    }
+    return [];
   }
 
   // ─── Teardown ────────────────────────────────────────────────
