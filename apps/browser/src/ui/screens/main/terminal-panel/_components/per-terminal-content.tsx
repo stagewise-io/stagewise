@@ -10,6 +10,8 @@ interface PerTerminalContentProps {
   isActive: boolean;
 }
 
+const BACKEND_RESIZE_DEBOUNCE_MS = 80;
+
 export function PerTerminalContent({
   terminalId,
   isActive,
@@ -17,6 +19,8 @@ export function PerTerminalContent({
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const resizeTimerRef = useRef<number | null>(null);
+  const lastSentSizeRef = useRef<{ cols: number; rows: number } | null>(null);
   /** Absolute backend output offset consumed by this renderer. */
   const consumedOffsetRef = useRef(0);
 
@@ -43,6 +47,38 @@ export function PerTerminalContent({
   getTerminalSnapshotRef.current = getTerminalSnapshot;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
+
+  const sendResize = (immediate = false) => {
+    const term = terminalRef.current;
+    if (!term) return;
+
+    if (resizeTimerRef.current !== null) {
+      window.clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = null;
+    }
+
+    const sendCurrentSize = () => {
+      const currentTerm = terminalRef.current;
+      if (!currentTerm) return;
+
+      const size = { cols: currentTerm.cols, rows: currentTerm.rows };
+      const lastSize = lastSentSizeRef.current;
+      if (lastSize?.cols === size.cols && lastSize.rows === size.rows) return;
+
+      lastSentSizeRef.current = size;
+      terminalResizeRef.current(terminalId, size.cols, size.rows);
+    };
+
+    if (immediate) {
+      sendCurrentSize();
+      return;
+    }
+
+    resizeTimerRef.current = window.setTimeout(() => {
+      resizeTimerRef.current = null;
+      sendCurrentSize();
+    }, BACKEND_RESIZE_DEBOUNCE_MS);
+  };
 
   const HUES = {
     base: 85,
@@ -153,7 +189,7 @@ export function PerTerminalContent({
       fitTimer = requestAnimationFrame(() => {
         try {
           fitAddon.fit();
-          terminalResizeRef.current(terminalId, term.cols, term.rows);
+          sendResize(true);
           if (isActiveRef.current) term.focus();
         } catch {
           // May fail during layout transitions.
@@ -170,6 +206,11 @@ export function PerTerminalContent({
         terminalRef.current = null;
       }
       fitAddonRef.current = null;
+      if (resizeTimerRef.current !== null) {
+        window.clearTimeout(resizeTimerRef.current);
+        resizeTimerRef.current = null;
+      }
+      lastSentSizeRef.current = null;
       cancelAnimationFrame(fitTimer);
     };
   }, [terminalId]);
@@ -213,7 +254,7 @@ export function PerTerminalContent({
     const tid = setTimeout(() => {
       try {
         fit.fit();
-        terminalResizeRef.current(terminalId, term.cols, term.rows);
+        sendResize(true);
         term.focus();
       } catch {
         // ignore
@@ -234,7 +275,7 @@ export function PerTerminalContent({
       if (rect.width === 0 || rect.height === 0) return;
       try {
         fit.fit();
-        terminalResizeRef.current(terminalId, term.cols, term.rows);
+        sendResize();
       } catch {
         // Ignore fit errors during transition.
       }
