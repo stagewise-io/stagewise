@@ -146,6 +146,5 @@ export function BrowserTabHotkeys({
     toggleDevTools(activeTabId);
   }, HotkeyActions.DEV_TOOLS);
 
-
   return null;
 }

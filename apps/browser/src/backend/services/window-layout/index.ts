@@ -1907,6 +1907,9 @@ export class WindowLayoutService extends DisposableService {
     );
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     if (tab) {
+      if (tabId && this.activeTabId !== tabId) {
+        await this.handleSwitchTab(tabId);
+      }
       tab.loadURL(url, transition);
     } else {
       this.logger.error(

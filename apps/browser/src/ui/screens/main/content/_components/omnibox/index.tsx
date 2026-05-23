@@ -123,12 +123,15 @@ export const Omnibox = ({
     }
   }, [displayedTabUrl, tab?.isLoading]);
 
-  // Close omnibox when the active tab changes or when this tab becomes inactive
+  // Close and blur omnibox when this tab becomes inactive. Hidden inputs can
+  // otherwise keep DOM focus and submit navigation from the wrong tab.
   useEffect(() => {
     if (!isActive) {
       setIsOmniboxOpen(false);
+      setNavigationPending(false);
+      inputRef.current?.blur();
     }
-  }, [tabId, isActive]);
+  }, [isActive]);
 
   // Sync Electron z-order with omnibox open state so the popover is visible
   // above tab webcontents. Only force stagewise-ui to foreground on open.
@@ -175,6 +178,7 @@ export const Omnibox = ({
   const onSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      if (!isActive) return;
       if (!inputValue || inputValue.trim() === '') {
         return;
       }
@@ -193,7 +197,16 @@ export const Omnibox = ({
       // Navigate with TYPED transition to indicate user typed in omnibox
       goto(url, tabId, PageTransition.TYPED);
     },
-    [inputValue, tabId, searchEngines, defaultEngineId],
+    [
+      inputValue,
+      tabId,
+      tab?.agentInstanceId,
+      tab?.url,
+      isActive,
+      searchEngines,
+      defaultEngineId,
+      goto,
+    ],
   );
 
   const onOpenChange = useCallback(
@@ -255,10 +268,11 @@ export const Omnibox = ({
         keepHighlight={true}
         mode="inline"
       >
-        <div className="flex-1">
+        <div className="h-full flex-1">
           <Autocomplete.Input
             ref={inputRef}
             placeholder="Search or type a URL"
+            disabled={!isActive}
             onFocus={onInputFocus}
             onKeyDown={onInputKeyDown}
             // Windows: body { user-select: none } suppresses the mousedown
@@ -266,7 +280,7 @@ export const Omnibox = ({
             // Explicitly calling focus() bypasses this platform-specific behavior.
             onMouseDown={() => inputRef.current?.focus()}
             className={cn(
-              'h-7.5 w-full flex-1 select-text pr-5 pl-3 text-muted-foreground text-sm focus:bg-surface-1 focus:text-foreground focus:outline-none focus:ring-derived-strong focus-visible:outline-none',
+              'h-full w-full flex-1 select-text pr-5 pl-3 text-muted-foreground text-sm focus:bg-surface-1 focus:text-foreground focus:outline-none focus:ring-derived-strong focus-visible:outline-none',
               // Only apply transitions for mouse interactions, instant for keyboard
               isKeyboardInteraction
                 ? 'transition-none'

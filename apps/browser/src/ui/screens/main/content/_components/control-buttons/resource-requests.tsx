@@ -31,10 +31,6 @@ import {
   PopoverTitle,
 } from '@stagewise/stage-ui/components/popover';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import {
-  Collapsible,
-  CollapsibleContent,
-} from '@stagewise/stage-ui/components/collapsible';
 import { Select } from '@stagewise/stage-ui/components/select';
 import type {
   PermissionRequest,
@@ -437,7 +433,7 @@ export function ResourceRequestsControlButton({
   const [urgentRequests, setUrgentRequests] = useState(false);
 
   // Refs to track previous request count and timeouts
-  const prevRequestCountRef = useRef(permissionRequests.length);
+  const prevRequestCountRef = useRef(0);
   const urgentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoDismissTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringPopoverRef = useRef(false);
@@ -577,34 +573,32 @@ export function ResourceRequestsControlButton({
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <Tooltip>
-        <Collapsible open={hasRequests}>
-          <CollapsibleContent className="p-0 opacity-100 blur-none transition-all duration-150 ease-out data-ending-style:h-8! data-starting-style:h-8! data-ending-style:w-0 data-starting-style:w-0 data-ending-style:overflow-hidden data-starting-style:overflow-hidden data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:blur-sm data-starting-style:blur-sm">
-            <TooltipTrigger>
-              <PopoverTrigger>
-                <Button
-                  variant="ghost"
-                  size="md"
-                  className="flex h-8 w-[calc-size(auto,size)] flex-row items-center gap-1 overflow-hidden px-2"
-                >
-                  {urgentRequests && (
-                    <div className="pointer-events-none absolute size-full animate-pulse-full bg-primary/10" />
-                  )}
-                  {previewIcons.map((icon) => (
-                    <PermissionIcon key={icon} type={icon} className="size-4" />
-                  ))}
-                  {permissionRequests.length > previewIcons.length && (
-                    <span className="select-none rounded-full bg-foreground/20 px-1.5 font-medium text-2xs text-foreground">
-                      +{permissionRequests.length - previewIcons.length}
-                    </span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-          </CollapsibleContent>
-        </Collapsible>
-        <TooltipContent side="bottom">{tooltipText}</TooltipContent>
-      </Tooltip>
+      {hasRequests && (
+        <Tooltip>
+          <TooltipTrigger>
+            <PopoverTrigger>
+              <Button
+                variant="ghost"
+                size="md"
+                className="flex h-8 w-[calc-size(auto,size)] flex-row items-center gap-1.5 overflow-hidden rounded-none px-2"
+              >
+                {urgentRequests && (
+                  <div className="pointer-events-none absolute size-full animate-pulse-full bg-primary/10" />
+                )}
+                {previewIcons.map((icon) => (
+                  <PermissionIcon key={icon} type={icon} className="size-4" />
+                ))}
+                {permissionRequests.length > previewIcons.length && (
+                  <span className="select-none rounded-full bg-foreground/20 px-1.5 font-medium text-2xs text-foreground">
+                    +{permissionRequests.length - previewIcons.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{tooltipText}</TooltipContent>
+        </Tooltip>
+      )}
 
       <PopoverContent
         className="w-80 rounded-lg p-2"

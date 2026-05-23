@@ -1,5 +1,4 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
-import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonState } from '@ui/hooks/use-karton';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { NavButtons } from './nav-buttons';
@@ -23,11 +22,10 @@ export interface PerTabContentRef {
 
 interface PerTabContentProps {
   tabId: string;
-  isActive: boolean;
 }
 
 export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
-  ({ tabId, isActive }, ref) => {
+  ({ tabId }, ref) => {
     const tab = useKartonState((s) => s.contentTabs.tabs[tabId]) as
       | TabState
       | undefined;
@@ -62,38 +60,19 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
     return (
       <TabErrorBoundary tabId={tabId}>
         {tab?.type === 'terminal' ? (
-          <div
-            className={cn(
-              'absolute inset-0 flex flex-col',
-              isActive ? 'z-10' : 'hidden',
-            )}
-          >
-            <PerTerminalContent terminalId={tabId} isActive={isActive} />
+          <div className="absolute inset-0 z-10 flex flex-col">
+            <PerTerminalContent terminalId={tabId} isActive />
           </div>
         ) : (
-          <div
-            className={cn(
-              'absolute inset-0 flex flex-col',
-              isActive ? 'z-10' : 'hidden',
-            )}
-          >
+          <div className="absolute inset-0 z-10 flex flex-col">
             {/* Control Bar */}
-            <div
-              className={cn(
-                'flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0',
-              )}
-            >
+            <div className="flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0 [&_button:focus-visible]:outline-offset-[-4px]">
               <NavButtons tabId={tabId} tab={tab} />
-              <Omnibox
-                ref={omniboxRef}
-                tabId={tabId}
-                tab={tab}
-                isActive={isActive}
-              />
+              <Omnibox ref={omniboxRef} tabId={tabId} tab={tab} isActive />
               <ZoomBar tabId={tabId} />
               <SearchBar tabId={tabId} ref={searchBarRef} />
               {(tab?.permissionRequests?.length ?? 0) > 0 && (
-                <ResourceRequestsControlButton tabId={tabId} isActive={isActive} />
+                <ResourceRequestsControlButton tabId={tabId} isActive />
               )}
               <div className="flex flex-row items-center gap-0.5">
                 {tab && <ColorSchemeWidget tab={tab} />}
@@ -109,10 +88,10 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                   className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
                 >
                   {/* Unified web contents overlay for devtools and DOM selection */}
-                  {isActive && !isInternalPage && <WebContentsOverlay />}
+                  {!isInternalPage && <WebContentsOverlay />}
                   {/* DOM context selector - uses the unified overlay via hook */}
-                  {isActive && !isInternalPage && <DOMContextSelector />}
-                  {isActive && tab?.authenticationRequest && (
+                  {!isInternalPage && <DOMContextSelector />}
+                  {tab?.authenticationRequest && (
                     <BasicAuthDialog
                       request={tab.authenticationRequest}
                       container={devAppPreviewContainerRef}

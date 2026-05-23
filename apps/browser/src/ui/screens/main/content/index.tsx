@@ -485,16 +485,16 @@ export function MainSection({
   const tabContentRefs = useRef<Record<string, PerTabContentRef | null>>({});
 
   const handleFocusUrlBar = useCallback(() => {
-    if (activeTabId) {
-      tabContentRefs.current[activeTabId]?.focusOmnibox();
+    if (effectiveActiveTabId) {
+      tabContentRefs.current[effectiveActiveTabId]?.focusOmnibox();
     }
-  }, [activeTabId]);
+  }, [effectiveActiveTabId]);
 
   const handleFocusSearchBar = useCallback(() => {
-    if (activeTabId) {
-      tabContentRefs.current[activeTabId]?.focusSearchBar();
+    if (effectiveActiveTabId) {
+      tabContentRefs.current[effectiveActiveTabId]?.focusSearchBar();
     }
-  }, [activeTabId]);
+  }, [effectiveActiveTabId]);
 
   useEffect(() => {
     if (!pendingOmniboxFocusRequest || !activeTabId) return;
@@ -670,17 +670,19 @@ export function MainSection({
         <div className="relative flex size-full flex-col">
           {/* Inner container with overflow clipping */}
           <div className="flex size-full flex-col overflow-hidden">
-            {/* Per-tab content instances — only visible tabs */}
-            {visibleTabIds.map((tabId) => (
-              <PerTabContent
-                key={tabId}
-                ref={(ref) => {
-                  tabContentRefs.current[tabId] = ref;
-                }}
-                tabId={tabId}
-                isActive={tabId === effectiveActiveTabId}
-              />
-            ))}
+            {/* Active tab content instance only. Hidden per-tab controls can
+                retain focus or portal event handlers, so the control bar and
+                content UI are mounted exclusively for the effective active tab. */}
+            {effectiveActiveTabId &&
+              visibleTabIds.includes(effectiveActiveTabId) && (
+                <PerTabContent
+                  key={effectiveActiveTabId}
+                  ref={(ref) => {
+                    tabContentRefs.current[effectiveActiveTabId] = ref;
+                  }}
+                  tabId={effectiveActiveTabId}
+                />
+              )}
           </div>
         </div>
       </div>
