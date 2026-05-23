@@ -234,14 +234,16 @@ function PermissionRequestRow({
   request,
   onAccept,
   onAlwaysAllow,
-  onAlwaysBlock,
+  onBlock,
   onSelectDevice,
+  onRespondToPairing,
 }: {
   request: PermissionRequest;
   onAccept: (requestId: string) => void;
   onAlwaysAllow: (requestId: string) => void;
-  onAlwaysBlock: (requestId: string) => void;
+  onBlock: (requestId: string) => void;
   onSelectDevice: (requestId: string, deviceId: string) => void;
+  onRespondToPairing: (requestId: string, confirmed: boolean) => void;
 }) {
   const icons = getRequestIcons(request);
   const description = getRequestDescription(request);
@@ -273,22 +275,36 @@ function PermissionRequestRow({
   }, []);
 
   const handleAccept = useCallback(() => {
-    if (isSimple) {
+    if (pairingRequest) {
+      onRespondToPairing(request.id, true);
+    } else if (isSimple) {
       onAccept(request.id);
     } else if (selectedDevice) {
       onSelectDevice(request.id, selectedDevice);
     }
-  }, [request.id, isSimple, selectedDevice, onAccept, onSelectDevice]);
+  }, [
+    request.id,
+    isSimple,
+    selectedDevice,
+    pairingRequest,
+    onAccept,
+    onSelectDevice,
+    onRespondToPairing,
+  ]);
 
   const handleAlwaysAllow = useCallback(() => {
     onAlwaysAllow(request.id);
   }, [request.id, onAlwaysAllow]);
 
-  const handleAlwaysBlock = useCallback(() => {
-    onAlwaysBlock(request.id);
-  }, [request.id, onAlwaysBlock]);
+  const handleBlock = useCallback(() => {
+    if (pairingRequest) {
+      onRespondToPairing(request.id, false);
+    } else {
+      onBlock(request.id);
+    }
+  }, [request.id, pairingRequest, onBlock, onRespondToPairing]);
 
-  const canAct = isSimple || !!selectedDevice;
+  const canAct = isSimple || !!selectedDevice || !!pairingRequest;
 
   return (
     <div className="relative flex shrink-0 flex-col items-stretch gap-0.5 py-1.5">
@@ -365,7 +381,7 @@ function PermissionRequestRow({
           >
             <IconCheckOutline18 className="size-3" /> Allow
           </Button>
-          <Button variant="secondary" size="xs" onClick={handleAlwaysBlock}>
+          <Button variant="secondary" size="xs" onClick={handleBlock}>
             <IconBanOutline18 className="size-3" /> Block
           </Button>
         </div>
@@ -387,7 +403,7 @@ function PermissionRequestRow({
           >
             <IconCheckOutline18 className="size-3" /> Always
           </Button>
-          <Button variant="secondary" size="xs" onClick={handleAlwaysBlock}>
+          <Button variant="secondary" size="xs" onClick={handleBlock}>
             <IconBanOutline18 className="size-3" /> Block
           </Button>
         </div>
@@ -419,11 +435,14 @@ export function ResourceRequestsControlButton({
   const alwaysAllowPermission = useKartonProcedure(
     (p) => p.browser.permissions.alwaysAllow,
   );
-  const alwaysBlockPermission = useKartonProcedure(
-    (p) => p.browser.permissions.alwaysBlock,
+  const rejectPermission = useKartonProcedure(
+    (p) => p.browser.permissions.reject,
   );
   const selectDevice = useKartonProcedure(
     (p) => p.browser.permissions.selectDevice,
+  );
+  const respondToPairing = useKartonProcedure(
+    (p) => p.browser.permissions.respondToPairing,
   );
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
@@ -538,15 +557,21 @@ export function ResourceRequestsControlButton({
     [alwaysAllowPermission],
   );
 
-  const handleAlwaysBlock = useCallback(
-    (requestId: string) => void alwaysBlockPermission(requestId),
-    [alwaysBlockPermission],
+  const handleBlock = useCallback(
+    (requestId: string) => void rejectPermission(requestId),
+    [rejectPermission],
   );
 
   const handleSelectDevice = useCallback(
     (requestId: string, deviceId: string) =>
       void selectDevice(requestId, deviceId),
     [selectDevice],
+  );
+
+  const handleRespondToPairing = useCallback(
+    (requestId: string, confirmed: boolean) =>
+      void respondToPairing(requestId, confirmed),
+    [respondToPairing],
   );
 
   // Get first few unique icon types for the button preview
@@ -626,8 +651,9 @@ export function ResourceRequestsControlButton({
                   request={request}
                   onAccept={handleAccept}
                   onAlwaysAllow={handleAlwaysAllow}
-                  onAlwaysBlock={handleAlwaysBlock}
+                  onBlock={handleBlock}
                   onSelectDevice={handleSelectDevice}
+                  onRespondToPairing={handleRespondToPairing}
                 />
               ))
           )}
