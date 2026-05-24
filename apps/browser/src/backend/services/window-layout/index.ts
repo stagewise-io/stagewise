@@ -1308,6 +1308,10 @@ export class WindowLayoutService extends DisposableService {
       }
     });
 
+    // Set agent instance BEFORE syncing to Karton state so addToTabOrder
+    // places the tab in the correct agent-specific order bucket (not global).
+    tab.setAgentInstance(agentInstanceId ?? null);
+
     this.tabs[id] = tab;
 
     // Update ChatStateController tabs reference
@@ -1358,9 +1362,6 @@ export class WindowLayoutService extends DisposableService {
     // Reinforce z-order after adding new tab view to ensure UI webcontent stays on top
     // (or tab content if isWebContentInteractive is true)
     this.updateZOrder();
-
-    // Assign to agent instance (null = globally visible)
-    tab.setAgentInstance(agentInstanceId ?? null);
 
     // Only activate new tab if requested AND source tab is active (or no source tab)
     // This prevents background tabs from stealing focus when they open links
