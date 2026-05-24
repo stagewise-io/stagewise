@@ -299,6 +299,7 @@ const config: ForgeConfig = {
     },
     extraResource: [
       './bundled',
+      './assets/sounds',
       `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
     ],
     prune: true,

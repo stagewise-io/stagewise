@@ -247,13 +247,16 @@ export function CommandCenter() {
 
       if (item.kind === 'agent') {
         setOpenAgent(item.agentId);
-        void resumeAgent(item.agentId);
-        void setLastOpenAgentId(item.agentId);
+        void setLastOpenAgentId(item.agentId).then(() =>
+          resumeAgent(item.agentId),
+        );
       } else if (item.kind === 'tab') {
-        if (item.agentInstanceId) {
-          setOpenAgent(item.agentInstanceId);
-          void resumeAgent(item.agentInstanceId);
-          void setLastOpenAgentId(item.agentInstanceId);
+        const agentInstanceId = item.agentInstanceId;
+        if (agentInstanceId) {
+          setOpenAgent(agentInstanceId);
+          void setLastOpenAgentId(agentInstanceId).then(() =>
+            resumeAgent(agentInstanceId),
+          );
         }
         void switchTab(item.tabId);
       } else if (item.kind === 'setting') {

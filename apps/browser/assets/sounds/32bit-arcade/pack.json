@@ -1,0 +1,8 @@
+{
+  "name": "32-bit Arcade",
+  "sounds": {
+    "done": "done.mp3",
+    "question": "question.mp3",
+    "error": "error.mp3"
+  }
+}

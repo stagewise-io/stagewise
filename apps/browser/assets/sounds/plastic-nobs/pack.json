@@ -1,0 +1,8 @@
+{
+  "name": "Plastic Nobs",
+  "sounds": {
+    "done": "done.mp3",
+    "question": "question.mp3",
+    "error": "error.mp3"
+  }
+}

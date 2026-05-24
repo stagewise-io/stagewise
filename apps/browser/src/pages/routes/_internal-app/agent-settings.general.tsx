@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { SearchableSelect } from '@stagewise/stage-ui/components/searchable-select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
+import { Switch } from '@stagewise/stage-ui/components/switch';
+import { toast } from '@stagewise/stage-ui/components/toaster';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
 import { IdeLogo } from '@ui/components/ide-logo';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
@@ -81,6 +83,184 @@ function IdeSelectionSetting() {
 }
 
 // =============================================================================
+// Notification Sounds Setting
+// =============================================================================
+
+const DEFAULT_SOUND_PACK = 'bubble-pops';
+
+function NotificationSoundsSetting() {
+  const globalConfig = useKartonState((s) => s.globalConfig);
+  const setGlobalConfig = useKartonProcedure((s) => s.setGlobalConfig);
+  const importSoundPack = useKartonProcedure((s) => s.importSoundPack);
+
+  const soundLoudness =
+    globalConfig.notificationSoundLoudness ??
+    (globalConfig.notificationSoundsEnabled === false ? 'off' : 'subtle');
+  const configuredPack = globalConfig.notificationSoundPack?.trim();
+  const availablePacks =
+    globalConfig.availableSoundPacks &&
+    globalConfig.availableSoundPacks.length > 0
+      ? globalConfig.availableSoundPacks
+      : [DEFAULT_SOUND_PACK];
+  const currentPack =
+    configuredPack && availablePacks.includes(configuredPack)
+      ? configuredPack
+      : DEFAULT_SOUND_PACK;
+  const packOptions = availablePacks.includes(currentPack)
+    ? availablePacks
+    : [currentPack, ...availablePacks];
+  const displayNames =
+    globalConfig.packDisplayNames ?? ({} as Record<string, string>);
+
+  const handleLoudnessChange = async (value: unknown) => {
+    const loudness = value as 'off' | 'subtle' | 'default';
+    await setGlobalConfig({
+      ...globalConfig,
+      notificationSoundLoudness: loudness,
+      // Keep legacy boolean in sync for older config consumers.
+      notificationSoundsEnabled: loudness !== 'off',
+    });
+  };
+
+  const handlePackChange = async (value: unknown) => {
+    await setGlobalConfig({
+      ...globalConfig,
+      notificationSoundPack: String(value),
+    });
+  };
+
+  const showImportErrorToast = (message: string) => {
+    toast({
+      id: `import-sound-pack-error-${Date.now()}`,
+      title: 'Import failed',
+      message,
+      type: 'error',
+      actions: [],
+    });
+  };
+
+  const handleImport = async () => {
+    try {
+      const result = await importSoundPack();
+      if (result && 'error' in result && result.error) {
+        showImportErrorToast(result.error);
+      }
+    } catch (err) {
+      showImportErrorToast(
+        err instanceof Error ? err.message : 'Sound pack import failed.',
+      );
+    }
+  };
+
+  const packLabel = (id: string): string =>
+    displayNames[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+
+  const loudnessItems = [
+    { value: 'off', label: 'Off' },
+    { value: 'subtle', label: 'Subtle' },
+    { value: 'default', label: 'Default' },
+  ];
+
+  const packItems = packOptions.map((pack) => ({
+    value: pack,
+    label: packLabel(pack),
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h3 className="font-medium text-base text-foreground">
+            Notification sounds
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            Play a sound when the agent finishes work, asks a question, or
+            encounters an error.
+          </p>
+        </div>
+        <SearchableSelect
+          value={soundLoudness}
+          onValueChange={handleLoudnessChange}
+          items={loudnessItems}
+          triggerVariant="secondary"
+          size="xs"
+          triggerClassName="w-auto min-w-0 px-2 py-3"
+          side="bottom"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-4 pl-0">
+        <div>
+          <h3 className="font-medium text-foreground text-sm">Sound pack</h3>
+          <p className="text-muted-foreground text-xs">
+            Choose which set of notification sounds to use.
+          </p>
+        </div>
+
+        <SearchableSelect
+          value={currentPack}
+          onValueChange={handlePackChange}
+          items={packItems}
+          triggerVariant="secondary"
+          size="xs"
+          triggerClassName="w-auto min-w-0 px-2 py-3"
+          side="bottom"
+        />
+      </div>
+
+      <button
+        type="button"
+        className="text-muted-foreground text-xs underline transition-colors hover:text-foreground"
+        onClick={handleImport}
+      >
+        Import sound pack…
+      </button>
+    </div>
+  );
+}
+
+// =============================================================================
+// Dock Bounce Setting (macOS only)
+// =============================================================================
+
+function DockBounceSetting() {
+  const globalConfig = useKartonState((s) => s.globalConfig);
+  const setGlobalConfig = useKartonProcedure((s) => s.setGlobalConfig);
+  const appInfo = useKartonState((s) => s.appInfo);
+
+  const isMacOS = appInfo.platform === 'darwin';
+  if (!isMacOS) return null;
+
+  const dockBounceEnabled = globalConfig.dockBounceEnabled ?? true;
+
+  const handleToggle = async (checked: boolean) => {
+    await setGlobalConfig({
+      ...globalConfig,
+      dockBounceEnabled: checked,
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h3 className="font-medium text-base text-foreground">
+          Dock icon bounce
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          Bounce the dock icon when the agent finishes, asks a question, or
+          encounters an error while the window is not focused.
+        </p>
+      </div>
+      <Switch
+        checked={dockBounceEnabled}
+        onCheckedChange={handleToggle}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+// =============================================================================
 // Main Page Component
 // =============================================================================
 
@@ -102,6 +282,16 @@ function Page() {
         <div className="mx-auto max-w-3xl space-y-8">
           <section className="space-y-6">
             <IdeSelectionSetting />
+          </section>
+
+          <hr className="border-derived-strong" />
+
+          <section className="space-y-6">
+            <h2 className="font-medium text-foreground text-lg">
+              Notifications
+            </h2>
+            <NotificationSoundsSetting />
+            <DockBounceSetting />
           </section>
         </div>
       </OverlayScrollbar>

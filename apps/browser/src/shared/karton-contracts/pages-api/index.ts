@@ -180,6 +180,10 @@ export type PagesApiContract = {
     trustCertificateAndReload: (tabId: string, origin: string) => Promise<void>;
     /** Set the global config (e.g., preferred IDE for opening files) */
     setGlobalConfig: (config: GlobalConfig) => Promise<void>;
+    /** Open a native file dialog to import a custom sound pack. Returns pack info on success, or an error object with a message on failure. */
+    importSoundPack: () => Promise<
+      { id: string; name: string } | { error: string }
+    >;
     /**
      * Get context files info (, AGENTS.md) for the current workspace.
      * Returns null if no workspace is loaded.
@@ -313,6 +317,12 @@ export const defaultState: PagesApiState = {
     telemetryLevel: 'full',
     openFilesInIde: 'other',
     hasSetIde: false,
+    notificationSoundsEnabled: true,
+    notificationSoundLoudness: 'subtle',
+    notificationSoundPack: 'bubble-pops',
+    availableSoundPacks: ['bubble-pops'],
+    packDisplayNames: {},
+    dockBounceEnabled: true,
   },
   userAccount: {
     status: 'unauthenticated',

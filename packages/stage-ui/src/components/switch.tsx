@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 
 export const switchVariants = cva(
   [
-    'relative flex cursor-pointer rounded-full',
+    'relative flex shrink-0 cursor-pointer rounded-full',
     'border border-border bg-surface-1',
     'transition-[background-position,box-shadow,background-color] duration-150ms ease-[cubic-bezier(0.26,0.75,0.38,0.45)]',
     'disabled:pointer-events-none disabled:opacity-50',

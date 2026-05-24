@@ -57,11 +57,14 @@ export type AgentState = {
    */
   toolApprovalMode: ToolApprovalMode;
   /**
-   * Classifier-attached context for tool parts currently in
-   * `approval-requested` state. Keys are the tool call IDs. Populated by
-   * `smart` mode when the classifier flags a command; consumed by the UI
-   * to render the rationale above the approve/skip buttons. Cleared as
-   * soon as the user responds to the approval request.
+   * Smart-approval classifier context keyed by tool call ID.
+   *
+   * Despite the legacy name, this is NOT the canonical source for whether a
+   * tool approval is pending. The canonical pending-approval state is stored
+   * on assistant history tool parts as `state === 'approval-requested'`, which
+   * exists for every approval mode/tool service. This record only stores the
+   * smart classifier explanation shown by the UI next to approval buttons.
+   * It is populated by smart shell approval and cleared when the user responds.
    */
   pendingApprovals: Record<string, { explanation: string }>;
   inputState: string; // Serialized input state - may be simple text or some stringified object if our input field needs that.

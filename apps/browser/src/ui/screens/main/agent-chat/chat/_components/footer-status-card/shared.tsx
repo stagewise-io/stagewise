@@ -107,6 +107,7 @@ export function StatusCardSectionComponent({
         <CollapsibleTrigger
           size="condensed"
           render={<div />}
+          nativeButton={false}
           className="w-full cursor-pointer p-0 hover:bg-transparent active:bg-transparent"
         >
           {item.trigger(isOpen)}

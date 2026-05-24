@@ -1,4 +1,5 @@
 import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
+import type { WebContents } from 'electron';
 import path from 'node:path';
 import type { AppState, SelectedElement } from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
@@ -615,6 +616,19 @@ export class WindowLayoutService extends DisposableService {
       throw new Error('UIController is not initialized or has been torn down');
     }
     return this.uiController.uiKarton;
+  }
+
+  /** Returns the main BaseWindow, or null if not yet created or destroyed. */
+  public getBaseWindow(): BaseWindow | null {
+    if (!this.baseWindow || this.baseWindow.isDestroyed()) return null;
+    return this.baseWindow;
+  }
+
+  /** Returns the UI WebContents for executing JS in the renderer. */
+  public getUIWebContents(): WebContents | null {
+    const view = this.uiController?.getView();
+    if (!view) return null;
+    return (view as any).webContents ?? null;
   }
 
   protected onTeardown() {
@@ -2095,13 +2109,16 @@ export class WindowLayoutService extends DisposableService {
   }
 
   private handleSetLastOpenAgentId = async (agentInstanceId: string | null) => {
-    // Lazily create tabs when switching to a not-yet-activated agent.
-    await this.ensureAgentTabsCreated(agentInstanceId);
-
+    // Update selection before any async tab restore. Agent resume can hydrate
+    // pending questions/approvals while tabs are being created; notification
+    // routing must already know which agent the user is opening.
     this.uiKarton.setState((draft) => {
       draft.browser.lastOpenAgentId = agentInstanceId;
     });
     this.saveTabState();
+
+    // Lazily create tabs when switching to a not-yet-activated agent.
+    await this.ensureAgentTabsCreated(agentInstanceId);
 
     // After lazy tab creation, activate an appropriate tab for the
     // new agent.  The frontend effect may have already run before
