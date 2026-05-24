@@ -1065,6 +1065,9 @@ export class ToolboxService extends DisposableService {
             this.uiKarton.setState((draft) => {
               const instance = draft.agents.instances[agentInstanceId];
               if (!instance) return;
+              // Legacy field name: this is smart-approval explanation metadata,
+              // not the canonical approval-pending state. The canonical state
+              // is the assistant tool part with state === 'approval-requested'.
               instance.state.pendingApprovals[toolCallId] = { explanation };
             });
           },

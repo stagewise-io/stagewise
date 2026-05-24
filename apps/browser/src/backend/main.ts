@@ -2,7 +2,8 @@
  * This file stores the main setup for the CLI.
  */
 
-import { app } from 'electron';
+import { app, dialog } from 'electron';
+import path from 'node:path';
 import { AuthService } from './services/auth';
 import { AgentManagerService } from './services/agent-manager';
 import { UserExperienceService } from './services/experience';
@@ -17,6 +18,7 @@ import {
   TelemetryService,
 } from './services/telemetry';
 import { GlobalConfigService } from './services/global-config';
+import { NotificationSoundsService } from './services/notification-sounds';
 import { PreferencesService } from './services/preferences';
 import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
@@ -189,6 +191,104 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
     uiKarton,
   );
+
+  // Resolve the sounds directory.
+  // Packaged: resourcesPath is the asar root. Dev: app.getAppPath() = project root.
+  const appRoot = app.isPackaged ? process.resourcesPath! : app.getAppPath();
+  const soundsDir = path.join(appRoot, 'assets', 'sounds');
+  const importedPacksDir = path.join(
+    app.getPath('userData'),
+    'imported-sound-packs',
+  );
+
+  const notificationSoundsService = await NotificationSoundsService.create(
+    logger,
+    uiKarton,
+    soundsDir,
+    importedPacksDir,
+    globalConfigService.get(),
+  );
+
+  // Wire the window ref for dock bouncing and web contents for audio playback.
+  notificationSoundsService.setWindowRef(() =>
+    windowLayoutService.getBaseWindow(),
+  );
+  notificationSoundsService.setWebContentsRef(() =>
+    windowLayoutService.getUIWebContents(),
+  );
+
+  // Keep the sounds service in sync with config changes.
+  const notificationSoundsConfigListener: Parameters<
+    typeof globalConfigService.addConfigUpdatedListener
+  >[0] = (newConfig) => {
+    notificationSoundsService.onConfigUpdated(newConfig);
+  };
+  globalConfigService.addConfigUpdatedListener(
+    notificationSoundsConfigListener,
+  );
+
+  // Push discovered sound packs and display names into global config.
+  notificationSoundsService.pushDiscoveredPacks((packs) => {
+    const cfg = globalConfigService.get();
+    const displayNames = notificationSoundsService.getPackDisplayNames();
+    const packsChanged =
+      !cfg.availableSoundPacks ||
+      cfg.availableSoundPacks.length !== packs.length ||
+      !cfg.availableSoundPacks.every((p, i) => p === packs[i]);
+    const namesChanged =
+      !cfg.packDisplayNames ||
+      Object.keys(cfg.packDisplayNames).length !==
+        Object.keys(displayNames).length ||
+      Object.entries(displayNames).some(
+        ([id, name]) => cfg.packDisplayNames?.[id] !== name,
+      );
+    if (packsChanged || namesChanged) {
+      void globalConfigService
+        .set({
+          ...cfg,
+          availableSoundPacks: packs,
+          packDisplayNames: displayNames,
+        })
+        .catch((err) => {
+          logger.error('[Main] Failed to save discovered sound packs', err);
+        });
+    }
+  });
+
+  // Wire the import sound pack procedure (opens native file dialog).
+  pagesService.registerImportSoundPackHandler(async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import Sound Pack',
+      filters: [{ name: 'Sound Pack JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    // User cancelled — no error, just nothing to do.
+    if (result.canceled || result.filePaths.length === 0) {
+      return { error: '' };
+    }
+    const imported = await notificationSoundsService.importPack(
+      result.filePaths[0],
+    );
+    // Propagate error if import failed.
+    if ('error' in imported) return imported;
+    // Refresh available packs in config so the UI picks up the new pack.
+    const cfg = globalConfigService.get();
+    const packs = notificationSoundsService.listPacks();
+    const displayNames = notificationSoundsService.getPackDisplayNames();
+    const newPack = imported.id;
+    try {
+      await globalConfigService.set({
+        ...cfg,
+        availableSoundPacks: packs,
+        packDisplayNames: displayNames,
+        notificationSoundPack: newPack,
+      });
+    } catch (err) {
+      logger.error('[Main] Failed to save imported sound pack', err);
+      return { error: 'Sound pack imported, but saving the selection failed.' };
+    }
+    return imported;
+  });
 
   ensureRipgrepInstalled({
     rgBinaryBasePath: getRipgrepBasePath(),
@@ -508,6 +608,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
           });
 
       const asyncTeardowns = Promise.all([
+        runAsyncTeardown('notificationSoundsService', async () => {
+          globalConfigService.removeConfigUpdatedListener(
+            notificationSoundsConfigListener,
+          );
+          notificationSoundsService.setWindowRef(() => null);
+          notificationSoundsService.setWebContentsRef(() => null);
+          await notificationSoundsService.teardown();
+        }),
         runAsyncTeardown('toolboxService', () => toolboxService.teardown()),
         runAsyncTeardown('gitService', () => gitService.teardown()),
         runAsyncTeardown('telemetryService', () => telemetryService.teardown()),

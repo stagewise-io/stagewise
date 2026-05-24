@@ -108,6 +108,9 @@ export class PagesService extends DisposableService {
     origin: string,
   ) => Promise<void>;
   private setGlobalConfigHandler?: (config: GlobalConfig) => Promise<void>;
+  private importSoundPackHandler?: () => Promise<
+    { id: string; name: string } | { error: string }
+  >;
   private getContextFilesHandler?: () => Promise<ContextFilesResult>;
   private generateWorkspaceMdHandler?: (workspacePath: string) => Promise<void>;
   private getExternalFileContentHandler?: (
@@ -878,6 +881,19 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
+      'importSoundPack',
+      async () => {
+        if (!this.importSoundPackHandler) {
+          this.logger.warn(
+            '[PagesService] importSoundPack called but no handler is set',
+          );
+          return { error: 'Import handler not configured.' };
+        }
+        return await this.importSoundPackHandler();
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
       'getContextFiles',
       async (_callingClientId: string): Promise<ContextFilesResult> => {
         if (!this.getContextFilesHandler) {
@@ -1339,6 +1355,13 @@ export class PagesService extends DisposableService {
     this.setGlobalConfigHandler = handler;
   }
 
+  /** Set the handler for importing a sound pack via a native file dialog. */
+  public registerImportSoundPackHandler(
+    handler: () => Promise<{ id: string; name: string } | { error: string }>,
+  ): void {
+    this.importSoundPackHandler = handler;
+  }
+
   /**
    * Set the handler for getting context files (.stagewise/, AGENTS.md).
    * This should be called by main.ts to wire up workspace context retrieval.
@@ -1548,6 +1571,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('setHasSeenOnboardingFlow');
     this.kartonServer.removeServerProcedureHandler('trustCertificateAndReload');
     this.kartonServer.removeServerProcedureHandler('setGlobalConfig');
+    this.kartonServer.removeServerProcedureHandler('importSoundPack');
     this.kartonServer.removeServerProcedureHandler('getContextFiles');
     this.kartonServer.removeServerProcedureHandler('generateWorkspaceMd');
     this.kartonServer.removeServerProcedureHandler('setProviderApiKey');
@@ -1595,6 +1619,7 @@ export class PagesService extends DisposableService {
     this.openTabHandler = undefined;
     this.userExperienceService = undefined;
     this.trustCertificateAndReloadHandler = undefined;
+    this.importSoundPackHandler = undefined;
     this.getContextFilesHandler = undefined;
     this.generateWorkspaceMdHandler = undefined;
     this.getExternalFileContentHandler = undefined;

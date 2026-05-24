@@ -531,8 +531,7 @@ export function AgentsList() {
     (id: string) => {
       // Optimistic: update the open agent immediately, don't wait for the RPC.
       setOpenAgent(id);
-      void resumeAgent(id);
-      void setLastOpenAgentId(id);
+      void setLastOpenAgentId(id).then(() => resumeAgent(id));
     },
     [resumeAgent, setOpenAgent, setLastOpenAgentId],
   );

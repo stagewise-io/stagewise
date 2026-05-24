@@ -352,6 +352,14 @@ export const globalConfigSchema = z
     telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
     openFilesInIde: openFilesInIdeSchema.default('other'),
     hasSetIde: z.boolean().default(false),
+    notificationSoundsEnabled: z.boolean().default(true),
+    notificationSoundLoudness: z
+      .enum(['off', 'subtle', 'default'])
+      .default('subtle'),
+    notificationSoundPack: z.string().default('bubble-pops'),
+    availableSoundPacks: z.array(z.string()).default(['bubble-pops']),
+    packDisplayNames: z.record(z.string(), z.string()).default({}),
+    dockBounceEnabled: z.boolean().default(true),
   })
   .loose();
 

@@ -1401,6 +1401,12 @@ export const defaultState: KartonContract['state'] = {
     telemetryLevel: 'full',
     openFilesInIde: 'other',
     hasSetIde: false,
+    notificationSoundsEnabled: true,
+    notificationSoundLoudness: 'subtle',
+    notificationSoundPack: 'bubble-pops',
+    availableSoundPacks: ['bubble-pops'],
+    packDisplayNames: {},
+    dockBounceEnabled: true,
   },
   userExperience: {
     storedExperienceData: {
