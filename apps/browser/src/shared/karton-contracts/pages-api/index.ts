@@ -19,6 +19,7 @@ import type {
   Patch,
   GlobalConfig,
   ModelProvider,
+  SocialAuthProvider,
 } from '../ui/shared-types';
 import type { CodingPlanId } from '../../coding-plans';
 import type {
@@ -265,6 +266,8 @@ export type PagesApiContract = {
     ) => Promise<{ error?: string }>;
     /** Verify an OTP code for the given email */
     verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
+    /** Start social sign-in in the system browser */
+    signInSocial: (provider: SocialAuthProvider) => Promise<{ error?: string }>;
     /** Log the current user out */
     logout: () => Promise<void>;
     /** Get current usage stats (window percentages + prepaid balance) */

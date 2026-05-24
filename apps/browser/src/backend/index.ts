@@ -4,6 +4,7 @@ unhandled();
 import { app, protocol } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
+import { installStartupOpenUrlListener } from './startup-url-events';
 
 // CRITICAL: `main` is imported dynamically (below in the 'ready' handler)
 // instead of statically. On Windows machines without the VC++ redistributable
@@ -50,6 +51,7 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(`com.squirrel.${appBaseName}.${appBaseName}`);
 }
 app.applicationMenu = null;
+installStartupOpenUrlListener();
 
 // Set the right path structure for the app
 // We keep userData where it is, but we will put session data into a sub-folder called "session"

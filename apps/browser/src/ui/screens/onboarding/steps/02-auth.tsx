@@ -2,13 +2,11 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { cn } from '@ui/utils';
 import { Input } from '@stagewise/stage-ui/components/input';
-import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
-import { useTurnstile } from '@ui/hooks/use-turnstile';
 import {
   Tooltip,
   TooltipTrigger,
@@ -22,6 +20,10 @@ import {
 } from '@ui/components/coding-plan-card';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import {
+  SignInOptionsPanel,
+  type SignInMethod,
+} from '@ui/components/auth/sign-in-options-panel';
+import {
   IconChevronLeftOutline18,
   IconChevronRightOutline18,
 } from 'nucleo-ui-outline-18';
@@ -32,7 +34,8 @@ import type {
 } from '@shared/karton-contracts/ui/shared-types';
 
 type AuthMode = 'stagewise' | 'api-keys' | 'coding-plan';
-type AuthPhase = 'form-input' | 'waiting-for-otp' | 'authentication-validated';
+type CompletionAuthMode = 'stagewise' | 'api-keys' | 'coding-plan';
+type AuthPhase = 'form-input' | 'authentication-validated';
 type ProviderKey =
   | 'anthropic'
   | 'openai'
@@ -54,8 +57,18 @@ const API_KEY_PROVIDERS: ProviderKey[] = [
 
 type ConnectResult = { success: true } | { success: false; error: string };
 
+const API_KEY_URLS: Record<ProviderKey, string> = {
+  anthropic: 'https://console.anthropic.com/settings/keys',
+  openai: 'https://platform.openai.com/api-keys',
+  google: 'https://aistudio.google.com/app/apikey',
+  moonshotai: 'https://platform.moonshot.ai/console/api-keys',
+  alibaba: 'https://dashscope.console.aliyun.com/apiKey',
+  deepseek: 'https://platform.deepseek.com/api_keys',
+  'z-ai': 'https://z.ai/manage-apikey/apikey-list',
+};
+
 export type OnboardingAuthCompletion = {
-  auth_method: AuthMode;
+  auth_method: CompletionAuthMode;
   provider?: ModelProvider;
   plan_id?: CodingPlanId;
 };
@@ -72,6 +85,7 @@ export function StepAuth({
 }) {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
+  const signInSocial = useKartonProcedure((p) => p.userAccount.signInSocial);
   const disconnectProvider = useKartonProcedure(
     (p) => p.preferences.disconnectProvider,
   );
@@ -99,27 +113,11 @@ export function StepAuth({
       ? 'authentication-validated'
       : 'form-input',
   );
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   // The anonymous telemetry toggle has been removed from onboarding.
   // Basic (anonymous) telemetry is enabled by default and is only opt-out
   // from the settings page. This state only governs the identifiable /
   // "full" telemetry upgrade checkbox shown below.
   const [telemetry, setTelemetry] = useState<TelemetryLevel>('anonymous');
-  const emailRef = useRef<HTMLInputElement>(null);
-  const otpRef = useRef<HTMLInputElement>(null);
-
-  const {
-    containerRef: turnstileRef,
-    token: turnstileToken,
-    ready: turnstileReady,
-    error: turnstileError,
-    enabled: turnstileEnabled,
-    reset: resetTurnstile,
-  } = useTurnstile();
-
   const [showMoreProviders, setShowMoreProviders] = useState(false);
 
   // API-keys list scroll fadeout — mirrors the models-list pattern in
@@ -133,15 +131,6 @@ export function StepAuth({
     axis: 'vertical',
     fadeDistance: 24,
   });
-
-  useEffect(() => {
-    if (isActive && mode === 'stagewise' && phase === 'form-input')
-      requestAnimationFrame(() => emailRef.current?.focus());
-  }, [isActive, mode, phase]);
-
-  useEffect(() => {
-    if (phase === 'waiting-for-otp') otpRef.current?.focus();
-  }, [phase]);
 
   const hasConnectedApiKey = useMemo(() => {
     const cfgs = preferences.providerConfigs ?? {};
@@ -183,8 +172,6 @@ export function StepAuth({
     ) {
       setPhase('form-input');
       switchMode('stagewise');
-      setCode('');
-      setError(null);
       setSelectedCodingPlanId(null);
     }
   }, [authStatus, phase, switchMode]);
@@ -242,48 +229,6 @@ export function StepAuth({
       );
     }
   }, [isActive, isValid, onValidityChange]);
-
-  const handleSendOtp = useCallback(async () => {
-    if (!email.trim()) return;
-    if (turnstileEnabled && !turnstileToken && !turnstileError) {
-      void track('onboarding-auth-otp-failed', {
-        error_kind: 'turnstile-not-ready',
-      });
-      setError('Security verification not ready. Please wait a moment.');
-      return;
-    }
-    void track('onboarding-auth-otp-requested');
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await sendOtp(email.trim(), turnstileToken ?? '');
-      if (result?.error) {
-        void track('onboarding-auth-otp-failed', {
-          error_kind: 'backend-error',
-        });
-        setError(result.error);
-        resetTurnstile();
-      } else {
-        setPhase('waiting-for-otp');
-      }
-    } catch {
-      void track('onboarding-auth-otp-failed', {
-        error_kind: 'network-error',
-      });
-      setError('Failed to send verification code.');
-      resetTurnstile();
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    email,
-    sendOtp,
-    track,
-    turnstileToken,
-    turnstileEnabled,
-    resetTurnstile,
-    turnstileError,
-  ]);
 
   const codingPlans = useMemo(() => Object.values(CODING_PLANS), []);
 
@@ -350,39 +295,13 @@ export function StepAuth({
     [disconnectProvider, track],
   );
 
-  const handleVerifyOtp = useCallback(async () => {
-    if (!code.trim()) return;
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await verifyOtp(email.trim(), code.trim());
-      if (result?.error) {
-        void track('onboarding-auth-otp-failed', {
-          error_kind: 'backend-error',
-        });
-        void track('onboarding-auth-method-failed', {
-          auth_method: 'stagewise',
-          error_kind: 'validation-error',
-        });
-        setError(result.error);
-      } else {
-        void track('onboarding-auth-otp-verified');
-        trackAuthCompleted({ auth_method: 'stagewise' });
-        setPhase('authentication-validated');
-      }
-    } catch {
-      void track('onboarding-auth-otp-failed', {
-        error_kind: 'network-error',
-      });
-      void track('onboarding-auth-method-failed', {
-        auth_method: 'stagewise',
-        error_kind: 'network-error',
-      });
-      setError('Failed to verify code.');
-    } finally {
-      setLoading(false);
-    }
-  }, [email, code, verifyOtp, track, trackAuthCompleted]);
+  const handleStagewiseAuthenticated = useCallback(
+    (_method: SignInMethod) => {
+      trackAuthCompleted({ auth_method: 'stagewise' });
+      setPhase('authentication-validated');
+    },
+    [trackAuthCompleted],
+  );
 
   if (phase === 'authentication-validated' && mode === 'stagewise') {
     return (
@@ -397,8 +316,6 @@ export function StepAuth({
             size="xs"
             onClick={() => {
               setPhase('form-input');
-              setCode('');
-              setError(null);
             }}
           >
             Use a different email
@@ -437,105 +354,37 @@ export function StepAuth({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4">
-      {!(mode === 'coding-plan' && selectedCodingPlanId !== null) && (
-        <div className="flex flex-col items-center gap-2 pb-2">
-          <h1 className="font-medium text-foreground text-xl">Authenticate</h1>
-          {mode === 'stagewise' && phase === 'form-input' && (
-            <p className="text-muted-foreground text-sm">
-              Get access to the latest models with stagewise.
-            </p>
-          )}
-          {mode === 'stagewise' && phase === 'waiting-for-otp' && (
-            <p className="text-muted-foreground text-sm">
-              We sent a code to{' '}
-              <span className="font-semibold text-muted-foreground">
-                {email}
-              </span>
-              . Enter it below.
-            </p>
-          )}
-          {mode === 'api-keys' && (
-            <p className="text-muted-foreground text-sm">
-              Enter at least one provider key to authenticate.
-            </p>
-          )}
-          {mode === 'coding-plan' && (
-            <p className="text-muted-foreground text-sm">
-              Connect a GLM, Kimi, Qwen, or MiniMax coding plan to authenticate.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Turnstile container — visible so interactive challenges can render */}
-      <div ref={turnstileRef} />
+      {!(mode === 'coding-plan' && selectedCodingPlanId !== null) &&
+        mode !== 'stagewise' && (
+          <div className="flex flex-col items-center gap-2 pb-2">
+            <h1 className="font-medium text-foreground text-xl">
+              Authenticate
+            </h1>
+            {mode === 'api-keys' && (
+              <p className="text-muted-foreground text-sm">
+                Enter at least one provider key to authenticate.
+              </p>
+            )}
+            {mode === 'coding-plan' && (
+              <p className="text-muted-foreground text-sm">
+                Connect a GLM, Kimi, Qwen, or MiniMax coding plan to
+                authenticate.
+              </p>
+            )}
+          </div>
+        )}
 
       {mode === 'stagewise' && phase === 'form-input' && (
-        <div className="flex gap-2">
-          <Input
-            ref={emailRef}
-            placeholder="you@example.com"
-            size="sm"
-            className="app-no-drag w-64"
-            type="email"
-            value={email}
-            onValueChange={(v) => setEmail(v)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleSendOtp();
-            }}
-            disabled={loading}
-          />
-          <Button
-            variant="primary"
-            className="shrink-0"
-            size="sm"
-            onClick={() => void handleSendOtp()}
-            disabled={
-              loading ||
-              !email.trim() ||
-              (turnstileEnabled && !turnstileError && !turnstileToken)
-            }
-          >
-            {turnstileEnabled && !turnstileReady && !turnstileError
-              ? 'Loading...'
-              : 'Sign in'}
-          </Button>
-        </div>
-      )}
-
-      {mode === 'stagewise' && phase === 'waiting-for-otp' && (
-        <div className="flex flex-col items-center gap-4">
-          <InputOtp
-            ref={otpRef}
-            length={6}
-            size="md"
-            value={code}
-            onChange={(val) => setCode(val)}
-            onComplete={() => void handleVerifyOtp()}
-            disabled={loading}
-            className="app-no-drag"
-          />
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void handleVerifyOtp()}
-            disabled={loading || code.length < 6}
-          >
-            {loading ? 'Verifying...' : 'Verify'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => {
-              setPhase('form-input');
-              setCode('');
-              setError(null);
-              resetTurnstile();
-            }}
-          >
-            Use a different email
-          </Button>
-        </div>
+        <SignInOptionsPanel
+          sendOtp={(email, token) => sendOtp(email, token ?? '')}
+          verifyOtp={verifyOtp}
+          signInSocial={signInSocial}
+          trackingPrefix="onboarding-auth"
+          track={track}
+          onUseApiKeys={() => switchMode('api-keys')}
+          onUseSubscription={() => switchMode('coding-plan')}
+          onAuthenticated={handleStagewiseAuthenticated}
+        />
       )}
 
       {mode === 'api-keys' && (
@@ -556,6 +405,8 @@ export function StepAuth({
               }
               onConnect={handleConnectSingleKey}
               onDisconnect={handleDisconnectApiKey}
+              apiKeyUrl={API_KEY_URLS.anthropic}
+              onGetApiKey={handleGetApiKey}
               onFocusProvider={(provider) => {
                 void track('onboarding-auth-api-key-input-focused', {
                   provider,
@@ -571,6 +422,8 @@ export function StepAuth({
               }
               onConnect={handleConnectSingleKey}
               onDisconnect={handleDisconnectApiKey}
+              apiKeyUrl={API_KEY_URLS.openai}
+              onGetApiKey={handleGetApiKey}
               onFocusProvider={(provider) => {
                 void track('onboarding-auth-api-key-input-focused', {
                   provider,
@@ -586,6 +439,8 @@ export function StepAuth({
               }
               onConnect={handleConnectSingleKey}
               onDisconnect={handleDisconnectApiKey}
+              apiKeyUrl={API_KEY_URLS.google}
+              onGetApiKey={handleGetApiKey}
               onFocusProvider={(provider) => {
                 void track('onboarding-auth-api-key-input-focused', {
                   provider,
@@ -605,6 +460,8 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  apiKeyUrl={API_KEY_URLS.moonshotai}
+                  onGetApiKey={handleGetApiKey}
                   onFocusProvider={(provider) => {
                     void track('onboarding-auth-api-key-input-focused', {
                       provider,
@@ -622,6 +479,8 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  apiKeyUrl={API_KEY_URLS.alibaba}
+                  onGetApiKey={handleGetApiKey}
                   onFocusProvider={(provider) => {
                     void track('onboarding-auth-api-key-input-focused', {
                       provider,
@@ -639,6 +498,8 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  apiKeyUrl={API_KEY_URLS.deepseek}
+                  onGetApiKey={handleGetApiKey}
                   onFocusProvider={(provider) => {
                     void track('onboarding-auth-api-key-input-focused', {
                       provider,
@@ -656,6 +517,8 @@ export function StepAuth({
                   }
                   onConnect={handleConnectSingleKey}
                   onDisconnect={handleDisconnectApiKey}
+                  apiKeyUrl={API_KEY_URLS['z-ai']}
+                  onGetApiKey={handleGetApiKey}
                   onFocusProvider={(provider) => {
                     void track('onboarding-auth-api-key-input-focused', {
                       provider,
@@ -671,7 +534,6 @@ export function StepAuth({
               size="xs"
               onClick={() => {
                 switchMode('stagewise');
-                setError(null);
                 setSelectedCodingPlanId(null);
               }}
             >
@@ -695,8 +557,6 @@ export function StepAuth({
           </div>
         </div>
       )}
-
-      {error && <p className="text-error-foreground text-sm">{error}</p>}
 
       {mode === 'coding-plan' && selectedCodingPlanId === null && (
         <div className="app-no-drag flex w-full max-w-md flex-col gap-3">
@@ -731,7 +591,6 @@ export function StepAuth({
               size="xs"
               onClick={() => {
                 switchMode('stagewise');
-                setError(null);
                 setSelectedCodingPlanId(null);
               }}
             >
@@ -782,34 +641,6 @@ export function StepAuth({
             </div>
           );
         })()}
-
-      {mode === 'stagewise' && phase === 'form-input' && (
-        <div className="flex flex-col items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => {
-              switchMode('api-keys');
-              setError(null);
-            }}
-          >
-            Use own API keys
-          </Button>
-          <div className="flex items-center gap-0">
-            <span className="text-subtle-foreground text-xs">or</span>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => {
-                switchMode('coding-plan');
-                setError(null);
-              }}
-            >
-              Use existing subscription
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -822,6 +653,8 @@ function ApiKeyRow({
   config,
   onConnect,
   onDisconnect,
+  apiKeyUrl,
+  onGetApiKey,
   onFocusProvider,
 }: {
   provider: ProviderKey;
@@ -834,6 +667,8 @@ function ApiKeyRow({
   };
   onConnect: (provider: ProviderKey, apiKey: string) => Promise<ConnectResult>;
   onDisconnect: (provider: ProviderKey) => Promise<void>;
+  apiKeyUrl: string;
+  onGetApiKey: (url: string) => void;
   onFocusProvider?: (provider: ProviderKey) => void;
 }) {
   const isConnected = !!config.encryptedApiKey && config.mode === 'official';
@@ -841,6 +676,7 @@ function ApiKeyRow({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isCreateKeyVisible, setIsCreateKeyVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   // Synchronous in-flight guards. React state updates are async, so overlapping
   // handlers (blur + click, Enter + click) within the same event cycle would
@@ -906,10 +742,37 @@ function ApiKeyRow({
   }, [onDisconnect, provider]);
 
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-muted-foreground text-xs">
-        {label}
-      </label>
+    <div
+      className="flex flex-col gap-1"
+      onMouseEnter={() => setIsCreateKeyVisible(true)}
+      onMouseLeave={() => setIsCreateKeyVisible(false)}
+      onFocus={() => setIsCreateKeyVisible(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setIsCreateKeyVisible(false);
+        }
+      }}
+    >
+      <div className="flex min-h-4 items-center justify-between gap-2">
+        <label htmlFor={inputId} className="text-muted-foreground text-xs">
+          {label}
+        </label>
+        {!isConnected && isCreateKeyVisible && (
+          <Tooltip>
+            <TooltipTrigger>
+              <button
+                type="button"
+                data-skip-auto-connect="true"
+                className="text-primary-foreground text-xs transition-colors hover:cursor-pointer hover:text-hover-derived"
+                onClick={() => onGetApiKey(apiKeyUrl)}
+              >
+                Create key
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{apiKeyUrl}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <div className="flex gap-1.5">
         <Input
           ref={inputRef}
@@ -949,8 +812,14 @@ function ApiKeyRow({
               void handleConnect();
             }
           }}
-          onBlur={() => {
+          onBlur={(event) => {
             if (isConnected) return;
+            if (
+              event.relatedTarget instanceof HTMLElement &&
+              event.relatedTarget.closest('[data-skip-auto-connect="true"]')
+            ) {
+              return;
+            }
             if (localInput.trim() && !isConnecting) {
               void handleConnect();
             }

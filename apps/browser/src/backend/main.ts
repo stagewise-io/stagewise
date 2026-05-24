@@ -53,6 +53,8 @@ import type { SkillDefinition } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
 import { detectShell, resolveShellEnv } from './utils/shell-env';
+import { AUTH_CALLBACK_PROTOCOL } from './services/auth/callback-scheme';
+import { registerStartupUrlHandler } from './startup-url-events';
 
 export type MainParameters = {
   launchOptions: {
@@ -161,7 +163,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   preferencesService.connectKarton(uiKarton, pagesService);
 
   // Create OmniboxSuggestionsService for omnibox autocomplete
-  const _omniboxSuggestionsService = await OmniboxSuggestionsService.create(
+  await OmniboxSuggestionsService.create(
     logger,
     uiKarton,
     historyService,
@@ -171,7 +173,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   );
 
   // Set up URL handlers
-  setupUrlHandlers(windowLayoutService, logger);
+  const registerAuthCallbackHandler = setupUrlHandlers(
+    windowLayoutService,
+    logger,
+  );
 
   const notificationService = await NotificationService.create(
     logger,
@@ -349,11 +354,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const filePickerService = await FilePickerService.create(logger, uiKarton);
 
   // DevToolAPIService handles devtools-related functionality and state
-  const _devToolAPIService = await DevToolAPIService.create(
-    logger,
-    uiKarton,
-    windowLayoutService,
-  );
+  await DevToolAPIService.create(logger, uiKarton, windowLayoutService);
 
   // URIHandlerService registers the app as the default protocol client for stagewise://
   // URL handling is done in main.ts via setupUrlHandlers() and handleCommandLineUrls()
@@ -365,6 +366,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     notificationService,
     logger,
   );
+  registerAuthCallbackHandler((url) => authService.handleAuthCallbackUrl(url));
 
   const credentialsService = await CredentialsService.create(logger);
 
@@ -452,11 +454,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       );
   });
 
-  const _appMenuService = new AppMenuService(
-    logger,
-    authService,
-    windowLayoutService,
-  );
+  new AppMenuService(logger, authService, windowLayoutService);
 
   const modelProviderService = new ModelProviderService(
     telemetryService,
@@ -557,7 +555,9 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   logger.debug('[Main] Startup complete');
 
   // Handle command line arguments for URLs on initial startup
-  handleCommandLineUrls(process.argv, windowLayoutService, logger);
+  handleCommandLineUrls(process.argv, windowLayoutService, logger, (url) =>
+    authService.handleAuthCallbackUrl(url),
+  );
 
   // Set up graceful shutdown to clean up database connections
   let isShuttingDown = false;
@@ -643,16 +643,28 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 }
 
 /**
+ * Checks if a URL points at a stable internal app page.
+ */
+function isInternalAppUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'stagewise:' && parsed.host === 'internal';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Checks if a string is a valid URL that the browser can open
  */
 function isOpenableUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return (
-      parsed.protocol === 'http:' ||
-      parsed.protocol === 'https:' ||
-      parsed.protocol === 'stagewise:'
-    );
+    if (isInternalAppUrl(url)) return true;
+    if (parsed.protocol === AUTH_CALLBACK_PROTOCOL) {
+      return isAuthCallbackUrl(url);
+    }
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }
@@ -678,12 +690,79 @@ function extractUrlsFromArgs(argv: string[]): string[] {
 /**
  * Opens a URL in a new browser tab (handles both http/https and stagewise:// URLs)
  */
+function isAuthCallbackUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== AUTH_CALLBACK_PROTOCOL) return false;
+    const fragmentParams = new URLSearchParams(parsed.hash.slice(1));
+    return (
+      parsed.host === 'auth' ||
+      parsed.pathname.includes('auth') ||
+      parsed.searchParams.has('code') ||
+      parsed.searchParams.has('token') ||
+      parsed.searchParams.has('error') ||
+      fragmentParams.has('code') ||
+      fragmentParams.has('token') ||
+      fragmentParams.has('error')
+    );
+  } catch {
+    return false;
+  }
+}
+
+type AuthCallbackHandler = (url: string) => boolean | Promise<boolean>;
+const MAX_QUEUED_AUTH_CALLBACK_URLS = 5;
+
+function describeIncomingUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (isAuthCallbackUrl(url)) return 'auth callback';
+    return `${parsed.protocol}//${parsed.host || '(no-host)'}`;
+  } catch {
+    return 'unparseable URL';
+  }
+}
+
+function handleAuthCallbackUrl(
+  url: string,
+  logger: Logger,
+  authCallbackHandler: AuthCallbackHandler,
+): void {
+  void Promise.resolve(authCallbackHandler(url)).catch((error) => {
+    logger.error(`[Main] Auth callback handling failed: ${String(error)}`);
+  });
+}
+
 function openIncomingUrl(
   url: string,
   windowLayoutService: WindowLayoutService,
   logger: Logger,
+  authCallbackHandler: AuthCallbackHandler | null,
+  queueAuthCallbackUrl?: (url: string) => void,
 ): void {
-  logger.debug(`[Main] Opening incoming URL: ${url}`);
+  if (isAuthCallbackUrl(url)) {
+    logger.debug('[Main] Received auth callback URL');
+    if (authCallbackHandler) {
+      handleAuthCallbackUrl(url, logger, authCallbackHandler);
+    } else {
+      queueAuthCallbackUrl?.(url);
+    }
+    return;
+  }
+  try {
+    if (
+      new URL(url).protocol === AUTH_CALLBACK_PROTOCOL &&
+      !isInternalAppUrl(url)
+    ) {
+      logger.warn(
+        `[Main] Ignoring malformed auth callback URL: ${describeIncomingUrl(url)}`,
+      );
+      return;
+    }
+  } catch {
+    return;
+  }
+  logger.debug(`[Main] Opening incoming URL: ${describeIncomingUrl(url)}`);
   void windowLayoutService.openUrlInNewTab(url);
 }
 
@@ -693,25 +772,55 @@ function openIncomingUrl(
 function setupUrlHandlers(
   windowLayoutService: WindowLayoutService,
   logger: Logger,
-): void {
-  // Handle 'open-url' event (macOS) - for both http/https and stagewise:// URLs
-  app.on('open-url', (ev: Electron.Event, url: string) => {
-    ev.preventDefault();
-    logger.debug(`[Main] open-url event received: ${url}`);
+): (handler: AuthCallbackHandler) => void {
+  let authCallbackHandler: AuthCallbackHandler | null = null;
+  const pendingAuthCallbackUrls: string[] = [];
+  const queueAuthCallbackUrl = (url: string) => {
+    if (pendingAuthCallbackUrls.length >= MAX_QUEUED_AUTH_CALLBACK_URLS) {
+      pendingAuthCallbackUrls.shift();
+    }
+    pendingAuthCallbackUrls.push(url);
+    logger.debug('[Main] Queued auth callback URL until handler is ready');
+  };
+
+  registerStartupUrlHandler((url) => {
+    logger.debug(`[Main] open-url event received: ${describeIncomingUrl(url)}`);
     if (isOpenableUrl(url)) {
-      openIncomingUrl(url, windowLayoutService, logger);
+      openIncomingUrl(
+        url,
+        windowLayoutService,
+        logger,
+        authCallbackHandler,
+        queueAuthCallbackUrl,
+      );
     }
   });
 
   // Handle 'second-instance' event (when app is already running)
   // This fires when user opens another URL while the app is running
   app.on('second-instance', (_ev: Electron.Event, argv: string[]) => {
-    logger.debug(`[Main] second-instance event received with argv: ${argv}`);
+    logger.debug(
+      `[Main] second-instance event received with ${argv.length} arguments`,
+    );
     const urls = extractUrlsFromArgs(argv);
     for (const url of urls) {
-      openIncomingUrl(url, windowLayoutService, logger);
+      openIncomingUrl(
+        url,
+        windowLayoutService,
+        logger,
+        authCallbackHandler,
+        queueAuthCallbackUrl,
+      );
     }
   });
+
+  return (handler: AuthCallbackHandler) => {
+    authCallbackHandler = handler;
+    const urls = pendingAuthCallbackUrls.splice(0);
+    for (const url of urls) {
+      handleAuthCallbackUrl(url, logger, handler);
+    }
+  };
 }
 
 /**
@@ -721,17 +830,29 @@ function handleCommandLineUrls(
   argv: string[],
   windowLayoutService: WindowLayoutService,
   logger: Logger,
+  authCallbackHandler: AuthCallbackHandler | null,
 ): void {
-  // Skip the first two args (node executable and script path)
-  const urls = extractUrlsFromArgs(argv.slice(2));
+  // Packaged protocol launches may pass the callback as the second argument
+  // without a script path. Scan all args and let URL filtering ignore argv[0]
+  // and non-URL flags.
+  const urls = extractUrlsFromArgs(argv);
   if (urls.length > 0) {
-    logger.debug(`[Main] Found URLs in command line arguments: ${urls}`);
+    logger.debug(
+      `[Main] Found ${urls.length} URLs in command line arguments: ${urls
+        .map(describeIncomingUrl)
+        .join(', ')}`,
+    );
     // Open the first URL immediately, others will be queued
-    openIncomingUrl(urls[0], windowLayoutService, logger);
+    openIncomingUrl(urls[0], windowLayoutService, logger, authCallbackHandler);
     // Open remaining URLs after a short delay to ensure the first one is processed
     for (let i = 1; i < urls.length; i++) {
       setTimeout(() => {
-        openIncomingUrl(urls[i], windowLayoutService, logger);
+        openIncomingUrl(
+          urls[i],
+          windowLayoutService,
+          logger,
+          authCallbackHandler,
+        );
       }, i * 100);
     }
   }

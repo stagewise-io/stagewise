@@ -71,6 +71,7 @@ export function wirePagesHandlers(deps: {
     sendOtp: (email, turnstileToken) =>
       authService.sendOtp(email, turnstileToken),
     verifyOtp: (email, code) => authService.verifyOtp(email, code),
+    signInSocial: (provider) => authService.signInSocial(provider),
     logout: () => authService.logout(),
   });
 
