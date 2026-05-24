@@ -23,7 +23,8 @@ export const Logo: FC<LogoProps> = ({
   ...props
 }) => {
   const colorStyle: Record<LogoColor, string> = {
-    default: 'fill-current text-primary-solid stroke-none',
+    default:
+      'fill-current text-primary-solid dark:text-primary-400 stroke-none',
     black: 'fill-current text-foreground stroke-none',
     white: 'fill-white stroke-none',
     zinc: 'fill-current text-muted-foreground stroke-none',

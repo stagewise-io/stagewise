@@ -23,6 +23,7 @@ import type {
   Patch,
   GlobalConfig,
   ModelProvider,
+  SocialAuthProvider,
 } from '@shared/karton-contracts/ui/shared-types';
 import { validateApiKeys } from '../utils/validate-api-keys';
 import { listAwsProfiles } from '../utils/aws-profiles';
@@ -99,6 +100,9 @@ export class PagesService extends DisposableService {
   private verifyOtpHandler?: (
     email: string,
     code: string,
+  ) => Promise<{ error?: string }>;
+  private signInSocialHandler?: (
+    provider: SocialAuthProvider,
   ) => Promise<{ error?: string }>;
   private logoutHandler?: () => Promise<void>;
   // Home page service dependencies
@@ -1193,6 +1197,16 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
+      'signInSocial',
+      async (_callingClientId: string, provider: SocialAuthProvider) => {
+        if (!this.signInSocialHandler) {
+          return { error: 'Auth service not available' };
+        }
+        return this.signInSocialHandler(provider);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
       'logout',
       async (_callingClientId: string) => {
         if (!this.logoutHandler) {
@@ -1302,10 +1316,12 @@ export class PagesService extends DisposableService {
       turnstileToken: string,
     ) => Promise<{ error?: string }>;
     verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
+    signInSocial: (provider: SocialAuthProvider) => Promise<{ error?: string }>;
     logout: () => Promise<void>;
   }): void {
     this.sendOtpHandler = handlers.sendOtp;
     this.verifyOtpHandler = handlers.verifyOtp;
+    this.signInSocialHandler = handlers.signInSocial;
     this.logoutHandler = handlers.logout;
   }
 
@@ -1590,6 +1606,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('disconnectProvider');
     this.kartonServer.removeServerProcedureHandler('sendOtp');
     this.kartonServer.removeServerProcedureHandler('verifyOtp');
+    this.kartonServer.removeServerProcedureHandler('signInSocial');
     this.kartonServer.removeServerProcedureHandler('logout');
 
     this.kartonServer.removeServerProcedureHandler('getUsageCurrent');
@@ -1628,6 +1645,7 @@ export class PagesService extends DisposableService {
     this.getUsageHistoryHandler = undefined;
     this.sendOtpHandler = undefined;
     this.verifyOtpHandler = undefined;
+    this.signInSocialHandler = undefined;
     this.logoutHandler = undefined;
 
     await this.transport.close();

@@ -6,7 +6,9 @@ import type { IdentifierService } from './identifier';
 import type { PreferencesService } from './preferences';
 import {
   modelProviderSchema,
+  socialAuthProviderSchema,
   type ModelProvider,
+  type SocialAuthProvider,
   type TelemetryLevel,
   type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
@@ -19,6 +21,7 @@ type OnboardingAuthMethod = 'stagewise' | 'api-keys' | 'coding-plan';
 type OnboardingAuthCompletionMethod = OnboardingAuthMethod | 'unknown';
 type OnboardingAuthFailureKind =
   | 'validation-error'
+  | 'backend-error'
   | 'network-error'
   | 'unknown-error';
 type OnboardingOtpFailureKind =
@@ -39,6 +42,7 @@ const codingPlanIdSchema = z.enum([
 ]);
 const onboardingAuthFailureKindSchema = z.enum([
   'validation-error',
+  'backend-error',
   'network-error',
   'unknown-error',
 ]);
@@ -84,6 +88,8 @@ export type EventProperties = {
     plan_id: CodingPlanId;
     provider: ModelProvider;
   };
+  'onboarding-auth-social-requested': { provider: SocialAuthProvider };
+  'onboarding-auth-social-verified': { provider: SocialAuthProvider };
   'onboarding-auth-otp-requested': undefined;
   'onboarding-auth-otp-verified': undefined;
   'onboarding-auth-otp-failed': {
@@ -96,7 +102,7 @@ export type EventProperties = {
   };
   'onboarding-auth-method-failed': {
     auth_method: OnboardingAuthMethod;
-    provider?: ModelProvider;
+    provider?: ModelProvider | SocialAuthProvider;
     plan_id?: CodingPlanId;
     error_kind: OnboardingAuthFailureKind;
   };
@@ -104,6 +110,30 @@ export type EventProperties = {
     auth_method: 'api-keys' | 'coding-plan';
     provider: ModelProvider;
     plan_id?: CodingPlanId;
+  };
+  'account-auth-social-requested': { provider: SocialAuthProvider };
+  'account-auth-social-verified': { provider: SocialAuthProvider };
+  'account-auth-otp-requested': undefined;
+  'account-auth-otp-verified': undefined;
+  'account-auth-otp-failed': {
+    error_kind: OnboardingOtpFailureKind;
+  };
+  'account-auth-method-failed': {
+    auth_method: 'stagewise';
+    provider?: SocialAuthProvider;
+    error_kind: OnboardingAuthFailureKind;
+  };
+  'chat-auth-social-requested': { provider: SocialAuthProvider };
+  'chat-auth-social-verified': { provider: SocialAuthProvider };
+  'chat-auth-otp-requested': undefined;
+  'chat-auth-otp-verified': undefined;
+  'chat-auth-otp-failed': {
+    error_kind: OnboardingOtpFailureKind;
+  };
+  'chat-auth-method-failed': {
+    auth_method: 'stagewise';
+    provider?: SocialAuthProvider;
+    error_kind: OnboardingAuthFailureKind;
   };
 
   // Workspace
@@ -435,11 +465,25 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'onboarding-auth-method-completed',
   'onboarding-auth-method-failed',
   'onboarding-auth-mode-switched',
+  'onboarding-auth-social-requested',
+  'onboarding-auth-social-verified',
   'onboarding-auth-otp-failed',
   'onboarding-auth-otp-requested',
   'onboarding-auth-otp-verified',
   'onboarding-auth-provider-disconnected',
   'onboarding-auth-providers-expanded',
+  'account-auth-method-failed',
+  'account-auth-otp-failed',
+  'account-auth-otp-requested',
+  'account-auth-otp-verified',
+  'account-auth-social-requested',
+  'account-auth-social-verified',
+  'chat-auth-method-failed',
+  'chat-auth-otp-failed',
+  'chat-auth-otp-requested',
+  'chat-auth-otp-verified',
+  'chat-auth-social-requested',
+  'chat-auth-social-verified',
   'onboarding-demo-slide-clicked',
   'settings-opened',
   'suggestion-clicked',
@@ -505,13 +549,21 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'onboarding-auth-method-failed': z.object({
     auth_method: onboardingAuthMethodSchema,
-    provider: modelProviderSchema.optional(),
+    provider: z
+      .union([modelProviderSchema, socialAuthProviderSchema])
+      .optional(),
     plan_id: codingPlanIdSchema.optional(),
     error_kind: onboardingAuthFailureKindSchema,
   }),
   'onboarding-auth-mode-switched': z.object({
     from: onboardingAuthMethodSchema,
     to: onboardingAuthMethodSchema,
+  }),
+  'onboarding-auth-social-requested': z.object({
+    provider: socialAuthProviderSchema,
+  }),
+  'onboarding-auth-social-verified': z.object({
+    provider: socialAuthProviderSchema,
   }),
   'onboarding-auth-otp-failed': z.object({
     error_kind: onboardingOtpFailureKindSchema,
@@ -525,6 +577,38 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'onboarding-auth-providers-expanded': z.object({
     expanded: z.boolean(),
+  }),
+  'account-auth-social-requested': z.object({
+    provider: socialAuthProviderSchema,
+  }),
+  'account-auth-social-verified': z.object({
+    provider: socialAuthProviderSchema,
+  }),
+  'account-auth-otp-failed': z.object({
+    error_kind: onboardingOtpFailureKindSchema,
+  }),
+  'account-auth-otp-requested': z.undefined().optional(),
+  'account-auth-otp-verified': z.undefined().optional(),
+  'account-auth-method-failed': z.object({
+    auth_method: z.literal('stagewise'),
+    provider: socialAuthProviderSchema.optional(),
+    error_kind: onboardingAuthFailureKindSchema,
+  }),
+  'chat-auth-social-requested': z.object({
+    provider: socialAuthProviderSchema,
+  }),
+  'chat-auth-social-verified': z.object({
+    provider: socialAuthProviderSchema,
+  }),
+  'chat-auth-otp-failed': z.object({
+    error_kind: onboardingOtpFailureKindSchema,
+  }),
+  'chat-auth-otp-requested': z.undefined().optional(),
+  'chat-auth-otp-verified': z.undefined().optional(),
+  'chat-auth-method-failed': z.object({
+    auth_method: z.literal('stagewise'),
+    provider: socialAuthProviderSchema.optional(),
+    error_kind: onboardingAuthFailureKindSchema,
   }),
   'onboarding-demo-slide-clicked': z.object({
     slide_name: z.string(),

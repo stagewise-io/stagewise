@@ -12,11 +12,11 @@ import type {
   CustomModel,
   ModelCapabilities,
   ModelProvider,
-  ProviderEndpointMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
   PROVIDER_DISPLAY_INFO,
   PROVIDER_OFFICIAL_URLS,
+  providerEndpointModeSchema,
 } from '@shared/karton-contracts/ui/shared-types';
 import { availableModels } from '@shared/available-models';
 import { CODING_PLANS, type CodingPlan } from '@shared/coding-plans';
@@ -118,9 +118,13 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
   }, [validated]);
 
   const handleModeChange = useCallback(
-    async (newMode: string) => {
+    async (newMode: unknown) => {
+      const parsedMode = providerEndpointModeSchema.safeParse(newMode);
+      if (!parsedMode.success) return;
+
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.providerConfigs[provider].mode = newMode as ProviderEndpointMode;
+        draft.providerConfigs[provider] ??= { mode: 'stagewise' };
+        draft.providerConfigs[provider].mode = parsedMode.data;
       });
       await updatePreferences(patches);
     },
@@ -1267,6 +1271,23 @@ function CustomModelsSection() {
 
 function Page() {
   const navigate = useNavigate();
+  useEffect(() => {
+    const scrollToHash = () => {
+      const targetId = window.location.hash.slice(1);
+      if (!targetId) return;
+
+      requestAnimationFrame(() => {
+        document.getElementById(targetId)?.scrollIntoView({
+          block: 'start',
+          behavior: 'smooth',
+        });
+      });
+    };
+
+    scrollToHash();
+    window.addEventListener('hashchange', scrollToHash);
+    return () => window.removeEventListener('hashchange', scrollToHash);
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -1283,7 +1304,7 @@ function Page() {
       <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
           {/* Coding Plans Section */}
-          <section className="space-y-6">
+          <section id="coding-plans" className="scroll-mt-6 space-y-6">
             <div>
               <h2 className="font-medium text-foreground text-lg">
                 Coding Plans
@@ -1300,7 +1321,7 @@ function Page() {
           <hr className="border-derived-subtle border-t" />
 
           {/* API Keys Section */}
-          <section className="space-y-6">
+          <section id="api-keys" className="scroll-mt-6 space-y-6">
             <div>
               <h2 className="font-medium text-foreground text-lg">API Keys</h2>
               <p className="text-muted-foreground text-sm">

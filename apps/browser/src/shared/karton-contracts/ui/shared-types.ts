@@ -21,6 +21,9 @@ export const modelProviderSchema = z.enum([
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
+export const socialAuthProviderSchema = z.enum(['google', 'github']);
+export type SocialAuthProvider = z.infer<typeof socialAuthProviderSchema>;
+
 /** Endpoint mode for a provider */
 export const providerEndpointModeSchema = z.enum([
   'stagewise',
@@ -790,7 +793,7 @@ export type ConfigurablePermissionType =
  */
 export const hostPermissionExceptionSchema = z.object({
   /** The permission setting for this origin */
-  setting: z.nativeEnum(PermissionSetting),
+  setting: z.enum(PermissionSetting),
   /** Unix timestamp when this exception was last modified */
   lastModified: z.number().optional(),
 });
@@ -804,30 +807,20 @@ export type HostPermissionException = z.infer<
  * These are used when no host-specific exception exists.
  */
 export const defaultPermissionSettingsSchema = z.object({
-  media: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  geolocation: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  notifications: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  fullscreen: z.nativeEnum(PermissionSetting).default(PermissionSetting.Allow),
-  bluetooth: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  hid: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  serial: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  usb: z.nativeEnum(PermissionSetting).default(PermissionSetting.Ask),
-  'clipboard-read': z
-    .nativeEnum(PermissionSetting)
-    .default(PermissionSetting.Ask),
-  'display-capture': z
-    .nativeEnum(PermissionSetting)
-    .default(PermissionSetting.Ask),
-  midi: z.nativeEnum(PermissionSetting).default(PermissionSetting.Allow),
-  'idle-detection': z
-    .nativeEnum(PermissionSetting)
-    .default(PermissionSetting.Ask),
-  'speaker-selection': z
-    .nativeEnum(PermissionSetting)
-    .default(PermissionSetting.Ask),
-  'storage-access': z
-    .nativeEnum(PermissionSetting)
-    .default(PermissionSetting.Ask),
+  media: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  geolocation: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  notifications: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  fullscreen: z.enum(PermissionSetting).default(PermissionSetting.Allow),
+  bluetooth: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  hid: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  serial: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  usb: z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  'clipboard-read': z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  'display-capture': z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  midi: z.enum(PermissionSetting).default(PermissionSetting.Allow),
+  'idle-detection': z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  'speaker-selection': z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  'storage-access': z.enum(PermissionSetting).default(PermissionSetting.Ask),
 });
 
 export type DefaultPermissionSettings = z.infer<

@@ -13,7 +13,7 @@ import { DisposableService } from '../disposable';
 import type { Logger } from '../logger';
 
 const API_URL =
-  (process.env.API_URL as string | undefined) ?? 'https://v1.api.stagewise.io';
+  (process.env.API_URL as string | undefined) ?? 'https://api.stagewise.io';
 
 /**
  * Allowed MIME types for upload — mirrors the server-side ALLOWED_MEDIA_TYPES
@@ -135,9 +135,6 @@ export class AssetCacheService extends DisposableService {
 
     const buffer = await fs.readFile(filePath);
     const hash = createHash('sha256').update(buffer).digest('hex');
-    this.logger.warn(
-      `[AssetCacheService] resolve() — file: ${filePath}, mediaType: ${mediaType}, hash: ${hash.slice(0, 12)}…`,
-    );
 
     // Check cache — require at least EXPIRY_SAFETY_MARGIN_S seconds left.
     const minExpiresAt = Math.floor(Date.now() / 1000) + EXPIRY_SAFETY_MARGIN_S;
@@ -146,36 +143,33 @@ export class AssetCacheService extends DisposableService {
       .from(assetCache)
       .where(eq(assetCache.fileHash, hash))
       .get();
-    this.logger.warn(
-      `[AssetCacheService] Cache lookup — found: ${!!cached}, expiresAt: ${cached?.expiresAt ?? 'n/a'}, minExpiresAt: ${minExpiresAt}`,
-    );
 
     // Fire-and-forget background sweep (throttled to once per minute).
     this.sweepExpired();
 
     if (cached && cached.expiresAt > minExpiresAt) {
-      this.logger.warn(
-        `[AssetCacheService] Cache hit → returning url: ${cached.readUrl.slice(0, 80)}…`,
-      );
+      this.logger.debug('[AssetCacheService] Cache hit');
       return { type: 'url', url: cached.readUrl };
     }
 
     // No valid cache entry — attempt upload.
     const token = this.getAccessToken();
     if (!token) {
-      this.logger.warn('[AssetCacheService] No access token — buffer fallback');
+      this.logger.debug(
+        '[AssetCacheService] No access token — buffer fallback',
+      );
       return { type: 'buffer', buffer };
     }
 
     if (!ALLOWED_MEDIA_TYPES.has(mediaType)) {
-      this.logger.warn(
+      this.logger.debug(
         `[AssetCacheService] Unsupported mediaType: ${mediaType} — buffer fallback`,
       );
       return { type: 'buffer', buffer };
     }
 
-    this.logger.warn(
-      `[AssetCacheService] Uploading ${filename} (${mediaType}, ${buffer.length} bytes)…`,
+    this.logger.debug(
+      `[AssetCacheService] Uploading attachment (${mediaType}, ${buffer.length} bytes)…`,
     );
 
     try {
@@ -190,12 +184,8 @@ export class AssetCacheService extends DisposableService {
         >[0]['mediaType'],
         contentLength: buffer.length,
       });
-      this.logger.warn(
-        `[AssetCacheService] Upload API response — error: ${JSON.stringify(error)}, uploadUrl: ${data?.uploadUrl?.slice(0, 80) ?? 'n/a'}`,
-      );
-
       if (error || !data) {
-        this.logger.warn(
+        this.logger.debug(
           `[AssetCacheService] Upload API failed — buffer fallback`,
         );
         return { type: 'buffer', buffer };
@@ -217,9 +207,6 @@ export class AssetCacheService extends DisposableService {
       ) as ArrayBuffer;
       formData.append('file', new Blob([arrayBuffer], { type: mediaType }));
 
-      this.logger.warn(
-        `[AssetCacheService] S3 POST → ${data.uploadUrl.slice(0, 80)}… fields: ${Object.keys(data.uploadFields).join(', ')}`,
-      );
       const postResponse = await fetch(data.uploadUrl, {
         method: 'POST',
         body: formData,
@@ -227,24 +214,19 @@ export class AssetCacheService extends DisposableService {
       const postBody = !postResponse.ok
         ? await postResponse.text().catch(() => '(unreadable)')
         : null;
-      this.logger.warn(
-        `[AssetCacheService] S3 POST response: ${postResponse.status} ${postResponse.statusText}${postBody ? ` — ${postBody.slice(0, 300)}` : ''}`,
-      );
+      if (!postResponse.ok) {
+        this.logger.debug(
+          `[AssetCacheService] S3 POST failed with ${postResponse.status} ${postResponse.statusText}${postBody ? ` (body length: ${postBody.length})` : ''}`,
+        );
+      }
 
       if (!postResponse.ok) {
-        this.logger.warn(
-          '[AssetCacheService] S3 POST failed — buffer fallback',
-        );
         return { type: 'buffer', buffer };
       }
 
       // Fixed 22-hour TTL — the read URL is valid for 24 hours on the server,
       // so this gives a comfortable 2-hour safety buffer.
       const expiresAt = Math.floor(Date.now() / 1000) + 22 * 60 * 60;
-      this.logger.warn(
-        `[AssetCacheService] S3 upload OK — readUrl: ${data.readUrl.slice(0, 80)}… expiresAt: ${expiresAt}`,
-      );
-
       // UPSERT in case the same hash was uploaded concurrently.
       await this.db
         .insert(assetCache)
@@ -254,10 +236,10 @@ export class AssetCacheService extends DisposableService {
           set: { readUrl: data.readUrl, expiresAt },
         });
 
-      this.logger.warn('[AssetCacheService] Cache written — returning url');
+      this.logger.debug('[AssetCacheService] Cache written — returning url');
       return { type: 'url', url: data.readUrl };
     } catch (err) {
-      this.logger.warn(
+      this.logger.debug(
         `[AssetCacheService] Upload pipeline threw — buffer fallback`,
         err,
       );

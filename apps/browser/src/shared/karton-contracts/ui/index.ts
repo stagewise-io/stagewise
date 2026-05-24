@@ -29,6 +29,7 @@ import type {
   WidgetId,
   DevToolbarOriginSettings,
   ToolApprovalMode,
+  SocialAuthProvider,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -1013,6 +1014,9 @@ export type KartonContract = {
         turnstileToken: string,
       ) => Promise<{ error?: string }>;
       verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
+      signInSocial: (
+        provider: SocialAuthProvider,
+      ) => Promise<{ error?: string }>;
       refreshStatus: () => Promise<void>;
       logout: () => Promise<void>;
       validateApiKeys: (keys: {

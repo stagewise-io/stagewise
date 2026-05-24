@@ -8,8 +8,15 @@ import type { Logger } from '../logger';
 import {
   AuthServerInterop,
   createBetterAuthClient,
+  openSocialAuthInSystemBrowser,
   type BetterAuthClient,
 } from './server-interop';
+import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
+import { AUTH_CALLBACK_PROTOCOL } from './callback-scheme';
+import {
+  createDevLoopbackAuthServer,
+  type DevLoopbackAuthServer,
+} from './dev-loopback-auth';
 import type { NotificationService } from '../notification';
 import type { IdentifierService } from '../identifier';
 import { DisposableService } from '../disposable';
@@ -56,6 +63,11 @@ export class AuthService extends DisposableService {
 
   private _refreshInterval: NodeJS.Timeout | null = null;
   private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
+  private pendingSocialAuth: {
+    resolve: (result: { error?: string }) => void;
+    timeout: NodeJS.Timeout;
+  } | null = null;
+  private activeLoopbackAuthServer: DevLoopbackAuthServer | null = null;
 
   private constructor(
     identifierService: IdentifierService,
@@ -142,6 +154,13 @@ export class AuthService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'userAccount.signInSocial',
+      async (_callingClientId: string, provider: SocialAuthProvider) => {
+        return this.signInSocial(provider);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.logout',
       async (_callingClientId: string) => {
         await this.logout();
@@ -180,13 +199,24 @@ export class AuthService extends DisposableService {
     return authService;
   }
 
-  protected onTeardown(): void {
+  protected async onTeardown(): Promise<void> {
     if (this._refreshInterval) {
       clearInterval(this._refreshInterval);
+      this._refreshInterval = null;
     }
+
+    if (this.pendingSocialAuth) {
+      clearTimeout(this.pendingSocialAuth.timeout);
+      const { resolve } = this.pendingSocialAuth;
+      this.pendingSocialAuth = null;
+      resolve({ error: 'Social sign-in was cancelled.' });
+    }
+
+    await this.disposeActiveLoopbackAuthServer();
 
     this.uiKarton.removeServerProcedureHandler('userAccount.sendOtp');
     this.uiKarton.removeServerProcedureHandler('userAccount.verifyOtp');
+    this.uiKarton.removeServerProcedureHandler('userAccount.signInSocial');
     this.uiKarton.removeServerProcedureHandler('userAccount.logout');
     this.uiKarton.removeServerProcedureHandler('userAccount.refreshStatus');
     this.uiKarton.removeServerProcedureHandler('userAccount.validateApiKeys');
@@ -274,6 +304,199 @@ export class AuthService extends DisposableService {
     } catch (err) {
       this.logger.error(`[AuthService] Unexpected error verifying OTP: ${err}`);
       return { error: 'An unexpected error occurred.' };
+    }
+  }
+
+  private completePendingSocialAuth(result: { error?: string }): void {
+    if (!this.pendingSocialAuth) return;
+    clearTimeout(this.pendingSocialAuth.timeout);
+    const { resolve } = this.pendingSocialAuth;
+    this.pendingSocialAuth = null;
+    void this.disposeActiveLoopbackAuthServer();
+    resolve(result);
+  }
+
+  private async disposeActiveLoopbackAuthServer(): Promise<void> {
+    const server = this.activeLoopbackAuthServer;
+    if (!server) return;
+    this.activeLoopbackAuthServer = null;
+    await server.dispose();
+  }
+
+  public async handleAuthCallbackUrl(url: string): Promise<boolean> {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return false;
+    }
+
+    let activeLoopbackCallback: URL | null = null;
+    if (this.activeLoopbackAuthServer) {
+      try {
+        activeLoopbackCallback = new URL(
+          this.activeLoopbackAuthServer.callbackUrl,
+        );
+      } catch {
+        activeLoopbackCallback = null;
+      }
+    }
+    const isLoopbackCallback =
+      !!activeLoopbackCallback &&
+      parsed.protocol === activeLoopbackCallback.protocol &&
+      parsed.host === activeLoopbackCallback.host &&
+      parsed.pathname === activeLoopbackCallback.pathname;
+
+    if (parsed.protocol !== AUTH_CALLBACK_PROTOCOL && !isLoopbackCallback) {
+      return false;
+    }
+
+    const callbackPath = parsed.hostname
+      ? `/${parsed.hostname}${parsed.pathname}`
+      : parsed.pathname;
+    const isAuthCallback =
+      callbackPath === '/auth/callback' ||
+      callbackPath.includes('/auth') ||
+      parsed.searchParams.has('error') ||
+      parsed.hash.startsWith('#token=');
+
+    if (!isAuthCallback) return false;
+    if (!this.pendingSocialAuth) return false;
+    const currentPending = this.pendingSocialAuth;
+
+    const fragmentParams = new URLSearchParams(parsed.hash.slice(1));
+    const callbackError =
+      parsed.searchParams.get('error_description') ??
+      parsed.searchParams.get('error') ??
+      fragmentParams.get('error_description') ??
+      fragmentParams.get('error');
+
+    if (callbackError) {
+      this.logger.error(
+        `[AuthService] Social sign-in failed: ${callbackError}`,
+      );
+      this.completePendingSocialAuth({ error: callbackError });
+      return true;
+    }
+
+    const token =
+      fragmentParams.get('token') ?? parsed.searchParams.get('token');
+
+    if (!token) {
+      const message = 'Social sign-in callback did not include a token.';
+      this.logger.error(`[AuthService] ${message}`);
+      this.completePendingSocialAuth({ error: message });
+      return true;
+    }
+
+    try {
+      const { data, error } = await this.authClient.authenticate({ token });
+      if (this.pendingSocialAuth !== currentPending) {
+        this.logger.debug(
+          '[AuthService] Ignoring stale social sign-in callback after authentication',
+        );
+        return true;
+      }
+      if (error || !data?.token) {
+        const message = error?.message ?? 'Social sign-in failed.';
+        this.logger.error(`[AuthService] Social sign-in failed: ${message}`);
+        if (this.pendingSocialAuth !== currentPending) {
+          this.logger.debug(
+            '[AuthService] Ignoring stale social sign-in failure after authentication',
+          );
+          return true;
+        }
+        this.completePendingSocialAuth({ error: message });
+        return true;
+      }
+
+      this.persistCredentials({
+        token: data.token,
+        user: {
+          id: data.user.id,
+          email: data.user.email ?? undefined,
+          name: data.user.name ?? undefined,
+        },
+      });
+
+      this.updateAuthState((draft) => {
+        draft.userAccount = {
+          ...draft.userAccount,
+          status: 'authenticated',
+          machineId: this.identifierService.getMachineId(),
+          user: { id: data.user.id, email: data.user.email ?? '' },
+        };
+      });
+
+      this.logger.debug('[AuthService] Completed social sign-in callback');
+      this.completePendingSocialAuth({});
+      void this.refreshSession().catch((refreshError) => {
+        this.logger.warn(
+          `[AuthService] Session refresh after social sign-in failed: ${refreshError}`,
+        );
+      });
+      return true;
+    } catch (err) {
+      this.logger.error(
+        `[AuthService] Unexpected error handling auth callback: ${err}`,
+      );
+      if (this.pendingSocialAuth !== currentPending) {
+        this.logger.debug(
+          '[AuthService] Ignoring stale social sign-in error after callback failure',
+        );
+        return true;
+      }
+      this.completePendingSocialAuth({
+        error: 'Failed to complete social sign-in.',
+      });
+      return true;
+    }
+  }
+
+  public async signInSocial(
+    provider: SocialAuthProvider,
+  ): Promise<{ error?: string }> {
+    if (this.pendingSocialAuth) {
+      return { error: 'A social sign-in flow is already in progress.' };
+    }
+
+    const completion = new Promise<{ error?: string }>((resolve) => {
+      const timeout = setTimeout(
+        () => {
+          this.pendingSocialAuth = null;
+          void this.disposeActiveLoopbackAuthServer();
+          resolve({ error: 'Social sign-in timed out.' });
+        },
+        5 * 60 * 1000,
+      );
+
+      this.pendingSocialAuth = { resolve, timeout };
+    });
+
+    try {
+      this.logger.debug(`[AuthService] Starting social sign-in: ${provider}`);
+      this.activeLoopbackAuthServer = await createDevLoopbackAuthServer(
+        (callbackUrl) => this.handleAuthCallbackUrl(callbackUrl),
+      );
+      await openSocialAuthInSystemBrowser(
+        provider,
+        this.activeLoopbackAuthServer
+          ? {
+              kind: 'loopback',
+              callbackUrl: this.activeLoopbackAuthServer.callbackUrl,
+            }
+          : undefined,
+      );
+      return await completion;
+    } catch (err) {
+      await this.disposeActiveLoopbackAuthServer();
+      this.logger.error(
+        `[AuthService] Unexpected error during social sign-in: ${err}`,
+      );
+      this.completePendingSocialAuth({
+        error: 'Failed to complete social sign-in.',
+      });
+      return await completion;
     }
   }
 

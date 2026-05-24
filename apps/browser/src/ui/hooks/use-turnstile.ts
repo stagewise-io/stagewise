@@ -31,6 +31,11 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
  *
  * When `VITE_TURNSTILE_SITE_KEY` is not set, the hook is inert —
  * `enabled` is false and `token` stays null.
+ *
+ * Internal app pages run on the custom `stagewise://` scheme. Turnstile is
+ * intentionally disabled there because custom-scheme origins are not reliable
+ * challenge targets; OTP still goes through the backend auth flow without a
+ * captcha token and surfaces any server-side rejection normally.
  */
 export function useTurnstile() {
   const [token, setToken] = useState<string | null>(null);
@@ -39,7 +44,8 @@ export function useTurnstile() {
   const widgetIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const enabled = !!TURNSTILE_SITE_KEY;
+  const isUnsupportedOrigin = window.location.protocol === 'stagewise:';
+  const enabled = !!TURNSTILE_SITE_KEY && !isUnsupportedOrigin;
 
   const initWidget = useCallback(() => {
     if (!window.turnstile || !containerRef.current) return;
