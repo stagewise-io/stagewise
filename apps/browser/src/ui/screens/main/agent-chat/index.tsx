@@ -85,11 +85,16 @@ export function AgentChat() {
       currentModelId,
       currentToolApprovalMode,
       paths.length > 0 ? paths : undefined,
-    ).then((id) => {
-      setOpenAgent(id);
-      setPendingCreate(false);
-      void setLastOpenAgentId(id);
-    });
+    )
+      .then((id) => {
+        setOpenAgent(id);
+        setPendingCreate(false);
+        void setLastOpenAgentId(id);
+      })
+      .catch((err) => {
+        console.error('Failed to create agent:', err);
+        setPendingCreate(false);
+      });
   }, [pendingCreate, createAgent, emptyAgentIdRef, setOpenAgent, track]);
 
   return (

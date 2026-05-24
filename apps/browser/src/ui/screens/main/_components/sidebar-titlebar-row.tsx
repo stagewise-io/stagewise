@@ -95,7 +95,7 @@ export function SidebarTitlebarRow({
       )}
       {sidebarCollapsed && agentTitle && (
         <span
-          className="app-no-drag ml-2 select-none truncate font-medium text-foreground text-sm"
+          className="app-no-drag ml-2 min-w-0 select-none truncate font-medium text-foreground text-sm"
           style={
             isMacOs ? { marginTop: TITLEBAR_ICON_OPTICAL_OFFSET } : undefined
           }
