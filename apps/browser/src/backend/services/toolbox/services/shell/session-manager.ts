@@ -365,7 +365,7 @@ export class SessionManager {
       readyResolve: null!,
       onData: onData ?? null,
       cwd,
-      currentCwd: null,
+      currentCwd: cwd,
       logger: this.getShellLogsDir
         ? new SessionLogger(
             path.join(
@@ -406,13 +406,10 @@ export class SessionManager {
     });
 
     // Wire parser events
-    parser.on('cwd', (currentCwd) => {
-      // OSC 7 is just terminal output. A command can print it itself, so only
-      // trust cwd updates observed while the shell is at/restoring a prompt.
-      // During command output, keep the previous trusted cwd so smart approval
-      // does not make decisions from spoofed directory metadata.
-      if (parser.inCommandOutput) return;
-      session.currentCwd = currentCwd;
+    parser.on('cwd', () => {
+      // OSC 7 is just terminal output. Commands can spoof both cwd metadata
+      // and OSC 133 boundaries, so agent sessions never trust in-band cwd
+      // updates for smart-approval cwd decisions.
     });
 
     parser.on('integrationDetected', () => {
@@ -589,8 +586,16 @@ export class SessionManager {
         // which will resolve any pending commands when the session exits.
       }
 
-      // Write the command to the PTY
+      // Write the command to the PTY. Once bytes are sent to the shell, the
+      // cwd can change in ways we cannot verify securely from terminal output:
+      // commands can spoof OSC 7 and OSC 133 boundaries. Keep the initial cwd
+      // for first-command approval only, then fail closed for subsequent
+      // relative commands until a new session is created with an explicit cwd.
       const command = request.command;
+      if (command.length > 0) {
+        session.currentCwd = null;
+      }
+
       if (request.rawInput) {
         // Raw stdin: write bytes verbatim — no \r, no sentinel
         session.pty.write(command);
@@ -599,7 +604,8 @@ export class SessionManager {
         // The agent is just waiting for output; the pending command will
         // resolve via timeout, pattern match, or session exit.
       } else if (session.shellIntegrationActive) {
-        // Shell integration handles boundaries via OSC 133
+        // Shell integration handles output boundaries via OSC 133. Cwd updates
+        // from that same terminal stream are intentionally ignored above.
         session.pty.write(`${command}\r`);
       } else if (session.parser.currentMode === 'sentinel') {
         // Wrap with sentinel for exit code detection
