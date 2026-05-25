@@ -97,7 +97,7 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed top-0 left-0 z-50 flex w-full justify-center bg-background/40 backdrop-blur-lg">
+    <div className="fixed top-0 left-0 z-[60] flex w-full justify-center bg-background/40 backdrop-blur-lg">
       {/* Desktop: single row, h-14. Mobile: column, height grows when open */}
       <div className="z-50 w-full max-w-7xl px-4 transition-all duration-150 ease-out">
         {/* Top row: always visible */}

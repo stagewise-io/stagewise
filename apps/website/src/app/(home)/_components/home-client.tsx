@@ -17,8 +17,8 @@ import useExistingSubscriptionDark from './feature-images/use-existing-subscript
 import useExistingSubscriptionLight from './feature-images/use-existing-subscription-light.webp';
 import githubRepoIssuesDark from './feature-images/github-repo-issues-dark.webp';
 import githubRepoIssuesLight from './feature-images/github-repo-issues-light.webp';
-import fullDemoDark from './feature-images/full-demo-dark.png';
-import fullDemoLight from './feature-images/full-demo-light.png';
+import fullDemoDark from './feature-images/full-demo-dark.webp';
+import fullDemoLight from './feature-images/full-demo-light.webp';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
 

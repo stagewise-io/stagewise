@@ -1,11 +1,11 @@
-import AgentIdeIntegrationDark from './agent-ide-integration-dark.png';
-import AgentIdeIntegrationLight from './agent-ide-integration-light.png';
-import DebuggerAccessDark from './debugger-access-dark.png';
-import DebuggerAccessLight from './debugger-access-light.png';
-import ExperimentsDark from './experiments-dark.png';
-import ExperimentsLight from './experiments-light.png';
-import ReverseEngineeringDark from './reverse-engineering-dark.png';
-import ReverseEngineeringLight from './reverse-engineering-light.png';
+import AgentIdeIntegrationDark from './agent-ide-integration-dark.webp';
+import AgentIdeIntegrationLight from './agent-ide-integration-light.webp';
+import DebuggerAccessDark from './debugger-access-dark.webp';
+import DebuggerAccessLight from './debugger-access-light.webp';
+import ExperimentsDark from './experiments-dark.webp';
+import ExperimentsLight from './experiments-light.webp';
+import ReverseEngineeringDark from './reverse-engineering-dark.webp';
+import ReverseEngineeringLight from './reverse-engineering-light.webp';
 
 export {
   AgentIdeIntegrationDark,
