@@ -47,6 +47,7 @@ import {
   getRipgrepBasePath,
 } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
+import { importLegacyPrereleaseData } from './utils/import-legacy-prerelease-data';
 import { discoverPlugins } from './utils/discover-plugins';
 import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
@@ -66,6 +67,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // In this file you can include the rest of your app's specific main process
   // code. You can also put them in separate files and import them here.
   const logger = new Logger(verbose ?? false);
+
+  await importLegacyPrereleaseData(logger);
 
   migrateLegacyPaths(logger);
 

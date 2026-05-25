@@ -25,6 +25,8 @@ const appBaseName = (() => {
   switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
+    case 'nightly':
+      return 'stagewise-nightly';
     case 'prerelease':
       return 'stagewise-prerelease';
     case 'dev':
@@ -37,6 +39,8 @@ const appName = (() => {
   switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
+    case 'nightly':
+      return 'stagewise Nightly';
     case 'prerelease':
       return 'stagewise (Pre-Release)';
     case 'dev':

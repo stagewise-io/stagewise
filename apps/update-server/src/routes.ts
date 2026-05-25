@@ -51,7 +51,12 @@ function resolveBaseUrl(req: Request): string {
 const router = Router();
 
 function isValidChannel(channel: string): channel is Channel {
-  return channel === 'release' || channel === 'beta' || channel === 'alpha';
+  return (
+    channel === 'release' ||
+    channel === 'nightly' ||
+    channel === 'beta' ||
+    channel === 'alpha'
+  );
 }
 
 function isValidLinuxFormat(format: string): format is LinuxFormat {

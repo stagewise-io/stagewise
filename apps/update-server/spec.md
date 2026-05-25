@@ -12,11 +12,12 @@ Build a auto-update / download server that responds to certain request paths wit
   - The app name should be configurable with an env var (`APP_NAME`).
   - The app is released and files are hosted in a github repo. Make this configurable as well (`APP_GITHUB_ORG` and `APP_GITHUB_REPO`)
 - The server offers multiple update channels:
-  - Release updates (returns only stable versions) under channel `release`
-  - Pre-Release updates (returns newest versions, including pre-release)
-    - Alpha channel (returns the latest pre-release, including pre-releases with alpha and beta version suffix) under channel `alpha`
-    - Beta channel (returns the latest pre-release, including pre-releases with beta version suffix, but no alpha versions) under channel `beta`.
-  - The channel param in URLs can be `release`, `beta` or `alpha`.
+  - Release updates (returns only stable versions) under channel `release`.
+  - Nightly updates (returns only nightly versions such as `1.0.1-nightly20260525001`) under channel `nightly`.
+  - Legacy pre-release updates are kept during the migration window:
+    - Alpha channel (returns the latest legacy pre-release, including pre-releases with alpha and beta version suffix) under channel `alpha`.
+    - Beta channel (returns the latest legacy pre-release with beta version suffix, but no alpha versions) under channel `beta`.
+  - The channel param in URLs can be `release`, `nightly`, `beta` or `alpha`.
 - The releases that are available should be fetched from github releases of the repository. Always fetch all releases (including pre-releases) that begin with the configured app name (like `${APP_NAME}@1.0.0-beta.1`) and ignore other releases.
   - The release assets include all the files that are needed in order to generate all responses.
   - The list of releases should be fetched once on start and then every 15 minutes again. Cache the fetched list until a refresh from github releases happens.
@@ -35,11 +36,11 @@ Build a auto-update / download server that responds to certain request paths wit
 
 ## App release format
 
-The versioning of the app is in semver with optional suffixes for pre-release versions. Examples: `1.2.3`, `1.1.0-alpha.2`, `2.2.0-beta.5`.
+The versioning of the app is in semver with optional suffixes for pre-release versions. Examples: `1.2.3`, `1.1.0-alpha001`, `2.2.0-beta005`, `1.0.1-nightly20260525001`.
 
-Release versions don't have suffixes, pre-releases always have a suffix with either "alpha" or "beta".
+Release versions don't have suffixes. Legacy pre-releases use a suffix with either "alpha" or "beta". Nightly versions use a suffix in the form `nightlyYYYYMMDDNNN`, where `NNN` is a three-digit per-day counter.
 
-Beta versions are newer than Alpha versions if the semver version is equal.
+The suffix name and counter are intentionally concatenated without dot separators so Squirrel.Windows' NuGet parser can read versions from update package filenames.
 
 ## GitHub releases file format
 
@@ -59,8 +60,9 @@ Note that release files may either start with `${APP_NAME}` or `${APP_NAME}-prer
 
 The update endpoint for macOS should offer the latest update for the given arch, channel and version. If there is no release at all available for the given arch, respond with HTTP code 204 (No content).
 
-- If the channel is alpha, offer the latest beta or alpha pre-release. Don't offer production releases for this channel.
-- If the channel is beta, only offer the latest beta pre-release.
+- If the channel is alpha, offer the latest beta or alpha legacy pre-release. Don't offer release or nightly releases for this channel.
+- If the channel is beta, only offer the latest beta legacy pre-release.
+- If the channel is nightly, only offer the latest nightly release.
 - If the channel is release, only offer the latest release.
 - The request will most likely include the request header set to type `application/json`. Always set the response header to `application/json` unless nothing is available (then it's plaintext).
 - If the latest release is equal to or lower than the user-given version, the server should also respond with 204 (No content). Make sure that versions are properly compared, including the beta and alpha release.
@@ -85,8 +87,9 @@ The update response should look like this:
 
 The update endpoint for Windows should offer the latest update for the given arch, channel and version. If there is no release at all available for the given arch, respond with an rempty response.
 
-- If the channel is alpha, offer the latest beta or alpha pre-release. Don't offer production releases for this channel.
-- If the channel is beta, only offer the latest beta pre-release.
+- If the channel is alpha, offer the latest beta or alpha legacy pre-release. Don't offer release or nightly releases for this channel.
+- If the channel is beta, only offer the latest beta legacy pre-release.
+- If the channel is nightly, only offer the latest nightly release.
 - If the channel is release, only offer the latest release.
 - Always set the response header datatype to plaintext.
 - If the latest release is equal to or lower than the user-given version, the server should also respond with an empty response. Make sure that versions are properly compared, including the beta and alpha release.

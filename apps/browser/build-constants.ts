@@ -1,13 +1,16 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import semver from 'semver';
 
-// Release channel: 'dev' | 'prerelease' | 'release'
-type ReleaseChannel = 'dev' | 'prerelease' | 'release';
+// Release channel: 'dev' | 'prerelease' | 'nightly' | 'release'
+type ReleaseChannel = 'dev' | 'prerelease' | 'nightly' | 'release';
 export const __APP_RELEASE_CHANNEL__: ReleaseChannel = (() => {
   switch (process.env.RELEASE_CHANNEL) {
     case 'release':
       return 'release';
+    case 'nightly':
+      return 'nightly';
     case 'prerelease':
       return 'prerelease';
     case 'dev':
@@ -27,6 +30,8 @@ export const __APP_BASE_NAME__ = (() => {
   switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
+    case 'nightly':
+      return 'stagewise-nightly';
     case 'prerelease':
       return 'stagewise-prerelease';
     case 'dev':
@@ -40,6 +45,8 @@ export const __APP_NAME__ = (() => {
   switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
+    case 'nightly':
+      return 'stagewise Nightly';
     case 'prerelease':
       return 'stagewise (Pre-Release)';
     case 'dev':
@@ -52,6 +59,8 @@ export const __APP_BUNDLE_ID__ = (() => {
   switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'io.stagewise.app';
+    case 'nightly':
+      return 'io.stagewise.nightly';
     case 'prerelease':
       return 'io.stagewise.prerelease';
     case 'dev':
@@ -61,9 +70,15 @@ export const __APP_BUNDLE_ID__ = (() => {
 })();
 
 export const __APP_VERSION__ = (() => {
-  const version = packageJson.version;
+  const override = process.env.APP_VERSION_OVERRIDE;
+  const version = override || packageJson.version;
   if (typeof version !== 'string') {
     throw new Error('Version not found in package.json');
+  }
+  if (!semver.valid(version)) {
+    throw new Error(
+      `Invalid app version${override ? ' override' : ''}: ${version}`,
+    );
   }
   return version;
 })();

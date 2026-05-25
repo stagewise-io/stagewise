@@ -19,7 +19,11 @@ import type { PreferencesService } from './preferences';
 import type { KartonService } from './karton';
 import type { UpdateChannel } from '@shared/karton-contracts/ui/shared-types';
 
-declare const __APP_RELEASE_CHANNEL__: 'dev' | 'prerelease' | 'release';
+declare const __APP_RELEASE_CHANNEL__:
+  | 'dev'
+  | 'prerelease'
+  | 'nightly'
+  | 'release';
 declare const __APP_VERSION__: string;
 declare const __APP_PLATFORM__: string;
 declare const __APP_ARCH__: string;
@@ -251,6 +255,8 @@ export class AutoUpdateService extends DisposableService {
     switch (__APP_RELEASE_CHANNEL__) {
       case 'release':
         return 'release';
+      case 'nightly':
+        return 'nightly';
       case 'prerelease': {
         const prefs = this.preferencesService.get();
         return prefs.updateChannel ?? this.inferChannelFromVersion();

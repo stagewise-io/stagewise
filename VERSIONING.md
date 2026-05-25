@@ -75,11 +75,20 @@ The channel name and counter are intentionally concatenated (no dot separator) s
 
 The counter is **capped at `999`**. Going beyond would break lexical ordering — for example `alpha1000` sorts lower than `alpha999` because SemVer 2.0 compares non-purely-numeric prerelease identifiers as ASCII strings. The bump script hard-fails if the limit is reached. If you're about to hit it, promote to the next channel (`alpha` → `beta` → `release`) or bump the base version so the counter resets.
 
+### Nightly Versions
+
+Nightly versions are generated dynamically by CI and are **not committed** to `apps/browser/package.json`.
+
+Format: `MAJOR.MINOR.PATCH-nightlyYYYYMMDDNNN` (e.g. `1.0.1-nightly20260525001`). The base version is the next patch after the current stable package version. For example, if `apps/browser/package.json` is `1.0.0`, the nightly base is `1.0.1`.
+
+The nightly suffix is a single SemVer prerelease identifier so the version remains compatible with Squirrel.Windows. `YYYYMMDD` is the UTC date and `NNN` is a 3-digit per-day counter.
+
 Examples:
 
 - `1.0.1-alpha001` - First alpha for upcoming 1.0.1
 - `1.0.1-alpha002` - Second alpha
 - `1.0.1-beta001` - First beta (after alpha phase)
+- `1.0.1-nightly20260525001` - Nightly build for the 1.0.1 release line
 - `1.0.1` - Final release
 
 ### Version Transitions
@@ -97,7 +106,8 @@ Examples:
 | Channel | npm Tag | Purpose |
 |---------|---------|---------|
 | alpha | `alpha` | Early testing, unstable |
-| beta | `beta` | Feature complete, testing |
+| beta | `beta` | Legacy prerelease testing during transition |
+| nightly | n/a | Scheduled/manual nightly builds from main |
 | release | `latest` | Production ready |
 
 ## Versioning Commands
@@ -137,6 +147,8 @@ Releases are driven by a two-step workflow:
    This opens a release PR that bumps the version and updates the changelog.
 
 2. **Auto Release** (automatic, `.github/workflows/auto-release.yml`) — fires when the release PR merges to `main`. It detects which packages need a release (based on tag absence), then invokes the reusable `_Release Browser` or `_Release Karton` workflow to build artifacts and publish.
+
+Nightly releases are separate from the release PR flow. `.github/workflows/nightly-release.yml` can be triggered manually and computes a dynamic nightly version without modifying package.json. Alpha and beta are legacy prerelease channels and should no longer be used for new releases; use the nightly workflow for nightly builds instead of creating new alpha/beta releases.
 
 **Prerequisites for release:**
 
