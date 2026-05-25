@@ -103,6 +103,11 @@ export const ExecuteShellCommandToolPart = ({
   const stdin = isExecute ? part.input?.stdin : undefined;
   const isStdin = isCreateSession ? false : !!stdin && !command;
   const isKill = isCreateSession ? false : !!part.input?.kill;
+  const killFailed =
+    isKill &&
+    output &&
+    'output' in output &&
+    output.output !== 'Session killed.';
 
   const effectiveOutputText = useMemo(() => {
     if (isCreateSession && output && 'message' in output) return output.message;
@@ -203,13 +208,14 @@ export const ExecuteShellCommandToolPart = ({
       : undefined,
   );
 
-  // Minimal display for create / kill — like copy/move UI.
-  // Skip when kill needs approval (always-ask mode); fall through to the
-  // standard approval trigger below so the UI doesn't block progression.
+  // Minimal display for successful/in-progress create / kill — like copy/move
+  // UI. Approval and denial states must fall through to the standard shell UI:
+  // approvals need action buttons, and denied kills need a visible skipped row.
   if (
-    (isCreateSession || isKill) &&
+    (isCreateSession || (isKill && !killFailed)) &&
     state !== 'approval' &&
-    state !== 'approval-responded'
+    state !== 'approval-responded' &&
+    state !== 'denied'
   ) {
     const streamingText = isCreateSession
       ? 'Opening new terminal…'
@@ -309,6 +315,18 @@ export const ExecuteShellCommandToolPart = ({
       );
     }
 
+    if (killFailed) {
+      return (
+        <div className="flex min-w-0 flex-1 flex-row items-center justify-start gap-1">
+          <IconXmarkOutline18 className="size-3 shrink-0" />
+          <TruncatedCommandText
+            text="Could not close terminal"
+            className="text-xs"
+          />
+        </div>
+      );
+    }
+
     const exitCode = output && 'exit_code' in output ? output.exit_code : null;
     const timedOut = output && 'timed_out' in output ? output.timed_out : false;
     const sessionExited =
@@ -349,7 +367,15 @@ export const ExecuteShellCommandToolPart = ({
         </span>
       </div>
     );
-  }, [state, explanation, part.errorText, isStdin, command, sessionId, output]);
+  }, [
+    state,
+    explanation,
+    part.errorText,
+    isStdin,
+    command,
+    output,
+    killFailed,
+  ]);
 
   const content = useMemo(() => {
     if (state === 'error') return undefined;
@@ -374,6 +400,11 @@ export const ExecuteShellCommandToolPart = ({
               <span className="select-none text-subtle-foreground">→ </span>
               <HumanizedStdin value={stdin ?? ''} />
             </>
+          ) : isKill ? (
+            <>
+              <span className="select-none text-subtle-foreground">$ </span>
+              close terminal {sessionId}
+            </>
           ) : (
             <>
               <span className="select-none text-subtle-foreground">$ </span>
@@ -388,7 +419,7 @@ export const ExecuteShellCommandToolPart = ({
         )}
       </div>
     );
-  }, [state, effectiveOutputText, command, isStdin, stdin]);
+  }, [state, effectiveOutputText, command, isStdin, isKill, sessionId, stdin]);
 
   const contentFooter = useMemo(() => {
     if (

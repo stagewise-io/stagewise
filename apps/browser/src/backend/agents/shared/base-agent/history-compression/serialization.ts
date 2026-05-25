@@ -39,6 +39,9 @@ const escapeTextForXML = (text: string): string => {
     .replace(/'/g, '&apos;');
 };
 
+const escapeSummaryValue = (value: unknown): string =>
+  escapeTextForXML(String(value ?? ''));
+
 // ─── Tool part → compact one-liner ─────────────────────────────────────────
 
 // ─── Helpers for output-aware serialisation ────────────────────────────────
@@ -53,7 +56,7 @@ const getErrorSuffix = (
   if (!('state' in part)) return undefined;
   if (part.state === 'output-error') {
     const msg = ('errorText' in part && part.errorText) || 'unknown error';
-    return ` ✗ ${String(msg).split('\n')[0].slice(0, 80)}`;
+    return ` ✗ ${escapeSummaryValue(String(msg).split('\n')[0].slice(0, 80))}`;
   }
   if (part.state === 'output-denied') return ' ✗ denied';
   return undefined;
@@ -75,10 +78,10 @@ const formatAskUserAnswers = (
     steps: { fields: { questionId: string; label: string }[] }[];
   },
 ): string => {
-  const title = input?.title ?? 'form';
+  const title = escapeSummaryValue(input?.title ?? 'form');
 
   if (output.cancelled || !output.completed) {
-    const reason = output.cancelReason ?? 'cancelled';
+    const reason = escapeSummaryValue(output.cancelReason ?? 'cancelled');
     return `[asked user: ${title} → ${reason}]`;
   }
 
@@ -96,7 +99,7 @@ const formatAskUserAnswers = (
   const pairs = Object.entries(answers)
     .map(([qId, val]) => {
       const label = labelMap.get(qId) ?? qId;
-      return `${label}: ${String(val)}`;
+      return `${escapeSummaryValue(label)}: ${escapeSummaryValue(val)}`;
     })
     .join('; ');
   return `[asked user: ${title} → ${pairs}]`;
@@ -118,40 +121,48 @@ const serializeToolPart = (
   const err = getErrorSuffix(part);
 
   switch (part.type) {
-    case 'tool-read':
-      if (err) return `[read: ${part.input.path}${err}]`;
-      return `[read: ${part.input.path}]`;
+    case 'tool-read': {
+      const path = escapeSummaryValue(part.input.path);
+      if (err) return `[read: ${path}${err}]`;
+      return `[read: ${path}]`;
+    }
 
-    case 'tool-multiEdit':
-      if (err) return `[edited: ${part.input.path}${err}]`;
-      return `[edited: ${part.input.path} (${Array.isArray(part.input.edits) ? part.input.edits.length : '?'} edits)]`;
+    case 'tool-multiEdit': {
+      const path = escapeSummaryValue(part.input.path);
+      if (err) return `[edited: ${path}${err}]`;
+      return `[edited: ${path} (${Array.isArray(part.input.edits) ? part.input.edits.length : '?'} edits)]`;
+    }
 
     case 'tool-write': {
-      if (err) return `[wrote: ${part.input.path}${err}]`;
+      const path = escapeSummaryValue(part.input.path);
+      if (err) return `[wrote: ${path}${err}]`;
       // Distinguish create vs update when output.message is available
       const owMsg = part.output?.message;
       if (typeof owMsg === 'string' && owMsg.includes('created'))
-        return `[created: ${part.input.path}]`;
-      return `[wrote: ${part.input.path}]`;
+        return `[created: ${path}]`;
+      return `[wrote: ${path}]`;
     }
 
     case 'tool-copy': {
       const action = part.input.move ? 'moved' : 'copied';
-      return `[${action}: ${part.input.input_path} → ${part.input.output_path}${err ?? ''}]`;
+      const inputPath = escapeSummaryValue(part.input.input_path);
+      const outputPath = escapeSummaryValue(part.input.output_path);
+      return `[${action}: ${inputPath} → ${outputPath}${err ?? ''}]`;
     }
 
     case 'tool-delete':
-      return `[deleted: ${part.input.path}${err ?? ''}]`;
+      return `[deleted: ${escapeSummaryValue(part.input.path)}${err ?? ''}]`;
 
     case 'tool-createShellSession': {
-      const sid = part.output?.session_id ?? '?';
-      return `[shell: new session ${sid} in ${part.input.cwd ?? ''}${err ?? ''}]`;
+      const sid = escapeSummaryValue(part.output?.session_id ?? '?');
+      const cwd = escapeSummaryValue(part.input.cwd ?? '');
+      return `[shell: new session ${sid} in ${cwd}${err ?? ''}]`;
     }
 
     case 'tool-executeShellCommand': {
-      const label = String(
-        part.input.explanation ?? part.input.command ?? '',
-      ).slice(0, 80);
+      const label = escapeSummaryValue(
+        String(part.input.explanation ?? part.input.command ?? '').slice(0, 80),
+      );
       if (err) return `[shell: ${label}${err}]`;
       if (part.output) {
         const { exit_code, timed_out } = part.output;
@@ -164,19 +175,26 @@ const serializeToolPart = (
     }
 
     case 'tool-executeSandboxJs':
-      return `[sandbox: ${String(part.input.explanation ?? '').slice(0, 80)}${err ?? ''}]`;
+      return `[sandbox: ${escapeSummaryValue(String(part.input.explanation ?? '').slice(0, 80))}${err ?? ''}]`;
 
-    case 'tool-grepSearch':
-      if (err) return `[searched: "${part.input.query}"${err}]`;
-      return `[searched: "${part.input.query}"${part.input.include_file_pattern ? ` in ${part.input.include_file_pattern}` : ''}]`;
+    case 'tool-grepSearch': {
+      const query = escapeSummaryValue(part.input.query);
+      const pattern = part.input.include_file_pattern
+        ? ` in ${escapeSummaryValue(part.input.include_file_pattern)}`
+        : '';
+      if (err) return `[searched: "${query}"${err}]`;
+      return `[searched: "${query}"${pattern}]`;
+    }
 
     case 'tool-glob':
-      return `[glob: ${part.input.pattern}${err ?? ''}]`;
+      return `[glob: ${escapeSummaryValue(part.input.pattern)}${err ?? ''}]`;
 
     case 'tool-getLintingDiagnostics': {
-      const paths = Array.isArray(part.input.paths)
-        ? part.input.paths.join(', ')
-        : part.input.paths;
+      const paths = escapeSummaryValue(
+        Array.isArray(part.input.paths)
+          ? part.input.paths.join(', ')
+          : part.input.paths,
+      );
       if (err) return `[lint: ${paths}${err}]`;
       if (part.output?.summary) {
         const s = part.output.summary;
@@ -187,17 +205,18 @@ const serializeToolPart = (
     }
 
     case 'tool-listLibraryDocs':
-      return `[docs-search: ${part.input.name}${err ?? ''}]`;
+      return `[docs-search: ${escapeSummaryValue(part.input.name)}${err ?? ''}]`;
 
     case 'tool-searchInLibraryDocs':
-      return `[docs-read: ${part.input.libraryId} → ${part.input.topic}${err ?? ''}]`;
+      return `[docs-read: ${escapeSummaryValue(part.input.libraryId)} → ${escapeSummaryValue(part.input.topic)}${err ?? ''}]`;
 
     case 'tool-askUserQuestions': {
-      if (err) return `[asked user: ${part.input.title ?? 'form'}${err}]`;
+      if (err)
+        return `[asked user: ${escapeSummaryValue(part.input.title ?? 'form')}${err}]`;
       if (part.output) {
         return formatAskUserAnswers(part.output, part.input);
       }
-      return `[asked user: ${part.input.title ?? 'form'}]`;
+      return `[asked user: ${escapeSummaryValue(part.input.title ?? 'form')}]`;
     }
 
     default:
@@ -253,7 +272,9 @@ const serializeUserMetadataAnnotations = (
       const names = attachments
         .filter((a) => a != null)
         .map((a) => a.originalFileName ?? a.path?.split('/').pop() ?? 'file');
-      annotations.push(`[attached: ${names.join(', ')}]`);
+      annotations.push(
+        `[attached: ${names.map(escapeSummaryValue).join(', ')}]`,
+      );
     }
 
     // @-mentions (files, tabs, workspaces)
@@ -270,7 +291,9 @@ const serializeUserMetadataAnnotations = (
           if (m.providerType === 'workspace') return m.name ?? 'workspace';
           return m.providerType ?? 'unknown';
         });
-      annotations.push(`[mentioned: ${labels.join(', ')}]`);
+      annotations.push(
+        `[mentioned: ${labels.map(escapeSummaryValue).join(', ')}]`,
+      );
     }
   } catch {
     // Metadata is best-effort — skip annotations rather than crash
