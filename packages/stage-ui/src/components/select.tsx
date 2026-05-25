@@ -1,13 +1,10 @@
 import { Select as SelectBase } from '@base-ui/react/select';
+import { CheckIcon } from 'lucide-react';
 import * as React from 'react';
 import { cn } from '../lib/utils';
 import { handleCtrlNavKeys } from '../lib/keyboard-nav';
 import { OverlayScrollbar } from './overlay-scrollbar';
-import {
-  IconCheckFill18,
-  IconChevronDownFill18,
-  IconChevronUpFill18,
-} from 'nucleo-ui-fill-18';
+import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
 
 // ============================================================================
 // Types
@@ -262,9 +259,9 @@ export interface SelectProps<
 
 const sizes = {
   trigger: {
-    xs: 'gap-1 text-xs font-normal px-2 py-0.5',
-    sm: 'gap-1 text-sm font-normal px-2.5 py-1',
-    md: 'gap-1.5 text-sm font-normal px-3 py-2',
+    xs: 'h-4 gap-1 text-xs font-normal',
+    sm: 'h-5 gap-1 text-sm font-normal',
+    md: 'h-6 gap-1.5 text-sm font-normal',
   } satisfies Record<SelectSize, string>,
   popup: {
     xs: 'text-xs',
@@ -285,7 +282,7 @@ const sizes = {
 
 const triggerVariants = {
   ghost:
-    'bg-transparent text-muted-foreground hover:text-foreground data-[popup-open]:text-foreground',
+    'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
   secondary:
     'border border-derived bg-surface-1 text-foreground hover:bg-hover-derived active:bg-active-derived data-popup-open:bg-hover-derived',
 } satisfies Record<SelectTriggerVariant, string>;
@@ -526,10 +523,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
         <SelectBase.Trigger
           ref={ref}
           className={cn(
-            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0',
-            'shadow-none',
-            'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
-            'data-disabled:pointer-events-none data-disabled:opacity-50',
+            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2 has-disabled:pointer-events-none has-disabled:opacity-50',
             triggerVariants[triggerVariant],
             sizes.trigger[size],
             triggerClassName,
@@ -579,7 +573,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
             ref={popupRef}
             className={cn(
               'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
-              'rounded-lg border border-derived bg-background p-1 shadow-lg',
+              'rounded-lg border border-border-subtle bg-background p-1 shadow-lg',
               'transition-[transform,scale,opacity] duration-150 ease-out',
               'data-ending-style:scale-90 data-ending-style:opacity-0',
               'data-starting-style:scale-90 data-starting-style:opacity-0',
@@ -588,10 +582,6 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
             )}
             onKeyDown={handleCtrlNavKeys}
           >
-            <SelectBase.ScrollUpArrow className="top-0 z-1 -ml-1 flex h-5 w-full shrink-0 items-center justify-center rounded-t-md bg-background text-muted-foreground">
-              <IconChevronUpFill18 className="size-3" />
-            </SelectBase.ScrollUpArrow>
-
             <OverlayScrollbar
               className={cn('max-h-48', scrollContainerClassName)}
             >
@@ -622,15 +612,10 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                             value={item.value as any}
                             disabled={item.disabled}
                             className={cn(
-                              'group/item',
-                              'w-full min-w-36 shrink-0 cursor-default select-none rounded-md outline-none',
-                              'text-foreground',
-                              'data-highlighted:bg-surface-1',
-                              'data-disabled:pointer-events-none data-disabled:opacity-50',
+                              'group/item w-full min-w-24 cursor-default rounded-md bg-background text-foreground outline-none hover:bg-hover-derived data-disabled:pointer-events-none data-disabled:opacity-50',
                               hasDescription ? 'items-start' : 'items-center',
                               sizes.item[size],
                               itemClassName,
-                              // Grid layout only when showing indicator
                               showItemIndicator &&
                                 'grid grid-cols-[0.75rem_1fr] gap-2',
                               !showItemIndicator && 'flex',
@@ -643,12 +628,15 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                                   hasDescription && 'mt-0.5',
                                 )}
                               >
-                                <IconCheckFill18 className="size-full text-muted-foreground" />
+                                <CheckIcon className="size-full text-muted-foreground" />
                               </SelectBase.ItemIndicator>
                             )}
 
                             <SelectBase.ItemText
-                              className={cn(showItemIndicator && 'col-start-2')}
+                              className={cn(
+                                showItemIndicator &&
+                                  'col-start-2 flex flex-row items-center justify-between gap-4',
+                              )}
                             >
                               {renderItemContent(item)}
                             </SelectBase.ItemText>
@@ -660,10 +648,6 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                 )}
               </SelectBase.List>
             </OverlayScrollbar>
-
-            <SelectBase.ScrollDownArrow className="bottom-0 z-1 -ml-1 flex h-5 w-full shrink-0 items-center justify-center rounded-b-md bg-background text-muted-foreground">
-              <IconChevronDownFill18 className="size-2" />
-            </SelectBase.ScrollDownArrow>
           </SelectBase.Popup>
         </SelectBase.Positioner>
       </SelectBase.Portal>

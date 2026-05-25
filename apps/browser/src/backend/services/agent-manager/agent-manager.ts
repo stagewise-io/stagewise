@@ -1,4 +1,7 @@
-import type { BaseAgent } from '@/agents/shared/base-agent';
+import type {
+  AgentNotificationEvent,
+  BaseAgent,
+} from '@/agents/shared/base-agent';
 import {
   type AgentHistoryEntry,
   AgentTypes,
@@ -83,6 +86,10 @@ export class AgentManagerService extends DisposableService {
   private readonly assetCacheService?: AssetCacheService;
   private readonly processedImageCacheService?: ProcessedImageCacheService;
   private readonly gitService: GitService;
+  private readonly notificationEventHandler?: (
+    event: AgentNotificationEvent,
+    agentId: string,
+  ) => void | Promise<void>;
 
   private agentPersistenceDB: AgentPersistenceDB | null = null;
   private readonly dbReadyPromise: Promise<AgentPersistenceDB | null>;
@@ -94,6 +101,10 @@ export class AgentManagerService extends DisposableService {
     logger: Logger,
     modelProviderService: ModelProviderService,
     gitService: GitService,
+    notificationEventHandler?: (
+      event: AgentNotificationEvent,
+      agentId: string,
+    ) => void | Promise<void>,
     assetCacheService?: AssetCacheService,
     processedImageCacheService?: ProcessedImageCacheService,
   ) {
@@ -104,6 +115,7 @@ export class AgentManagerService extends DisposableService {
     this.logger = logger;
     this.modelProviderService = modelProviderService;
     this.gitService = gitService;
+    this.notificationEventHandler = notificationEventHandler;
     this.assetCacheService = assetCacheService;
     this.processedImageCacheService = processedImageCacheService;
 
@@ -810,6 +822,7 @@ export class AgentManagerService extends DisposableService {
       // @ts-expect-error - The onFinish handler returns outputs with the configured schema of the agent. dunno why ts doesn't get this right.
       parent?.onFinish,
       parent?.onError,
+      this.notificationEventHandler,
       {
         ...(initialState ?? {}),
         activeModelId:

@@ -115,6 +115,10 @@ export class PagesService extends DisposableService {
   private importSoundPackHandler?: () => Promise<
     { id: string; name: string } | { error: string }
   >;
+  private previewSoundPackHandler?: (
+    packId: string,
+    loudness: 'off' | 'subtle' | 'default',
+  ) => Promise<{ ok: boolean }>;
   private getContextFilesHandler?: () => Promise<ContextFilesResult>;
   private generateWorkspaceMdHandler?: (workspacePath: string) => Promise<void>;
   private getExternalFileContentHandler?: (
@@ -898,6 +902,23 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
+      'previewSoundPack',
+      async (
+        _callingClientId: string,
+        packId: string,
+        loudness: 'off' | 'subtle' | 'default',
+      ) => {
+        if (!this.previewSoundPackHandler) {
+          this.logger.warn(
+            '[PagesService] previewSoundPack called but no handler is set',
+          );
+          return { ok: false };
+        }
+        return await this.previewSoundPackHandler(packId, loudness);
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
       'getContextFiles',
       async (_callingClientId: string): Promise<ContextFilesResult> => {
         if (!this.getContextFilesHandler) {
@@ -1371,11 +1392,21 @@ export class PagesService extends DisposableService {
     this.setGlobalConfigHandler = handler;
   }
 
-  /** Set the handler for importing a sound pack via a native file dialog. */
+  /** Set the handler for importing a custom sound via a native file dialog. */
   public registerImportSoundPackHandler(
     handler: () => Promise<{ id: string; name: string } | { error: string }>,
   ): void {
     this.importSoundPackHandler = handler;
+  }
+
+  /** Set the handler for previewing a sound pack's done sound. */
+  public registerPreviewSoundPackHandler(
+    handler: (
+      packId: string,
+      loudness: 'off' | 'subtle' | 'default',
+    ) => Promise<{ ok: boolean }>,
+  ): void {
+    this.previewSoundPackHandler = handler;
   }
 
   /**
@@ -1588,6 +1619,7 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('trustCertificateAndReload');
     this.kartonServer.removeServerProcedureHandler('setGlobalConfig');
     this.kartonServer.removeServerProcedureHandler('importSoundPack');
+    this.kartonServer.removeServerProcedureHandler('previewSoundPack');
     this.kartonServer.removeServerProcedureHandler('getContextFiles');
     this.kartonServer.removeServerProcedureHandler('generateWorkspaceMd');
     this.kartonServer.removeServerProcedureHandler('setProviderApiKey');

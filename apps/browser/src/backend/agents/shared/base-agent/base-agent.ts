@@ -63,6 +63,8 @@ import type { StagewiseProviderMetadata } from '../../stagewise-provider';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
 
+export type AgentNotificationEvent = 'done' | 'question' | 'error';
+
 /**
  * The base configuration for an agent. Should be defined by the inheriting class.
  */
@@ -412,6 +414,10 @@ export abstract class BaseAgent<
    * times — without this dedupe we would over-count requests by 10×+.
    */
   private _seenApprovalRequestIds = new Set<string>();
+  private readonly notificationEventHandler?: (
+    event: AgentNotificationEvent,
+    agentId: string,
+  ) => void | Promise<void>;
 
   // Handler that get's called when the agent wants to spawn a child agent.
   private readonly spawnChildAgentHandler: <
@@ -488,6 +494,10 @@ export abstract class BaseAgent<
         : never,
     ) => void | Promise<void>,
     finishToolErrorHandler?: (error: Error) => void | Promise<void>,
+    notificationEventHandler?: (
+      event: AgentNotificationEvent,
+      agentId: string,
+    ) => void | Promise<void>,
     initialState?: Partial<AgentState>,
     assetCacheService?: AssetCacheService,
     processedImageCacheService?: ProcessedImageCacheService,
@@ -502,6 +512,7 @@ export abstract class BaseAgent<
     this.spawnChildAgentHandler = spawnChildAgentHandler;
     this.finishToolHandler = finishToolHandler;
     this.finishToolErrorHandler = finishToolErrorHandler;
+    this.notificationEventHandler = notificationEventHandler;
     this.assetCacheService = assetCacheService;
     this.processedImageCacheService = processedImageCacheService;
     this._cacheAnalyzer = new MessageCacheAnalyzer(instanceId, logger);
@@ -1550,6 +1561,7 @@ export abstract class BaseAgent<
           stack: err.stack,
         };
       });
+      this.emitNotificationEvent('error');
       return;
     }
 
@@ -1586,6 +1598,7 @@ export abstract class BaseAgent<
           stack: error.stack,
         };
       });
+      this.emitNotificationEvent('error');
       return;
     }
 
@@ -1674,6 +1687,7 @@ export abstract class BaseAgent<
                 stack: error.stack,
               };
             });
+            this.emitNotificationEvent('error');
           }
         }
       },
@@ -1746,6 +1760,9 @@ export abstract class BaseAgent<
               stack: error.stack,
             };
         });
+        if (!parsedPlanLimit) {
+          this.emitNotificationEvent('error');
+        }
         this.logger.debug(
           `[BaseAgent:${this.instanceId}] Wrote error to public state`,
         );
@@ -1858,13 +1875,19 @@ export abstract class BaseAgent<
           // setTimeout to keep the call stack clean (unbounded recursion).
           setTimeout(() => void this.runStep(), 0);
         } else if (pending === false) {
+          const hasAssistantMessage = this.state
+            .get()
+            .history.some((m) => m.role === 'assistant');
           this.state.set((draft) => {
             draft.isWorking = false;
-            if (draft.history.some((m) => m.role === 'assistant')) {
+            if (hasAssistantMessage) {
               draft.unread = true;
             }
           });
           this.onIdle();
+          if (hasAssistantMessage) {
+            this.emitNotificationEvent('done');
+          }
         }
         // pending === null → onFinish never set a decision (error path,
         // aborted, or superseded step). Nothing to do; the onError /
@@ -1907,6 +1930,7 @@ export abstract class BaseAgent<
           stack: error.stack,
         };
       });
+      this.emitNotificationEvent('error');
     }
   }
 
@@ -2738,6 +2762,7 @@ export abstract class BaseAgent<
                   agent_instance_id: this.instanceId,
                   tool_call_id: approvalId,
                 });
+                this.emitNotificationEvent('question');
               }
             }
           },
@@ -3231,6 +3256,16 @@ export abstract class BaseAgent<
       };
     }
     return wrapped;
+  }
+
+  private emitNotificationEvent(event: AgentNotificationEvent): void {
+    void Promise.resolve(
+      this.notificationEventHandler?.(event, this.instanceId),
+    ).catch((error) => {
+      this.logger.debug(
+        `[BaseAgent:${this.instanceId}] Notification event failed: ${(error as Error).message}`,
+      );
+    });
   }
 
   private emitToolCallEvents(result: StepResult<StagewiseToolSet>): void {

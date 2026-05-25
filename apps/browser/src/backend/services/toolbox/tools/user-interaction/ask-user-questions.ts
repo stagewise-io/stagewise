@@ -154,6 +154,7 @@ export function cleanupQuestionsForAgent(
 export const askUserQuestions = (
   uiKarton: KartonService,
   agentInstanceId: string,
+  onQuestionRequested?: (agentId: string) => void | Promise<void>,
 ) => {
   return tool({
     description: DESCRIPTION,
@@ -199,6 +200,10 @@ export const askUserQuestions = (
           agent.state.unread = true;
         }
       });
+
+      void Promise.resolve(onQuestionRequested?.(agentInstanceId)).catch(
+        () => {},
+      );
 
       // Create deferred promise
       const result = await new Promise<AskUserQuestionsToolOutput>(

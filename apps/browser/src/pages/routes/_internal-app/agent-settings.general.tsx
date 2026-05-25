@@ -1,12 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { Select } from '@stagewise/stage-ui/components/select';
 import { SearchableSelect } from '@stagewise/stage-ui/components/searchable-select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
+import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { toast } from '@stagewise/stage-ui/components/toaster';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
 import { IdeLogo } from '@ui/components/ide-logo';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import { IDE_SELECTION_ITEMS } from '@ui/utils';
+import { IconMediaPlayOutline18 } from 'nucleo-ui-outline-18';
 
 export const Route = createFileRoute('/_internal-app/agent-settings/general')({
   component: Page,
@@ -87,13 +96,20 @@ function IdeSelectionSetting() {
 // =============================================================================
 
 const DEFAULT_SOUND_PACK = 'bubble-pops';
+const LOUDNESS_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'subtle', label: 'Subtle' },
+  { value: 'default', label: 'Loud' },
+] as const;
+type SoundLoudness = (typeof LOUDNESS_OPTIONS)[number]['value'];
 
 function NotificationSoundsSetting() {
   const globalConfig = useKartonState((s) => s.globalConfig);
   const setGlobalConfig = useKartonProcedure((s) => s.setGlobalConfig);
   const importSoundPack = useKartonProcedure((s) => s.importSoundPack);
+  const previewSoundPack = useKartonProcedure((s) => s.previewSoundPack);
 
-  const soundLoudness =
+  const soundLoudness: SoundLoudness =
     globalConfig.notificationSoundLoudness ??
     (globalConfig.notificationSoundsEnabled === false ? 'off' : 'subtle');
   const configuredPack = globalConfig.notificationSoundPack?.trim();
@@ -112,8 +128,22 @@ function NotificationSoundsSetting() {
   const displayNames =
     globalConfig.packDisplayNames ?? ({} as Record<string, string>);
 
-  const handleLoudnessChange = async (value: unknown) => {
-    const loudness = value as 'off' | 'subtle' | 'default';
+  const loudnessIndex = Math.max(
+    0,
+    LOUDNESS_OPTIONS.findIndex((option) => option.value === soundLoudness),
+  );
+
+  const handleLoudnessChange = async (value: number) => {
+    const index = Math.max(
+      0,
+      Math.min(LOUDNESS_OPTIONS.length - 1, Math.round(value)),
+    );
+    const loudness = LOUDNESS_OPTIONS[index]?.value ?? 'subtle';
+    if (loudness !== 'off') {
+      void previewSoundPack(currentPack, loudness).catch(() => {
+        // Preview is best-effort; config changes should still succeed.
+      });
+    }
     await setGlobalConfig({
       ...globalConfig,
       notificationSoundLoudness: loudness,
@@ -122,17 +152,30 @@ function NotificationSoundsSetting() {
     });
   };
 
+  const handlePreviewSound = () => {
+    if (soundLoudness === 'off') return;
+    void previewSoundPack(currentPack, soundLoudness).catch(() => {
+      // Preview is best-effort.
+    });
+  };
+
   const handlePackChange = async (value: unknown) => {
+    const pack = String(value);
+    if (soundLoudness !== 'off') {
+      void previewSoundPack(pack, soundLoudness).catch(() => {
+        // Preview is best-effort; config changes should still succeed.
+      });
+    }
     await setGlobalConfig({
       ...globalConfig,
-      notificationSoundPack: String(value),
+      notificationSoundPack: pack,
     });
   };
 
   const showImportErrorToast = (message: string) => {
     toast({
       id: `import-sound-pack-error-${Date.now()}`,
-      title: 'Import failed',
+      title: 'Custom sound import failed',
       message,
       type: 'error',
       actions: [],
@@ -147,19 +190,13 @@ function NotificationSoundsSetting() {
       }
     } catch (err) {
       showImportErrorToast(
-        err instanceof Error ? err.message : 'Sound pack import failed.',
+        err instanceof Error ? err.message : 'Custom sound import failed.',
       );
     }
   };
 
   const packLabel = (id: string): string =>
     displayNames[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-
-  const loudnessItems = [
-    { value: 'off', label: 'Off' },
-    { value: 'subtle', label: 'Subtle' },
-    { value: 'default', label: 'Default' },
-  ];
 
   const packItems = packOptions.map((pack) => ({
     value: pack,
@@ -168,53 +205,81 @@ function NotificationSoundsSetting() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="font-medium text-base text-foreground">
-            Notification sounds
-          </h3>
-          <p className="text-muted-foreground text-sm">
-            Play a sound when the agent finishes work, asks a question, or
-            encounters an error.
-          </p>
-        </div>
-        <SearchableSelect
-          value={soundLoudness}
-          onValueChange={handleLoudnessChange}
-          items={loudnessItems}
-          triggerVariant="secondary"
-          size="xs"
-          triggerClassName="w-auto min-w-0 px-2 py-3"
-          side="bottom"
-        />
+      <div>
+        <h3 className="font-medium text-base text-foreground">
+          Notification sounds
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          Play a sound when the agent finishes work, asks a question, or
+          encounters an error.
+        </p>
       </div>
 
-      <div className="flex items-center justify-between gap-4 pl-0">
-        <div>
-          <h3 className="font-medium text-foreground text-sm">Sound pack</h3>
-          <p className="text-muted-foreground text-xs">
-            Choose which set of notification sounds to use.
-          </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <h4 className="font-medium text-foreground text-sm">Loudness</h4>
+          <div className="w-32 space-y-0.5 pl-2">
+            <Slider
+              value={loudnessIndex}
+              min={0}
+              max={2}
+              step={1}
+              ariaLabel="Notification sound loudness"
+              onValueChange={handleLoudnessChange}
+            />
+            <div className="relative h-3 text-[11px] text-muted-foreground">
+              {LOUDNESS_OPTIONS.map((option, index) => (
+                <span
+                  key={option.value}
+                  className="absolute -translate-x-1/2"
+                  style={{
+                    left: `${(index / (LOUDNESS_OPTIONS.length - 1)) * 100}%`,
+                  }}
+                >
+                  {option.label}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <SearchableSelect
-          value={currentPack}
-          onValueChange={handlePackChange}
-          items={packItems}
-          triggerVariant="secondary"
-          size="xs"
-          triggerClassName="w-auto min-w-0 px-2 py-3"
-          side="bottom"
-        />
+        <div className="space-y-2">
+          <h4 className="font-medium text-foreground text-sm">Theme</h4>
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={currentPack}
+              onValueChange={handlePackChange}
+              items={packItems}
+              triggerVariant="secondary"
+              size="xs"
+              triggerClassName="w-40 min-w-0 px-2 py-3"
+              side="bottom"
+            />
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={soundLoudness === 'off'}
+                  onClick={handlePreviewSound}
+                  aria-label="Preview sound"
+                >
+                  <IconMediaPlayOutline18 className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Preview sound</TooltipContent>
+            </Tooltip>
+          </div>
+          <button
+            type="button"
+            className="block text-muted-foreground text-xs underline transition-colors hover:text-foreground"
+            onClick={handleImport}
+          >
+            Use custom sound…
+          </button>
+        </div>
       </div>
-
-      <button
-        type="button"
-        className="text-muted-foreground text-xs underline transition-colors hover:text-foreground"
-        onClick={handleImport}
-      >
-        Import sound pack…
-      </button>
     </div>
   );
 }
@@ -254,7 +319,7 @@ function DockBounceSetting() {
       <Switch
         checked={dockBounceEnabled}
         onCheckedChange={handleToggle}
-        size="sm"
+        size="xs"
       />
     </div>
   );
