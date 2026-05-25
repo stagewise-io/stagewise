@@ -348,11 +348,7 @@ describeIfShell('SessionManager (integration)', () => {
 
       const r = await sm.executeCommand(sid, { command: 'pwd' });
       expect(r.output).toContain(path.basename(uniqueDir));
-      if (sm.getSession(sid)?.shellIntegrationActive) {
-        expect(sm.getCurrentCwd(sid)).toBe(uniqueDir);
-      } else {
-        expect(sm.getCurrentCwd(sid)).toBeUndefined();
-      }
+      expect(sm.getCurrentCwd(sid)).toBeUndefined();
     } finally {
       sm?.killAll();
       // Windows needs time to release PTY directory locks after kill
@@ -366,13 +362,30 @@ describeIfShell('SessionManager (integration)', () => {
     const sid = sm.createSession('agent-test', cwd, env);
     await waitForReady(sm, sid);
 
-    const trustedCwd = sm.getCurrentCwd(sid);
     await sm.executeCommand(sid, {
       command: `printf '\\033]7;file://localhost/tmp/spoofed\\007'`,
     });
 
     if (sm.getSession(sid)?.shellIntegrationActive) {
-      expect(sm.getCurrentCwd(sid)).toBe(trustedCwd);
+      expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed');
+      expect(sm.getCurrentCwd(sid)).toBeUndefined();
+    } else {
+      expect(sm.getCurrentCwd(sid)).toBeUndefined();
+    }
+  });
+
+  it('ignores cwd spoofing that fakes OSC 133 command completion first', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-test', cwd, env);
+    await waitForReady(sm, sid);
+
+    await sm.executeCommand(sid, {
+      command: `printf '\\033]133;D;0\\007\\033]7;file://localhost/tmp/spoofed-after-fake-d\\007'`,
+    });
+
+    if (sm.getSession(sid)?.shellIntegrationActive) {
+      expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed-after-fake-d');
+      expect(sm.getCurrentCwd(sid)).toBeUndefined();
     } else {
       expect(sm.getCurrentCwd(sid)).toBeUndefined();
     }

@@ -207,7 +207,8 @@ describe('OscParser — OSC 7 cwd metadata', () => {
     parser.write(`before${osc7('/tmp/project')}after`);
 
     expect(cwd).toHaveBeenCalledWith('/tmp/project');
-    expect(output).toHaveBeenCalledWith('beforeafter');
+    expect(output).toHaveBeenNthCalledWith(1, 'before');
+    expect(output).toHaveBeenNthCalledWith(2, 'after');
   });
 
   it('handles OSC 7 sequences split across chunks', () => {
@@ -231,6 +232,25 @@ describe('OscParser — OSC 7 cwd metadata', () => {
     parser.write(`${osc('C')}one${osc7('/tmp/project')}two${osc('D', '0')}`);
 
     expect(done.mock.calls[0][0].output).toBe('onetwo');
+  });
+
+  it('preserves OSC 133 and OSC 7 event order within one chunk', () => {
+    const events: string[] = [];
+    parser.on('commandStart', () => events.push('commandStart'));
+    parser.on('cwd', (cwd) => events.push(`cwd:${cwd}`));
+    parser.on('commandDone', () => events.push('commandDone'));
+    parser.on('promptStart', () => events.push('promptStart'));
+
+    parser.write(
+      `${osc('C')}output${osc('D', '0')}${osc7('/tmp/after-command')}${osc('A')}`,
+    );
+
+    expect(events).toEqual([
+      'commandStart',
+      'commandDone',
+      'cwd:/tmp/after-command',
+      'promptStart',
+    ]);
   });
 });
 

@@ -15,21 +15,18 @@ import { EventEmitter } from 'node:events';
 
 // ─── OSC regexes ──────────────────────────────────────────────────
 // Matches both BEL (\x07) and ST (\x1b\\) terminators.
-const OSC_133_RE =
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC 133 protocol
-  /\x1b\]133;([ABCD])(?:;(-?\d+))?\x07|\x1b\]133;([ABCD])(?:;(-?\d+))?\x1b\\/g;
-
-const OSC_7_RE =
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC 7 protocol
-  /\x1b\]7;file:\/\/[^/\x07\x1b]*(\/[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
+const OSC_RE =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC protocol
+  /\x1b\](?:133;([ABCD])(?:;(-?\d+))?|7;file:\/\/[^/\x07\x1b]*(\/[^\x07\x1b]*))(?:\x07|\x1b\\)/g;
 
 // ─── Sentinel format ──────────────────────────────────────────────
 // __STAGE_DONE_<id>_<exitCode>__
 const SENTINEL_RE = /__STAGE_DONE_([a-zA-Z0-9_-]+)_(-?\d+)__/;
 
 // ─── Strip all OSC 133 / OSC 7 sequences from text ────────────────
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are OSC protocol terminators
-const OSC_STRIP_RE = /\x1b\](?:133;[ABCD](?:;-?\d+)?|7;[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
+const OSC_STRIP_RE =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are OSC protocol terminators
+  /\x1b\](?:133;[ABCD](?:;-?\d+)?|7;[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -177,7 +174,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
    * (i.e. it's not a truncated partial).
    */
   private isCompleteSequence(s: string): boolean {
-    // Quick check: does it contain a BEL or ST terminator after ]133?
+    // Quick check: does it contain a BEL or ST terminator after the OSC introducer?
     if (s.includes('\x07')) return true;
     if (s.includes('\x1b\\') && s.indexOf('\x1b\\') > s.indexOf('\x1b]'))
       return true;
@@ -186,19 +183,26 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
 
   private processOsc(data: string): void {
     let lastIndex = 0;
-    this.processOsc7(data);
-    OSC_133_RE.lastIndex = 0;
+    OSC_RE.lastIndex = 0;
 
     let match: RegExpExecArray | null;
     // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop pattern
-    while ((match = OSC_133_RE.exec(data)) !== null) {
+    while ((match = OSC_RE.exec(data)) !== null) {
       const beforeMatch = data.slice(lastIndex, match.index);
-      const marker = match[1] || match[3]; // A, B, C, or D
-      const codeStr = match[2] || match[4]; // exit code for D
+      const marker = match[1]; // A, B, C, or D for OSC 133
+      const codeStr = match[2]; // exit code for OSC 133;D
+      const cwdPath = match[3]; // path payload for OSC 7
 
       // Emit non-sequence text as output
       if (beforeMatch.length > 0) {
         this.handleTextOutput(beforeMatch);
+      }
+
+      if (cwdPath !== undefined) {
+        const cwd = decodeFileUriPath(cwdPath);
+        if (cwd) this.emit('cwd', cwd);
+        lastIndex = match.index + match[0].length;
+        continue;
       }
 
       if (!this.oscDetected) {
@@ -241,17 +245,6 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     const remaining = data.slice(lastIndex);
     if (remaining.length > 0) {
       this.handleTextOutput(remaining);
-    }
-  }
-
-  private processOsc7(data: string): void {
-    OSC_7_RE.lastIndex = 0;
-
-    let match: RegExpExecArray | null;
-    // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop pattern
-    while ((match = OSC_7_RE.exec(data)) !== null) {
-      const cwd = decodeFileUriPath(match[1]);
-      if (cwd) this.emit('cwd', cwd);
     }
   }
 
