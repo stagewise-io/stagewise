@@ -288,20 +288,23 @@ export const executeShellCommand = (
       input: ExecuteShellCommandToolInput,
       { toolCallId },
     ) => {
+      // Closing an agent-owned terminal is always safe to allow. It only
+      // terminates a PTY process tree we spawned, and it must remain possible
+      // regardless of the selected approval mode, including alwaysAsk.
+      if (input.kill) return false;
+
       const mode = getToolApprovalMode();
       if (mode === 'alwaysAllow') return false;
       if (mode === 'alwaysAsk') return true;
 
-      // Short-circuit read-only session operations. `kill` terminates a
-      // shell session we ourselves spawned, and an empty-command poll on
-      // an existing session only drains pending output. Neither has any
-      // side effect outside the agent's own process tree, so invoking the
-      // classifier here would waste up to 5s × 3 fallback models for a
-      // call that can never be unsafe. Non-empty `stdin` (e.g. `y\r`)
-      // still falls through to the classifier so interactive prompts
-      // remain covered.
+      // Short-circuit read-only session operations. An empty-command poll on
+      // an existing session only drains pending output and has no side effect
+      // outside the agent's own process tree, so invoking the classifier here
+      // would waste up to 5s × 3 fallback models for a call that can never be
+      // unsafe. Non-empty `stdin` (e.g. `y\r`) still falls through to the
+      // classifier so interactive prompts remain covered.
       const classifierCommand = input.command ?? input.stdin ?? '';
-      if (input.kill || (classifierCommand === '' && input.session_id)) {
+      if (classifierCommand === '' && input.session_id) {
         return false;
       }
 
