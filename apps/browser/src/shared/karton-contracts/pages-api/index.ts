@@ -181,10 +181,15 @@ export type PagesApiContract = {
     trustCertificateAndReload: (tabId: string, origin: string) => Promise<void>;
     /** Set the global config (e.g., preferred IDE for opening files) */
     setGlobalConfig: (config: GlobalConfig) => Promise<void>;
-    /** Open a native file dialog to import a custom sound pack. Returns pack info on success, or an error object with a message on failure. */
+    /** Open a native file dialog to import a custom MP3 or sound pack JSON. Returns pack info on success, or an error object with a message on failure. */
     importSoundPack: () => Promise<
       { id: string; name: string } | { error: string }
     >;
+    /** Preview the done sound for a notification sound pack. */
+    previewSoundPack: (
+      packId: string,
+      loudness: 'off' | 'subtle' | 'default',
+    ) => Promise<{ ok: boolean }>;
     /**
      * Get context files info (, AGENTS.md) for the current workspace.
      * Returns null if no workspace is loaded.

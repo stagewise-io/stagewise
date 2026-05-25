@@ -1,13 +1,15 @@
 /**
  * NotificationSoundsService — plays sounds and optionally bounces the macOS
- * dock icon when agent state transitions occur:
+ * dock icon when explicit agent notification events are emitted:
  *   - Done (agent finishes work)        → done sound + short dock bounce
  *   - Waiting for user (question/approval) → question sound + long dock bounce
  *   - Error                             → error sound + long dock bounce
  *
  * Sounds are loaded from sound pack directories under assets/sounds/.
- * Each pack must contain done.mp3, question.mp3, and error.mp3.
+ * Each pack can contain done.mp3, question.mp3, and error.mp3.
  * Packs may include pack.json metadata with a human-readable display name.
+ * A custom single-MP3 import is stored as a pack that reuses the same file
+ * for every notification event.
  *
  * Dock bouncing only applies on macOS and only when the window is not focused.
  * Uses 'informational' (single short bounce) for all events — macOS does not
@@ -27,7 +29,6 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import type { Logger } from './logger';
 import type { KartonService } from './karton';
-import type { AppState } from '@shared/karton-contracts/ui';
 import type { GlobalConfig } from '@shared/karton-contracts/ui/shared-types';
 import { DisposableService } from './disposable';
 
@@ -53,6 +54,10 @@ const SOUND_VOLUME: Record<SoundLoudness, number> = {
 
 /**
  * JSON format for importing custom sound packs.
+ *
+ * Users can also import a single .mp3 file directly. In that case, the same
+ * file is used for done, question, and error notifications, and the pack's
+ * display name is the MP3 filename.
  *
  * Example `pack.json`:
  * ```json
@@ -145,18 +150,6 @@ export class NotificationSoundsService extends DisposableService {
   /** Whether the macOS dock should bounce. */
   private dockBounceEnabled = true;
 
-  /** Track previous agent states to detect transitions. */
-  private previousAgentStates = new Map<
-    string,
-    {
-      isWorking: boolean;
-      hasError: boolean;
-      hasPendingApproval: boolean;
-      hasPendingQuestion: boolean;
-      hasUnread: boolean;
-    }
-  >();
-
   /** Reference to the web contents for executing audio playback JS. */
   private webContentsRef: (() => WebContents | null) | null = null;
 
@@ -167,25 +160,8 @@ export class NotificationSoundsService extends DisposableService {
    *  Reset to 0 when the window regains focus. */
   private lastSoundPlayedAt = 0;
 
-  /** Cooldown between consecutive notification sounds. */
+  /** Cooldown between consecutive low-priority done notifications. */
   private readonly DEBOUNCE_MS = 10_000;
-
-  /**
-   * Done is delayed so approval/question states that arrive in the next Karton
-   * update can preempt it. Without this, approval pauses can incorrectly play
-   * done.mp3 first and then suppress question.mp3 via cooldown.
-   */
-  private readonly DONE_DELAY_MS = 250;
-
-  private pendingDoneTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-  /** Currently open agent instance ID (from Karton browser state).
-   *  Used to suppress notifications for agents the user is viewing. */
-  private lastOpenAgentId: string | null = null;
-
-  private readonly boundOnKartonStateChange = (state: AppState) => {
-    this.onKartonStateChange(state);
-  };
 
   // ------------------------------------------------------------------
   // Construction
@@ -238,9 +214,6 @@ export class NotificationSoundsService extends DisposableService {
     // Load the initial pack.
     await this.loadPack(this.activePack);
 
-    // Subscribe to agent state changes to detect transitions.
-    this.uiKarton.registerStateChangeCallback(this.boundOnKartonStateChange);
-
     this.logger.debug(
       `[NotificationSoundsService] Initialized (pack="${this.activePack}", loudness=${this.soundLoudness}, dockBounce=${this.dockBounceEnabled})`,
     );
@@ -285,6 +258,31 @@ export class NotificationSoundsService extends DisposableService {
     );
   }
 
+  /** Handle an explicit semantic notification event emitted by an agent. */
+  notifyAgentEvent(event: SoundEvent, agentId: string): void {
+    void this.triggerNotification(event, agentId);
+  }
+
+  /** Play the done sound for a pack so the user can preview it in settings. */
+  async previewPackDoneSound(
+    packName: string,
+    loudness: SoundLoudness,
+  ): Promise<boolean> {
+    const resolvedPack = this.resolveValidPack(packName);
+    await this.loadPack(resolvedPack);
+    const player = this.players.get(resolvedPack);
+    if (!player) return false;
+
+    if (loudness === 'off') return false;
+
+    return this.playFromBuffer(
+      'done',
+      player,
+      SOUND_VOLUME[loudness],
+      resolvedPack,
+    );
+  }
+
   /** List available sound pack IDs (directory names). */
   listPacks(): string[] {
     const packs = new Set<string>();
@@ -325,16 +323,72 @@ export class NotificationSoundsService extends DisposableService {
   }
 
   /**
-   * Import a sound pack from a JSON manifest file.
+   * Import a custom sound from either:
+   * - a single .mp3 file, reused for all notification events, or
+   * - a JSON manifest following the {@link ImportedPackManifest} format.
    *
-   * The JSON file must follow the {@link ImportedPackManifest} format.
    * Referenced .mp3 files are resolved relative to the JSON file's directory.
    * Everything is copied into a randomly-named folder under the
    * imported-packs directory.
-   *
-   * @returns The imported pack's id, or null on failure.
    */
-  async importPack(jsonFilePath: string): Promise<ImportPackResult> {
+  async importPack(filePath: string): Promise<ImportPackResult> {
+    const lowerPath = filePath.toLowerCase();
+    if (lowerPath.endsWith('.mp3')) {
+      return this.importSingleMp3(filePath);
+    }
+    if (!lowerPath.endsWith('.json')) {
+      return {
+        error: 'Select an .mp3 file or a sound pack .json manifest.',
+      };
+    }
+    return this.importManifestPack(filePath);
+  }
+
+  private importSingleMp3(mp3FilePath: string): ImportPackResult {
+    const fileName = path.basename(mp3FilePath);
+    const displayName = path.basename(mp3FilePath, path.extname(mp3FilePath));
+    const validationError = this.validateMp3File(mp3FilePath, fileName);
+    if (validationError) return { error: validationError };
+
+    const packId = crypto.randomUUID();
+    const packDir = path.join(this.importedPacksDir, packId);
+    try {
+      fs.mkdirSync(packDir, { recursive: true });
+      for (const event of ['done', 'question', 'error'] as SoundEvent[]) {
+        fs.copyFileSync(mp3FilePath, path.join(packDir, `${event}.mp3`));
+      }
+      const packMeta: ImportedPackManifest = {
+        name: displayName,
+        description: 'Custom sound imported from a single MP3 file.',
+        sounds: {
+          done: 'done.mp3',
+          question: 'question.mp3',
+          error: 'error.mp3',
+        },
+      };
+      fs.writeFileSync(
+        path.join(packDir, 'pack.json'),
+        JSON.stringify(packMeta, null, 2),
+        'utf-8',
+      );
+    } catch (err) {
+      try {
+        fs.rmSync(packDir, { recursive: true, force: true });
+      } catch {
+        /* best-effort cleanup */
+      }
+      const message = `Failed to import MP3: ${(err as Error).message}`;
+      this.logger.warn(`[NotificationSoundsService] ${message}`);
+      return { error: message };
+    }
+
+    this.logger.debug(
+      `[NotificationSoundsService] Imported custom MP3 "${displayName}" (id=${packId})`,
+    );
+    return { id: packId, name: displayName };
+  }
+
+  private importManifestPack(jsonFilePath: string): ImportPackResult {
     // 1. Read and validate the manifest.
     let manifest: ImportedPackManifest;
     try {
@@ -400,32 +454,12 @@ export class NotificationSoundsService extends DisposableService {
         this.logger.warn(
           `[NotificationSoundsService] Rejected path traversal: ${filename}`,
         );
+        errors.push(`"${filename}" must be relative to the manifest file.`);
         continue;
       }
-      if (!src.toLowerCase().endsWith('.mp3')) {
-        errors.push(`"${filename}" is not an .mp3 file.`);
-        continue;
-      }
-      if (!fs.existsSync(src)) {
-        errors.push(`Sound file "${filename}" not found.`);
-        continue;
-      }
-      // Quick header check — valid MP3 starts with sync byte 0xFF
-      // followed by 0xE0–0xFF or an ID3 tag ("ID3").
-      try {
-        const header = Buffer.alloc(3);
-        const fd = fs.openSync(src, 'r');
-        fs.readSync(fd, header, 0, 3, 0);
-        fs.closeSync(fd);
-        const isId3 =
-          header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33;
-        const isFrameSync = header[0] === 0xff && (header[1] & 0xe0) === 0xe0;
-        if (!isId3 && !isFrameSync) {
-          errors.push(`"${filename}" does not appear to be a valid MP3 file.`);
-          continue;
-        }
-      } catch {
-        errors.push(`Failed to read "${filename}". The file may be corrupted.`);
+      const validationError = this.validateMp3File(src, filename);
+      if (validationError) {
+        errors.push(validationError);
         continue;
       }
 
@@ -490,6 +524,35 @@ export class NotificationSoundsService extends DisposableService {
     return { id: packId, name: manifest.name };
   }
 
+  private validateMp3File(
+    filePath: string,
+    displayName: string,
+  ): string | null {
+    if (!filePath.toLowerCase().endsWith('.mp3')) {
+      return `"${displayName}" is not an .mp3 file.`;
+    }
+    if (!fs.existsSync(filePath)) {
+      return `Sound file "${displayName}" not found.`;
+    }
+    // Quick header check — valid MP3 starts with sync byte 0xFF followed by
+    // 0xE0–0xFF or an ID3 tag ("ID3").
+    try {
+      const header = Buffer.alloc(3);
+      const fd = fs.openSync(filePath, 'r');
+      fs.readSync(fd, header, 0, 3, 0);
+      fs.closeSync(fd);
+      const isId3 =
+        header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33;
+      const isFrameSync = header[0] === 0xff && (header[1] & 0xe0) === 0xe0;
+      if (!isId3 && !isFrameSync) {
+        return `"${displayName}" does not appear to be a valid MP3 file.`;
+      }
+    } catch {
+      return `Failed to read "${displayName}". The file may be corrupted.`;
+    }
+    return null;
+  }
+
   /**
    * Ensure the given pack ID exists. If not (e.g. an imported pack was
    * deleted), fall back to the default pack. Returns the valid pack ID.
@@ -529,13 +592,7 @@ export class NotificationSoundsService extends DisposableService {
   // ------------------------------------------------------------------
 
   protected onTeardown(): void {
-    this.uiKarton.unregisterStateChangeCallback(this.boundOnKartonStateChange);
-    for (const timer of this.pendingDoneTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.pendingDoneTimers.clear();
     this.players.clear();
-    this.previousAgentStates.clear();
     this.logger.debug('[NotificationSoundsService] Teardown complete');
   }
 
@@ -587,131 +644,6 @@ export class NotificationSoundsService extends DisposableService {
   }
 
   // ------------------------------------------------------------------
-  // Agent state transition detection
-  // ------------------------------------------------------------------
-
-  private onKartonStateChange(state: AppState): void {
-    // Track the currently open agent for visibility checks.
-    this.lastOpenAgentId = state?.browser?.lastOpenAgentId ?? null;
-
-    const instances: Record<string, any> = state?.agents?.instances ?? {};
-    const toolbox: Record<string, any> = state?.toolbox ?? {};
-
-    // Collect all known agent IDs (from instances + toolbox).
-    const allIds = new Set([
-      ...Object.keys(instances),
-      ...Object.keys(toolbox),
-    ]);
-
-    for (const agentId of allIds) {
-      const agentState = (instances[agentId] as any)?.state;
-      const tbEntry = toolbox[agentId];
-
-      const prev = this.previousAgentStates.get(agentId);
-
-      const curr = {
-        isWorking: agentState?.isWorking ?? prev?.isWorking ?? false,
-        hasError: agentState?.error
-          ? agentState.error.kind !== 'plan-limit-exceeded'
-          : false,
-        hasPendingApproval: agentState
-          ? hasPendingCanonicalToolApproval(agentState)
-          : (prev?.hasPendingApproval ?? false),
-        hasPendingQuestion: tbEntry
-          ? !!tbEntry.pendingUserQuestion
-          : (prev?.hasPendingQuestion ?? false),
-        hasUnread: agentState?.unread ?? prev?.hasUnread ?? false,
-      };
-
-      // A newly observed agent may already be waiting for the user when the app
-      // hydrates after restart. Treat that first observation as baseline; only
-      // notify on later transitions while the service is actively observing.
-      if (!prev) {
-        this.previousAgentStates.set(agentId, curr);
-        continue;
-      }
-
-      const approvalOrQuestionAppeared =
-        (!prev.hasPendingApproval && curr.hasPendingApproval) ||
-        (!prev.hasPendingQuestion && curr.hasPendingQuestion);
-      const errorAppeared = !prev.hasError && curr.hasError;
-
-      if (
-        curr.hasPendingApproval ||
-        curr.hasPendingQuestion ||
-        curr.hasError ||
-        curr.isWorking
-      ) {
-        this.cancelPendingDone(agentId);
-      }
-
-      // Approval/question/error are higher priority than done.
-      if (approvalOrQuestionAppeared) {
-        this.cancelPendingDone(agentId);
-        void this.triggerNotification('question', agentId);
-      }
-
-      if (errorAppeared) {
-        this.cancelPendingDone(agentId);
-        void this.triggerNotification('error', agentId);
-      }
-
-      // Transition: working → not working, no error → DONE.
-      // This is delayed/cancelable so tool approvals/questions that land in a
-      // following Karton update still win and play question.mp3 instead.
-      if (
-        prev.isWorking &&
-        !curr.isWorking &&
-        !curr.hasError &&
-        !curr.hasPendingApproval &&
-        !curr.hasPendingQuestion &&
-        curr.hasUnread
-      ) {
-        this.scheduleDoneNotification(agentId);
-      }
-
-      this.previousAgentStates.set(agentId, curr);
-    }
-
-    // Clean up agents that no longer exist in state.
-    for (const agentId of this.previousAgentStates.keys()) {
-      if (!allIds.has(agentId)) {
-        this.cancelPendingDone(agentId);
-        this.previousAgentStates.delete(agentId);
-      }
-    }
-  }
-
-  private scheduleDoneNotification(agentId: string): void {
-    this.cancelPendingDone(agentId);
-
-    const timer = setTimeout(() => {
-      this.pendingDoneTimers.delete(agentId);
-      const latest = this.previousAgentStates.get(agentId);
-      if (
-        !latest ||
-        latest.isWorking ||
-        latest.hasError ||
-        latest.hasPendingApproval ||
-        latest.hasPendingQuestion ||
-        !latest.hasUnread
-      ) {
-        return;
-      }
-      void this.triggerNotification('done', agentId);
-    }, this.DONE_DELAY_MS);
-
-    this.pendingDoneTimers.set(agentId, timer);
-  }
-
-  private cancelPendingDone(agentId: string): void {
-    const timer = this.pendingDoneTimers.get(agentId);
-    if (!timer) return;
-    clearTimeout(timer);
-    this.pendingDoneTimers.delete(agentId);
-  }
-
-  // ------------------------------------------------------------------
   // Trigger notification
   // ------------------------------------------------------------------
 
@@ -719,8 +651,10 @@ export class NotificationSoundsService extends DisposableService {
     event: SoundEvent,
     agentId: string,
   ): Promise<void> {
+    const windowFocused = this.isWindowFocused();
+
     // Reset debounce cooldown if the user has focused the window.
-    if (this.isWindowFocused()) {
+    if (windowFocused) {
       this.lastSoundPlayedAt = 0;
     }
 
@@ -733,10 +667,13 @@ export class NotificationSoundsService extends DisposableService {
       return;
     }
 
-    // Skip if the triggering agent is the one currently selected in the app.
-    // On startup, Electron may report the window as unfocused while the UI is
-    // restoring; app selection is the reliable signal for agent focus here.
-    if (this.lastOpenAgentId === agentId) {
+    // Skip only when the triggering agent is currently visible to the user.
+    // If the app window is out of focus, the selected agent is not actually
+    // visible, so it should still notify.
+    if (
+      this.uiKarton.state.browser.lastOpenAgentId === agentId &&
+      windowFocused
+    ) {
       return;
     }
 
@@ -749,7 +686,7 @@ export class NotificationSoundsService extends DisposableService {
 
     // Bounce dock if enabled and on macOS and window is not focused.
     if (this.dockBounceEnabled && process.platform === 'darwin') {
-      if (!this.isWindowFocused()) {
+      if (!windowFocused) {
         delivered = this.bounceDock(event) || delivered;
       }
     }
@@ -779,11 +716,13 @@ export class NotificationSoundsService extends DisposableService {
   private async playFromBuffer(
     event: SoundEvent,
     player: AudioPlayer,
+    volume = SOUND_VOLUME[this.soundLoudness],
+    packName = this.activePack,
   ): Promise<boolean> {
     const buffer = player.buffers[event];
     if (!buffer) {
       this.logger.debug(
-        `[NotificationSoundsService] No "${event}" sound in pack "${this.activePack}"`,
+        `[NotificationSoundsService] No "${event}" sound in pack "${packName}"`,
       );
       return false;
     }
@@ -794,11 +733,11 @@ export class NotificationSoundsService extends DisposableService {
     const dataUrl = player.dataUrls[event];
     if (!dataUrl) {
       this.logger.debug(
-        `[NotificationSoundsService] Missing pre-encoded "${event}" data URL for pack "${this.activePack}"`,
+        `[NotificationSoundsService] Missing pre-encoded "${event}" data URL for pack "${packName}"`,
       );
       return false;
     }
-    return this.sendPlayRequest(dataUrl, SOUND_VOLUME[this.soundLoudness]);
+    return this.sendPlayRequest(dataUrl, volume);
   }
 
   /**
@@ -883,28 +822,6 @@ export class NotificationSoundsService extends DisposableService {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function hasPendingCanonicalToolApproval(agentState: any): boolean {
-  // Canonical approval state lives on assistant history tool parts. This covers
-  // all approval modes/services, including alwaysAsk. Do not rely on
-  // `pendingApprovals` for notification routing; that legacy field only stores
-  // smart-approval classifier explanations.
-  for (const message of agentState.history ?? []) {
-    if (message?.role !== 'assistant') continue;
-    for (const part of message.parts ?? []) {
-      if (
-        (part?.type === 'dynamic-tool' || part?.type?.startsWith?.('tool-')) &&
-        part.state === 'approval-requested'
-      ) {
-        return true;
-      }
-    }
-  }
-
-  // Backward-compatible fallback for old/in-flight state where a smart
-  // approval explanation exists before the UI tool part is fully merged.
-  return Object.keys(agentState.pendingApprovals ?? {}).length > 0;
-}
 
 function normalizeLoudness(config: GlobalConfig): SoundLoudness {
   const loudness = (

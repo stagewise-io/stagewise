@@ -39,6 +39,11 @@ export function GlobalHotkeyBindings() {
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const resumeAgentRef = useRef(resumeAgent);
   resumeAgentRef.current = resumeAgent;
+  const setLastOpenAgentId = useKartonProcedure(
+    (p) => p.browser.setLastOpenAgentId,
+  );
+  const setLastOpenAgentIdRef = useRef(setLastOpenAgentId);
+  setLastOpenAgentIdRef.current = setLastOpenAgentId;
   const platform = useMemo(() => getCurrentPlatform(), []);
   const {
     stepAgentCycle,
@@ -50,6 +55,12 @@ export function GlobalHotkeyBindings() {
   const isCyclingAgentsRef = useRef(isCyclingAgents);
   isCyclingAgentsRef.current = isCyclingAgents;
   const hasActiveCycleRef = useRef(false);
+
+  const openAgentInBackend = useCallback((id: string) => {
+    void setLastOpenAgentIdRef
+      .current(id)
+      .then(() => resumeAgentRef.current(id));
+  }, []);
 
   const handleAgentCycle = useCallback(
     (direction: 'next' | 'previous') => {
@@ -64,9 +75,9 @@ export function GlobalHotkeyBindings() {
       const nextId = stepAgentCycle(getVisibleAgentIds(), direction);
       if (!nextId) return;
       const { id, committed } = commitAgentCycle();
-      if (id && committed) void resumeAgentRef.current(id);
+      if (id && committed) openAgentInBackend(id);
     },
-    [stepAgentCycle, commitAgentCycle],
+    [stepAgentCycle, commitAgentCycle, openAgentInBackend],
   );
 
   // Ctrl+Tab / Ctrl+Shift+Tab — agent cycling with preview.
@@ -106,8 +117,8 @@ export function GlobalHotkeyBindings() {
   const commitCycle = useCallback(() => {
     hasActiveCycleRef.current = false;
     const { id, committed } = commitAgentCycle();
-    if (id && committed) void resumeAgentRef.current(id);
-  }, [commitAgentCycle]);
+    if (id && committed) openAgentInBackend(id);
+  }, [commitAgentCycle, openAgentInBackend]);
 
   const cancelCycle = useCallback(() => {
     hasActiveCycleRef.current = false;
@@ -156,9 +167,9 @@ export function GlobalHotkeyBindings() {
       const id = index === 8 ? visibleAgentIds.at(-1) : visibleAgentIds[index];
       if (!id) return;
       focusAgentFromHotkey(id);
-      void resumeAgentRef.current(id);
+      openAgentInBackend(id);
     },
-    [focusAgentFromHotkey],
+    [focusAgentFromHotkey, openAgentInBackend],
   );
 
   useHotKeyListener(

@@ -260,11 +260,19 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     }
   });
 
-  // Wire the import sound pack procedure (opens native file dialog).
+  pagesService.registerPreviewSoundPackHandler(async (packId, loudness) => ({
+    ok: await notificationSoundsService.previewPackDoneSound(packId, loudness),
+  }));
+
+  // Wire the custom sound import procedure (opens native file dialog).
   pagesService.registerImportSoundPackHandler(async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Import Sound Pack',
-      filters: [{ name: 'Sound Pack JSON', extensions: ['json'] }],
+      title: 'Use Custom Sound',
+      filters: [
+        { name: 'Sound files', extensions: ['mp3', 'json'] },
+        { name: 'MP3 audio', extensions: ['mp3'] },
+        { name: 'Sound pack JSON', extensions: ['json'] },
+      ],
       properties: ['openFile'],
     });
     // User cancelled — no error, just nothing to do.
@@ -412,6 +420,9 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     detectedShell,
     resolvedEnvPromise,
   );
+  toolboxService.setNotificationEventHandler((event, agentId) => {
+    notificationSoundsService.notifyAgentEvent(event, agentId);
+  });
 
   // Give DiffHistoryService a way to resolve workspace roots for the
   // gitignore-aware filter in `registerAgentEdit`. Evaluated lazily per
@@ -490,6 +501,9 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
     modelProviderService,
     gitService,
+    (event, agentId) => {
+      notificationSoundsService.notifyAgentEvent(event, agentId);
+    },
     assetCacheService,
     processedImageCacheService,
   );

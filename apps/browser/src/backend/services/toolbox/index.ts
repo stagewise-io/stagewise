@@ -191,6 +191,12 @@ export class ToolboxService extends DisposableService {
   private mountManagerService: MountManagerService | null = null;
   private readonly preferencesService: PreferencesService;
   private unsubPreferenceSync: (() => void) | null = null;
+  private notificationEventHandler:
+    | ((
+        event: 'done' | 'question' | 'error',
+        agentId: string,
+      ) => void | Promise<void>)
+    | null = null;
 
   /** Cached API client - recreated when auth changes */
   private apiClient: ApiClient | null = null;
@@ -342,6 +348,15 @@ export class ToolboxService extends DisposableService {
    */
   public setModelProviderService(service: ModelProviderService): void {
     this.modelProviderService = service;
+  }
+
+  public setNotificationEventHandler(
+    handler: (
+      event: 'done' | 'question' | 'error',
+      agentId: string,
+    ) => void | Promise<void>,
+  ): void {
+    this.notificationEventHandler = handler;
   }
 
   public setWorkspaceLastUsedAtResolver(
@@ -1042,7 +1057,15 @@ export class ToolboxService extends DisposableService {
         if (!this.windowLayoutService) return null;
         return readConsoleLogsTool(this.windowLayoutService, agentInstanceId);
       case 'askUserQuestions':
-        return askUserQuestionsTool(this.uiKarton, agentInstanceId);
+        return askUserQuestionsTool(this.uiKarton, agentInstanceId, (id) => {
+          void Promise.resolve(
+            this.notificationEventHandler?.('question', id),
+          ).catch((error) => {
+            this.logger.debug(
+              `[ToolboxService] Notification event failed: ${(error as Error).message}`,
+            );
+          });
+        });
       case 'createShellSession': {
         if (!this.shellService?.isAvailable()) return null;
         return createShellSessionTool(this.shellService, agentInstanceId, () =>
