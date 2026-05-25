@@ -59,7 +59,9 @@ export function GlobalHotkeyBindings() {
   const openAgentInBackend = useCallback((id: string) => {
     void setLastOpenAgentIdRef
       .current(id)
-      .then(() => resumeAgentRef.current(id));
+      .catch(() => undefined)
+      .then(() => resumeAgentRef.current(id))
+      .catch(() => undefined);
   }, []);
 
   const handleAgentCycle = useCallback(

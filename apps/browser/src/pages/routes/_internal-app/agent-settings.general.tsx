@@ -160,15 +160,15 @@ function NotificationSoundsSetting() {
   };
 
   const handlePackChange = async (value: unknown) => {
-    const pack = String(value);
+    if (typeof value !== 'string' || !packOptions.includes(value)) return;
     if (soundLoudness !== 'off') {
-      void previewSoundPack(pack, soundLoudness).catch(() => {
+      void previewSoundPack(value, soundLoudness).catch(() => {
         // Preview is best-effort; config changes should still succeed.
       });
     }
     await setGlobalConfig({
       ...globalConfig,
-      notificationSoundPack: pack,
+      notificationSoundPack: value,
     });
   };
 

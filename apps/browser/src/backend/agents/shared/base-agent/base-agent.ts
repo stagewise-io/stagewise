@@ -1511,6 +1511,7 @@ export abstract class BaseAgent<
     // assistant message at a point where it is guaranteed to exist in
     // `state.history` — see the tail block below for the race rationale.
     let finishedResult: StepResult<StagewiseToolSet> | null = null;
+    let stepHasApprovalRequest = false;
 
     let queueFlushIndex = -1;
     this.state.set((draft) => {
@@ -1643,6 +1644,9 @@ export abstract class BaseAgent<
         // in `state.history`. The tail applies it safely after
         // Promise.all resolves. See populateReasoningDetailsOnAssistantMessage.
         finishedResult = result;
+        stepHasApprovalRequest = result.content.some(
+          (part) => part.type === 'tool-approval-request',
+        );
 
         // Log step completion details
         this.logger.debug(
@@ -1885,7 +1889,7 @@ export abstract class BaseAgent<
             }
           });
           this.onIdle();
-          if (hasAssistantMessage) {
+          if (hasAssistantMessage && !stepHasApprovalRequest) {
             this.emitNotificationEvent('done');
           }
         }

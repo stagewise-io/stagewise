@@ -539,8 +539,11 @@ export class NotificationSoundsService extends DisposableService {
     try {
       const header = Buffer.alloc(3);
       const fd = fs.openSync(filePath, 'r');
-      fs.readSync(fd, header, 0, 3, 0);
-      fs.closeSync(fd);
+      try {
+        fs.readSync(fd, header, 0, 3, 0);
+      } finally {
+        fs.closeSync(fd);
+      }
       const isId3 =
         header[0] === 0x49 && header[1] === 0x44 && header[2] === 0x33;
       const isFrameSync = header[0] === 0xff && (header[1] & 0xe0) === 0xe0;
