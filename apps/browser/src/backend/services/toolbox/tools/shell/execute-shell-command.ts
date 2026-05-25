@@ -255,16 +255,20 @@ export const createShellSession = (
     strict: false,
     needsApproval: async () => false,
     execute: async (params: CreateShellSessionToolInput, { toolCallId }) => {
-      const cwd = resolveCwd(params.cwd, getMountedPaths);
-      const sessionId = shellService.createSession(
-        agentInstanceId,
-        toolCallId,
-        cwd,
-      );
-      return {
-        session_id: sessionId,
-        message: `Session ${sessionId} created in ${params.cwd}.`,
-      };
+      try {
+        const cwd = resolveCwd(params.cwd, getMountedPaths);
+        const sessionId = shellService.createSession(
+          agentInstanceId,
+          toolCallId,
+          cwd,
+        );
+        return {
+          session_id: sessionId,
+          message: `Session ${sessionId} created in ${params.cwd}.`,
+        };
+      } finally {
+        shellService.clearPendingOutputs(agentInstanceId, toolCallId);
+      }
     },
   });
 };
@@ -307,12 +311,18 @@ export const executeShellCommand = (
             SMART_APPROVAL_TAIL_LINES,
           ) ?? '')
         : '';
-      const cwdPrefix = input.session_id
-        ? toClassifierCwdPrefix(
-            shellService.getSessionCwd(input.session_id),
-            getMountedPaths,
-          )
-        : '';
+      const currentCwd = input.session_id
+        ? shellService.getSessionCurrentCwd(input.session_id)
+        : undefined;
+      // If a session's current cwd is not verified by shell integration,
+      // fail closed by requiring manual approval for non-read-only calls.
+      if (input.session_id && !currentCwd) {
+        const explanation =
+          'Current terminal directory is unknown. Approving manually to stay safe.';
+        smartApproval.recordPendingApproval(toolCallId, explanation);
+        return true;
+      }
+      const cwdPrefix = toClassifierCwdPrefix(currentCwd, getMountedPaths);
 
       const result = await classifyShellCommand(
         {
@@ -336,6 +346,17 @@ export const executeShellCommand = (
       { toolCallId, abortSignal },
     ) => {
       try {
+        if (!params.session_id) {
+          return {
+            session_id: null,
+            output: 'session_id is required. Use createShellSession first.',
+            exit_code: null,
+            session_exited: false,
+            timed_out: false,
+            resolved_by: 'abort' as const,
+          };
+        }
+
         // Stdin mode — write raw bytes, capture output
         if (params.stdin !== undefined) {
           if (params.command || params.kill) {

@@ -1,7 +1,8 @@
 /**
- * OSC 133 parser for PTY shell integration.
+ * OSC parser for PTY shell integration.
  *
- * Detects command boundaries via VS Code-style OSC 133 escape sequences:
+ * Detects cwd updates via OSC 7 and command boundaries via VS Code-style
+ * OSC 133 escape sequences:
  *   133;A — Prompt start
  *   133;B — Prompt end (user pressed enter, command about to run)
  *   133;C — Command output start
@@ -12,19 +13,23 @@
 
 import { EventEmitter } from 'node:events';
 
-// ─── OSC 133 regex ────────────────────────────────────────────────
+// ─── OSC regexes ──────────────────────────────────────────────────
 // Matches both BEL (\x07) and ST (\x1b\\) terminators.
 const OSC_133_RE =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC 133 protocol
   /\x1b\]133;([ABCD])(?:;(-?\d+))?\x07|\x1b\]133;([ABCD])(?:;(-?\d+))?\x1b\\/g;
 
+const OSC_7_RE =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC 7 protocol
+  /\x1b\]7;file:\/\/[^/\x07\x1b]*(\/[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
+
 // ─── Sentinel format ──────────────────────────────────────────────
 // __STAGE_DONE_<id>_<exitCode>__
 const SENTINEL_RE = /__STAGE_DONE_([a-zA-Z0-9_-]+)_(-?\d+)__/;
 
-// ─── Strip all OSC 133 sequences from text ────────────────────────
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC 133 protocol
-const OSC_133_STRIP_RE = /\x1b\]133;[ABCD](?:;-?\d+)?(?:\x07|\x1b\\)/g;
+// ─── Strip all OSC 133 / OSC 7 sequences from text ────────────────
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are OSC protocol terminators
+const OSC_STRIP_RE = /\x1b\](?:133;[ABCD](?:;-?\d+)?|7;[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -52,6 +57,8 @@ export interface OscParserEvents {
   sentinelDone: [id: string, exitCode: number];
   /** Shell integration detected (first OSC 133 sequence seen) */
   integrationDetected: [];
+  /** Current working directory reported by OSC 7. */
+  cwd: [path: string];
 }
 
 /**
@@ -125,15 +132,18 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     const input = this.escBuffer + data;
     this.escBuffer = '';
 
-    // Check for a trailing partial ESC sequence that might be split
-    // across chunks: buffer it for the next write.
+    // Check for a trailing partial OSC sequence that might be split
+    // across chunks: buffer it for the next write. Only OSC prefixes
+    // are buffered so normal CSI sequences keep their old behavior.
     const lastEsc = input.lastIndexOf('\x1b');
     let processable: string;
-    if (lastEsc >= 0 && lastEsc > input.length - 20) {
-      // Could be a partial OSC sequence — the longest possible is
-      // \x1b]133;D;-NNN\x1b\\ (~18 chars). Buffer from the ESC.
+    if (lastEsc >= 0) {
       const tail = input.slice(lastEsc);
-      if (!this.isCompleteSequence(tail)) {
+      if (
+        (tail === '\x1b' || tail.startsWith('\x1b]')) &&
+        tail.length <= 4096 &&
+        !this.isCompleteSequence(tail)
+      ) {
         processable = input.slice(0, lastEsc);
         this.escBuffer = tail;
       } else {
@@ -163,7 +173,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
   }
 
   /**
-   * Check if a string fragment contains a complete OSC 133 sequence
+   * Check if a string fragment contains a complete OSC sequence
    * (i.e. it's not a truncated partial).
    */
   private isCompleteSequence(s: string): boolean {
@@ -176,6 +186,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
 
   private processOsc(data: string): void {
     let lastIndex = 0;
+    this.processOsc7(data);
     OSC_133_RE.lastIndex = 0;
 
     let match: RegExpExecArray | null;
@@ -233,11 +244,24 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     }
   }
 
-  private handleTextOutput(text: string): void {
-    if (this._inCommandOutput) {
-      this.commandOutputBuf += text;
+  private processOsc7(data: string): void {
+    OSC_7_RE.lastIndex = 0;
+
+    let match: RegExpExecArray | null;
+    // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop pattern
+    while ((match = OSC_7_RE.exec(data)) !== null) {
+      const cwd = decodeFileUriPath(match[1]);
+      if (cwd) this.emit('cwd', cwd);
     }
-    this.emit('output', text);
+  }
+
+  private handleTextOutput(text: string): void {
+    const stripped = stripOscSequences(text);
+    if (stripped.length === 0) return;
+    if (this._inCommandOutput) {
+      this.commandOutputBuf += stripped;
+    }
+    this.emit('output', stripped);
   }
 
   private processSentinel(data: string): void {
@@ -283,10 +307,23 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
 // ─── Utilities ────────────────────────────────────────────────────
 
 /**
- * Strip OSC 133 sequences from text.
+ * Strip shell-integration OSC sequences from text.
  */
 export function stripOsc133(text: string): string {
-  return text.replace(OSC_133_STRIP_RE, '');
+  return stripOscSequences(text);
+}
+
+function stripOscSequences(text: string): string {
+  return text.replace(OSC_STRIP_RE, '');
+}
+
+function decodeFileUriPath(pathname: string | undefined): string | null {
+  if (!pathname) return null;
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
 }
 
 /**

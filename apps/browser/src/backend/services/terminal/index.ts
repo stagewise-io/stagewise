@@ -2,7 +2,6 @@ import * as pty from 'node-pty';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import type { Terminal as IHeadlessTerminal } from '@xterm/headless';
 import xtermHeadless from '@xterm/headless';
 import { SerializeAddon } from '@xterm/addon-serialize';
@@ -21,6 +20,7 @@ const HeadlessTerminal = xtermHeadless.Terminal as new (options: {
 }) => IHeadlessTerminal;
 import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
+import { OscParser } from '@/services/toolbox/services/shell/osc-parser';
 import type { DetectedShell } from '@/services/toolbox/services/shell/types';
 import {
   DEFAULT_TERMINAL_COLS,
@@ -34,7 +34,9 @@ import { getTerminalTabDefaults } from '@shared/karton-contracts/ui';
 interface UserTerminalSession {
   id: string;
   pty: pty.IPty;
-  /** Partial OSC escape sequence carried over from the previous
+  /** Shared shell-integration OSC parser used by agent and user terminals. */
+  parser: OscParser;
+  /** Partial UI OSC escape sequence carried over from the previous
    *  data chunk. OSC sequences can span multiple onData calls. */
   oscBuffer: string;
   /** Backend-owned terminal presentation model. */
@@ -64,10 +66,6 @@ const MAX_OUTPUT_BUFFER = 128 * 1024; // 128 KB
  *  numeric parameter for validation. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
 const OSC_TITLE_RE = /^\x1b\]([012]);([^\x07\x1b]*?)(\x07|\x1b\\)/;
-
-/** Regex matching OSC 7 cwd updates: ESC ] 7 ; file://host/path BEL | ST. */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
-const OSC_CWD_RE = /^\x1b\]7;(file:\/\/[^\x07\x1b]*?)(\x07|\x1b\\)/;
 
 /** Regex matching OSC 11 background color queries: ESC ] 11 ; ? BEL | ST. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
@@ -107,19 +105,6 @@ function Global:Prompt() {
 }
 __StagewiseTerminalEmitMetadata
 `.trim();
-
-function cwdFromOsc7Uri(uri: string): string | null {
-  try {
-    const parsed = new URL(uri);
-    if (parsed.protocol !== 'file:') return null;
-    if (process.platform === 'win32') {
-      return fileURLToPath(parsed) || null;
-    }
-    return decodeURIComponent(parsed.pathname) || null;
-  } catch {
-    return null;
-  }
-}
 
 function hexColorToOscRgb(color: string): string {
   const normalized = color.replace(/^#/, '');
@@ -248,16 +233,16 @@ function findForegroundProcess(shellPid: number): TerminalProcessInfo | null {
 /**
  * Process raw PTY data through the OSC pipeline:
  *  - Strips complete OSC 0/1/2 title sequences from the output.
- *  - Strips complete OSC 7 cwd sequences from the output.
+ *  - Strips complete OSC 7 cwd sequences from the output. OSC 7
+ *    metadata is parsed by the shared OscParser instance.
  *  - Responds to OSC 11 background color queries from terminal apps.
- *  - Calls callbacks for extracted title/cwd metadata.
+ *  - Calls callbacks for extracted title metadata.
  *  - Returns clean output and a carried-over partial-sequence buffer.
  */
 function processOscData(
   chunk: string,
   prevOscBuffer: string,
   onTitle: (title: string) => void,
-  onCwd: (cwd: string) => void,
   onBackgroundQuery: () => void,
 ): { output: string; oscBuffer: string } {
   let combined = prevOscBuffer + chunk;
@@ -278,14 +263,6 @@ function processOscData(
       const title = titleMatch[2];
       if (title) onTitle(title);
       combined = tail.slice(titleMatch[0].length);
-      continue;
-    }
-
-    const cwdMatch = OSC_CWD_RE.exec(tail);
-    if (cwdMatch) {
-      const cwd = cwdFromOsc7Uri(cwdMatch[1]);
-      if (cwd) onCwd(cwd);
-      combined = tail.slice(cwdMatch[0].length);
       continue;
     }
 
@@ -793,9 +770,20 @@ export class TerminalService extends DisposableService {
     const serializeAddon = new SerializeAddon();
     headless.loadAddon(serializeAddon);
 
+    const parser = new OscParser();
+    parser.on('cwd', (cwd) => {
+      this.uiKarton.setState((draft) => {
+        const tab = draft.contentTabs.tabs[terminalId];
+        if (tab && tab.type === 'terminal') {
+          tab.cwd = cwd;
+        }
+      });
+    });
+
     const session: UserTerminalSession = {
       id: terminalId,
       pty: ptyProcess,
+      parser,
       oscBuffer: '',
       headless,
       serializeAddon,
@@ -810,6 +798,7 @@ export class TerminalService extends DisposableService {
       if (!curSession || this.disposed) return;
 
       this.updateTerminalMetadata(terminalId);
+      curSession.parser.write(data);
 
       const { output, oscBuffer } = processOscData(
         data,
@@ -820,14 +809,6 @@ export class TerminalService extends DisposableService {
             const tab = draft.contentTabs.tabs[terminalId];
             if (tab && tab.type === 'terminal') {
               tab.title = title;
-            }
-          });
-        },
-        (cwd) => {
-          this.uiKarton.setState((draft) => {
-            const tab = draft.contentTabs.tabs[terminalId];
-            if (tab && tab.type === 'terminal') {
-              tab.cwd = cwd;
             }
           });
         },
@@ -906,6 +887,7 @@ export class TerminalService extends DisposableService {
       );
     }
 
+    session.parser.removeAllListeners();
     session.headless.dispose();
     this.sessions.delete(terminalId);
     this.outputBuffers.delete(terminalId);
@@ -941,6 +923,7 @@ export class TerminalService extends DisposableService {
   private onPtyExit(terminalId: string): void {
     const session = this.sessions.get(terminalId);
     if (!session) return;
+    session.parser.removeAllListeners();
     session.headless.dispose();
     this.sessions.delete(terminalId);
     this.outputBuffers.delete(terminalId);
@@ -1036,6 +1019,7 @@ export class TerminalService extends DisposableService {
         // Best-effort cleanup
       }
       try {
+        session.parser.removeAllListeners();
         session.headless.dispose();
       } catch {
         // Best-effort cleanup

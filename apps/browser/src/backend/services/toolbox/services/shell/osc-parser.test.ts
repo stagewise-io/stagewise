@@ -20,6 +20,8 @@ const oscST = (marker: string, param?: string) =>
 const sentinel = (id: string, exitCode: number) =>
   `__STAGE_DONE_${id}_${exitCode}__`;
 
+const osc7 = (path: string) => `\x1b]7;file://${path}\x07`;
+
 // ─── OSC 133 parsing ─────────────────────────────────────────────
 
 describe('OscParser — OSC 133 mode', () => {
@@ -184,6 +186,51 @@ describe('OscParser — OSC 133 mode', () => {
 
     // 'prompt$' should be emitted as output
     expect(output).toHaveBeenCalledWith('prompt$');
+  });
+});
+
+// ─── OSC 7 cwd parsing ───────────────────────────────────────────
+
+describe('OscParser — OSC 7 cwd metadata', () => {
+  let parser: OscParser;
+
+  beforeEach(() => {
+    parser = new OscParser();
+  });
+
+  it('emits cwd from OSC 7 while preserving normal output', () => {
+    const cwd = vi.fn();
+    const output = vi.fn();
+    parser.on('cwd', cwd);
+    parser.on('output', output);
+
+    parser.write(`before${osc7('/tmp/project')}after`);
+
+    expect(cwd).toHaveBeenCalledWith('/tmp/project');
+    expect(output).toHaveBeenCalledWith('beforeafter');
+  });
+
+  it('handles OSC 7 sequences split across chunks', () => {
+    const cwd = vi.fn();
+    const output = vi.fn();
+    parser.on('cwd', cwd);
+    parser.on('output', output);
+
+    parser.write('before\x1b]7;file://');
+    parser.write('/tmp/split%20path\x07after');
+
+    expect(cwd).toHaveBeenCalledWith('/tmp/split path');
+    expect(output).toHaveBeenNthCalledWith(1, 'before');
+    expect(output).toHaveBeenNthCalledWith(2, 'after');
+  });
+
+  it('strips OSC 7 from command output', () => {
+    const done = vi.fn();
+    parser.on('commandDone', done);
+
+    parser.write(`${osc('C')}one${osc7('/tmp/project')}two${osc('D', '0')}`);
+
+    expect(done.mock.calls[0][0].output).toBe('onetwo');
   });
 });
 

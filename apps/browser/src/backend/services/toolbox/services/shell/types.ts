@@ -148,6 +148,8 @@ export interface PtySession {
   logger: SessionLogger | null;
   /** Working directory the session was started in. */
   cwd: string;
+  /** Last current working directory reported by shell integration. */
+  currentCwd: string | null;
   /** Path to the temp init script file, for cleanup. */
   initScriptPath: string | null;
 }
