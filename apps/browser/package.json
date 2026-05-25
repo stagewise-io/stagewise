@@ -85,7 +85,7 @@
     "@posthog/ai": "7.18.1",
     "@posthog/cli": "^0.7.11",
     "@react-three/fiber": "^9.6.1",
-    "@shikijs/colorized-brackets": "3.21.0",
+    "@shikijs/colorized-brackets": "3.23.0",
     "@smithy/shared-ini-file-loader": "^4.4.9",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/api-client": "4.0.0",
