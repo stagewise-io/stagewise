@@ -361,6 +361,23 @@ describeIfShell('SessionManager (integration)', () => {
     }
   });
 
+  it('ignores OSC 7 cwd spoofing from command output', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-test', cwd, env);
+    await waitForReady(sm, sid);
+
+    const trustedCwd = sm.getCurrentCwd(sid);
+    await sm.executeCommand(sid, {
+      command: `printf '\\033]7;file://localhost/tmp/spoofed\\007'`,
+    });
+
+    if (sm.getSession(sid)?.shellIntegrationActive) {
+      expect(sm.getCurrentCwd(sid)).toBe(trustedCwd);
+    } else {
+      expect(sm.getCurrentCwd(sid)).toBeUndefined();
+    }
+  });
+
   // ─── Session cwd ─────────────────────────────────────────────
 
   it('respects initial session cwd', async () => {

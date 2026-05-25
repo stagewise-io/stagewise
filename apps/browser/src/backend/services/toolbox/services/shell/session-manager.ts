@@ -407,6 +407,11 @@ export class SessionManager {
 
     // Wire parser events
     parser.on('cwd', (currentCwd) => {
+      // OSC 7 is just terminal output. A command can print it itself, so only
+      // trust cwd updates observed while the shell is at/restoring a prompt.
+      // During command output, keep the previous trusted cwd so smart approval
+      // does not make decisions from spoofed directory metadata.
+      if (parser.inCommandOutput) return;
       session.currentCwd = currentCwd;
     });
 
