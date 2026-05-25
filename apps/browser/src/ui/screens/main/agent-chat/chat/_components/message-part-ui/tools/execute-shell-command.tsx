@@ -211,39 +211,20 @@ export const ExecuteShellCommandToolPart = ({
   // Minimal display for successful/in-progress create / kill — like copy/move
   // UI. Approval and denial states must fall through to the standard shell UI:
   // approvals need action buttons, and denied kills need a visible skipped row.
-  if (
+  // Keep this as a flag instead of returning before later hooks. The same tool
+  // part can transition between minimal and standard layouts, and conditional
+  // hook counts crash React with "Rendered fewer hooks than expected".
+  const useMinimalShellRow =
     (isCreateSession || (isKill && !killFailed)) &&
     state !== 'approval' &&
     state !== 'approval-responded' &&
-    state !== 'denied'
-  ) {
-    const streamingText = isCreateSession
-      ? 'Opening new terminal…'
-      : 'Closing terminal…';
-    const finishedText = isCreateSession
-      ? 'Opened new terminal'
-      : 'Closed terminal';
-
-    return (
-      <ToolPartUINotCollapsible
-        icon={<IconTerminalOutline18 className="size-3" />}
-        part={part}
-        minimal
-        disableShimmer={isKill}
-        streamingText={streamingText}
-        finishedText={
-          <span className="flex min-w-0 gap-1">
-            <span className="shrink-0 font-medium">{finishedText}</span>
-            {isCreateSession && sessionId && (
-              <span className="truncate font-normal opacity-75">
-                {sessionId}
-              </span>
-            )}
-          </span>
-        }
-      />
-    );
-  }
+    state !== 'denied';
+  const minimalStreamingText = isCreateSession
+    ? 'Opening new terminal…'
+    : 'Closing terminal…';
+  const minimalFinishedText = isCreateSession
+    ? 'Opened new terminal'
+    : 'Closed terminal';
 
   const trigger = useMemo(() => {
     if (state === 'approval' || state === 'approval-responded') {
@@ -494,6 +475,28 @@ export const ExecuteShellCommandToolPart = ({
     classifierExplanation,
     part.state,
   ]);
+
+  if (useMinimalShellRow) {
+    return (
+      <ToolPartUINotCollapsible
+        icon={<IconTerminalOutline18 className="size-3" />}
+        part={part}
+        minimal
+        disableShimmer={isKill}
+        streamingText={minimalStreamingText}
+        finishedText={
+          <span className="flex min-w-0 gap-1">
+            <span className="shrink-0 font-medium">{minimalFinishedText}</span>
+            {sessionId && (
+              <span className="truncate font-normal opacity-75">
+                {sessionId}
+              </span>
+            )}
+          </span>
+        }
+      />
+    );
+  }
 
   return (
     <ToolPartUI
