@@ -1085,6 +1085,7 @@ export class ToolboxService extends DisposableService {
           this.shellService,
           agentInstanceId,
           getToolApprovalMode,
+          () => this.getMountedPathsForAgent(agentInstanceId),
           smartApproval,
         );
       }

@@ -178,6 +178,17 @@ function pickRecentOutput(
   return recent;
 }
 
+function splitMountPrefix(mountPrefix: string): {
+  prefix: string;
+  rest: string;
+} {
+  const slashIdx = mountPrefix.indexOf('/');
+  return {
+    prefix: slashIdx === -1 ? mountPrefix : mountPrefix.slice(0, slashIdx),
+    rest: slashIdx === -1 ? '' : mountPrefix.slice(slashIdx + 1),
+  };
+}
+
 function resolveCwd(
   mountPrefix: string | undefined,
   getMountedPaths: MountedPathsGetter,
@@ -186,10 +197,7 @@ function resolveCwd(
 
   if (mountPrefix) {
     // Split "weba9/apps/browser" into prefix "weba9" + rest "apps/browser"
-    const slashIdx = mountPrefix.indexOf('/');
-    const prefix =
-      slashIdx === -1 ? mountPrefix : mountPrefix.slice(0, slashIdx);
-    const rest = slashIdx === -1 ? '' : mountPrefix.slice(slashIdx + 1);
+    const { prefix, rest } = splitMountPrefix(mountPrefix);
 
     const mountRoot = mounts.get(prefix);
     if (!mountRoot) {
@@ -211,6 +219,29 @@ function resolveCwd(
   }
 
   return homedir();
+}
+
+function toClassifierCwdPrefix(
+  absoluteCwd: string | undefined,
+  getMountedPaths: MountedPathsGetter,
+): string {
+  if (!absoluteCwd) return '';
+  const normalizedCwd = resolve(absoluteCwd);
+
+  for (const [prefix, mountRoot] of getMountedPaths()) {
+    const resolvedRoot = resolve(mountRoot);
+    if (
+      normalizedCwd !== resolvedRoot &&
+      !normalizedCwd.startsWith(`${resolvedRoot}${sep}`)
+    ) {
+      continue;
+    }
+
+    const relativePath = normalizedCwd.slice(resolvedRoot.length + 1);
+    return relativePath ? `${prefix}/${relativePath}` : prefix;
+  }
+
+  return '';
 }
 
 export const createShellSession = (
@@ -242,6 +273,7 @@ export const executeShellCommand = (
   shellService: ShellService,
   agentInstanceId: string,
   getToolApprovalMode: () => ToolApprovalMode,
+  getMountedPaths: MountedPathsGetter,
   smartApproval: SmartApprovalDeps,
 ) => {
   return tool({
@@ -275,11 +307,17 @@ export const executeShellCommand = (
             SMART_APPROVAL_TAIL_LINES,
           ) ?? '')
         : '';
+      const cwdPrefix = input.session_id
+        ? toClassifierCwdPrefix(
+            shellService.getSessionCwd(input.session_id),
+            getMountedPaths,
+          )
+        : '';
 
       const result = await classifyShellCommand(
         {
           command: classifierCommand,
-          cwdPrefix: '',
+          cwdPrefix,
           agentExplanation: input.explanation ?? '',
           shellTail,
         },
