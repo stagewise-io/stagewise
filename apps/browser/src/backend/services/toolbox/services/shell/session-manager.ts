@@ -365,6 +365,7 @@ export class SessionManager {
       readyResolve: null!,
       onData: onData ?? null,
       cwd,
+      currentCwd: null,
       logger: this.getShellLogsDir
         ? new SessionLogger(
             path.join(
@@ -405,6 +406,10 @@ export class SessionManager {
     });
 
     // Wire parser events
+    parser.on('cwd', (currentCwd) => {
+      session.currentCwd = currentCwd;
+    });
+
     parser.on('integrationDetected', () => {
       // The bash/zsh integration scripts guard `133;D` emission on
       // `__stagewise_command_executed`, which is 0 at init, so no
@@ -696,6 +701,12 @@ export class SessionManager {
 
   getSession(sessionId: string): PtySession | undefined {
     return this.sessions.get(sessionId);
+  }
+
+  getCurrentCwd(sessionId: string): string | undefined {
+    const session = this.sessions.get(sessionId);
+    if (!session?.shellIntegrationActive) return undefined;
+    return session.currentCwd ?? undefined;
   }
 
   /**

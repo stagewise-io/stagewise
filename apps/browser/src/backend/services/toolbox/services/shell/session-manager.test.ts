@@ -348,6 +348,11 @@ describeIfShell('SessionManager (integration)', () => {
 
       const r = await sm.executeCommand(sid, { command: 'pwd' });
       expect(r.output).toContain(path.basename(uniqueDir));
+      if (sm.getSession(sid)?.shellIntegrationActive) {
+        expect(sm.getCurrentCwd(sid)).toBe(uniqueDir);
+      } else {
+        expect(sm.getCurrentCwd(sid)).toBeUndefined();
+      }
     } finally {
       sm?.killAll();
       // Windows needs time to release PTY directory locks after kill

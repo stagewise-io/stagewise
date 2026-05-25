@@ -329,9 +329,9 @@ export class ShellService extends DisposableService {
     return lines.slice(-maxLines).join('\n');
   }
 
-  /** Returns the absolute cwd a session was initially created with. */
-  public getSessionCwd(sessionId: string): string | undefined {
-    return this.sessionManager?.getSession(sessionId)?.cwd;
+  /** Returns the latest shell-reported cwd for a session, when known. */
+  public getSessionCurrentCwd(sessionId: string): string | undefined {
+    return this.sessionManager?.getCurrentCwd(sessionId);
   }
 
   clearPendingOutputs(agentId: string, toolCallId: string): void {
