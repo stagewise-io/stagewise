@@ -28,6 +28,6 @@ export function validateConfig(): void {
   }
 }
 
-export type Channel = 'release' | 'beta' | 'alpha';
+export type Channel = 'release' | 'nightly' | 'beta' | 'alpha';
 export type Platform = 'macos' | 'win' | 'linux';
 export type LinuxFormat = 'deb' | 'rpm';

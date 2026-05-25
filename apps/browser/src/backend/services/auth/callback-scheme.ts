@@ -1,6 +1,7 @@
 type AuthCallbackScheme =
   | 'stagewise'
   | 'stagewise-prerelease'
+  | 'stagewise-nightly'
   | 'stagewise-dev';
 
 function getDefaultAuthCallbackScheme(): AuthCallbackScheme {
@@ -9,6 +10,8 @@ function getDefaultAuthCallbackScheme(): AuthCallbackScheme {
       return 'stagewise';
     case 'prerelease':
       return 'stagewise-prerelease';
+    case 'nightly':
+      return 'stagewise-nightly';
     case 'dev':
       return 'stagewise-dev';
     default:

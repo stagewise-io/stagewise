@@ -1,4 +1,8 @@
-declare const __APP_RELEASE_CHANNEL__: 'dev' | 'prerelease' | 'release';
+declare const __APP_RELEASE_CHANNEL__:
+  | 'dev'
+  | 'prerelease'
+  | 'nightly'
+  | 'release';
 declare const __APP_BASE_NAME__: string;
 declare const __APP_NAME__: string;
 declare const __APP_BUNDLE_ID__: string;

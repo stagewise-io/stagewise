@@ -31,6 +31,11 @@ const windowsSignConfig = getWindowsSignConfig();
 console.log(
   `[forge.config] Release channel: ${buildConstants.__APP_RELEASE_CHANNEL__}`,
 );
+const visualAssetChannel =
+  buildConstants.__APP_RELEASE_CHANNEL__ === 'nightly'
+    ? 'prerelease'
+    : buildConstants.__APP_RELEASE_CHANNEL__;
+
 // DMG volume name (shown when mounted)
 const dmgVolumeName = 'Install stagewise';
 
@@ -300,7 +305,7 @@ const config: ForgeConfig = {
     extraResource: [
       './bundled',
       './assets/sounds',
-      `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
+      `./assets/icons/${visualAssetChannel}/icon.png`,
     ],
     prune: true,
     afterCopy: [
@@ -309,7 +314,7 @@ const config: ForgeConfig = {
       uploadSourceMapsAndCleanup,
     ],
     afterComplete: [copyVcRedist], // sources DLLs directly from VS install on the runner
-    icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon`,
+    icon: `./assets/icons/${visualAssetChannel}/icon`,
     appCopyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
     win32metadata: {
       CompanyName: 'stagewise Inc.',
@@ -359,8 +364,8 @@ const config: ForgeConfig = {
       version: buildConstants.__APP_VERSION__,
       setupExe: `${buildConstants.__APP_BASE_NAME__}-${buildConstants.__APP_VERSION__}-${arch}-setup.exe`,
       copyright: `Copyright © ${new Date().getFullYear()} stagewise Inc.`,
-      setupIcon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.ico`,
-      loadingGif: `./assets/install/${buildConstants.__APP_RELEASE_CHANNEL__}/windows-install-image.gif`,
+      setupIcon: `./assets/icons/${visualAssetChannel}/icon.ico`,
+      loadingGif: `./assets/install/${visualAssetChannel}/windows-install-image.gif`,
       title: `Installing ${buildConstants.__APP_NAME__}...`,
       // Windows code signing for the installer (uses same config as packager)
       ...(windowsSignConfig ? { windowsSign: windowsSignConfig } : {}),
@@ -371,7 +376,7 @@ const config: ForgeConfig = {
         bin: buildConstants.__APP_BASE_NAME__,
         productName: buildConstants.__APP_NAME__,
         genericName: 'Web Browser',
-        icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
+        icon: `./assets/icons/${visualAssetChannel}/icon.png`,
         homepage: 'https://stagewise.io',
         categories: ['Development', 'Network', 'Utility'],
       },
@@ -382,7 +387,7 @@ const config: ForgeConfig = {
         bin: buildConstants.__APP_BASE_NAME__,
         productName: buildConstants.__APP_NAME__,
         genericName: 'Web Browser',
-        icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.png`,
+        icon: `./assets/icons/${visualAssetChannel}/icon.png`,
         homepage: 'https://stagewise.io',
         categories: ['Development', 'Network', 'Utility'],
         section: 'devel',
@@ -392,7 +397,7 @@ const config: ForgeConfig = {
     new MakerDMG({
       format: 'UDZO',
       title: dmgVolumeName,
-      icon: `./assets/icons/${buildConstants.__APP_RELEASE_CHANNEL__}/icon.icns`,
+      icon: `./assets/icons/${visualAssetChannel}/icon.icns`,
       additionalDMGOptions: {},
       background: './assets/install/macos-dmg-background.png',
       contents: [

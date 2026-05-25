@@ -14,7 +14,12 @@ on:
       channel:
         required: true
         type: string
-        description: "Release channel (alpha, beta, release)"
+        description: "Release channel (alpha, beta, nightly, release)"
+      ref:
+        required: false
+        type: string
+        default: main
+        description: "Git ref to tag and release"
     secrets:
       NUCLEO_LICENSE_KEY:
         required: false
@@ -67,6 +72,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -242,7 +248,8 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           # Release channel
-          RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || 'prerelease' }}
+          RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || inputs.channel == 'nightly' && 'nightly' || 'prerelease' }}
+          APP_VERSION_OVERRIDE: ${{ inputs.version }}
 
       - name: List build output
         working-directory: apps/browser

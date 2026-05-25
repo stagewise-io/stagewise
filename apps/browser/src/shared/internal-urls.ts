@@ -4,8 +4,9 @@
  *
  * The `stagewise://internal` origin is intentionally stable across release
  * channels. Do not couple it to OAuth callback schemes such as
- * `stagewise-dev://` or `stagewise-prerelease://`; those are OS-level deep
- * links, while this origin is the app's privileged in-browser page host.
+ * `stagewise-dev://`, `stagewise-prerelease://`, or
+ * `stagewise-nightly://`; those are OS-level deep links, while this origin is
+ * the app's privileged in-browser page host.
  */
 
 /** The home page URL - displayed when opening a new tab or on startup */

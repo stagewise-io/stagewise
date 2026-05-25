@@ -84,7 +84,7 @@ export type PagesApiState = {
     version: string; // The version of the app.
     platform: 'darwin' | 'linux' | 'win32'; // The platform on which the app is running.
     // Build-time constants
-    releaseChannel: 'dev' | 'prerelease' | 'release'; // The release channel of the app.
+    releaseChannel: 'dev' | 'prerelease' | 'nightly' | 'release'; // The release channel of the app.
     author: string; // Author name.
     copyright: string; // Copyright string.
     homepage: string; // Homepage URL.

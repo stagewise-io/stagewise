@@ -1,0 +1,85 @@
+name: "Nightly Release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build"
+        required: false
+        type: string
+        default: main
+      date:
+        description: "Nightly date override (YYYYMMDD)"
+        required: false
+        type: string
+      counter:
+        description: "Nightly counter override (1-999)"
+        required: false
+        type: string
+
+run-name: "Nightly Release: ${{ inputs.ref || 'main' }}"
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Compute nightly version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 10.30.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
+
+      - name: Compute version
+        id: version
+        env:
+          NIGHTLY_DATE: ${{ inputs.date }}
+          NIGHTLY_COUNTER: ${{ inputs.counter }}
+        run: |
+          ARGS=(--github-output)
+          if [ -n "$NIGHTLY_DATE" ]; then
+            ARGS+=(--date "$NIGHTLY_DATE")
+          fi
+          if [ -n "$NIGHTLY_COUNTER" ]; then
+            ARGS+=(--counter "$NIGHTLY_COUNTER")
+          fi
+          pnpm tsx scripts/release/nightly-version.ts "${ARGS[@]}" >> "$GITHUB_OUTPUT"
+
+  release-nightly:
+    name: Release nightly
+    needs: version
+    permissions:
+      contents: write
+    uses: ./.github/workflows/_release-browser.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      tag: ${{ needs.version.outputs.tag }}
+      channel: nightly
+      ref: ${{ inputs.ref || 'main' }}
+    secrets: inherit
