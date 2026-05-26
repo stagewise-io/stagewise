@@ -221,27 +221,41 @@ function resolveCwd(
   return homedir();
 }
 
-function toClassifierCwdPrefix(
+export function absoluteCwdToMountPrefix(
   absoluteCwd: string | undefined,
   getMountedPaths: MountedPathsGetter,
-): string {
-  if (!absoluteCwd) return '';
+): string | undefined {
+  if (!absoluteCwd) return undefined;
   const normalizedCwd = resolve(absoluteCwd);
+  let bestPrefix: string | undefined;
+  let bestRoot = '';
 
   for (const [prefix, mountRoot] of getMountedPaths()) {
     const resolvedRoot = resolve(mountRoot);
     if (
-      normalizedCwd !== resolvedRoot &&
-      !normalizedCwd.startsWith(`${resolvedRoot}${sep}`)
+      (normalizedCwd === resolvedRoot ||
+        normalizedCwd.startsWith(`${resolvedRoot}${sep}`)) &&
+      resolvedRoot.length > bestRoot.length
     ) {
-      continue;
+      bestPrefix = prefix;
+      bestRoot = resolvedRoot;
     }
-
-    const relativePath = normalizedCwd.slice(resolvedRoot.length + 1);
-    return relativePath ? `${prefix}/${relativePath}` : prefix;
   }
 
-  return '';
+  if (!bestPrefix) return undefined;
+  if (normalizedCwd === bestRoot) return bestPrefix;
+
+  return `${bestPrefix}/${normalizedCwd
+    .slice(bestRoot.length + 1)
+    .split(sep)
+    .join('/')}`;
+}
+
+function toClassifierCwdPrefix(
+  absoluteCwd: string | undefined,
+  getMountedPaths: MountedPathsGetter,
+): string {
+  return absoluteCwdToMountPrefix(absoluteCwd, getMountedPaths) ?? '';
 }
 
 export const createShellSession = (
@@ -314,12 +328,10 @@ export const executeShellCommand = (
             SMART_APPROVAL_TAIL_LINES,
           ) ?? '')
         : '';
-      const currentCwd = input.session_id
-        ? shellService.getSessionCurrentCwd(input.session_id)
-        : undefined;
+      const currentCwd = shellService.getSessionCurrentCwd(input.session_id);
       // If a session's current cwd is not verified by shell integration,
       // fail closed by requiring manual approval for non-read-only calls.
-      if (input.session_id && !currentCwd) {
+      if (!currentCwd) {
         const explanation =
           'Current terminal directory is unknown. Approving manually to stay safe.';
         smartApproval.recordPendingApproval(toolCallId, explanation);

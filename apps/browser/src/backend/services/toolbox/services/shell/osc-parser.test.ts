@@ -187,6 +187,28 @@ describe('OscParser — OSC 133 mode', () => {
     // 'prompt$' should be emitted as output
     expect(output).toHaveBeenCalledWith('prompt$');
   });
+
+  it('emits cwd for OSC 7 cwd updates', () => {
+    const cwd = vi.fn();
+    parser.on('cwd', cwd);
+
+    parser.write(osc7('host/Users/test/project'));
+
+    expect(cwd).toHaveBeenCalledWith('/Users/test/project');
+    expect(parser.currentMode).toBe('detecting');
+  });
+
+  it('handles long OSC 7 cwd sequences split across chunks', () => {
+    const cwd = vi.fn();
+    parser.on('cwd', cwd);
+
+    parser.write('\x1b]7;file://host/Users/test/very/long/path');
+    parser.write('/inside/workspace\x07');
+
+    expect(cwd).toHaveBeenCalledWith(
+      '/Users/test/very/long/path/inside/workspace',
+    );
+  });
 });
 
 // ─── OSC 7 cwd parsing ───────────────────────────────────────────
@@ -225,13 +247,16 @@ describe('OscParser — OSC 7 cwd metadata', () => {
     expect(output).toHaveBeenNthCalledWith(2, 'after');
   });
 
-  it('strips OSC 7 from command output', () => {
+  it('strips and ignores OSC 7 from command output', () => {
     const done = vi.fn();
+    const cwd = vi.fn();
     parser.on('commandDone', done);
+    parser.on('cwd', cwd);
 
     parser.write(`${osc('C')}one${osc7('/tmp/project')}two${osc('D', '0')}`);
 
     expect(done.mock.calls[0][0].output).toBe('onetwo');
+    expect(cwd).not.toHaveBeenCalled();
   });
 
   it('preserves OSC 133 and OSC 7 event order within one chunk', () => {
@@ -365,6 +390,12 @@ describe('stripOsc133', () => {
   it('strips multiple sequences', () => {
     const input = `${osc('A')}prompt${osc('B')}${osc('C')}out${osc('D', '0')}`;
     expect(stripOsc133(input)).toBe('promptout');
+  });
+
+  it('strips OSC 7 cwd sequences', () => {
+    expect(stripOsc133(`before${osc7('file://host/tmp/project')}after`)).toBe(
+      'beforeafter',
+    );
   });
 
   it('returns plain text unchanged', () => {

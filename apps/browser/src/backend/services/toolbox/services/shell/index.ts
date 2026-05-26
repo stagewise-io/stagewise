@@ -334,6 +334,10 @@ export class ShellService extends DisposableService {
     return this.sessionManager?.getCurrentCwd(sessionId);
   }
 
+  public getSessionCwd(sessionId: string): string | undefined {
+    return this.sessionManager?.getSessionCwd(sessionId);
+  }
+
   clearPendingOutputs(agentId: string, toolCallId: string): void {
     this.outputBuffers.delete(toolCallId);
 

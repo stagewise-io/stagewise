@@ -8,6 +8,16 @@
  *   133;C — Command output start
  *   133;D;{exitCode} — Command finished
  *
+ * Also detects OSC 7 cwd updates emitted by the shell integration so the
+ * single session cwd source of truth stays current for UI and smart approval.
+ *
+ * Trust boundary: command output is external content. A program can print OSC
+ * 7 bytes that look like cwd metadata, but that must not update the shell cwd:
+ * child commands do not change the parent shell's cwd. The parser therefore
+ * strips OSC 7 from command output and only emits cwd events for metadata seen
+ * outside the command-output region, where the shell prompt integration reports
+ * the parent shell's latest cwd after builtins such as `cd` have run.
+ *
  * Falls back to sentinel-based detection when shell integration is absent.
  */
 
@@ -130,15 +140,15 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     this.escBuffer = '';
 
     // Check for a trailing partial OSC sequence that might be split
-    // across chunks: buffer it for the next write. Only OSC prefixes
-    // are buffered so normal CSI sequences keep their old behavior.
+    // across chunks. Buffer a final ESC or OSC introducer so split OSC 133
+    // markers and long OSC 7 cwd payloads are reassembled on the next write.
     const lastEsc = input.lastIndexOf('\x1b');
     let processable: string;
     if (lastEsc >= 0) {
       const tail = input.slice(lastEsc);
       if (
         (tail === '\x1b' || tail.startsWith('\x1b]')) &&
-        tail.length <= 4096 &&
+        tail.length <= 65_536 &&
         !this.isCompleteSequence(tail)
       ) {
         processable = input.slice(0, lastEsc);
@@ -176,9 +186,8 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
   private isCompleteSequence(s: string): boolean {
     // Quick check: does it contain a BEL or ST terminator after the OSC introducer?
     if (s.includes('\x07')) return true;
-    if (s.includes('\x1b\\') && s.indexOf('\x1b\\') > s.indexOf('\x1b]'))
-      return true;
-    return false;
+    const st = s.indexOf('\x1b\\');
+    return st > s.indexOf('\x1b]');
   }
 
   private processOsc(data: string): void {
@@ -199,8 +208,14 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
       }
 
       if (cwdPath !== undefined) {
-        const cwd = decodeFileUriPath(cwdPath);
-        if (cwd) this.emit('cwd', cwd);
+        // OSC 7 printed while a command is producing output is untrusted
+        // command content, not parent-shell state. Strip it from visible output
+        // but do not emit a cwd event. Only prompt-integration OSC 7, emitted
+        // after the shell has regained control, may update SessionManager.cwd.
+        if (!this._inCommandOutput) {
+          const cwd = decodeFileUriPath(cwdPath);
+          if (cwd) this.emit('cwd', cwd);
+        }
         lastIndex = match.index + match[0].length;
         continue;
       }
@@ -312,11 +327,19 @@ function stripOscSequences(text: string): string {
 
 function decodeFileUriPath(pathname: string | undefined): string | null {
   if (!pathname) return null;
+  let decoded = pathname;
   try {
-    return decodeURIComponent(pathname);
+    decoded = decodeURIComponent(pathname);
   } catch {
-    return pathname;
+    // Some shells emit raw paths instead of percent-encoded file URLs.
   }
+
+  if (process.platform === 'win32') {
+    if (/^\/[A-Za-z]:\//.test(decoded)) decoded = decoded.slice(1);
+    decoded = decoded.replace(/\//g, '\\');
+  }
+
+  return decoded;
 }
 
 /**
