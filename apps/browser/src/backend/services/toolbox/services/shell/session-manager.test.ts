@@ -196,6 +196,17 @@ describe('command timeout/idle selection', () => {
 const shell = detectShell();
 
 /**
+ * Extra `pty.spawn` options used by tests. On Windows CI the ConPTY helper
+ * (`node_modules/node-pty/lib/conpty_console_list_agent.js`) races with
+ * fast-exiting test shells and logs dozens of `AttachConsole failed`
+ * stacks per run — harmless but extremely noisy and a drag on triage.
+ * Winpty has no such helper. Our tests only assert on byte-level I/O,
+ * where winpty is indistinguishable from ConPTY for these purposes.
+ */
+const TEST_PTY_SPAWN_OPTIONS =
+  process.platform === 'win32' ? { useConpty: false } : {};
+
+/**
  * Check whether node-pty can actually spawn a PTY in this environment.
  * macOS sandboxed apps (e.g. stagewise) may block posix_spawnp.
  */
@@ -208,6 +219,7 @@ function canSpawnPty(): boolean {
       cols: 80,
       rows: 10,
       cwd: fs.realpathSync(os.tmpdir()),
+      ...TEST_PTY_SPAWN_OPTIONS,
     });
     p.kill();
     return true;
@@ -228,17 +240,6 @@ const describeIfShell = ptyAvailable ? describe : describe.skip;
  * turbo with 4+ concurrent workspace test runners. Healthy runs detect
  * OSC 133 well under 200 ms, so this is defensive headroom only. */
 const TEST_DETECT_TIMEOUT_MS = 5000;
-
-/**
- * Extra `pty.spawn` options used by tests. On Windows CI the ConPTY helper
- * (`node_modules/node-pty/lib/conpty_console_list_agent.js`) races with
- * fast-exiting test shells and logs dozens of `AttachConsole failed`
- * stacks per run — harmless but extremely noisy and a drag on triage.
- * Winpty has no such helper. Our tests only assert on byte-level I/O,
- * where winpty is indistinguishable from ConPTY for these purposes.
- */
-const TEST_PTY_SPAWN_OPTIONS =
-  process.platform === 'win32' ? { useConpty: false } : {};
 
 /**
  * Wait until the session has determined its parser mode —
