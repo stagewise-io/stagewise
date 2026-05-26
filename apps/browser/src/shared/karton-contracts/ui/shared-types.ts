@@ -245,6 +245,7 @@ export const globalConfigSchema = z
     availableSoundPacks: z.array(z.string()).default(['bubble-pops']),
     packDisplayNames: z.record(z.string(), z.string()).default({}),
     dockBounceEnabled: z.boolean().default(true),
+    blockAppSuspensionWhenAgentsActive: z.boolean().default(true),
   })
   .loose();
 

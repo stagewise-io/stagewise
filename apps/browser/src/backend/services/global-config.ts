@@ -42,8 +42,11 @@ export class GlobalConfigService extends DisposableService {
     });
     this.uiKarton.registerServerProcedureHandler(
       'config.set',
-      async (_callingClientId: string, config: GlobalConfig) =>
-        this.set(config),
+      async (_callingClientId: string, configPatch: Partial<GlobalConfig>) =>
+        this.set({
+          ...this.get(),
+          ...configPatch,
+        }),
     );
 
     this.logger.debug(

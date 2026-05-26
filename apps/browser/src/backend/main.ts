@@ -67,6 +67,7 @@ import { AssetCacheService } from './services/asset-cache';
 import { detectShell, resolveShellEnv } from './utils/shell-env';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
+import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -719,6 +720,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     getLogIngestSnapshot: () => toolboxService.getLogIngestSnapshot(),
   });
 
+  const agentPowerSaveBlockerService = AgentPowerSaveBlockerService.create(
+    logger,
+    uiKarton,
+  );
+
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
   // workspace-md generating, search engines, global config, auth)
   await wirePagesStateSync({
@@ -964,6 +970,9 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       runTeardown('agentCorePersistence', () => persistence.teardown());
       runTeardown('assetCacheService', () => assetCacheService.teardown());
       runTeardown('autoUpdateService', () => autoUpdateService.teardown());
+      runTeardown('agentPowerSaveBlockerService', () =>
+        agentPowerSaveBlockerService.teardown(),
+      );
 
       // Shared budget for async teardowns. Toolbox teardown kills live
       // PTY sessions before Node env teardown begins — this is what

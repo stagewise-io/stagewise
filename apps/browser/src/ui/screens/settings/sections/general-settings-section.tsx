@@ -33,7 +33,6 @@ function IdeSelectionSetting() {
 
   const handleIdeChange = async (value: string) => {
     await setGlobalConfig({
-      ...globalConfig,
       openFilesInIde: value as OpenFilesInIde,
       hasSetIde: true,
     });
@@ -69,6 +68,45 @@ function IdeSelectionSetting() {
         size="xs"
         triggerClassName="w-auto min-w-0 px-2 py-3"
         side="bottom"
+      />
+    </div>
+  );
+}
+
+// =============================================================================
+// Power Save Blocker Setting Component
+// =============================================================================
+
+function PowerSaveBlockerSetting() {
+  const globalConfig = useKartonState((s) => s.globalConfig);
+  const setGlobalConfig = useKartonProcedure((p) => p.config.set);
+
+  const isEnabled = globalConfig.blockAppSuspensionWhenAgentsActive ?? true;
+
+  const handleChange = async (checked: boolean) => {
+    await setGlobalConfig({
+      blockAppSuspensionWhenAgentsActive: checked,
+    });
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <label htmlFor="agent-power-save-blocker" className="min-w-0 flex-1">
+        <h3 className="font-medium text-base text-foreground">
+          Keep app awake while agents work
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          Prevent app suspension while agents run tool loops or other active
+          work. Waiting for questions or tool approval still counts as idle.
+        </p>
+      </label>
+
+      <Switch
+        id="agent-power-save-blocker"
+        checked={isEnabled}
+        onCheckedChange={handleChange}
+        size="sm"
+        className="shrink-0"
       />
     </div>
   );
@@ -139,7 +177,6 @@ function NotificationsSetting() {
     previewSound(currentPack, notificationSoundLoudness);
 
     await setGlobalConfig({
-      ...globalConfig,
       notificationSoundsEnabled: notificationSoundLoudness !== 'off',
       notificationSoundLoudness,
     });
@@ -149,7 +186,6 @@ function NotificationsSetting() {
     if (typeof value !== 'string' || !packOptions.includes(value)) return;
     previewSound(value, soundLoudness);
     await setGlobalConfig({
-      ...globalConfig,
       notificationSoundPack: value,
     });
   };
@@ -192,7 +228,6 @@ function NotificationsSetting() {
 
   const handleDockBounceChange = async (checked: boolean) => {
     await setGlobalConfig({
-      ...globalConfig,
       dockBounceEnabled: checked,
     });
   };
@@ -319,6 +354,7 @@ export function GeneralSettingsSection() {
           </div>
           <section className="space-y-6">
             <IdeSelectionSetting />
+            <PowerSaveBlockerSetting />
           </section>
 
           <hr className="border-derived-subtle border-t" />
