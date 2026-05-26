@@ -100,6 +100,7 @@ HISTSIZE=0 2>/dev/null
 HISTFILESIZE=0 2>/dev/null
 set +o history 2>/dev/null
 __stagewise_command_executed=0
+__stagewise_boundary_token="__STAGEWISE_BOUNDARY_TOKEN__"
 __stagewise_file_uri_path() {
   local path="$1"
   local encoded=''
@@ -120,7 +121,7 @@ __stagewise_emit_cwd() {
 __stagewise_prompt_command() {
   local exit_code=$?
   if [ "$__stagewise_command_executed" = "1" ]; then
-    printf '\\033]133;D;%d\\007' "$exit_code"
+    printf '\\033]133;D;%d;%s\\007' "$exit_code" "$__stagewise_boundary_token"
     __stagewise_command_executed=0
   fi
   __stagewise_emit_cwd
@@ -151,6 +152,7 @@ SAVEHIST=0 2>/dev/null
 unsetopt SHARE_HISTORY INC_APPEND_HISTORY APPEND_HISTORY 2>/dev/null
 PROMPT_EOL_MARK=''
 __stagewise_command_executed=0
+__stagewise_boundary_token="__STAGEWISE_BOUNDARY_TOKEN__"
 __stagewise_file_uri_path() {
   local path="$1"
   local encoded=''
@@ -172,7 +174,7 @@ autoload -Uz add-zsh-hook 2>/dev/null
 __stagewise_precmd() {
   local exit_code=$?
   if [[ "$__stagewise_command_executed" == "1" ]]; then
-    printf '\\033]133;D;%d\\007' "$exit_code"
+    printf '\\033]133;D;%d;%s\\007' "$exit_code" "$__stagewise_boundary_token"
     __stagewise_command_executed=0
   fi
   __stagewise_emit_cwd
@@ -205,6 +207,7 @@ $Global:__StagewiseState = @{
   OriginalPrompt = $function:Prompt
   LastHistoryId  = -1
   IsInExecution  = $false
+  BoundaryToken  = "__STAGEWISE_BOUNDARY_TOKEN__"
 }
 function Global:Prompt() {
   $FakeCode = [int]!$global:?
@@ -214,9 +217,9 @@ function Global:Prompt() {
   if ($Global:__StagewiseState.LastHistoryId -ne -1 -and ($Global:__StagewiseState.HasPSReadLine -eq $false -or $Global:__StagewiseState.IsInExecution -eq $true)) {
     $Global:__StagewiseState.IsInExecution = $false
     if ($LastHistoryEntry.Id -eq $Global:__StagewiseState.LastHistoryId) {
-      $Result += "$([char]0x1b)]133;D\`a"
+      $Result += "$([char]0x1b)]133;D;0;$($Global:__StagewiseState.BoundaryToken)\`a"
     } else {
-      $Result += "$([char]0x1b)]133;D;$FakeCode\`a"
+      $Result += "$([char]0x1b)]133;D;$FakeCode;$($Global:__StagewiseState.BoundaryToken)\`a"
     }
   }
   $Cwd = (Get-Location).ProviderPath.Replace('\\', '/')
@@ -359,7 +362,8 @@ export class SessionManager {
       ...this.ptySpawnOptions,
     });
 
-    const parser = new OscParser();
+    const boundaryToken = randomUUID().replace(/-/g, '');
+    const parser = new OscParser(boundaryToken);
 
     const session: PtySession = {
       id: sessionId,
@@ -423,11 +427,12 @@ export class SessionManager {
     //   approval.
     // - It represents the parent shell process cwd, not cwd-like bytes printed
     //   by child commands.
-    // - OscParser strips and ignores OSC 7 from command output. Cwd events here
-    //   are accepted only as shell-integration prompt metadata emitted after the
-    //   shell regains control, which captures real shell cwd changes such as
-    //   `cd` while preventing command-output spoofing from affecting approval
-    //   context.
+    // - OscParser strips and ignores OSC 7 from command output, and only trusts
+    //   OSC 133 command-end markers containing this session's unexposed boundary
+    //   token. Cwd events here are accepted only as shell-integration prompt
+    //   metadata emitted after the shell regains control, which captures real
+    //   shell cwd changes such as `cd` while preventing command-output spoofing
+    //   from affecting approval context.
     parser.on('cwd', (cwd) => {
       const normalizedCwd = path.resolve(cwd);
       if (normalizedCwd === session.cwd) return;
@@ -1143,7 +1148,14 @@ export class SessionManager {
       // timeout with rich prompt frameworks like starship/p10k).
       const nativeTempPath = path.join(tmpdir(), `sw-${session.id}.sh`);
       try {
-        fs.writeFileSync(nativeTempPath, script, { mode: 0o600 });
+        fs.writeFileSync(
+          nativeTempPath,
+          script.replaceAll(
+            '__STAGEWISE_BOUNDARY_TOKEN__',
+            session.parser.boundaryToken ?? '',
+          ),
+          { mode: 0o600 },
+        );
         session.initScriptPath = nativeTempPath;
         // Dot-source is POSIX (cannot be aliased). Cleanup handled by deactivateSession.
         // Single-quote to survive paths containing spaces (e.g. Windows
@@ -1154,7 +1166,14 @@ export class SessionManager {
         session.pty.write(`. '${shellPath}'\r`);
       } catch (_err) {
         // Temp file write failed — fall back to eval through the line editor.
-        session.pty.write(`eval $'${escapeForShell(script)}'\r`);
+        session.pty.write(
+          `eval $'${escapeForShell(
+            script.replaceAll(
+              '__STAGEWISE_BOUNDARY_TOKEN__',
+              session.parser.boundaryToken ?? '',
+            ),
+          )}'\r`,
+        );
       }
     }
   }

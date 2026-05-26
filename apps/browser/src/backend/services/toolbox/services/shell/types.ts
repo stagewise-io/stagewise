@@ -149,9 +149,11 @@ export interface PtySession {
   /** Latest known working directory for the session. */
   cwd: string;
   /**
-   * Last trusted working directory. For agent sessions this is only the
-   * session creation cwd. Once input is written to the shell, terminal-emitted
-   * cwd metadata is not trusted because commands can spoof OSC 7 and OSC 133.
+   * Last trusted working directory for the parent shell process. Initialized
+   * from the session spawn cwd and updated only from prompt-time shell
+   * integration metadata. Command output is untrusted and must not affect this
+   * value, because child commands can print OSC bytes but cannot change the
+   * parent shell's cwd.
    */
   currentCwd: string | null;
   /** Path to the temp init script file, for cleanup. */

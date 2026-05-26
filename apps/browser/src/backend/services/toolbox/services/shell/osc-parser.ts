@@ -12,11 +12,14 @@
  * single session cwd source of truth stays current for UI and smart approval.
  *
  * Trust boundary: command output is external content. A program can print OSC
- * 7 bytes that look like cwd metadata, but that must not update the shell cwd:
- * child commands do not change the parent shell's cwd. The parser therefore
- * strips OSC 7 from command output and only emits cwd events for metadata seen
- * outside the command-output region, where the shell prompt integration reports
- * the parent shell's latest cwd after builtins such as `cd` have run.
+ * 7 / OSC 133 bytes that look like shell-integration metadata, but that must
+ * not update the shell cwd: child commands do not change the parent shell's
+ * cwd. The parser therefore strips OSC 7 from command output and only accepts
+ * OSC 133 command-end markers carrying the per-session boundary token. That
+ * prevents command output from forging `133;D` to escape the command-output
+ * region before printing a fake cwd. Cwd events emitted outside the trusted
+ * command-output region are prompt metadata from the parent shell, reporting
+ * the latest cwd after builtins such as `cd` have run.
  *
  * Falls back to sentinel-based detection when shell integration is absent.
  */
@@ -27,7 +30,7 @@ import { EventEmitter } from 'node:events';
 // Matches both BEL (\x07) and ST (\x1b\\) terminators.
 const OSC_RE =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are the OSC protocol
-  /\x1b\](?:133;([ABCD])(?:;(-?\d+))?|7;file:\/\/[^/\x07\x1b]*(\/[^\x07\x1b]*))(?:\x07|\x1b\\)/g;
+  /\x1b\](?:133;([ABCD])(?:;(-?\d+)(?:;([A-Za-z0-9_-]+))?)?|7;file:\/\/[^/\x07\x1b]*(\/[^\x07\x1b]*))(?:\x07|\x1b\\)/g;
 
 // ─── Sentinel format ──────────────────────────────────────────────
 // __STAGE_DONE_<id>_<exitCode>__
@@ -36,7 +39,7 @@ const SENTINEL_RE = /__STAGE_DONE_([a-zA-Z0-9_-]+)_(-?\d+)__/;
 // ─── Strip all OSC 133 / OSC 7 sequences from text ────────────────
 const OSC_STRIP_RE =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC/BEL control chars are OSC protocol terminators
-  /\x1b\](?:133;[ABCD](?:;-?\d+)?|7;[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
+  /\x1b\](?:133;[ABCD](?:;-?\d+(?:;[A-Za-z0-9_-]+)?)?|7;[^\x07\x1b]*)(?:\x07|\x1b\\)/g;
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -91,6 +94,10 @@ declare interface OscParserEmitter {
 
 export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
   private mode: ParserMode = 'detecting';
+
+  constructor(public readonly boundaryToken?: string) {
+    super();
+  }
 
   /** Buffer for partial escape sequences split across data chunks */
   private escBuffer = '';
@@ -200,7 +207,8 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
       const beforeMatch = data.slice(lastIndex, match.index);
       const marker = match[1]; // A, B, C, or D for OSC 133
       const codeStr = match[2]; // exit code for OSC 133;D
-      const cwdPath = match[3]; // path payload for OSC 7
+      const boundaryToken = match[3]; // optional trust token for OSC 133;D
+      const cwdPath = match[4]; // path payload for OSC 7
 
       // Emit non-sequence text as output
       if (beforeMatch.length > 0) {
@@ -215,6 +223,18 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
         if (!this._inCommandOutput) {
           const cwd = decodeFileUriPath(cwdPath);
           if (cwd) this.emit('cwd', cwd);
+        }
+        lastIndex = match.index + match[0].length;
+        continue;
+      }
+
+      if (this._inCommandOutput) {
+        // While a command is producing output, OSC bytes are command output
+        // unless they are the shell integration's authenticated command-end
+        // marker. This prevents output from forging 133;D, clearing the
+        // command-output flag, and then spoofing OSC 7 cwd metadata.
+        if (marker === 'D' && this.isTrustedBoundary(boundaryToken)) {
+          this.finishCommand(codeStr);
         }
         lastIndex = match.index + match[0].length;
         continue;
@@ -239,16 +259,9 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
           this.emit('commandStart');
           break;
         case 'D': {
-          const exitCode =
-            codeStr != null ? Number.parseInt(codeStr, 10) : null;
-          const output = this.commandOutputBuf;
-          this._inCommandOutput = false;
-          this.commandOutputBuf = '';
-          this.emit('commandDone', {
-            output: stripOsc133(output),
-            exitCode:
-              exitCode != null && !Number.isNaN(exitCode) ? exitCode : null,
-          });
+          if (this.isTrustedBoundary(boundaryToken)) {
+            this.finishCommand(codeStr);
+          }
           break;
         }
       }
@@ -270,6 +283,23 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
       this.commandOutputBuf += stripped;
     }
     this.emit('output', stripped);
+  }
+
+  private isTrustedBoundary(boundaryToken: string | undefined): boolean {
+    return this.boundaryToken === undefined
+      ? true
+      : boundaryToken === this.boundaryToken;
+  }
+
+  private finishCommand(codeStr: string | undefined): void {
+    const exitCode = codeStr != null ? Number.parseInt(codeStr, 10) : null;
+    const output = this.commandOutputBuf;
+    this._inCommandOutput = false;
+    this.commandOutputBuf = '';
+    this.emit('commandDone', {
+      output: stripOsc133(output),
+      exitCode: exitCode != null && !Number.isNaN(exitCode) ? exitCode : null,
+    });
   }
 
   private processSentinel(data: string): void {
