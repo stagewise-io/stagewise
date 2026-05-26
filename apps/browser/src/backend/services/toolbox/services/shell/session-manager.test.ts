@@ -438,11 +438,7 @@ describeIfShell('SessionManager (integration)', () => {
         ].join(''),
       });
 
-      // A forged trusted command-end marker can resolve the command before
-      // later bytes are included in the tool result. The security invariant is
-      // that the subsequent forged cwd metadata must not update the trusted
-      // parent-shell cwd.
-      expect(r.output).toContain('before');
+      expect(r.output).toContain('beforeafter');
       expect(sm.getCurrentCwd(sid)).not.toBe(spoofedDir);
       expect(sm.getCurrentCwd(sid)).toBe(cwd);
     } finally {

@@ -412,7 +412,13 @@ export class SessionManager {
       ...this.ptySpawnOptions,
     });
 
-    const parser = new OscParser(boundaryToken);
+    const parser = new OscParser(boundaryToken, (cwdCandidate) => {
+      const processCwd = getProcessCwd(ptyProcess.pid);
+      if (processCwd == null) return 'unknown';
+      return areSameShellCwd(path.resolve(cwdCandidate), processCwd)
+        ? 'trusted'
+        : 'untrusted';
+    });
 
     const session: PtySession = {
       id: sessionId,

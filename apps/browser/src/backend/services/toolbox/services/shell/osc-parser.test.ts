@@ -276,6 +276,41 @@ describe('OscParser — OSC 7 cwd metadata', () => {
     expect(cwd).toHaveBeenCalledWith('/tmp/real');
   });
 
+  it('rejects token-matching command end when following cwd is untrusted', () => {
+    parser = new OscParser('trusted-token', (cwd) =>
+      cwd === '/tmp/real' ? 'trusted' : 'untrusted',
+    );
+    const done = vi.fn();
+    const cwd = vi.fn();
+    parser.on('commandDone', done);
+    parser.on('cwd', cwd);
+
+    parser.write(
+      `${osc('C')}before${osc('D', '0;trusted-token')}${osc7('/tmp/spoofed')}after${osc('D', '0;trusted-token')}${osc7('/tmp/real')}`,
+    );
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(done.mock.calls[0][0].output).toBe('beforeafter');
+    expect(cwd).toHaveBeenCalledOnce();
+    expect(cwd).toHaveBeenCalledWith('/tmp/real');
+  });
+
+  it('finishes token-matching command end when cwd trust is unknown', () => {
+    parser = new OscParser('trusted-token', () => 'unknown');
+    const done = vi.fn();
+    const cwd = vi.fn();
+    parser.on('commandDone', done);
+    parser.on('cwd', cwd);
+
+    parser.write(
+      `${osc('C')}output${osc('D', '0;trusted-token')}${osc7('/tmp/unknown')}${osc('A')}`,
+    );
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(done.mock.calls[0][0].output).toBe('output');
+    expect(cwd).not.toHaveBeenCalled();
+  });
+
   it('preserves OSC 133 and OSC 7 event order within one chunk', () => {
     const events: string[] = [];
     parser.on('commandStart', () => events.push('commandStart'));
