@@ -395,10 +395,11 @@ describeIfShell('SessionManager (integration)', () => {
     const sid = sm.createSession('agent-test', cwd, env);
     await waitForReady(sm, sid);
 
-    await sm.executeCommand(sid, {
-      command: `printf '\\033]133;D;0\\007\\033]7;file://localhost/tmp/spoofed-after-fake-d\\007'`,
+    const r = await sm.executeCommand(sid, {
+      command: `printf 'before\\033]133;D;0\\007\\033]7;file://localhost/tmp/spoofed-after-fake-d\\007after'`,
     });
 
+    expect(r.output).toContain('beforeafter');
     expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed-after-fake-d');
     expect(sm.getCurrentCwd(sid)).toBe(cwd);
   });

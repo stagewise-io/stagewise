@@ -259,6 +259,23 @@ describe('OscParser — OSC 7 cwd metadata', () => {
     expect(cwd).not.toHaveBeenCalled();
   });
 
+  it('does not let command output forge command end before OSC 7 cwd', () => {
+    parser = new OscParser('trusted-token');
+    const done = vi.fn();
+    const cwd = vi.fn();
+    parser.on('commandDone', done);
+    parser.on('cwd', cwd);
+
+    parser.write(
+      `${osc('C')}before${osc('D', '0')}${osc7('/tmp/spoofed')}after${osc('D', '0;trusted-token')}${osc7('/tmp/real')}`,
+    );
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(done.mock.calls[0][0].output).toBe('beforeafter');
+    expect(cwd).toHaveBeenCalledTimes(1);
+    expect(cwd).toHaveBeenCalledWith('/tmp/real');
+  });
+
   it('preserves OSC 133 and OSC 7 event order within one chunk', () => {
     const events: string[] = [];
     parser.on('commandStart', () => events.push('commandStart'));
