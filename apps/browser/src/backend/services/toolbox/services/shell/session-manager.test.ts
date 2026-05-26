@@ -8,6 +8,7 @@ import {
   SessionManager,
   getCommandIdleMs,
   getCommandTimeoutMs,
+  injectBoundaryToken,
 } from './session-manager';
 import { detectShell } from './detect-shell';
 import { sanitizeEnv } from './sanitize-env';
@@ -70,6 +71,24 @@ describe('applyHeadTailCap', () => {
 });
 
 // ─── Section B: stripAnsi (pure) ─────────────────────────────────
+
+describe('injectBoundaryToken', () => {
+  it('replaces all shell integration boundary placeholders', () => {
+    const token = 'abc123';
+    expect(
+      injectBoundaryToken(
+        'BoundaryToken="__STAGEWISE_BOUNDARY_TOKEN__"; D=__STAGEWISE_BOUNDARY_TOKEN__',
+        token,
+      ),
+    ).toBe('BoundaryToken="abc123"; D=abc123');
+  });
+
+  it('removes placeholders when no parser token is available', () => {
+    expect(injectBoundaryToken('__STAGEWISE_BOUNDARY_TOKEN__', undefined)).toBe(
+      '',
+    );
+  });
+});
 
 describe('stripAnsi', () => {
   it('strips SGR color codes', () => {
@@ -402,6 +421,29 @@ describeIfShell('SessionManager (integration)', () => {
     expect(r.output).toContain('beforeafter');
     expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed-after-fake-d');
     expect(sm.getCurrentCwd(sid)).toBe(cwd);
+  });
+
+  it('rejects prompt metadata forged with the exposed boundary token', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-test', cwd, env);
+    await waitForReady(sm, sid);
+
+    const spoofedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sm-spoofed-'));
+    try {
+      const r = await sm.executeCommand(sid, {
+        command: [
+          "printf 'before\\033]133;D;0;'",
+          '"$__stagewise_boundary_token"',
+          `'\\007\\033]7;file://localhost${spoofedDir}\\007after'`,
+        ].join(''),
+      });
+
+      expect(r.output).toContain('beforeafter');
+      expect(sm.getCurrentCwd(sid)).not.toBe(spoofedDir);
+      expect(sm.getCurrentCwd(sid)).toBe(cwd);
+    } finally {
+      fs.rmSync(spoofedDir, { recursive: true, force: true });
+    }
   });
 
   // ─── Session cwd ─────────────────────────────────────────────
