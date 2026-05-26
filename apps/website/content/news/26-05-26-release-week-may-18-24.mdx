@@ -1,0 +1,57 @@
+---
+title: "Release Week: May 18–24"
+author: stagewise team
+type: releases
+description: "Last week shipped redesigned browser tabs, restart recovery for tabs and agents, UI zoom, more keyboard shortcuts, Gemini 3.5 Flash support, and a new CMD+K control center."
+date: 2026-05-26
+---
+
+## What Shipped Last Week
+
+Last week focused on making stagewise easier to use as an orchestration platform for multiple agents.
+
+We re-aligned browsing capabilities around agents instead of treating browser tabs as a standalone feature. We also focused on better keyboard navigation and other small quality-of-life improvements.
+
+### Browser tabs now belong to agents by default
+
+Browser tabs got a redesigned UI, and the ownership model changed with it. Tabs are now **per-agent by default**, so tab state follows the agent that opened it.
+
+![Screenshot of the redesigned stagewise browser tabs, including per-agent tabs and a pin action for global tabs.](/news/release-week-may-18-24-browsing-tabs.png)
+
+The pin icon makes a tab global. Use it when a page should stay available outside one agent.
+
+### stagewise now recovers your tabs and selected agent after restart
+
+stagewise now stores which tabs were open before the last restart, plus which agent was selected.
+
+On launch, both come back. The app state is closer to where you left it.
+
+### UI zoom, more hotkeys, and less input clutter
+
+You can now zoom the stagewise UI in and out with the usual app shortcuts: **CMD/CTRL+-** to zoom out, **CMD/CTRL++** to zoom in, and **CMD/CTRL+0** to reset.
+
+We also added more hotkeys across the app, so common actions are easier to reach from the keyboard.
+
+We removed the list of agent-owned shell sections from the chat input area. It added noise in a place that should stay focused on the prompt.
+
+### Gemini 3.5 Flash support
+
+Gemini 3.5 Flash is now available in the model picker.
+
+![Screenshot of Gemini 3.5 Flash selected in the stagewise model picker.](/news/release-week-may-18-24-gemini-flash.png)
+
+This adds another current Google model option for agentic coding work inside stagewise.
+
+### CMD+K opens the new control center
+
+We added a new **CMD+K control center** for navigation and app actions.
+
+![Screenshot of the stagewise CMD+K control center showing agents, tabs, and settings.](/news/release-week-may-18-24-command-center.png)
+
+It gives you one searchable place for agents, tabs, settings, and app actions.
+
+## What the Week Adds Up To
+
+This week was about state recovery, cleaner tab ownership, more keyboard entry points, and broader model support.
+
+Less reset between tabs, agents, and restarts.
