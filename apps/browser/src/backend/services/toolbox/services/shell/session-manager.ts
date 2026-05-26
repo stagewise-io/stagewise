@@ -1,4 +1,5 @@
 import * as pty from 'node-pty';
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -72,6 +73,54 @@ const ANSI_RE =
 
 export function stripAnsi(str: string): string {
   return str.replace(ANSI_RE, '');
+}
+
+function getProcessCwd(pid: number): string | null {
+  try {
+    if (process.platform === 'linux') {
+      return fs.readlinkSync(`/proc/${pid}/cwd`);
+    }
+
+    if (process.platform === 'darwin') {
+      const output = execFileSync(
+        'lsof',
+        ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'],
+        {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 250,
+        },
+      );
+      const cwdLine = output.split('\n').find((line) => line.startsWith('n'));
+      return cwdLine ? cwdLine.slice(1) : null;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function realpathOrNull(cwd: string): string | null {
+  try {
+    return fs.realpathSync.native(cwd);
+  } catch {
+    return null;
+  }
+}
+
+function areSameShellCwd(a: string, b: string): boolean {
+  if (path.resolve(a) === path.resolve(b)) return true;
+  const realA = realpathOrNull(a);
+  const realB = realpathOrNull(b);
+  return realA != null && realB != null && realA === realB;
+}
+
+export function injectBoundaryToken(
+  script: string,
+  boundaryToken: string | undefined,
+): string {
+  return script.replaceAll('__STAGEWISE_BOUNDARY_TOKEN__', boundaryToken ?? '');
 }
 
 // ─── Head/tail output capping ────────────────────────────────────
@@ -352,7 +401,8 @@ export class SessionManager {
       sessionId = randomUUID();
     }
 
-    const spawnArgs = this.getSpawnArgs();
+    const boundaryToken = randomUUID().replace(/-/g, '');
+    const spawnArgs = this.getSpawnArgs(boundaryToken);
     const ptyProcess = pty.spawn(this.shell.path, spawnArgs, {
       name: 'xterm-256color',
       cols: DEFAULT_TERMINAL_COLS,
@@ -362,7 +412,6 @@ export class SessionManager {
       ...this.ptySpawnOptions,
     });
 
-    const boundaryToken = randomUUID().replace(/-/g, '');
     const parser = new OscParser(boundaryToken);
 
     const session: PtySession = {
@@ -428,14 +477,23 @@ export class SessionManager {
     // - It represents the parent shell process cwd, not cwd-like bytes printed
     //   by child commands.
     // - OscParser strips and ignores OSC 7 from command output, and only trusts
-    //   OSC 133 command-end markers containing this session's unexposed boundary
-    //   token. Cwd events here are accepted only as shell-integration prompt
-    //   metadata emitted after the shell regains control, which captures real
-    //   shell cwd changes such as `cd` while preventing command-output spoofing
-    //   from affecting approval context.
+    //   OSC 133 command-end markers containing this session's boundary token.
+    //   That token is a guardrail, not the trust root: shell state is still
+    //   same-user command-controlled, so a cwd update is accepted only when it
+    //   matches the OS-reported cwd of the parent shell process. If the OS cwd
+    //   cannot be read, keep the last trusted cwd rather than trusting PTY bytes.
+    //   This keeps real `cd` behavior where validation is available while
+    //   preventing forged prompt metadata from moving smart approval into a
+    //   command-controlled directory.
     parser.on('cwd', (cwd) => {
       const normalizedCwd = path.resolve(cwd);
       if (normalizedCwd === session.cwd) return;
+
+      const processCwd = getProcessCwd(session.pty.pid);
+      if (!processCwd || !areSameShellCwd(normalizedCwd, processCwd)) {
+        return;
+      }
+
       session.cwd = normalizedCwd;
       session.currentCwd = normalizedCwd;
       session.lastActivityAt = Date.now();
@@ -1150,10 +1208,7 @@ export class SessionManager {
       try {
         fs.writeFileSync(
           nativeTempPath,
-          script.replaceAll(
-            '__STAGEWISE_BOUNDARY_TOKEN__',
-            session.parser.boundaryToken ?? '',
-          ),
+          injectBoundaryToken(script, session.parser.boundaryToken),
           { mode: 0o600 },
         );
         session.initScriptPath = nativeTempPath;
@@ -1168,10 +1223,7 @@ export class SessionManager {
         // Temp file write failed — fall back to eval through the line editor.
         session.pty.write(
           `eval $'${escapeForShell(
-            script.replaceAll(
-              '__STAGEWISE_BOUNDARY_TOKEN__',
-              session.parser.boundaryToken ?? '',
-            ),
+            injectBoundaryToken(script, session.parser.boundaryToken),
           )}'\r`,
         );
       }
@@ -1185,9 +1237,13 @@ export class SessionManager {
     }
   }
 
-  private getSpawnArgs(): string[] {
+  private getSpawnArgs(boundaryToken: string): string[] {
     if (this.shell.type === 'powershell') {
-      return ['-NoExit', '-Command', POWERSHELL_INTEGRATION];
+      return [
+        '-NoExit',
+        '-Command',
+        injectBoundaryToken(POWERSHELL_INTEGRATION, boundaryToken),
+      ];
     }
     if (process.platform === 'win32' && this.shell.type === 'bash') {
       return ['--login', '-i'];
