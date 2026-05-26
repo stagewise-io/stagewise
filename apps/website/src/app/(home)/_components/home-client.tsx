@@ -32,6 +32,18 @@ interface NewsPost {
   type: NewsType;
 }
 
+const HERO_IMAGE_SIZES = '(min-width: 1280px) 1216px, calc(100vw - 32px)';
+const FEATURE_IMAGE_SIZES =
+  '(min-width: 1280px) 700px, (min-width: 768px) 60vw, calc(100vw - 80px)';
+const FEATURE_ZOOM_IMAGE_SIZES =
+  '(min-width: 1280px) 1200px, (min-width: 768px) 90vw, 100vw';
+const AGENT_MANAGEMENT_IMAGE_SIZES =
+  '(min-width: 1280px) 2100px, (min-width: 768px) 180vw, 200vw';
+const OPEN_SOURCE_IMAGE_SIZES =
+  '(min-width: 1280px) 560px, (min-width: 768px) 45vw, calc(100vw - 80px)';
+const OPEN_SOURCE_ZOOM_IMAGE_SIZES =
+  '(min-width: 1280px) 840px, (min-width: 768px) 70vw, 100vw';
+
 function DownloadButtons({ className }: { className?: string }) {
   const [userOS, setUserOS] = useState<string>('your OS');
   const [downloadUrl, setDownloadUrl] = useState<string>('#');
@@ -147,11 +159,15 @@ function FeatureSection() {
                 src={bgLight}
                 className="absolute inset-0 h-full w-full object-cover dark:hidden"
                 alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
               />
               <Image
                 src={bgDark}
                 className="absolute inset-0 hidden h-full w-full object-cover dark:block"
                 alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
               />
               <Image
                 src={efficientCodingAgentLight}
@@ -161,6 +177,8 @@ function FeatureSection() {
                   transformOrigin: 'left center',
                 }}
                 alt="Efficient coding agent view"
+                sizes={FEATURE_ZOOM_IMAGE_SIZES}
+                quality={80}
               />
               <Image
                 src={efficientCodingAgentDark}
@@ -170,6 +188,8 @@ function FeatureSection() {
                   transformOrigin: 'left center',
                 }}
                 alt="Efficient coding agent view"
+                sizes={FEATURE_ZOOM_IMAGE_SIZES}
+                quality={80}
               />
             </div>
           </div>
@@ -194,23 +214,31 @@ function FeatureSection() {
                 src={bgLight}
                 className="absolute inset-0 h-full w-full object-cover dark:hidden"
                 alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
               />
               <Image
                 src={bgDark}
                 className="absolute inset-0 hidden h-full w-full object-cover dark:block"
                 alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
               />
               <Image
                 src={agentManagementLight}
                 className="absolute top-0 left-0 w-full dark:hidden"
                 style={{ transform: 'scale(3)', transformOrigin: 'top left' }}
                 alt="Agent management view"
+                sizes={AGENT_MANAGEMENT_IMAGE_SIZES}
+                quality={85}
               />
               <Image
                 src={agentManagementDark}
                 className="absolute top-0 left-0 hidden w-full dark:block"
                 style={{ transform: 'scale(3)', transformOrigin: 'top left' }}
                 alt="Agent management view"
+                sizes={AGENT_MANAGEMENT_IMAGE_SIZES}
+                quality={85}
               />
             </div>
           </div>
@@ -262,11 +290,15 @@ function FeatureSection() {
                 src={bgLight}
                 className="absolute inset-0 h-full w-full object-cover dark:hidden"
                 alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
               />
               <Image
                 src={bgDark}
                 className="absolute inset-0 hidden h-full w-full object-cover dark:block"
                 alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
               />
               <Image
                 src={useExistingSubscriptionLight}
@@ -276,6 +308,8 @@ function FeatureSection() {
                   transformOrigin: 'center center',
                 }}
                 alt="Use existing subscription view"
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={80}
               />
               <Image
                 src={useExistingSubscriptionDark}
@@ -285,6 +319,8 @@ function FeatureSection() {
                   transformOrigin: 'center center',
                 }}
                 alt="Use existing subscription view"
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={80}
               />
             </div>
           </div>
@@ -368,24 +404,32 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                   src={bgLight}
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                  sizes={HERO_IMAGE_SIZES}
+                  quality={70}
                   priority
                 />
                 <Image
                   src={bgDark}
                   alt=""
                   className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+                  sizes={HERO_IMAGE_SIZES}
+                  quality={70}
                   priority
                 />
                 <Image
                   src={fullDemoLight}
                   alt="stagewise full product overview"
                   className="relative z-10 block h-full dark:hidden"
+                  sizes={HERO_IMAGE_SIZES}
+                  quality={85}
                   priority
                 />
                 <Image
                   src={fullDemoDark}
                   alt="stagewise full product overview"
                   className="relative z-10 hidden h-full dark:block"
+                  sizes={HERO_IMAGE_SIZES}
+                  quality={85}
                   priority
                 />
               </div>
@@ -436,11 +480,15 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                   src={bgLight}
                   className="absolute inset-0 h-full w-full object-cover dark:hidden"
                   alt=""
+                  sizes={OPEN_SOURCE_IMAGE_SIZES}
+                  quality={70}
                 />
                 <Image
                   src={bgDark}
                   className="absolute inset-0 hidden h-full w-full object-cover dark:block"
                   alt=""
+                  sizes={OPEN_SOURCE_IMAGE_SIZES}
+                  quality={70}
                 />
                 <Image
                   src={githubRepoIssuesLight}
@@ -450,6 +498,8 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                     transformOrigin: 'top left',
                   }}
                   alt="GitHub repo issues view"
+                  sizes={OPEN_SOURCE_ZOOM_IMAGE_SIZES}
+                  quality={80}
                 />
                 <Image
                   src={githubRepoIssuesDark}
@@ -459,6 +509,8 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                     transformOrigin: 'top left',
                   }}
                   alt="GitHub repo issues view"
+                  sizes={OPEN_SOURCE_ZOOM_IMAGE_SIZES}
+                  quality={80}
                 />
               </div>
             </div>

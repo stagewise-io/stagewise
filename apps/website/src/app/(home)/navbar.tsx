@@ -125,6 +125,11 @@ export function Navbar() {
               size="icon-md"
               onClick={() => setIsOpen((prev) => !prev)}
               className="sm:hidden"
+              aria-label={
+                isOpen ? 'Close navigation menu' : 'Open navigation menu'
+              }
+              aria-expanded={isOpen}
+              aria-controls="mobile-navigation-menu"
             >
               {isOpen ? (
                 <XIcon className="size-4" />
@@ -137,7 +142,10 @@ export function Navbar() {
 
         {/* Mobile dropdown */}
         {isOpen && (
-          <div className="flex flex-col items-start gap-1 border-border border-t pb-3 sm:hidden">
+          <div
+            id="mobile-navigation-menu"
+            className="flex flex-col items-start gap-1 border-border border-t pb-3 sm:hidden"
+          >
             <NavbarButton href="https://docs.stagewise.io">Docs</NavbarButton>
             <NavbarButton href="/news">News</NavbarButton>
             <NavbarButton href="/mission">Mission</NavbarButton>
