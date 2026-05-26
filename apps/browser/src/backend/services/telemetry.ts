@@ -74,6 +74,9 @@ export type EventProperties = {
   'onboarding-demo-slide-clicked': {
     slide_name: string;
   };
+  'legacy-prerelease-bridge-shown': undefined;
+  'legacy-prerelease-bridge-dismissed': undefined;
+  'legacy-prerelease-bridge-download-clicked': undefined;
   'onboarding-auth-mode-switched': {
     from: OnboardingAuthMethod;
     to: OnboardingAuthMethod;
@@ -485,6 +488,9 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'chat-auth-social-requested',
   'chat-auth-social-verified',
   'onboarding-demo-slide-clicked',
+  'legacy-prerelease-bridge-shown',
+  'legacy-prerelease-bridge-dismissed',
+  'legacy-prerelease-bridge-download-clicked',
   'settings-opened',
   'suggestion-clicked',
   'suggestion-dismissed',
@@ -613,6 +619,9 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'onboarding-demo-slide-clicked': z.object({
     slide_name: z.string(),
   }),
+  'legacy-prerelease-bridge-shown': z.undefined().optional(),
+  'legacy-prerelease-bridge-dismissed': z.undefined().optional(),
+  'legacy-prerelease-bridge-download-clicked': z.undefined().optional(),
   'settings-opened': z.undefined().optional(),
   'suggestion-clicked': z.object({
     suggestion_id: z.string(),
