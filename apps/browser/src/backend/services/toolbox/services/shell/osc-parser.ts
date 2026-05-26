@@ -414,8 +414,12 @@ function decodeFileUriPath(pathname: string | undefined): string | null {
   }
 
   if (process.platform === 'win32') {
-    if (/^\/[A-Za-z]:\//.test(decoded)) decoded = decoded.slice(1);
-    decoded = decoded.replace(/\//g, '\\');
+    // PowerShell emits Windows drive paths as file://localhost/C:/path.
+    // Only convert those drive-letter paths to native separators; OSC 7 can
+    // also carry POSIX-style paths in tests or non-file-system contexts, and
+    // those must not become \tmp\project on Windows.
+    const drivePath = decoded.match(/^\/?([A-Za-z]:(?:\/.*)?)$/);
+    if (drivePath) return drivePath[1].replace(/\//g, '\\');
   }
 
   return decoded;

@@ -247,6 +247,36 @@ describe('OscParser — OSC 7 cwd metadata', () => {
     expect(output).toHaveBeenNthCalledWith(2, 'after');
   });
 
+  it('preserves POSIX-style OSC 7 paths on Windows', () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      const cwd = vi.fn();
+      parser.on('cwd', cwd);
+
+      parser.write(osc7('/tmp/project'));
+
+      expect(cwd).toHaveBeenCalledWith('/tmp/project');
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    }
+  });
+
+  it('normalizes Windows drive-letter OSC 7 paths on Windows', () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      const cwd = vi.fn();
+      parser.on('cwd', cwd);
+
+      parser.write(osc7('/C:/Users/test/project'));
+
+      expect(cwd).toHaveBeenCalledWith('C:\\Users\\test\\project');
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    }
+  });
+
   it('strips and ignores OSC 7 from command output', () => {
     const done = vi.fn();
     const cwd = vi.fn();
