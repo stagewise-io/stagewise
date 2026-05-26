@@ -177,6 +177,42 @@ describe('isEventMatch', () => {
       expect(isEventMatch(ev, def, 'windows')).toBe(true);
     });
   });
+
+  describe('layout-dependent symbol keys', () => {
+    it('matches Slash by produced character', () => {
+      const def: HotkeyDefinition = { accelerator: 'Mod+Slash' };
+      const ev = createKeyboardEvent({
+        code: 'Digit7',
+        key: '/',
+        metaKey: true,
+      });
+      expect(isEventMatch(ev, def, 'mac')).toBe(true);
+    });
+
+    it('does NOT match Slash by physical key when it produces minus', () => {
+      const def: HotkeyDefinition = { accelerator: 'Mod+Slash' };
+      const ev = createKeyboardEvent({
+        code: 'Slash',
+        key: '-',
+        metaKey: true,
+      });
+      expect(isEventMatch(ev, def, 'mac')).toBe(false);
+    });
+
+    it('matches shifted Slash aliases on QWERTZ-style layouts', () => {
+      const def: HotkeyDefinition = {
+        accelerator: 'Mod+Slash',
+        aliases: ['Mod+Shift+Slash'],
+      };
+      const ev = createKeyboardEvent({
+        code: 'Digit7',
+        key: '/',
+        metaKey: true,
+        shiftKey: true,
+      });
+      expect(isEventMatch(ev, def, 'mac')).toBe(true);
+    });
+  });
 });
 
 describe('getDisplayString', () => {
