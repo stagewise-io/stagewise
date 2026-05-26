@@ -24,7 +24,7 @@ import type {
 import { MentionIcon } from './mention-icon';
 import { FilePathTree } from './file-path-tree';
 import { WorkspacePreviewSummary } from './workspace-preview-summary';
-import { getBaseName } from '@shared/path-utils';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 
 type SidePanelContent =
   | {
@@ -82,7 +82,7 @@ function deriveSidePanel(
     const meta = (item as FileMentionItem).meta;
     const mount = mounts.find((m) => m.prefix === meta.mountPrefix);
     const workspaceName = mount
-      ? getBaseName(mount.path) || mount.path
+      ? getWorkspaceDisplayLabel(mount)
       : meta.mountPrefix;
 
     if (meta.isDirectory) {
@@ -129,7 +129,7 @@ function deriveSidePanel(
       type: 'workspace',
       key: `workspace:${meta.prefix}`,
       mount,
-      name: meta.name,
+      name: getWorkspaceDisplayLabel(mount) || meta.name,
     };
   }
 

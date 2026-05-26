@@ -12,7 +12,9 @@ import {
 import { getBaseName, getParentPath, normalizePath } from '@shared/path-utils';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { FileContextMenu } from '@ui/components/file-context-menu';
+import type { MountEntry } from '@shared/karton-contracts/ui';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 import {
   type StatusCardSection,
   type FormattedFileDiff,
@@ -26,6 +28,8 @@ export interface FileDiffSectionProps {
   diffSummary: FormattedFileDiff[];
   /** All mounts ever seen (resolved from env snapshots). */
   resolvedMounts: Mount[];
+  /** Currently connected mounts with live Git metadata for display labels. */
+  activeMounts: MountEntry[];
   /** Paths of currently connected mounts. */
   activeMountPaths: Set<string>;
   onRejectAll: (hunkIds: string[]) => void;
@@ -66,6 +70,7 @@ function getRelativeDir(absoluteFilePath: string, mounts: Mount[]): string {
 function groupDiffsByMount(
   diffs: FormattedFileDiff[],
   mounts: Mount[],
+  activeMounts: MountEntry[],
   activeMountPaths: Set<string>,
 ): {
   label: string;
@@ -77,11 +82,17 @@ function groupDiffsByMount(
     string,
     { label: string; isDisconnected: boolean; diffs: FormattedFileDiff[] }
   >();
+  const activeMountsByPath = new Map(
+    activeMounts.map((mount) => [mount.path, mount]),
+  );
 
   // Pre-create groups in mount order
   for (const mount of mounts) {
+    const activeMount = activeMountsByPath.get(mount.path);
     groups.set(mount.path, {
-      label: getBaseName(mount.path) || mount.path,
+      label: activeMount
+        ? getWorkspaceDisplayLabel(activeMount)
+        : getBaseName(mount.path) || mount.path,
       isDisconnected: !activeMountPaths.has(mount.path),
       diffs: [],
     });
@@ -196,17 +207,20 @@ export function FileDiffFileItem({
 function FileDiffList({
   diffs,
   resolvedMounts,
+  activeMounts,
   activeMountPaths,
   onOpenDiffReview,
 }: {
   diffs: FormattedFileDiff[];
   resolvedMounts: Mount[];
+  activeMounts: MountEntry[];
   activeMountPaths: Set<string>;
   onOpenDiffReview: (fileId: string) => void;
 }) {
   const groups = useMemo(
-    () => groupDiffsByMount(diffs, resolvedMounts, activeMountPaths),
-    [diffs, resolvedMounts, activeMountPaths],
+    () =>
+      groupDiffsByMount(diffs, resolvedMounts, activeMounts, activeMountPaths),
+    [diffs, resolvedMounts, activeMounts, activeMountPaths],
   );
 
   // Show group labels when the agent ever had more than one workspace connected
@@ -262,6 +276,7 @@ export function FileDiffSection(
     pendingDiffs,
     diffSummary,
     resolvedMounts,
+    activeMounts,
     activeMountPaths,
     onRejectAll,
     onAcceptAll,
@@ -338,6 +353,7 @@ export function FileDiffSection(
         <FileDiffList
           diffs={pendingDiffs}
           resolvedMounts={resolvedMounts}
+          activeMounts={activeMounts}
           activeMountPaths={activeMountPaths}
           onOpenDiffReview={onOpenDiffReview}
         />
@@ -345,6 +361,7 @@ export function FileDiffSection(
         <FileDiffList
           diffs={filteredSummary}
           resolvedMounts={resolvedMounts}
+          activeMounts={activeMounts}
           activeMountPaths={activeMountPaths}
           onOpenDiffReview={onOpenDiffReview}
         />

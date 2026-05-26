@@ -34,8 +34,8 @@ import {
   type WorkspaceMdStatus,
 } from './workspace-md-section';
 import { UserQuestionSection } from './user-question-section';
-import { getBaseName } from '@shared/path-utils';
 import { getAgentOwnedPlanPaths, PLANS_PREFIX } from '@shared/plan-ownership';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 import { getAgentOwnedLogPaths, LOGS_PREFIX } from '@shared/log-ownership';
 import { buildPlanSections, type PlanEntry } from './plan-section';
 import {
@@ -390,7 +390,7 @@ export function StatusCard() {
 
     for (const mount of workspaceMounts) {
       const agent = agentByPath.get(mount.path);
-      const folderName = getBaseName(mount.path) || mount.path;
+      const folderName = getWorkspaceDisplayLabel(mount);
 
       let status: WorkspaceMdStatus;
       let errorMessage: string | null = null;
@@ -599,6 +599,7 @@ export function StatusCard() {
       pendingDiffs: effectivePendingDiffs,
       diffSummary: formattedDiffSummary,
       resolvedMounts,
+      activeMounts: workspaceMounts,
       activeMountPaths,
       onRejectAll: (hunkIds: string[]) => {
         setOptimisticHunkIds((prev) => {

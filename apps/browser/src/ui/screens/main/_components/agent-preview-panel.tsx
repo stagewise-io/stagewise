@@ -9,6 +9,7 @@ import { getBaseName, getParentPath } from '@shared/path-utils';
 import type { MountedWorkspaceGitSummary } from '@shared/karton-contracts/ui';
 import type { StoredAgentPreview } from '@shared/karton-contracts/ui/agent';
 import { FileIcon } from '@ui/components/file-icon';
+import { getWorkspaceDisplayInfo } from '@ui/utils/workspace-display';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import {
@@ -401,7 +402,7 @@ function WorkspacePathBadge({
   path: string;
   git: MountedWorkspaceGitSummary | null;
 }) {
-  const name = getBaseName(path) || path;
+  const display = getWorkspaceDisplayInfo({ path, git });
   const gitRef = git?.branch ?? git?.headSha?.slice(0, 7) ?? null;
   const tooltip = gitRef ? `${path} (${gitRef})` : path;
   return (
@@ -418,7 +419,7 @@ function WorkspacePathBadge({
       ) : (
         <IconFolder5Outline18 className="size-3 shrink-0" />
       )}
-      <span className="max-w-28 truncate">{name}</span>
+      <span className="max-w-28 truncate">{display.label}</span>
     </span>
   );
 }

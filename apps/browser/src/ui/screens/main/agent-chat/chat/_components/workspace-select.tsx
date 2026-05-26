@@ -56,6 +56,7 @@ import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';
 import { getBaseName } from '@shared/path-utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
+import { getWorkspaceDisplayInfo } from '@ui/utils/workspace-display';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import {
   type MountEntry,
@@ -113,7 +114,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
   onUnmount: (prefix: string) => void;
   agentInstanceId: string;
 }) {
-  const name = getBaseName(mount.path) || mount.path;
+  const display = getWorkspaceDisplayInfo(mount);
   const gitRef = mount.git ? formatGitRef(mount.git) : null;
 
   const respectAgentsMd = useKartonState(
@@ -373,7 +374,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
           >
             {unmountIcon}
             <span className="min-w-0 truncate group-hover/workspace:text-foreground group-focus-visible/workspace:text-foreground group-has-[[data-unmount]:hover]/workspace:text-muted-foreground">
-              {name}
+              {display.title}
             </span>
             {gitRef && (
               <span className="min-w-0 truncate text-subtle-foreground group-hover/workspace:text-muted-foreground group-focus-visible/workspace:text-muted-foreground group-has-[[data-unmount]:hover]/workspace:text-subtle-foreground">
@@ -415,7 +416,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
             >
               <WorkspacePreviewCardContent
                 mount={mount}
-                name={name}
+                name={display.label}
                 onItemHover={handleItemHover}
                 onItemLeave={cancelPendingOpen}
                 activeRow={
@@ -455,7 +456,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                 ) : sidePanelContent.type === 'contextFiles' ? (
                   <ContextFilesSidePanel
                     mount={mount}
-                    name={name}
+                    name={display.label}
                     respectAgentsMd={respectAgentsMd}
                     onToggleAgentsMd={handleToggleAgentsMd}
                     isGeneratingWorkspaceMd={isGeneratingWorkspaceMd}
@@ -1573,7 +1574,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   agentInstanceId: string;
 }) {
   const track = useTrack();
-  const name = getBaseName(mount.path) || mount.path;
+  const display = getWorkspaceDisplayInfo(mount);
   const gitRef = useMemo(
     () => (mount.git ? formatGitRef(mount.git) : null),
     [mount.git],
@@ -2022,8 +2023,13 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             <TooltipContent>Disconnect workspace</TooltipContent>
           </Tooltip>
           <span className="shrink-0 truncate text-muted-foreground">
-            {name}
+            {display.title}
           </span>
+          {display.qualifier && (
+            <span className="min-w-0 truncate text-subtle-foreground">
+              {display.qualifier}
+            </span>
+          )}
           <span
             aria-hidden
             className="shrink-0 select-none text-subtle-foreground"

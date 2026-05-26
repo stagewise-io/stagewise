@@ -13,10 +13,11 @@ import {
 } from 'react';
 import { cn } from '@pages/utils';
 import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/types';
+import type { MountEntry } from '@shared/karton-contracts/ui';
 import type { Patch } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
-import { getBaseName } from '@shared/path-utils';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 import {
   Tooltip,
   TooltipTrigger,
@@ -69,17 +70,14 @@ function useIsOverflowing(ref: RefObject<HTMLElement | null>) {
 // Workspace Subheader
 // =============================================================================
 
-function WorkspaceSubheader({ workspacePath }: { workspacePath: string }) {
-  const folderName = useMemo(
-    () => getBaseName(workspacePath) || workspacePath,
-    [workspacePath],
-  );
+function WorkspaceSubheader({ mount }: { mount: MountEntry }) {
+  const displayName = useMemo(() => getWorkspaceDisplayLabel(mount), [mount]);
 
   return (
     <div className="flex flex-col">
-      <span className="font-medium text-foreground text-sm">{folderName}</span>
+      <span className="font-medium text-foreground text-sm">{displayName}</span>
       <span className="truncate text-subtle-foreground text-xs">
-        {workspacePath}
+        {mount.path}
       </span>
     </div>
   );
@@ -231,14 +229,7 @@ function SkillRow({
   );
 }
 
-function SkillsSection({
-  workspaceMounts,
-}: {
-  workspaceMounts: Array<{
-    path: string;
-    skills: Array<{ name: string; description: string }>;
-  }>;
-}) {
+function SkillsSection({ workspaceMounts }: { workspaceMounts: MountEntry[] }) {
   const hasSkills = workspaceMounts.some((m) => m.skills.length > 0);
 
   return (
@@ -255,7 +246,7 @@ function SkillsSection({
             .filter((mount) => mount.skills.length > 0)
             .map((mount) => (
               <div key={mount.path} className="space-y-2">
-                <WorkspaceSubheader workspacePath={mount.path} />
+                <WorkspaceSubheader mount={mount} />
                 <WorkspaceSkillsList
                   workspacePath={mount.path}
                   skills={mount.skills}
@@ -415,11 +406,7 @@ function ContextFilesSection({
   workspaceMounts,
   contextFiles,
 }: {
-  workspaceMounts: Array<{
-    path: string;
-    workspaceMdContent: string | null;
-    agentsMdContent: string | null;
-  }>;
+  workspaceMounts: MountEntry[];
   contextFiles: ContextFilesResult | null;
 }) {
   return (
@@ -434,7 +421,7 @@ function ContextFilesSection({
         <div className="space-y-4">
           {workspaceMounts.map((mount) => (
             <div key={mount.path} className="space-y-2">
-              <WorkspaceSubheader workspacePath={mount.path} />
+              <WorkspaceSubheader mount={mount} />
               <WorkspaceContextFilesList
                 workspacePath={mount.path}
                 workspaceMd={

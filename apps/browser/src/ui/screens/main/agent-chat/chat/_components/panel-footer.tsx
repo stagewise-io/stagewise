@@ -66,6 +66,7 @@ import {
   enrichTipTapContent,
 } from '@ui/utils/tiptap-content-utils';
 import { getCurrentDraftAnswers } from './footer-status-card/user-question-section';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 import {
   Tooltip,
   TooltipContent,
@@ -83,10 +84,6 @@ const CHAT_INPUT_FOCUS_REQUESTED_EVENT = 'chat-input-focus-requested';
 
 function formatWorkspaceGitRef(git: MountEntry['git']): string | null {
   return git?.branch ?? git?.headSha?.slice(0, 7) ?? null;
-}
-
-function getWorkspaceDisplayName(mount: MountEntry): string {
-  return mount.path.split(/[\\/]/).filter(Boolean).at(-1) ?? mount.path;
 }
 
 function formatWorkspaceActionError(message: string): string {
@@ -812,7 +809,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         if (!result.ok) {
           return {
             ok: false as const,
-            message: `${getWorkspaceDisplayName(mount)}: ${result.message}`,
+            message: `${getWorkspaceDisplayLabel(mount)}: ${result.message}`,
           };
         }
 
@@ -827,7 +824,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       } catch (error) {
         return {
           ok: false as const,
-          message: `${getWorkspaceDisplayName(mount)}: ${
+          message: `${getWorkspaceDisplayLabel(mount)}: ${
             error instanceof Error
               ? error.message
               : 'Failed to execute workspace action.'

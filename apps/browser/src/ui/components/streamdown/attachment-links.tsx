@@ -32,6 +32,7 @@ import { inferMimeType } from '@shared/mime-utils';
 import { getBaseName } from '@shared/path-utils';
 import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
 import { FileReferenceBadge } from '@ui/components/file-reference-badge';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -50,11 +51,12 @@ function useWorkspaceName(filePath: string): string | null {
     const slashIdx = filePath.indexOf('/');
     if (slashIdx <= 0) return null;
     const prefix = filePath.slice(0, slashIdx);
-    const mounts =
-      (historicalMounts?.length ? historicalMounts : null) ?? liveMounts ?? [];
-    const mount = mounts.find((m) => m.prefix === prefix);
-    if (!mount) return null;
-    return getBaseName(mount.path) || mount.path;
+    const liveMount = liveMounts?.find((m) => m.prefix === prefix);
+    if (liveMount) return getWorkspaceDisplayLabel(liveMount);
+
+    const historicalMount = historicalMounts?.find((m) => m.prefix === prefix);
+    if (!historicalMount) return null;
+    return getBaseName(historicalMount.path) || historicalMount.path;
   }, [filePath, historicalMounts, liveMounts]);
 }
 
