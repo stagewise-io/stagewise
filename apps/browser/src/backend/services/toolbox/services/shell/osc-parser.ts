@@ -52,6 +52,9 @@ export interface CommandDoneEvent {
   exitCode: number | null;
 }
 
+export type CwdTrustResult = 'trusted' | 'untrusted' | 'unknown';
+export type CwdTrustValidator = (cwd: string) => CwdTrustResult;
+
 export interface OscParserEvents {
   /** Prompt is being shown (133;A) */
   promptStart: [];
@@ -95,7 +98,10 @@ declare interface OscParserEmitter {
 export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
   private mode: ParserMode = 'detecting';
 
-  constructor(public readonly boundaryToken?: string) {
+  constructor(
+    public readonly boundaryToken?: string,
+    private readonly isTrustedCwd?: CwdTrustValidator,
+  ) {
     super();
   }
 
@@ -108,6 +114,15 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
   /** Accumulated output between 133;C and 133;D */
   private commandOutputBuf = '';
   private _inCommandOutput = false;
+
+  /**
+   * Trusted-token command-end marker seen while command output is active.
+   * When cwd validation is available, the marker is held until the next
+   * prompt-time OSC 7. Trusted cwd accepts it; untrusted cwd rejects it;
+   * unknown cwd keeps it pending until the next marker so completion still
+   * works on platforms where parent-process cwd cannot be read.
+   */
+  private pendingCommandDone: { codeStr: string | undefined } | null = null;
 
   /** Whether at least one OSC 133 sequence has been seen */
   private oscDetected = false;
@@ -210,8 +225,11 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
       const boundaryToken = match[3]; // optional trust token for OSC 133;D
       const cwdPath = match[4]; // path payload for OSC 7
 
-      // Emit non-sequence text as output
+      // Emit non-sequence text as output. If text arrives after a pending
+      // command-end marker but before trusted prompt cwd metadata, the marker
+      // was command output spoofing; keep collecting visible output.
       if (beforeMatch.length > 0) {
+        this.pendingCommandDone = null;
         this.handleTextOutput(beforeMatch);
       }
 
@@ -220,8 +238,20 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
         // command content, not parent-shell state. Strip it from visible output
         // but do not emit a cwd event. Only prompt-integration OSC 7, emitted
         // after the shell has regained control, may update SessionManager.cwd.
-        if (!this._inCommandOutput) {
-          const cwd = decodeFileUriPath(cwdPath);
+        const cwd = decodeFileUriPath(cwdPath);
+        if (this.pendingCommandDone) {
+          if (cwd) {
+            const trust = this.getCwdTrust(cwd);
+            if (trust === 'trusted') {
+              this.emit('cwd', cwd);
+              const { codeStr } = this.pendingCommandDone;
+              this.pendingCommandDone = null;
+              this.finishCommand(codeStr);
+            } else if (trust === 'untrusted') {
+              this.pendingCommandDone = null;
+            }
+          }
+        } else if (!this._inCommandOutput) {
           if (cwd) this.emit('cwd', cwd);
         }
         lastIndex = match.index + match[0].length;
@@ -234,10 +264,23 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
         // marker. This prevents output from forging 133;D, clearing the
         // command-output flag, and then spoofing OSC 7 cwd metadata.
         if (marker === 'D' && this.isTrustedBoundary(boundaryToken)) {
-          this.finishCommand(codeStr);
+          if (this.isTrustedCwd) {
+            this.pendingCommandDone = { codeStr };
+          } else {
+            this.finishCommand(codeStr);
+          }
+          lastIndex = match.index + match[0].length;
+          continue;
         }
-        lastIndex = match.index + match[0].length;
-        continue;
+
+        if (this.pendingCommandDone) {
+          const { codeStr } = this.pendingCommandDone;
+          this.pendingCommandDone = null;
+          this.finishCommand(codeStr);
+        } else {
+          lastIndex = match.index + match[0].length;
+          continue;
+        }
       }
 
       if (!this.oscDetected) {
@@ -272,6 +315,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     // Remaining text after last match
     const remaining = data.slice(lastIndex);
     if (remaining.length > 0) {
+      this.pendingCommandDone = null;
       this.handleTextOutput(remaining);
     }
   }
@@ -289,6 +333,10 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     return this.boundaryToken === undefined
       ? true
       : boundaryToken === this.boundaryToken;
+  }
+
+  private getCwdTrust(cwd: string): CwdTrustResult {
+    return this.isTrustedCwd?.(cwd) ?? 'trusted';
   }
 
   private finishCommand(codeStr: string | undefined): void {
@@ -338,6 +386,7 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     this.sentinelBuffer = '';
     this.commandOutputBuf = '';
     this._inCommandOutput = false;
+    this.pendingCommandDone = null;
     this.removeAllListeners();
   }
 }
