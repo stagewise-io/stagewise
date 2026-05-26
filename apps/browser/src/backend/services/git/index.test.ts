@@ -130,6 +130,7 @@ describe('GitService', () => {
       repositoryId: repoGitDir,
       worktreeId: repoPath,
       repoRoot: repoPath,
+      mainWorktreePath: repoPath,
       commonGitDir: repoGitDir,
       isWorktree: false,
       branch: 'main',
@@ -161,6 +162,7 @@ describe('GitService', () => {
     await expect(
       service.getMountedWorkspaceSummary('/repo'),
     ).resolves.toMatchObject({
+      mainWorktreePath: repoPath,
       branch: null,
       headSha: 'abc123',
     });
@@ -229,6 +231,7 @@ describe('GitService', () => {
     ).resolves.toMatchObject({
       repositoryId: repoGitDir,
       worktreeId: repoLinkedPath,
+      mainWorktreePath: repoPath,
       isWorktree: true,
       branch: 'feature/test',
       headSha: 'def456',

@@ -144,13 +144,18 @@ export class GitService extends DisposableService {
     const repositoryInfo = await this.getWorkspaceRepositoryInfo(workspacePath);
     if (!repositoryInfo) return null;
 
-    const worktreeInfo = await this.getWorktreeInfo(workspacePath);
+    const worktrees = await this.listWorktrees(workspacePath);
+    const worktreeInfo = await this.getWorktreeInfo(workspacePath, worktrees);
     if (!worktreeInfo) return null;
+
+    const mainWorktreePath =
+      worktrees.find((worktree) => worktree.isMainWorktree)?.path ?? null;
 
     return {
       repositoryId: repositoryInfo.repositoryId,
       worktreeId: worktreeInfo.worktreeId,
       repoRoot: repositoryInfo.repoRoot,
+      mainWorktreePath,
       commonGitDir: repositoryInfo.commonGitDir,
       isWorktree: !worktreeInfo.isMainWorktree,
       branch: worktreeInfo.branch,
@@ -214,6 +219,7 @@ export class GitService extends DisposableService {
 
   public async getWorktreeInfo(
     workspacePath: string,
+    knownWorktrees?: GitWorktreeInfo[],
   ): Promise<GitWorktreeInfo | null> {
     const result = await this.runGit(workspacePath, [
       'rev-parse',
@@ -232,7 +238,8 @@ export class GitService extends DisposableService {
 
     const worktreePath = path.resolve(worktreePathRaw);
     const normalizedWorktreePath = normalizeGitPath(worktreePath);
-    const worktrees = await this.listWorktrees(workspacePath);
+    const worktrees =
+      knownWorktrees ?? (await this.listWorktrees(workspacePath));
     const matchedWorktree = worktrees.find(
       (worktree) => normalizeGitPath(worktree.path) === normalizedWorktreePath,
     );

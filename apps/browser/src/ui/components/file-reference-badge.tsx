@@ -14,6 +14,7 @@ import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { getBaseName } from '@shared/path-utils';
+import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
 
 // ─── Path classification ─────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ function useWorkspaceData(prefix: string): WorkspaceData | null {
   return useMemo(() => {
     if (liveMount) {
       return {
-        name: getBaseName(liveMount.path) || liveMount.path,
+        name: getWorkspaceDisplayLabel(liveMount),
         path: liveMount.path,
         hasGit: liveMount.git !== null,
         isMounted: true,

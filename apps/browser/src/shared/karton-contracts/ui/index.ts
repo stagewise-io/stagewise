@@ -50,6 +50,7 @@ export type WorkspaceGitSummary = {
   repositoryId: string;
   worktreeId: string;
   repoRoot: string;
+  mainWorktreePath: string | null;
   commonGitDir: string;
   isWorktree: boolean;
   branch: string | null;
