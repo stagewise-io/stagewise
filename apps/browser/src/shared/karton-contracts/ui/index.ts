@@ -1230,7 +1230,7 @@ export type KartonContract = {
       quitAndInstall: () => Promise<void>;
     };
     config: {
-      set: (config: GlobalConfig) => Promise<void>;
+      set: (config: Partial<GlobalConfig>) => Promise<void>;
       previewSoundPack: (
         packId: string,
         loudness: 'off' | 'subtle' | 'default',
@@ -1659,6 +1659,7 @@ export const defaultState: KartonContract['state'] = {
     availableSoundPacks: ['bubble-pops'],
     packDisplayNames: {},
     dockBounceEnabled: true,
+    blockAppSuspensionWhenAgentsActive: true,
   },
   userExperience: {
     storedExperienceData: {

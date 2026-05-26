@@ -5,10 +5,12 @@ import type {
   GlobalConfig,
 } from '@shared/karton-contracts/ui/shared-types';
 
+type IdeConfigPatch = Pick<GlobalConfig, 'openFilesInIde' | 'hasSetIde'>;
+
 export type UseFileIDEHrefOptions = {
   resolvePath: (relativePath: string) => string | null;
   globalConfig: GlobalConfig;
-  setGlobalConfig: (config: GlobalConfig) => Promise<void>;
+  setGlobalConfig: (config: IdeConfigPatch) => Promise<void>;
 };
 
 export function useFileIDEHref({
@@ -34,7 +36,6 @@ export function useFileIDEHref({
   const pickIdeAndOpen = useCallback(
     async (ide: OpenFilesInIde, relativePath: string, lineNumber?: number) => {
       await setGlobalConfig({
-        ...globalConfig,
         openFilesInIde: ide,
         hasSetIde: true,
       });
@@ -44,7 +45,7 @@ export function useFileIDEHref({
       const url = getIDEFileUrl(absolutePath, ide, lineNumber);
       window.open(url, '_blank');
     },
-    [globalConfig, setGlobalConfig, resolvePath],
+    [setGlobalConfig, resolvePath],
   );
 
   return {
