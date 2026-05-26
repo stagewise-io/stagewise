@@ -114,13 +114,16 @@ __stagewise_file_uri_path() {
   done
   printf '%s' "$encoded"
 }
+__stagewise_emit_cwd() {
+  printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
+}
 __stagewise_prompt_command() {
   local exit_code=$?
   if [ "$__stagewise_command_executed" = "1" ]; then
     printf '\\033]133;D;%d\\007' "$exit_code"
     __stagewise_command_executed=0
   fi
-  printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
+  __stagewise_emit_cwd
   printf '\\033]133;A\\007'
 }
 __stagewise_pre_exec() {
@@ -135,7 +138,7 @@ if [ -z "$PROMPT_COMMAND" ]; then
 else
   PROMPT_COMMAND="__stagewise_prompt_command;\${PROMPT_COMMAND}"
 fi
-printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
+__stagewise_emit_cwd
 printf '\\033]133;A\\007'
 `.trim();
 
@@ -162,6 +165,9 @@ __stagewise_file_uri_path() {
   done
   printf '%s' "$encoded"
 }
+__stagewise_emit_cwd() {
+  printf '\\033]7;file://%s%s\\007' "\${HOST:-\${HOSTNAME:-localhost}}" "$(__stagewise_file_uri_path "$PWD")"
+}
 autoload -Uz add-zsh-hook 2>/dev/null
 __stagewise_precmd() {
   local exit_code=$?
@@ -169,7 +175,7 @@ __stagewise_precmd() {
     printf '\\033]133;D;%d\\007' "$exit_code"
     __stagewise_command_executed=0
   fi
-  printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
+  __stagewise_emit_cwd
   printf '\\033]133;A\\007'
 }
 __stagewise_preexec() {
@@ -184,7 +190,7 @@ else
   precmd_functions+=(__stagewise_precmd)
   preexec_functions+=(__stagewise_preexec)
 fi
-printf '\\033]7;file://%s%s\\007' "\${HOST:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
+__stagewise_emit_cwd
 printf '\\033]133;A\\007'
 `.trim();
 
@@ -213,6 +219,9 @@ function Global:Prompt() {
       $Result += "$([char]0x1b)]133;D;$FakeCode\`a"
     }
   }
+  $Cwd = (Get-Location).ProviderPath.Replace('\\', '/')
+  if ($Cwd -match '^[A-Za-z]:/') { $Cwd = "/$Cwd" }
+  $Result += "$([char]0x1b)]7;file://localhost$Cwd\`a"
   $Result += "$([char]0x1b)]133;A\`a"
   if ($FakeCode -ne 0) { Write-Error "failure" -ea ignore }
   $Result += $Global:__StagewiseState.OriginalPrompt.Invoke()
@@ -409,11 +418,23 @@ export class SessionManager {
       this.handleSessionExit(sessionId, exitCode);
     });
 
-    // Wire parser events
-    parser.on('cwd', () => {
-      // OSC 7 is just terminal output. Commands can spoof both cwd metadata
-      // and OSC 133 boundaries, so agent sessions never trust in-band cwd
-      // updates for smart-approval cwd decisions.
+    // Trust model for cwd tracking:
+    // - `session.cwd` is the single source of truth used by UI and smart
+    //   approval.
+    // - It represents the parent shell process cwd, not cwd-like bytes printed
+    //   by child commands.
+    // - OscParser strips and ignores OSC 7 from command output. Cwd events here
+    //   are accepted only as shell-integration prompt metadata emitted after the
+    //   shell regains control, which captures real shell cwd changes such as
+    //   `cd` while preventing command-output spoofing from affecting approval
+    //   context.
+    parser.on('cwd', (cwd) => {
+      const normalizedCwd = path.resolve(cwd);
+      if (normalizedCwd === session.cwd) return;
+      session.cwd = normalizedCwd;
+      session.currentCwd = normalizedCwd;
+      session.lastActivityAt = Date.now();
+      this.onSessionStateChange?.(agentInstanceId);
     });
 
     parser.on('integrationDetected', () => {
@@ -594,15 +615,7 @@ export class SessionManager {
         // which will resolve any pending commands when the session exits.
       }
 
-      // Write the command to the PTY. Once bytes are sent to the shell, the
-      // cwd can change in ways we cannot verify securely from terminal output:
-      // commands can spoof OSC 7 and OSC 133 boundaries. Keep the initial cwd
-      // for first-command approval only, then fail closed for subsequent
-      // relative commands until a new session is created with an explicit cwd.
       const command = request.command;
-      if (command.length > 0) {
-        session.currentCwd = null;
-      }
 
       if (request.rawInput) {
         // Raw stdin: write bytes verbatim — no \r, no sentinel
@@ -612,8 +625,8 @@ export class SessionManager {
         // The agent is just waiting for output; the pending command will
         // resolve via timeout, pattern match, or session exit.
       } else if (session.shellIntegrationActive) {
-        // Shell integration handles output boundaries via OSC 133. Cwd updates
-        // from that same terminal stream are intentionally ignored above.
+        // Shell integration handles output boundaries via OSC 133 and emits
+        // OSC 7 cwd metadata at prompt time for session cwd tracking.
         session.pty.write(`${command}\r`);
       } else if (session.parser.currentMode === 'sentinel') {
         // Wrap with sentinel for exit code detection
@@ -723,9 +736,11 @@ export class SessionManager {
   }
 
   getCurrentCwd(sessionId: string): string | undefined {
-    const session = this.sessions.get(sessionId);
-    if (!session?.shellIntegrationActive) return undefined;
-    return session.currentCwd ?? undefined;
+    return this.getSessionCwd(sessionId);
+  }
+
+  getSessionCwd(sessionId: string): string | undefined {
+    return this.sessions.get(sessionId)?.cwd;
   }
 
   /**

@@ -268,6 +268,19 @@ async function waitForSessionExit(
   }
 }
 
+async function waitForCwd(
+  sm: SessionManager,
+  sessionId: string,
+  expectedCwd: string,
+  timeoutMs = 2000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (sm.getCurrentCwd(sessionId) === expectedCwd) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 describeIfShell('SessionManager (integration)', () => {
   const env = sanitizeEnv();
   const cwd = fs.realpathSync(os.tmpdir());
@@ -348,7 +361,12 @@ describeIfShell('SessionManager (integration)', () => {
 
       const r = await sm.executeCommand(sid, { command: 'pwd' });
       expect(r.output).toContain(path.basename(uniqueDir));
-      expect(sm.getCurrentCwd(sid)).toBeUndefined();
+      if (sm.getSession(sid)?.shellIntegrationActive) {
+        await waitForCwd(sm, sid, uniqueDir);
+        expect(sm.getCurrentCwd(sid)).toBe(uniqueDir);
+      } else {
+        expect(sm.getCurrentCwd(sid)).toBe(cwd);
+      }
     } finally {
       sm?.killAll();
       // Windows needs time to release PTY directory locks after kill
@@ -357,7 +375,7 @@ describeIfShell('SessionManager (integration)', () => {
     }
   });
 
-  it('ignores OSC 7 cwd spoofing from command output', async () => {
+  it('ignores OSC 7 cwd spoofing from command output and keeps the shell cwd', async () => {
     sm = createSM();
     const sid = sm.createSession('agent-test', cwd, env);
     await waitForReady(sm, sid);
@@ -366,15 +384,13 @@ describeIfShell('SessionManager (integration)', () => {
       command: `printf '\\033]7;file://localhost/tmp/spoofed\\007'`,
     });
 
-    if (sm.getSession(sid)?.shellIntegrationActive) {
-      expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed');
-      expect(sm.getCurrentCwd(sid)).toBeUndefined();
-    } else {
-      expect(sm.getCurrentCwd(sid)).toBeUndefined();
-    }
+    // Command output is external content. A child command printing OSC 7 must
+    // not affect the parent shell cwd used by smart approval.
+    expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed');
+    expect(sm.getCurrentCwd(sid)).toBe(cwd);
   });
 
-  it('ignores cwd spoofing that fakes OSC 133 command completion first', async () => {
+  it('keeps the last valid shell cwd when command output tries to fake prompt metadata', async () => {
     sm = createSM();
     const sid = sm.createSession('agent-test', cwd, env);
     await waitForReady(sm, sid);
@@ -383,12 +399,8 @@ describeIfShell('SessionManager (integration)', () => {
       command: `printf '\\033]133;D;0\\007\\033]7;file://localhost/tmp/spoofed-after-fake-d\\007'`,
     });
 
-    if (sm.getSession(sid)?.shellIntegrationActive) {
-      expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed-after-fake-d');
-      expect(sm.getCurrentCwd(sid)).toBeUndefined();
-    } else {
-      expect(sm.getCurrentCwd(sid)).toBeUndefined();
-    }
+    expect(sm.getCurrentCwd(sid)).not.toBe('/tmp/spoofed-after-fake-d');
+    expect(sm.getCurrentCwd(sid)).toBe(cwd);
   });
 
   // ─── Session cwd ─────────────────────────────────────────────

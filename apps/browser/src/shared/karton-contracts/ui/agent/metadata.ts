@@ -263,7 +263,7 @@ export const shellSessionSnapshotSchema = z.object({
   tailContent: z.string().optional(),
   /** Last visible terminal line, derived from headless xterm buffer. */
   lastLine: z.string().optional(),
-  /** Working directory the session was started in. */
+  /** Latest known working directory for the session. */
   cwd: z.string(),
   /** Unix ms timestamp of session creation. */
   createdAt: z.number(),

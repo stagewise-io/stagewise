@@ -146,7 +146,7 @@ export interface PtySession {
   onData: ((sessionId: string, data: string) => void) | null;
   /** Append-only log writer for the session's full output history. */
   logger: SessionLogger | null;
-  /** Working directory the session was started in. */
+  /** Latest known working directory for the session. */
   cwd: string;
   /**
    * Last trusted working directory. For agent sessions this is only the
