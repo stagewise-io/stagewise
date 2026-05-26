@@ -151,6 +151,7 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.OPEN_MODEL_SELECT]: {
     accelerator: 'Mod+Slash',
+    aliases: ['Mod+Shift+Slash'],
     captureDominantly: true,
   },
   [HotkeyActions.OPEN_COMMAND_CENTER]: {
@@ -522,7 +523,7 @@ function matchKeyToken(ev: KeyboardEvent, token: string): boolean {
     case 'PERIOD':
       return ev.code === 'Period';
     case 'SLASH':
-      return ev.code === 'Slash';
+      return ev.key === '/' || ev.code === 'NumpadDivide';
 
     // Function keys (F1-F24)
     default:
