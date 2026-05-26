@@ -6,8 +6,8 @@ import {
 } from '@shared/hotkeys';
 import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
-import { useKartonProcedure } from '@ui/hooks/use-karton';
-import { useAgentSwitcher } from '@ui/hooks/use-open-chat';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSidebarCollapsed } from './sidebar-collapsed-context';
 import { useCommandCenter } from '../command-center';
@@ -34,6 +34,10 @@ function getVisibleAgentIds() {
 export function GlobalHotkeyBindings() {
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const globalHotkeysEnabled = !isCommandCenterOpen;
+  const lastOpenAgentId = useKartonState(
+    (state) => state.browser.lastOpenAgentId,
+  );
+  const [, setOpenAgent] = useOpenAgent();
 
   // -- Agent switching --------------------------------------------------
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
@@ -55,6 +59,7 @@ export function GlobalHotkeyBindings() {
   const isCyclingAgentsRef = useRef(isCyclingAgents);
   isCyclingAgentsRef.current = isCyclingAgents;
   const hasActiveCycleRef = useRef(false);
+  const lastRecoveryResumeAtRef = useRef(0);
 
   const openAgentInBackend = useCallback((id: string) => {
     void setLastOpenAgentIdRef
@@ -63,6 +68,45 @@ export function GlobalHotkeyBindings() {
       .then(() => resumeAgentRef.current(id))
       .catch(() => undefined);
   }, []);
+
+  const resumeLastOpenAgentAfterRecovery = useCallback(() => {
+    if (!lastOpenAgentId) return;
+
+    const now = Date.now();
+    if (now - lastRecoveryResumeAtRef.current < 1000) return;
+    lastRecoveryResumeAtRef.current = now;
+
+    setOpenAgent(lastOpenAgentId);
+    void setLastOpenAgentIdRef
+      .current(lastOpenAgentId)
+      .catch(() => undefined)
+      .then(() => resumeAgentRef.current(lastOpenAgentId))
+      .catch(() => undefined);
+  }, [lastOpenAgentId, setOpenAgent]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        resumeLastOpenAgentAfterRecovery();
+      }
+    };
+    const handleKartonReconnect = (event: Event) => {
+      const customEvent = event as CustomEvent<{ type?: string }>;
+      if (customEvent.detail?.type === 'reconnected') {
+        resumeLastOpenAgentAfterRecovery();
+      }
+    };
+
+    window.addEventListener('online', resumeLastOpenAgentAfterRecovery);
+    window.addEventListener('karton-reconnect', handleKartonReconnect);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('online', resumeLastOpenAgentAfterRecovery);
+      window.removeEventListener('karton-reconnect', handleKartonReconnect);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [resumeLastOpenAgentAfterRecovery]);
 
   const handleAgentCycle = useCallback(
     (direction: 'next' | 'previous') => {
