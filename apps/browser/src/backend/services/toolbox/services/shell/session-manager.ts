@@ -250,6 +250,10 @@ interface PendingCommand {
   rawOutputCapped: boolean;
   /** Serialized buffer text captured at the moment of a buffer-based pattern match. */
   bufferSnapshot?: string;
+  /** Sanitized regex match captured from raw output when buffer matching fails. */
+  rawPatternSnapshot?: string;
+  /** Whether the first command-output start marker has already set markLine. */
+  hasCommandStart: boolean;
   /** Idle-detection state (see `DEFAULT_IDLE_MS`). */
   idleTimerHandle: NodeJS.Timeout | null;
   /** Silence threshold in ms (0 disables idle detection for this command). */
@@ -438,9 +442,12 @@ export class SessionManager {
       const cid = this.sessionCommandMap.get(sessionId);
       if (!cid) return;
       const pending = this.pendingCommands.get(cid);
-      if (!pending) return;
+      if (!pending || pending.hasCommandStart) return;
       const newMark = session.logger?.getMarkPosition();
-      if (newMark !== undefined) pending.markLine = newMark;
+      if (newMark !== undefined) {
+        pending.markLine = newMark;
+        pending.hasCommandStart = true;
+      }
     });
 
     parser.on('sentinelDone', (id, exitCode) => {
@@ -549,6 +556,7 @@ export class SessionManager {
         waitUntil: request.waitUntil,
         rawOutput: '',
         rawOutputCapped: false,
+        hasCommandStart: false,
         idleTimerHandle: null,
         idleMs,
       };
@@ -890,16 +898,26 @@ export class SessionManager {
   }
 
   private collectOutput(pending: PendingCommand): string {
+    const rawOutput = stripAnsi(pending.rawOutput).trimEnd();
+
     // If a buffer snapshot was captured at pattern-match time, return it
     // directly. This avoids a second serialization that may produce a
-    // different (possibly empty) range if the cursor moved since the match.
+    // different range if the cursor moved since the match.
     if (pending.bufferSnapshot != null) {
       const snapLines = pending.bufferSnapshot.split('\n');
       return applyHeadTailCap(snapLines).trimEnd();
     }
 
+    // If logger matching failed but sanitized raw command output matched the
+    // requested pattern, return only the matched visible text. Do not fall back
+    // to the full raw stream for logger-backed sessions: it can include text
+    // that the terminal later cleared or redrew away.
+    if (pending.rawPatternSnapshot != null) {
+      return pending.rawPatternSnapshot;
+    }
+
     const session = this.sessions.get(pending.sessionId);
-    if (!session?.logger) return stripAnsi(pending.rawOutput).trimEnd();
+    if (!session?.logger) return rawOutput;
 
     const logger = session.logger;
     const isAlt = logger.isAlternateBufferActive();
@@ -936,18 +954,11 @@ export class SessionManager {
 
     const session = this.sessions.get(sessionId);
 
-    // Gate for the no-logger fallback path only: accumulate raw output
-    // (used by the regex matcher when no xterm is attached) exclusively
-    // while inside real command output. This prevents prompt text and
-    // the echoed command line from polluting `pending.rawOutput` and
-    // triggering spurious matches.
-    //
-    // NOTE: we intentionally do NOT gate the logger-based matcher below.
-    // On CI and minimal shells the parser may stay in `detecting` mode
-    // for the entire command (OSC 133 never arrives), and gating there
-    // would make patterns never resolve. The logger-based matcher scopes
-    // to `pending.markLine` and skips the first serialized line (the
-    // prompt + echoed command) to avoid echo-leak matches.
+    // Accumulate raw output exclusively while inside real command output.
+    // This prevents prompt text and the echoed command line from polluting
+    // `pending.rawOutput` and triggering spurious matches. The raw stream is
+    // used directly when no logger exists and as a fallback when logger-backed
+    // xterm serialization is stale or marked from the wrong row.
     const inUserOutput =
       session?.parser.inCommandOutput ||
       session?.parser.currentMode === 'sentinel';
@@ -998,13 +1009,21 @@ export class SessionManager {
           if (matchText && re.test(matchText)) {
             pending.bufferSnapshot = lines.join('\n');
             this.resolveCommand(pending.commandId, null);
+            return;
           }
-        } else if (inUserOutput && !pending.rawOutputCapped) {
-          // Fallback: no logger — match against raw ANSI stream.
-          // Gated on inUserOutput because `rawOutput` can only grow
-          // there (see above).
-          if (re.test(pending.rawOutput))
+        }
+
+        if (inUserOutput && !pending.rawOutputCapped) {
+          // Fallback: match against sanitized visible command output. Capture
+          // only the matched text so logger-backed results do not expose raw
+          // transient output that the terminal later cleared or redrew away.
+          const rawMatchText = stripAnsi(pending.rawOutput).trimEnd();
+          re.lastIndex = 0;
+          const match = re.exec(rawMatchText);
+          if (match?.[0]) {
+            pending.rawPatternSnapshot = match[0];
             this.resolveCommand(pending.commandId, null);
+          }
         }
       } catch {
         // Invalid regex — ignore

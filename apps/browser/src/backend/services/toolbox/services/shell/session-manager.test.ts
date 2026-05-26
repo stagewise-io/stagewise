@@ -558,6 +558,8 @@ describeIfShell('SessionManager (integration)', () => {
       });
 
       expect(r.output).toContain('RECENT_TAIL_MARKER');
+      expect(r.timedOut).toBe(false);
+      expect(r.resolvedBy).toBe('pattern');
       expect(r.recentOutput).toContain('RECENT_TAIL_MARKER');
       expect(r.recentOutput?.length ?? 0).toBeLessThanOrEqual(
         SHELL_RESPONSE_TAIL_MAX_CHARS,
@@ -593,6 +595,7 @@ describeIfShell('SessionManager (integration)', () => {
 
       expect(r.output).toContain('BUFFER_MARKER_123');
       expect(r.timedOut).toBe(false);
+      expect(r.resolvedBy).toBe('pattern');
       expect(elapsed).toBeLessThan(8000);
     } finally {
       sm?.killAll();
