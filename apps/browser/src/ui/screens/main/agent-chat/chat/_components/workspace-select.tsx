@@ -351,7 +351,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
           ) : (
             <IconFolder5Outline18 className="size-3 shrink-0 group-hover/workspace:opacity-0 group-focus-visible/workspace:opacity-0" />
           )}
-          <IconXmarkFill18 className="absolute size-3.5 text-muted-foreground opacity-0 group-hover/unmount:text-foreground group-hover/workspace:opacity-100 group-focus-visible/workspace:opacity-100" />
+          <IconXmarkFill18 className="absolute size-3 text-muted-foreground opacity-0 group-hover/unmount:text-foreground group-hover/workspace:opacity-100 group-focus-visible/workspace:opacity-100" />
         </span>
       </TooltipTrigger>
       <TooltipContent>Disconnect workspace</TooltipContent>
@@ -2017,7 +2017,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
                 ) : (
                   <IconCodeBranchOutline18 className="size-3 shrink-0 group-hover/workspace:opacity-0" />
                 )}
-                <IconXmarkFill18 className="absolute size-3.5 text-muted-foreground opacity-0 group-hover/unmount:text-foreground group-hover/workspace:opacity-100" />
+                <IconXmarkFill18 className="absolute size-3 text-muted-foreground opacity-0 group-hover/unmount:text-foreground group-hover/workspace:opacity-100" />
               </span>
             </TooltipTrigger>
             <TooltipContent>Disconnect workspace</TooltipContent>
