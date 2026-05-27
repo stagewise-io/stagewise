@@ -1,5 +1,64 @@
 # Changelog
 
+## 1.1.0 (2026-05-27)
+
+### Features
+
+* show worktree main as workspacename (59e9b24)
+* prepare nightly release infrastructure (23d9b03)
+* add agent notification sounds (f894e4d)
+* add social-signins to login options (3e36df2)
+* add agent notification sounds (4693c72)
+* show new chat button and title in collapsed sidebar titlebar (e1072d1)
+* add user-controllable terminal tabs (c8d2046)
+* add more shortcut-controls and align design (1cbab15)
+* prompt cleanup for unused managed worktrees (eaa20b0)
+* use local branch as default for 'use branch' (d61013a)
+* show placeholder for worktree-/branch-creation (e874640)
+* saving git-option preferences (7af6e2a)
+* add full worktree support (8a0ced9)
+
+### Bug Fixes
+
+* reduce cross-icon size on workspace-select (72e6f11)
+* make hotkeys QWERTZ-compatible (694ae1f)
+* preserve posix osc cwd paths (589ebd0)
+* validate shell command end metadata (d063d73)
+* validate shell cwd metadata (40f1d17)
+* harden shell cwd tracking (080f903)
+* track shell cwd for approvals (d26ecea)
+* harden shell output pattern matching (9caa51e)
+* address notification review findings (efba190)
+* distrust shell cwd metadata (c5da96b)
+* address review findings for shell tool refactor (6442259)
+* handle createAgent rejection and add min-w-0 for title truncation (70caae9)
+* fix agent tab ordering and collapsed sidebar create flow (a8f9369)
+* persist agent-created background tabs after restart (0d27d69)
+* gate subscribeCDPEvent and fix ignored validateTabAccess return (c12d7cd)
+* assign agent-created tabs to the creating agent and gate tab access (38369ba)
+* add PIN entry for Bluetooth providePin pairing (d08ef74)
+* correct permission request actions (e726d84)
+* mount only active tab content (285eba4)
+* debounce terminal resize events (6512304)
+* load user shell config in terminals (5b88835)
+* preserve powershell prompt status (4009cd4)
+* default terminals to user home (e96959d)
+* stabilize windows terminals (c5cb0f5)
+* address terminal review findings (5cd9ce1)
+* fix git-option selection staleness (56392bf)
+* fix PR issues (80adb79)
+* preserve switch worktree target defaults (2f6ef7d)
+* fix stale branch-names (a55adee)
+* fix optimistic msg filtering (40870a5)
+* truncate and simplify git-option error label (13625cc)
+
+### Other Changes
+
+* split shell tool into createShellSession + executeShellCommand (b99dac5)
+* remove downloads feature, redesign permission icons to outline (0170290)
+* remove unused browser suggestions (ac19b8f)
+* replace git-tools with git-service information (f19b4ad)
+
 ## 1.0.0 (2026-05-27)
 
 ### Features
