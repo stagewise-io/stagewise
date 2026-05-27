@@ -54,7 +54,8 @@ export function BrowserTabHotkeys({
   useHotKeyListener(() => {
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId || !currentZoomPercentage) return;
-    if (currentZoomPercentage >= 500) return;
+    const max = isTerminalTab ? 150 : 500;
+    if (currentZoomPercentage >= max) return;
     setZoomPercentage(currentZoomPercentage + 10, activeTabId);
   }, HotkeyActions.ZOOM_IN);
 
