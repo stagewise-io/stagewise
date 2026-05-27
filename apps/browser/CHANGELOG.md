@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0 (2026-05-27)
+
+### Features
+
+* add reveal-file smart logic, platform-aware labels, and terminal tab hotkey (dd940c7)
+
+### Bug Fixes
+
+* ignore prerelease tags for stable baseline (a9112ed)
+* apply release version before packaging (c31d195)
+* make nightly versions squirrel-compatible (e0da7e6)
+* allow stop hotkey in chat input (eada218)
+* route stop hotkey through focused UI (7d76c94)
+* let focused terminal handle ctrl-c (cd424c1)
+* refine zoom hotkey behavior (b1a82fa)
+* cap terminal zoom at 150 percent max (70403c0)
+* add zoom for terminal tabs, fix UI zoom white space (4ab48ae)
+* split UI zoom from tab-content zoom hotkey handlers (d31ab98)
+
 ## 1.0.1 (2026-05-27)
 
 ### Bug Fixes
