@@ -60,7 +60,7 @@ async function getNextCounter(
   baseVersion: string,
   date: string,
 ): Promise<number> {
-  const tagPrefix = `stagewise@${baseVersion}-nightly${date}`;
+  const tagPrefix = `stagewise@${baseVersion}-nightly${date}c`;
   const { stdout } = await exec(
     `git tag --list "${tagPrefix}*" --sort=-version:refname`,
   );
@@ -68,7 +68,7 @@ async function getNextCounter(
     .split('\n')
     .map((tag) => tag.trim())
     .filter(Boolean)
-    .map((tag) => tag.match(/nightly\d{8}(\d{3})$/)?.[1])
+    .map((tag) => tag.match(/nightly\d{8}c(\d{3})$/)?.[1])
     .filter((counter): counter is string => Boolean(counter))
     .map((counter) => Number.parseInt(counter, 10))
     .filter((counter) => Number.isInteger(counter));
@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   const counter = values.counter
     ? Number.parseInt(values.counter, 10)
     : await getNextCounter(baseVersion, date);
-  const version = `${baseVersion}-nightly${date}${formatCounter(counter)}`;
+  const version = `${baseVersion}-nightly${date}c${formatCounter(counter)}`;
   const tag = `stagewise@${version}`;
 
   if (!semver.valid(version)) {

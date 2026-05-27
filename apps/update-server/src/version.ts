@@ -46,7 +46,7 @@ export function parseVersion(version: string): ParsedVersion | null {
     // This is SemVer 1.0-compatible so Squirrel.Windows' embedded NuGet parser
     // (used client-side on Windows) can handle the filename-derived version.
     const concatenatedMatch = first.match(/^(alpha|beta)(\d+)$/);
-    const nightlyMatch = first.match(/^nightly(\d{8})(\d{3})$/);
+    const nightlyMatch = first.match(/^nightly(\d{8})c(\d{3})$/);
     if (concatenatedMatch) {
       prereleaseType = concatenatedMatch[1] as 'alpha' | 'beta';
       prereleaseNum = Number.parseInt(concatenatedMatch[2], 10);
@@ -95,7 +95,7 @@ export function matchesChannel(
 ): boolean {
   switch (channel) {
     case 'release':
-      return version.prereleaseType === null;
+      return version.prerelease === null;
     case 'nightly':
       return version.prereleaseType === 'nightly';
     case 'beta':
