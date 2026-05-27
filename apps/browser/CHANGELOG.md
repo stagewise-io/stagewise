@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.0.0 (2026-05-27)
+
+### Features
+
+* show worktree main as workspacename (59e9b24)
+* prepare nightly release infrastructure (23d9b03)
+* add agent notification sounds (f894e4d)
+* add social-signins to login options (3e36df2)
+* add agent notification sounds (4693c72)
+* show new chat button and title in collapsed sidebar titlebar (e1072d1)
+* add user-controllable terminal tabs (c8d2046)
+* add more shortcut-controls and align design (1cbab15)
+* prompt cleanup for unused managed worktrees (eaa20b0)
+* use local branch as default for 'use branch' (d61013a)
+* show placeholder for worktree-/branch-creation (e874640)
+* saving git-option preferences (7af6e2a)
+* add full worktree support (8a0ced9)
+
+### Bug Fixes
+
+* make hotkeys QWERTZ-compatible (694ae1f)
+* preserve posix osc cwd paths (589ebd0)
+* validate shell command end metadata (d063d73)
+* validate shell cwd metadata (40f1d17)
+* harden shell cwd tracking (080f903)
+* track shell cwd for approvals (d26ecea)
+* harden shell output pattern matching (9caa51e)
+* address notification review findings (efba190)
+* distrust shell cwd metadata (c5da96b)
+* address review findings for shell tool refactor (6442259)
+* handle createAgent rejection and add min-w-0 for title truncation (70caae9)
+* fix agent tab ordering and collapsed sidebar create flow (a8f9369)
+* persist agent-created background tabs after restart (0d27d69)
+* gate subscribeCDPEvent and fix ignored validateTabAccess return (c12d7cd)
+* assign agent-created tabs to the creating agent and gate tab access (38369ba)
+* add PIN entry for Bluetooth providePin pairing (d08ef74)
+* correct permission request actions (e726d84)
+* mount only active tab content (285eba4)
+* debounce terminal resize events (6512304)
+* load user shell config in terminals (5b88835)
+* preserve powershell prompt status (4009cd4)
+* default terminals to user home (e96959d)
+* stabilize windows terminals (c5cb0f5)
+* address terminal review findings (5cd9ce1)
+* fix git-option selection staleness (56392bf)
+* fix PR issues (80adb79)
+* preserve switch worktree target defaults (2f6ef7d)
+* fix stale branch-names (a55adee)
+* fix optimistic msg filtering (40870a5)
+* truncate and simplify git-option error label (13625cc)
+
+### Other Changes
+
+* split shell tool into createShellSession + executeShellCommand (b99dac5)
+* remove downloads feature, redesign permission icons to outline (0170290)
+* remove unused browser suggestions (ac19b8f)
+* replace git-tools with git-service information (f19b4ad)
+
 ## 1.0.0-alpha097 (2026-05-22)
 
 ### Features
@@ -314,26 +372,18 @@
 
 * normalize agent-intances-db (separate messages) (86b0590)
 
-## 1.0.0-alpha.63 (2026-04-19)
-
 ### Bug Fixes
 
 * fixing model-id-mismatch for direct anthropic requests (cc3ff69)
-
-## 1.0.0-alpha.62 (2026-04-19)
 
 ### Features
 
 * integrate Cloudflare Turnstile for enhanced security in OTP flow (eff2fa4)
 
-## 1.0.0-alpha.61 (2026-04-18)
-
 ### Bug Fixes
 
 * fix title generation logic and system prompt for conversations (b7a5c68)
 * add file system documentation to workspace-md-agent (dcb3b97)
-
-## 1.0.0-alpha.60 (2026-04-17)
 
 ### Features
 
@@ -346,8 +396,6 @@
 * try-catch ingest-server startup (076cf2e)
 * streamline log ingestion and validation in environment renderer and toolbox service (5119df9)
 
-## 1.0.0-alpha.59 (2026-04-16)
-
 ### Features
 
 * add opus-4-7 (e6bad3a)
@@ -356,14 +404,10 @@
 
 * normalize error handling in streamText and runStep methods (6ffbf62)
 
-## 1.0.0-alpha.58 (2026-04-15)
-
 ### Bug Fixes
 
 * strip backticks from rich text examples (1b98e57)
 * remove prompt for context-generation (b74f991)
-
-## 1.0.0-alpha.57 (2026-04-14)
 
 ### Features
 
@@ -374,8 +418,6 @@
 * fix model-ids for all models (c364f8c)
 * fix ask-user-tool (efa3a00)
 
-## 1.0.0-alpha.56 (2026-04-13)
-
 ### Bug Fixes
 
 * fix document-search focus-bug (b1bb219)
@@ -384,8 +426,6 @@
 ### Other Changes
 
 * adapt browser to new backend-requirements (7851a62)
-
-## 1.0.0-alpha.55 (2026-04-13)
 
 ### Features
 
@@ -400,22 +440,16 @@
 * show loader in app startup screen (8b8ff5f)
 * dont show login form on unreachable server (d0ac0d5)
 
-## 1.0.0-alpha.54 (2026-04-10)
-
 ### Bug Fixes
 
 * add delete-confirmation-popup for agents (d3706f9)
 * fix tab-sorting (9aeffe6)
 * remove stagewise-logs from webcontents (eac29d7)
 
-## 1.0.0-alpha.53 (2026-04-10)
-
 ### Bug Fixes
 
 * fix runtime-node issues on windows (4007ea2)
 * fix isolated-fs path resolution on windows (ed59ce6)
-
-## 1.0.0-alpha.52 (2026-04-09)
 
 ### Bug Fixes
 
@@ -424,13 +458,9 @@
 * fix schema-errors with direct anthropic-provider (b9c58c0)
 * allow sending 1-char messages (ca87e94)
 
-## 1.0.0-alpha.51 (2026-04-09)
-
 ### Bug Fixes
 
 * include more detailed sandbox-explanation in system-prompt (227d2cf)
-
-## 1.0.0-alpha.50 (2026-04-08)
 
 ### Bug Fixes
 
@@ -444,27 +474,19 @@
 
 * show notifications above chat-input instead of overlay (31cf81d)
 
-## 1.0.0-alpha.49 (2026-04-08)
-
 ### Bug Fixes
 
 * hotkey behavior for downloads popover (80bedcf)
 * fix misinterpretation of files as binary (c9edd7f)
 * make plan-view readonly (cf6f487)
 
-## 1.0.0-alpha.48 (2026-04-06)
-
 ### Features
 
 * add /preview to commands (35cfc09)
 
-## 1.0.0-alpha.47 (2026-04-06)
-
 ### Bug Fixes
 
 * create dirs for agent runtime that may be missing (d3bd903)
-
-## 1.0.0-alpha.46 (2026-04-02)
 
 ### Features
 
@@ -500,8 +522,6 @@
 * convert text clips from extra attachments to files (82044a7)
 * standardize file reference and attachments format for both agents and users (417395b)
 
-## 1.0.0-alpha.45 (2026-03-30)
-
 ### Bug Fixes
 
 * apply max-w- to chat-input (8752d87)
@@ -512,8 +532,6 @@
 * update onboarding steps and feature images and explain the product (3e63d64)
 * rename 'commands' to 'skills' in types and functions (8f289de)
 * turn 'commands' into 'skills' with frontmatter properties (474b1ff)
-
-## 1.0.0-alpha.44 (2026-03-26)
 
 ### Features
 
@@ -551,13 +569,9 @@
 * move 'revert-edits'-confirm dialog into shareable component (97a0801)
 * add 'hidden' to commands and use flat markdown-structure w/ frontmatter (89d8686)
 
-## 1.0.0-alpha.43 (2026-03-20)
-
 ### Bug Fixes
 
 * increase timeout for compression-llm retries to 30s (33fb877)
-
-## 1.0.0-alpha.42 (2026-03-20)
 
 ### Bug Fixes
 
@@ -567,8 +581,6 @@
 * handle edge cases in history compression (297a91d)
 * make compression respect context size for kept messages, reduce tool output cap (c4ff9ee)
 * fix tool-error message (handle 'noSuchTool', etc.) (79df676)
-
-## 1.0.0-alpha.41 (2026-03-19)
 
 ### Features
 
@@ -586,14 +598,10 @@
 * simplify and shorten env-changes strings (2aa3449)
 * make tab ids simple counter numerics like in chrome (25ac595)
 
-## 1.0.0-alpha.40 (2026-03-18)
-
 ### Bug Fixes
 
 * better escaping of inputs for context compression prompt (f21a5b5)
 * make context compression and title generation more reliable (ec0afd7)
-
-## 1.0.0-alpha.39 (2026-03-18)
 
 ### Features
 
@@ -612,33 +620,23 @@
 
 * make windows install include redistributables (041d855)
 
-## 1.0.0-alpha.38 (2026-03-18)
-
 ### Features
 
 * add support for gpt 5.4 mini/ nano (c2ad158)
-
-## 1.0.0-alpha.37 (2026-03-18)
 
 ### Bug Fixes
 
 * treat file-deletion with creation as modification (2512090)
 
-## 1.0.0-alpha.36 (2026-03-17)
-
 ### Bug Fixes
 
 * add app-launched to bypass-list (ce0fdea)
-
-## 1.0.0-alpha.35 (2026-03-17)
 
 ### Bug Fixes
 
 * fix license-dialog in about-page (c096a73)
 * prevent jumping around of cursor on input fields (06fc409)
 * graceful handling of token limit hits during tool calls (d162b0c)
-
-## 1.0.0-alpha.34 (2026-03-17)
 
 ### Features
 
@@ -650,32 +648,22 @@
 * prevent user-question checkboxes from shrinking (039732f)
 * remove duplicate 'compacted' message (74bda1d)
 
-## 1.0.0-alpha.33 (2026-03-17)
-
 ### Other Changes
 
 * remove "tool" suffixes from tool names (4ebd0a3)
-
-## 1.0.0-alpha.32 (2026-03-16)
 
 ### Bug Fixes
 
 * don't show env-message when agent reverts its own edits (21d7c09)
 * name 'handle' to 'id' for tabs in message-structure (752dfc9)
 
-## 1.0.0-alpha.31 (2026-03-15)
-
 ### Bug Fixes
 
 * make context-usage ring use dynamic context size (be816ce)
 
-## 1.0.0-alpha.30 (2026-03-15)
-
 ### Bug Fixes
 
 * add missing asar-unpacking for 'sharp' (96e3b52)
-
-## 1.0.0-alpha.29 (2026-03-15)
 
 ### Bug Fixes
 
@@ -687,34 +675,24 @@
 
 * replace tabHandle with shorter, unique tabIds (d1ef5b1)
 
-## 1.0.0-alpha.28 (2026-03-15)
-
 ### Bug Fixes
 
 * move telemetry-filter to application-level (4fa167e)
 * prevent link-clicking default behaviour in chat-input (7896a57)
 
-## 1.0.0-alpha.27 (2026-03-13)
-
 ### Bug Fixes
 
 * revert to base64 for file parts (fa852f0)
 
-## 1.0.0-alpha.26 (2026-03-13)
-
 ### Bug Fixes
 
 * increase tab-handle recycle limit to 100 (8e4d4b1)
-
-## 1.0.0-alpha.25 (2026-03-13)
 
 ### Bug Fixes
 
 * add explanation-string to sandbox-tool (1ecd95d)
 * use theme tokens for logo colors (2210c27)
 * fix logo-colors in sign-in and onboarding (037706f)
-
-## 1.0.0-alpha.24 (2026-03-13)
 
 ### Bug Fixes
 
@@ -725,39 +703,27 @@
 
 * enforce explicit aliases for pages- and ui-imports (2378337)
 
-## 1.0.0-alpha.23 (2026-03-12)
-
 ### Bug Fixes
 
 * fix unchecked array-access in diff-history (73fb2dc)
-
-## 1.0.0-alpha.22 (2026-03-12)
 
 ### Bug Fixes
 
 * make library-tools return proper error messages (3ee1a47)
 * add more padding to shell-cmd-text (1c9aac5)
 
-## 1.0.0-alpha.21 (2026-03-12)
-
 ### Bug Fixes
 
 * fix stale z-index/ focus handling on omnibox (0d997ab)
-
-## 1.0.0-alpha.20 (2026-03-12)
 
 ### Bug Fixes
 
 * fix error on app-start due to unstable arrays (29eb8f0)
 
-## 1.0.0-alpha.19 (2026-03-12)
-
 ### Bug Fixes
 
 * fix olive surface-tinted color (294f525)
 * use release_pat to trigger ci on release-pr's (b0703a9)
-
-## 1.0.0-alpha.18 (2026-03-12)
 
 ### Bug Fixes
 
@@ -768,19 +734,13 @@
 * fix rerenders with unstable karton arrays (7482bd1)
 * make signin-link dynamic (5da4a04)
 
-## 1.0.0-alpha.17 (2026-03-11)
-
 ### Bug Fixes
 
 * catch lsp-client errors on startup (0769679)
 
-## 1.0.0-alpha.16 (2026-03-11)
-
 ### Bug Fixes
 
 * bump api-client and fix library-tool signature (8adc977)
-
-## 1.0.0-alpha.15 (2026-03-11)
 
 ### Bug Fixes
 
@@ -792,33 +752,23 @@
 * show workspace info in file-diff-section (42c5ddf)
 * only open new diff-review tabs when none is already present (e90cc02)
 
-## 1.0.0-alpha.14 (2026-03-11)
-
 ### Bug Fixes
 
 * fix path resolution for shell on MacOS (6a41572)
 * only show file-diff env-msgs from other contributors (not the agent itself) (3c0d1d7)
 * make sure that broken tool input doesn't cause ai sdk failures (ed09a35)
 
-## 1.0.0-alpha.13 (2026-03-11)
-
 ### Bug Fixes
 
 * fix windows build signing (8a58f5a)
-
-## 1.0.0-alpha.12 (2026-03-11)
 
 ### Features
 
 * use cached asset urls for images to prevent errors with size-constraints in our api (bdfbc2f)
 
-## 1.0.0-alpha.11 (2026-03-11)
-
 ### Bug Fixes
 
 * fix ui-import for pages app (84f2474)
-
-## 1.0.0-alpha.10 (2026-03-10)
 
 ### Features
 
@@ -836,16 +786,12 @@
 * include system prompt section about mini-app vs cdp vs source code (7d37dde)
 * soften system prompt about mermaid and trade-offs (aecdce3)
 
-## 1.0.0-alpha.9 (2026-03-10)
-
 ### Bug Fixes
 
 * add missing auto-mount of workspaces to ActiveAgentsGrid creation (7ab1990)
 * place env-messages **before** tool-approval parts to ensure ai-sdk conversions work (6cc5bfb)
 * disable 'approve'/'skip' buttons in bash execution on input-stream (2353638)
 * replace deprecated sonnet-4-5 with 4-6 (faf596f)
-
-## 1.0.0-alpha.8 (2026-03-09)
 
 ### Features
 
@@ -895,8 +841,6 @@
 
 * remove unused props (c0ca135)
 * remove unused type and schema defs (9598899)
-
-## 1.0.0-alpha.7 (2026-03-07)
 
 ### Features
 
@@ -961,8 +905,6 @@
 * only save env-snapshots domains when they actually changed (81d3b5a)
 * move truncation-detection to 'use-is-truncated' (1a23aca)
 
-## 1.0.0-alpha.6 (2026-02-27)
-
 ### Features
 
 * allow suspending/archiving agents (f2589eb)
@@ -986,8 +928,6 @@
 
 * more explicit steering of stagewise-conform behavior in OpenAI models (68a0b1e)
 * restructure rich-text attachment files (cefd75b)
-
-## 1.0.0-alpha.5 (2026-02-26)
 
 ### Features
 
@@ -1028,8 +968,6 @@
 
 * clean up agent notifications mechanism (d232768)
 
-## 1.0.0-alpha.4 (2026-02-24)
-
 ### Features
 
 * add button to show/hide sidebar (125f26d)
@@ -1058,8 +996,6 @@
 
 * use optimistic updates for agent creation/switch/deletion (597354b)
 * move backend-wiring and state sync between pages- and main-app (a0f3449)
-
-## 1.0.0-alpha.3 (2026-02-22)
 
 ### Features
 
@@ -1169,14 +1105,10 @@
 * refactor agent system prompt to be based on markdown snippets (b35570a)
 * cleaned up telemetry-event-types to refactor events (a51b9cc)
 
-## 1.0.0-alpha.2 (2026-02-13)
-
 ### Bug Fixes
 
 * correct import path (b3fcf83)
 * more memory for build to prevent builttime crashes (a9f1822)
-
-## 1.0.0-alpha.1 (2026-02-12)
 
 ### Features
 
@@ -1440,8 +1372,6 @@
 * make auth work fully within our browser (ee1efdf)
 * add central preferences service and adapt telemetry to this (e645772)
 
-## 1.0.0-beta.1 (2026-01-06)
-
 ### Features
 
 * add hotkey text to zoom (ab2cb53)
@@ -1449,8 +1379,6 @@
 ### Bug Fixes
 
 * make line-number-section sticky in code-diff component (f751fe4)
-
-## 1.0.0-alpha.1 (2026-01-06)
 
 ### Features
 
@@ -1461,4 +1389,3 @@
 * make line-number-section sticky in code-diff component (f751fe4)
 
 All notable changes to the browser app will be documented in this file.
-
