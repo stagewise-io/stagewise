@@ -45,8 +45,15 @@ export function useHotKeyListener(
       if (!enabled) return;
 
       // For non-dominant hotkeys, check if a native editable element should consume the event
-      // This allows standard text editing behavior to work (e.g., Cmd+ArrowLeft in inputs)
-      if (!definition.captureDominantly && shouldNativeInputConsumeEvent(ev))
+      // This allows standard text editing behavior to work (e.g., Cmd+ArrowLeft in inputs).
+      // STOP_AGENT is selection-aware at the call site: Ctrl+C should still stop
+      // the agent from chat input when there is no selected text, but preserve
+      // native copy when there is a selection.
+      if (
+        hotKeyAction !== HotkeyActions.STOP_AGENT &&
+        !definition.captureDominantly &&
+        shouldNativeInputConsumeEvent(ev)
+      )
         return;
 
       // The first matching hotkey action will be executed and abort further processing of other hotkey actions.
