@@ -30,7 +30,9 @@ import {
   IconCodeBranchOutline18,
   IconCopyOutline18,
   IconFolder5Outline18,
+  IconFolderOpenOutline18,
   IconPenDrawSparkleOutline18,
+  IconSquareTerminalOutline18,
 } from 'nucleo-ui-outline-18';
 import {
   Tooltip,
@@ -52,7 +54,11 @@ import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { IdeLogo } from '@ui/components/ide-logo';
-import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@ui/utils';
+import {
+  getIDEFileUrl,
+  IDE_SELECTION_ITEMS,
+  nativeFileManagerLabel,
+} from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';
 import { getBaseName } from '@shared/path-utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
@@ -72,6 +78,7 @@ import {
 } from '@shared/karton-contracts/ui';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useContentCollapsed } from '@ui/screens/main/_components/content-collapsed-context';
 import {
   memo,
   useCallback,
@@ -932,12 +939,44 @@ function WorkspacePreviewCardContent({
   const hasSkills = mount.skills.length > 0;
   const gitRef = mount.git ? formatGitRef(mount.git) : null;
   const gitStatus = mount.git ? formatGitStatus(mount.git.status) : null;
+  const [openAgent] = useOpenAgent();
+  const createTerminal = useKartonProcedure((p) => p.browser.createTerminal);
+  const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
+    useContentCollapsed();
 
   const handleCopyPath = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
       event.preventDefault();
       void navigator.clipboard?.writeText(mount.path);
+    },
+    [mount.path],
+  );
+
+  const handleOpenTerminal = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (contentCollapsed) setContentCollapsed(false);
+      void createTerminal(mount.path, openAgent);
+    },
+    [
+      mount.path,
+      openAgent,
+      createTerminal,
+      contentCollapsed,
+      setContentCollapsed,
+    ],
+  );
+
+  const handleRevealInFileManager = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      event.preventDefault();
+      window.open(
+        `stagewise://reveal-file/${encodeURIComponent(mount.path)}`,
+        '_blank',
+      );
     },
     [mount.path],
   );
@@ -1011,7 +1050,37 @@ function WorkspacePreviewCardContent({
         </div>
       )}
 
-      <div className="flex justify-end gap-0.5 px-2.5 py-1.5">
+      <div className="flex justify-end gap-1.5 px-2 py-1.5">
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-2xs"
+              aria-label="Open terminal"
+              onClick={handleOpenTerminal}
+              className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+            >
+              <IconSquareTerminalOutline18 className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Open terminal</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-2xs"
+              aria-label={`Reveal in ${nativeFileManagerLabel}`}
+              onClick={handleRevealInFileManager}
+              className="text-muted-foreground hover:text-foreground focus-visible:text-foreground"
+            >
+              <IconFolderOpenOutline18 className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Reveal in {nativeFileManagerLabel}</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger>
             <Button

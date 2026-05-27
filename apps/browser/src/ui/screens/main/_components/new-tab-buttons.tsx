@@ -4,6 +4,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { GlobePlusIcon } from './globe-plus-icon';
 import { WindowPlusIcon } from '../terminal-panel/_components/window-plus-icon';
 
@@ -32,7 +34,12 @@ export function NewTabButtons({
             <GlobePlusIcon className="size-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Open browsing tab</TooltipContent>
+        <TooltipContent>
+          <span className="flex items-center gap-1.5">
+            <span>Open browsing tab</span>
+            <HotkeyCombo action={HotkeyActions.NEW_TAB} size="xs" />
+          </span>
+        </TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger>
@@ -46,7 +53,12 @@ export function NewTabButtons({
             <WindowPlusIcon className="size-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Open terminal tab</TooltipContent>
+        <TooltipContent>
+          <span className="flex items-center gap-1.5">
+            <span>Open terminal tab</span>
+            <HotkeyCombo action={HotkeyActions.NEW_TERMINAL_TAB} size="xs" />
+          </span>
+        </TooltipContent>
       </Tooltip>
     </div>
   );

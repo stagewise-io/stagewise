@@ -167,7 +167,12 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   return (
     <>
       {show && <GlobalHotkeyBindings />}
-      {show && <AgentHotkeyBindings onCreateTab={handleCreateTab} />}
+      {show && (
+        <AgentHotkeyBindings
+          onCreateTab={handleCreateTab}
+          onCreateTerminalTab={handleOpenTerminal}
+        />
+      )}
       {show && <CommandCenterHotkeys />}
       {show && <CommandCenter />}
       <div

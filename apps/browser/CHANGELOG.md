@@ -5,7 +5,6 @@
 ### Bug Fixes
 
 * reduce cross-icon size on workspace-select (72e6f11)
-
 ## 1.0.0 (2026-05-27)
 
 ### Features
@@ -13,8 +12,6 @@
 * show worktree main as workspacename (59e9b24)
 * prepare nightly release infrastructure (23d9b03)
 * add agent notification sounds (f894e4d)
-* add social-signins to login options (3e36df2)
-* add agent notification sounds (4693c72)
 * show new chat button and title in collapsed sidebar titlebar (e1072d1)
 * add user-controllable terminal tabs (c8d2046)
 * add more shortcut-controls and align design (1cbab15)

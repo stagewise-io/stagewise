@@ -1,4 +1,5 @@
 import { session, shell } from 'electron';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Logger } from '../logger';
@@ -49,6 +50,27 @@ export function canBrowserHandleUrl(url: string): boolean {
  * in the requested IDE. Falls back to revealing the folder in
  * Finder / Explorer if no files exist.
  */
+/**
+ * Reveal a path in the native file manager.
+ * Directories are opened directly (openPath), files are shown in their
+ * parent folder (showItemInFolder).
+ */
+export function revealPathInFileManager(filePath: string): void {
+  try {
+    if (
+      fsSync.existsSync(filePath) &&
+      fsSync.statSync(filePath).isDirectory()
+    ) {
+      shell.openPath(filePath);
+    } else {
+      shell.showItemInFolder(filePath);
+    }
+  } catch {
+    // Fall back to showItemInFolder on any stat error
+    shell.showItemInFolder(filePath);
+  }
+}
+
 export async function openFolderFirstFileInIde(
   url: string,
   logger: Logger,
@@ -73,7 +95,7 @@ export async function openFolderFirstFileInIde(
       const ideUrl = getIDEFileUrl(target, ide);
       logger.debug(`[openFolderFirstFileInIde] Opening first file: ${target}`);
       if (ideUrl.startsWith('stagewise://reveal-file/')) {
-        shell.showItemInFolder(target);
+        revealPathInFileManager(target);
       } else {
         shell.openExternal(ideUrl);
       }
@@ -81,13 +103,13 @@ export async function openFolderFirstFileInIde(
       logger.debug(
         `[openFolderFirstFileInIde] Folder empty, revealing: ${folderPath}`,
       );
-      shell.showItemInFolder(folderPath);
+      revealPathInFileManager(folderPath);
     }
   } catch (err) {
     logger.error(
       `[openFolderFirstFileInIde] Failed to read folder: ${folderPath}`,
       err,
     );
-    shell.showItemInFolder(folderPath);
+    revealPathInFileManager(folderPath);
   }
 }
