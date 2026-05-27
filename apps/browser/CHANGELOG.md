@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 (2026-05-27)
+
+### Bug Fixes
+
+* reduce cross-icon size on workspace-select (72e6f11)
+
 ## 1.0.0 (2026-05-27)
 
 ### Features
