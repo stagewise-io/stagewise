@@ -14,6 +14,7 @@ import type { FaviconService } from '../favicon';
 import type { PagesService } from '../pages';
 import type { PreferencesService } from '../preferences';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
+import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
 import { UIController } from './ui-controller';
 import {
   BrowsingTabController,
@@ -395,6 +396,10 @@ export class WindowLayoutService extends DisposableService {
       ) => void)
     | null = null;
 
+  private uiZoomPreferenceListener:
+    | ((newPrefs: UserPreferences, oldPrefs: UserPreferences) => void)
+    | null = null;
+
   private constructor(
     logger: Logger,
     historyService: HistoryService,
@@ -462,6 +467,10 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.setCaptureAndStoreElementScreenshotHandler(
       this.handleCaptureAndStoreElementScreenshot.bind(this),
     );
+    this.applyUiZoomPercentage(
+      this.preferencesService.get().general.uiZoomPercentage,
+    );
+    this.setupUiZoomPreferenceListener();
 
     const savedState = this.loadWindowState();
     const defaultWidth = 1200;
@@ -651,6 +660,11 @@ export class WindowLayoutService extends DisposableService {
     if (this.syncThemeColorsListener) {
       ipcMain.removeListener('sync-theme-colors', this.syncThemeColorsListener);
       this.syncThemeColorsListener = null;
+    }
+
+    if (this.uiZoomPreferenceListener) {
+      this.preferencesService.removeListener(this.uiZoomPreferenceListener);
+      this.uiZoomPreferenceListener = null;
     }
 
     ipcMain.removeHandler('request-turnstile-token');
@@ -1081,10 +1095,39 @@ export class WindowLayoutService extends DisposableService {
         width: bounds.width,
         height: bounds.height,
       });
+      this.applyUiZoomPercentage(
+        this.preferencesService.get().general.uiZoomPercentage,
+      );
 
       // Restore correct z-layering (UI on top of tabs or vice versa)
       this.updateZOrder();
     });
+  }
+
+  private applyUiZoomPercentage(percentage: number): void {
+    if (!this.uiController) return;
+
+    const view = this.uiController.getView();
+    if (view.webContents.isDestroyed()) return;
+
+    const factor = Math.max(0.1, percentage / 100);
+    view.webContents.setZoomFactor(factor);
+    this.logger.debug(
+      `[WindowLayoutService] Applied UI webContents zoom factor: ${factor}`,
+    );
+  }
+
+  private setupUiZoomPreferenceListener(): void {
+    if (this.uiZoomPreferenceListener) return;
+
+    this.uiZoomPreferenceListener = (newPrefs, oldPrefs) => {
+      const nextZoom = newPrefs.general.uiZoomPercentage;
+      if (nextZoom === oldPrefs.general.uiZoomPercentage) return;
+
+      this.applyUiZoomPercentage(nextZoom);
+    };
+
+    this.preferencesService.addListener(this.uiZoomPreferenceListener);
   }
 
   private setupPagesServiceHandlers() {
@@ -2001,7 +2044,8 @@ export class WindowLayoutService extends DisposableService {
     percentage: number,
     tabId?: string,
   ) => {
-    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    const resolvedTabId = tabId ?? this.activeTabId;
+    const tab = resolvedTabId ? this.tabs[resolvedTabId] : undefined;
     tab?.setZoomPercentage(percentage);
   };
 

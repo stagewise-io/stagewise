@@ -6,11 +6,15 @@ import {
 } from '@shared/hotkeys';
 import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
-import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useAgentSwitcher } from '@ui/hooks/use-open-chat';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { produceWithPatches, enablePatches } from 'immer';
 import { useSidebarCollapsed } from './sidebar-collapsed-context';
 import { useCommandCenter } from '../command-center';
+
+enablePatches();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -233,6 +237,66 @@ export function GlobalHotkeyBindings() {
   useHotKeyListener(
     () => toggleSidebar(),
     HotkeyActions.TOGGLE_SIDEBAR,
+    globalHotkeysEnabled,
+  );
+
+  // -- UI zoom (Mod+=, Mod+-, Mod+0) ------------------------------------
+  // Only applies when keyboard focus is on stagewise UI chrome.
+  // When tab-content has focus, returns false so browser-tab or terminal
+  // scoped zoom handlers can handle the same zoom hotkey.
+  const preferences = useKartonState((s) => s.preferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const uiZoomPercentage = useKartonState(
+    (s) => s.preferences.general.uiZoomPercentage,
+  );
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const { tabUiState } = useTabUIState();
+  const focusedPanel = activeTabId
+    ? (tabUiState[activeTabId]?.focusedPanel ?? 'stagewise-ui')
+    : 'stagewise-ui';
+
+  const shouldDeferToTabZoom = focusedPanel === 'tab-content';
+
+  const handleUiZoomIn = useCallback(() => {
+    if (shouldDeferToTabZoom) return false;
+    if (uiZoomPercentage >= 130) return;
+    const [, patches] = produceWithPatches(preferences, (draft) => {
+      draft.general.uiZoomPercentage = Math.min(uiZoomPercentage + 10, 130);
+    });
+    void updatePreferences(patches);
+  }, [shouldDeferToTabZoom, uiZoomPercentage, preferences, updatePreferences]);
+
+  const handleUiZoomOut = useCallback(() => {
+    if (shouldDeferToTabZoom) return false;
+    if (uiZoomPercentage <= 70) return;
+    const [, patches] = produceWithPatches(preferences, (draft) => {
+      draft.general.uiZoomPercentage = Math.max(uiZoomPercentage - 10, 70);
+    });
+    void updatePreferences(patches);
+  }, [shouldDeferToTabZoom, uiZoomPercentage, preferences, updatePreferences]);
+
+  const handleUiZoomReset = useCallback(() => {
+    if (shouldDeferToTabZoom) return false;
+    if (uiZoomPercentage === 100) return;
+    const [, patches] = produceWithPatches(preferences, (draft) => {
+      draft.general.uiZoomPercentage = 100;
+    });
+    void updatePreferences(patches);
+  }, [shouldDeferToTabZoom, uiZoomPercentage, preferences, updatePreferences]);
+
+  useHotKeyListener(
+    handleUiZoomIn,
+    HotkeyActions.ZOOM_IN,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    handleUiZoomOut,
+    HotkeyActions.ZOOM_OUT,
+    globalHotkeysEnabled,
+  );
+  useHotKeyListener(
+    handleUiZoomReset,
+    HotkeyActions.ZOOM_RESET,
     globalHotkeysEnabled,
   );
 

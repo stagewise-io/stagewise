@@ -265,10 +265,20 @@ async function main(): Promise<void> {
   const lastStableTag = await getLastStableTag(packageConfig.tagPrefix);
   console.log(`   Last stable tag: ${lastStableTag || 'none'}`);
 
-  // Determine starting point for commits
-  let sinceRef = options.since || lastTag;
+  const requestedChannel = options.channel;
+
+  // Determine starting point for commits. Stable releases from an existing
+  // stable version must compare against the latest stable tag, not the latest
+  // tag across all channels. Otherwise old alpha/beta tags can win Git's
+  // version sort and cause stable changelogs to include an entire prerelease
+  // cycle again.
+  const useStableBaseline =
+    requestedChannel === 'release' && !isCurrentPrerelease && !options.since;
+  let sinceRef = options.since || (useStableBaseline ? lastStableTag : lastTag);
   if (options.since) {
     console.log(`   Using --since: ${options.since}`);
+  } else if (useStableBaseline) {
+    console.log(`   Using stable baseline: ${sinceRef || 'none'}`);
   }
 
   // Get commits since last tag or specified ref
@@ -284,7 +294,6 @@ async function main(): Promise<void> {
 
   // Determine if this is a channel promotion (alpha→beta or prerelease→release)
   // Note: options.channel is always provided in CI, which is the primary use case for promotions
-  const requestedChannel = options.channel;
   const isChannelPromotion =
     isCurrentPrerelease &&
     requestedChannel &&

@@ -15,17 +15,9 @@ export function ScreenRouter() {
   const hasSeenOnboarding = useKartonState(
     (s) => s.userExperience.storedExperienceData.hasSeenOnboardingFlow,
   );
-  const uiZoomPercentage = useKartonState(
-    (s) => s.preferences.general.uiZoomPercentage,
-  );
 
   return (
-    <div
-      className="fixed inset-0"
-      style={{
-        zoom: uiZoomPercentage / 100,
-      }}
-    >
+    <div className="fixed inset-0">
       {!connected || hasSeenOnboarding === null ? (
         <div className="absolute inset-0 flex size-full flex-col items-center justify-center gap-4">
           <Logo

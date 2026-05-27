@@ -1,9 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
+import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import { HotkeyActions } from '@shared/hotkeys';
 import '@xterm/xterm/css/xterm.css';
+
+const BASE_FONT_SIZE = 13;
 
 interface PerTerminalContentProps {
   terminalId: string;
@@ -24,6 +29,18 @@ export function PerTerminalContent({
   /** Absolute backend output offset consumed by this renderer. */
   const consumedOffsetRef = useRef(0);
 
+  // Global terminal zoom (Cmd+=, Cmd+-, Cmd+0 when terminal has focus).
+  // Persisted in user preferences so it survives app restarts and applies
+  // consistently across all terminal tabs.
+  const zoomPercentage = useKartonState(
+    (s) => s.preferences.general.terminalZoomPercentage,
+  );
+  const terminalScale = zoomPercentage / 100;
+
+  // Terminal lives in the normal DOM. UI zoom affects it like any other UI,
+  // while terminal-specific zoom adjusts xterm's own font size.
+  const fontSize = BASE_FONT_SIZE * terminalScale;
+
   const outputBuffer = useKartonState(
     (s) => s.terminals.outputBuffers[terminalId] ?? '',
   );
@@ -38,6 +55,10 @@ export function PerTerminalContent({
   const getTerminalSnapshot = useKartonProcedure(
     (p) => p.browser.getTerminalSnapshot,
   );
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const { tabUiState, setTabUiState } = useTabUIState();
+  const isTerminalFocused =
+    tabUiState[terminalId]?.focusedPanel === 'tab-content';
 
   const terminalInputRef = useRef(terminalInput);
   terminalInputRef.current = terminalInput;
@@ -47,6 +68,53 @@ export function PerTerminalContent({
   getTerminalSnapshotRef.current = getTerminalSnapshot;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
+
+  const markTerminalFocused = () => {
+    setTabUiState(terminalId, { focusedPanel: 'tab-content' });
+  };
+
+  const updateTerminalZoom = useCallback(
+    (nextZoomPercentage: number) => {
+      void updatePreferences([
+        {
+          op: 'replace',
+          path: ['general', 'terminalZoomPercentage'],
+          value: nextZoomPercentage,
+        },
+      ]);
+    },
+    [updatePreferences],
+  );
+
+  useHotKeyListener(
+    () => {
+      if (!isActive || !isTerminalFocused) return false;
+      if (zoomPercentage >= 150) return;
+      updateTerminalZoom(Math.min(zoomPercentage + 10, 150));
+    },
+    HotkeyActions.ZOOM_IN,
+    isActive,
+  );
+
+  useHotKeyListener(
+    () => {
+      if (!isActive || !isTerminalFocused) return false;
+      if (zoomPercentage <= 50) return;
+      updateTerminalZoom(Math.max(zoomPercentage - 10, 50));
+    },
+    HotkeyActions.ZOOM_OUT,
+    isActive,
+  );
+
+  useHotKeyListener(
+    () => {
+      if (!isActive || !isTerminalFocused) return false;
+      if (zoomPercentage === 100) return;
+      updateTerminalZoom(100);
+    },
+    HotkeyActions.ZOOM_RESET,
+    isActive,
+  );
 
   const sendResize = (immediate = false) => {
     const term = terminalRef.current;
@@ -146,7 +214,7 @@ export function PerTerminalContent({
       theme: getTheme(),
       fontFamily:
         "'Roboto Mono', Menlo, Monaco, stagewise-builtin-roboto-mono, 'Noto Sans Mono', ui-monospace, 'SF Mono', 'Segoe UI Mono', 'Ubuntu Mono', 'Noto Mono', 'Liberation Mono', 'Inter Mono', Consolas, monospace",
-      fontSize: 13,
+      fontSize,
       fontWeight: 'normal',
       fontWeightBold: 'bold',
       letterSpacing: 0,
@@ -160,7 +228,7 @@ export function PerTerminalContent({
     try {
       term.loadAddon(new WebglAddon());
     } catch {
-      // Fall back to canvas renderer if WebGL is unavailable.
+      // Fall back to the default renderer if WebGL is unavailable.
     }
 
     let aborted = false;
@@ -188,6 +256,7 @@ export function PerTerminalContent({
       terminalRef.current = term;
 
       term.onData((data: string) => {
+        markTerminalFocused();
         terminalInputRef.current(terminalId, data);
       });
 
@@ -251,22 +320,33 @@ export function PerTerminalContent({
     }
   }, [outputBuffer, baseOffset, endOffset]);
 
+  // Re-fit when terminal zoom or active state changes.
   useEffect(() => {
     if (!isActive) return;
     const term = terminalRef.current;
     const fit = fitAddonRef.current;
     if (!term || !fit) return;
-    const tid = setTimeout(() => {
-      try {
-        fit.fit();
-        sendResize(true);
-        term.focus();
-      } catch {
-        // ignore
-      }
-    }, 0);
-    return () => clearTimeout(tid);
-  }, [isActive, terminalId]);
+
+    term.options.fontSize = fontSize;
+
+    let frame2 = 0;
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => {
+        try {
+          fit.fit();
+          sendResize(true);
+          term.focus();
+        } catch {
+          // ignore
+        }
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(frame1);
+      if (frame2) cancelAnimationFrame(frame2);
+    };
+  }, [isActive, terminalId, fontSize]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -292,9 +372,12 @@ export function PerTerminalContent({
 
   return (
     <div
-      ref={containerRef}
-      className="size-full bg-background p-1"
+      className="size-full overflow-hidden bg-background p-1"
       style={{ display: isActive ? undefined : 'none' }}
-    />
+      onFocusCapture={markTerminalFocused}
+      onPointerDown={markTerminalFocused}
+    >
+      <div ref={containerRef} className="size-full overflow-hidden" />
+    </div>
   );
 }
