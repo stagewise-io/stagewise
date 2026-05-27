@@ -3,7 +3,7 @@ import {
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -14,6 +14,11 @@ export const WebContentsBoundsSyncer = () => {
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
   );
+  const uiZoomPercentage = useKartonState(
+    (s) => s.preferences.general.uiZoomPercentage,
+  );
+  const uiZoomPercentageRef = useRef(uiZoomPercentage);
+  const sendBoundsUpdateRef = useRef<(() => void) | null>(null);
 
   useLayoutEffect(() => {
     // Don't set up observers if Karton isn't connected yet. Bounds fired
@@ -52,6 +57,7 @@ export const WebContentsBoundsSyncer = () => {
       }
 
       const rect = containerElement.getBoundingClientRect();
+      const uiZoomFactor = uiZoomPercentageRef.current / 100;
 
       if (rect.width <= 0 || rect.height <= 0) {
         // Element exists but hasn't been laid out yet (common during Electron
@@ -68,11 +74,16 @@ export const WebContentsBoundsSyncer = () => {
         return;
       }
 
+      // Electron WebContentsView bounds are in native window coordinates,
+      // while getBoundingClientRect() is reported in renderer CSS pixels.
+      // With UI zoom now applied via webContents.setZoomFactor(), convert
+      // the CSS-pixel rect back to visual/native coordinates before sending
+      // it to the backend.
       const newBounds: Bounds = {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
+        x: Math.round(rect.x * uiZoomFactor),
+        y: Math.round(rect.y * uiZoomFactor),
+        width: Math.round(rect.width * uiZoomFactor),
+        height: Math.round(rect.height * uiZoomFactor),
       };
 
       const boundsChanged =
@@ -87,6 +98,8 @@ export const WebContentsBoundsSyncer = () => {
         lastBounds = newBounds;
       }
     };
+
+    sendBoundsUpdateRef.current = sendBoundsUpdate;
 
     // --- Hover detection logic (driven by mousemove, not polling) ---
 
@@ -244,8 +257,16 @@ export const WebContentsBoundsSyncer = () => {
       }
       // Clean up by hiding
       updateLayout.fire(null);
+      if (sendBoundsUpdateRef.current === sendBoundsUpdate) {
+        sendBoundsUpdateRef.current = null;
+      }
     };
   }, [activeTabId, connected]);
+
+  useLayoutEffect(() => {
+    uiZoomPercentageRef.current = uiZoomPercentage;
+    sendBoundsUpdateRef.current?.();
+  }, [uiZoomPercentage]);
 
   return null;
 };

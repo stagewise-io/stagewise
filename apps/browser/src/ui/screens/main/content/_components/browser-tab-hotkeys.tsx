@@ -47,19 +47,18 @@ export function BrowserTabHotkeys({
     activeTabIdRef.current = activeTabId;
   }, [activeTabId]);
 
-  // Tab-content zoom — applies to both browser and terminal tabs.
-  // When keyboard focus is inside the tab content (not stagewise UI).
-  // Returns false when stagewise-ui has focus so GlobalHotkeyBindings
-  // (registered earlier in the same capture phase) handles UI zoom.
+  // Browser tab-content zoom. Terminal zoom is handled locally in
+  // PerTerminalContent so it can mark/require terminal focus explicitly.
   useHotKeyListener(() => {
+    if (isTerminalTab) return false;
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId || !currentZoomPercentage) return;
-    const max = isTerminalTab ? 150 : 500;
-    if (currentZoomPercentage >= max) return;
+    if (currentZoomPercentage >= 500) return;
     setZoomPercentage(currentZoomPercentage + 10, activeTabId);
   }, HotkeyActions.ZOOM_IN);
 
   useHotKeyListener(() => {
+    if (isTerminalTab) return false;
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId || !currentZoomPercentage) return;
     if (currentZoomPercentage <= 50) return;
@@ -67,6 +66,7 @@ export function BrowserTabHotkeys({
   }, HotkeyActions.ZOOM_OUT);
 
   useHotKeyListener(() => {
+    if (isTerminalTab) return false;
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId) return;
     setZoomPercentage(100, activeTabId);
