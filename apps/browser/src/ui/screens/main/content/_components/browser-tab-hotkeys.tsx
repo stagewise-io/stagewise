@@ -2,15 +2,12 @@ import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
-import { produceWithPatches, enablePatches } from 'immer';
 import { useEffect, useRef } from 'react';
-
-enablePatches();
 
 /**
  * Browser-tab–scoped hotkeys — mounted per content panel. Handles
  * per-tab web actions: history navigation, page reload, find, dev tools,
- * zoom, and URL bar focus.
+ * tab-content zoom, and URL bar focus.
  */
 export function BrowserTabHotkeys({
   onFocusUrlBar,
@@ -37,12 +34,6 @@ export function BrowserTabHotkeys({
     (p) => p.browser.setZoomPercentage,
   );
 
-  const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const uiZoomPercentage = useKartonState(
-    (s) => s.preferences.general.uiZoomPercentage,
-  );
-
   const currentZoomPercentage = useKartonState((s) =>
     activeTabId ? s.contentTabs.tabs[activeTabId]?.zoomPercentage : 100,
   );
@@ -56,46 +47,28 @@ export function BrowserTabHotkeys({
     activeTabIdRef.current = activeTabId;
   }, [activeTabId]);
 
-  // Zoom helpers
+  // Tab-content zoom — only applies when keyboard focus is inside a
+  // web page. Returns false when stagewise-ui has focus so the
+  // GlobalHotkeyBindings UI zoom handler (registered earlier in the
+  // same capture phase) can handle it.
   useHotKeyListener(() => {
-    if (focusedPanel === 'tab-content') {
-      if (!activeTabId || !currentZoomPercentage || isTerminalTab) return;
-      if (currentZoomPercentage >= 500) return;
-      setZoomPercentage(currentZoomPercentage + 10, activeTabId);
-    } else {
-      if (uiZoomPercentage >= 130) return;
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.general.uiZoomPercentage = Math.min(uiZoomPercentage + 10, 130);
-      });
-      void updatePreferences(patches);
-    }
+    if (focusedPanel !== 'tab-content') return false;
+    if (!activeTabId || !currentZoomPercentage || isTerminalTab) return;
+    if (currentZoomPercentage >= 500) return;
+    setZoomPercentage(currentZoomPercentage + 10, activeTabId);
   }, HotkeyActions.ZOOM_IN);
 
   useHotKeyListener(() => {
-    if (focusedPanel === 'tab-content') {
-      if (!activeTabId || !currentZoomPercentage || isTerminalTab) return;
-      if (currentZoomPercentage <= 50) return;
-      setZoomPercentage(currentZoomPercentage - 10, activeTabId);
-    } else {
-      if (uiZoomPercentage <= 70) return;
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.general.uiZoomPercentage = Math.max(uiZoomPercentage - 10, 70);
-      });
-      void updatePreferences(patches);
-    }
+    if (focusedPanel !== 'tab-content') return false;
+    if (!activeTabId || !currentZoomPercentage || isTerminalTab) return;
+    if (currentZoomPercentage <= 50) return;
+    setZoomPercentage(currentZoomPercentage - 10, activeTabId);
   }, HotkeyActions.ZOOM_OUT);
 
   useHotKeyListener(() => {
-    if (focusedPanel === 'tab-content') {
-      if (!activeTabId || isTerminalTab) return;
-      setZoomPercentage(100, activeTabId);
-    } else {
-      if (uiZoomPercentage === 100) return;
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.general.uiZoomPercentage = 100;
-      });
-      void updatePreferences(patches);
-    }
+    if (focusedPanel !== 'tab-content') return false;
+    if (!activeTabId || isTerminalTab) return;
+    setZoomPercentage(100, activeTabId);
   }, HotkeyActions.ZOOM_RESET);
 
   // URL bar (Mod+Alt+L): always focus the omnibox.
