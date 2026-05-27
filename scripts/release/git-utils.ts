@@ -33,10 +33,10 @@ export async function getLastStableTag(prefix: string): Promise<string | null> {
     );
     const tags = stdout.trim().split('\n').filter(Boolean);
 
-    // Find the first tag that doesn't contain alpha or beta
+    // Find the first tag without any prerelease suffix.
     for (const tag of tags) {
       const version = tag.replace(prefix, '');
-      if (!version.includes('-alpha') && !version.includes('-beta')) {
+      if (!version.includes('-')) {
         return tag;
       }
     }
