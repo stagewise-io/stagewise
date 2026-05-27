@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import '@xterm/xterm/css/xterm.css';
+
+const BASE_FONT_SIZE = 13;
 
 interface PerTerminalContentProps {
   terminalId: string;
@@ -23,6 +25,18 @@ export function PerTerminalContent({
   const lastSentSizeRef = useRef<{ cols: number; rows: number } | null>(null);
   /** Absolute backend output offset consumed by this renderer. */
   const consumedOffsetRef = useRef(0);
+
+  // Tab-level zoom (Cmd+=, Cmd+-, Cmd+0).  Terminal tabs use the
+  // same zoomPercentage field as browser tabs; the backend updates
+  // it directly in karton state for terminal-type tabs.
+  const zoomPercentage = useKartonState((s) => {
+    const tab = s.contentTabs.tabs[terminalId];
+    return tab?.zoomPercentage ?? 100;
+  });
+  const fontSize = useMemo(
+    () => Math.round(BASE_FONT_SIZE * (zoomPercentage / 100)),
+    [zoomPercentage],
+  );
 
   const outputBuffer = useKartonState(
     (s) => s.terminals.outputBuffers[terminalId] ?? '',
@@ -146,7 +160,7 @@ export function PerTerminalContent({
       theme: getTheme(),
       fontFamily:
         "'Roboto Mono', Menlo, Monaco, stagewise-builtin-roboto-mono, 'Noto Sans Mono', ui-monospace, 'SF Mono', 'Segoe UI Mono', 'Ubuntu Mono', 'Noto Mono', 'Liberation Mono', 'Inter Mono', Consolas, monospace",
-      fontSize: 13,
+      fontSize,
       fontWeight: 'normal',
       fontWeightBold: 'bold',
       letterSpacing: 0,
@@ -251,6 +265,7 @@ export function PerTerminalContent({
     }
   }, [outputBuffer, baseOffset, endOffset]);
 
+  // Re-fit when font size changes (zoom) or tab becomes active.
   useEffect(() => {
     if (!isActive) return;
     const term = terminalRef.current;
@@ -258,6 +273,7 @@ export function PerTerminalContent({
     if (!term || !fit) return;
     const tid = setTimeout(() => {
       try {
+        term.options.fontSize = fontSize;
         fit.fit();
         sendResize(true);
         term.focus();
@@ -266,7 +282,7 @@ export function PerTerminalContent({
       }
     }, 0);
     return () => clearTimeout(tid);
-  }, [isActive, terminalId]);
+  }, [isActive, terminalId, fontSize]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -293,7 +309,7 @@ export function PerTerminalContent({
   return (
     <div
       ref={containerRef}
-      className="size-full bg-background p-1"
+      className="size-full bg-background"
       style={{ display: isActive ? undefined : 'none' }}
     />
   );

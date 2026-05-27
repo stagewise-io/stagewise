@@ -2001,8 +2001,22 @@ export class WindowLayoutService extends DisposableService {
     percentage: number,
     tabId?: string,
   ) => {
-    const tab = tabId ? this.tabs[tabId] : this.activeTab;
-    tab?.setZoomPercentage(percentage);
+    const resolvedTabId = tabId ?? this.activeTabId;
+    const tab = resolvedTabId ? this.tabs[resolvedTabId] : undefined;
+    if (tab) {
+      tab.setZoomPercentage(percentage);
+    } else if (resolvedTabId) {
+      // Terminal tabs have no BrowsingTabController — update state directly.
+      const isTerminal =
+        this.uiKarton.state.contentTabs.tabs[resolvedTabId]?.type ===
+        'terminal';
+      if (isTerminal) {
+        this.uiKarton.setState((draft) => {
+          const t = draft.contentTabs.tabs[resolvedTabId];
+          if (t) t.zoomPercentage = percentage;
+        });
+      }
+    }
   };
 
   private handleSetTabAgentInstance = async (
