@@ -1,7 +1,7 @@
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import { getCurrentPlatform } from '@shared/hotkeys';
 
-const nativeFileManagerLabel = (() => {
+export const nativeFileManagerLabel = (() => {
   const platform = getCurrentPlatform();
   if (platform === 'mac') return 'Finder';
   if (platform === 'windows') return 'Explorer';
@@ -60,7 +60,7 @@ export const getIDEFileUrl = (
       url = `kiro://file/${absFilePath}`;
       break;
     case 'other':
-      url = `stagewise://reveal-file/${absFilePath}`;
+      url = `stagewise://reveal-file/${encodeURIComponent(absFilePath)}`;
       break;
   }
   if (lineNumber) url += `:${lineNumber}`;

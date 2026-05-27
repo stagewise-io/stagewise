@@ -37,6 +37,7 @@ import type { TelemetryService } from '../telemetry';
 import {
   canBrowserHandleUrl,
   openFolderFirstFileInIde,
+  revealPathInFileManager,
 } from './protocol-utils';
 import { ContextMenuWebContent } from './utils/context-menu-web-content';
 import {
@@ -1310,13 +1311,13 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     wc.on('will-navigate', (event, url) => {
       if (url.startsWith('stagewise://reveal-file/')) {
         event.preventDefault();
-        const filePath = url
-          .replace('stagewise://reveal-file/', '')
-          .replace(/:\d+$/, '');
+        const filePath = decodeURIComponent(
+          url.replace('stagewise://reveal-file/', '').replace(/:\d+$/, ''),
+        );
         this.logger.debug(
           `[TabController] Revealing file in folder: ${filePath}`,
         );
-        shell.showItemInFolder(filePath);
+        revealPathInFileManager(filePath);
         return;
       }
       if (url.startsWith('stagewise://open-folder-in-ide/')) {
@@ -1332,7 +1333,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
         );
         if (url.startsWith('file://')) {
           const filePath = fileURLToPath(url).replace(/:\d+$/, '');
-          shell.showItemInFolder(filePath);
+          revealPathInFileManager(filePath);
         } else shell.openExternal(url);
       }
     });
@@ -1580,13 +1581,15 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     wc.setWindowOpenHandler((details) => {
       // Intercept stagewise://reveal-file/ to show file in native file manager
       if (details.url.startsWith('stagewise://reveal-file/')) {
-        const filePath = details.url
-          .replace('stagewise://reveal-file/', '')
-          .replace(/:\d+$/, '');
+        const filePath = decodeURIComponent(
+          details.url
+            .replace('stagewise://reveal-file/', '')
+            .replace(/:\d+$/, ''),
+        );
         this.logger.debug(
           `[TabController] Revealing file in folder: ${filePath}`,
         );
-        shell.showItemInFolder(filePath);
+        revealPathInFileManager(filePath);
         return { action: 'deny' };
       }
 
@@ -1605,7 +1608,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
         );
         if (details.url.startsWith('file://')) {
           const filePath = fileURLToPath(details.url).replace(/:\d+$/, '');
-          shell.showItemInFolder(filePath);
+          revealPathInFileManager(filePath);
         } else shell.openExternal(details.url);
 
         return { action: 'deny' };

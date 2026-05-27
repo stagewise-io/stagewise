@@ -14,8 +14,10 @@ import { useCommandCenter } from '../command-center';
  */
 export function AgentHotkeyBindings({
   onCreateTab,
+  onCreateTerminalTab,
 }: {
   onCreateTab: () => void;
+  onCreateTerminalTab: () => void;
 }) {
   // -- Content panel toggle (Mod+Alt+B) ----------------------------------
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
@@ -46,6 +48,16 @@ export function AgentHotkeyBindings({
       onCreateTab();
     },
     HotkeyActions.NEW_TAB,
+    agentHotkeysEnabled,
+  );
+
+  // Mod+Alt+T: new terminal tab
+  useHotKeyListener(
+    () => {
+      if (contentCollapsed) setContentCollapsed(false);
+      onCreateTerminalTab();
+    },
+    HotkeyActions.NEW_TERMINAL_TAB,
     agentHotkeysEnabled,
   );
 

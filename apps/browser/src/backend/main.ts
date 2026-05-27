@@ -201,9 +201,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   );
 
   // Resolve the sounds directory.
-  // Packaged: resourcesPath is the asar root. Dev: app.getAppPath() = project root.
-  const appRoot = app.isPackaged ? process.resourcesPath! : app.getAppPath();
-  const soundsDir = path.join(appRoot, 'assets', 'sounds');
+  // Packaged: extraResource copies leaf dirs directly into Resources/.
+  // So ./assets/sounds → Resources/sounds/, NOT Resources/assets/sounds/.
+  // Dev: app.getAppPath() = project root where assets/sounds/ exists.
+  const soundsDir = app.isPackaged
+    ? path.join(process.resourcesPath!, 'sounds')
+    : path.join(app.getAppPath(), 'assets', 'sounds');
   const importedPacksDir = path.join(
     app.getPath('userData'),
     'imported-sound-packs',

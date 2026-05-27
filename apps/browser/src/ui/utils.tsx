@@ -319,7 +319,11 @@ export const getTruncatedFileUrl = (
   return `${leadingSep || ''}${truncatedPath}`;
 };
 
-export { IDE_SELECTION_ITEMS, getIDEFileUrl } from '@shared/ide-url';
+export {
+  IDE_SELECTION_ITEMS,
+  getIDEFileUrl,
+  nativeFileManagerLabel,
+} from '@shared/ide-url';
 
 /**
  * Extract an image URL from drag-and-drop data transfer.

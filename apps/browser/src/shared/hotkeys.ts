@@ -61,6 +61,7 @@ export enum HotkeyActions {
 
   // Tab & window navigation
   NEW_TAB = 'new_tab',
+  NEW_TERMINAL_TAB = 'new_terminal_tab',
   CLOSE_TAB = 'close_tab',
   NEXT_TAB = 'next_tab',
   PREV_TAB = 'prev_tab',
@@ -192,6 +193,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   // Tab & window navigation
   [HotkeyActions.NEW_TAB]: {
     accelerator: 'Mod+T',
+    captureDominantly: true,
+  },
+  [HotkeyActions.NEW_TERMINAL_TAB]: {
+    accelerator: 'Mod+Alt+T',
     captureDominantly: true,
   },
   [HotkeyActions.CLOSE_TAB]: {

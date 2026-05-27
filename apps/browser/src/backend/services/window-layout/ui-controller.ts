@@ -15,6 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   canBrowserHandleUrl,
   openFolderFirstFileInIde,
+  revealPathInFileManager,
 } from './protocol-utils';
 import {
   default as installExtension,
@@ -475,13 +476,13 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     view.webContents.on('will-navigate', (event, url) => {
       if (url.startsWith('stagewise://reveal-file/')) {
         event.preventDefault();
-        const filePath = url
-          .replace('stagewise://reveal-file/', '')
-          .replace(/:\d+$/, '');
+        const filePath = decodeURIComponent(
+          url.replace('stagewise://reveal-file/', '').replace(/:\d+$/, ''),
+        );
         this.logger.debug(
           `[UIController] Revealing file in folder: ${filePath}`,
         );
-        shell.showItemInFolder(filePath);
+        revealPathInFileManager(filePath);
         return;
       }
       if (url.startsWith('stagewise://open-folder-in-ide/')) {
@@ -493,13 +494,15 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     view.webContents.setWindowOpenHandler((details) => {
       // Intercept stagewise://reveal-file/ to show file in native file manager
       if (details.url.startsWith('stagewise://reveal-file/')) {
-        const filePath = details.url
-          .replace('stagewise://reveal-file/', '')
-          .replace(/:\d+$/, '');
+        const filePath = decodeURIComponent(
+          details.url
+            .replace('stagewise://reveal-file/', '')
+            .replace(/:\d+$/, ''),
+        );
         this.logger.debug(
           `[UIController] Revealing file in folder: ${filePath}`,
         );
-        shell.showItemInFolder(filePath);
+        revealPathInFileManager(filePath);
         return { action: 'deny' };
       }
 
@@ -518,7 +521,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         );
         if (details.url.startsWith('file://')) {
           const filePath = fileURLToPath(details.url).replace(/:\d+$/, '');
-          shell.showItemInFolder(filePath);
+          revealPathInFileManager(filePath);
         } else shell.openExternal(details.url);
 
         return { action: 'deny' };
