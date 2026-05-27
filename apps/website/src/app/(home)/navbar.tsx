@@ -28,15 +28,15 @@ function NavDownloadButton() {
     if (isMobile) return;
     if (platform.includes('mac') || ua.includes('mac')) {
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/alpha/macos/arm64',
+        'https://dl.stagewise.io/download/stagewise/release/macos/arm64',
       );
     } else if (platform.includes('win') || ua.includes('win')) {
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/alpha/win/x64',
+        'https://dl.stagewise.io/download/stagewise/release/win/x64',
       );
     } else if (platform.includes('linux') || ua.includes('linux')) {
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/alpha/linux/deb/x86_64',
+        'https://dl.stagewise.io/download/stagewise/release/linux/deb/x86_64',
       );
     }
   }, []);
