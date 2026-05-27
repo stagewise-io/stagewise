@@ -527,11 +527,14 @@ export const userPreferencesSchema = z.object({
       startupPage: pageSettingSchema.default({ type: 'home' }),
       /** UI zoom percentage applied to the Stagewise interface (70-130) */
       uiZoomPercentage: z.number().min(70).max(130).default(100),
+      /** Global terminal zoom percentage applied to all terminal tabs (50-150) */
+      terminalZoomPercentage: z.number().min(50).max(150).default(100),
     })
     .default({
       newTabPage: { type: 'home' },
       startupPage: { type: 'home' },
       uiZoomPercentage: 100,
+      terminalZoomPercentage: 100,
     }),
   /** Website permission settings (defaults and host-specific overrides) */
   permissions: z.lazy(() => permissionsPreferencesSchema),
@@ -667,6 +670,7 @@ export const defaultUserPreferences: UserPreferences = {
     newTabPage: { type: 'home' },
     startupPage: { type: 'home' },
     uiZoomPercentage: 100,
+    terminalZoomPercentage: 100,
   },
   permissions: defaultPermissionsForUserPrefs,
   devToolbar: defaultDevToolbarForUserPrefs,

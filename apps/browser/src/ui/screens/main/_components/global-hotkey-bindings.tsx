@@ -242,8 +242,8 @@ export function GlobalHotkeyBindings() {
 
   // -- UI zoom (Mod+=, Mod+-, Mod+0) ------------------------------------
   // Only applies when keyboard focus is on stagewise UI chrome.
-  // When tab-content has focus, returns false so BrowserTabHotkeys
-  // (which registers later in the same capture phase) handles it.
+  // When tab-content has focus, returns false so browser-tab or terminal
+  // scoped zoom handlers can handle the same zoom hotkey.
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
   const uiZoomPercentage = useKartonState(
@@ -255,32 +255,34 @@ export function GlobalHotkeyBindings() {
     ? (tabUiState[activeTabId]?.focusedPanel ?? 'stagewise-ui')
     : 'stagewise-ui';
 
+  const shouldDeferToTabZoom = focusedPanel === 'tab-content';
+
   const handleUiZoomIn = useCallback(() => {
-    if (focusedPanel === 'tab-content') return false;
+    if (shouldDeferToTabZoom) return false;
     if (uiZoomPercentage >= 130) return;
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.general.uiZoomPercentage = Math.min(uiZoomPercentage + 10, 130);
     });
     void updatePreferences(patches);
-  }, [focusedPanel, uiZoomPercentage, preferences, updatePreferences]);
+  }, [shouldDeferToTabZoom, uiZoomPercentage, preferences, updatePreferences]);
 
   const handleUiZoomOut = useCallback(() => {
-    if (focusedPanel === 'tab-content') return false;
+    if (shouldDeferToTabZoom) return false;
     if (uiZoomPercentage <= 70) return;
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.general.uiZoomPercentage = Math.max(uiZoomPercentage - 10, 70);
     });
     void updatePreferences(patches);
-  }, [focusedPanel, uiZoomPercentage, preferences, updatePreferences]);
+  }, [shouldDeferToTabZoom, uiZoomPercentage, preferences, updatePreferences]);
 
   const handleUiZoomReset = useCallback(() => {
-    if (focusedPanel === 'tab-content') return false;
+    if (shouldDeferToTabZoom) return false;
     if (uiZoomPercentage === 100) return;
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.general.uiZoomPercentage = 100;
     });
     void updatePreferences(patches);
-  }, [focusedPanel, uiZoomPercentage, preferences, updatePreferences]);
+  }, [shouldDeferToTabZoom, uiZoomPercentage, preferences, updatePreferences]);
 
   useHotKeyListener(
     handleUiZoomIn,

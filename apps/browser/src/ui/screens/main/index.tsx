@@ -24,6 +24,7 @@ import {
   ContentCollapsedProvider,
   useContentCollapsed,
 } from './_components/content-collapsed-context';
+import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { ContentToggleButton } from './_components/content-toggle-button';
 import { GlobalHotkeyBindings } from './_components/global-hotkey-bindings';
 import { AgentHotkeyBindings } from './_components/agent-hotkey-bindings';
@@ -58,6 +59,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const { setTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
   const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
@@ -153,6 +155,11 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
     void createTerminal(undefined, openAgent);
   }, [createTerminal, openAgent, contentCollapsed, setContentCollapsed]);
 
+  const markStagewiseUiFocused = useCallback(() => {
+    if (!activeTabId) return;
+    setTabUiState(activeTabId, { focusedPanel: 'stagewise-ui' });
+  }, [activeTabId, setTabUiState]);
+
   // Headless: keeps `openAgent` valid regardless of whether the sidebar
   // (which used to own this effect) is mounted.
   useAutoSelectFirstAgent();
@@ -168,6 +175,8 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
           'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
           !show && 'pointer-events-none opacity-0 blur-lg',
         )}
+        onFocusCapture={markStagewiseUiFocused}
+        onPointerDownCapture={markStagewiseUiFocused}
       >
         {/* Single global drag zone for macOS titlebar — sits behind everything */}
         {isMacOs && !isFullScreen && (
