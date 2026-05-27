@@ -68,17 +68,17 @@ function DownloadButtons({ className }: { className?: string }) {
     if (platform.includes('mac') || userAgent.includes('mac')) {
       setUserOS('macOS');
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/alpha/macos/arm64',
+        'https://dl.stagewise.io/download/stagewise/release/macos/arm64',
       );
     } else if (platform.includes('win') || userAgent.includes('win')) {
       setUserOS('Windows');
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/alpha/win/x64',
+        'https://dl.stagewise.io/download/stagewise/release/win/x64',
       );
     } else if (platform.includes('linux') || userAgent.includes('linux')) {
       setUserOS('Linux');
       setDownloadUrl(
-        'https://dl.stagewise.io/download/stagewise/alpha/linux/deb/x86_64',
+        'https://dl.stagewise.io/download/stagewise/release/linux/deb/x86_64',
       );
     } else {
       setIsOsSupported(false);
