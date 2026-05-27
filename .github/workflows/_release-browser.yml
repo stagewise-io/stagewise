@@ -175,6 +175,18 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Apply release version to package metadata
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const path = "apps/browser/package.json";
+            const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+            pkg.version = process.env.RELEASE_VERSION;
+            fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+          '
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+
       - name: Import macOS signing certs
         if: runner.os == 'macOS'
         uses: apple-actions/import-codesign-certs@v3
