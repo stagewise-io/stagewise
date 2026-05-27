@@ -186,7 +186,7 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.STOP_AGENT]: {
     accelerator: 'Ctrl+C',
-    captureDominantly: true,
+    captureDominantly: false,
   },
 
   // Tab & window navigation

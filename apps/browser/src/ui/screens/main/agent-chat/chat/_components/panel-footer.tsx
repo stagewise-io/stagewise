@@ -27,7 +27,6 @@ import {
 } from '@ui/hooks/use-karton';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useEventListener } from '@ui/hooks/use-event-listener';
-import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useTrack } from '@ui/hooks/use-track';
 import {
   ChatInput,
@@ -300,15 +299,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   );
 
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
-  const activeTabIsTerminal = useKartonState((s) =>
-    activeTabId ? s.contentTabs.tabs[activeTabId]?.type === 'terminal' : false,
-  );
-  const { tabUiState } = useTabUIState();
-  const activeFocusedPanel = activeTabId
-    ? (tabUiState[activeTabId]?.focusedPanel ?? 'stagewise-ui')
-    : 'stagewise-ui';
-  const terminalHasFocus =
-    activeTabIsTerminal && activeFocusedPanel === 'tab-content';
 
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
@@ -1248,11 +1238,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   useHotKeyListener(
     useCallback(
       (event: KeyboardEvent) => {
-        if (terminalHasFocus) return false;
         if (shouldPreserveNativeCopy(event)) return false;
         void abortAgentRef.current();
       },
-      [shouldPreserveNativeCopy, terminalHasFocus],
+      [shouldPreserveNativeCopy],
     ),
     HotkeyActions.STOP_AGENT,
     isWorking && !hasPendingQuestion,
