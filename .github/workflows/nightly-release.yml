@@ -1,6 +1,10 @@
 name: "Nightly Release"
 
 on:
+  schedule:
+    # Run daily at 03:00 UTC. The workflow skips if main has not changed
+    # since the latest nightly tag reachable from main.
+    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       ref:
@@ -23,8 +27,54 @@ permissions:
   contents: read
 
 jobs:
+  should-release:
+    name: Check for main changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check latest nightly tag
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest_nightly_tag=$(git tag \
+            --list 'stagewise@*-nightly*' \
+            --merged HEAD \
+            --sort=-version:refname \
+            | head -n 1)
+
+          if [ -z "$latest_nightly_tag" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest_nightly_commit=$(git rev-list -n 1 "$latest_nightly_tag")
+          current_commit=$(git rev-parse HEAD)
+
+          if [ "$latest_nightly_commit" = "$current_commit" ]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   version:
     name: Compute nightly version
+    needs: should-release
+    if: needs.should-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
