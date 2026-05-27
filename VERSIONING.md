@@ -79,16 +79,16 @@ The counter is **capped at `999`**. Going beyond would break lexical ordering â€
 
 Nightly versions are generated dynamically by CI and are **not committed** to `apps/browser/package.json`.
 
-Format: `MAJOR.MINOR.PATCH-nightlyYYYYMMDDNNN` (e.g. `1.0.1-nightly20260525001`). The base version is the next patch after the current stable package version. For example, if `apps/browser/package.json` is `1.0.0`, the nightly base is `1.0.1`.
+Format: `MAJOR.MINOR.PATCH-nightlyYYYYMMDDcNNN` (e.g. `1.0.1-nightly20260525c001`). The base version is the next patch after the current stable package version. For example, if `apps/browser/package.json` is `1.0.0`, the nightly base is `1.0.1`.
 
-The nightly suffix is a single SemVer prerelease identifier so the version remains compatible with Squirrel.Windows. `YYYYMMDD` is the UTC date and `NNN` is a 3-digit per-day counter.
+The nightly suffix is a single SemVer prerelease identifier so the version remains compatible with Squirrel.Windows. `YYYYMMDD` is the UTC date and `NNN` is a 3-digit per-day counter. The `c` separator prevents Squirrel.Windows' embedded NuGet parser from reading `YYYYMMDDNNN` as one integer, which overflows Int32.
 
 Examples:
 
 - `1.0.1-alpha001` - First alpha for upcoming 1.0.1
 - `1.0.1-alpha002` - Second alpha
 - `1.0.1-beta001` - First beta (after alpha phase)
-- `1.0.1-nightly20260525001` - Nightly build for the 1.0.1 release line
+- `1.0.1-nightly20260525c001` - Nightly build for the 1.0.1 release line
 - `1.0.1` - Final release
 
 ### Version Transitions

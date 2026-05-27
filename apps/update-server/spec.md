@@ -13,7 +13,7 @@ Build a auto-update / download server that responds to certain request paths wit
   - The app is released and files are hosted in a github repo. Make this configurable as well (`APP_GITHUB_ORG` and `APP_GITHUB_REPO`)
 - The server offers multiple update channels:
   - Release updates (returns only stable versions) under channel `release`.
-  - Nightly updates (returns only nightly versions such as `1.0.1-nightly20260525001`) under channel `nightly`.
+  - Nightly updates (returns only nightly versions such as `1.0.1-nightly20260525c001`) under channel `nightly`.
   - Legacy pre-release updates are kept during the migration window:
     - Alpha channel (returns the latest legacy pre-release, including pre-releases with alpha and beta version suffix) under channel `alpha`.
     - Beta channel (returns the latest legacy pre-release with beta version suffix, but no alpha versions) under channel `beta`.
@@ -36,9 +36,9 @@ Build a auto-update / download server that responds to certain request paths wit
 
 ## App release format
 
-The versioning of the app is in semver with optional suffixes for pre-release versions. Examples: `1.2.3`, `1.1.0-alpha001`, `2.2.0-beta005`, `1.0.1-nightly20260525001`.
+The versioning of the app is in semver with optional suffixes for pre-release versions. Examples: `1.2.3`, `1.1.0-alpha001`, `2.2.0-beta005`, `1.0.1-nightly20260525c001`.
 
-Release versions don't have suffixes. Legacy pre-releases use a suffix with either "alpha" or "beta". Nightly versions use a suffix in the form `nightlyYYYYMMDDNNN`, where `NNN` is a three-digit per-day counter.
+Release versions don't have suffixes. Legacy pre-releases use a suffix with either "alpha" or "beta". Nightly versions use a suffix in the form `nightlyYYYYMMDDcNNN`, where `NNN` is a three-digit per-day counter.
 
 The suffix name and counter are intentionally concatenated without dot separators so Squirrel.Windows' NuGet parser can read versions from update package filenames.
 
