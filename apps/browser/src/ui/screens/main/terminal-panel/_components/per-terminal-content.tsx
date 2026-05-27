@@ -374,6 +374,7 @@ export function PerTerminalContent({
     <div
       className="size-full overflow-hidden bg-background p-1"
       style={{ display: isActive ? undefined : 'none' }}
+      onFocusCapture={markTerminalFocused}
       onPointerDown={markTerminalFocused}
     >
       <div ref={containerRef} className="size-full overflow-hidden" />
