@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 (2026-05-27)
+
+### Features
+
+* add reveal-file smart logic, platform-aware labels, and terminal tab hotkey (dd940c7)
+
+### Bug Fixes
+
+* apply release version before packaging (c31d195)
+* make nightly versions squirrel-compatible (e0da7e6)
+
 ## 1.0.1 (2026-05-27)
 
 ### Bug Fixes
