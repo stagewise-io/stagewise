@@ -96,6 +96,7 @@ jobs:
       version: ${{ needs.detect.outputs.stagewise-version }}
       tag: ${{ needs.detect.outputs.stagewise-tag }}
       channel: ${{ needs.detect.outputs.stagewise-channel }}
+      ref: ${{ github.sha }}
     secrets: inherit
 
   # ---------------------------------------------------------------------------
