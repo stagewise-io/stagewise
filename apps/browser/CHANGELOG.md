@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0-alpha098 (2026-05-28)
+
+### Features
+
+* add migrate-to-stable dialog (9622107)
+
 ## 1.0.0-alpha097 (2026-05-22)
 
 ### Features
