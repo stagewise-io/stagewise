@@ -186,6 +186,9 @@ describe('WorktreeSetupRunner', () => {
     expect(state.workspaceGitSetup.runsByPath[workspacePath]?.status).toBe(
       'running',
     );
+
+    child.emit('close', 0);
+    runner.teardown();
   });
 
   it('updates state to succeeded on zero exit', async () => {
@@ -286,18 +289,26 @@ describe('WorktreeSetupRunner', () => {
     const { state, uiKarton } = createKarton();
     const spawnProcess = vi.fn();
     const captureException = vi.fn();
+    let resolveEnv!: (env: Record<string, string> | null) => void;
+    const resolvedEnvPromise = new Promise<Record<string, string> | null>(
+      (resolve) => {
+        resolveEnv = resolve;
+      },
+    );
     const runner = createRunner({
       logger: { warn: vi.fn() } as unknown as Logger,
       telemetryService: {
         captureException,
       } as unknown as TelemetryService,
       uiKarton,
-      resolvedEnvPromise: new Promise(() => {}),
+      resolvedEnvPromise,
       spawnProcess,
       timeoutMs: 10,
     });
 
-    void runner.start(metadata(mainWorktreePath, workspacePath));
+    const startPromise = runner.start(
+      metadata(mainWorktreePath, workspacePath),
+    );
 
     await vi.waitFor(() => {
       expect(state.workspaceGitSetup.runsByPath[workspacePath]?.status).toBe(
@@ -310,6 +321,9 @@ describe('WorktreeSetupRunner', () => {
       message: 'Worktree setup timed out.',
     });
     expect(captureException).not.toHaveBeenCalled();
+
+    resolveEnv(null);
+    await startPromise;
   });
 
   it('flushes pending output when the process exits', async () => {
