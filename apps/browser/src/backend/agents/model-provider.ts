@@ -6,6 +6,12 @@ import type {
   CustomModel,
   CustomEndpoint,
 } from '@shared/karton-contracts/ui/shared-types';
+import type { ReasoningSignatureSource } from '@shared/karton-contracts/ui/agent/metadata';
+import {
+  createReasoningSignatureSource,
+  getSemanticProviderForApiSpec,
+  type ProviderMode,
+} from './reasoning-signatures';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { availableModels } from '@shared/available-models';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -44,7 +50,7 @@ const stagewiseUrlPassthroughMiddleware: LanguageModelMiddleware = {
   }),
 };
 
-export type ProviderMode = 'stagewise' | 'official' | 'custom';
+export type { ProviderMode } from './reasoning-signatures';
 
 export type ModelWithOptions = {
   model: LanguageModelV3;
@@ -52,6 +58,7 @@ export type ModelWithOptions = {
   headers: Record<string, string>;
   contextWindowSize: number;
   providerMode: ProviderMode;
+  reasoningSignatureSource: ReasoningSignatureSource;
   /**
    * When true, the agent must strip the `strict` field from every tool
    * definition before passing them to `streamText`. Required for providers
@@ -347,15 +354,19 @@ export class ModelProviderService {
     };
 
     if (mode === 'stagewise') {
+      if (!officialProvider) {
+        throw new Error(
+          `Model ${modelSettings.modelId} has no officialProvider set`,
+        );
+      }
       const proxyBaseUrl =
         process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
       // OpenRouter uses different provider prefixes for some vendors
       const OPENROUTER_PROVIDER_MAP: Partial<Record<ModelProvider, string>> = {
         alibaba: 'qwen',
       };
-      const routerProvider = officialProvider
-        ? (OPENROUTER_PROVIDER_MAP[officialProvider] ?? officialProvider)
-        : officialProvider;
+      const routerProvider =
+        OPENROUTER_PROVIDER_MAP[officialProvider] ?? officialProvider;
       const prefixedModelId = `${routerProvider}/${modelSettings.modelId}`;
       const stagewiseProvider = createStagewise({
         apiKey: this.authService.accessToken ?? '',
@@ -375,6 +386,11 @@ export class ModelProviderService {
         >[0]['providerOptions'],
         contextWindowSize: modelSettings.modelContextRaw,
         providerMode: 'stagewise',
+        reasoningSignatureSource: createReasoningSignatureSource(
+          'stagewise',
+          officialProvider,
+          prefixedModelId,
+        ),
       };
     }
 
@@ -447,6 +463,12 @@ export class ModelProviderService {
       posthogProperties: Record<string, unknown>;
     },
   ): Omit<ModelWithOptions, 'providerMode'> {
+    const reasoningSignatureSource = createReasoningSignatureSource(
+      'official',
+      provider,
+      modelId,
+    );
+
     switch (provider) {
       case 'anthropic': {
         const p = createAnthropic({ apiKey, baseURL });
@@ -460,6 +482,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'openai': {
@@ -474,6 +497,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'google': {
@@ -488,6 +512,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'moonshotai': {
@@ -507,6 +532,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'alibaba': {
@@ -526,6 +552,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'deepseek': {
@@ -544,6 +571,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'z-ai': {
@@ -562,6 +590,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       case 'minimax': {
@@ -580,6 +609,7 @@ export class ModelProviderService {
             typeof streamText
           >[0]['providerOptions'],
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       default: {
@@ -608,6 +638,12 @@ export class ModelProviderService {
     );
     const baseURL = endpoint.baseUrl || undefined;
     const { apiSpec } = endpoint;
+    const reasoningSignatureSource = createReasoningSignatureSource(
+      'custom',
+      getSemanticProviderForApiSpec(apiSpec),
+      modelId,
+      { apiSpec, endpointId: endpoint.id },
+    );
 
     switch (apiSpec) {
       case 'anthropic': {
@@ -620,6 +656,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -633,6 +670,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -646,6 +684,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -659,6 +698,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -677,6 +717,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -690,6 +731,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
           stripStrictFromTools: true,
         };
       }
@@ -716,6 +758,7 @@ export class ModelProviderService {
           headers,
           providerOptions: modelProviderOptions as any,
           contextWindowSize,
+          reasoningSignatureSource,
         };
       }
       default: {
@@ -775,6 +818,12 @@ export class ModelProviderService {
     }
 
     const providerKey = apiSpec.startsWith('openai-') ? 'openai' : apiSpec;
+    const reasoningSignatureSource = createReasoningSignatureSource(
+      'custom',
+      getSemanticProviderForApiSpec(apiSpec),
+      customModel.modelId,
+      { apiSpec, endpointId: endpoint?.id ?? customModel.endpointId },
+    );
     const providerOptions =
       Object.keys(customModel.providerOptions).length > 0
         ? ({ [providerKey]: customModel.providerOptions } as any)
@@ -791,6 +840,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -804,6 +854,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -817,6 +868,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -830,6 +882,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -849,6 +902,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
         };
       }
 
@@ -863,6 +917,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
           stripStrictFromTools: true,
         };
       }
@@ -890,6 +945,7 @@ export class ModelProviderService {
           headers,
           providerOptions,
           contextWindowSize: customModel.contextWindowSize,
+          reasoningSignatureSource,
         };
       }
     }

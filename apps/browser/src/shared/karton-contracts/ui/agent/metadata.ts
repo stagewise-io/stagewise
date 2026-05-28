@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { environmentDiffSnapshotSchema } from '../shared-types';
+import {
+  apiSpecSchema,
+  environmentDiffSnapshotSchema,
+  modelProviderSchema,
+  providerEndpointModeSchema,
+} from '../shared-types';
 
 /**
  * A path-based attachment on a user message.
@@ -49,6 +54,43 @@ export const textClipAttachmentSchema = z.object({
 
 /** @deprecated Use file-based `.textclip` attachments instead. */
 export type TextClipAttachment = z.infer<typeof textClipAttachmentSchema>;
+
+export const reasoningSignatureSourceSchema = z
+  .object({
+    providerMode: providerEndpointModeSchema,
+    provider: modelProviderSchema,
+    apiSpec: apiSpecSchema.optional(),
+    endpointId: z.string().optional(),
+    modelId: z.string(),
+  })
+  .superRefine((source, ctx) => {
+    if (source.providerMode !== 'custom') return;
+    if (!source.apiSpec) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Custom reasoning signature sources require apiSpec',
+        path: ['apiSpec'],
+      });
+    }
+    if (!source.endpointId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Custom reasoning signature sources require endpointId',
+        path: ['endpointId'],
+      });
+    }
+  });
+
+export type ReasoningSignatureSource = z.infer<
+  typeof reasoningSignatureSourceSchema
+>;
+
+export const ownedReasoningDetailsSchema = z.object({
+  source: reasoningSignatureSourceSchema,
+  details: z.array(z.record(z.string(), z.unknown())).min(1),
+});
+
+export type OwnedReasoningDetails = z.infer<typeof ownedReasoningDetailsSchema>;
 
 export const browserTabSnapshotSchema = z.object({
   id: z.string(),
@@ -343,19 +385,21 @@ const metadataSchema = z.object({
    */
   pathReferences: z.record(z.string(), z.string()).optional(),
   /**
-   * Signed `reasoning_details` captured from the provider response.
-   * Re-injected into outbound assistant messages on subsequent requests
-   * so providers (Anthropic via Bedrock/OpenRouter, Google) can verify
-   * chain-of-thought signatures and keep extending the thinking process.
+   * Provider-owned signed `reasoning_details` captured from the provider
+   * response. Re-injected only when the outbound model route matches the
+   * semantic owner so Anthropic/Google/OpenAI signatures are never replayed
+   * across provider boundaries.
    *
    * Shape is provider-defined (`reasoning.text`, `reasoning.encrypted`,
    * `reasoning.summary`, etc., each carrying `signature` /
    * `thought_signature` / `format`). We store entries verbatim so
    * forward-compat is preserved — do NOT tighten this schema.
-   *
-   * Populated by `populateReasoningDetailsOnAssistantMessage` at step end.
-   * Consumed by `convertAssistantMessage` when building ModelMessages
-   * (attached under `providerOptions.openaiCompatible.reasoning_details`).
+   */
+  ownedReasoningDetails: z.array(ownedReasoningDetailsSchema).optional(),
+  /**
+   * @deprecated Legacy flat signed `reasoning_details` captured before
+   * provider ownership was tracked. Kept readable for existing DB rows;
+   * conversion consumes it via conservative source inference only.
    */
   reasoningDetails: z.array(z.record(z.string(), z.unknown())).optional(),
 });

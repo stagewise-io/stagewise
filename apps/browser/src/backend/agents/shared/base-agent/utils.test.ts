@@ -7,8 +7,12 @@ import type {
   EnvironmentSnapshot,
   FullEnvironmentSnapshot,
 } from '@shared/karton-contracts/ui/agent/metadata';
-import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+import type {
+  ReasoningSignatureSource,
+  UserMessageMetadata,
+} from '@shared/karton-contracts/ui/agent/metadata';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
+import type { ModelMessage } from 'ai';
 import { convertAgentMessagesToModelMessages } from './utils';
 import {
   resolveEffectiveSnapshot,
@@ -76,24 +80,136 @@ function makeAssistantMsg(
   } as AgentMessage;
 }
 
+function makeReasoningAssistantMsg(
+  metadata: Partial<UserMessageMetadata>,
+): AgentMessage {
+  return {
+    id: 'a-reasoning',
+    role: 'assistant',
+    parts: [
+      { type: 'step-start' },
+      { type: 'reasoning', text: 'private thought', state: 'done' },
+      { type: 'text', text: 'visible answer', state: 'done' },
+    ],
+    metadata: {
+      ...makeMetadata(),
+      ...metadata,
+    },
+  } as AgentMessage;
+}
+
+const stagewiseAnthropicSource: ReasoningSignatureSource = {
+  providerMode: 'stagewise',
+  provider: 'anthropic',
+  modelId: 'anthropic/claude-sonnet-4.6',
+};
+
+const stagewiseOpenAISource: ReasoningSignatureSource = {
+  providerMode: 'stagewise',
+  provider: 'openai',
+  modelId: 'openai/gpt-5.4',
+};
+
+const stagewiseGoogleSource: ReasoningSignatureSource = {
+  providerMode: 'stagewise',
+  provider: 'google',
+  modelId: 'google/gemini-3.1-pro-preview',
+};
+
+const officialAnthropicSource: ReasoningSignatureSource = {
+  providerMode: 'official',
+  provider: 'anthropic',
+  modelId: 'claude-sonnet-4.6',
+};
+
+const customAnthropicSource: ReasoningSignatureSource = {
+  providerMode: 'custom',
+  provider: 'anthropic',
+  apiSpec: 'amazon-bedrock',
+  endpointId: 'bedrock-prod',
+  modelId: 'anthropic.claude-sonnet-4-6',
+};
+
+type AssistantModelMessage = Extract<ModelMessage, { role: 'assistant' }>;
+
+type TextLikePart = {
+  type: string;
+  text?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isTextLikePart(value: unknown): value is TextLikePart {
+  return isRecord(value) && typeof value.type === 'string';
+}
+
+function getAssistantMessages(
+  messages: ModelMessage[],
+): AssistantModelMessage[] {
+  return messages.filter(
+    (message): message is AssistantModelMessage => message.role === 'assistant',
+  );
+}
+
+function getContentParts(message: ModelMessage): TextLikePart[] {
+  const { content } = message;
+  if (Array.isArray(content)) return content.filter(isTextLikePart);
+  if (typeof content === 'string') return [{ type: 'text', text: content }];
+  return [];
+}
+
+function hasReasoningPart(message: AssistantModelMessage): boolean {
+  return getContentParts(message).some((part) => part.type === 'reasoning');
+}
+
+function getReasoningDetails(message: ModelMessage): unknown {
+  const providerOptions = message.providerOptions;
+  if (!isRecord(providerOptions)) return undefined;
+  const openaiCompatible = providerOptions.openaiCompatible;
+  if (!isRecord(openaiCompatible)) return undefined;
+  return openaiCompatible.reasoning_details;
+}
+
+function convertWithReasoningSource(
+  messages: AgentMessage[],
+  source?: ReasoningSignatureSource,
+) {
+  return convertAgentMessagesToModelMessages(
+    messages,
+    '',
+    {},
+    'agent-1',
+    noopBlobReader,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    source,
+  );
+}
+
 /**
  * Extract all text from a user model message's content array.
  */
-function getUserMsgTexts(msg: any): string[] {
-  const content = Array.isArray(msg.content)
-    ? msg.content
-    : [{ type: 'text', text: msg.content }];
-  return content
-    .filter((p: any) => p.type === 'text' && typeof p.text === 'string')
-    .map((p: any) => p.text as string);
+function getUserMsgTexts(msg: ModelMessage): string[] {
+  return getContentParts(msg)
+    .filter((part) => part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text!);
 }
 
-function hasEnvSnapshot(msg: any): boolean {
-  return getUserMsgTexts(msg).some((t) => t.includes('<env-snapshot>'));
+function hasEnvSnapshot(msg: ModelMessage): boolean {
+  return getUserMsgTexts(msg).some((text) => text.includes('<env-snapshot>'));
 }
 
-function hasEnvChanges(msg: any): boolean {
-  return getUserMsgTexts(msg).some((t) => t.includes('<env-changes>'));
+function hasEnvChanges(msg: ModelMessage): boolean {
+  return getUserMsgTexts(msg).some((text) => text.includes('<env-changes>'));
 }
 
 const noopBlobReader = async () => Buffer.alloc(0);
@@ -120,6 +236,247 @@ describe('convertAgentMessagesToModelMessages – env context injection', () => 
     expect(hasEnvSnapshot(userMessages[0])).toBe(true);
     expect(hasEnvChanges(userMessages[0])).toBe(false);
   });
+});
+
+describe('convertAgentMessagesToModelMessages – reasoning signatures', () => {
+  it('attaches matching owned Anthropic stagewise reasoning details', async () => {
+    const details = [
+      {
+        type: 'reasoning.text',
+        text: 'private thought',
+        signature: 'anthropic-signature',
+      },
+    ];
+    const messages = [
+      makeReasoningAssistantMsg({
+        ownedReasoningDetails: [{ source: stagewiseAnthropicSource, details }],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      stagewiseAnthropicSource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toEqual(details);
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('attaches matching non-stagewise details and strips reasoning parts', async () => {
+    const details = [
+      {
+        type: 'reasoning.text',
+        text: 'private thought',
+        signature: 'anthropic-signature',
+      },
+    ];
+    const messages = [
+      makeReasoningAssistantMsg({
+        ownedReasoningDetails: [{ source: customAnthropicSource, details }],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      customAnthropicSource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toEqual(details);
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('strips mismatched non-stagewise owned details', async () => {
+    const messages = [
+      makeReasoningAssistantMsg({
+        ownedReasoningDetails: [
+          {
+            source: customAnthropicSource,
+            details: [
+              {
+                type: 'reasoning.text',
+                text: 'private thought',
+                signature: 'anthropic-signature',
+              },
+            ],
+          },
+        ],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      stagewiseOpenAISource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toBeUndefined();
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('does not attach mismatched owned details for OpenAI', async () => {
+    const messages = [
+      makeReasoningAssistantMsg({
+        ownedReasoningDetails: [
+          {
+            source: stagewiseAnthropicSource,
+            details: [
+              {
+                type: 'reasoning.text',
+                text: 'private thought',
+                signature: 'anthropic-signature',
+              },
+            ],
+          },
+        ],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      stagewiseOpenAISource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toBeUndefined();
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('replays legacy Anthropic-shaped details only for stagewise Anthropic', async () => {
+    const details = [
+      {
+        type: 'reasoning.text',
+        text: 'private thought',
+        signature: 'anthropic-signature',
+      },
+    ];
+    const messages = [makeReasoningAssistantMsg({ reasoningDetails: details })];
+
+    const matching = await convertWithReasoningSource(
+      messages,
+      stagewiseAnthropicSource,
+    );
+    const mismatched = await convertWithReasoningSource(
+      messages,
+      stagewiseGoogleSource,
+    );
+
+    expect(getReasoningDetails(getAssistantMessages(matching)[0])).toEqual(
+      details,
+    );
+    expect(
+      getReasoningDetails(getAssistantMessages(mismatched)[0]),
+    ).toBeUndefined();
+  });
+
+  it('replays legacy Google-shaped details only for stagewise Google', async () => {
+    const details = [
+      {
+        type: 'reasoning.encrypted',
+        text: 'private thought',
+        thought_signature: 'google-signature',
+      },
+    ];
+    const messages = [makeReasoningAssistantMsg({ reasoningDetails: details })];
+
+    const matching = await convertWithReasoningSource(
+      messages,
+      stagewiseGoogleSource,
+    );
+    const mismatched = await convertWithReasoningSource(
+      messages,
+      stagewiseAnthropicSource,
+    );
+
+    expect(getReasoningDetails(getAssistantMessages(matching)[0])).toEqual(
+      details,
+    );
+    expect(
+      getReasoningDetails(getAssistantMessages(mismatched)[0]),
+    ).toBeUndefined();
+  });
+
+  it('does not replay legacy details with ambiguous signature fields', async () => {
+    const messages = [
+      makeReasoningAssistantMsg({
+        reasoningDetails: [
+          {
+            type: 'reasoning.text',
+            text: 'private thought',
+            signature: 'anthropic-signature',
+            thought_signature: 'google-signature',
+          },
+        ],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      stagewiseGoogleSource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toBeUndefined();
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('does not replay legacy unknown-shaped details', async () => {
+    const messages = [
+      makeReasoningAssistantMsg({
+        reasoningDetails: [{ type: 'reasoning.text', text: 'private thought' }],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      stagewiseAnthropicSource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toBeUndefined();
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('strips unmatched legacy reasoning on non-stagewise routes', async () => {
+    const messages = [
+      makeReasoningAssistantMsg({
+        reasoningDetails: [
+          {
+            type: 'reasoning.text',
+            text: 'private thought',
+            signature: 'anthropic-signature',
+          },
+        ],
+      }),
+    ];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      officialAnthropicSource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toBeUndefined();
+    expect(hasReasoningPart(assistant)).toBe(false);
+  });
+
+  it('preserves native reasoning parts when no stagewise metadata exists', async () => {
+    const messages = [makeReasoningAssistantMsg({})];
+
+    const result = await convertWithReasoningSource(
+      messages,
+      officialAnthropicSource,
+    );
+    const assistant = getAssistantMessages(result)[0];
+
+    expect(getReasoningDetails(assistant)).toBeUndefined();
+    expect(hasReasoningPart(assistant)).toBe(true);
+  });
+});
+
+describe('convertAgentMessagesToModelMessages – env context changes', () => {
+  const agentId = 'agent-1';
 
   it('does not inject env-changes when snapshots are identical', async () => {
     const snap = makeSnapshot();
