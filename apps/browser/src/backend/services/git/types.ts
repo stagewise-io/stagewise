@@ -94,7 +94,12 @@ export type GitMutationResult =
   | GitActionFailure;
 
 export type GitCreateWorktreeResult =
-  | { ok: true; path: string; git: MountedWorkspaceGitSummary | null }
+  | {
+      ok: true;
+      path: string;
+      branchName: string;
+      git: MountedWorkspaceGitSummary | null;
+    }
   | GitActionFailure;
 
 export type GitCreateBranchOptions = {

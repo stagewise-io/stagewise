@@ -20,6 +20,9 @@ import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import type { UserExperienceService } from '@/services/experience';
 import { getWorktreesDir } from '@/utils/paths';
+import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
+
+const services: MountManagerService[] = [];
 
 beforeEach(async () => {
   mockHomeDir = await fs.mkdtemp(
@@ -28,6 +31,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await Promise.all(services.splice(0).map((service) => service.teardown()));
   await fs.rm(mockHomeDir, { recursive: true, force: true });
 });
 
@@ -52,6 +56,9 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
       },
     },
     agents: { instances: { agent1: { type: 'regular' } } },
+    workspaceGitSetup: {
+      runsByPath: {} as Record<string, WorkspaceGitSetupRun>,
+    },
   };
 
   const uiKarton = {
@@ -92,11 +99,23 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
         },
       ],
     })),
+    getWorkspaceRepositoryInfo: vi.fn(async (workspacePath: string) => ({
+      repositoryId: path.join(workspacePath, '.git'),
+      repoRoot: workspacePath,
+      commonGitDir: path.join(workspacePath, '.git'),
+    })),
+    getWorkspaceMainWorktreePath: vi.fn(async (workspacePath: string) =>
+      workspacePath.includes('linked-worktree')
+        ? workspacePath.replace('linked-worktree', 'main-worktree')
+        : workspacePath,
+    ),
+    getMountedWorkspaceSummary: vi.fn(async () => null),
     switchBranch: vi.fn(async () => ({ ok: true, git: null })),
     createBranch: vi.fn(async () => ({ ok: true, git: null })),
-    createWorktree: vi.fn(async (workspacePath: string) => ({
+    createWorktree: vi.fn(async (workspacePath: string, options) => ({
       ok: true,
       path: path.join(workspacePath, '..', 'created-worktree'),
+      branchName: options.worktreeName.trim(),
       git: null,
     })),
   } as unknown as GitService;
@@ -121,14 +140,24 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
   };
 
   const service = new MountManagerService(
-    { warn: vi.fn() } as unknown as Logger,
+    {
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      isDebugEnabled: false,
+    } as unknown as Logger,
     {} as FilePickerService,
     userExperienceService,
     uiKarton,
-    { capture: vi.fn() } as unknown as TelemetryService,
+    {
+      capture: vi.fn(),
+      captureException: vi.fn(),
+    } as unknown as TelemetryService,
     gitService,
     preferencesService as never,
   );
+
+  services.push(service);
 
   return { service, procedureHandlers, state, gitService };
 }
@@ -293,5 +322,171 @@ describe('MountManagerService path-based Git actions', () => {
       worktreeName: 'feature-a',
       sourceBranch: 'main',
     });
+  });
+
+  it('creates worktrees from the main worktree when called from a linked worktree', async () => {
+    const repoDir = path.join(getWorktreesDir(), 'repo-hash');
+    await fs.mkdir(repoDir, { recursive: true });
+    const linkedPath = await fs.mkdtemp(path.join(repoDir, 'linked-worktree-'));
+    const mainPath = linkedPath.replace('linked-worktree', 'main-worktree');
+    await fs.mkdir(mainPath, { recursive: true });
+    const { service, procedureHandlers, gitService } = createHarness({
+      recentPaths: [linkedPath],
+    });
+    await initializeService(service);
+
+    const handler = procedureHandlers.get('toolbox.createGitWorktreeByPath');
+    await expect(
+      handler?.('client1', linkedPath, {
+        worktreeName: 'feature-a',
+        sourceBranch: 'main',
+      }),
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(gitService.createWorktree).toHaveBeenCalledWith(mainPath, {
+      worktreeName: 'feature-a',
+      sourceBranch: 'main',
+    });
+  });
+
+  it('rejects worktree creation when the derived main worktree is untrusted', async () => {
+    const repoDir = path.join(getWorktreesDir(), 'repo-hash');
+    await fs.mkdir(repoDir, { recursive: true });
+    const linkedPath = await fs.mkdtemp(path.join(repoDir, 'linked-worktree-'));
+    const untrustedMainPath = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'untrusted-main-worktree-'),
+    );
+    const { service, procedureHandlers, gitService } = createHarness();
+    vi.mocked(gitService.getWorkspaceMainWorktreePath).mockResolvedValueOnce(
+      untrustedMainPath,
+    );
+    vi.mocked(gitService.getWorkspaceRepositoryInfo).mockImplementation(
+      async (workspacePath: string) => {
+        if (workspacePath === untrustedMainPath) return null;
+        return {
+          repositoryId: path.join(linkedPath, '.git'),
+          repoRoot: linkedPath,
+          commonGitDir: path.join(linkedPath, '.git'),
+        };
+      },
+    );
+    await initializeService(service);
+
+    const handler = procedureHandlers.get('toolbox.createGitWorktreeByPath');
+    await expect(
+      handler?.('client1', linkedPath, {
+        worktreeName: 'feature-a',
+        sourceBranch: 'main',
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: 'not-git-repo',
+    });
+
+    expect(gitService.createWorktree).not.toHaveBeenCalled();
+  });
+
+  it('starts pending setup only after mounting the created worktree', async () => {
+    const recentPath = await fs.mkdtemp(path.join(os.tmpdir(), 'recent-repo-'));
+    const createdPath = path.join(recentPath, '..', 'created-worktree');
+    const scriptPath = path.join(
+      createdPath,
+      '.stagewise',
+      'worktree-setup.sh',
+    );
+    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+    await fs.writeFile(scriptPath, 'exit 0');
+    const { service, procedureHandlers, state } = createHarness({
+      recentPaths: [recentPath],
+    });
+    await initializeService(service);
+
+    const createHandler = procedureHandlers.get(
+      'toolbox.createGitWorktreeByPath',
+    );
+    await createHandler?.('client1', recentPath, {
+      worktreeName: 'feature-a',
+      sourceBranch: 'main',
+    });
+    expect(state.workspaceGitSetup.runsByPath[createdPath]).toBeUndefined();
+
+    const mountHandler = procedureHandlers.get('toolbox.mountWorkspace');
+    await mountHandler?.('client1', 'agent1', createdPath);
+
+    await vi.waitFor(() => {
+      expect(state.workspaceGitSetup.runsByPath[createdPath]).toBeDefined();
+    });
+  });
+
+  it('does not start setup for manually mounted worktrees', async () => {
+    const manualPath = await fs.mkdtemp(path.join(os.tmpdir(), 'manual-repo-'));
+    const scriptPath = path.join(manualPath, '.stagewise', 'worktree-setup.sh');
+    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+    await fs.writeFile(scriptPath, 'exit 0');
+    const { service, procedureHandlers, state } = createHarness();
+    await initializeService(service);
+
+    const mountHandler = procedureHandlers.get('toolbox.mountWorkspace');
+    await mountHandler?.('client1', 'agent1', manualPath);
+
+    expect(state.workspaceGitSetup.runsByPath[manualPath]).toBeUndefined();
+  });
+
+  it('does not create setup state when the setup script is missing', async () => {
+    const recentPath = await fs.mkdtemp(path.join(os.tmpdir(), 'recent-repo-'));
+    const createdPath = path.join(recentPath, '..', 'created-worktree');
+    const { service, procedureHandlers, state } = createHarness({
+      recentPaths: [recentPath],
+    });
+    await initializeService(service);
+
+    const createHandler = procedureHandlers.get(
+      'toolbox.createGitWorktreeByPath',
+    );
+    await createHandler?.('client1', recentPath, {
+      worktreeName: 'feature-a',
+      sourceBranch: 'main',
+    });
+    const mountHandler = procedureHandlers.get('toolbox.mountWorkspace');
+    await mountHandler?.('client1', 'agent1', createdPath);
+
+    expect(state.workspaceGitSetup.runsByPath[createdPath]).toBeUndefined();
+  });
+
+  it('keeps failed setup worktrees mounted', async () => {
+    const recentPath = await fs.mkdtemp(path.join(os.tmpdir(), 'recent-repo-'));
+    const createdPath = path.join(recentPath, '..', 'created-worktree');
+    const scriptPath = path.join(
+      createdPath,
+      '.stagewise',
+      'worktree-setup.sh',
+    );
+    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+    await fs.writeFile(scriptPath, 'echo failed >&2\nexit 1');
+    const { service, procedureHandlers, state } = createHarness({
+      recentPaths: [recentPath],
+    });
+    await initializeService(service);
+
+    const createHandler = procedureHandlers.get(
+      'toolbox.createGitWorktreeByPath',
+    );
+    await createHandler?.('client1', recentPath, {
+      worktreeName: 'feature-a',
+      sourceBranch: 'main',
+    });
+    const mountHandler = procedureHandlers.get('toolbox.mountWorkspace');
+    await mountHandler?.('client1', 'agent1', createdPath);
+
+    await vi.waitFor(() => {
+      expect(state.workspaceGitSetup.runsByPath[createdPath]?.status).toBe(
+        'failed',
+      );
+    });
+    expect(
+      state.toolbox.agent1.workspace.mounts.some(
+        (mount) => mount.path === createdPath,
+      ),
+    ).toBe(true);
   });
 });

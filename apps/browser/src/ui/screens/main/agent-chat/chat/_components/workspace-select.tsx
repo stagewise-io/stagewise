@@ -47,7 +47,7 @@ import {
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { CheckIcon, XIcon, Loader2Icon } from 'lucide-react';
+import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
 
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
@@ -75,6 +75,8 @@ import {
   type WorkspaceGitCreateWorktreeOptions,
   type WorkspaceGitCreateWorktreeResult,
   type WorkspaceGitMutationResult,
+  type WorkspaceGitSetupRun,
+  type KartonContract,
 } from '@shared/karton-contracts/ui';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -91,8 +93,14 @@ import {
 import { Button } from '@stagewise/stage-ui/components/button';
 import { applyWorkspaceGitActionPreferences } from './workspace-action-preferences';
 import { hydrateWorkspaceActionConfigWithDefaults } from './workspace-action-config-utils';
+import {
+  SetupRunSidePanel,
+  WorkspaceSetupStatusIndicator,
+} from './workspace-setup-status';
 
 const EMPTY_SKILLS: string[] = [];
+type KartonState = KartonContract['state'];
+type KartonProcedures = KartonContract['serverProcedures'];
 
 function formatGitRef(git: MountedWorkspaceGitSummary): string | null {
   return git.branch ?? git.headSha?.slice(0, 7) ?? null;
@@ -123,19 +131,35 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
 }) {
   const display = getWorkspaceDisplayInfo(mount);
   const gitRef = mount.git ? formatGitRef(mount.git) : null;
+  const setupRun = useKartonState(
+    (s: KartonState) => s.workspaceGitSetup.runsByPath[mount.path],
+  );
+  const [open, setOpen] = useState(false);
+  const [seenSucceededSetupRunIds, setSeenSucceededSetupRunIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const showSucceededSetupReceipt =
+    setupRun?.status === 'succeeded' &&
+    !seenSucceededSetupRunIds.has(setupRun.id);
+  const showSetupRunDetails =
+    setupRun?.status === 'running' ||
+    setupRun?.status === 'failed' ||
+    showSucceededSetupReceipt;
 
   const respectAgentsMd = useKartonState(
-    (s) =>
+    (s: KartonState) =>
       s.preferences?.agent?.workspaceSettings?.[mount.path]?.respectAgentsMd ??
       false,
   );
-  const preferences = useKartonState((s) => s.preferences);
-  const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
+  const preferences = useKartonState((s: KartonState) => s.preferences);
+  const preferencesUpdate = useKartonProcedure(
+    (p: KartonProcedures) => p.preferences.update,
+  );
   const generateWorkspaceMd = useKartonProcedure(
-    (p) => p.toolbox.generateWorkspaceMd,
+    (p: KartonProcedures) => p.toolbox.generateWorkspaceMd,
   );
 
-  const isGeneratingWorkspaceMd = useKartonState((s) => {
+  const isGeneratingWorkspaceMd = useKartonState((s: KartonState) => {
     for (const id in s.agents.instances) {
       const inst = s.agents.instances[id];
       if (!inst) continue;
@@ -181,7 +205,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
   );
 
   const disabledSkills = useKartonState(
-    (s) =>
+    (s: KartonState) =>
       s.preferences?.agent?.workspaceSettings?.[mount.path]?.disabledSkills ??
       EMPTY_SKILLS,
   );
@@ -192,7 +216,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
         preferences?.agent?.workspaceSettings?.[mount.path];
       const current = currentSettings?.disabledSkills ?? [];
       const next = enabled
-        ? current.filter((s) => s !== skillName)
+        ? current.filter((s: string) => s !== skillName)
         : [...current, skillName];
 
       const patches = currentSettings
@@ -221,7 +245,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
   );
 
   const openInIdeSelection = useKartonState(
-    (s) => s.globalConfig.openFilesInIde,
+    (s: KartonState) => s.globalConfig.openFilesInIde,
   );
 
   const resolveAbsolute = useCallback((p: string) => p, []);
@@ -263,6 +287,23 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
     }, 150);
   }, [cancelPendingClear, cancelPendingOpen]);
 
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      if (next) return;
+      cancelPendingOpen();
+      setSidePanelContent(null);
+      if (setupRun?.status !== 'succeeded' || !showSucceededSetupReceipt) {
+        return;
+      }
+      setSeenSucceededSetupRunIds((current) => {
+        if (current.has(setupRun.id)) return current;
+        return new Set([...Array.from(current), setupRun.id]);
+      });
+    },
+    [cancelPendingOpen, setupRun, showSucceededSetupReceipt],
+  );
+
   useEffect(
     () => () => {
       cancelPendingClear();
@@ -284,7 +325,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
     fadeDistance: 24,
   });
 
-  useLayoutEffect(() => {
+  const updateSidePanelOffset = useCallback(() => {
     if (!sidePanelContent || !sidePanelRef.current || !containerRef.current)
       return;
     const panelHeight = sidePanelRef.current.offsetHeight;
@@ -296,6 +337,24 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
 
     setSidePanelOffset(offset);
   }, [sidePanelContent, itemCenterY]);
+
+  useLayoutEffect(() => {
+    updateSidePanelOffset();
+  }, [updateSidePanelOffset]);
+
+  useEffect(() => {
+    if (!sidePanelContent || !sidePanelRef.current || !containerRef.current)
+      return;
+
+    const observer = new ResizeObserver(() => {
+      updateSidePanelOffset();
+    });
+    observer.observe(sidePanelRef.current);
+    observer.observe(containerRef.current);
+    updateSidePanelOffset();
+
+    return () => observer.disconnect();
+  }, [sidePanelContent, updateSidePanelOffset]);
 
   const handleItemHover = useCallback(
     (content: SidePanelContent, event: React.MouseEvent<HTMLElement>) => {
@@ -366,7 +425,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
   );
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <FileContextMenu relativePath={mount.path} resolvePath={resolveAbsolute}>
         <PopoverTrigger>
           <Button
@@ -388,6 +447,10 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                 {gitRef}
               </span>
             )}
+            <WorkspaceSetupStatusIndicator
+              setupRun={setupRun}
+              failedClassName="text-muted-foreground group-hover/workspace:text-foreground group-focus-visible/workspace:text-foreground group-has-[[data-unmount]:hover]/workspace:text-muted-foreground"
+            />
             <IconChevronDownFill18 className="size-3 shrink-0 text-subtle-foreground group-hover/workspace:text-muted-foreground group-focus-visible/workspace:text-muted-foreground group-has-[[data-unmount]:hover]/workspace:text-subtle-foreground" />
           </Button>
         </PopoverTrigger>
@@ -424,6 +487,8 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
               <WorkspacePreviewCardContent
                 mount={mount}
                 name={display.label}
+                setupRun={setupRun}
+                showSetupRunDetails={showSetupRunDetails}
                 onItemHover={handleItemHover}
                 onItemLeave={cancelPendingOpen}
                 activeRow={
@@ -431,7 +496,9 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                     ? 'contextFiles'
                     : sidePanelContent?.type === 'skillsList'
                       ? 'skillsList'
-                      : null
+                      : sidePanelContent?.type === 'setupRun'
+                        ? 'setupRun'
+                        : null
                 }
               />
             </PopoverBase.Popup>
@@ -470,6 +537,8 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                     onGenerateWorkspaceMd={handleGenerateWorkspaceMd}
                     openInIdeSelection={openInIdeSelection}
                   />
+                ) : sidePanelContent.type === 'setupRun' && setupRun ? (
+                  <SetupRunSidePanel setupRun={setupRun} />
                 ) : (
                   <SkillsListSidePanel
                     skills={mount.skills}
@@ -566,7 +635,8 @@ type SidePanelContent =
   | { type: 'workspaceMd'; content: string; workspacePath: string }
   | { type: 'agentsMd'; content: string; workspacePath: string }
   | { type: 'contextFiles' }
-  | { type: 'skillsList' };
+  | { type: 'skillsList' }
+  | { type: 'setupRun' };
 
 function ContextFilesSidePanel({
   mount,
@@ -921,12 +991,16 @@ function SkillsListSidePanel({
 function WorkspacePreviewCardContent({
   mount,
   name,
+  setupRun,
+  showSetupRunDetails,
   onItemHover,
   onItemLeave,
   activeRow,
 }: {
   mount: MountEntry;
   name: string;
+  setupRun?: WorkspaceGitSetupRun;
+  showSetupRunDetails: boolean;
   onItemHover: (
     content: SidePanelContent,
     event: React.MouseEvent<HTMLElement>,
@@ -934,15 +1008,24 @@ function WorkspacePreviewCardContent({
   /** Cancels a pending open if the cursor leaves the row before the
    * open delay elapses. */
   onItemLeave: () => void;
-  activeRow: 'contextFiles' | 'skillsList' | null;
+  activeRow: 'contextFiles' | 'skillsList' | 'setupRun' | null;
 }) {
   const hasSkills = mount.skills.length > 0;
   const gitRef = mount.git ? formatGitRef(mount.git) : null;
   const gitStatus = mount.git ? formatGitStatus(mount.git.status) : null;
   const [openAgent] = useOpenAgent();
-  const createTerminal = useKartonProcedure((p) => p.browser.createTerminal);
+  const createTerminal = useKartonProcedure(
+    (p: KartonProcedures) => p.browser.createTerminal,
+  );
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
     useContentCollapsed();
+  const setupTitle = setupRun
+    ? setupRun.status === 'running'
+      ? 'Worktree setup running'
+      : setupRun.status === 'failed'
+        ? 'Worktree setup failed'
+        : 'Worktree setup done'
+    : null;
 
   const handleCopyPath = useCallback(
     (event: React.MouseEvent) => {
@@ -1019,6 +1102,25 @@ function WorkspacePreviewCardContent({
       </div>
 
       <div className="mx-2.5 border-border-subtle border-t" />
+
+      {setupRun && showSetupRunDetails && setupTitle && (
+        <div
+          data-active={activeRow === 'setupRun' ? '' : undefined}
+          className={cn(
+            'group/row flex cursor-default items-center gap-1.5 px-2.5 py-1.5 text-muted-foreground',
+            'hover:text-foreground data-[active]:text-foreground',
+            setupRun.status === 'succeeded' &&
+              'text-subtle-foreground hover:text-muted-foreground data-[active]:text-muted-foreground',
+          )}
+          onMouseEnter={(e) => onItemHover({ type: 'setupRun' }, e)}
+          onMouseLeave={onItemLeave}
+        >
+          <span className="min-w-0 flex-1 truncate font-medium text-xs">
+            {setupTitle}
+          </span>
+          <IconChevronRightOutline18 className="ml-auto size-3 shrink-0" />
+        </div>
+      )}
 
       {/* Context files row — opens side panel on hover */}
       <div
@@ -1648,24 +1750,29 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     () => (mount.git ? formatGitRef(mount.git) : null),
     [mount.git],
   );
+  const setupRun = useKartonState(
+    (s: KartonState) => s.workspaceGitSetup.runsByPath[mount.path],
+  );
   const listWorkspaceGitBranches = useKartonProcedure(
-    (p) => p.toolbox.listWorkspaceGitBranches,
+    (p: KartonProcedures) => p.toolbox.listWorkspaceGitBranches,
   );
   const listWorkspaceGitWorktrees = useKartonProcedure(
-    (p) => p.toolbox.listWorkspaceGitWorktrees,
+    (p: KartonProcedures) => p.toolbox.listWorkspaceGitWorktrees,
   );
   const createWorkspaceGitWorktree = useKartonProcedure(
-    (p) => p.toolbox.createWorkspaceGitWorktree,
+    (p: KartonProcedures) => p.toolbox.createWorkspaceGitWorktree,
   );
   const createWorkspaceGitBranch = useKartonProcedure(
-    (p) => p.toolbox.createWorkspaceGitBranch,
+    (p: KartonProcedures) => p.toolbox.createWorkspaceGitBranch,
   );
   const switchWorkspaceGitBranch = useKartonProcedure(
-    (p) => p.toolbox.switchWorkspaceGitBranch,
+    (p: KartonProcedures) => p.toolbox.switchWorkspaceGitBranch,
   );
-  const mountWorkspace = useKartonProcedure((p) => p.toolbox.mountWorkspace);
+  const mountWorkspace = useKartonProcedure(
+    (p: KartonProcedures) => p.toolbox.mountWorkspace,
+  );
   const unmountWorkspace = useKartonProcedure(
-    (p) => p.toolbox.unmountWorkspace,
+    (p: KartonProcedures) => p.toolbox.unmountWorkspace,
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const [branchesResult, setBranchesResult] =
@@ -1696,16 +1803,20 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     () => getCurrentBranchValue(branchesResult, gitRef),
     [branchesResult, gitRef],
   );
-  const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
-  const generalWorkspaceGitActionPreference = useKartonState(
-    (s) => s.preferences.agent.workspaceGitActionPreferences.general,
+  const preferencesUpdate = useKartonProcedure(
+    (p: KartonProcedures) => p.preferences.update,
   );
-  const repositoryWorkspaceGitActionPreference = useKartonState((s) =>
-    mount.git?.repositoryId
-      ? s.preferences.agent.workspaceGitActionPreferences.repositories[
-          mount.git.repositoryId
-        ]
-      : undefined,
+  const generalWorkspaceGitActionPreference = useKartonState(
+    (s: KartonState) =>
+      s.preferences.agent.workspaceGitActionPreferences.general,
+  );
+  const repositoryWorkspaceGitActionPreference = useKartonState(
+    (s: KartonState) =>
+      mount.git?.repositoryId
+        ? s.preferences.agent.workspaceGitActionPreferences.repositories[
+            mount.git.repositoryId
+          ]
+        : undefined,
   );
 
   const [open, setOpen] = useState(false);
@@ -2119,6 +2230,10 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
               <span className="min-w-0 truncate text-subtle-foreground group-hover/action:text-muted-foreground group-has-[[data-popup-open]]/action:text-muted-foreground">
                 {triggerSummary}
               </span>
+              <WorkspaceSetupStatusIndicator
+                setupRun={setupRun}
+                failedClassName="text-muted-foreground group-hover/action:text-foreground group-focus-visible/action:text-foreground"
+              />
               <IconChevronDownFill18 className="size-3 shrink-0 text-subtle-foreground group-hover/action:text-muted-foreground group-has-[[data-popup-open]]/action:text-muted-foreground" />
             </Button>
           </PopoverTrigger>
@@ -2682,14 +2797,17 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
 }: ConnectWorkspaceSelectProps) {
   const track = useTrack();
   const listGitBranchesByPath = useKartonProcedure(
-    (p) => p.toolbox.listGitBranchesByPath,
+    (p: KartonProcedures) => p.toolbox.listGitBranchesByPath,
   );
   const listGitWorktreesByPath = useKartonProcedure(
-    (p) => p.toolbox.listGitWorktreesByPath,
+    (p: KartonProcedures) => p.toolbox.listGitWorktreesByPath,
   );
-  const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
+  const preferencesUpdate = useKartonProcedure(
+    (p: KartonProcedures) => p.preferences.update,
+  );
   const workspaceGitActionGeneralPreference = useKartonState(
-    (s) => s.preferences.agent.workspaceGitActionPreferences.general,
+    (s: KartonState) =>
+      s.preferences.agent.workspaceGitActionPreferences.general,
   );
   const fallbackBranchItems = useMemo(() => getBranchSelectItems(null), []);
   const fallbackWorktreeItems = useMemo(() => getWorktreeSelectItems(), []);
@@ -3376,29 +3494,32 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   const [openAgent] = useOpenAgent();
 
   const recentlyOpenedWorkspaces = useKartonState(
-    (s) => s.userExperience.storedExperienceData.recentlyOpenedWorkspaces,
+    (s: KartonState) =>
+      s.userExperience.storedExperienceData.recentlyOpenedWorkspaces,
   );
-  const mountWorkspace = useKartonProcedure((p) => p.toolbox.mountWorkspace);
+  const mountWorkspace = useKartonProcedure(
+    (p: KartonProcedures) => p.toolbox.mountWorkspace,
+  );
   const createGitWorktreeByPath = useKartonProcedure(
-    (p) => p.toolbox.createGitWorktreeByPath,
+    (p: KartonProcedures) => p.toolbox.createGitWorktreeByPath,
   );
   const createGitBranchByPath = useKartonProcedure(
-    (p) => p.toolbox.createGitBranchByPath,
+    (p: KartonProcedures) => p.toolbox.createGitBranchByPath,
   );
   const switchGitBranchByPath = useKartonProcedure(
-    (p) => p.toolbox.switchGitBranchByPath,
+    (p: KartonProcedures) => p.toolbox.switchGitBranchByPath,
   );
   const unmountWorkspace = useKartonProcedure(
-    (p) => p.toolbox.unmountWorkspace,
+    (p: KartonProcedures) => p.toolbox.unmountWorkspace,
   );
   const track = useTrack();
-  const allMounts = useKartonState((s) =>
+  const allMounts = useKartonState((s: KartonState) =>
     openAgent
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
       : EMPTY_MOUNTS,
   );
   const mountedPaths = useMemo(
-    () => new Set(allMounts.map((mount) => mount.path)),
+    () => new Set<string>(allMounts.map((mount: MountEntry) => mount.path)),
     [allMounts],
   );
   const pendingConnectActionConfigsRef = useRef<
@@ -3469,7 +3590,9 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
 
       track('workspace-connect-started');
 
-      const previousPrefixes = new Set(allMounts.map((mount) => mount.prefix));
+      const previousPrefixes = new Set<string>(
+        allMounts.map((mount: MountEntry) => mount.prefix),
+      );
 
       // Connect-new is picker-first because there is no workspace path until
       // the native picker resolves. Carry the selected config into the
@@ -3639,7 +3762,7 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   return (
     <div className="scrollbar-none flex min-w-0 shrink-0 items-center gap-7 overflow-x-auto px-1 py-0.5">
       {/* Connected workspaces */}
-      {allMounts.map((mount) => {
+      {allMounts.map((mount: MountEntry) => {
         const useActionSelect = chatIsEmpty && !!mount.git;
         return useActionSelect ? (
           <WorkspaceActionSelect
