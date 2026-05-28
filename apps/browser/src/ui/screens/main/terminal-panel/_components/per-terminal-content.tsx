@@ -319,7 +319,7 @@ export function PerTerminalContent({
       lastSentSizeRef.current = null;
       cancelAnimationFrame(fitTimer);
     };
-  }, [terminalId]);
+  }, [terminalId, markTerminalFocused, focusTerminalIfReady]);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

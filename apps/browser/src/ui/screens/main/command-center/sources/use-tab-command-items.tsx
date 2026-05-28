@@ -36,36 +36,42 @@ function tabTitle(tab: TabState) {
 export function useTabCommandItems(query: string) {
   const tabs = useKartonState(
     useComparingSelector((s): TabCommandItem[] => {
-      const activeTabId = s.browser.activeTabId;
-      return Object.values(s.browser.tabs).map((tab) => {
-        const title = tabTitle(tab);
+      const activeTabId = s.contentTabs.activeTabId;
+      return (
+        Object.values(s.contentTabs.tabs)
+          // Browser mode intentionally lists web tabs only. Terminal tab
+          // search/switching will be added later as its own command source.
+          .filter((tab) => tab.type === undefined || tab.type === 'browser')
+          .map((tab) => {
+            const title = tabTitle(tab);
 
-        return {
-          id: `tab:${tab.id}`,
-          kind: 'tab',
-          mode: 'browser',
-          title,
-          subtitle: tab.url,
-          keywords: ['tab', 'browser', tab.url],
-          icon: (
-            <CommandCenterTabFavicon
-              faviconUrls={tab.faviconUrls}
-              title={title}
-              url={tab.url}
-            />
-          ),
-          tabId: tab.id,
-          url: tab.url,
-          agentInstanceId: tab.agentInstanceId,
-          faviconUrls: tab.faviconUrls,
-          screenshot: tab.screenshot,
-          isActive: tab.id === activeTabId,
-          // In tab UI, the pin icon means “keep global”. Global tabs have no
-          // agent owner; agent-owned tabs are visually unpinned/scoped.
-          isPinned: tab.agentInstanceId === null,
-          lastFocusedAt: tab.lastFocusedAt,
-        };
-      });
+            return {
+              id: `tab:${tab.id}`,
+              kind: 'tab',
+              mode: 'browser',
+              title,
+              subtitle: tab.url,
+              keywords: ['tab', 'browser', tab.url],
+              icon: (
+                <CommandCenterTabFavicon
+                  faviconUrls={tab.faviconUrls}
+                  title={title}
+                  url={tab.url}
+                />
+              ),
+              tabId: tab.id,
+              url: tab.url,
+              agentInstanceId: tab.agentInstanceId,
+              faviconUrls: tab.faviconUrls,
+              screenshot: tab.screenshot,
+              isActive: tab.id === activeTabId,
+              // In tab UI, the pin icon means “keep global”. Global tabs have no
+              // agent owner; agent-owned tabs are visually unpinned/scoped.
+              isPinned: tab.agentInstanceId === null,
+              lastFocusedAt: tab.lastFocusedAt,
+            };
+          })
+      );
     }, tabsEqual),
   );
 
