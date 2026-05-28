@@ -4,7 +4,6 @@ import {
   HotkeyActions,
   isEventMatch,
 } from '@shared/hotkeys';
-import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
@@ -225,9 +224,9 @@ export function GlobalHotkeyBindings() {
   );
 
   // -- Settings (Mod+,) --------------------------------------------------
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   useHotKeyListener(
-    () => createTab(SETTINGS_PAGE_URL, true),
+    () => void openSettings(),
     HotkeyActions.OPEN_SETTINGS,
     globalHotkeysEnabled,
   );

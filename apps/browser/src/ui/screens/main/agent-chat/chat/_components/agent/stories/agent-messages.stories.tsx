@@ -28,6 +28,7 @@ const createStoryState = (
     },
     {
       userExperience: {
+        pendingOnboardingSuggestion: null,
         storedExperienceData: {
           recentlyOpenedWorkspaces: [],
           hasSeenOnboardingFlow: false,

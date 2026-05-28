@@ -2,11 +2,6 @@ import type { KartonService } from '../services/karton';
 import type { PagesService } from '../services/pages';
 import type { DiffHistoryService } from '../services/diff-history';
 import type { WindowLayoutService } from '../services/window-layout';
-import type { ToolboxService } from '../services/toolbox';
-import type { AgentManagerService } from '../services/agent-manager';
-import type { AuthService } from '../services/auth';
-import type { UserExperienceService } from '../services/experience';
-import type { AutoUpdateService } from '../services/auto-update';
 import type { Logger } from '../services/logger';
 
 export function wirePagesHandlers(deps: {
@@ -14,11 +9,6 @@ export function wirePagesHandlers(deps: {
   pagesService: PagesService;
   diffHistoryService: DiffHistoryService;
   windowLayoutService: WindowLayoutService;
-  toolboxService: ToolboxService;
-  agentManagerService: AgentManagerService;
-  authService: AuthService;
-  userExperienceService: UserExperienceService;
-  autoUpdateService: AutoUpdateService;
   logger: Logger;
 }): void {
   const {
@@ -26,11 +16,6 @@ export function wirePagesHandlers(deps: {
     pagesService,
     diffHistoryService,
     windowLayoutService,
-    toolboxService,
-    agentManagerService,
-    authService,
-    userExperienceService,
-    autoUpdateService,
     logger,
   } = deps;
 
@@ -55,34 +40,6 @@ export function wirePagesHandlers(deps: {
       windowLayoutService.trustCertificateAndReload(tabId, origin);
     },
   );
-
-  // --- Context files handler ---
-  pagesService.setGetContextFilesHandler(() =>
-    toolboxService.getContextFilesForAllWorkspaces(),
-  );
-
-  // --- Workspace-md generation handler ---
-  pagesService.setGenerateWorkspaceMdHandler(async (workspacePath) => {
-    await agentManagerService.generateWorkspaceMdForPath(workspacePath);
-  });
-
-  // --- Auth handlers ---
-  pagesService.setAuthHandlers({
-    sendOtp: (email, turnstileToken) =>
-      authService.sendOtp(email, turnstileToken),
-    verifyOtp: (email, code) => authService.verifyOtp(email, code),
-    signInSocial: (provider) => authService.signInSocial(provider),
-    logout: () => authService.logout(),
-  });
-
-  // --- Usage handlers ---
-  pagesService.setUsageHandlers({
-    getUsageCurrent: () => authService.getUsageCurrent(),
-    getUsageHistory: (params) => authService.getUsageHistory(params.days),
-  });
-
-  // --- Wire user experience service into pages service ---
-  pagesService.setUserExperienceService(userExperienceService);
 
   // --- Accept/reject pending edits handlers ---
   pagesService.setAcceptAllPendingEditsHandler(
@@ -160,10 +117,4 @@ export function wirePagesHandlers(deps: {
       await diffHistoryService.acceptAndRejectHunks([], hunkIds);
     },
   );
-
-  // --- Auto-update handlers ---
-  pagesService.setAutoUpdateHandlers({
-    checkForUpdates: () => autoUpdateService.checkForUpdates(),
-    quitAndInstall: () => autoUpdateService.quitAndInstall(),
-  });
 }

@@ -92,13 +92,71 @@ export interface FaviconBatchRequest {
   faviconUrls: string[];
 }
 
+export type DownloadState =
+  | 'in_progress'
+  | 'complete'
+  | 'cancelled'
+  | 'interrupted';
+
+export interface DownloadsFilter {
+  search?: string;
+  limit?: number;
+  offset?: number;
+  state?: DownloadState;
+}
+
+export interface DownloadResult {
+  id: number;
+  guid: string;
+  url: string;
+  targetPath: string;
+  filename: string;
+  fileExists: boolean;
+  state: DownloadState;
+  receivedBytes: number;
+  totalBytes: number;
+  startTime: Date;
+  endTime?: Date | null;
+  isActive: boolean;
+  progress: number;
+  isPaused?: boolean;
+  canResume?: boolean;
+}
+
+export interface ActiveDownloadInfo {
+  id: number;
+  state: DownloadState;
+  receivedBytes: number;
+  totalBytes: number;
+  isPaused: boolean;
+  canResume: boolean;
+  progress?: number;
+  filename: string;
+  url: string;
+  targetPath: string;
+  startTime: Date;
+  currentSpeedKBps?: number;
+  speedHistory?: Array<{
+    timestamp: number;
+    speedKBps: number;
+    totalBytes: number;
+  }>;
+}
+
+export interface DownloadControlResult {
+  success: boolean;
+  error?: string;
+}
+
 // Options for clearing browsing data
 export interface ClearBrowsingDataOptions {
   /** Clear browsing history (URLs, visits, search terms, etc.) */
   history?: boolean;
   /** Clear cached favicons */
   favicons?: boolean;
-  /** Optional time range - only clear data within this range (applies to history and session data) */
+  /** Clear download history (only applies to "all time" — not time-range scoped) */
+  downloads?: boolean;
+  /** Optional time range - only clear data within this range (applies to history and session data; downloads are skipped when a time range is set) */
   timeRange?: {
     /** Start of range (inclusive). If omitted, clears from beginning of time */
     start?: Date;
@@ -129,6 +187,8 @@ export interface ClearBrowsingDataResult {
   success: boolean;
   /** Number of history entries (URLs) cleared */
   historyEntriesCleared?: number;
+  /** Whether downloads were cleared */
+  downloadsCleared?: boolean;
   /** Number of favicons cleared */
   faviconsCleared?: number;
   /** Whether cookies were cleared */

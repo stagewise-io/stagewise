@@ -772,6 +772,13 @@ export class WindowLayoutService extends DisposableService {
   }
 
   /**
+   * Open the settings screen in the main UI (replaces the old internal page tab).
+   */
+  public openSettings(): void {
+    this.uiController?.setAppScreenSettings();
+  }
+
+  /**
    * Configures the shared browser content session to appear as a regular
    * Chrome browser, preventing anti-bot/anti-spam detection.
    * Sets a dynamic user agent and intercepts Sec-CH-UA headers.

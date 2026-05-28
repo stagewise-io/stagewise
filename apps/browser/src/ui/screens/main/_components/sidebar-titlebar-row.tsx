@@ -36,13 +36,17 @@ import { useKartonState } from '@ui/hooks/use-karton';
 export function SidebarTitlebarRow({
   absolute = false,
   sidebarCollapsed = false,
+  showSidebarToggle = true,
   agentTitle,
   onCreateChat,
+  children,
 }: {
   absolute?: boolean;
   sidebarCollapsed?: boolean;
+  showSidebarToggle?: boolean;
   agentTitle?: string;
   onCreateChat?: () => void;
+  children?: React.ReactNode;
 }) {
   const counterScale = useUiZoomCounterScale();
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
@@ -64,9 +68,12 @@ export function SidebarTitlebarRow({
       )}
     >
       <TrafficLightGutter />
-      <div className="ml-0.5 shrink-0">
-        <SidebarToggleButton />
-      </div>
+      {showSidebarToggle && (
+        <div className="ml-0.5 shrink-0">
+          <SidebarToggleButton />
+        </div>
+      )}
+      {children}
       {sidebarCollapsed && onCreateChat && (
         <Tooltip>
           <TooltipTrigger>

@@ -1,9 +1,8 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useCallback } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { Select } from '@stagewise/stage-ui/components/select';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { produceWithPatches, enablePatches } from 'immer';
 import { ChevronLeftIcon } from 'lucide-react';
 import type { ConfigurablePermissionType } from '@shared/karton-contracts/ui/shared-types';
@@ -13,22 +12,6 @@ import {
 } from '@shared/karton-contracts/ui/shared-types';
 
 enablePatches();
-
-export const Route = createFileRoute(
-  '/_internal-app/browsing-settings/website-permissions',
-)({
-  component: Page,
-  validateSearch: (search: Record<string, unknown>) => ({
-    host: (search.host as string) || '',
-  }),
-  head: () => ({
-    meta: [
-      {
-        title: 'Website Permissions',
-      },
-    ],
-  }),
-});
 
 /** Human-readable labels for permission types */
 const permissionTypeLabels: Record<ConfigurablePermissionType, string> = {
@@ -56,11 +39,15 @@ const permissionSettingLabels: Record<PermissionSetting | -1, string> = {
   [PermissionSetting.Block]: 'Block',
 };
 
-function Page() {
-  const { host } = Route.useSearch();
-  const navigate = useNavigate();
+export function WebsitePermissionsSection() {
+  const settingsRoute = useKartonState((s) => s.appScreen.settingsRoute);
+  const host =
+    settingsRoute.section === 'website-permissions' ? settingsRoute.host : '';
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   // Get the current setting for a permission type for this host
   const getHostSetting = useCallback(
@@ -179,26 +166,26 @@ function Page() {
 
   if (!host) {
     return (
-      <div className="flex h-full w-full flex-col">
-        {/* Header */}
-        <div className="flex items-center border-border-subtle border-b px-6 py-4">
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => navigate({ to: '/browsing-settings' })}
-            >
-              <ChevronLeftIcon className="size-4" />
-            </Button>
-            <h1 className="font-semibold text-foreground text-xl">
-              Website Permissions
-            </h1>
-          </div>
-        </div>
-
+      <div className="h-full w-full">
         {/* Content */}
-        <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-          <div className="mx-auto max-w-3xl">
+        <OverlayScrollbar
+          className="h-full"
+          contentClassName="px-6 pt-24 pb-24"
+        >
+          <div className="mx-auto max-w-3xl space-y-8">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setSettingsRoute({ section: 'browsing' })}
+              >
+                <ChevronLeftIcon className="size-4" />
+              </Button>
+              <h1 className="font-semibold text-foreground text-xl">
+                Website Permissions
+              </h1>
+            </div>
             <p className="text-muted-foreground">
               No website selected. Please select a website from the Browsing
               Settings page.
@@ -210,29 +197,26 @@ function Page() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border/30 border-b px-6 py-4">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => navigate({ to: '/browsing-settings' })}
-          >
-            <ChevronLeftIcon className="size-4" />
-          </Button>
-          <div className="flex flex-col">
-            <h1 className="font-semibold text-foreground text-xl">
-              Website Permissions
-            </h1>
-            <span className="text-muted-foreground text-sm">{host}</span>
-          </div>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto max-w-3xl space-y-6">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setSettingsRoute({ section: 'browsing' })}
+            >
+              <ChevronLeftIcon className="size-4" />
+            </Button>
+            <div className="flex flex-col">
+              <h1 className="font-semibold text-foreground text-xl">
+                Website Permissions
+              </h1>
+              <span className="text-muted-foreground text-sm">{host}</span>
+            </div>
+          </div>
           {/* Summary */}
           <div className="rounded-lg border border-border/30 bg-surface-1/50 p-4">
             <p className="text-muted-foreground text-sm">

@@ -5,7 +5,6 @@ import type { WindowLayoutService } from './window-layout';
 import type { AuthService } from './auth';
 import { fileURLToPath } from 'node:url';
 import { DisposableService } from './disposable';
-import { SETTINGS_PAGE_URL } from '@shared/internal-urls';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -64,7 +63,7 @@ export class AppMenuService extends DisposableService {
             label: 'Settings',
             accelerator: 'CmdOrCtrl+,',
             click: () => {
-              void this.windowLayoutService.openUrl(SETTINGS_PAGE_URL);
+              this.windowLayoutService.openSettings();
             },
           },
           { type: 'separator' },

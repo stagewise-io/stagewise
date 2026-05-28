@@ -14,7 +14,7 @@ import {
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
 import { ChevronDownIcon } from 'lucide-react';
-import { useKartonState } from '@ui/hooks/use-karton';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { availableModels } from '@shared/available-models';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
@@ -112,6 +112,7 @@ function PlanLimitExceededError({
   onRetry: () => void;
 }) {
   const subscription = useKartonState((s) => s.userAccount.subscription);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const plan = subscription?.plan;
 
   const resetsAt = error.exceededWindows[0]?.resetsAt;
@@ -152,12 +153,13 @@ function PlanLimitExceededError({
       <span className="text-muted-foreground text-xs">{description}</span>
 
       <div className="flex flex-row items-center justify-end gap-2 pt-2">
-        <a
-          href="stagewise://internal/agent-settings/models-providers"
+        <button
+          type="button"
+          onClick={() => void openSettings({ section: 'models-providers' })}
           className={buttonVariants({ variant: 'ghost', size: 'xs' })}
         >
           Configure API keys
-        </a>
+        </button>
 
         <Button
           variant="primary"
@@ -238,6 +240,7 @@ function GenericError({
   const [helpExpanded, setHelpExpanded] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   const [openAgent] = useOpenAgent();
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
 
   const activeModelId = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.activeModelId : undefined,
@@ -297,12 +300,13 @@ function GenericError({
       {showSignInLink && (
         <div className="text-muted-foreground text-xs">
           Please{' '}
-          <a
-            href="stagewise://internal/account"
+          <button
+            type="button"
+            onClick={() => void openSettings({ section: 'account' })}
             className="text-primary-foreground underline hover:text-primary-foreground/80"
           >
             sign in to stagewise
-          </a>{' '}
+          </button>{' '}
           to continue.
         </div>
       )}

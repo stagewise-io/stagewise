@@ -11,6 +11,7 @@ import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-con
 import type { ColorScheme } from '@shared/karton-contracts/ui';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import type { SelectedElement } from '@shared/selected-elements';
+import type { SettingsRoute } from '@shared/settings-route';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   canBrowserHandleUrl,
@@ -650,6 +651,35 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   }
 
   private registerKartonProcedures() {
+    // App screen navigation
+    this.uiKarton.registerServerProcedureHandler(
+      'appScreen.openSettings',
+      async (_callingClientId: string, route?: SettingsRoute) => {
+        this.uiKarton.setState((draft) => {
+          draft.appScreen.mode = 'settings';
+          draft.appScreen.settingsRoute = route ?? {
+            section: 'models-providers',
+          };
+        });
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'appScreen.closeSettings',
+      async (_callingClientId: string) => {
+        this.uiKarton.setState((draft) => {
+          draft.appScreen.mode = 'main';
+        });
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'appScreen.setSettingsRoute',
+      async (_callingClientId: string, route: SettingsRoute) => {
+        this.uiKarton.setState((draft) => {
+          draft.appScreen.settingsRoute = route;
+        });
+      },
+    );
+
     this.uiKarton.registerServerProcedureHandler(
       'openExternalUrl',
       async (_callingClientId: string, url: string): Promise<void> => {
@@ -1085,6 +1115,16 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     );
   }
 
+  /**
+   * Open the settings screen from the backend (e.g. app menu).
+   */
+  public setAppScreenSettings(): void {
+    this.uiKarton.setState((draft) => {
+      draft.appScreen.mode = 'settings';
+      draft.appScreen.settingsRoute = { section: 'models-providers' };
+    });
+  }
+
   public forwardFocusEvent(tabId: string) {
     this.view.webContents.send('stagewise-tab-focused', tabId);
   }
@@ -1144,6 +1184,9 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   }
 
   public unregisterKartonProcedures() {
+    this.uiKarton.removeServerProcedureHandler('appScreen.openSettings');
+    this.uiKarton.removeServerProcedureHandler('appScreen.closeSettings');
+    this.uiKarton.removeServerProcedureHandler('appScreen.setSettingsRoute');
     this.uiKarton.removeServerProcedureHandler('openExternalUrl');
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');

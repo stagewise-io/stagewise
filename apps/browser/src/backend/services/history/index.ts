@@ -625,6 +625,24 @@ export class HistoryService {
   }
 
   /**
+   * Clear all download history from the database.
+   * @returns Number of download entries that were deleted
+   */
+  async clearDownloads(): Promise<number> {
+    const countResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.downloads)
+      .get();
+    const downloadCount = countResult?.count ?? 0;
+
+    await this.db.delete(schema.downloadsSlices);
+    await this.db.delete(schema.downloadsUrlChains);
+    await this.db.delete(schema.downloads);
+
+    return downloadCount;
+  }
+
+  /**
    * Clear all history data from the database.
    * Deletes all data from all history-related tables.
    * @returns Number of URL entries that were deleted

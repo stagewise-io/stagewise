@@ -1,36 +1,26 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
-import { useTrack } from '@pages/hooks/use-track';
-import { useState, useRef, useEffect } from 'react';
+import { Input } from '@stagewise/stage-ui/components/input';
+import { InputOtp } from '@stagewise/stage-ui/components/input-otp';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { useTrack } from '@ui/hooks/use-track';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { cn } from '@pages/utils';
+import { cn } from '@ui/utils';
 import { produceWithPatches } from 'immer';
 import type { TelemetryLevel } from '@shared/karton-contracts/ui/shared-types';
-import { SignInOptionsPanel } from '@ui/components/auth/sign-in-options-panel';
 import type { CurrentUsageResponse } from '@shared/karton-contracts/pages-api/types';
 
 const CONSOLE_URL =
   import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 
-export const Route = createFileRoute('/_internal-app/account')({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'Account',
-      },
-    ],
-  }),
-});
+type AuthPhase = 'form-input' | 'waiting-for-otp';
 
-function Page() {
+export function AccountSection() {
   const userAccount = useKartonState((s) => s.userAccount);
-  const sendOtp = useKartonProcedure((p) => p.sendOtp);
-  const verifyOtp = useKartonProcedure((p) => p.verifyOtp);
-  const signInSocial = useKartonProcedure((p) => p.signInSocial);
-  const logout = useKartonProcedure((p) => p.logout);
+  const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
+  const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
+  const logout = useKartonProcedure((p) => p.userAccount.logout);
   // `useTrack` swallows RPC errors so a failed telemetry capture (e.g.
   // backend karton server unavailable) cannot crash the page.
   const track = useTrack();
@@ -46,17 +36,14 @@ function Page() {
   }, [track]);
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex flex-col items-center border-border-subtle border-b px-6 py-6">
-        <div className="w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">Account</h1>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-12 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">Account</h1>
+          </div>
           {userAccount?.status === 'authenticated' ||
           userAccount?.status === 'server_unreachable' ? (
             <AuthenticatedView
@@ -66,11 +53,7 @@ function Page() {
               onLogout={() => void logout()}
             />
           ) : (
-            <LoginView
-              sendOtp={(email, token) => sendOtp(email, token ?? '')}
-              verifyOtp={verifyOtp}
-              signInSocial={signInSocial}
-            />
+            <LoginView sendOtp={sendOtp} verifyOtp={verifyOtp} />
           )}
         </div>
       </OverlayScrollbar>
@@ -93,7 +76,7 @@ function AuthenticatedView({
   machineId?: string;
   onLogout: () => void;
 }) {
-  const openTab = useKartonProcedure((p) => p.openTab);
+  const openTab = useKartonProcedure((p) => p.browser.createTab);
 
   return (
     <>
@@ -211,7 +194,9 @@ function formatResetTime(iso: string): string {
 }
 
 function UsageSection() {
-  const getUsageCurrent = useKartonProcedure((p) => p.getUsageCurrent);
+  const getUsageCurrent = useKartonProcedure(
+    (p) => p.userAccount.getUsageCurrent,
+  );
   const getUsageCurrentRef = useRef(getUsageCurrent);
   getUsageCurrentRef.current = getUsageCurrent;
   const [usage, setUsage] = useState<CurrentUsageResponse | null>(null);
@@ -305,7 +290,7 @@ function UsageSection() {
 
 function TelemetrySetting() {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const telemetryMode = preferences.privacy.telemetryLevel;
 
@@ -368,37 +353,145 @@ function TelemetrySetting() {
 function LoginView({
   sendOtp,
   verifyOtp,
-  signInSocial,
 }: {
-  sendOtp: (email: string, token?: string) => Promise<{ error?: string }>;
+  sendOtp: (
+    email: string,
+    turnstileToken: string,
+  ) => Promise<{ error?: string }>;
   verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
-  signInSocial: (provider: 'google' | 'github') => Promise<{ error?: string }>;
 }) {
-  const navigate = useNavigate();
-  const track = useTrack();
+  const [phase, setPhase] = useState<AuthPhase>('form-input');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const otpRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (phase === 'form-input') emailRef.current?.focus();
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'waiting-for-otp') otpRef.current?.focus();
+  }, [phase]);
+
+  const handleSendOtp = useCallback(async () => {
+    if (!email.trim()) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const turnstileToken = (await window.__solveTurnstile?.()) ?? '';
+      const result = await sendOtp(email.trim(), turnstileToken);
+      if (result?.error) setError(result.error);
+      else setPhase('waiting-for-otp');
+    } catch {
+      setError('Failed to send verification code.');
+    } finally {
+      setLoading(false);
+    }
+  }, [email, sendOtp]);
+
+  const handleVerifyOtp = useCallback(async () => {
+    if (!code.trim()) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await verifyOtp(email.trim(), code.trim());
+      if (result?.error) setError(result.error);
+      // On success, the auth state change callback will update userAccount
+      // and the parent component will switch to AuthenticatedView
+    } catch {
+      setError('Failed to verify code.');
+    } finally {
+      setLoading(false);
+    }
+  }, [email, code, verifyOtp]);
 
   return (
-    <SignInOptionsPanel
-      title="Authenticate"
-      description="Get access to the latest models with stagewise."
-      variant="centered"
-      sendOtp={sendOtp}
-      verifyOtp={verifyOtp}
-      signInSocial={signInSocial}
-      trackingPrefix="account-auth"
-      track={track}
-      onUseApiKeys={() =>
-        navigate({
-          to: '/agent-settings/models-providers',
-          hash: 'api-keys',
-        })
-      }
-      onUseSubscription={() =>
-        navigate({
-          to: '/agent-settings/models-providers',
-          hash: 'coding-plans',
-        })
-      }
-    />
+    <>
+      <div className="flex flex-col gap-2">
+        <h2 className="font-medium text-foreground text-lg">Authenticate</h2>
+        {phase === 'form-input' && (
+          <p className="text-muted-foreground text-sm">
+            Get access to the latest models with stagewise.
+          </p>
+        )}
+        {phase === 'waiting-for-otp' && (
+          <p className="text-muted-foreground text-sm">
+            We sent a code to{' '}
+            <span className="font-medium text-foreground">{email}</span>.
+          </p>
+        )}
+      </div>
+
+      <hr className="border-border-subtle" />
+
+      {phase === 'form-input' && (
+        <div className="flex max-w-sm flex-col gap-4">
+          <div className="flex gap-2">
+            <Input
+              ref={emailRef}
+              placeholder="you@example.com"
+              size="sm"
+              type="email"
+              value={email}
+              onValueChange={(v) => setEmail(v)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleSendOtp();
+              }}
+              disabled={loading}
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              className="shrink-0"
+              onClick={() => void handleSendOtp()}
+              disabled={loading || !email.trim()}
+            >
+              Sign in
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {phase === 'waiting-for-otp' && (
+        <div className="flex flex-col items-start gap-4">
+          <div className="flex items-center gap-2">
+            <InputOtp
+              ref={otpRef}
+              length={6}
+              size="sm"
+              value={code}
+              onChange={(val) => setCode(val)}
+              onComplete={() => void handleVerifyOtp()}
+              disabled={loading}
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              className="shrink-0"
+              onClick={() => void handleVerifyOtp()}
+              disabled={loading || code.length < 6}
+            >
+              {loading ? 'Verifying...' : 'Verify'}
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              setPhase('form-input');
+              setCode('');
+              setError(null);
+            }}
+          >
+            Use a different email
+          </Button>
+        </div>
+      )}
+
+      {error && <p className="text-error-foreground text-sm">{error}</p>}
+    </>
   );
 }

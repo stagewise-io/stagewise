@@ -1,25 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useKartonProcedure } from '@pages/hooks/use-karton';
+import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { Loader2Icon } from 'lucide-react';
-
-export const Route = createFileRoute('/_internal-app/clear-data')({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'Clear Data',
-      },
-    ],
-  }),
-});
 
 type DataType =
   | 'history'
   | 'favicons'
+  | 'downloads'
   | 'cookies'
   | 'cache'
   | 'storage'
@@ -39,6 +28,11 @@ const dataOptions: DataOption[] = [
     id: 'history',
     label: 'Browsing history',
     description: 'URLs, visits, and search terms',
+  },
+  {
+    id: 'downloads',
+    label: 'Download history',
+    description: 'List of downloaded files (not the files themselves)',
   },
   {
     id: 'cookies',
@@ -82,10 +76,11 @@ const dataOptions: DataOption[] = [
   },
 ];
 
-function Page() {
+export function ClearDataSection() {
   const [selectedTypes, setSelectedTypes] = useState<Set<DataType>>(
     new Set([
       'history',
+      'downloads',
       'cookies',
       'cache',
       'storage',
@@ -101,7 +96,9 @@ function Page() {
     message: string;
   } | null>(null);
 
-  const clearBrowsingData = useKartonProcedure((s) => s.clearBrowsingData);
+  const clearBrowsingData = useKartonProcedure(
+    (p) => p.browser.clearBrowsingData,
+  );
 
   const toggleDataType = (type: DataType) => {
     setSelectedTypes((prev) => {
@@ -132,6 +129,7 @@ function Page() {
       const options = {
         history: selectedTypes.has('history'),
         favicons: selectedTypes.has('favicons'),
+        downloads: selectedTypes.has('downloads'),
         cookies: selectedTypes.has('cookies'),
         cache: selectedTypes.has('cache'),
         storage: selectedTypes.has('storage'),
@@ -157,6 +155,9 @@ function Page() {
           clearedItems.push(
             `${response.historyEntriesCleared} history ${response.historyEntriesCleared === 1 ? 'entry' : 'entries'}`,
           );
+        }
+        if (response.downloadsCleared === true) {
+          clearedItems.push('downloads');
         }
         if (response.faviconsCleared) {
           clearedItems.push(`${response.faviconsCleared} favicons`);
@@ -199,17 +200,16 @@ function Page() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">Clear Data</h1>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">
+              Clear Data
+            </h1>
+          </div>
           {/* Data Selection Section */}
           <section className="space-y-4">
             <div>

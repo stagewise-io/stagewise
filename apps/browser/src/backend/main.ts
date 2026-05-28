@@ -3,7 +3,6 @@
  */
 
 import { app, dialog } from 'electron';
-import path from 'node:path';
 import { AuthService } from './services/auth';
 import { AgentManagerService } from './services/agent-manager';
 import { UserExperienceService } from './services/experience';
@@ -18,10 +17,10 @@ import {
   TelemetryService,
 } from './services/telemetry';
 import { GlobalConfigService } from './services/global-config';
-import { NotificationSoundsService } from './services/notification-sounds';
 import { PreferencesService } from './services/preferences';
 import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
+import { NotificationSoundsService } from './services/notification-sounds';
 import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
@@ -33,8 +32,6 @@ import { DevToolAPIService } from './services/dev-tool-api';
 import { OmniboxSuggestionsService } from './services/omnibox-suggestions';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { ToolboxService } from './services/toolbox';
-import type { KartonService } from './services/karton';
-import { GitService } from './services/git';
 import { CredentialsService } from './services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { ModelProviderService } from './agents/model-provider';
@@ -47,15 +44,20 @@ import {
   getRipgrepBasePath,
 } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
-import { importLegacyPrereleaseData } from './utils/import-legacy-prerelease-data';
 import { discoverPlugins } from './utils/discover-plugins';
 import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
 import { ProcessedImageCacheService } from './services/processed-image-cache';
+import { GitService } from './services/git';
 import { detectShell, resolveShellEnv } from './utils/shell-env';
-import { AUTH_CALLBACK_PROTOCOL } from './services/auth/callback-scheme';
+import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
+import type {
+  HistoryFilter,
+  HistoryResult,
+  FaviconBitmapResult,
+} from '@shared/karton-contracts/pages-api/types';
 
 export type MainParameters = {
   launchOptions: {
@@ -67,8 +69,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // In this file you can include the rest of your app's specific main process
   // code. You can also put them in separate files and import them here.
   const logger = new Logger(verbose ?? false);
-
-  await importLegacyPrereleaseData(logger);
 
   migrateLegacyPaths(logger);
 
@@ -122,12 +122,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
     historyService,
     faviconService,
-    webDataService,
     telemetryService,
   );
-
-  // Initialize search engines state
-  await pagesService.syncSearchEnginesState();
 
   // Create LocalPortsScannerService to discover local dev servers
   const localPortsScannerService =
@@ -143,7 +139,33 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     preferencesService,
     telemetryService,
   );
-  const uiKarton: KartonService = windowLayoutService.uiKarton;
+  const uiKarton = windowLayoutService.uiKarton;
+
+  const detectedShell = detectShell();
+  const resolvedEnvPromise = detectedShell
+    ? resolveShellEnv(detectedShell)
+    : Promise.resolve(null);
+  const gitService = await GitService.create({
+    logger,
+    telemetryService,
+    resolvedEnvPromise,
+  });
+
+  // Push search engine definitions to UI karton state.
+  webDataService
+    .getSearchEngines()
+    .then((engines) => {
+      uiKarton.setState((draft) => {
+        draft.searchEngines = engines;
+      });
+      if (verbose)
+        logger.debug(
+          `[Main] Pushed ${engines.length} search engines to UI karton`,
+        );
+    })
+    .catch((error) => {
+      logger.warn('[Main] Failed to load search engines', error);
+    });
 
   // Push bundled plugin definitions to UI karton state
   discoverPlugins(getPluginsPath()).then((plugins) => {
@@ -166,7 +188,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   preferencesService.connectKarton(uiKarton, pagesService);
 
   // Create OmniboxSuggestionsService for omnibox autocomplete
-  await OmniboxSuggestionsService.create(
+  const _omniboxSuggestionsService = await OmniboxSuggestionsService.create(
     logger,
     uiKarton,
     historyService,
@@ -175,7 +197,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     localPortsScannerService,
   );
 
-  // Set up URL handlers
+  // Set up URL handlers, capturing the auth callback registration function
   const registerAuthCallbackHandler = setupUrlHandlers(
     windowLayoutService,
     logger,
@@ -220,7 +242,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     globalConfigService.get(),
   );
 
-  // Wire the window ref for dock bouncing and web contents for audio playback.
   notificationSoundsService.setWindowRef(() =>
     windowLayoutService.getBaseWindow(),
   );
@@ -228,7 +249,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     windowLayoutService.getUIWebContents(),
   );
 
-  // Keep the sounds service in sync with config changes.
   const notificationSoundsConfigListener: Parameters<
     typeof globalConfigService.addConfigUpdatedListener
   >[0] = (newConfig) => {
@@ -238,75 +258,34 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     notificationSoundsConfigListener,
   );
 
-  // Push discovered sound packs and display names into global config.
-  notificationSoundsService.pushDiscoveredPacks((packs) => {
-    const cfg = globalConfigService.get();
-    const displayNames = notificationSoundsService.getPackDisplayNames();
-    const packsChanged =
-      !cfg.availableSoundPacks ||
-      cfg.availableSoundPacks.length !== packs.length ||
-      !cfg.availableSoundPacks.every((p, i) => p === packs[i]);
-    const namesChanged =
-      !cfg.packDisplayNames ||
-      Object.keys(cfg.packDisplayNames).length !==
-        Object.keys(displayNames).length ||
-      Object.entries(displayNames).some(
-        ([id, name]) => cfg.packDisplayNames?.[id] !== name,
-      );
-    if (packsChanged || namesChanged) {
-      void globalConfigService
-        .set({
-          ...cfg,
-          availableSoundPacks: packs,
-          packDisplayNames: displayNames,
-        })
-        .catch((err) => {
-          logger.error('[Main] Failed to save discovered sound packs', err);
-        });
-    }
-  });
-
-  pagesService.registerPreviewSoundPackHandler(async (packId, loudness) => ({
-    ok: await notificationSoundsService.previewPackDoneSound(packId, loudness),
-  }));
-
-  // Wire the custom sound import procedure (opens native file dialog).
-  pagesService.registerImportSoundPackHandler(async () => {
-    const result = await dialog.showOpenDialog({
-      title: 'Use Custom Sound',
-      filters: [
-        { name: 'Sound files', extensions: ['mp3', 'json'] },
-        { name: 'MP3 audio', extensions: ['mp3'] },
-        { name: 'Sound pack JSON', extensions: ['json'] },
-      ],
-      properties: ['openFile'],
-    });
-    // User cancelled — no error, just nothing to do.
-    if (result.canceled || result.filePaths.length === 0) {
-      return { error: '' };
-    }
-    const imported = await notificationSoundsService.importPack(
-      result.filePaths[0],
-    );
-    // Propagate error if import failed.
-    if ('error' in imported) return imported;
-    // Refresh available packs in config so the UI picks up the new pack.
+  const syncAvailableSoundPacks = async (
+    selectedPack?: string,
+  ): Promise<void> => {
     const cfg = globalConfigService.get();
     const packs = notificationSoundsService.listPacks();
     const displayNames = notificationSoundsService.getPackDisplayNames();
-    const newPack = imported.id;
-    try {
-      await globalConfigService.set({
-        ...cfg,
-        availableSoundPacks: packs,
-        packDisplayNames: displayNames,
-        notificationSoundPack: newPack,
-      });
-    } catch (err) {
-      logger.error('[Main] Failed to save imported sound pack', err);
-      return { error: 'Sound pack imported, but saving the selection failed.' };
-    }
-    return imported;
+    const packsChanged =
+      cfg.availableSoundPacks.length !== packs.length ||
+      !cfg.availableSoundPacks.every((p, i) => p === packs[i]);
+    const namesChanged =
+      Object.keys(cfg.packDisplayNames).length !==
+        Object.keys(displayNames).length ||
+      Object.entries(displayNames).some(
+        ([id, name]) => cfg.packDisplayNames[id] !== name,
+      );
+
+    if (!packsChanged && !namesChanged && !selectedPack) return;
+
+    await globalConfigService.set({
+      ...cfg,
+      availableSoundPacks: packs,
+      packDisplayNames: displayNames,
+      ...(selectedPack ? { notificationSoundPack: selectedPack } : {}),
+    });
+  };
+
+  void syncAvailableSoundPacks().catch((err) => {
+    logger.error('[Main] Failed to save discovered sound packs', err);
   });
 
   ensureRipgrepInstalled({
@@ -368,7 +347,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const filePickerService = await FilePickerService.create(logger, uiKarton);
 
   // DevToolAPIService handles devtools-related functionality and state
-  await DevToolAPIService.create(logger, uiKarton, windowLayoutService);
+  const _devToolAPIService = await DevToolAPIService.create(
+    logger,
+    uiKarton,
+    windowLayoutService,
+  );
 
   // URIHandlerService registers the app as the default protocol client for stagewise://
   // URL handling is done in main.ts via setupUrlHandlers() and handleCommandLineUrls()
@@ -380,29 +363,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     notificationService,
     logger,
   );
+
+  // Wire auth callback handler so social sign-in / protocol URLs are
+  // routed to AuthService instead of opened as browser tabs.
   registerAuthCallbackHandler((url) => authService.handleAuthCallbackUrl(url));
-
-  const credentialsService = await CredentialsService.create(logger);
-
-  credentialsService.setAccessTokenProvider(() => authService.accessToken);
-
-  const detectedShell = detectShell();
-  const resolvedEnvPromise: Promise<Record<string, string> | null> =
-    detectedShell
-      ? resolveShellEnv(detectedShell).catch((err) => {
-          logger.warn(
-            '[Main] Error resolving shell environment — falling back to process.env',
-            err,
-          );
-          return null;
-        })
-      : Promise.resolve(null);
-
-  const gitService = await GitService.create({
-    logger,
-    telemetryService,
-    resolvedEnvPromise,
-  });
 
   const userExperienceService = await UserExperienceService.create(
     logger,
@@ -410,6 +374,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
     gitService,
   );
+
+  const credentialsService = await CredentialsService.create(logger);
+
+  credentialsService.setAccessTokenProvider(() => authService.accessToken);
 
   const toolboxService = await ToolboxService.create(
     logger,
@@ -426,9 +394,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     detectedShell,
     resolvedEnvPromise,
   );
-  toolboxService.setNotificationEventHandler((event, agentId) => {
-    notificationSoundsService.notifyAgentEvent(event, agentId);
-  });
 
   // Give DiffHistoryService a way to resolve workspace roots for the
   // gitignore-aware filter in `registerAgentEdit`. Evaluated lazily per
@@ -471,7 +436,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       );
   });
 
-  new AppMenuService(logger, authService, windowLayoutService);
+  const _appMenuService = new AppMenuService(
+    logger,
+    authService,
+    windowLayoutService,
+  );
 
   const modelProviderService = new ModelProviderService(
     telemetryService,
@@ -507,30 +476,19 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
     modelProviderService,
     gitService,
-    (event, agentId) => {
-      notificationSoundsService.notifyAgentEvent(event, agentId);
-    },
+    (event, agentId) =>
+      notificationSoundsService.notifyAgentEvent(event, agentId),
     assetCacheService,
     processedImageCacheService,
   );
-
-  toolboxService.setWorkspaceLastUsedAtResolver(async (workspacePaths) => {
-    const db = await agentManagerService.getPersistenceDB();
-    return (
-      (await db?.getWorkspaceLastUsedAtByPath(workspacePaths)) ?? new Map()
-    );
-  });
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
   // workspace-md generating, search engines, global config, auth)
   await wirePagesStateSync({
     uiKarton,
     pagesService,
-    webDataService,
     globalConfigService,
-    authService,
     logger,
-    telemetryService,
   });
 
   // Wire all pages-api handler setters (pending edits accept/reject,
@@ -540,37 +498,185 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     pagesService,
     diffHistoryService,
     windowLayoutService,
-    toolboxService,
-    agentManagerService,
-    authService,
-    userExperienceService,
-    autoUpdateService,
     logger,
   });
 
-  // Wire credential CRUD operations from CredentialsService to PagesService
-  pagesService.registerCredentialHandlers(
-    async (typeId, data) => {
+  // Wire permission-exceptions clear handler (used by clearBrowsingData)
+  pagesService.setClearPermissionExceptionsHandler(() =>
+    preferencesService.clearAllPermissionExceptionsForAllTypes(),
+  );
+
+  // --- Wire main UI settings RPC procedures ---
+
+  uiKarton.registerServerProcedureHandler(
+    'config.previewSoundPack',
+    async (
+      _cid: string,
+      packId: string,
+      loudness: 'off' | 'subtle' | 'default',
+    ) => ({
+      ok: await notificationSoundsService.previewPackDoneSound(
+        packId,
+        loudness,
+      ),
+    }),
+  );
+
+  uiKarton.registerServerProcedureHandler(
+    'config.importSoundPack',
+    async () => {
+      const result = await dialog.showOpenDialog({
+        title: 'Use Custom Sound',
+        filters: [
+          { name: 'Sound files', extensions: ['mp3', 'json'] },
+          { name: 'MP3 audio', extensions: ['mp3'] },
+          { name: 'Sound pack JSON', extensions: ['json'] },
+        ],
+        properties: ['openFile'],
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { error: '' };
+      }
+
+      const imported = await notificationSoundsService.importPack(
+        result.filePaths[0],
+      );
+      if ('error' in imported) return imported;
+
+      try {
+        await syncAvailableSoundPacks(imported.id);
+      } catch (err) {
+        logger.error('[Main] Failed to save imported sound pack', err);
+        return {
+          error: 'Sound pack imported, but saving the selection failed.',
+        };
+      }
+
+      return imported;
+    },
+  );
+
+  // browser.addSearchEngine / removeSearchEngine
+  uiKarton.registerServerProcedureHandler(
+    'browser.addSearchEngine',
+    async (
+      _cid: string,
+      input: { name: string; url: string; keyword: string },
+    ) => {
+      const id = await webDataService.addSearchEngine(input);
+      await webDataService.getSearchEngines().then((engines) => {
+        uiKarton.setState((draft) => {
+          draft.searchEngines = engines;
+        });
+      });
+      return { id, success: true };
+    },
+  );
+  uiKarton.registerServerProcedureHandler(
+    'browser.removeSearchEngine',
+    async (_cid: string, id: number) => {
+      const removed = await webDataService.removeSearchEngine(id);
+      await webDataService.getSearchEngines().then((engines) => {
+        uiKarton.setState((draft) => {
+          draft.searchEngines = engines;
+        });
+      });
+      return { success: removed };
+    },
+  );
+
+  // browser.clearBrowsingData
+  uiKarton.registerServerProcedureHandler(
+    'browser.clearBrowsingData',
+    async (
+      _cid: string,
+      options: Parameters<typeof pagesService.clearBrowsingData>[0],
+    ) => {
+      return pagesService.clearBrowsingData(options);
+    },
+  );
+
+  // browser.getHistory / browser.getFaviconBitmaps (history settings section)
+  uiKarton.registerServerProcedureHandler(
+    'browser.getHistory',
+    async (_cid: string, filter: HistoryFilter): Promise<HistoryResult[]> => {
+      const results = await historyService.queryHistory(filter);
+      const pageUrls = results.map((r) => r.url);
+      const faviconMap = await faviconService.getFaviconsForUrls(pageUrls);
+      return results.map((r) => ({
+        ...r,
+        faviconUrl: faviconMap.get(r.url) ?? null,
+      }));
+    },
+  );
+  uiKarton.registerServerProcedureHandler(
+    'browser.getFaviconBitmaps',
+    async (
+      _cid: string,
+      faviconUrls: string[],
+    ): Promise<Record<string, FaviconBitmapResult>> => {
+      const bitmapMap = await faviconService.getFaviconBitmaps(faviconUrls);
+      const result: Record<string, FaviconBitmapResult> = {};
+      for (const [url, bitmap] of bitmapMap) {
+        result[url] = bitmap;
+      }
+      return result;
+    },
+  );
+
+  // toolbox.getContextFiles / toolbox.generateWorkspaceMdForPath
+  uiKarton.registerServerProcedureHandler(
+    'toolbox.getContextFiles',
+    async (_cid: string) => {
+      return toolboxService.getContextFilesForAllWorkspaces();
+    },
+  );
+  uiKarton.registerServerProcedureHandler(
+    'toolbox.generateWorkspaceMdForPath',
+    async (_cid: string, workspacePath: string) => {
+      await agentManagerService.generateWorkspaceMdForPath(workspacePath);
+    },
+  );
+
+  // userAccount.getUsageCurrent / getUsageHistory
+  uiKarton.registerServerProcedureHandler(
+    'userAccount.getUsageCurrent',
+    async (_cid: string) => {
+      return authService.getUsageCurrent();
+    },
+  );
+  uiKarton.registerServerProcedureHandler(
+    'userAccount.getUsageHistory',
+    async (_cid: string, params: { days?: number }) => {
+      return authService.getUsageHistory(params.days);
+    },
+  );
+
+  // credentials.set / credentials.delete / credentials.getConfiguredIds
+  uiKarton.registerServerProcedureHandler(
+    'credentials.set',
+    async (_cid: string, typeId: string, data: Record<string, string>) => {
       await credentialsService.set(
         typeId as CredentialTypeId,
         data as Parameters<typeof credentialsService.set>[1],
       );
     },
-    async (typeId) => {
+  );
+  uiKarton.registerServerProcedureHandler(
+    'credentials.delete',
+    async (_cid: string, typeId: string) => {
       await credentialsService.delete(typeId as CredentialTypeId);
     },
-    () => credentialsService.listConfigured(),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'credentials.getConfiguredIds',
+    async (_cid: string) => {
+      return credentialsService.listConfigured();
+    },
   );
 
   logger.debug('[Main] Normal operation services bootstrapped');
-
-  void toolboxService
-    .scanWorkspaceGitCleanupCandidatesOnStartup()
-    .catch((error) => {
-      logger.warn(
-        `[Main] Failed to scan worktree cleanup candidates: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    });
 
   logger.debug('[Main] Startup complete');
 
@@ -628,16 +734,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
           });
 
       const asyncTeardowns = Promise.all([
-        runAsyncTeardown('notificationSoundsService', async () => {
-          globalConfigService.removeConfigUpdatedListener(
-            notificationSoundsConfigListener,
-          );
-          notificationSoundsService.setWindowRef(() => null);
-          notificationSoundsService.setWebContentsRef(() => null);
-          await notificationSoundsService.teardown();
-        }),
         runAsyncTeardown('toolboxService', () => toolboxService.teardown()),
-        runAsyncTeardown('gitService', () => gitService.teardown()),
         runAsyncTeardown('telemetryService', () => telemetryService.teardown()),
       ]);
 
@@ -663,28 +760,19 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 }
 
 /**
- * Checks if a URL points at a stable internal app page.
- */
-function isInternalAppUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'stagewise:' && parsed.host === 'internal';
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Checks if a string is a valid URL that the browser can open
  */
 function isOpenableUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    if (isInternalAppUrl(url)) return true;
-    if (parsed.protocol === AUTH_CALLBACK_PROTOCOL) {
-      return isAuthCallbackUrl(url);
-    }
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return (
+      parsed.protocol === 'http:' ||
+      parsed.protocol === 'https:' ||
+      parsed.protocol === 'stagewise:' ||
+      parsed.protocol === 'stagewise-prerelease:' ||
+      parsed.protocol === 'stagewise-nightly:' ||
+      parsed.protocol === 'stagewise-dev:'
+    );
   } catch {
     return false;
   }
@@ -707,31 +795,31 @@ function extractUrlsFromArgs(argv: string[]): string[] {
   return urls;
 }
 
-/**
- * Opens a URL in a new browser tab (handles both http/https and stagewise:// URLs)
- */
+type AuthCallbackHandler = (url: string) => boolean | Promise<boolean>;
+const MAX_QUEUED_AUTH_CALLBACK_URLS = 5;
+
 function isAuthCallbackUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== AUTH_CALLBACK_PROTOCOL) return false;
-    const fragmentParams = new URLSearchParams(parsed.hash.slice(1));
-    return (
-      parsed.host === 'auth' ||
-      parsed.pathname.includes('auth') ||
-      parsed.searchParams.has('code') ||
-      parsed.searchParams.has('token') ||
-      parsed.searchParams.has('error') ||
-      fragmentParams.has('code') ||
-      fragmentParams.has('token') ||
-      fragmentParams.has('error')
-    );
+    if (
+      parsed.protocol !== 'stagewise:' &&
+      parsed.protocol !== 'stagewise-prerelease:' &&
+      parsed.protocol !== 'stagewise-nightly:' &&
+      parsed.protocol !== 'stagewise-dev:'
+    ) {
+      return false;
+    }
+    // Auth callback URLs have /auth in the path.
+    // Normalize: stagewise://auth/callback → hostname='auth', pathname='/callback',
+    // so reconstruct the full path the same way auth/index.ts does.
+    const callbackPath = parsed.hostname
+      ? `/${parsed.hostname}${parsed.pathname}`
+      : parsed.pathname;
+    return callbackPath.includes('/auth');
   } catch {
     return false;
   }
 }
-
-type AuthCallbackHandler = (url: string) => boolean | Promise<boolean>;
-const MAX_QUEUED_AUTH_CALLBACK_URLS = 5;
 
 function describeIncomingUrl(url: string): string {
   try {
@@ -753,6 +841,9 @@ function handleAuthCallbackUrl(
   });
 }
 
+/**
+ * Opens a URL in a new browser tab, routing auth callbacks to the handler.
+ */
 function openIncomingUrl(
   url: string,
   windowLayoutService: WindowLayoutService,
@@ -769,25 +860,13 @@ function openIncomingUrl(
     }
     return;
   }
-  try {
-    if (
-      new URL(url).protocol === AUTH_CALLBACK_PROTOCOL &&
-      !isInternalAppUrl(url)
-    ) {
-      logger.warn(
-        `[Main] Ignoring malformed auth callback URL: ${describeIncomingUrl(url)}`,
-      );
-      return;
-    }
-  } catch {
-    return;
-  }
   logger.debug(`[Main] Opening incoming URL: ${describeIncomingUrl(url)}`);
   void windowLayoutService.openUrlInNewTab(url);
 }
 
 /**
- * Sets up event handlers for opening URLs from OS events
+ * Sets up event handlers for opening URLs from OS events.
+ * Returns a function to register the auth callback handler once AuthService is ready.
  */
 function setupUrlHandlers(
   windowLayoutService: WindowLayoutService,
@@ -803,6 +882,8 @@ function setupUrlHandlers(
     logger.debug('[Main] Queued auth callback URL until handler is ready');
   };
 
+  // Use registerStartupUrlHandler (installed in index.ts) to get all
+  // open-url events, including those queued before main.ts runs.
   registerStartupUrlHandler((url) => {
     logger.debug(`[Main] open-url event received: ${describeIncomingUrl(url)}`);
     if (isOpenableUrl(url)) {
@@ -817,7 +898,6 @@ function setupUrlHandlers(
   });
 
   // Handle 'second-instance' event (when app is already running)
-  // This fires when user opens another URL while the app is running
   app.on('second-instance', (_ev: Electron.Event, argv: string[]) => {
     logger.debug(
       `[Main] second-instance event received with ${argv.length} arguments`,
@@ -844,7 +924,9 @@ function setupUrlHandlers(
 }
 
 /**
- * Handles URLs from command line arguments on initial startup
+ * Handles URLs from command line arguments on initial startup.
+ * Packaged protocol launches may pass the callback URL as argv[1]
+ * without a script-path argument, so we scan all of argv.
  */
 function handleCommandLineUrls(
   argv: string[],
@@ -852,9 +934,6 @@ function handleCommandLineUrls(
   logger: Logger,
   authCallbackHandler: AuthCallbackHandler | null,
 ): void {
-  // Packaged protocol launches may pass the callback as the second argument
-  // without a script path. Scan all args and let URL filtering ignore argv[0]
-  // and non-URL flags.
   const urls = extractUrlsFromArgs(argv);
   if (urls.length > 0) {
     logger.debug(

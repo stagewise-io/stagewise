@@ -1,29 +1,28 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
-import { useTrack } from '@pages/hooks/use-track';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { useTrack } from '@ui/hooks/use-track';
 import type {
   CustomEndpoint,
   CustomModel,
   ModelCapabilities,
   ModelProvider,
+  ProviderEndpointMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
   PROVIDER_DISPLAY_INFO,
   PROVIDER_OFFICIAL_URLS,
-  providerEndpointModeSchema,
 } from '@shared/karton-contracts/ui/shared-types';
 import { availableModels } from '@shared/available-models';
 import { CODING_PLANS, type CodingPlan } from '@shared/coding-plans';
 import { CodingPlanCard } from '@ui/components/coding-plan-card';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 
-import { cn } from '@pages/utils';
+import { cn } from '@ui/utils';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import {
@@ -57,19 +56,6 @@ import {
 
 enablePatches();
 
-export const Route = createFileRoute(
-  '/_internal-app/agent-settings/models-providers',
-)({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'Models & Providers',
-      },
-    ],
-  }),
-});
-
 // =============================================================================
 // Model Provider Configuration
 // =============================================================================
@@ -86,13 +72,19 @@ const PROVIDERS: ModelProvider[] = [
 ];
 
 function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
-  const navigate = useNavigate();
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
-  const setProviderApiKey = useKartonProcedure((s) => s.setProviderApiKey);
-  const clearProviderApiKey = useKartonProcedure((s) => s.clearProviderApiKey);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const setProviderApiKey = useKartonProcedure(
+    (p) => p.preferences.setProviderApiKey,
+  );
+  const clearProviderApiKey = useKartonProcedure(
+    (p) => p.preferences.clearProviderApiKey,
+  );
   const validateProviderApiKey = useKartonProcedure(
-    (s) => s.validateProviderApiKey,
+    (p) => p.preferences.validateProviderApiKey,
   );
 
   const config = preferences.providerConfigs?.[provider] ?? {
@@ -119,12 +111,8 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
 
   const handleModeChange = useCallback(
     async (newMode: unknown) => {
-      const parsedMode = providerEndpointModeSchema.safeParse(newMode);
-      if (!parsedMode.success) return;
-
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.providerConfigs[provider] ??= { mode: 'stagewise' };
-        draft.providerConfigs[provider].mode = parsedMode.data;
+        draft.providerConfigs[provider].mode = newMode as ProviderEndpointMode;
       });
       await updatePreferences(patches);
     },
@@ -307,7 +295,7 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
                 variant="secondary"
                 size="sm"
                 onClick={() =>
-                  navigate({ to: '/agent-settings/custom-providers' })
+                  setSettingsRoute({ section: 'custom-providers' })
                 }
               >
                 Configure Providers
@@ -324,7 +312,7 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
                 onValueChange={handleCustomProviderChange}
                 items={customProviderItems}
                 placeholder="Select a provider..."
-                size="sm"
+                size="md"
                 triggerClassName="w-full"
               />
             </div>
@@ -341,9 +329,13 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
 
 function SettingsCodingPlanCard({ plan }: { plan: CodingPlan }) {
   const preferences = useKartonState((s) => s.preferences);
-  const connectCodingPlan = useKartonProcedure((s) => s.connectCodingPlan);
-  const disconnectProvider = useKartonProcedure((s) => s.disconnectProvider);
-  const openExternalUrl = useKartonProcedure((s) => s.openExternalUrl);
+  const connectCodingPlan = useKartonProcedure(
+    (p) => p.preferences.connectCodingPlan,
+  );
+  const disconnectProvider = useKartonProcedure(
+    (p) => p.preferences.disconnectProvider,
+  );
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
 
   const config = preferences.providerConfigs?.[plan.provider] ?? {
     mode: 'stagewise' as const,
@@ -754,7 +746,7 @@ function CustomModelDialog({
                 value={endpointId}
                 onValueChange={(val) => setEndpointId(val as string)}
                 items={endpointOptions}
-                size="sm"
+                size="md"
                 triggerClassName="w-full"
               />
             </div>
@@ -1059,7 +1051,7 @@ function CustomModelCard({
 
 function CustomModelsSection() {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const customModels = preferences?.customModels ?? [];
   const customEndpoints = preferences?.customEndpoints ?? [];
@@ -1269,42 +1261,24 @@ function CustomModelsSection() {
 // Main Page Component
 // =============================================================================
 
-function Page() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    const scrollToHash = () => {
-      const targetId = window.location.hash.slice(1);
-      if (!targetId) return;
-
-      requestAnimationFrame(() => {
-        document.getElementById(targetId)?.scrollIntoView({
-          block: 'start',
-          behavior: 'smooth',
-        });
-      });
-    };
-
-    scrollToHash();
-    window.addEventListener('hashchange', scrollToHash);
-    return () => window.removeEventListener('hashchange', scrollToHash);
-  }, []);
+export function ModelsProvidersSection() {
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">
-            Models & Providers
-          </h1>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">
+              Models & Providers
+            </h1>
+          </div>
           {/* Coding Plans Section */}
-          <section id="coding-plans" className="scroll-mt-6 space-y-6">
+          <section className="space-y-6">
             <div>
               <h2 className="font-medium text-foreground text-lg">
                 Coding Plans
@@ -1321,7 +1295,7 @@ function Page() {
           <hr className="border-derived-subtle border-t" />
 
           {/* API Keys Section */}
-          <section id="api-keys" className="scroll-mt-6 space-y-6">
+          <section className="space-y-6">
             <div>
               <h2 className="font-medium text-foreground text-lg">API Keys</h2>
               <p className="text-muted-foreground text-sm">
@@ -1350,7 +1324,7 @@ function Page() {
                   variant="secondary"
                   size="sm"
                   onClick={() =>
-                    navigate({ to: '/agent-settings/custom-providers' })
+                    setSettingsRoute({ section: 'custom-providers' })
                   }
                 >
                   Custom Providers

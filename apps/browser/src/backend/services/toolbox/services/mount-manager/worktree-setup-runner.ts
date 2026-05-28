@@ -4,7 +4,6 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import type { KartonService } from '@/services/karton';
-import type { AppState } from '@shared/karton-contracts/ui';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 
@@ -117,7 +116,7 @@ export class WorktreeSetupRunner {
 
     const runId = randomUUID();
     const startedAt = Date.now();
-    this.uiKarton.setState((draft: AppState) => {
+    this.uiKarton.setState((draft) => {
       draft.workspaceGitSetup.runsByPath[metadata.workspacePath] = {
         id: runId,
         workspacePath: metadata.workspacePath,
@@ -313,7 +312,7 @@ export class WorktreeSetupRunner {
     stdoutTail: string,
     stderrTail: string,
   ): void {
-    this.uiKarton.setState((draft: AppState) => {
+    this.uiKarton.setState((draft) => {
       const run = draft.workspaceGitSetup.runsByPath[workspacePath];
       if (!run || run.status !== 'running') return;
       run.stdoutTail = stdoutTail;
@@ -332,7 +331,7 @@ export class WorktreeSetupRunner {
       error?: Error;
     },
   ): void {
-    this.uiKarton.setState((draft: AppState) => {
+    this.uiKarton.setState((draft) => {
       const run = draft.workspaceGitSetup.runsByPath[workspacePath];
       if (!run) return;
       run.status = result.status;

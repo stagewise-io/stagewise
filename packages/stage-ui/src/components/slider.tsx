@@ -2,6 +2,19 @@ import * as React from 'react';
 import { Slider as BaseSlider } from '@base-ui/react/slider';
 import { cn } from '../lib/utils';
 
+const sliderThicknessStyles = {
+  default: {
+    track: 'h-1.5',
+    thumb: 'size-4',
+  },
+  thick: {
+    track: 'h-2.5',
+    thumb: 'size-5',
+  },
+} as const;
+
+export type SliderThickness = keyof typeof sliderThicknessStyles;
+
 export type SliderProps = Omit<
   React.ComponentProps<typeof BaseSlider.Root>,
   'value' | 'defaultValue' | 'onValueChange'
@@ -14,6 +27,7 @@ export type SliderProps = Omit<
   trackClassName?: string;
   indicatorClassName?: string;
   thumbClassName?: string;
+  thickness?: SliderThickness;
 };
 
 export function Slider({
@@ -26,8 +40,11 @@ export function Slider({
   trackClassName,
   indicatorClassName,
   thumbClassName,
+  thickness = 'default',
   ...props
 }: SliderProps) {
+  const thicknessStyles = sliderThicknessStyles[thickness];
+
   return (
     <BaseSlider.Root
       {...props}
@@ -48,8 +65,9 @@ export function Slider({
       >
         <BaseSlider.Track
           className={cn(
-            'relative h-1.5 w-full rounded-full bg-surface-2',
+            'relative w-full rounded-full bg-surface-2',
             'border border-derived-subtle',
+            thicknessStyles.track,
             trackClassName,
           )}
         >
@@ -62,7 +80,8 @@ export function Slider({
           <BaseSlider.Thumb
             aria-label={ariaLabel}
             className={cn(
-              'size-4 rounded-full border border-border bg-background shadow-elevation-1',
+              'rounded-full border border-border bg-background shadow-elevation-1',
+              thicknessStyles.thumb,
               'transition-[box-shadow,background-color,border-color] duration-150',
               'hover:bg-hover-derived active:bg-active-derived',
               'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary-solid has-[:focus-visible]:outline-offset-2',

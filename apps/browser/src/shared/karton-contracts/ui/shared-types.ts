@@ -718,14 +718,15 @@ export const searchEngineSchema = z.object({
 
 export type SearchEngine = z.infer<typeof searchEngineSchema>;
 
-/** Input for adding a new search engine (UI format with %s) */
+/** Input for adding a new search engine. Placeholder is normalized to {searchTerms} on save. */
 export const addSearchEngineInputSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   url: z
     .string()
     .min(1, 'URL is required')
-    .refine((url) => url.includes('%s'), {
-      message: 'URL must contain %s placeholder for search terms',
+    .refine((url) => url.includes('%s') || url.includes('{searchTerms}'), {
+      message:
+        'URL must contain {searchTerms} or %s placeholder for search terms',
     }),
   keyword: z.string().min(1, 'Keyword is required'),
 });

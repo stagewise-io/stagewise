@@ -1,13 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router';
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { cn } from '@pages/utils';
+import { cn } from '@ui/utils';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
@@ -26,17 +25,6 @@ import {
 } from 'nucleo-ui-outline-18';
 
 enablePatches();
-
-export const Route = createFileRoute('/_internal-app/agent-settings/plugins')({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'Plugins',
-      },
-    ],
-  }),
-});
 
 function PluginIcon({
   logoSvg,
@@ -334,24 +322,21 @@ function PluginDetailView({
   }, [plugin.skills, userVisibleCredentials]);
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" onClick={onBack}>
-              <IconChevronLeftOutline18 className="size-4" />
-            </Button>
-            <h1 className="font-semibold text-foreground text-xl">
-              {plugin.displayName}
-            </h1>
-          </div>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon-sm" onClick={onBack}>
+                <IconChevronLeftOutline18 className="size-4" />
+              </Button>
+              <h1 className="font-semibold text-foreground text-xl">
+                {plugin.displayName}
+              </h1>
+            </div>
+          </div>
           {/* Plugin info */}
           <div className="flex items-start gap-4">
             <div className="shrink-0">
@@ -403,14 +388,37 @@ function PluginDetailView({
   );
 }
 
-function Page() {
+export function PluginsSection() {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
-  const configuredCredentialIds = useKartonState(
-    (s) => s.configuredCredentialIds,
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const getConfiguredCredentialIds = useKartonProcedure(
+    (p) => p.credentials.getConfiguredIds,
   );
-  const setCredential = useKartonProcedure((s) => s.setCredential);
-  const deleteCredential = useKartonProcedure((s) => s.deleteCredential);
+  const [configuredCredentialIds, setConfiguredCredentialIds] = useState<
+    string[]
+  >([]);
+
+  useEffect(() => {
+    getConfiguredCredentialIds().then(setConfiguredCredentialIds);
+  }, [getConfiguredCredentialIds]);
+  const setCredential = useKartonProcedure((p) => p.credentials.set);
+  const deleteCredential = useKartonProcedure((p) => p.credentials.delete);
+
+  const handleSetCredential = useCallback(
+    async (typeId: string, data: Record<string, string>) => {
+      await setCredential(typeId, data);
+      setConfiguredCredentialIds(await getConfiguredCredentialIds());
+    },
+    [setCredential, getConfiguredCredentialIds],
+  );
+
+  const handleDeleteCredential = useCallback(
+    async (typeId: string) => {
+      await deleteCredential(typeId);
+      setConfiguredCredentialIds(await getConfiguredCredentialIds());
+    },
+    [deleteCredential, getConfiguredCredentialIds],
+  );
 
   const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null);
 
@@ -457,28 +465,25 @@ function Page() {
         onToggle={() => handleTogglePlugin(selectedPlugin.id)}
         onBack={() => setSelectedPluginId(null)}
         configuredCredentialIds={configuredCredentialIds}
-        setCredential={setCredential}
-        deleteCredential={deleteCredential}
+        setCredential={handleSetCredential}
+        deleteCredential={handleDeleteCredential}
       />
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">Plugins</h1>
-          <p className="text-muted-foreground text-sm">
-            Enable or disable plugins to extend the agent's capabilities with
-            additional skills.
-          </p>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-        <div className="mx-auto max-w-3xl">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
+        <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">Plugins</h1>
+            <p className="text-muted-foreground text-sm">
+              Enable or disable plugins to extend the agent's capabilities with
+              additional skills.
+            </p>
+          </div>
           {enabledPlugins.length > 0 && (
             <>
               <div className="pb-1.5 text-muted-foreground text-xs">

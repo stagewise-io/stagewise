@@ -1,41 +1,18 @@
 import type {
+  PendingEditsResult,
+  ExternalFileContentResult,
   HistoryFilter,
   HistoryResult,
   FaviconBitmapResult,
-  ClearBrowsingDataOptions,
-  ClearBrowsingDataResult,
-  PendingEditsResult,
-  SearchEngine,
-  AddSearchEngineInput,
-  AddSearchEngineResult,
-  RemoveSearchEngineResult,
-  ContextFilesResult,
-  ExternalFileContentResult,
-  CurrentUsageResponse,
-  UsageHistoryResponse,
 } from './types';
-import type {
-  UserPreferences,
-  Patch,
-  GlobalConfig,
-  ModelProvider,
-  SocialAuthProvider,
-} from '../ui/shared-types';
-import type { CodingPlanId } from '../../coding-plans';
-import type {
-  ApiKeyValidationResult,
-  AuthStatus,
-  MountedWorkspaceGitSummary,
-  PlanEntry,
-} from '../ui';
+import type { GlobalConfig } from '../ui/shared-types';
+import type { PlanEntry } from '../ui';
 import type { FileDiff } from '../ui/shared-types';
-import { defaultUserPreferences } from '../ui/shared-types';
-import type { PluginDefinition } from '../../plugins';
 
 export type WorkspaceMountInfo = {
   prefix: string;
   path: string;
-  git: MountedWorkspaceGitSummary | null;
+  git: import('../ui').MountedWorkspaceGitSummary | null;
   skills: Array<{ name: string; description: string }>;
   /** Full file content, or `null` when the file does not exist on disk. */
   workspaceMdContent: string | null;
@@ -46,76 +23,17 @@ export type WorkspaceMountInfo = {
 export type PagesApiState = {
   /** Pending file edits by chat ID, pushed in real-time */
   pendingEditsByAgentInstanceId: Record<string, FileDiff[]>;
-  /** User preferences (read-only sync) */
-  preferences: UserPreferences;
-  /** Global config (read-only sync, updated via setGlobalConfig procedure) */
+  /** Global config (read-only sync, updated via backend state sync) */
   globalConfig: GlobalConfig;
-  /** Available search engines from Web Data database */
-  searchEngines: SearchEngine[];
-  /** User account status, synced from AuthService */
-  userAccount: {
-    status: AuthStatus;
-    machineId?: string;
-    user?: {
-      id: string;
-      email: string;
-    };
-    subscription?: {
-      active: boolean;
-      plan?: string;
-      expiresAt?: string;
-    };
-  };
   /** Currently mounted workspaces, deduplicated across all agents */
   workspaceMounts: WorkspaceMountInfo[];
-  /** Workspace paths where a WORKSPACE.md agent is currently running */
-  workspaceMdGenerating: Record<string, boolean>;
-  /** Credential type IDs that have stored data (synced after set/delete) */
-  configuredCredentialIds: string[];
-  /** Bundled plugin definitions (static, pushed once at startup) */
-  plugins: PluginDefinition[];
   /** Global plans (workspace-independent, synced from AppState.plans) */
   plans: PlanEntry[];
-  // Current stagewise app runtime information
-  appInfo: {
-    baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
-    name: string; // Display name (e.g., 'stagewise (Dev-Build)', 'stagewise').
-    bundleId: string; // Bundle ID (e.g., 'io.stagewise.dev').
-    version: string; // The version of the app.
-    platform: 'darwin' | 'linux' | 'win32'; // The platform on which the app is running.
-    // Build-time constants
-    releaseChannel: 'dev' | 'prerelease' | 'nightly' | 'release'; // The release channel of the app.
-    author: string; // Author name.
-    copyright: string; // Copyright string.
-    homepage: string; // Homepage URL.
-    arch: string; // Architecture (e.g., 'x64', 'arm64').
-    otherVersions: Record<string, string | undefined>; // Other versions of the app.
-  };
-  /** Auto-update status synced from the backend AutoUpdateService */
-  autoUpdate: {
-    status:
-      | 'idle'
-      | 'checking'
-      | 'downloading'
-      | 'ready'
-      | 'not-available'
-      | 'error'
-      | 'unsupported';
-    updateInfo: {
-      releaseName?: string;
-      releaseNotes?: string;
-    } | null;
-    errorMessage: string | null;
-  };
 };
 
 export type PagesApiContract = {
   state: PagesApiState;
   serverProcedures: {
-    getHistory: (filter: HistoryFilter) => Promise<HistoryResult[]>;
-    getFaviconBitmaps: (
-      faviconUrls: string[],
-    ) => Promise<Record<string, FaviconBitmapResult>>;
     openTab: (url: string, setActive?: boolean) => Promise<void>;
     /**
      * Open a URL in the user's system default browser. Only `http:` and
@@ -123,9 +41,12 @@ export type PagesApiContract = {
      * to prevent arbitrary protocol handling via a renderer procedure.
      */
     openExternalUrl: (url: string) => Promise<void>;
-    clearBrowsingData: (
-      options: ClearBrowsingDataOptions,
-    ) => Promise<ClearBrowsingDataResult>;
+    /** Get browser history entries for standalone internal pages. */
+    getHistory: (filter: HistoryFilter) => Promise<HistoryResult[]>;
+    /** Get favicon bitmap data for standalone internal pages. */
+    getFaviconBitmaps: (
+      faviconUrls: string[],
+    ) => Promise<Record<string, FaviconBitmapResult>>;
     /** Get pending file edits for a specific chat */
     getPendingEdits: (agentInstanceId: string) => Promise<PendingEditsResult>;
     /** Accept all pending edits for a specific chat */
@@ -144,167 +65,12 @@ export type PagesApiContract = {
     getExternalFileContent: (
       oid: string,
     ) => Promise<ExternalFileContentResult | null>;
-    /** Get current user preferences */
-    getPreferences: () => Promise<UserPreferences>;
-    /** Update user preferences by applying Immer patches */
-    updatePreferences: (patches: Patch[]) => Promise<void>;
-    /** Get all available search engines */
-    getSearchEngines: () => Promise<SearchEngine[]>;
-    /** Add a new custom search engine (URL should use %s placeholder) */
-    addSearchEngine: (
-      input: AddSearchEngineInput,
-    ) => Promise<AddSearchEngineResult>;
-    /** Remove a custom search engine by ID */
-    removeSearchEngine: (id: number) => Promise<RemoveSearchEngineResult>;
-    /** Set whether user has seen the onboarding flow */
-    setHasSeenOnboardingFlow: (
-      input:
-        | boolean
-        | {
-            value: boolean;
-            auth?: {
-              auth_method: 'stagewise' | 'api-keys' | 'coding-plan' | 'unknown';
-              provider?: ModelProvider;
-              plan_id?:
-                | 'glm-coding-plan'
-                | 'kimi-plan'
-                | 'qwen-plan'
-                | 'minimax-plan';
-            };
-          },
-    ) => Promise<void>;
     /**
      * Trust a certificate for a specific origin in a tab and reload.
      * This adds the origin to a per-tab whitelist that allows certificate errors.
      * The whitelist is cleared when the tab is closed.
      */
     trustCertificateAndReload: (tabId: string, origin: string) => Promise<void>;
-    /** Set the global config (e.g., preferred IDE for opening files) */
-    setGlobalConfig: (config: GlobalConfig) => Promise<void>;
-    /** Open a native file dialog to import a custom MP3 or sound pack JSON. Returns pack info on success, or an error object with a message on failure. */
-    importSoundPack: () => Promise<
-      { id: string; name: string } | { error: string }
-    >;
-    /** Preview the done sound for a notification sound pack. */
-    previewSoundPack: (
-      packId: string,
-      loudness: 'off' | 'subtle' | 'default',
-    ) => Promise<{ ok: boolean }>;
-    /**
-     * Get context files info (, AGENTS.md) for the current workspace.
-     * Returns null if no workspace is loaded.
-     */
-    getContextFiles: () => Promise<ContextFilesResult>;
-    /** Trigger WORKSPACE.md generation for a workspace path */
-    generateWorkspaceMd: (workspacePath: string) => Promise<void>;
-    /** Set an encrypted API key for a provider (encrypted via safeStorage on backend) */
-    setProviderApiKey: (
-      provider: ModelProvider,
-      apiKey: string,
-    ) => Promise<void>;
-    /** Clear the API key for a provider */
-    clearProviderApiKey: (provider: ModelProvider) => Promise<void>;
-    /**
-     * Atomically disconnect a provider: clear the encrypted API key and flip
-     * the provider's endpoint mode back to `'stagewise'` in a single patch
-     * update. Prevents the UI from observing a state where mode is
-     * disconnected but the key is still at rest (or vice versa).
-     */
-    disconnectProvider: (provider: ModelProvider) => Promise<void>;
-    /** Set an encrypted API key for a custom endpoint */
-    setCustomEndpointApiKey: (
-      endpointId: string,
-      apiKey: string,
-    ) => Promise<void>;
-    /** Clear the API key for a custom endpoint */
-    clearCustomEndpointApiKey: (endpointId: string) => Promise<void>;
-    /** Set an encrypted secret key for a custom endpoint */
-    setCustomEndpointSecretKey: (
-      endpointId: string,
-      secretKey: string,
-    ) => Promise<void>;
-    /** Set encrypted Google credentials JSON for a custom endpoint */
-    setCustomEndpointGoogleCredentials: (
-      endpointId: string,
-      credentials: string,
-    ) => Promise<void>;
-    /**
-     * Enumerate AWS profiles declared in `~/.aws/config` and
-     * `~/.aws/credentials`. Each entry carries the profile's declared
-     * region (and `sso_region`, if set) so the UI can pick the
-     * correct Bedrock cross-region inference profile prefix without
-     * a second round-trip. Returns an empty list (with an error
-     * message) when the ini files cannot be read.
-     *
-     * `envRegion` mirrors `AWS_REGION` / `AWS_DEFAULT_REGION` from
-     * the Electron main process env — mainly useful as a fallback
-     * for `default-chain` mode where the profile files don't apply.
-     */
-    listAwsProfiles: () => Promise<{
-      profiles: Array<{
-        name: string;
-        region?: string;
-        ssoRegion?: string;
-      }>;
-      envRegion?: string;
-      error?: string;
-    }>;
-    /** Validate a provider API key by making a lightweight test request */
-    validateProviderApiKey: (
-      provider: ModelProvider,
-      apiKey: string,
-      baseUrl?: string,
-    ) => Promise<ApiKeyValidationResult>;
-    /**
-     * Connect a Tier-A coding plan in one shot: validate the user-supplied
-     * key against the plan's provider, encrypt+store it, and flip the
-     * provider's endpoint mode to `'official'`. No state change on failure.
-     */
-    connectCodingPlan: (
-      planId: CodingPlanId,
-      apiKey: string,
-    ) => Promise<{ success: true } | { success: false; error: string }>;
-    /** Send an OTP code to the given email for sign-in */
-    sendOtp: (
-      email: string,
-      turnstileToken: string,
-    ) => Promise<{ error?: string }>;
-    /** Verify an OTP code for the given email */
-    verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
-    /** Start social sign-in in the system browser */
-    signInSocial: (provider: SocialAuthProvider) => Promise<{ error?: string }>;
-    /** Log the current user out */
-    logout: () => Promise<void>;
-    /** Get current usage stats (window percentages + prepaid balance) */
-    getUsageCurrent: () => Promise<CurrentUsageResponse>;
-    /** Get daily usage history breakdown */
-    getUsageHistory: (params: {
-      days?: number;
-    }) => Promise<UsageHistoryResponse>;
-    /** Store credential data for a registered type (encrypted at rest) */
-    setCredential: (
-      typeId: string,
-      data: Record<string, string>,
-    ) => Promise<void>;
-    /** Remove stored credential data for a type */
-    deleteCredential: (typeId: string) => Promise<void>;
-    /** Return the list of credential type IDs that have stored data */
-    getConfiguredCredentialIds: () => Promise<string[]>;
-    /** Save content to a file inside a mounted workspace */
-    saveWorkspaceFile: (
-      mountPrefix: string,
-      relativePath: string,
-      content: string,
-    ) => Promise<void>;
-    /** Save content to a plan file in the global plans directory */
-    savePlanFile: (filename: string, content: string) => Promise<void>;
-    /** Auto-update actions */
-    autoUpdate: {
-      /** Manually trigger an update check */
-      checkForUpdates: () => Promise<void>;
-      /** Quit the app and install the downloaded update */
-      quitAndInstall: () => Promise<void>;
-    };
     /**
      * Forward a UI telemetry event to the backend TelemetryService. The
      * backend validates the event name against `UI_TELEMETRY_EVENT_NAMES`
@@ -320,7 +86,6 @@ export type PagesApiContract = {
 
 export const defaultState: PagesApiState = {
   pendingEditsByAgentInstanceId: {},
-  preferences: defaultUserPreferences,
   globalConfig: {
     telemetryLevel: 'full',
     openFilesInIde: 'other',
@@ -332,31 +97,6 @@ export const defaultState: PagesApiState = {
     packDisplayNames: {},
     dockBounceEnabled: true,
   },
-  userAccount: {
-    status: 'unauthenticated',
-  },
-  searchEngines: [],
   workspaceMounts: [],
-  workspaceMdGenerating: {},
-  configuredCredentialIds: [],
-  plugins: [],
   plans: [],
-  appInfo: {
-    baseName: __APP_BASE_NAME__,
-    name: __APP_NAME__,
-    bundleId: __APP_BUNDLE_ID__,
-    version: __APP_VERSION__,
-    platform: __APP_PLATFORM__ as 'darwin' | 'linux' | 'win32',
-    releaseChannel: __APP_RELEASE_CHANNEL__,
-    author: __APP_AUTHOR__,
-    copyright: __APP_COPYRIGHT__,
-    homepage: __APP_HOMEPAGE__,
-    arch: __APP_ARCH__,
-    otherVersions: {},
-  },
-  autoUpdate: {
-    status: 'idle',
-    updateInfo: null,
-    errorMessage: null,
-  },
 };

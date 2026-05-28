@@ -10,6 +10,7 @@ import type {
   ShellSessionSnapshot,
 } from './agent/metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
+import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
 import type { FileDiff } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
@@ -36,8 +37,25 @@ import {
   PermissionSetting,
   configurablePermissionTypes,
 } from './shared-types';
-import type { PageTransition } from '../pages-api/types';
+import type {
+  PageTransition,
+  DownloadState,
+  HistoryFilter,
+  HistoryResult,
+  FaviconBitmapResult,
+} from '../pages-api/types';
+import type {
+  AddSearchEngineInput,
+  AddSearchEngineResult,
+  RemoveSearchEngineResult,
+  ClearBrowsingDataOptions,
+  ClearBrowsingDataResult,
+  ContextFilesResult,
+  CurrentUsageResponse,
+  UsageHistoryResponse,
+} from '../pages-api/types';
 import type { CodingPlanId } from '../../coding-plans';
+import type { SettingsRoute } from '../../settings-route';
 import type {
   AgentState,
   AgentTypes,
@@ -86,12 +104,6 @@ export type WorkspaceGitWorktreeInfo = {
   current: boolean;
 };
 
-/**
- * Worktree switching intentionally returns a path only; callers replace the
- * mounted workspace with existing mount/unmount procedures. In no-message-yet
- * chats, the UI may mount the repo root first for @-mentions, then run the
- * selected Git action on first send and swap to the resulting path.
- */
 export type WorkspaceGitWorktreesResult = {
   currentPath: string | null;
   worktrees: WorkspaceGitWorktreeInfo[];
@@ -188,8 +200,47 @@ export type WorkspaceGitCreateWorktreeOptions = {
   sourceBranch: string;
 };
 
+/** Speed data point for download speed history */
+export type DownloadSpeedDataPoint = {
+  /** Unix timestamp in ms */
+  timestamp: number;
+  /** Speed in KB/s */
+  speedKBps: number;
+  /** Total bytes received at this point */
+  totalBytes: number;
+};
+
+/** Summary download info for the control button display */
+export type DownloadSummary = {
+  /** Download ID */
+  id: number;
+  /** Filename */
+  filename: string;
+  /** Progress percentage (0-100) */
+  progress: number;
+  /** Whether this is an active/running download */
+  isActive: boolean;
+  /** Download state */
+  state: DownloadState;
+  /** Whether the download is paused (only for active) */
+  isPaused?: boolean;
+  /** Target path on disk */
+  targetPath: string;
+  /** Download start time */
+  startTime: Date;
+  /** Download end time (for completed) */
+  endTime?: Date;
+  /** Current download speed in KB/s (only for active downloads) */
+  currentSpeedKBps?: number;
+  /** Speed history for graphing (up to 100 data points covering 10 minutes) */
+  speedHistory?: DownloadSpeedDataPoint[];
+};
 export type { UserMessageMetadata, ReactSelectedElementInfo };
 export type { SelectedElement } from '../../selected-elements';
+
+export type InspirationWebsite = NonNullable<
+  Awaited<ReturnType<ApiClient['v1']['inspiration']['get']>>['data']
+>;
 
 export type {
   TextUIPart,
@@ -242,6 +293,8 @@ export type { UpdateChannel } from './shared-types';
  */
 export type ChatSummary = {
   id: string;
+  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs. */
+  type?: 'browser' | 'terminal';
   title: string;
   createdAt: Date;
   updatedAt: Date;
@@ -263,6 +316,14 @@ export const onboardingStateSchema = z.object({
 });
 
 export type OnboardingState = z.infer<typeof onboardingStateSchema>;
+
+/** Schema for downloads state persisted data */
+export const downloadsStateSchema = z.object({
+  /** ISO timestamp when downloads were last marked as seen */
+  lastSeenAt: z.string().nullable(),
+});
+
+export type DownloadsState = z.infer<typeof downloadsStateSchema>;
 
 export const lastViewedChatsSchema = z.record(z.string(), z.number());
 
@@ -487,8 +548,7 @@ export type TabState = {
   isContentFullscreen: boolean;
   /** Pending HTTP Basic Auth request for this tab */
   authenticationRequest: AuthenticationRequest | null;
-  /** ── Terminal-specific fields (present when type === 'terminal') ── */
-  /** Working directory the PTY was spawned in. Always set for terminal tabs. */
+  /** Terminal-specific fields (present when type === 'terminal') */
   cwd: string;
   terminalRunningProcess?: string | null;
   createdAt?: number;
@@ -496,11 +556,6 @@ export type TabState = {
   exitCode?: number | null;
 };
 
-/** Browser-neutral defaults for terminal tab entries.  Spread these and
- *  override the tab-identity fields (id, title, agentInstanceId, cwd,
- *  createdAt, lastFocusedAt, exited, exitCode).  All tabs share a single
- *  definition so adding a new field to `TabState` doesn't require hunting
- *  down every inline object literal. */
 export function getTerminalTabDefaults(): Omit<
   TabState,
   'id' | 'title' | 'createdAt' | 'lastFocusedAt'
@@ -630,6 +685,10 @@ export type PendingUserQuestion = {
 };
 
 export type AppState = {
+  appScreen: {
+    mode: 'main' | 'settings';
+    settingsRoute: SettingsRoute;
+  };
   internalData: {
     posthog?: {
       apiKey?: string;
@@ -731,6 +790,11 @@ export type AppState = {
   // State of the current user experience (getting started etc.)
   userExperience: {
     storedExperienceData: StoredExperienceData;
+    pendingOnboardingSuggestion: {
+      id: string;
+      url: string;
+      prompt: string;
+    } | null;
     devAppPreview: {
       isFullScreen: boolean;
       inShowCodeMode: boolean;
@@ -755,11 +819,8 @@ export type AppState = {
   }[];
 
   // Terminal output buffers — active, keyed by terminalId.
-  // Terminal tabs live in `contentTabs.tabs` with `type: 'terminal'`.
   terminals: {
-    /** Batched PTY output buffers, keyed by terminalId. */
     outputBuffers: Record<string, string>;
-    /** Monotonic output offsets for each terminal buffer. */
     outputBufferOffsets: Record<
       string,
       { baseOffset: number; endOffset: number }
@@ -768,19 +829,14 @@ export type AppState = {
 
   // Unified content tabs (browser + terminal + future tab types)
   contentTabs: {
-    /** All tab metadata keyed by ID, discriminated by `type` field. */
     tabs: Record<string, TabState>;
-    /** Ordered global tab IDs, visible for every agent. */
     globalOrder: string[];
-    /** Ordered per-agent tab IDs, keyed by agent instance ID. */
     agentOrders: Record<string, string[]>;
-    /** Currently active tab ID. */
     activeTabId: string | null;
   };
 
   // Browsing runtime state (global, not per-tab)
   browsing: {
-    /** Unique identifier for the current browser process lifetime. */
     sessionId: string;
     history: HistoryEntry[];
     contextSelectionMode: boolean;
@@ -788,7 +844,7 @@ export type AppState = {
     hoveredElement: SelectedElement | null;
   };
 
-  // Browser state (deprecated — use contentTabs + browsing)
+  // Browser state
   browser: {
     tabs: Record<string, TabState>;
     activeTabId: string | null;
@@ -812,6 +868,19 @@ export type AppState = {
     lastOpenAgentId: string | null;
   };
 
+  // Downloads state for the control button
+  // Contains running downloads + recent finished downloads (up to 5 total)
+  downloads: {
+    /** List of downloads to display (running + recent finished) */
+    items: DownloadSummary[];
+    /** Number of currently active downloads */
+    activeCount: number;
+    /** Whether there are finished downloads the user hasn't seen yet */
+    hasUnseenDownloads: boolean;
+    /** Timestamp when downloads were last marked as seen (null if never) */
+    lastSeenAt: Date | null;
+  };
+
   // User preferences (synced from PreferencesService)
   preferences: UserPreferences;
 
@@ -821,6 +890,10 @@ export type AppState = {
   // Current system theme (light or dark) based on OS preference
   systemTheme: 'light' | 'dark';
 
+  /** Deduplicated workspace mounts from all agent instances */
+  workspaceMounts: MountEntry[];
+  /** Workspace paths where a WORKSPACE.md agent is currently running */
+  workspaceMdGenerating: Record<string, boolean>;
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
 
@@ -1006,6 +1079,10 @@ export type KartonContract = {
         agentInstanceId: string,
         mountPrefix: string,
       ) => Promise<void>;
+      /** Get context files for all workspaces */
+      getContextFiles: () => Promise<ContextFilesResult>;
+      /** Generate WORKSPACE.md for a workspace path (does not require agent instance) */
+      generateWorkspaceMdForPath: (workspacePath: string) => Promise<void>;
       submitUserQuestionStep: (
         agentInstanceId: string,
         questionId: string,
@@ -1049,6 +1126,12 @@ export type KartonContract = {
       ) => Promise<{ error?: string }>;
       refreshStatus: () => Promise<void>;
       logout: () => Promise<void>;
+      /** Get current usage stats */
+      getUsageCurrent: () => Promise<CurrentUsageResponse>;
+      /** Get daily usage history breakdown */
+      getUsageHistory: (params: {
+        days?: number;
+      }) => Promise<UsageHistoryResponse>;
       validateApiKeys: (keys: {
         anthropic?: string;
         openai?: string;
@@ -1099,8 +1182,10 @@ export type KartonContract = {
                   | 'qwen-plan'
                   | 'minimax-plan';
               };
+              suggestion?: { id: string; url: string; prompt: string };
             },
       ) => Promise<void>;
+      clearPendingOnboardingSuggestion: () => Promise<void>;
     };
     filePicker: {
       createRequest: (request: FilePickerRequest) => Promise<string[]>;
@@ -1117,6 +1202,14 @@ export type KartonContract = {
     };
     config: {
       set: (config: GlobalConfig) => Promise<void>;
+      previewSoundPack: (
+        packId: string,
+        loudness: 'off' | 'subtle' | 'default',
+      ) => Promise<{ ok: boolean }>;
+      importSoundPack: () => Promise<
+        | { id: string; name: string; error?: never }
+        | { id?: never; name?: never; error: string }
+      >;
     };
     telemetry: {
       capture: (
@@ -1326,6 +1419,58 @@ export type KartonContract = {
         cols: number;
         rows: number;
       }>;
+      /** Add a custom search engine */
+      addSearchEngine: (
+        input: AddSearchEngineInput,
+      ) => Promise<AddSearchEngineResult>;
+      /** Remove a custom search engine */
+      removeSearchEngine: (id: number) => Promise<RemoveSearchEngineResult>;
+      /** Clear browsing data */
+      clearBrowsingData: (
+        options: ClearBrowsingDataOptions,
+      ) => Promise<ClearBrowsingDataResult>;
+      /** Query browsing history with optional text search and pagination */
+      getHistory: (filter: HistoryFilter) => Promise<HistoryResult[]>;
+      /** Get base64-encoded favicon bitmaps for a list of favicon URLs */
+      getFaviconBitmaps: (
+        faviconUrls: string[],
+      ) => Promise<Record<string, FaviconBitmapResult>>;
+    };
+    credentials: {
+      /** Store credential data for a registered type */
+      set: (typeId: string, data: Record<string, string>) => Promise<void>;
+      /** Remove stored credential data */
+      delete: (typeId: string) => Promise<void>;
+      /** Return the list of credential type IDs that have stored data */
+      getConfiguredIds: () => Promise<string[]>;
+    };
+    downloads: {
+      /** Mark all current downloads as seen (updates lastSeenAt timestamp) */
+      markSeen: () => Promise<void>;
+      /** Pause an active download */
+      pause: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Resume a paused download */
+      resume: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Cancel an active download */
+      cancel: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Open a downloaded file using the system default application */
+      openFile: (
+        filePath: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Show a downloaded file in the system file manager (Finder/Explorer) */
+      showInFolder: (
+        filePath: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      /** Delete a download record and its file */
+      delete: (
+        downloadId: number,
+      ) => Promise<{ success: boolean; error?: string }>;
     };
     preferences: {
       /** Update user preferences by applying Immer patches */
@@ -1337,31 +1482,54 @@ export type KartonContract = {
       ) => Promise<void>;
       /** Clear the API key for a provider */
       clearProviderApiKey: (provider: ModelProvider) => Promise<void>;
+      /** Set an encrypted API key for a custom endpoint */
+      setCustomEndpointApiKey: (
+        endpointId: string,
+        apiKey: string,
+      ) => Promise<void>;
+      /** Clear the API key for a custom endpoint */
+      clearCustomEndpointApiKey: (endpointId: string) => Promise<void>;
+      /** Set an encrypted secret key for a custom endpoint */
+      setCustomEndpointSecretKey: (
+        endpointId: string,
+        secretKey: string,
+      ) => Promise<void>;
+      /** Set encrypted Google credentials JSON for a custom endpoint */
+      setCustomEndpointGoogleCredentials: (
+        endpointId: string,
+        credentials: string,
+      ) => Promise<void>;
+      /** Enumerate AWS profiles */
+      listAwsProfiles: () => Promise<{
+        profiles: Array<{
+          name: string;
+          region?: string;
+          ssoRegion?: string;
+        }>;
+        envRegion?: string;
+        error?: string;
+      }>;
+      /** Validate a provider API key */
+      validateProviderApiKey: (
+        provider: ModelProvider,
+        apiKey: string,
+        baseUrl?: string,
+      ) => Promise<ApiKeyValidationResult>;
       /**
        * Atomically disconnect a provider: clear the encrypted API key and
        * flip the provider's endpoint mode back to `'stagewise'` in a single
-       * patch update. Prevents the UI from observing a state where mode is
-       * disconnected but the key is still at rest (or vice versa).
+       * patch update.
        */
       disconnectProvider: (provider: ModelProvider) => Promise<void>;
       /**
-       * Atomically connect a Tier-A coding plan: validate the user-supplied
-       * key against the plan's provider, encrypt+store it, and flip the
-       * provider's endpoint mode to `'official'`. No state change on
-       * validation failure — the UI never observes a half-connected state.
-       * Inverse of `disconnectProvider`; mirrors `pages-api.connectCodingPlan`.
+       * Atomically connect a Tier-A coding plan.
        */
       connectCodingPlan: (
         planId: CodingPlanId,
         apiKey: string,
       ) => Promise<{ success: true } | { success: false; error: string }>;
       /**
-       * Atomically connect a provider's own API key: validate the
-       * user-supplied key, encrypt+store it, and flip the provider's
-       * endpoint mode to `'official'` in a single patch update. No state
-       * change on validation failure — the UI never observes a
-       * half-connected state (key stored but mode still `'stagewise'`, or
-       * vice versa). Inverse of `disconnectProvider`.
+       * Atomically connect a provider's own API key.
        */
       connectProvider: (
         provider: ModelProvider,
@@ -1390,10 +1558,19 @@ export type KartonContract = {
      * a new tab behind the onboarding overlay.
      */
     openExternalUrl: (url: string) => Promise<void>;
+    appScreen: {
+      openSettings: (route?: SettingsRoute) => Promise<void>;
+      closeSettings: () => Promise<void>;
+      setSettingsRoute: (route: SettingsRoute) => Promise<void>;
+    };
   };
 };
 
 export const defaultState: KartonContract['state'] = {
+  appScreen: {
+    mode: 'main',
+    settingsRoute: { section: 'models-providers' },
+  },
   internalData: {
     posthog: {
       apiKey: import.meta.env.VITE_POSTHOG_API_KEY,
@@ -1451,6 +1628,7 @@ export const defaultState: KartonContract['state'] = {
       hasSeenOnboardingFlow: null,
       lastViewedChats: {},
     },
+    pendingOnboardingSuggestion: null,
     devAppPreview: {
       isFullScreen: false,
       inShowCodeMode: false,
@@ -1487,9 +1665,17 @@ export const defaultState: KartonContract['state'] = {
     lastActiveTabPerAgent: {},
     lastOpenAgentId: null,
   },
+  downloads: {
+    items: [],
+    activeCount: 0,
+    hasUnseenDownloads: false,
+    lastSeenAt: null,
+  },
   preferences: defaultUserPreferences,
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
+  workspaceMounts: [],
+  workspaceMdGenerating: {},
   plugins: [],
   skills: [],
   plans: [],

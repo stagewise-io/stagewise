@@ -93,6 +93,7 @@ export function StatusCard() {
     (p) => p.toolbox.acceptHunks,
   );
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
@@ -274,16 +275,13 @@ export function StatusCard() {
         : '.stagewise/WORKSPACE.md';
       if (needsIdePicker) {
         // Fall back to settings when no IDE has been configured yet
-        void createTab(
-          'stagewise://internal/agent-settings/skills-context',
-          true,
-        );
+        void openSettings({ section: 'skills-context' });
         return;
       }
       const href = getFileIDEHref(filePath);
       if (href && href !== '#') window.open(href, '_blank');
     },
-    [needsIdePicker, getFileIDEHref, createTab],
+    [needsIdePicker, getFileIDEHref, openSettings],
   );
 
   // Procedure to remove a queued message

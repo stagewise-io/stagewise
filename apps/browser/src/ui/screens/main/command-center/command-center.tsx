@@ -105,6 +105,7 @@ export function CommandCenter() {
   );
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const setTabAgentInstance = useKartonProcedure(
     (p) => p.browser.setTabAgentInstance,
@@ -268,13 +269,18 @@ export function CommandCenter() {
         }
         void switchTab(item.tabId);
       } else if (item.kind === 'setting') {
-        void createTab(item.url, true);
+        if (item.settingsRoute) {
+          void openSettings(item.settingsRoute);
+        } else if (item.url) {
+          void createTab(item.url, true);
+        }
       }
 
       dismissCommandCenter();
     },
     [
       createTab,
+      openSettings,
       dismissCommandCenter,
       resumeAgent,
       setLastOpenAgentId,

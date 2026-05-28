@@ -410,9 +410,11 @@ export class WebDataService {
    */
   async addSearchEngine(input: {
     name: string;
-    url: string; // Expected to be in {searchTerms} format
+    url: string; // Normalized to {searchTerms} below
     keyword: string;
   }): Promise<number> {
+    // Normalize placeholder: UI accepts %s, backend uses {searchTerms}
+    const url = input.url.replace('%s', '{searchTerms}');
     // Find the maximum ID and ensure we use at least CUSTOM_ENGINE_ID_START
     // Note: Database uses intMode: 'bigint', so we need to convert to number
     const maxIdResult = await this.db
@@ -429,7 +431,7 @@ export class WebDataService {
     // Extract favicon URL from the search engine URL
     let faviconUrl = '';
     try {
-      const parsedUrl = new URL(input.url.replace('{searchTerms}', 'test'));
+      const parsedUrl = new URL(url.replace('{searchTerms}', 'test'));
       faviconUrl = `${parsedUrl.origin}/favicon.ico`;
     } catch {
       // If URL parsing fails, leave faviconUrl empty
@@ -439,7 +441,7 @@ export class WebDataService {
       id: newId,
       shortName: input.name,
       keyword: input.keyword,
-      url: input.url,
+      url: url,
       faviconUrl,
       safeForAutoreplace: 0,
       inputEncodings: 'UTF-8',
