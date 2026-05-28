@@ -126,6 +126,7 @@ jobs:
     needs: version
     permissions:
       contents: write
+      actions: write
     uses: ./.github/workflows/_release-browser.yml
     with:
       version: ${{ needs.version.outputs.version }}
