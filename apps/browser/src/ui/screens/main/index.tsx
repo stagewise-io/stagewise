@@ -152,7 +152,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
 
   const handleOpenTerminal = useCallback(() => {
     if (contentCollapsed) setContentCollapsed(false);
-    void createTerminal(undefined, openAgent);
+    return createTerminal(undefined, openAgent);
   }, [createTerminal, openAgent, contentCollapsed, setContentCollapsed]);
 
   const markStagewiseUiFocused = useCallback(() => {

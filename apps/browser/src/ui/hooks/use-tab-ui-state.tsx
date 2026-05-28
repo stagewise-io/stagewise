@@ -6,17 +6,16 @@ import React, {
   useMemo,
 } from 'react';
 
-export type State =
-  | {
-      focusedPanel: 'tab-content';
-    }
-  | {
-      focusedPanel: 'stagewise-ui';
-    };
+export type State = {
+  focusedPanel?: 'tab-content' | 'stagewise-ui';
+  terminalFocusRequestId?: number;
+};
 
 export type TabStateUI = {
   tabUiState: Record<string, State>;
   setTabUiState: (tabId: string, state: State) => void;
+  requestTerminalFocus: (tabId: string) => void;
+  clearTerminalFocusRequest: (tabId: string) => void;
   removeTabUiState: (tabId: string) => void;
 };
 
@@ -46,6 +45,26 @@ export const TabStateUIProvider = ({
     }));
   }, []);
 
+  const requestTerminalFocus = useCallback((tabId: string) => {
+    setTabUiStateInternal((prev) => ({
+      ...prev,
+      [tabId]: {
+        ...prev[tabId],
+        terminalFocusRequestId: (prev[tabId]?.terminalFocusRequestId ?? 0) + 1,
+      },
+    }));
+  }, []);
+
+  const clearTerminalFocusRequest = useCallback((tabId: string) => {
+    setTabUiStateInternal((prev) => ({
+      ...prev,
+      [tabId]: {
+        ...prev[tabId],
+        terminalFocusRequestId: undefined,
+      },
+    }));
+  }, []);
+
   const removeTabUiState = useCallback((tabId: string) => {
     setTabUiStateInternal((prev) => {
       const { [tabId]: _, ...rest } = prev;
@@ -57,9 +76,17 @@ export const TabStateUIProvider = ({
     () => ({
       tabUiState,
       setTabUiState,
+      requestTerminalFocus,
+      clearTerminalFocusRequest,
       removeTabUiState,
     }),
-    [tabUiState, setTabUiState, removeTabUiState],
+    [
+      tabUiState,
+      setTabUiState,
+      requestTerminalFocus,
+      clearTerminalFocusRequest,
+      removeTabUiState,
+    ],
   );
 
   return (

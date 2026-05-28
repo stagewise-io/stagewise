@@ -56,9 +56,11 @@ export function PerTerminalContent({
     (p) => p.browser.getTerminalSnapshot,
   );
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const { tabUiState, setTabUiState } = useTabUIState();
-  const isTerminalFocused =
-    tabUiState[terminalId]?.focusedPanel === 'tab-content';
+  const { tabUiState, setTabUiState, clearTerminalFocusRequest } =
+    useTabUIState();
+  const terminalUiState = tabUiState[terminalId];
+  const isTerminalFocused = terminalUiState?.focusedPanel === 'tab-content';
+  const terminalFocusRequestId = terminalUiState?.terminalFocusRequestId;
 
   const terminalInputRef = useRef(terminalInput);
   terminalInputRef.current = terminalInput;
@@ -68,10 +70,22 @@ export function PerTerminalContent({
   getTerminalSnapshotRef.current = getTerminalSnapshot;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
+  const terminalFocusRequestIdRef = useRef(terminalFocusRequestId);
+  terminalFocusRequestIdRef.current = terminalFocusRequestId;
 
-  const markTerminalFocused = () => {
+  const markTerminalFocused = useCallback(() => {
     setTabUiState(terminalId, { focusedPanel: 'tab-content' });
-  };
+  }, [setTabUiState, terminalId]);
+
+  const focusTerminalIfReady = useCallback(() => {
+    const term = terminalRef.current;
+    if (!term) return false;
+
+    term.focus();
+    markTerminalFocused();
+    clearTerminalFocusRequest(terminalId);
+    return true;
+  }, [clearTerminalFocusRequest, markTerminalFocused, terminalId]);
 
   const updateTerminalZoom = useCallback(
     (nextZoomPercentage: number) => {
@@ -204,6 +218,11 @@ export function PerTerminalContent({
   };
 
   useEffect(() => {
+    if (!isActive || terminalFocusRequestId === undefined) return;
+    focusTerminalIfReady();
+  }, [focusTerminalIfReady, isActive, terminalFocusRequestId]);
+
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -255,6 +274,13 @@ export function PerTerminalContent({
       term.open(container);
       terminalRef.current = term;
 
+      if (
+        isActiveRef.current &&
+        terminalFocusRequestIdRef.current !== undefined
+      ) {
+        focusTerminalIfReady();
+      }
+
       term.onData((data: string) => {
         markTerminalFocused();
         terminalInputRef.current(terminalId, data);
@@ -264,7 +290,13 @@ export function PerTerminalContent({
         try {
           fitAddon.fit();
           sendResize(true);
-          if (isActiveRef.current) term.focus();
+          if (isActiveRef.current) {
+            if (terminalFocusRequestIdRef.current !== undefined) {
+              focusTerminalIfReady();
+            } else {
+              term.focus();
+            }
+          }
         } catch {
           // May fail during layout transitions.
         }
