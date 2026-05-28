@@ -24,6 +24,8 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(__dirname, './src/shared'),
       '@ui': path.resolve(__dirname, './src/ui'),
+      '@pages': path.resolve(__dirname, './src/pages'),
+      '@assets': path.resolve(__dirname, './assets/pages'),
     },
     mainFields: ['module', 'main'],
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],

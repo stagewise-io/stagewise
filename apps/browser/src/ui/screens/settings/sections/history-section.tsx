@@ -1,4 +1,3 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Input } from '@stagewise/stage-ui/components/input';
 import {
@@ -7,19 +6,10 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2Icon, LinkIcon } from 'lucide-react';
 import { IconChevronRightOutline18 } from 'nucleo-ui-outline-18';
-import {
-  useKartonProcedure,
-  useKartonConnected,
-} from '@pages/hooks/use-karton';
+import { useKartonProcedure } from '@ui/hooks/use-karton';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -27,21 +17,19 @@ import type {
 } from '@shared/karton-contracts/pages-api/types';
 import { List } from 'react-window';
 
-export const Route = createFileRoute('/_internal-app/history')({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'History',
-      },
-    ],
-  }),
-});
+// =============================================================================
+// Constants
+// =============================================================================
 
 const PAGE_SIZE = 50;
+const PAGE_HEADER_HEIGHT = 64;
 const DATE_HEADER_HEIGHT = 64;
 const ENTRY_ROW_HEIGHT = 56;
 const ORIGIN_GROUP_HEADER_HEIGHT = 48;
+
+// =============================================================================
+// Row Types
+// =============================================================================
 
 type DateHeaderRow = {
   type: 'date-header';
@@ -67,6 +55,10 @@ type EntryRow = {
 };
 
 type Row = DateHeaderRow | OriginGroupHeaderRow | EntryRow;
+
+// =============================================================================
+// Helpers
+// =============================================================================
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
@@ -102,12 +94,10 @@ function getUrlDisplayPath(url: string): string {
   }
 }
 
-// Convert history results to flat row list with date headers and origin groups
 function historyToRows(history: HistoryResult[]): Row[] {
   const rows: Row[] = [];
   let currentDate: string | null = null;
 
-  // First, group entries by date
   const dateGroups: { date: string; entries: HistoryResult[] }[] = [];
   for (const entry of history) {
     const dateKey = formatDate(entry.visitTime);
@@ -121,12 +111,9 @@ function historyToRows(history: HistoryResult[]): Row[] {
   for (const dateGroup of dateGroups) {
     rows.push({ type: 'date-header', date: dateGroup.date });
 
-    // Find consecutive runs of same origin within this date
     let i = 0;
     while (i < dateGroup.entries.length) {
       const origin = getUrlOrigin(dateGroup.entries[i]!.url);
-
-      // Find the end of this consecutive run
       let j = i + 1;
       while (
         j < dateGroup.entries.length &&
@@ -134,11 +121,9 @@ function historyToRows(history: HistoryResult[]): Row[] {
       ) {
         j++;
       }
-
       const runLength = j - i;
 
       if (runLength >= 2) {
-        // Multi-entry group — add group header + grouped entries
         const groupId = `group-${dateGroup.entries[i]!.visitId}`;
         rows.push({
           type: 'origin-group-header',
@@ -160,7 +145,6 @@ function historyToRows(history: HistoryResult[]): Row[] {
           });
         }
       } else {
-        // Single entry — no group
         const e = dateGroup.entries[i]!;
         rows.push({
           type: 'entry',
@@ -180,7 +164,6 @@ function historyToRows(history: HistoryResult[]): Row[] {
   return rows;
 }
 
-// Filter out entries belonging to collapsed groups
 function filterCollapsedRows(rows: Row[], collapsedGroups: Set<string>): Row[] {
   if (collapsedGroups.size === 0) return rows;
   return rows.filter((row) => {
@@ -195,7 +178,10 @@ function filterCollapsedRows(rows: Row[], collapsedGroups: Set<string>): Row[] {
   });
 }
 
-// Favicon component with fallback
+// =============================================================================
+// Favicon Component
+// =============================================================================
+
 function Favicon({
   faviconUrl,
   bitmaps,
@@ -234,22 +220,28 @@ function Favicon({
   );
 }
 
-// Row props type for the List component
+// =============================================================================
+// Row Component
+// =============================================================================
+
 type RowProps = {
   rows: Row[];
   faviconBitmaps: Record<string, FaviconBitmapResult>;
   collapsedGroups: Set<string>;
+  searchText: string;
+  onSearchTextChange: (value: string) => void;
   onOpenUrl: (url: string) => void;
   onToggleGroup: (groupId: string) => void;
 };
 
-// Row component for the virtualized list
 function RowComponent({
   index,
   style,
   rows,
   faviconBitmaps,
   collapsedGroups,
+  searchText,
+  onSearchTextChange,
   onOpenUrl,
   onToggleGroup,
 }: {
@@ -261,8 +253,25 @@ function RowComponent({
     role: 'listitem';
   };
 } & RowProps) {
-  const row = rows[index]!;
   const [copyTooltipText, setCopyTooltipText] = useState('Copy link');
+
+  if (index === 0) {
+    return (
+      <div style={style} className="flex items-start pb-8">
+        <div className="flex w-full items-center gap-24">
+          <h1 className="font-semibold text-foreground text-xl">History</h1>
+          <Input
+            type="text"
+            placeholder="Search history"
+            value={searchText}
+            onValueChange={onSearchTextChange}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const row = rows[index - 1]!;
 
   if (row.type === 'date-header') {
     return (
@@ -340,7 +349,11 @@ function RowComponent({
   );
 }
 
-function Page() {
+// =============================================================================
+// Main Component
+// =============================================================================
+
+export function HistorySection() {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearchText, setDebouncedSearchText] = useState('');
   const [history, setHistory] = useState<HistoryResult[]>([]);
@@ -352,12 +365,11 @@ function Page() {
     Record<string, FaviconBitmapResult>
   >({});
 
-  // Wait for Karton connection before fetching data
-  const isConnected = useKartonConnected();
-
-  const getHistory = useKartonProcedure((s) => s.getHistory);
-  const getFaviconBitmaps = useKartonProcedure((s) => s.getFaviconBitmaps);
-  const openTab = useKartonProcedure((s) => s.openTab);
+  const getHistory = useKartonProcedure((p) => p.browser.getHistory);
+  const getFaviconBitmaps = useKartonProcedure(
+    (p) => p.browser.getFaviconBitmaps,
+  );
+  const createTab = useKartonProcedure((p) => p.browser.createTab);
   const getHistoryRef = useRef(getHistory);
   const getFaviconBitmapsRef = useRef(getFaviconBitmaps);
   const listRef = useRef<{
@@ -375,7 +387,6 @@ function Page() {
   useEffect(() => {
     getHistoryRef.current = getHistory;
   }, [getHistory]);
-
   useEffect(() => {
     getFaviconBitmapsRef.current = getFaviconBitmaps;
   }, [getFaviconBitmaps]);
@@ -392,7 +403,6 @@ function Page() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerSize({
@@ -401,13 +411,11 @@ function Page() {
         });
       }
     });
-
     resizeObserver.observe(container);
     setContainerSize({
       width: container.clientWidth,
       height: container.clientHeight,
     });
-
     return () => resizeObserver.disconnect();
   }, []);
 
@@ -416,10 +424,8 @@ function Page() {
     const faviconUrls = historyResults
       .map((r) => r.faviconUrl)
       .filter((url): url is string => url !== null);
-
     const uniqueUrls = Array.from(new Set(faviconUrls));
     if (uniqueUrls.length === 0) return;
-
     try {
       const bitmaps = await getFaviconBitmapsRef.current(uniqueUrls);
       setFaviconBitmaps((prev) => ({ ...prev, ...bitmaps }));
@@ -428,11 +434,8 @@ function Page() {
     }
   }, []);
 
-  // Load initial history when search changes or connection is established
+  // Load initial history when search changes
   useEffect(() => {
-    // Don't fetch until connection is established
-    if (!isConnected) return;
-
     let cancelled = false;
 
     async function fetchInitialHistory() {
@@ -441,7 +444,6 @@ function Page() {
       setHistory([]);
       setHasMore(true);
 
-      // Reset list scroll position
       if (listRef.current) {
         listRef.current.scrollToRow({ index: 0 });
       }
@@ -452,9 +454,7 @@ function Page() {
           limit: PAGE_SIZE,
           offset: 0,
         };
-
         const results = await getHistoryRef.current(filter);
-
         if (!cancelled) {
           setHistory(results);
           setHasMore(results.length === PAGE_SIZE);
@@ -472,30 +472,22 @@ function Page() {
     }
 
     fetchInitialHistory();
-
     return () => {
       cancelled = true;
     };
-    // Note: fetchFavicons is stable (useCallback with []) and listRef is a ref,
-    // so they don't need to be in the dependency array
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchText, isConnected]);
+  }, [debouncedSearchText, fetchFavicons]);
 
-  // Load more history (for infinite scroll)
+  // Load more history (infinite scroll)
   const loadMoreHistory = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
-
     setIsLoadingMore(true);
-
     try {
       const filter: HistoryFilter = {
         text: debouncedSearchText.trim() || undefined,
         limit: PAGE_SIZE,
         offset: history.length,
       };
-
       const results = await getHistoryRef.current(filter);
-
       setHistory((prev) => [...prev, ...results]);
       setHasMore(results.length === PAGE_SIZE);
       fetchFavicons(results);
@@ -529,20 +521,18 @@ function Page() {
     });
   }, []);
 
-  // Convert history to flat rows, then filter collapsed groups
+  // Convert history to rows + filter collapsed
   const allRows = useMemo(() => historyToRows(history), [history]);
   const rows = useMemo(
     () => filterCollapsedRows(allRows, collapsedGroups),
     [allRows, collapsedGroups],
   );
 
-  // Get row height based on row type
   const getRowHeight = useCallback(
     (index: number): number => {
-      if (index >= rows.length) {
-        return ENTRY_ROW_HEIGHT;
-      }
-      const row = rows[index]!;
+      if (index === 0) return PAGE_HEADER_HEIGHT;
+      if (index > rows.length) return ENTRY_ROW_HEIGHT;
+      const row = rows[index - 1]!;
       if (row.type === 'date-header') return DATE_HEADER_HEIGHT;
       if (row.type === 'origin-group-header') return ORIGIN_GROUP_HEADER_HEIGHT;
       return ENTRY_ROW_HEIGHT;
@@ -550,13 +540,12 @@ function Page() {
     [rows],
   );
 
-  // Handle rows rendered - trigger load more when near bottom
+  // Trigger load more when near bottom
   const handleRowsRendered = useCallback(
     (
       visibleRows: { startIndex: number; stopIndex: number },
       _allRows: { startIndex: number; stopIndex: number },
     ) => {
-      // Load more when we're within 10 items of the end
       if (
         hasMore &&
         !isLoadingMore &&
@@ -569,145 +558,124 @@ function Page() {
     [hasMore, isLoadingMore, isLoading, rows.length, loadMoreHistory],
   );
 
-  // Error cause message extraction
-  const errorCauseMessage = useMemo((): string | null => {
-    if (!error || !('cause' in error) || !error.cause) return null;
-    return error.cause instanceof Error
-      ? error.cause.message
-      : String(error.cause);
-  }, [error]);
-
   // Handle opening URL in new tab
   const handleOpenUrl = useCallback(
     (url: string) => {
-      openTab(url, true);
+      void createTab(url, true);
     },
-    [openTab],
+    [createTab],
   );
 
-  // Row props for the list
+  // Row props
   const rowProps = useMemo(
     () => ({
       rows,
       faviconBitmaps,
       collapsedGroups,
+      searchText,
+      onSearchTextChange: setSearchText,
       onOpenUrl: handleOpenUrl,
       onToggleGroup: toggleGroup,
     }),
-    [rows, faviconBitmaps, collapsedGroups, handleOpenUrl, toggleGroup],
+    [
+      rows,
+      faviconBitmaps,
+      collapsedGroups,
+      searchText,
+      handleOpenUrl,
+      toggleGroup,
+    ],
   );
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-24">
-          <h1 className="font-semibold text-foreground text-xl">History</h1>
-          <Input
-            type="text"
-            placeholder="Search history"
-            value={searchText}
-            onValueChange={setSearchText}
-          />
-        </div>
-      </div>
-
-      {/* History entries */}
-      <div className="flex-1 overflow-hidden px-6 pt-6 pb-24">
-        <div
-          ref={containerRef}
-          className="mx-auto h-full max-w-3xl overflow-hidden"
-        >
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : error ? (
-            <div className="flex h-full flex-col items-center justify-center px-4">
-              <div className="max-w-md space-y-2 text-center">
-                <p className="font-medium text-error-foreground text-sm">
-                  {error.message}
-                </p>
-                {import.meta.env.DEV && error.stack && (
-                  <details className="mt-4 text-left">
-                    <summary className="cursor-pointer text-muted-foreground text-xs">
-                      Technical details (dev mode)
-                    </summary>
-                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-surface-1 p-2 text-muted-foreground text-xs">
-                      {error.stack}
-                    </pre>
-                  </details>
-                )}
-                {errorCauseMessage && (
-                  <p className="text-muted-foreground text-xs">
-                    Cause: {errorCauseMessage}
-                  </p>
-                )}
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-4"
-                onClick={async () => {
-                  setError(null);
-                  setIsLoading(true);
-
-                  try {
-                    const filter: HistoryFilter = {
-                      text: debouncedSearchText.trim() || undefined,
-                      limit: PAGE_SIZE,
-                      offset: 0,
-                    };
-                    const results = await getHistoryRef.current(filter);
-                    setHistory(results);
-                    setHasMore(results.length === PAGE_SIZE);
-                    setIsLoading(false);
-                    fetchFavicons(results);
-                  } catch (err) {
-                    setError(
-                      err instanceof Error
-                        ? err
-                        : new Error('Failed to load history'),
-                    );
-                    setIsLoading(false);
-                  }
-                }}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-muted-foreground text-sm">
-                {searchText
-                  ? 'No history found matching your search'
-                  : 'No history yet'}
+    <div className="h-full w-full overflow-hidden px-6 pt-24 pb-24">
+      <div
+        ref={containerRef}
+        className="mx-auto h-full max-w-3xl overflow-hidden"
+      >
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="flex h-full flex-col items-center justify-center px-4">
+            <div className="max-w-md space-y-2 text-center">
+              <p className="font-medium text-error-foreground text-sm">
+                {error.message}
               </p>
-            </div>
-          ) : containerSize.height > 0 ? (
-            <>
-              <List
-                listRef={listRef}
-                rowCount={rows.length}
-                rowHeight={getRowHeight}
-                rowComponent={RowComponent}
-                rowProps={rowProps}
-                onRowsRendered={handleRowsRendered}
-                overscanCount={5}
-                className="scrollbar-subtle"
-                style={{
-                  height: containerSize.height,
-                  width: containerSize.width,
-                }}
-              />
-              {isLoadingMore && (
-                <div className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-center bg-linear-to-t from-background to-transparent">
-                  <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-                </div>
+              {import.meta.env.DEV && error.stack && (
+                <details className="mt-4 text-left">
+                  <summary className="cursor-pointer text-muted-foreground text-xs">
+                    Technical details (dev mode)
+                  </summary>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded bg-surface-1 p-2 text-muted-foreground text-xs">
+                    {error.stack}
+                  </pre>
+                </details>
               )}
-            </>
-          ) : null}
-        </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-4"
+              onClick={async () => {
+                setError(null);
+                setIsLoading(true);
+                try {
+                  const filter: HistoryFilter = {
+                    text: debouncedSearchText.trim() || undefined,
+                    limit: PAGE_SIZE,
+                    offset: 0,
+                  };
+                  const results = await getHistoryRef.current(filter);
+                  setHistory(results);
+                  setHasMore(results.length === PAGE_SIZE);
+                  setIsLoading(false);
+                  fetchFavicons(results);
+                } catch (err) {
+                  setError(
+                    err instanceof Error
+                      ? err
+                      : new Error('Failed to load history'),
+                  );
+                  setIsLoading(false);
+                }
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-muted-foreground text-sm">
+              {searchText
+                ? 'No history found matching your search'
+                : 'No history yet'}
+            </p>
+          </div>
+        ) : containerSize.height > 0 ? (
+          <>
+            <List
+              listRef={listRef}
+              rowCount={rows.length + 1}
+              rowHeight={getRowHeight}
+              rowComponent={RowComponent}
+              rowProps={rowProps}
+              onRowsRendered={handleRowsRendered}
+              overscanCount={5}
+              className="scrollbar-subtle"
+              style={{
+                height: containerSize.height,
+                width: containerSize.width,
+              }}
+            />
+            {isLoadingMore && (
+              <div className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-center bg-linear-to-t from-background to-transparent">
+                <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
     </div>
   );

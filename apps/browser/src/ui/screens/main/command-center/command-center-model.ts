@@ -1,5 +1,6 @@
 import type { HotkeyActions } from '@shared/hotkeys';
 import type { ReactNode } from 'react';
+import type { SettingsRoute } from '@shared/settings-route';
 
 export type CommandCenterMode = 'global' | 'agents' | 'browser' | 'settings';
 
@@ -61,6 +62,7 @@ export type SettingCommandItem = CommandCenterItemBase & {
   kind: 'setting';
   mode: 'settings';
   url: string;
+  settingsRoute?: SettingsRoute;
 };
 
 export type ActionCommandItem = CommandCenterItemBase & {

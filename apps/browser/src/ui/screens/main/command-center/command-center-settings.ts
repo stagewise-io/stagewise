@@ -1,5 +1,5 @@
-import { HISTORY_PAGE_URL, SETTINGS_PAGE_URL } from '@shared/internal-urls';
 import type { SettingCommandItem } from './command-center-model';
+import type { SettingsRoute } from '@shared/settings-route';
 
 export type CommandCenterSettingDefinition = Omit<
   SettingCommandItem,
@@ -14,7 +14,16 @@ export type CommandCenterSettingDefinition = Omit<
     | 'plugins'
     | 'browser'
     | 'history';
+  settingsRoute?: SettingsRoute;
 };
+
+const ROUTE_MODELS_PROVIDERS: SettingsRoute = { section: 'models-providers' };
+const ROUTE_CUSTOM_PROVIDERS: SettingsRoute = { section: 'custom-providers' };
+const ROUTE_AGENT_GENERAL: SettingsRoute = { section: 'agent-general' };
+const ROUTE_SKILLS_CONTEXT: SettingsRoute = { section: 'skills-context' };
+const ROUTE_PLUGINS: SettingsRoute = { section: 'plugins' };
+const ROUTE_BROWSING: SettingsRoute = { section: 'browsing' };
+const ROUTE_HISTORY: SettingsRoute = { section: 'history' };
 
 export const commandCenterSettings: CommandCenterSettingDefinition[] = [
   {
@@ -22,7 +31,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'Models & Providers',
     subtitle: 'Configure model providers and coding plans',
     keywords: ['models', 'providers', 'llm', 'ai', 'coding plans'],
-    url: SETTINGS_PAGE_URL,
+    url: '',
+    settingsRoute: ROUTE_MODELS_PROVIDERS,
     iconName: 'models',
   },
   {
@@ -40,7 +50,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
       'z-ai',
       'minimax',
     ],
-    url: SETTINGS_PAGE_URL,
+    url: '',
+    settingsRoute: ROUTE_MODELS_PROVIDERS,
     iconName: 'key',
   },
   {
@@ -48,7 +59,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'Custom Providers',
     subtitle: 'Manage custom model endpoints',
     keywords: ['custom provider', 'endpoint', 'openai compatible', 'bedrock'],
-    url: 'stagewise://internal/agent-settings/custom-providers',
+    url: '',
+    settingsRoute: ROUTE_CUSTOM_PROVIDERS,
     iconName: 'provider',
   },
   {
@@ -56,7 +68,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'General Agent Settings',
     subtitle: 'Configure default agent behavior',
     keywords: ['agent', 'general', 'settings', 'behavior'],
-    url: 'stagewise://internal/agent-settings/general',
+    url: '',
+    settingsRoute: ROUTE_AGENT_GENERAL,
     iconName: 'settings',
   },
   {
@@ -64,7 +77,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'Skills & Context files',
     subtitle: 'Manage skill and context file preferences',
     keywords: ['skills', 'context', 'agents.md', 'workspace.md'],
-    url: 'stagewise://internal/agent-settings/skills-context',
+    url: '',
+    settingsRoute: ROUTE_SKILLS_CONTEXT,
     iconName: 'context',
   },
   {
@@ -72,7 +86,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'Plugins',
     subtitle: 'Configure bundled and enabled plugins',
     keywords: ['plugins', 'extensions', 'tools'],
-    url: 'stagewise://internal/agent-settings/plugins',
+    url: '',
+    settingsRoute: ROUTE_PLUGINS,
     iconName: 'plugins',
   },
   {
@@ -80,7 +95,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'Browsing Settings',
     subtitle: 'Configure browser behavior and permissions',
     keywords: ['browser', 'browsing', 'permissions', 'search engine'],
-    url: 'stagewise://internal/browsing-settings',
+    url: '',
+    settingsRoute: ROUTE_BROWSING,
     iconName: 'browser',
   },
   {
@@ -88,7 +104,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     title: 'History',
     subtitle: 'Open browsing history',
     keywords: ['history', 'visited', 'pages'],
-    url: HISTORY_PAGE_URL,
+    url: '',
+    settingsRoute: ROUTE_HISTORY,
     iconName: 'history',
   },
 ];

@@ -34,6 +34,8 @@ import {
   CommandCenterProvider,
 } from './command-center';
 
+// Reuse the same autoSaveId as the settings screen so the root panel layout
+// (sidebar width, content width) persists when switching between screens.
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
 
 export function DefaultLayout({ show }: { show: boolean }) {

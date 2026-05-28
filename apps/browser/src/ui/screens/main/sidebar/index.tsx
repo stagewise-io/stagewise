@@ -14,8 +14,6 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { SETTINGS_PAGE_URL, ACCOUNT_PAGE_URL } from '@shared/internal-urls';
-import { HotkeyActions } from '@shared/hotkeys';
 import { useTrack } from '@ui/hooks/use-track';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
@@ -28,7 +26,6 @@ import {
 import { NotificationBanners } from '../agent-chat/chat/_components/notification-banners';
 import { UsageWarningBadge } from '../agent-chat/chat/_components/usage-warning-badge';
 import { WorktreeCleanupBadge } from './worktree-cleanup-badge';
-import { HotkeyCombo } from '@ui/components/hotkey-combo';
 
 // Read the persisted collapsed state *once* at module eval so we can seed
 // `defaultSize` on first render. Without this the panel mounts expanded
@@ -47,7 +44,7 @@ export function Sidebar() {
   const preCollapseSizeRef = useRef<number>(DEFAULT_EXPANDED_SIZE);
 
   const track = useTrack();
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const counterScale = useUiZoomCounterScale();
 
   const { collapsed, setCollapsed } = useSidebarCollapsed();
@@ -63,13 +60,13 @@ export function Sidebar() {
 
   const handleOpenSettings = useCallback(() => {
     track('settings-opened');
-    createTab(SETTINGS_PAGE_URL, true);
-  }, [createTab, track]);
+    void openSettings({ section: 'models-providers' });
+  }, [openSettings, track]);
 
   const handleOpenAccount = useCallback(() => {
     track('account-opened');
-    createTab(ACCOUNT_PAGE_URL, true);
-  }, [createTab, track]);
+    void openSettings({ section: 'account' });
+  }, [openSettings, track]);
 
   // Sync context-driven collapse state to the imperative panel handle.
   // Guards prevent infinite loops with onCollapse/onExpand callbacks.
@@ -118,8 +115,8 @@ export function Sidebar() {
 
           <div className="mt-8 flex shrink-0 flex-col gap-2">
             <NotificationBanners />
-            <WorktreeCleanupBadge />
             <UsageWarningBadge />
+            <WorktreeCleanupBadge />
           </div>
 
           {/* Bottom auth section */}
@@ -172,15 +169,7 @@ export function Sidebar() {
                     <IconGear2Outline18 className="size-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top">
-                  <span className="flex items-center gap-1.5">
-                    <span>Settings</span>
-                    <HotkeyCombo
-                      action={HotkeyActions.OPEN_SETTINGS}
-                      size="xs"
-                    />
-                  </span>
-                </TooltipContent>
+                <TooltipContent side="top">Settings</TooltipContent>
               </Tooltip>
             </div>
           </div>

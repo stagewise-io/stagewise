@@ -259,9 +259,9 @@ export interface SelectProps<
 
 const sizes = {
   trigger: {
-    xs: 'h-4 gap-1 text-xs font-normal',
-    sm: 'h-5 gap-1 text-sm font-normal',
-    md: 'h-6 gap-1.5 text-sm font-normal',
+    xs: 'h-4 gap-1 px-1.5 text-xs font-normal',
+    sm: 'h-6 gap-1 px-2 text-sm font-normal',
+    md: 'h-8 gap-1.5 px-4 text-sm font-normal',
   } satisfies Record<SelectSize, string>,
   popup: {
     xs: 'text-xs',
@@ -269,9 +269,9 @@ const sizes = {
     md: 'text-sm',
   } satisfies Record<SelectSize, string>,
   item: {
-    xs: 'px-2 py-1',
-    sm: 'px-2 py-1.5',
-    md: 'px-2.5 py-2',
+    xs: 'px-2 py-0.5',
+    sm: 'px-2 py-1',
+    md: 'px-2 py-1.5',
   } satisfies Record<SelectSize, string>,
   icon: {
     xs: 'size-3',
@@ -523,7 +523,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
         <SelectBase.Trigger
           ref={ref}
           className={cn(
-            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-lg p-0 shadow-none focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2 data-disabled:pointer-events-none data-disabled:opacity-50',
+            'inline-flex max-w-full cursor-pointer items-center justify-between rounded-md shadow-none focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2 data-disabled:pointer-events-none data-disabled:opacity-50',
             triggerVariants[triggerVariant],
             sizes.trigger[size],
             triggerClassName,
@@ -573,7 +573,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
             ref={popupRef}
             className={cn(
               'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
-              'rounded-lg border border-border-subtle bg-background p-1 shadow-lg',
+              'rounded-md border border-border-subtle bg-background p-1 shadow-lg',
               'transition-[transform,scale,opacity] duration-150 ease-out',
               'data-ending-style:scale-90 data-ending-style:opacity-0',
               'data-starting-style:scale-90 data-starting-style:opacity-0',
@@ -612,7 +612,7 @@ function SelectInner<Value = string | null, Multiple extends boolean = false>(
                             value={item.value as any}
                             disabled={item.disabled}
                             className={cn(
-                              'group/item w-full min-w-24 cursor-default rounded-md bg-background text-foreground outline-none',
+                              'group/item w-full min-w-24 cursor-default rounded-sm bg-background text-foreground outline-none',
                               'hover:bg-hover-derived data-highlighted:bg-hover-derived',
                               'data-disabled:pointer-events-none data-disabled:opacity-50',
                               hasDescription ? 'items-start' : 'items-center',

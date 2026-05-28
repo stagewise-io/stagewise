@@ -1,34 +1,18 @@
-import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { syncDerivedState } from '../utils/sync-derived-state';
 import type { KartonService } from '../services/karton';
 import type { PagesService } from '../services/pages';
-import type { WebDataService } from '../services/webdata';
 import type { GlobalConfigService } from '../services/global-config';
-import type { AuthService } from '../services/auth';
 import type { Logger } from '../services/logger';
-import type { TelemetryService } from '../services/telemetry';
 
 export async function wirePagesStateSync(deps: {
   uiKarton: KartonService;
   pagesService: PagesService;
-  webDataService: WebDataService;
   globalConfigService: GlobalConfigService;
-  authService: AuthService;
   logger: Logger;
-  telemetryService: TelemetryService;
 }): Promise<void> {
-  const {
-    uiKarton,
-    pagesService,
-    webDataService,
-    globalConfigService,
-    authService,
-    logger,
-    telemetryService,
-  } = deps;
+  const { uiKarton, pagesService, globalConfigService, logger } = deps;
 
   // --- Pending edits sync (uiKarton -> pages) ---
-  // Uses a per-agent snapshot map since each agent instance is tracked independently
   const previousPendingEditsSnapshots = new Map<string, string>();
 
   const hashContent = (s: string | null | undefined): string => {
@@ -59,23 +43,6 @@ export async function wirePagesStateSync(deps: {
       }
     }
   });
-
-  // --- Workspace-MD generating state sync (uiKarton -> pages) ---
-  syncDerivedState(
-    uiKarton,
-    (state) => {
-      const generating: Record<string, boolean> = {};
-      for (const agentId in state.agents.instances) {
-        const inst = state.agents.instances[agentId];
-        if (inst.type !== AgentTypes.WORKSPACE_MD) continue;
-        if (!inst.state.isWorking) continue;
-        const path = state.toolbox[agentId]?.workspace?.mounts?.[0]?.path;
-        if (path) generating[path] = true;
-      }
-      return generating;
-    },
-    (generating) => pagesService.syncWorkspaceMdGeneratingState(generating),
-  );
 
   // --- Workspace mounts sync (uiKarton -> pages) ---
   syncDerivedState(
@@ -110,47 +77,11 @@ export async function wirePagesStateSync(deps: {
     (plans) => pagesService.syncPlansState(plans),
   );
 
-  // --- Auto-update state sync (uiKarton -> pages) ---
-  syncDerivedState(
-    uiKarton,
-    (state) => state.autoUpdate,
-    (autoUpdate) => pagesService.syncAutoUpdateState(autoUpdate),
-  );
-
-  // --- Search engines sync (webDataService -> uiKarton + pages) ---
-  const syncSearchEnginesToUiKarton = async () => {
-    const engines = await webDataService.getSearchEngines();
-    uiKarton.setState((draft) => {
-      draft.searchEngines = engines;
-    });
-  };
-  await syncSearchEnginesToUiKarton();
-  pagesService.setOnSearchEnginesChangeHandler(syncSearchEnginesToUiKarton);
-
   // --- Global config bidirectional sync ---
   pagesService.syncGlobalConfigState(globalConfigService.get());
-  pagesService.registerGlobalConfigHandler(async (config) => {
-    await globalConfigService.set(config);
-  });
   globalConfigService.addConfigUpdatedListener((newConfig) => {
     pagesService.syncGlobalConfigState(newConfig);
   });
 
-  // --- Auth state sync ---
-  authService.registerAuthStateChangeCallback((newAuthState) => {
-    if (newAuthState.user) {
-      logger.debug(
-        '[Main] User logged in, identifying user and setting user properties...',
-      );
-      telemetryService.setUserProperties({
-        user_id: newAuthState.user?.id,
-        user_email: newAuthState.user?.email,
-      });
-      telemetryService.identifyUser();
-    } else
-      logger.debug('[Main] No user data available, not identifying user...');
-
-    pagesService.syncUserAccountState(newAuthState);
-  });
-  pagesService.syncUserAccountState(authService.authState);
+  logger.debug('[pages-state-sync] State sync initialized');
 }

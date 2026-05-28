@@ -760,23 +760,30 @@ export class NotificationSoundsService extends DisposableService {
     }
 
     try {
-      // Escape single quotes and backticks for JS string safety.
-      const safeUrl = dataUrl
-        .replace(/\\/g, '\\\\')
-        .replace(/'/g, "\\'")
-        .replace(/`/g, '\\`');
-
       const code = `
-        (function(){
+        (async function() {
+          const players = window.__stagewiseNotificationAudioPlayers ?? new Set();
+          window.__stagewiseNotificationAudioPlayers = players;
+
+          const audio = new Audio(${JSON.stringify(dataUrl)});
+          audio.volume = ${Math.max(0, Math.min(1, volume))};
+          players.add(audio);
+
+          const cleanup = () => players.delete(audio);
+          audio.addEventListener('ended', cleanup, { once: true });
+          audio.addEventListener('error', cleanup, { once: true });
+
           try {
-            var a = new Audio('${safeUrl}');
-            a.volume = ${Math.max(0, Math.min(1, volume))};
-            a.play().catch(function(){});
-          } catch(_){}
+            await audio.play();
+            return true;
+          } catch (error) {
+            cleanup();
+            throw error;
+          }
         })();
       `;
 
-      await wc.executeJavaScript(code);
+      await wc.executeJavaScript(code, true);
       return true;
     } catch (err) {
       this.logger.debug(

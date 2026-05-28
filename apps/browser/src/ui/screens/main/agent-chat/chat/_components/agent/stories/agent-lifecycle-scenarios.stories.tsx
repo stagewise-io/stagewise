@@ -38,6 +38,7 @@ const baseState: Partial<AppState> = {
     activeModelId: availableModels[0]?.modelId,
   }),
   userExperience: {
+    pendingOnboardingSuggestion: null,
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,

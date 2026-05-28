@@ -4,6 +4,7 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { DefaultLayout } from './main';
+import { SettingsScreen } from './settings';
 import { OnboardingWizard } from './onboarding';
 import { Logo } from '@ui/components/ui/logo';
 import { WebContentsBoundsSyncer } from '@ui/components/web-contents-bounds-syncer';
@@ -15,6 +16,7 @@ export function ScreenRouter() {
   const hasSeenOnboarding = useKartonState(
     (s) => s.userExperience.storedExperienceData.hasSeenOnboardingFlow,
   );
+  const appScreenMode = useKartonState((s) => s.appScreen.mode);
 
   return (
     <div className="fixed inset-0">
@@ -45,10 +47,14 @@ export function ScreenRouter() {
           )}
         </div>
       ) : hasSeenOnboarding ? (
-        <>
-          <DefaultLayout show />
-          <WebContentsBoundsSyncer />
-        </>
+        appScreenMode === 'settings' ? (
+          <SettingsScreen />
+        ) : (
+          <>
+            <DefaultLayout show />
+            <WebContentsBoundsSyncer />
+          </>
+        )
       ) : (
         <OnboardingWizard />
       )}

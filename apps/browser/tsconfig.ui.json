@@ -11,7 +11,9 @@
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@shared/*": ["./src/shared/*"],
-      "@ui/*": ["./src/ui/*"]
+      "@ui/*": ["./src/ui/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@assets/*": ["./assets/pages/*"]
     },
     "types": ["vite/client"],
     "skipLibCheck": true

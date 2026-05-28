@@ -2,17 +2,13 @@ import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { Logo } from '@ui/components/ui/logo';
 import { SignInOptionsPanel } from '@ui/components/auth/sign-in-options-panel';
 import { useTrack } from '@ui/hooks/use-track';
-import {
-  SETTINGS_API_KEYS_PAGE_URL,
-  SETTINGS_CODING_PLANS_PAGE_URL,
-} from '@shared/internal-urls';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
 
 export function NotSignedIn() {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
   const signInSocial = useKartonProcedure((p) => p.userAccount.signInSocial);
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const track = useTrack();
 
   return (
@@ -26,9 +22,9 @@ export function NotSignedIn() {
         signInSocial={(provider: SocialAuthProvider) => signInSocial(provider)}
         trackingPrefix="chat-auth"
         track={track}
-        onUseApiKeys={() => void createTab(SETTINGS_API_KEYS_PAGE_URL, true)}
+        onUseApiKeys={() => void openSettings({ section: 'models-providers' })}
         onUseSubscription={() =>
-          void createTab(SETTINGS_CODING_PLANS_PAGE_URL, true)
+          void openSettings({ section: 'models-providers' })
         }
       />
     </div>

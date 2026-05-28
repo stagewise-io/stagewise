@@ -269,6 +269,64 @@ export class PreferencesService extends DisposableService {
       },
     );
 
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setCustomEndpointApiKey',
+      async (_callingClientId: string, endpointId: string, apiKey: string) => {
+        await this.setCustomEndpointApiKey(endpointId, apiKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.clearCustomEndpointApiKey',
+      async (_callingClientId: string, endpointId: string) => {
+        await this.clearCustomEndpointApiKey(endpointId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setCustomEndpointSecretKey',
+      async (
+        _callingClientId: string,
+        endpointId: string,
+        secretKey: string,
+      ) => {
+        await this.setCustomEndpointSecretKey(endpointId, secretKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setCustomEndpointGoogleCredentials',
+      async (
+        _callingClientId: string,
+        endpointId: string,
+        credentials: string,
+      ) => {
+        await this.setCustomEndpointGoogleCredentials(endpointId, credentials);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.listAwsProfiles',
+      async (_callingClientId: string) => {
+        const { listAwsProfiles } = await import('../utils/aws-profiles');
+        return listAwsProfiles();
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.validateProviderApiKey',
+      async (
+        _callingClientId: string,
+        provider: ModelProvider,
+        apiKey: string,
+        baseUrl?: string,
+      ) => {
+        const { validateApiKeys } = await import('../utils/validate-api-keys');
+        const results = await validateApiKeys({ [provider]: apiKey }, baseUrl);
+        return results[provider];
+      },
+    );
+
     // Dev toolbar procedures
     this.uiKarton.registerServerProcedureHandler(
       'devToolbar.updateWidgetOrder',
@@ -352,23 +410,6 @@ export class PreferencesService extends DisposableService {
         return this.getOrCreateOriginSettings(origin);
       },
     );
-
-    // Pages procedures
-    this.pagesService.registerPreferencesHandlers(
-      () => this.get(),
-      (patches) => this.update(patches),
-      () => this.clearAllPermissionExceptionsForAllTypes(),
-      (provider, apiKey) => this.setProviderApiKey(provider, apiKey),
-      (provider) => this.clearProviderApiKey(provider),
-      (endpointId, apiKey) => this.setCustomEndpointApiKey(endpointId, apiKey),
-      (endpointId) => this.clearCustomEndpointApiKey(endpointId),
-      (endpointId, secretKey) =>
-        this.setCustomEndpointSecretKey(endpointId, secretKey),
-      (endpointId, credentials) =>
-        this.setCustomEndpointGoogleCredentials(endpointId, credentials),
-      (planId, apiKey) => this.connectCodingPlan(planId, apiKey),
-      (provider) => this.disconnectProvider(provider),
-    );
   }
 
   private syncToKarton(): void {
@@ -383,9 +424,6 @@ export class PreferencesService extends DisposableService {
     this.uiKarton.setState((draft) => {
       draft.preferences = prefs;
     });
-
-    // Sync to Pages API Karton state
-    this.pagesService.syncPreferencesState(structuredClone(this.preferences));
   }
 
   private async save(
@@ -1174,6 +1212,22 @@ export class PreferencesService extends DisposableService {
         'preferences.connectCodingPlan',
       );
       this.uiKarton.removeServerProcedureHandler('preferences.connectProvider');
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setCustomEndpointApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.clearCustomEndpointApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setCustomEndpointSecretKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setCustomEndpointGoogleCredentials',
+      );
+      this.uiKarton.removeServerProcedureHandler('preferences.listAwsProfiles');
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.validateProviderApiKey',
+      );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',
       );

@@ -1,5 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import {
   RadioGroup,
   Radio,
@@ -36,17 +35,6 @@ import {
 
 enablePatches();
 
-export const Route = createFileRoute('/_internal-app/about')({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'About',
-      },
-    ],
-  }),
-});
-
 interface LicenseEntry {
   name: string;
   version: string;
@@ -58,7 +46,10 @@ interface LicenseEntry {
 
 function AppUpdateStatus() {
   const autoUpdate = useKartonState((s) => s.autoUpdate);
-  const autoUpdateProcedures = useKartonProcedure((s) => s.autoUpdate);
+  const checkForUpdates = useKartonProcedure(
+    (p) => p.autoUpdate.checkForUpdates,
+  );
+  const quitAndInstall = useKartonProcedure((p) => p.autoUpdate.quitAndInstall);
 
   if (autoUpdate.status === 'unsupported') {
     return null;
@@ -88,7 +79,7 @@ function AppUpdateStatus() {
               variant="ghost"
               size="sm"
               className="px-0"
-              onClick={() => autoUpdateProcedures.checkForUpdates()}
+              onClick={() => checkForUpdates()}
             >
               <IconRefreshAnticlockwiseOutline18 className="size-3" />
               Check Again
@@ -97,10 +88,7 @@ function AppUpdateStatus() {
         );
       case 'ready':
         return (
-          <Button
-            size="sm"
-            onClick={() => autoUpdateProcedures.quitAndInstall()}
-          >
+          <Button size="sm" onClick={() => quitAndInstall()}>
             Install Update & Restart
           </Button>
         );
@@ -112,7 +100,7 @@ function AppUpdateStatus() {
             variant="ghost"
             size="sm"
             className="px-0"
-            onClick={() => autoUpdateProcedures.checkForUpdates()}
+            onClick={() => checkForUpdates()}
           >
             <IconRefreshAnticlockwiseOutline18 className="size-3" />
             Check for Updates
@@ -141,7 +129,7 @@ function AppUpdateStatus() {
 function UpdateChannelSetting() {
   const preferences = useKartonState((s) => s.preferences);
   const appInfo = useKartonState((s) => s.appInfo);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const inferredChannel: UpdateChannel = appInfo.version.includes('-alpha')
     ? 'alpha'
@@ -149,7 +137,7 @@ function UpdateChannelSetting() {
 
   const currentChannel = preferences.updateChannel ?? inferredChannel;
 
-  const handleChannelChange = async (value: string) => {
+  const handleChannelChange = async (value: unknown) => {
     const channel = value as UpdateChannel;
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.updateChannel = channel;
@@ -429,22 +417,19 @@ function OpenSourceLicenses() {
   );
 }
 
-function Page() {
+export function AboutSection() {
   const appInfo = useKartonState((s) => s.appInfo);
   const [appLicenseOpen, setAppLicenseOpen] = useState(false);
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex flex-col items-center border-border-subtle border-b px-6 py-4">
-        <div className="w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">About</h1>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">About</h1>
+          </div>
           {/* App Name Section */}
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline gap-2">

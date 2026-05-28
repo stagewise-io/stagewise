@@ -96,6 +96,7 @@ export const ModelSelect = memo(function ModelSelect({
     openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
   );
   const setSelectedModel = useKartonProcedure((p) => p.agents.setActiveModelId);
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const customModels = useKartonState((s) => s.preferences.customModels);
   const disabledModelIds = useKartonState(
     (s) => s.preferences.agent.disabledModelIds,
@@ -239,17 +240,14 @@ export const ModelSelect = memo(function ModelSelect({
     (value: string | null) => {
       if (!value) return;
       if (value === OPEN_MODEL_SETTINGS_VALUE) {
-        // Navigate via the in-app deep link; matches the pattern used by
-        // `not-signed-in.tsx` and `message-runtime-error.tsx`.
-        window.location.href =
-          'stagewise://internal/agent-settings/models-providers';
+        void openSettings({ section: 'models-providers' });
         return;
       }
       if (!openAgent) return;
       setSelectedModel(openAgent, value as ModelId);
       onModelChange?.();
     },
-    [openAgent, setSelectedModel, onModelChange],
+    [openAgent, openSettings, setSelectedModel, onModelChange],
   );
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {

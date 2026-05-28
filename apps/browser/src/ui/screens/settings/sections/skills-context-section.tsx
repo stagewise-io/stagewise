@@ -1,8 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { IconPenDrawSparkleFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import {
+  useComparingSelector,
+  useKartonProcedure,
+  useKartonState,
+} from '@ui/hooks/use-karton';
 import {
   useEffect,
   useState,
@@ -11,35 +14,19 @@ import {
   useRef,
   useLayoutEffect,
 } from 'react';
-import { cn } from '@pages/utils';
+import { cn } from '@ui/utils';
 import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/types';
 import type { MountEntry } from '@shared/karton-contracts/ui';
 import type { Patch } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
-import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
+import { getBaseName } from '@shared/path-utils';
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import type { RefObject } from 'react';
-
-export const Route = createFileRoute(
-  '/_internal-app/agent-settings/skills-context',
-)({
-  component: Page,
-  validateSearch: (search: Record<string, unknown>) => ({
-    workspace: (search.workspace as string) || '',
-  }),
-  head: () => ({
-    meta: [
-      {
-        title: 'Skills & Context files',
-      },
-    ],
-  }),
-});
 
 // =============================================================================
 // Vertical overflow detection (like useIsTruncated but for height)
@@ -70,14 +57,17 @@ function useIsOverflowing(ref: RefObject<HTMLElement | null>) {
 // Workspace Subheader
 // =============================================================================
 
-function WorkspaceSubheader({ mount }: { mount: MountEntry }) {
-  const displayName = useMemo(() => getWorkspaceDisplayLabel(mount), [mount]);
+function WorkspaceSubheader({ workspacePath }: { workspacePath: string }) {
+  const folderName = useMemo(
+    () => getBaseName(workspacePath) || workspacePath,
+    [workspacePath],
+  );
 
   return (
     <div className="flex flex-col">
-      <span className="font-medium text-foreground text-sm">{displayName}</span>
+      <span className="font-medium text-foreground text-sm">{folderName}</span>
       <span className="truncate text-subtle-foreground text-xs">
-        {mount.path}
+        {workspacePath}
       </span>
     </div>
   );
@@ -95,7 +85,7 @@ function WorkspaceSkillsList({
   skills: Array<{ name: string; description: string }>;
 }) {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const disabledSkills = useMemo(
     () =>
@@ -229,7 +219,14 @@ function SkillRow({
   );
 }
 
-function SkillsSection({ workspaceMounts }: { workspaceMounts: MountEntry[] }) {
+function SkillsSection({
+  workspaceMounts,
+}: {
+  workspaceMounts: Array<{
+    path: string;
+    skills: Array<{ name: string; description: string }>;
+  }>;
+}) {
   const hasSkills = workspaceMounts.some((m) => m.skills.length > 0);
 
   return (
@@ -246,7 +243,7 @@ function SkillsSection({ workspaceMounts }: { workspaceMounts: MountEntry[] }) {
             .filter((mount) => mount.skills.length > 0)
             .map((mount) => (
               <div key={mount.path} className="space-y-2">
-                <WorkspaceSubheader mount={mount} />
+                <WorkspaceSubheader workspacePath={mount.path} />
                 <WorkspaceSkillsList
                   workspacePath={mount.path}
                   skills={mount.skills}
@@ -277,8 +274,10 @@ function WorkspaceContextFilesList({
   workspaceMd: { exists: boolean; path: string | null; content: string | null };
 }) {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
-  const generateWorkspaceMd = useKartonProcedure((s) => s.generateWorkspaceMd);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const generateWorkspaceMd = useKartonProcedure(
+    (p) => p.toolbox.generateWorkspaceMdForPath,
+  );
   const isGenerating = useKartonState(
     (s) => !!s.workspaceMdGenerating[workspacePath],
   );
@@ -406,7 +405,11 @@ function ContextFilesSection({
   workspaceMounts,
   contextFiles,
 }: {
-  workspaceMounts: MountEntry[];
+  workspaceMounts: Array<{
+    path: string;
+    workspaceMdContent: string | null;
+    agentsMdContent: string | null;
+  }>;
   contextFiles: ContextFilesResult | null;
 }) {
   return (
@@ -421,7 +424,7 @@ function ContextFilesSection({
         <div className="space-y-4">
           {workspaceMounts.map((mount) => (
             <div key={mount.path} className="space-y-2">
-              <WorkspaceSubheader mount={mount} />
+              <WorkspaceSubheader workspacePath={mount.path} />
               <WorkspaceContextFilesList
                 workspacePath={mount.path}
                 workspaceMd={
@@ -450,9 +453,32 @@ function ContextFilesSection({
 // Main Page Component
 // =============================================================================
 
-function Page() {
-  const workspaceMounts = useKartonState((s) => s.workspaceMounts);
-  const getContextFiles = useKartonProcedure((s) => s.getContextFiles);
+export function SkillsContextSection() {
+  const workspaceMounts = useKartonState(
+    useComparingSelector(
+      (s): MountEntry[] => {
+        const seen = new Map<string, MountEntry>();
+
+        for (const agentId in s.toolbox) {
+          const mounts = s.toolbox[agentId]?.workspace?.mounts ?? [];
+          for (const mount of mounts) {
+            if (!seen.has(mount.path)) seen.set(mount.path, mount);
+          }
+        }
+
+        return Array.from(seen.values());
+      },
+      (a, b) => {
+        if (a === b) return true;
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) return false;
+        }
+        return true;
+      },
+    ),
+  );
+  const getContextFiles = useKartonProcedure((p) => p.toolbox.getContextFiles);
   const getContextFilesRef = useRef(getContextFiles);
   getContextFilesRef.current = getContextFiles;
 
@@ -491,23 +517,20 @@ function Page() {
   const hasWorkspaces = workspaceMounts.length > 0;
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">
-            Skills & Context files
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Per-workspace configuration, context files, and skills for the
-            stagewise agent.
-          </p>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-        <div className="mx-auto max-w-3xl">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
+        <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">
+              Skills & Context files
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Per-workspace configuration, context files, and skills for the
+              stagewise agent.
+            </p>
+          </div>
           {!hasWorkspaces ? (
             <div className="rounded-lg border border-derived p-4">
               <p className="text-muted-foreground text-sm">

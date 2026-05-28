@@ -1,7 +1,6 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
-import { useTrack } from '@pages/hooks/use-track';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { useTrack } from '@ui/hooks/use-track';
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 import type {
@@ -35,19 +34,6 @@ import {
 } from 'nucleo-ui-outline-18';
 
 enablePatches();
-
-export const Route = createFileRoute(
-  '/_internal-app/agent-settings/custom-providers',
-)({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'Custom Providers',
-      },
-    ],
-  }),
-});
 
 // =============================================================================
 // Custom Endpoint Components
@@ -284,7 +270,7 @@ function BedrockFields({
             setAwsAuthMode(val as 'access-keys' | 'profile' | 'default-chain')
           }
           items={AWS_AUTH_MODE_OPTIONS}
-          size="sm"
+          size="md"
           triggerClassName="w-full"
         />
       </div>
@@ -329,7 +315,7 @@ function BedrockFields({
               onValueChange={(val) => setAwsProfileName(val ?? '')}
               items={profileItems}
               placeholder="Select a profile..."
-              size="sm"
+              size="md"
               triggerClassName="w-full"
             />
           ) : (
@@ -664,7 +650,9 @@ function CustomEndpointDialog({
   // truth. Reloading every time the user switches to `profile` covers
   // the "user ran `aws configure` in another terminal" flow without
   // forcing them to reopen the dialog.
-  const listAwsProfiles = useKartonProcedure((p) => p.listAwsProfiles);
+  const listAwsProfiles = useKartonProcedure(
+    (p) => p.preferences.listAwsProfiles,
+  );
   const [awsProfiles, setAwsProfiles] = useState<AwsProfileInfo[]>([]);
   const [awsEnvRegion, setAwsEnvRegion] = useState<string | undefined>();
   const [awsProfilesError, setAwsProfilesError] = useState<
@@ -899,7 +887,7 @@ function CustomEndpointDialog({
               value={apiSpec}
               onValueChange={(val) => setApiSpec(val as ApiSpec)}
               items={API_SPEC_OPTIONS}
-              size="sm"
+              size="md"
               triggerClassName="w-full"
             />
           </div>
@@ -1131,15 +1119,15 @@ function CustomEndpointCard({
 
 function CustomEndpointsSection() {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
   const setCustomEndpointApiKey = useKartonProcedure(
-    (s) => s.setCustomEndpointApiKey,
+    (p) => p.preferences.setCustomEndpointApiKey,
   );
   const setCustomEndpointSecretKey = useKartonProcedure(
-    (s) => s.setCustomEndpointSecretKey,
+    (p) => p.preferences.setCustomEndpointSecretKey,
   );
   const setCustomEndpointGoogleCredentials = useKartonProcedure(
-    (s) => s.setCustomEndpointGoogleCredentials,
+    (p) => p.preferences.setCustomEndpointGoogleCredentials,
   );
 
   const endpoints = preferences?.customEndpoints ?? [];
@@ -1318,36 +1306,35 @@ function CustomEndpointsSection() {
 // Page Component
 // =============================================================================
 
-function Page() {
-  const navigate = useNavigate();
+export function CustomProvidersSection() {
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
 
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => navigate({ to: '/agent-settings/models-providers' })}
-          >
-            <IconChevronLeftOutline18 className="size-4" />
-          </Button>
-          <div className="flex flex-col">
-            <h1 className="font-semibold text-foreground text-xl">
-              Custom Providers
-            </h1>
-            <span className="text-muted-foreground text-sm">
-              Add custom API endpoints for self-hosted or third-party LLM
-              services.
-            </span>
-          </div>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
-        <div className="mx-auto max-w-3xl">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
+        <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setSettingsRoute({ section: 'models-providers' })}
+            >
+              <IconChevronLeftOutline18 className="size-4" />
+            </Button>
+            <div className="flex flex-col">
+              <h1 className="font-semibold text-foreground text-xl">
+                Custom Providers
+              </h1>
+              <span className="text-muted-foreground text-sm">
+                Add custom API endpoints for self-hosted or third-party LLM
+                services.
+              </span>
+            </div>
+          </div>
           <CustomEndpointsSection />
         </div>
       </OverlayScrollbar>

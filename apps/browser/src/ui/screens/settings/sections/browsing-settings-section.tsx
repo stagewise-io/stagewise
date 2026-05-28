@@ -1,4 +1,3 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   RadioGroup,
@@ -27,7 +26,7 @@ import {
 
 enablePatches();
 
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { Select } from '@stagewise/stage-ui/components/select';
 import type {
   PageSetting,
@@ -38,17 +37,6 @@ import {
   configurablePermissionTypes,
 } from '@shared/karton-contracts/ui/shared-types';
 
-export const Route = createFileRoute('/_internal-app/browsing-settings/')({
-  component: Page,
-  head: () => ({
-    meta: [
-      {
-        title: 'General',
-      },
-    ],
-  }),
-});
-
 // =============================================================================
 // Search Engine Setting Component
 // =============================================================================
@@ -56,9 +44,11 @@ export const Route = createFileRoute('/_internal-app/browsing-settings/')({
 function SearchEngineSetting() {
   const preferences = useKartonState((s) => s.preferences);
   const searchEngines = useKartonState((s) => s.searchEngines);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
-  const addSearchEngine = useKartonProcedure((s) => s.addSearchEngine);
-  const removeSearchEngine = useKartonProcedure((s) => s.removeSearchEngine);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const addSearchEngine = useKartonProcedure((p) => p.browser.addSearchEngine);
+  const removeSearchEngine = useKartonProcedure(
+    (p) => p.browser.removeSearchEngine,
+  );
 
   const defaultEngineId = preferences.search.defaultEngineId;
 
@@ -72,8 +62,8 @@ function SearchEngineSetting() {
   const [addError, setAddError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const handleDefaultEngineChange = async (value: string) => {
-    const engineId = Number.parseInt(value, 10);
+  const handleDefaultEngineChange = async (value: unknown) => {
+    const engineId = Number.parseInt(String(value), 10);
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.search.defaultEngineId = engineId;
     });
@@ -311,7 +301,7 @@ interface PageSettingProps {
 
 function PageSettingComponent({ type, title, description }: PageSettingProps) {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const pageSetting = preferences.general[type];
 
@@ -332,7 +322,7 @@ function PageSettingComponent({ type, title, description }: PageSettingProps) {
     };
   }, []);
 
-  const handleTypeChange = async (value: string) => {
+  const handleTypeChange = async (value: unknown) => {
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.general[type].type = value as PageSetting['type'];
     });
@@ -448,7 +438,7 @@ const permissionSettingLabels: Record<PermissionSetting, string> = {
 
 function PermissionDefaultsSetting() {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((s) => s.updatePreferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const handlePermissionChange = useCallback(
     async (permissionType: ConfigurablePermissionType, value: string) => {
@@ -555,7 +545,9 @@ function PermissionDefaultsSetting() {
 
 function WebsitePermissionOverrides() {
   const preferences = useKartonState((s) => s.preferences);
-  const navigate = useNavigate();
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
 
   // Collect all unique hosts that have any permission overrides
   const hostsWithOverrides = (() => {
@@ -580,10 +572,7 @@ function WebsitePermissionOverrides() {
   })();
 
   const handleHostClick = (host: string) => {
-    navigate({
-      to: '/browsing-settings/website-permissions',
-      search: { host },
-    });
+    setSettingsRoute({ section: 'website-permissions', host });
   };
 
   if (hostsWithOverrides.length === 0) {
@@ -646,19 +635,16 @@ function WebsitePermissionOverrides() {
 // Main Page Component
 // =============================================================================
 
-function Page() {
+export function BrowsingSettingsSection() {
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Header */}
-      <div className="flex items-center border-border-subtle border-b px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="font-semibold text-foreground text-xl">General</h1>
-        </div>
-      </div>
-
+    <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="flex-1" contentClassName="px-6 pt-6 pb-24">
+      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="font-semibold text-foreground text-xl">General</h1>
+          </div>
           {/* General Section */}
           <section className="space-y-6">
             <div>

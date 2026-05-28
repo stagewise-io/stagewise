@@ -28,10 +28,9 @@ export const DialogContent = ({
     >
       <BaseDialog.Backdrop
         className={cn(
-          'absolute inset-0 z-40 size-full bg-overlay/20 backdrop-blur-xs dark:bg-overlay/50',
+          'absolute inset-0 z-40 size-full bg-overlay/20 dark:bg-overlay/50',
           'transition-all duration-150 ease-out',
           'data-ending-style:opacity-0 data-starting-style:opacity-0',
-          'data-ending-style:backdrop-blur-none data-starting-style:backdrop-blur-none',
         )}
       />
       <BaseDialog.Popup
@@ -39,7 +38,7 @@ export const DialogContent = ({
         className={cn(
           'app-no-drag absolute top-1/2 left-1/2 z-40 -translate-x-1/2 -translate-y-1/2',
           'flex h-full w-full flex-col items-stretch gap-6 p-5',
-          'bg-background text-foreground backdrop-blur-lg',
+          'bg-background text-foreground',
           'border border-border-subtle',
           'duration-150 ease-out',
           'data-ending-style:origin-top data-starting-style:origin-bottom',

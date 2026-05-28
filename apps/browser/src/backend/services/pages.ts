@@ -3,7 +3,6 @@ import type { Logger } from './logger';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { inferMimeType } from '@shared/mime-utils';
 import {
   createKartonServer,
@@ -18,60 +17,39 @@ import {
 } from '@shared/karton-contracts/pages-api';
 import type { PlanEntry } from '@shared/karton-contracts/ui';
 import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
-import type {
-  UserPreferences,
-  Patch,
-  GlobalConfig,
-  ModelProvider,
-  SocialAuthProvider,
-} from '@shared/karton-contracts/ui/shared-types';
-import { validateApiKeys } from '../utils/validate-api-keys';
-import { listAwsProfiles } from '../utils/aws-profiles';
-import type { CodingPlanId } from '@shared/coding-plans';
-import type { OnboardingAuthCompletion } from './experience';
+import type { GlobalConfig } from '@shared/karton-contracts/ui/shared-types';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
-import type { WebDataService } from './webdata';
-import type { UserExperienceService } from './experience';
 import type {
-  HistoryFilter,
-  HistoryResult,
-  FaviconBitmapResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
   PendingEditsResult,
-  AddSearchEngineInput,
-  ContextFilesResult,
   ExternalFileContentResult,
-  CurrentUsageResponse,
-  UsageHistoryResponse,
+  HistoryFilter,
+  HistoryResult,
+  FaviconBitmapResult,
 } from '@shared/karton-contracts/pages-api/types';
 import { DisposableService } from './disposable';
 import type { TelemetryService } from './telemetry';
 import { isUIEventName, parseUIEventProperties } from './telemetry';
-import { discoverPlugins } from '@/utils/discover-plugins';
-import { getPluginsPath, getPlansDir } from '@/utils/paths';
+import { getPlansDir } from '@/utils/paths';
 
 declare const PAGES_VITE_DEV_SERVER_URL: string;
 declare const PAGES_VITE_NAME: string;
 
 /**
- * Service responsible for registering the custom protocol handler for the pages renderer.
- * This service registers the "stagewise" protocol handler on the default browsing session
- * used by tabs, enabling client-side routing and asset serving.
- *
- * Also exposes the PagesApi Karton contract for communication with the pages renderer.
+ * Service responsible for the stagewise:// protocol handler for the pages
+ * renderer (internal pages: history, downloads, diff-review, plans) and the
+ * PagesApi Karton contract for communication with those pages.
  */
 export class PagesService extends DisposableService {
   private readonly logger: Logger;
   private readonly historyService: HistoryService;
   private readonly faviconService: FaviconService;
-  private readonly webDataService?: WebDataService;
   private kartonServer: KartonServer<PagesApiContract>;
   private transport: ElectronServerTransport;
   private portCloseListeners = new Map<MessagePortMain, () => void>();
   private openTabHandler?: (url: string, setActive?: boolean) => Promise<void>;
-  private onSearchEnginesChangeHandler?: () => Promise<void>;
   private getPendingEditsHandler?: (
     agentInstanceId: string,
   ) => Promise<PendingEditsResult>;
@@ -89,48 +67,14 @@ export class PagesService extends DisposableService {
     agentInstanceId: string,
     fileId: string,
   ) => Promise<void>;
-  private getPreferencesHandler?: () => UserPreferences;
-  private updatePreferencesHandler?: (patches: Patch[]) => Promise<void>;
   private clearPermissionExceptionsHandler?: () => Promise<void>;
-  // Auth handlers (delegated to AuthService via main.ts)
-  private sendOtpHandler?: (
-    email: string,
-    turnstileToken: string,
-  ) => Promise<{ error?: string }>;
-  private verifyOtpHandler?: (
-    email: string,
-    code: string,
-  ) => Promise<{ error?: string }>;
-  private signInSocialHandler?: (
-    provider: SocialAuthProvider,
-  ) => Promise<{ error?: string }>;
-  private logoutHandler?: () => Promise<void>;
-  // Home page service dependencies
-  private userExperienceService?: UserExperienceService;
   private trustCertificateAndReloadHandler?: (
     tabId: string,
     origin: string,
   ) => Promise<void>;
-  private setGlobalConfigHandler?: (config: GlobalConfig) => Promise<void>;
-  private importSoundPackHandler?: () => Promise<
-    { id: string; name: string } | { error: string }
-  >;
-  private previewSoundPackHandler?: (
-    packId: string,
-    loudness: 'off' | 'subtle' | 'default',
-  ) => Promise<{ ok: boolean }>;
-  private getContextFilesHandler?: () => Promise<ContextFilesResult>;
-  private generateWorkspaceMdHandler?: (workspacePath: string) => Promise<void>;
   private getExternalFileContentHandler?: (
     oid: string,
   ) => Promise<ExternalFileContentResult | null>;
-  private getUsageCurrentHandler?: () => Promise<CurrentUsageResponse>;
-  private getUsageHistoryHandler?: (params: {
-    days?: number;
-  }) => Promise<UsageHistoryResponse>;
-  // Auto-update handlers (delegated to AutoUpdateService via wiring)
-  private autoUpdateCheckHandler?: () => void;
-  private autoUpdateQuitAndInstallHandler?: () => void;
 
   private readonly telemetryService: TelemetryService;
 
@@ -138,14 +82,12 @@ export class PagesService extends DisposableService {
     logger: Logger,
     historyService: HistoryService,
     faviconService: FaviconService,
-    webDataService: WebDataService | undefined,
     telemetryService: TelemetryService,
   ) {
     super();
     this.logger = logger;
     this.historyService = historyService;
     this.faviconService = faviconService;
-    this.webDataService = webDataService;
     this.telemetryService = telemetryService;
 
     this.transport = new ElectronServerTransport();
@@ -154,20 +96,7 @@ export class PagesService extends DisposableService {
       initialState: defaultState,
       transport: this.transport,
     });
-    this.kartonServer.setState((draft) => {
-      draft.appInfo.otherVersions = { ...process.versions, modules: undefined };
-    });
 
-    discoverPlugins(getPluginsPath()).then((plugins) => {
-      this.kartonServer.setState((draft) => {
-        draft.plugins = plugins;
-      });
-      this.logger.debug(
-        `[PagesService] Discovered ${plugins.length} bundled plugins`,
-      );
-    });
-
-    // Set up initial state
     this.logger.debug(
       '[PagesService] Karton server initialized with MessagePort transport',
     );
@@ -189,14 +118,12 @@ export class PagesService extends DisposableService {
     logger: Logger,
     historyService: HistoryService,
     faviconService: FaviconService,
-    webDataService: WebDataService | undefined,
     telemetryService: TelemetryService,
   ): Promise<PagesService> {
     const instance = new PagesService(
       logger,
       historyService,
       faviconService,
-      webDataService,
       telemetryService,
     );
     await instance.initialize();
@@ -212,8 +139,6 @@ export class PagesService extends DisposableService {
     const ses = session.fromPartition('persist:browser-content');
 
     ses.protocol.handle('stagewise', (request) => {
-      // Normalize the URL - ensure it has an origin (hostname)
-      // "stagewise://" needs an origin to be valid, default to "internal"
       let normalizedRequestUrl = request.url;
       if (
         normalizedRequestUrl === 'stagewise://' ||
@@ -221,7 +146,6 @@ export class PagesService extends DisposableService {
       )
         normalizedRequestUrl = 'stagewise://internal/';
 
-      // Parse URL and check if origin is "internal"
       let url: URL;
       try {
         url = new URL(normalizedRequestUrl);
@@ -229,20 +153,16 @@ export class PagesService extends DisposableService {
         this.logger.error(
           `[PagesService] Failed to parse URL: ${err}. Redirecting to not-found page.`,
         );
-        // Redirect to not-found page for invalid URLs
         return Response.redirect('stagewise://internal/not-found', 302);
       }
 
-      // Only serve the app if the origin (hostname) is "internal"
       if (url.hostname !== 'internal') {
         this.logger.debug(
           `[PagesService] Redirecting request with origin: ${url.hostname} to not-found page. Only "internal" origin is allowed.`,
         );
-        // Redirect to not-found page
         return Response.redirect('stagewise://internal/not-found', 302);
       }
 
-      // In dev mode, forward all requests to the dev server
       if (PAGES_VITE_DEV_SERVER_URL) {
         const pathname = url.pathname || '/';
         const search = url.search || '';
@@ -250,7 +170,6 @@ export class PagesService extends DisposableService {
         return net.fetch(devServerUrl);
       }
 
-      // In production, serve files if they exist, otherwise serve index.html
       const requestPath = url.pathname || '/';
 
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -259,7 +178,6 @@ export class PagesService extends DisposableService {
         `../renderer/${PAGES_VITE_NAME}`,
       );
 
-      // If path is empty or just "/", serve index.html
       if (!requestPath || requestPath === '/') {
         const indexPath = path.resolve(pagesBaseDir, 'index.html');
         const normalizedIndexPath = indexPath.replace(/\\/g, '/');
@@ -267,13 +185,11 @@ export class PagesService extends DisposableService {
         return net.fetch(fileUrl);
       }
 
-      // Remove leading slash and resolve the file path
       const normalizedPath = requestPath.startsWith('/')
         ? requestPath.slice(1)
         : requestPath;
       const filePath = path.resolve(pagesBaseDir, normalizedPath);
 
-      // If file exists, serve it; otherwise serve index.html for client-side routing
       const targetPath = existsSync(filePath)
         ? filePath
         : path.resolve(pagesBaseDir, 'index.html');
@@ -286,17 +202,9 @@ export class PagesService extends DisposableService {
       '[PagesService] Registered stagewise protocol handler for browsing session',
     );
 
-    // Register workspace:// protocol on the browsing session so that
-    // internal pages (stagewise://internal/*) can fetch workspace files.
-    // Origin-gated: only requests originating from stagewise://internal are
-    // allowed; external websites in other tabs get a 403.
+    // workspace:// protocol
     ses.protocol.handle('workspace', async (request) => {
       try {
-        // Gate: block requests from external websites.
-        // Chromium always sends Sec-Fetch-Site, even for subresource
-        // loads (<script>, <img>, etc.) that omit Origin/Referer.
-        // Internal same-session requests are 'same-origin' or absent;
-        // external pages are 'cross-site'.
         const secFetchSite = request.headers.get('Sec-Fetch-Site');
         if (secFetchSite === 'cross-site')
           return new Response('Forbidden', { status: 403 });
@@ -310,7 +218,6 @@ export class PagesService extends DisposableService {
         if (!mountPrefix || !relativePath)
           return new Response('Invalid workspace URL', { status: 400 });
 
-        // Resolve mount prefix to workspace root
         const workspaceRoot = this.findMountPath(mountPrefix);
         if (!workspaceRoot)
           return new Response('Mount not found', { status: 404 });
@@ -340,8 +247,7 @@ export class PagesService extends DisposableService {
       '[PagesService] Registered workspace protocol handler for browsing session',
     );
 
-    // Register plans:// protocol on the browsing session so that
-    // internal pages (stagewise://internal/plan/*) can fetch plan files.
+    // plans:// protocol
     ses.protocol.handle('plans', async (request) => {
       try {
         const secFetchSite = request.headers.get('Sec-Fetch-Site');
@@ -383,44 +289,6 @@ export class PagesService extends DisposableService {
 
   private registerProcedureHandlers(): void {
     this.kartonServer.registerServerProcedureHandler(
-      'getHistory',
-      async (
-        _callingClientId: string,
-        filter: HistoryFilter,
-      ): Promise<HistoryResult[]> => {
-        const historyResults = await this.historyService.queryHistory(filter);
-
-        // Get favicon URLs for all history entries efficiently
-        const pageUrls = historyResults.map((r) => r.url);
-        const faviconMap =
-          await this.faviconService.getFaviconsForUrls(pageUrls);
-
-        // Enrich history results with favicon URLs
-        return historyResults.map((result) => ({
-          ...result,
-          faviconUrl: faviconMap.get(result.url) ?? null,
-        }));
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getFaviconBitmaps',
-      async (
-        _callingClientId: string,
-        faviconUrls: string[],
-      ): Promise<Record<string, FaviconBitmapResult>> => {
-        const bitmapMap =
-          await this.faviconService.getFaviconBitmaps(faviconUrls);
-        // Convert Map to Record for JSON serialization
-        const result: Record<string, FaviconBitmapResult> = {};
-        for (const [url, bitmap] of bitmapMap) {
-          result[url] = bitmap;
-        }
-        return result;
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
       'openTab',
       async (
         _callingClientId: string,
@@ -438,24 +306,51 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
+      'getHistory',
+      async (
+        _callingClientId: string,
+        filter: HistoryFilter,
+      ): Promise<HistoryResult[]> => {
+        const results = await this.historyService.queryHistory(filter);
+        const pageUrls = results.map((result) => result.url);
+        const faviconMap =
+          await this.faviconService.getFaviconsForUrls(pageUrls);
+        return results.map((result) => ({
+          ...result,
+          faviconUrl: faviconMap.get(result.url) ?? null,
+        }));
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'getFaviconBitmaps',
+      async (
+        _callingClientId: string,
+        faviconUrls: string[],
+      ): Promise<Record<string, FaviconBitmapResult>> => {
+        const bitmapMap =
+          await this.faviconService.getFaviconBitmaps(faviconUrls);
+        const result: Record<string, FaviconBitmapResult> = {};
+        for (const [url, bitmap] of bitmapMap) {
+          result[url] = bitmap;
+        }
+        return result;
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
       'openExternalUrl',
       async (_callingClientId: string, url: string): Promise<void> => {
         let parsed: URL;
         try {
           parsed = new URL(url);
         } catch {
-          // Log only length — the raw string is untrusted and may carry
-          // query-string or fragment secrets, and we have no parsed form to
-          // safely strip them.
           this.logger.warn(
             `[PagesService] Rejected openExternalUrl (unparseable, length=${url.length})`,
           );
           return;
         }
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          // Log only scheme and host — pathname can leak sensitive data
-          // for non-HTTP schemes (e.g. mailto: local-part, file: paths),
-          // and search/hash/userinfo can carry tokens.
           this.logger.warn(
             `[PagesService] Rejected openExternalUrl (bad scheme ${parsed.protocol}): ${parsed.protocol}//${parsed.host}`,
           );
@@ -466,9 +361,6 @@ export class PagesService extends DisposableService {
     );
 
     // Bridge pages-renderer telemetry into the backend TelemetryService.
-    // Mirrors the `telemetry.capture` handler on the UI karton so internal
-    // pages (settings, account, etc.) can emit events through the same
-    // validation pipeline.
     this.kartonServer.registerServerProcedureHandler(
       'captureTelemetry',
       async (
@@ -490,156 +382,6 @@ export class PagesService extends DisposableService {
           return;
         }
         this.telemetryService.capture(eventName, parsedProperties);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'clearBrowsingData',
-      async (
-        _callingClientId: string,
-        options: ClearBrowsingDataOptions,
-      ): Promise<ClearBrowsingDataResult> => {
-        this.logger.info('[PagesService] Clear browsing data requested', {
-          history: options.history,
-          favicons: options.favicons,
-          cookies: options.cookies,
-          cache: options.cache,
-          storage: options.storage,
-          indexedDB: options.indexedDB,
-          serviceWorkers: options.serviceWorkers,
-          cacheStorage: options.cacheStorage,
-          permissionExceptions: options.permissionExceptions,
-          timeRange: options.timeRange,
-        });
-
-        try {
-          const result: ClearBrowsingDataResult = {
-            success: true,
-          };
-
-          // Clear history if requested
-          if (options.history) {
-            if (options.timeRange?.start || options.timeRange?.end) {
-              // Range-based clearing
-              const start = options.timeRange.start ?? new Date(0);
-              const end = options.timeRange.end ?? new Date();
-              result.historyEntriesCleared =
-                await this.historyService.clearHistoryRange(start, end);
-            } else {
-              // Clear all history
-              result.historyEntriesCleared =
-                await this.historyService.clearAllData();
-            }
-          }
-
-          // Clear favicons if requested
-          if (options.favicons) {
-            // Clear all favicons
-            result.faviconsCleared = await this.faviconService.clearAllData();
-          } else if (options.history) {
-            // If only history was cleared, clean up orphaned favicons
-            result.faviconsCleared =
-              await this.faviconService.cleanupOrphanedFavicons();
-          }
-
-          // Clear session data (cookies, cache, storage, etc.)
-          const ses = session.fromPartition('persist:browser-content');
-
-          // Clear HTTP cache if requested
-          if (options.cache) {
-            await ses.clearCache();
-            result.cacheCleared = true;
-            this.logger.debug('[PagesService] HTTP cache cleared');
-          }
-
-          // Build storage types to clear
-          const storageTypes: string[] = [];
-          if (options.cookies) storageTypes.push('cookies');
-          if (options.storage) {
-            storageTypes.push('localstorage');
-            // Note: sessionstorage is per-tab and cleared when tab closes
-          }
-          if (options.indexedDB) storageTypes.push('indexdb');
-          if (options.serviceWorkers) storageTypes.push('serviceworkers');
-          if (options.cacheStorage) storageTypes.push('cachestorage');
-
-          // Clear storage data if any types requested
-          if (storageTypes.length > 0) {
-            const clearStorageOptions: Electron.ClearStorageDataOptions = {
-              storages:
-                storageTypes as Electron.ClearStorageDataOptions['storages'],
-            };
-
-            // Apply time range if specified (only for cookies)
-            if (
-              options.cookies &&
-              options.timeRange?.start &&
-              storageTypes.length === 1
-            ) {
-              // Note: clearStorageData doesn't support time-based filtering for all types
-              // For cookies specifically, we can use cookies.remove with date filtering
-              // but clearStorageData is all-or-nothing
-              this.logger.debug(
-                '[PagesService] Time range filtering not fully supported for session storage, clearing all',
-              );
-            }
-
-            await ses.clearStorageData(clearStorageOptions);
-
-            if (options.cookies) result.cookiesCleared = true;
-            if (
-              options.storage ||
-              options.indexedDB ||
-              options.serviceWorkers ||
-              options.cacheStorage
-            ) {
-              result.storageCleared = true;
-            }
-
-            this.logger.debug('[PagesService] Session storage data cleared', {
-              storageTypes,
-            });
-          }
-
-          // Clear permission exceptions if requested
-          if (options.permissionExceptions) {
-            if (this.clearPermissionExceptionsHandler) {
-              await this.clearPermissionExceptionsHandler();
-              result.permissionExceptionsCleared = true;
-              this.logger.debug('[PagesService] Permission exceptions cleared');
-            } else {
-              this.logger.warn(
-                '[PagesService] Permission exceptions clear requested but no handler registered',
-              );
-            }
-          }
-
-          // Run vacuum if requested (default true)
-          if (options.vacuum !== false) {
-            const vacuumPromises: Promise<void>[] = [];
-            if (options.history) {
-              vacuumPromises.push(this.historyService.vacuum());
-            }
-            if (options.favicons) {
-              vacuumPromises.push(this.faviconService.vacuum());
-            }
-            await Promise.all(vacuumPromises);
-          }
-
-          this.logger.info(
-            '[PagesService] Clear browsing data completed',
-            result,
-          );
-          return result;
-        } catch (error) {
-          this.logger.error('[PagesService] Clear browsing data failed', error);
-          this.report(error as Error, 'clearBrowsingData');
-          return {
-            success: false,
-            error:
-              error instanceof Error ? error.message : 'Unknown error occurred',
-          };
-        }
       },
     );
 
@@ -741,123 +483,6 @@ export class PagesService extends DisposableService {
       },
     );
 
-    // Search engine procedures
-    this.kartonServer.registerServerProcedureHandler(
-      'getSearchEngines',
-      async (_callingClientId: string) => {
-        if (!this.webDataService) {
-          this.logger.warn(
-            '[PagesService] getSearchEngines called but webDataService is not available',
-          );
-          return [];
-        }
-        return this.webDataService.getSearchEngines();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'addSearchEngine',
-      async (_callingClientId: string, input: AddSearchEngineInput) => {
-        if (!this.webDataService) {
-          return {
-            success: false as const,
-            error: 'Search engine service not available',
-          };
-        }
-        try {
-          // Convert %s to {searchTerms} for internal storage
-          const internalUrl = input.url.replace(/%s/g, '{searchTerms}');
-
-          const id = await this.webDataService.addSearchEngine({
-            name: input.name,
-            url: internalUrl,
-            keyword: input.keyword,
-          });
-
-          // Sync updated list to state
-          await this.syncSearchEnginesState();
-
-          return { success: true as const, id };
-        } catch (error) {
-          this.logger.error(
-            '[PagesService] Failed to add search engine',
-            error,
-          );
-          this.report(error as Error, 'addSearchEngine');
-          return {
-            success: false as const,
-            error:
-              error instanceof Error
-                ? error.message
-                : 'Failed to add search engine',
-          };
-        }
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'removeSearchEngine',
-      async (_callingClientId: string, id: number) => {
-        if (!this.webDataService) {
-          return {
-            success: false,
-            error: 'Search engine service not available',
-          };
-        }
-        try {
-          const removed = await this.webDataService.removeSearchEngine(id);
-          if (!removed) {
-            return {
-              success: false,
-              error: 'Search engine not found',
-            };
-          }
-
-          // Sync updated list to state
-          await this.syncSearchEnginesState();
-
-          return { success: true };
-        } catch (error) {
-          this.logger.error(
-            '[PagesService] Failed to remove search engine',
-            error,
-          );
-          this.report(error as Error, 'removeSearchEngine');
-          return {
-            success: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : 'Failed to remove search engine',
-          };
-        }
-      },
-    );
-
-    // Home page procedure handlers
-    this.kartonServer.registerServerProcedureHandler(
-      'setHasSeenOnboardingFlow',
-      async (
-        _callingClientId: string,
-        input:
-          | boolean
-          | {
-              value: boolean;
-              auth?: OnboardingAuthCompletion;
-            },
-      ): Promise<void> => {
-        if (!this.userExperienceService) {
-          this.logger.warn(
-            '[PagesService] setHasSeenOnboardingFlow called but UserExperienceService not set',
-          );
-          return;
-        }
-        const value = typeof input === 'boolean' ? input : input.value;
-        const auth = typeof input === 'boolean' ? undefined : input.auth;
-        await this.userExperienceService.setHasSeenOnboardingFlow(value, auth);
-      },
-    );
-
     this.kartonServer.registerServerProcedureHandler(
       'trustCertificateAndReload',
       async (
@@ -874,562 +499,69 @@ export class PagesService extends DisposableService {
         await this.trustCertificateAndReloadHandler(tabId, origin);
       },
     );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'setGlobalConfig',
-      async (_callingClientId: string, config: GlobalConfig): Promise<void> => {
-        if (!this.setGlobalConfigHandler) {
-          this.logger.warn(
-            '[PagesService] setGlobalConfig called but no handler is set',
-          );
-          return;
-        }
-        await this.setGlobalConfigHandler(config);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'importSoundPack',
-      async () => {
-        if (!this.importSoundPackHandler) {
-          this.logger.warn(
-            '[PagesService] importSoundPack called but no handler is set',
-          );
-          return { error: 'Import handler not configured.' };
-        }
-        return await this.importSoundPackHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'previewSoundPack',
-      async (
-        _callingClientId: string,
-        packId: string,
-        loudness: 'off' | 'subtle' | 'default',
-      ) => {
-        if (!this.previewSoundPackHandler) {
-          this.logger.warn(
-            '[PagesService] previewSoundPack called but no handler is set',
-          );
-          return { ok: false };
-        }
-        return await this.previewSoundPackHandler(packId, loudness);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getContextFiles',
-      async (_callingClientId: string): Promise<ContextFilesResult> => {
-        if (!this.getContextFilesHandler) {
-          this.logger.warn(
-            '[PagesService] getContextFiles called but no handler is set',
-          );
-          // Return a default response indicating no workspace
-          return {};
-        }
-        return await this.getContextFilesHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'generateWorkspaceMd',
-      async (
-        _callingClientId: string,
-        workspacePath: string,
-      ): Promise<void> => {
-        if (!this.generateWorkspaceMdHandler) {
-          throw new Error('[PagesService] generateWorkspaceMd handler not set');
-        }
-        await this.generateWorkspaceMdHandler(workspacePath);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getUsageCurrent',
-      async (_callingClientId: string): Promise<CurrentUsageResponse> => {
-        if (!this.getUsageCurrentHandler) {
-          throw new Error('Usage handler not available');
-        }
-        return this.getUsageCurrentHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getUsageHistory',
-      async (
-        _callingClientId: string,
-        params: { days?: number },
-      ): Promise<UsageHistoryResponse> => {
-        if (!this.getUsageHistoryHandler) {
-          throw new Error('Usage handler not available');
-        }
-        return this.getUsageHistoryHandler(params);
-      },
-    );
   }
 
-  /**
-   * Set the handler for opening tabs. This should be called by WindowLayoutService.
-   */
+  // ── Public setter methods (called by wiring) ──
+
   public setOpenTabHandler(
     handler: (url: string, setActive?: boolean) => Promise<void>,
   ): void {
     this.openTabHandler = handler;
   }
 
-  /**
-   * Set the handler called when search engines change.
-   * This allows main.ts to sync search engines to the UI Karton.
-   */
-  public setOnSearchEnginesChangeHandler(handler: () => Promise<void>): void {
-    this.onSearchEnginesChangeHandler = handler;
-  }
-
-  /**
-   * Set the handler for getting pending edits. This should be called by main.ts.
-   */
   public setGetPendingEditsHandler(
     handler: (agentInstanceId: string) => Promise<PendingEditsResult>,
   ): void {
     this.getPendingEditsHandler = handler;
   }
 
-  /**
-   * Set the handler for accepting all pending edits. This should be called by main.ts.
-   */
   public setAcceptAllPendingEditsHandler(
     handler: (agentInstanceId: string) => Promise<void>,
   ): void {
     this.acceptAllPendingEditsHandler = handler;
   }
 
-  /**
-   * Set the handler for rejecting all pending edits. This should be called by main.ts.
-   */
   public setRejectAllPendingEditsHandler(
     handler: (agentInstanceId: string) => Promise<void>,
   ): void {
     this.rejectAllPendingEditsHandler = handler;
   }
 
-  /**
-   * Set the handler for accepting a single pending edit. This should be called by main.ts.
-   */
   public setAcceptPendingEditHandler(
     handler: (agentInstanceId: string, fileId: string) => Promise<void>,
   ): void {
     this.acceptPendingEditHandler = handler;
   }
 
-  /**
-   * Set the handler for rejecting a single pending edit. This should be called by main.ts.
-   */
   public setRejectPendingEditHandler(
     handler: (agentInstanceId: string, fileId: string) => Promise<void>,
   ): void {
     this.rejectPendingEditHandler = handler;
   }
 
-  /**
-   * Set the handler for getting external file content by blob OID.
-   * This should be called by main.ts to wire up to DiffHistoryService.
-   */
   public setGetExternalFileContentHandler(
     handler: (oid: string) => Promise<ExternalFileContentResult | null>,
   ): void {
     this.getExternalFileContentHandler = handler;
   }
 
-  /**
-   * Register handlers for preferences operations.
-   * Called by PreferencesService during initialization.
-   */
-  public registerPreferencesHandlers(
-    getHandler: () => UserPreferences,
-    updateHandler: (patches: Patch[]) => Promise<void>,
-    clearPermissionExceptionsHandler: () => Promise<void>,
-    setProviderApiKeyHandler: (
-      provider: ModelProvider,
-      apiKey: string,
-    ) => Promise<void>,
-    clearProviderApiKeyHandler: (provider: ModelProvider) => Promise<void>,
-    setCustomEndpointApiKeyHandler: (
-      endpointId: string,
-      apiKey: string,
-    ) => Promise<void>,
-    clearCustomEndpointApiKeyHandler: (endpointId: string) => Promise<void>,
-    setCustomEndpointSecretKeyHandler: (
-      endpointId: string,
-      secretKey: string,
-    ) => Promise<void>,
-    setCustomEndpointGoogleCredentialsHandler: (
-      endpointId: string,
-      credentials: string,
-    ) => Promise<void>,
-    connectCodingPlanHandler: (
-      planId: CodingPlanId,
-      apiKey: string,
-    ) => Promise<{ success: true } | { success: false; error: string }>,
-    disconnectProviderHandler: (provider: ModelProvider) => Promise<void>,
-  ): void {
-    this.getPreferencesHandler = getHandler;
-    this.updatePreferencesHandler = updateHandler;
-    this.clearPermissionExceptionsHandler = clearPermissionExceptionsHandler;
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getPreferences',
-      async (_callingClientId: string) => {
-        if (!this.getPreferencesHandler) {
-          throw new Error('Preferences handler not registered');
-        }
-        return this.getPreferencesHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'updatePreferences',
-      async (_callingClientId: string, patches: Patch[]) => {
-        if (!this.updatePreferencesHandler) {
-          throw new Error('Preferences handler not registered');
-        }
-        await this.updatePreferencesHandler(patches);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'setProviderApiKey',
-      async (
-        _callingClientId: string,
-        provider: ModelProvider,
-        apiKey: string,
-      ) => {
-        await setProviderApiKeyHandler(provider, apiKey);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'clearProviderApiKey',
-      async (_callingClientId: string, provider: ModelProvider) => {
-        await clearProviderApiKeyHandler(provider);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'setCustomEndpointApiKey',
-      async (_callingClientId: string, endpointId: string, apiKey: string) => {
-        await setCustomEndpointApiKeyHandler(endpointId, apiKey);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'clearCustomEndpointApiKey',
-      async (_callingClientId: string, endpointId: string) => {
-        await clearCustomEndpointApiKeyHandler(endpointId);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'setCustomEndpointSecretKey',
-      async (
-        _callingClientId: string,
-        endpointId: string,
-        secretKey: string,
-      ) => {
-        await setCustomEndpointSecretKeyHandler(endpointId, secretKey);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'setCustomEndpointGoogleCredentials',
-      async (
-        _callingClientId: string,
-        endpointId: string,
-        credentials: string,
-      ) => {
-        await setCustomEndpointGoogleCredentialsHandler(
-          endpointId,
-          credentials,
-        );
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'listAwsProfiles',
-      async (_callingClientId: string) => {
-        return listAwsProfiles();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'validateProviderApiKey',
-      async (
-        _callingClientId: string,
-        provider: ModelProvider,
-        apiKey: string,
-        baseUrl?: string,
-      ) => {
-        const results = await validateApiKeys({ [provider]: apiKey }, baseUrl);
-        return results[provider];
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'connectCodingPlan',
-      async (
-        _callingClientId: string,
-        planId: CodingPlanId,
-        apiKey: string,
-      ) => {
-        return connectCodingPlanHandler(planId, apiKey);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'disconnectProvider',
-      async (_callingClientId: string, provider: ModelProvider) => {
-        await disconnectProviderHandler(provider);
-      },
-    );
-
-    // Auth procedure handlers
-    this.kartonServer.registerServerProcedureHandler(
-      'sendOtp',
-      async (
-        _callingClientId: string,
-        email: string,
-        turnstileToken: string,
-      ) => {
-        if (!this.sendOtpHandler) {
-          return { error: 'Auth service not available' };
-        }
-        return this.sendOtpHandler(email, turnstileToken);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'verifyOtp',
-      async (_callingClientId: string, email: string, code: string) => {
-        if (!this.verifyOtpHandler) {
-          return { error: 'Auth service not available' };
-        }
-        return this.verifyOtpHandler(email, code);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'signInSocial',
-      async (_callingClientId: string, provider: SocialAuthProvider) => {
-        if (!this.signInSocialHandler) {
-          return { error: 'Auth service not available' };
-        }
-        return this.signInSocialHandler(provider);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'logout',
-      async (_callingClientId: string) => {
-        if (!this.logoutHandler) {
-          return;
-        }
-        await this.logoutHandler();
-      },
-    );
-
-    this.logger.debug('[PagesService] Preferences handlers registered');
-  }
-
-  /**
-   * Register handlers for credential CRUD operations.
-   * Called by main.ts after CredentialsService is available.
-   */
-  public registerCredentialHandlers(
-    setHandler: (typeId: string, data: Record<string, string>) => Promise<void>,
-    deleteHandler: (typeId: string) => Promise<void>,
-    listConfiguredHandler: () => string[],
-  ): void {
-    this.kartonServer.registerServerProcedureHandler(
-      'setCredential',
-      async (
-        _callingClientId: string,
-        typeId: string,
-        data: Record<string, string>,
-      ) => {
-        await setHandler(typeId, data);
-        this.syncConfiguredCredentialIds(listConfiguredHandler);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'deleteCredential',
-      async (_callingClientId: string, typeId: string) => {
-        await deleteHandler(typeId);
-        this.syncConfiguredCredentialIds(listConfiguredHandler);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getConfiguredCredentialIds',
-      async (_callingClientId: string) => {
-        return listConfiguredHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'saveWorkspaceFile',
-      async (
-        _callingClientId: string,
-        mountPrefix: string,
-        relativePath: string,
-        content: string,
-      ) => {
-        const workspaceRoot = this.findMountPath(mountPrefix);
-        if (!workspaceRoot) throw new Error(`Mount not found: ${mountPrefix}`);
-
-        const absolutePath = path.resolve(workspaceRoot, relativePath);
-        if (!absolutePath.startsWith(workspaceRoot + path.sep))
-          throw new Error('Path traversal denied');
-
-        await writeFile(absolutePath, content, 'utf-8');
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'savePlanFile',
-      async (_callingClientId: string, filename: string, content: string) => {
-        const plansDir = getPlansDir();
-        const absolutePath = path.resolve(plansDir, filename);
-        if (!absolutePath.startsWith(plansDir + path.sep))
-          throw new Error('Path traversal denied');
-
-        await writeFile(absolutePath, content, 'utf-8');
-      },
-    );
-
-    this.syncConfiguredCredentialIds(listConfiguredHandler);
-    this.logger.debug('[PagesService] Credential handlers registered');
-  }
-
-  private syncConfiguredCredentialIds(
-    listConfiguredHandler: () => string[],
-  ): void {
-    this.kartonServer.setState((draft) => {
-      draft.configuredCredentialIds = listConfiguredHandler();
-    });
-  }
-
-  /**
-   * Set the UserExperienceService for home page functionality.
-   * This should be called by main.ts after UserExperienceService is created.
-   */
-  public setUserExperienceService(service: UserExperienceService): void {
-    this.userExperienceService = service;
-  }
-
-  /**
-   * Set auth handlers for account management.
-   * This should be called by main.ts to wire up to AuthService.
-   */
-  public setAuthHandlers(handlers: {
-    sendOtp: (
-      email: string,
-      turnstileToken: string,
-    ) => Promise<{ error?: string }>;
-    verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
-    signInSocial: (provider: SocialAuthProvider) => Promise<{ error?: string }>;
-    logout: () => Promise<void>;
-  }): void {
-    this.sendOtpHandler = handlers.sendOtp;
-    this.verifyOtpHandler = handlers.verifyOtp;
-    this.signInSocialHandler = handlers.signInSocial;
-    this.logoutHandler = handlers.logout;
-  }
-
-  /**
-   * Set the handlers for usage data retrieval.
-   * This should be called by pages-handler-wiring to wire up to AuthService.
-   */
-  public setUsageHandlers(handlers: {
-    getUsageCurrent: () => Promise<CurrentUsageResponse>;
-    getUsageHistory: (params: {
-      days?: number;
-    }) => Promise<UsageHistoryResponse>;
-  }): void {
-    this.getUsageCurrentHandler = handlers.getUsageCurrent;
-    this.getUsageHistoryHandler = handlers.getUsageHistory;
-  }
-
-  /**
-   * Sync user account state to the Pages API Karton state.
-   * Called by main.ts when auth state changes.
-   */
-  public syncUserAccountState(
-    state: PagesApiContract['state']['userAccount'],
-  ): void {
-    this.kartonServer.setState((draft) => {
-      draft.userAccount = state;
-    });
-  }
-
-  /**
-   * Set the handler for trusting a certificate and reloading the tab.
-   * This should be called by main.ts to wire up to WindowLayoutService.
-   */
   public setTrustCertificateAndReloadHandler(
     handler: (tabId: string, origin: string) => Promise<void>,
   ): void {
     this.trustCertificateAndReloadHandler = handler;
   }
 
-  /**
-   * Set the handler for setting global config.
-   * This should be called by main.ts to wire up to GlobalConfigService.
-   */
-  public registerGlobalConfigHandler(
-    handler: (config: GlobalConfig) => Promise<void>,
+  public setClearPermissionExceptionsHandler(
+    handler: () => Promise<void>,
   ): void {
-    this.setGlobalConfigHandler = handler;
+    this.clearPermissionExceptionsHandler = handler;
   }
 
-  /** Set the handler for importing a custom sound via a native file dialog. */
-  public registerImportSoundPackHandler(
-    handler: () => Promise<{ id: string; name: string } | { error: string }>,
-  ): void {
-    this.importSoundPackHandler = handler;
-  }
+  // ── State sync methods ──
 
-  /** Set the handler for previewing a sound pack's done sound. */
-  public registerPreviewSoundPackHandler(
-    handler: (
-      packId: string,
-      loudness: 'off' | 'subtle' | 'default',
-    ) => Promise<{ ok: boolean }>,
-  ): void {
-    this.previewSoundPackHandler = handler;
-  }
-
-  /**
-   * Set the handler for getting context files (.stagewise/, AGENTS.md).
-   * This should be called by main.ts to wire up workspace context retrieval.
-   */
-  public setGetContextFilesHandler(
-    handler: () => Promise<ContextFilesResult>,
-  ): void {
-    this.getContextFilesHandler = handler;
-  }
-
-  public setGenerateWorkspaceMdHandler(
-    handler: (workspacePath: string) => Promise<void>,
-  ): void {
-    this.generateWorkspaceMdHandler = handler;
-  }
-
-  public syncWorkspaceMdGeneratingState(
-    generatingByPath: Record<string, boolean>,
-  ): void {
+  public syncGlobalConfigState(config: GlobalConfig): void {
     this.kartonServer.setState((draft) => {
-      draft.workspaceMdGenerating = generatingByPath;
+      draft.globalConfig = config;
     });
   }
 
@@ -1445,68 +577,6 @@ export class PagesService extends DisposableService {
     });
   }
 
-  /**
-   * Resolve a mount prefix to its absolute workspace root path
-   * by looking up the current workspaceMounts state.
-   */
-  private findMountPath(prefix: string): string | null {
-    for (const mount of this.kartonServer.state.workspaceMounts)
-      if (mount.prefix === prefix) return mount.path;
-
-    return null;
-  }
-
-  /**
-   * Sync global config state to the Pages API Karton state.
-   * Called by main.ts when global config changes.
-   */
-  public syncGlobalConfigState(config: GlobalConfig): void {
-    this.kartonServer.setState((draft) => {
-      draft.globalConfig = config;
-    });
-  }
-
-  /**
-   * Sync preferences state to the Pages API Karton state.
-   * Called by PreferencesService when preferences change.
-   */
-  public syncPreferencesState(preferences: UserPreferences): void {
-    this.kartonServer.setState((draft) => {
-      draft.preferences = preferences;
-    });
-  }
-
-  /**
-   * Sync search engines state to the Pages API Karton state.
-   * Called after search engines are added/removed or during initialization.
-   * Also notifies the onSearchEnginesChangeHandler to sync to UI Karton.
-   */
-  public async syncSearchEnginesState(): Promise<void> {
-    if (!this.webDataService) {
-      this.logger.warn(
-        '[PagesService] Cannot sync search engines - webDataService not available',
-      );
-      return;
-    }
-
-    const engines = await this.webDataService.getSearchEngines();
-    this.kartonServer.setState((draft) => {
-      draft.searchEngines = engines;
-    });
-
-    // Notify main.ts to sync to UI Karton as well
-    if (this.onSearchEnginesChangeHandler) {
-      await this.onSearchEnginesChangeHandler();
-    }
-
-    this.logger.debug(
-      `[PagesService] Synced ${engines.length} search engines to state`,
-    );
-  }
-
-  /**
-   * Update the pending edits state for a specific chat. Called when edits change.
-   */
   public updatePendingEditsState(
     agentInstanceId: string,
     edits: FileDiff[],
@@ -1516,169 +586,193 @@ export class PagesService extends DisposableService {
     });
   }
 
-  /**
-   * Accept a new MessagePort connection for the PagesApi contract.
-   *
-   * @param port - The MessagePortMain from the main process side
-   * @returns The connection ID assigned to this port
-   */
+  // ── Port & lifecycle ──
+
+  private findMountPath(prefix: string): string | null {
+    for (const mount of this.kartonServer.state.workspaceMounts)
+      if (mount.prefix === prefix) return mount.path;
+    return null;
+  }
+
   public acceptPort(port: MessagePortMain): string {
-    // Setup close listener for connection monitoring
     const closeListener = () => {
       this.logger.warn('[PagesService] MessagePort closed - connection lost');
       this.portCloseListeners.delete(port);
     };
-
     this.portCloseListeners.set(port, closeListener);
     port.on('close', closeListener);
-
-    // Each internal-page tab gets its own unique connection ID so multiple
-    // tabs on stagewise://internal/ pages can coexist without stealing each
-    // other's port. The karton server broadcasts state to all connections.
     const id = this.transport.setPort(port);
     this.logger.debug(`[PagesService] Accepted port connection: ${id}`);
-
     return id;
   }
 
   /**
-   * Sync auto-update state to the Pages API Karton state.
-   * Called by pages-state-sync when uiKarton autoUpdate state changes.
+   * Clear browsing data. Public method callable from the main UI Karton
+   * handler (preferences.ts) as well.
    */
-  public syncAutoUpdateState(
-    state: PagesApiContract['state']['autoUpdate'],
-  ): void {
-    this.kartonServer.setState((draft) => {
-      draft.autoUpdate = state;
+  async clearBrowsingData(
+    options: ClearBrowsingDataOptions,
+  ): Promise<ClearBrowsingDataResult> {
+    this.logger.info('[PagesService] Clear browsing data requested', {
+      history: options.history,
+      favicons: options.favicons,
+      downloads: options.downloads,
+      cookies: options.cookies,
+      cache: options.cache,
+      storage: options.storage,
+      indexedDB: options.indexedDB,
+      serviceWorkers: options.serviceWorkers,
+      cacheStorage: options.cacheStorage,
+      permissionExceptions: options.permissionExceptions,
+      timeRange: options.timeRange,
     });
+
+    try {
+      const result: ClearBrowsingDataResult = { success: true };
+
+      if (options.history) {
+        if (options.timeRange?.start || options.timeRange?.end) {
+          const start = options.timeRange.start ?? new Date(0);
+          const end = options.timeRange.end ?? new Date();
+          result.historyEntriesCleared =
+            await this.historyService.clearHistoryRange(start, end);
+        } else {
+          result.historyEntriesCleared =
+            await this.historyService.clearAllData();
+        }
+      }
+
+      if (options.downloads) {
+        // Downloads clearing is not time-range scoped — only clear for
+        // "all time" requests to avoid unexpectedly wiping the full
+        // download history when the user expects a limited clear.
+        if (options.timeRange?.start || options.timeRange?.end) {
+          this.logger.debug(
+            '[PagesService] Skipping downloads clear — time-range not supported',
+          );
+        } else {
+          result.downloadsCleared =
+            (await this.historyService.clearDownloads()) > 0;
+        }
+      }
+
+      if (options.favicons) {
+        result.faviconsCleared = await this.faviconService.clearAllData();
+      } else if (options.history) {
+        result.faviconsCleared =
+          await this.faviconService.cleanupOrphanedFavicons();
+      }
+
+      const ses = session.fromPartition('persist:browser-content');
+
+      if (options.cache) {
+        await ses.clearCache();
+        result.cacheCleared = true;
+        this.logger.debug('[PagesService] HTTP cache cleared');
+      }
+
+      const storageTypes: string[] = [];
+      if (options.cookies) storageTypes.push('cookies');
+      if (options.storage) storageTypes.push('localstorage');
+      if (options.indexedDB) storageTypes.push('indexdb');
+      if (options.serviceWorkers) storageTypes.push('serviceworkers');
+      if (options.cacheStorage) storageTypes.push('cachestorage');
+
+      if (storageTypes.length > 0) {
+        const clearStorageOptions: Electron.ClearStorageDataOptions = {
+          storages:
+            storageTypes as Electron.ClearStorageDataOptions['storages'],
+        };
+
+        if (
+          options.cookies &&
+          options.timeRange?.start &&
+          storageTypes.length === 1
+        ) {
+          this.logger.debug(
+            '[PagesService] Time range filtering not fully supported for session storage, clearing all',
+          );
+        }
+
+        await ses.clearStorageData(clearStorageOptions);
+
+        if (options.cookies) result.cookiesCleared = true;
+        if (
+          options.storage ||
+          options.indexedDB ||
+          options.serviceWorkers ||
+          options.cacheStorage
+        ) {
+          result.storageCleared = true;
+        }
+
+        this.logger.debug('[PagesService] Session storage data cleared', {
+          storageTypes,
+        });
+      }
+
+      if (options.permissionExceptions) {
+        if (this.clearPermissionExceptionsHandler) {
+          await this.clearPermissionExceptionsHandler();
+          result.permissionExceptionsCleared = true;
+          this.logger.debug('[PagesService] Permission exceptions cleared');
+        } else {
+          this.logger.warn(
+            '[PagesService] Permission exceptions clear requested but no handler registered',
+          );
+        }
+      }
+
+      if (options.vacuum !== false) {
+        const vacuumPromises: Promise<void>[] = [];
+        if (options.history || options.downloads) {
+          vacuumPromises.push(this.historyService.vacuum());
+        }
+        if (options.favicons) {
+          vacuumPromises.push(this.faviconService.vacuum());
+        }
+        await Promise.all(vacuumPromises);
+      }
+
+      this.logger.info('[PagesService] Clear browsing data completed', result);
+      return result;
+    } catch (error) {
+      this.logger.error('[PagesService] Clear browsing data failed', error);
+      this.report(error as Error, 'clearBrowsingData');
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
   }
 
-  /**
-   * Set auto-update action handlers.
-   * Called by pages-handler-wiring to wire up to AutoUpdateService.
-   */
-  public setAutoUpdateHandlers(handlers: {
-    checkForUpdates: () => void;
-    quitAndInstall: () => void;
-  }): void {
-    this.autoUpdateCheckHandler = handlers.checkForUpdates;
-    this.autoUpdateQuitAndInstallHandler = handlers.quitAndInstall;
-
-    this.kartonServer.registerServerProcedureHandler(
-      'autoUpdate.checkForUpdates',
-      async (_callingClientId: string) => {
-        if (!this.autoUpdateCheckHandler) {
-          this.logger.warn(
-            '[PagesService] autoUpdate.checkForUpdates called but no handler registered',
-          );
-          return;
-        }
-        this.autoUpdateCheckHandler();
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'autoUpdate.quitAndInstall',
-      async (_callingClientId: string) => {
-        if (!this.autoUpdateQuitAndInstallHandler) {
-          this.logger.warn(
-            '[PagesService] autoUpdate.quitAndInstall called but no handler registered',
-          );
-          return;
-        }
-        this.autoUpdateQuitAndInstallHandler();
-      },
-    );
-  }
-
-  /**
-   * Close all connections and clean up resources.
-   */
   protected async onTeardown(): Promise<void> {
     this.logger.debug('[PagesService] Tearing down...');
 
-    // Unregister procedure handlers
-    this.kartonServer.removeServerProcedureHandler('getHistory');
-    this.kartonServer.removeServerProcedureHandler('getFaviconBitmaps');
     this.kartonServer.removeServerProcedureHandler('openTab');
     this.kartonServer.removeServerProcedureHandler('openExternalUrl');
     this.kartonServer.removeServerProcedureHandler('captureTelemetry');
-    this.kartonServer.removeServerProcedureHandler('clearBrowsingData');
     this.kartonServer.removeServerProcedureHandler('getPendingEdits');
     this.kartonServer.removeServerProcedureHandler('acceptAllPendingEdits');
     this.kartonServer.removeServerProcedureHandler('rejectAllPendingEdits');
     this.kartonServer.removeServerProcedureHandler('acceptPendingEdit');
     this.kartonServer.removeServerProcedureHandler('rejectPendingEdit');
     this.kartonServer.removeServerProcedureHandler('getExternalFileContent');
-    this.kartonServer.removeServerProcedureHandler('getPreferences');
-    this.kartonServer.removeServerProcedureHandler('updatePreferences');
-    this.kartonServer.removeServerProcedureHandler('getSearchEngines');
-    this.kartonServer.removeServerProcedureHandler('addSearchEngine');
-    this.kartonServer.removeServerProcedureHandler('removeSearchEngine');
-    this.kartonServer.removeServerProcedureHandler('setHasSeenOnboardingFlow');
     this.kartonServer.removeServerProcedureHandler('trustCertificateAndReload');
-    this.kartonServer.removeServerProcedureHandler('setGlobalConfig');
-    this.kartonServer.removeServerProcedureHandler('importSoundPack');
-    this.kartonServer.removeServerProcedureHandler('previewSoundPack');
-    this.kartonServer.removeServerProcedureHandler('getContextFiles');
-    this.kartonServer.removeServerProcedureHandler('generateWorkspaceMd');
-    this.kartonServer.removeServerProcedureHandler('setProviderApiKey');
-    this.kartonServer.removeServerProcedureHandler('clearProviderApiKey');
-    this.kartonServer.removeServerProcedureHandler('setCustomEndpointApiKey');
-    this.kartonServer.removeServerProcedureHandler('clearCustomEndpointApiKey');
-    this.kartonServer.removeServerProcedureHandler(
-      'setCustomEndpointSecretKey',
-    );
-    this.kartonServer.removeServerProcedureHandler(
-      'setCustomEndpointGoogleCredentials',
-    );
-    this.kartonServer.removeServerProcedureHandler('listAwsProfiles');
-    this.kartonServer.removeServerProcedureHandler('validateProviderApiKey');
-    this.kartonServer.removeServerProcedureHandler('connectCodingPlan');
-    this.kartonServer.removeServerProcedureHandler('disconnectProvider');
-    this.kartonServer.removeServerProcedureHandler('sendOtp');
-    this.kartonServer.removeServerProcedureHandler('verifyOtp');
-    this.kartonServer.removeServerProcedureHandler('signInSocial');
-    this.kartonServer.removeServerProcedureHandler('logout');
 
-    this.kartonServer.removeServerProcedureHandler('getUsageCurrent');
-    this.kartonServer.removeServerProcedureHandler('getUsageHistory');
-    this.kartonServer.removeServerProcedureHandler('setCredential');
-    this.kartonServer.removeServerProcedureHandler('deleteCredential');
-    this.kartonServer.removeServerProcedureHandler(
-      'getConfiguredCredentialIds',
-    );
-    this.kartonServer.removeServerProcedureHandler(
-      'autoUpdate.checkForUpdates',
-    );
-    this.kartonServer.removeServerProcedureHandler('autoUpdate.quitAndInstall');
-
-    // Unregister the protocol handler from the browsing session
     const ses = session.fromPartition('persist:browser-content');
     ses.protocol.unhandle('stagewise');
+    ses.protocol.unhandle('workspace');
     ses.protocol.unhandle('plans');
 
-    // Clean up all port close listeners
-    this.autoUpdateCheckHandler = undefined;
-    this.autoUpdateQuitAndInstallHandler = undefined;
     for (const [port, listener] of this.portCloseListeners.entries()) {
       port.off('close', listener);
     }
     this.portCloseListeners.clear();
     this.openTabHandler = undefined;
-    this.userExperienceService = undefined;
     this.trustCertificateAndReloadHandler = undefined;
-    this.importSoundPackHandler = undefined;
-    this.getContextFilesHandler = undefined;
-    this.generateWorkspaceMdHandler = undefined;
     this.getExternalFileContentHandler = undefined;
-
-    this.getUsageCurrentHandler = undefined;
-    this.getUsageHistoryHandler = undefined;
-    this.sendOtpHandler = undefined;
-    this.verifyOtpHandler = undefined;
-    this.signInSocialHandler = undefined;
-    this.logoutHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');
