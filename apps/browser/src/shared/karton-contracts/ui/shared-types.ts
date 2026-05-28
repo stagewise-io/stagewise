@@ -678,6 +678,7 @@ export const defaultUserPreferences: UserPreferences = {
   agent: {
     workspaceSettings: {},
     disabledModelIds: [
+      'claude-opus-4.7',
       'claude-opus-4.6',
       'kimi-k2.5',
       'gpt-5.4',
