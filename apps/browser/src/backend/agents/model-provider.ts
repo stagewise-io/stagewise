@@ -31,8 +31,8 @@ type ProviderOptions = Parameters<typeof streamText>[0]['providerOptions'];
 
 /**
  * Converts an OpenRouter-style Anthropic model ID (dots in version, e.g.
- * `claude-opus-4.7`) to the native Anthropic API format (hyphens, e.g.
- * `claude-opus-4-7`). Idempotent on IDs that already use hyphens.
+ * `claude-opus-4.8`) to the native Anthropic API format (hyphens, e.g.
+ * `claude-opus-4-8`). Idempotent on IDs that already use hyphens.
  */
 function toNativeAnthropicModelId(modelId: string): string {
   return modelId.replace(/\./g, '-');

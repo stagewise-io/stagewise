@@ -55,7 +55,7 @@
 
 利用可能なモデル:
 
-- **Anthropic**: Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5
+- **Anthropic**: Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5
 - **OpenAI**: GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
 - **Google**: Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
 - **Moonshot AI**: Kimi K2.6, Kimi K2.5

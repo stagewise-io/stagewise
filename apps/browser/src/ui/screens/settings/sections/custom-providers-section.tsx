@@ -136,13 +136,14 @@ function resolveEffectiveBedrockRegion(args: {
  * inference profile identifiers as published in Anthropic's Bedrock
  * reference (docs.anthropic.com → Models overview → Bedrock column).
  *
- * Note: the 4.6/4.7 generation uses short-form IDs without a date or
+ * Note: the 4.6/4.7/4.8 generation uses short-form IDs without a date or
  * `-v1:0` suffix — that is intentional on Anthropic's side, not a
  * placeholder. Older models (4.5 and earlier) still carry the dated,
  * versioned form.
  */
 function buildSuggestedBedrockMapping(prefix: string): string {
   const mapping: Record<string, string> = {
+    'claude-opus-4.8': `${prefix}anthropic.claude-opus-4-8`,
     'claude-opus-4.7': `${prefix}anthropic.claude-opus-4-7`,
     'claude-opus-4.6': `${prefix}anthropic.claude-opus-4-6-v1`,
     'claude-sonnet-4.6': `${prefix}anthropic.claude-sonnet-4-6`,
@@ -976,7 +977,7 @@ function CustomEndpointDialog({
             <textarea
               className="scrollbar-subtle w-full resize-y rounded-lg border border-derived p-2 font-mono text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-muted-foreground/35"
               rows={8}
-              placeholder='{"claude-opus-4.7": "anthropic.claude-opus-4-7"}'
+              placeholder='{"claude-opus-4.8": "anthropic.claude-opus-4-8"}'
               value={modelIdMappingJson}
               onChange={(e) => {
                 setModelIdMappingJson(e.target.value);
