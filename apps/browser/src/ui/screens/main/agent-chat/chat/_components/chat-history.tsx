@@ -20,6 +20,7 @@ import { useAutoScroll } from '@ui/hooks/use-auto-scroll';
 import { EmptyChatSuggestions } from './empty-chat-suggestions';
 import { useMessageEditState } from '@ui/hooks/use-message-edit-state';
 import { useScrollbarWidth } from '@ui/hooks/use-scrollbar-width';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import { AttachmentMetadataProvider } from '@ui/hooks/use-attachment-metadata';
 import { MountedPathsProvider } from '@ui/hooks/use-mounted-paths';
 import { MessageBrowserContextProvider } from '@ui/hooks/use-message-browser-context';
@@ -368,28 +369,32 @@ export const ChatHistory = () => {
   // Track container height to set the spacer
   useEffect(() => {
     let rafId: number;
-    let resizeObserver: ResizeObserver | null = null;
+    let disconnectResizeObserver: (() => void) | null = null;
     const checkViewport = () => {
       if (!scroller) {
         rafId = requestAnimationFrame(checkViewport);
         return;
       }
-      resizeObserver = new ResizeObserver((entries) => {
+      const { observer, disconnect } = createRafResizeObserver((entries) => {
         for (const entry of entries) {
           const newHeight = entry.contentRect.height;
           const newWidth = entry.contentRect.width;
           containerHeightRef.current = newHeight;
-          setContainerHeight(newHeight);
-          setContainerWidth(newWidth);
+          setContainerHeight((prev) => {
+            if (prev === newHeight) return prev;
+            return newHeight;
+          });
+          setContainerWidth((prev) => (prev === newWidth ? prev : newWidth));
           if (isAutoScrollEnabled()) updateSpacerHeight();
         }
       });
-      resizeObserver.observe(scroller);
+      disconnectResizeObserver = disconnect;
+      observer.observe(scroller);
     };
     checkViewport();
     return () => {
       cancelAnimationFrame(rafId);
-      resizeObserver?.disconnect();
+      disconnectResizeObserver?.();
     };
   }, [isAutoScrollEnabled, scrollToBottom, scroller]);
 
@@ -882,7 +887,7 @@ export const ChatHistory = () => {
   const showBetweenStepsIndicator = useMemo(() => {
     if (!isWorking) return false;
     const lastMessage = filteredMessages[filteredMessages.length - 1];
-    if (!lastMessage || lastMessage.role !== 'assistant') return false;
+    if (lastMessage?.role !== 'assistant') return false;
     if (isEmptyAssistantMessage(lastMessage)) return false;
     return areAllPartsSettled(lastMessage);
   }, [isWorking, filteredMessages]);

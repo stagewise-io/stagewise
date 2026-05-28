@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import { AgentCard, type AgentCardProps } from './agent-card';
 import {
   AgentPreviewPanel,
@@ -258,17 +259,18 @@ export function AgentCardWithPreview({
     });
     window.addEventListener('resize', onResize, { passive: true });
 
-    let ro: ResizeObserver | null = null;
+    let disconnectResizeObserver: (() => void) | null = null;
     const panel = panelRef.current;
     if (panel) {
-      ro = new ResizeObserver(() => computePosition());
-      ro.observe(panel);
+      const { observer, disconnect } = createRafResizeObserver(computePosition);
+      disconnectResizeObserver = disconnect;
+      observer.observe(panel);
     }
 
     return () => {
       window.removeEventListener('scroll', onScroll, { capture: true });
       window.removeEventListener('resize', onResize);
-      ro?.disconnect();
+      disconnectResizeObserver?.();
     };
   }, [isOpen, computePosition]);
 

@@ -28,6 +28,7 @@ import {
 import { FileDiffSection, formatFileDiff } from './file-diff-section';
 import { MessageQueueSection } from './message-queue-section';
 import { AttachmentMetadataProvider } from '@ui/hooks/use-attachment-metadata';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import { MountedPathsProvider } from '@ui/hooks/use-mounted-paths';
 import {
   WorkspaceMdStatusSection,
@@ -671,20 +672,22 @@ export function StatusCard() {
     previousHeightRef.current = initialHeight;
 
     // Only dispatch events on actual resize changes (not initial mount)
-    const resizeObserver = new ResizeObserver(() => {
-      const height = hasContent ? card.offsetHeight : 0;
+    const { observer: resizeObserver, disconnect: disconnectResizeObserver } =
+      createRafResizeObserver(() => {
+        const height = hasContent ? card.offsetHeight : 0;
+        if (previousHeightRef.current === height) return;
 
-      document.documentElement.style.setProperty(
-        '--status-card-height',
-        `${height}px`,
-      );
+        document.documentElement.style.setProperty(
+          '--status-card-height',
+          `${height}px`,
+        );
 
-      previousHeightRef.current = height;
-    });
+        previousHeightRef.current = height;
+      });
     resizeObserver.observe(card);
 
     return () => {
-      resizeObserver.disconnect();
+      disconnectResizeObserver();
       document.documentElement.style.setProperty('--status-card-height', '0px');
     };
   }, [items.length]);

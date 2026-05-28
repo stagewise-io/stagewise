@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2Icon, LinkIcon } from 'lucide-react';
 import { IconChevronRightOutline18 } from 'nucleo-ui-outline-18';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -403,20 +404,30 @@ export function HistorySection() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
-      }
-    });
+
+    const { observer: resizeObserver, disconnect: disconnectResizeObserver } =
+      createRafResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerSize((prev) => {
+            const next = {
+              width: entry.contentRect.width,
+              height: entry.contentRect.height,
+            };
+            if (prev.width === next.width && prev.height === next.height) {
+              return prev;
+            }
+            return next;
+          });
+        }
+      });
+
     resizeObserver.observe(container);
     setContainerSize({
       width: container.clientWidth,
       height: container.clientHeight,
     });
-    return () => resizeObserver.disconnect();
+
+    return () => disconnectResizeObserver();
   }, []);
 
   // Fetch favicon bitmaps for a batch of history results

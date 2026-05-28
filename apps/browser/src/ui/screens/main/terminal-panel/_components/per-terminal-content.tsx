@@ -6,6 +6,7 @@ import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import '@xterm/xterm/css/xterm.css';
 
 const BASE_FONT_SIZE = 13;
@@ -244,14 +245,39 @@ export function PerTerminalContent({
     });
 
     term.loadAddon(fitAddon);
-    try {
-      term.loadAddon(new WebglAddon());
-    } catch {
-      // Fall back to the default renderer if WebGL is unavailable.
-    }
 
     let aborted = false;
     let fitTimer = 0;
+    let webglRestoreTimer = 0;
+    let webglAddon: WebglAddon | null = null;
+
+    const disposeWebglAddon = () => {
+      webglAddon?.dispose();
+      webglAddon = null;
+    };
+
+    const loadWebglAddon = () => {
+      if (aborted || webglAddon) return;
+
+      let addon: WebglAddon | null = null;
+      try {
+        addon = new WebglAddon();
+        addon.onContextLoss(() => {
+          disposeWebglAddon();
+          if (aborted) return;
+
+          webglRestoreTimer = window.setTimeout(() => {
+            webglRestoreTimer = 0;
+            loadWebglAddon();
+          }, 1000);
+        });
+        term.loadAddon(addon);
+        webglAddon = addon;
+      } catch {
+        addon?.dispose();
+        disposeWebglAddon();
+      }
+    };
 
     const init = async () => {
       await document.fonts.ready;
@@ -273,6 +299,7 @@ export function PerTerminalContent({
 
       term.open(container);
       terminalRef.current = term;
+      loadWebglAddon();
 
       if (
         isActiveRef.current &&
@@ -307,6 +334,11 @@ export function PerTerminalContent({
 
     return () => {
       aborted = true;
+      if (webglRestoreTimer !== 0) {
+        window.clearTimeout(webglRestoreTimer);
+        webglRestoreTimer = 0;
+      }
+      disposeWebglAddon();
       term.dispose();
       if (terminalRef.current === term) {
         terminalRef.current = null;
@@ -384,7 +416,7 @@ export function PerTerminalContent({
     const container = containerRef.current;
     if (!container) return;
 
-    const observer = new ResizeObserver(() => {
+    const { observer, disconnect } = createRafResizeObserver(() => {
       const term = terminalRef.current;
       const fit = fitAddonRef.current;
       if (!term || !fit) return;
@@ -399,7 +431,7 @@ export function PerTerminalContent({
     });
 
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => disconnect();
   }, [terminalId]);
 
   return (

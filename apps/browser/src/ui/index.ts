@@ -31,15 +31,31 @@ import posthog from 'posthog-js';
 import '@ui/app.css';
 import { App } from '@ui/app';
 import { initThemeColorSync } from '@ui/utils/theme-color-sync';
+import { containsResizeObserverLoopError } from '@ui/utils/resize-observer';
 
 // Register global Turnstile solver for cross-context token proxy.
 // Must live in the UI renderer (not pages) because vite.ui.config.ts
 // has envDir set to read VITE_TURNSTILE_SITE_KEY from apps/browser/.env.
 import '@ui/services/turnstile-solver';
 
+function errorFromErrorEvent(event: ErrorEvent) {
+  if (event.error instanceof Error) return event.error;
+
+  const message = event.message || 'Unknown renderer error';
+  return new Error(message);
+}
+
 // Global safety net: capture unhandled errors and rejections to PostHog
 window.addEventListener('error', (event) => {
-  posthog.captureException(event.error ?? event, {
+  if (
+    containsResizeObserverLoopError(event.error) ||
+    containsResizeObserverLoopError(event.message)
+  ) {
+    event.preventDefault();
+    return;
+  }
+
+  posthog.captureException(errorFromErrorEvent(event), {
     source: 'renderer',
     handler: 'globalOnError',
     message: event.message,
