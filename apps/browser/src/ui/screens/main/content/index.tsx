@@ -247,7 +247,7 @@ export function MainSection({
   // Ref-based reads prevent stale closures so the effect always sees
   // current Karton state even when lazily-created tabs land between
   // the agent switch and the next render.
-  const prevOpenAgentRef = useRef<string | null>(null);
+  const prevOpenAgentRef = useRef(openAgent);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const globalOrderRef = useRef(globalOrder);
@@ -259,64 +259,99 @@ export function MainSection({
   const lastActiveTabPerAgentRef = useRef(lastActiveTabPerAgent);
   lastActiveTabPerAgentRef.current = lastActiveTabPerAgent;
 
+  const isActiveTabVisibleForAgent = useCallback((agentId: string) => {
+    const curActiveId = activeTabIdRef.current;
+    if (!curActiveId) return false;
+
+    const currentTab = tabsRef.current[curActiveId];
+    if (!currentTab) return false;
+
+    return (
+      currentTab.agentInstanceId === null ||
+      currentTab.agentInstanceId === agentId
+    );
+  }, []);
+
+  const reconcileActiveTabForAgent = useCallback(
+    (agentId: string) => {
+      const curTabs = tabsRef.current;
+      const curActiveId = activeTabIdRef.current;
+      const curLastActive = lastActiveTabPerAgentRef.current;
+      const curGlobalOrder = globalOrderRef.current;
+      const curAgentOrders = agentOrdersRef.current;
+
+      // Bail only if the current tab is explicitly for this agent.
+      // A global tab is "visible" everywhere but we still want to
+      // switch to a remembered agent-specific tab when available.
+      if (curActiveId && curTabs[curActiveId]) {
+        const currentTab = curTabs[curActiveId];
+        if (currentTab.agentInstanceId === agentId) return;
+      }
+
+      // Need to switch — collect visible tab IDs for the agent
+      const visibleIds = [
+        ...curGlobalOrder.filter((id) => curTabs[id]?.agentInstanceId === null),
+        ...(curAgentOrders[agentId] ?? []).filter(
+          (id) => curTabs[id]?.agentInstanceId === agentId,
+        ),
+      ];
+
+      // Prefer previously active tab for this agent
+      const prevActive = curLastActive[agentId];
+      if (
+        prevActive &&
+        curTabs[prevActive] &&
+        visibleIds.includes(prevActive)
+      ) {
+        switchTab(prevActive);
+        return;
+      }
+
+      // Prefer any agent-specific tab
+      const agentTab = visibleIds.find(
+        (id) => curTabs[id]?.agentInstanceId === agentId,
+      );
+      if (agentTab) {
+        switchTab(agentTab);
+        return;
+      }
+
+      // Prefer any global tab
+      const globalTab = visibleIds.find(
+        (id) => curTabs[id]?.agentInstanceId === null,
+      );
+      if (globalTab) {
+        switchTab(globalTab);
+        return;
+      }
+
+      // No visible tabs for this agent — do nothing;
+      // effectiveActiveTabId derived below will show empty state.
+    },
+    [switchTab],
+  );
+
   useEffect(() => {
     const prevAgent = prevOpenAgentRef.current;
     prevOpenAgentRef.current = openAgent;
 
-    // Only react to actual agent changes
-    if (prevAgent === openAgent) return;
     if (!openAgent) return;
 
-    const curTabs = tabsRef.current;
-    const curActiveId = activeTabIdRef.current;
-    const curLastActive = lastActiveTabPerAgentRef.current;
-    const curGlobalOrder = globalOrderRef.current;
-    const curAgentOrders = agentOrdersRef.current;
-
-    // Bail only if the current tab is explicitly for this agent.
-    // A global tab is "visible" everywhere but we still want to
-    // switch to a remembered agent-specific tab when available.
-    if (curActiveId && curTabs[curActiveId]) {
-      const currentTab = curTabs[curActiveId];
-      if (currentTab.agentInstanceId === openAgent) return;
-    }
-
-    // Need to switch — collect visible tab IDs for the new agent
-    const visibleIds = [
-      ...curGlobalOrder.filter((id) => curTabs[id]?.agentInstanceId === null),
-      ...(openAgent ? (curAgentOrders[openAgent] ?? []) : []).filter(
-        (id) => curTabs[id]?.agentInstanceId === openAgent,
-      ),
-    ];
-
-    // Prefer previously active tab for this agent
-    const prevActive = curLastActive[openAgent];
-    if (prevActive && curTabs[prevActive] && visibleIds.includes(prevActive)) {
-      switchTab(prevActive);
+    if (prevAgent === openAgent) {
+      if (!isActiveTabVisibleForAgent(openAgent)) {
+        reconcileActiveTabForAgent(openAgent);
+      }
       return;
     }
 
-    // Prefer any agent-specific tab
-    const agentTab = visibleIds.find(
-      (id) => curTabs[id]?.agentInstanceId === openAgent,
-    );
-    if (agentTab) {
-      switchTab(agentTab);
-      return;
-    }
-
-    // Prefer any global tab
-    const globalTab = visibleIds.find(
-      (id) => curTabs[id]?.agentInstanceId === null,
-    );
-    if (globalTab) {
-      switchTab(globalTab);
-      return;
-    }
-
-    // No visible tabs for this agent — do nothing;
-    // effectiveActiveTabId derived below will show empty state.
-  }, [openAgent, switchTab, globalOrder, agentOrders]);
+    reconcileActiveTabForAgent(openAgent);
+  }, [
+    openAgent,
+    isActiveTabVisibleForAgent,
+    reconcileActiveTabForAgent,
+    globalOrder,
+    agentOrders,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Optimistic tab order

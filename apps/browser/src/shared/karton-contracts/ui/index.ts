@@ -1280,7 +1280,7 @@ export type KartonContract = {
       createTerminal: (
         cwd?: string,
         agentInstanceId?: string | null,
-      ) => Promise<void>;
+      ) => Promise<string | null>;
       /** Write keystroke data to a terminal's PTY. */
       terminalInput: (terminalId: string, data: string) => Promise<void>;
       /** Resize a terminal's PTY dimensions. */

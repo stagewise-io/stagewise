@@ -17,7 +17,7 @@ export function AgentHotkeyBindings({
   onCreateTerminalTab,
 }: {
   onCreateTab: () => void;
-  onCreateTerminalTab: () => void;
+  onCreateTerminalTab: () => Promise<string | null>;
 }) {
   // -- Content panel toggle (Mod+Alt+B) ----------------------------------
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
@@ -36,9 +36,12 @@ export function AgentHotkeyBindings({
   // -- Tab management (per-agent) ---------------------------------------
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
+  const globalOrder = useKartonState((s) => s.contentTabs.globalOrder);
+  const agentOrders = useKartonState((s) => s.contentTabs.agentOrders);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
-  const { removeTabUiState } = useTabUIState();
+  const { tabUiState, requestTerminalFocus, removeTabUiState } =
+    useTabUIState();
 
   // Mod+T: new tab (attached to current agent, opens content panel)
   const [openAgent] = useOpenAgent();
@@ -51,11 +54,16 @@ export function AgentHotkeyBindings({
     agentHotkeysEnabled,
   );
 
+  const createTerminalTabSafely = useCallback(
+    () => onCreateTerminalTab().catch(() => null),
+    [onCreateTerminalTab],
+  );
+
   // Mod+Alt+T: new terminal tab
   useHotKeyListener(
     () => {
       if (contentCollapsed) setContentCollapsed(false);
-      onCreateTerminalTab();
+      void createTerminalTabSafely();
     },
     HotkeyActions.NEW_TERMINAL_TAB,
     agentHotkeysEnabled,
@@ -73,12 +81,41 @@ export function AgentHotkeyBindings({
   );
 
   // -- Content panel tab navigation (Mod+Alt+PageDown / Mod+Alt+PageUp) --
-  // Only tabs visible for the current agent (global + agent-attached).
-  const visibleTabIds = Object.keys(tabs).filter(
-    (id) =>
-      tabs[id]?.agentInstanceId === null ||
-      tabs[id]?.agentInstanceId === openAgent,
+  // Only tabs visible for the current agent (global + agent-attached), in
+  // the same order as the rendered tab bar.
+  const visibleTabIds = [
+    ...globalOrder.filter((id) => tabs[id]?.agentInstanceId === null),
+    ...(openAgent ? (agentOrders[openAgent] ?? []) : []).filter(
+      (id) => tabs[id]?.agentInstanceId === openAgent,
+    ),
+  ];
+  const visibleTerminalIds = visibleTabIds.filter(
+    (id) => tabs[id]?.type === 'terminal',
   );
+
+  const focusTerminal = useCallback(
+    (terminalId: string) => {
+      void switchTab(terminalId);
+      requestTerminalFocus(terminalId);
+    },
+    [requestTerminalFocus, switchTab],
+  );
+
+  const getNextTerminalId = useCallback(() => {
+    if (visibleTerminalIds.length === 0) return null;
+    if (!activeTabId) return visibleTerminalIds[0] ?? null;
+
+    const activeVisibleIndex = visibleTabIds.indexOf(activeTabId);
+    if (activeVisibleIndex === -1) return visibleTerminalIds[0] ?? null;
+
+    return (
+      visibleTerminalIds.find(
+        (terminalId) => visibleTabIds.indexOf(terminalId) > activeVisibleIndex,
+      ) ??
+      visibleTerminalIds[0] ??
+      null
+    );
+  }, [activeTabId, visibleTabIds, visibleTerminalIds]);
 
   const switchToTabByIndex = useCallback(
     (index: number) => {
@@ -86,6 +123,52 @@ export function AgentHotkeyBindings({
       if (id) void switchTab(id);
     },
     [visibleTabIds, switchTab],
+  );
+
+  useHotKeyListener(
+    () => {
+      const activeTab = activeTabId ? tabs[activeTabId] : undefined;
+      const activeTabIsVisibleTerminal =
+        !!activeTabId &&
+        activeTab?.type === 'terminal' &&
+        visibleTerminalIds.includes(activeTabId);
+      const activeTerminalFocused =
+        !!activeTabId &&
+        tabUiState[activeTabId]?.focusedPanel === 'tab-content';
+      const nextTerminalId = getNextTerminalId();
+
+      if (visibleTerminalIds.length === 0) {
+        if (contentCollapsed) setContentCollapsed(false);
+        void createTerminalTabSafely().then((terminalId) => {
+          if (terminalId) requestTerminalFocus(terminalId);
+        });
+        return;
+      }
+
+      if (contentCollapsed) {
+        setContentCollapsed(false);
+        focusTerminal(
+          activeTabIsVisibleTerminal
+            ? activeTabId
+            : (nextTerminalId ?? visibleTerminalIds[0]!),
+        );
+        return;
+      }
+
+      if (activeTabIsVisibleTerminal && activeTerminalFocused) {
+        setContentCollapsed(true);
+        return;
+      }
+
+      if (activeTabIsVisibleTerminal) {
+        requestTerminalFocus(activeTabId);
+        return;
+      }
+
+      if (nextTerminalId) focusTerminal(nextTerminalId);
+    },
+    HotkeyActions.FOCUS_OR_TOGGLE_TERMINAL,
+    agentHotkeysEnabled,
   );
 
   const cycleTab = useCallback(

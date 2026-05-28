@@ -62,6 +62,7 @@ export enum HotkeyActions {
   // Tab & window navigation
   NEW_TAB = 'new_tab',
   NEW_TERMINAL_TAB = 'new_terminal_tab',
+  FOCUS_OR_TOGGLE_TERMINAL = 'focus_or_toggle_terminal',
   CLOSE_TAB = 'close_tab',
   NEXT_TAB = 'next_tab',
   PREV_TAB = 'prev_tab',
@@ -197,6 +198,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.NEW_TERMINAL_TAB]: {
     accelerator: 'Mod+Alt+T',
+    captureDominantly: true,
+  },
+  [HotkeyActions.FOCUS_OR_TOGGLE_TERMINAL]: {
+    accelerator: 'Ctrl+Backquote',
     captureDominantly: true,
   },
   [HotkeyActions.CLOSE_TAB]: {

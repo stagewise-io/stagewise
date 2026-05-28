@@ -473,7 +473,7 @@ export class TerminalService extends DisposableService {
         cwd?: string,
         agentInstanceId?: string | null,
       ) => {
-        await this.handleCreateTerminal(cwd, agentInstanceId);
+        return await this.handleCreateTerminal(cwd, agentInstanceId);
       },
     );
 
@@ -558,8 +558,8 @@ export class TerminalService extends DisposableService {
   private async handleCreateTerminal(
     cwd?: string,
     agentInstanceId?: string | null,
-  ): Promise<void> {
-    if (this.disposed) return;
+  ): Promise<string | null> {
+    if (this.disposed) return null;
 
     const resolvedCwd = cwd ?? this.resolveDefaultCwd(agentInstanceId);
     this.terminalCounter++;
@@ -568,7 +568,7 @@ export class TerminalService extends DisposableService {
     const createdAt = Date.now();
 
     const actualCwd = this.createPty(terminalId, resolvedCwd);
-    if (!actualCwd) return;
+    if (!actualCwd) return null;
 
     // Insert the tab into contentTabs but do NOT set activeTabId here.
     // WindowLayoutService owns all active-tab transitions — it needs to
@@ -600,6 +600,8 @@ export class TerminalService extends DisposableService {
     this.logger.info(
       `[TerminalService] Created terminal ${terminalId} in ${actualCwd}`,
     );
+
+    return terminalId;
   }
 
   /** Compute the default CWD for a new terminal:
