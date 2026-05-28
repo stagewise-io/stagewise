@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 
 /**
  * Hook that detects the native scrollbar width.
@@ -54,16 +55,15 @@ export function useScrollbarWidth(): number {
 
     // Set up ResizeObserver on the inner element
     // When scrollbar mode changes, the inner element's available width changes
-    const resizeObserver = new ResizeObserver(() => {
-      updateScrollbarWidth();
-    });
+    const { observer: resizeObserver, disconnect: disconnectResizeObserver } =
+      createRafResizeObserver(updateScrollbarWidth);
     resizeObserver.observe(inner);
 
     // Also listen for window resize as a fallback
     window.addEventListener('resize', updateScrollbarWidth);
 
     return () => {
-      resizeObserver.disconnect();
+      disconnectResizeObserver();
       window.removeEventListener('resize', updateScrollbarWidth);
       if (container.parentNode) container.parentNode.removeChild(container);
 

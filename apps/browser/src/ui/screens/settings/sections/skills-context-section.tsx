@@ -21,6 +21,7 @@ import type { Patch } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
 import { getBaseName } from '@shared/path-utils';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import {
   Tooltip,
   TooltipTrigger,
@@ -45,9 +46,9 @@ function useIsOverflowing(ref: RefObject<HTMLElement | null>) {
     };
     check();
 
-    const observer = new ResizeObserver(check);
+    const { observer, disconnect } = createRafResizeObserver(check);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => disconnect();
   });
 
   return { isOverflowing, tooltipOpen, setTooltipOpen };

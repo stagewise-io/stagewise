@@ -39,10 +39,15 @@ export const TabStateUIProvider = ({
   );
 
   const setTabUiState = useCallback((tabId: string, newState: State) => {
-    setTabUiStateInternal((prev) => ({
-      ...prev,
-      [tabId]: { ...prev[tabId], ...newState },
-    }));
+    setTabUiStateInternal((prev) => {
+      const prevState = prev[tabId];
+      if (prevState?.focusedPanel === newState.focusedPanel) return prev;
+
+      return {
+        ...prev,
+        [tabId]: { ...prevState, ...newState },
+      };
+    });
   }, []);
 
   const requestTerminalFocus = useCallback((tabId: string) => {
@@ -67,6 +72,8 @@ export const TabStateUIProvider = ({
 
   const removeTabUiState = useCallback((tabId: string) => {
     setTabUiStateInternal((prev) => {
+      if (!(tabId in prev)) return prev;
+
       const { [tabId]: _, ...rest } = prev;
       return rest;
     });

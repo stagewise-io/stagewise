@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { PostHogProvider as PostHogProviderOriginal } from 'posthog-js/react';
 import posthog from 'posthog-js';
+import { containsResizeObserverLoopError } from '@ui/utils/resize-observer';
 import { useKartonState } from './use-karton';
 
 let registeredSuperPropsInitKey: string | null = null;
@@ -45,6 +46,7 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
         before_send: (event) => {
           // Filter out user app errors - only capture toolbar errors
           if (!event) return null; // Reject the event
+          if (containsResizeObserverLoopError(event)) return null;
           return event;
         },
         disable_session_recording: telemetryLevel !== 'full',

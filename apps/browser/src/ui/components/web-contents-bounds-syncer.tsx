@@ -4,6 +4,7 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { useLayoutEffect, useRef } from 'react';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 
 type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -169,7 +170,8 @@ export const WebContentsBoundsSyncer = () => {
 
     // --- Container element tracking ---
 
-    const resizeObserver = new ResizeObserver(sendBoundsUpdate);
+    const { observer: resizeObserver, disconnect: disconnectResizeObserver } =
+      createRafResizeObserver(sendBoundsUpdate);
 
     const attachContainer = (el: HTMLElement | null) => {
       if (el === containerElement) return;
@@ -245,7 +247,7 @@ export const WebContentsBoundsSyncer = () => {
         cancelAnimationFrame(pendingFrameId);
         pendingFrameId = null;
       }
-      resizeObserver.disconnect();
+      disconnectResizeObserver();
       mutationObserver.disconnect();
       window.removeEventListener('resize', sendBoundsUpdate);
       document.removeEventListener('mousemove', handleMouseMove);

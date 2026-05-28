@@ -1,4 +1,5 @@
 import { type RefObject, useLayoutEffect, useState } from 'react';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
 
 export function useIsTruncated(ref: RefObject<HTMLElement | null>) {
   const [isTruncated, setIsTruncated] = useState(false);
@@ -17,9 +18,9 @@ export function useIsTruncated(ref: RefObject<HTMLElement | null>) {
     };
     check();
 
-    const observer = new ResizeObserver(check);
+    const { observer, disconnect } = createRafResizeObserver(check);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => disconnect();
   });
 
   return { isTruncated, tooltipOpen, setTooltipOpen };
