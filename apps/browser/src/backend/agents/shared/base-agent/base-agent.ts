@@ -17,7 +17,10 @@ import type {
   AgentState,
   AgentRuntimeError,
 } from '@shared/karton-contracts/ui/agent';
-import type { FullEnvironmentSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
+import type {
+  FullEnvironmentSnapshot,
+  ReasoningSignatureSource,
+} from '@shared/karton-contracts/ui/agent/metadata';
 import type { ModelCapabilities } from '@shared/karton-contracts/ui/shared-types';
 import { type ModelId, getModelCapabilities } from '@shared/available-models';
 import type { z } from 'zod';
@@ -60,6 +63,7 @@ import { clearPendingApproval } from './pending-approvals-cleanup';
 import type { StagewiseToolSet } from '@shared/karton-contracts/ui/agent/tools/types';
 import { stripStrictFromToolSet } from './strip-strict-from-tools';
 import type { StagewiseProviderMetadata } from '../../stagewise-provider';
+import { reasoningSourcesMatch } from '../../reasoning-signatures';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { AgentsMap } from '../../agents-map';
 
@@ -1183,27 +1187,21 @@ export abstract class BaseAgent<
   protected async transformMessagesToModelMessages(
     messages: AgentMessage[],
     systemPrompt: string,
+    modelId: ModelId,
+    modelContextWindowSize: number,
+    reasoningSignatureSource?: ReasoningSignatureSource,
   ): Promise<ModelMessage[]> {
-    const activeModelId = this.state.get().activeModelId;
     const fileReadCache = await this.getFileReadCache();
-    const capabilities = getModelCapabilities(activeModelId);
+    const capabilities = getModelCapabilities(modelId);
 
-    // Derive per-request content limits from the model's context window
-    // so the transformer pipeline uses explicit values instead of
-    // module-level globals.
-    let contentLimits: ContentLimits | undefined;
-    try {
-      const { contextWindowSize } =
-        this.modelProviderService.getModelWithOptions(activeModelId, '');
-      contentLimits = {
-        maxReadChars: deriveMaxReadChars(contextWindowSize),
-        maxPreviewLines: 30,
-      };
-    } catch {
-      // Model lookup can fail when the provider is misconfigured.
-      // Fall through — undefined contentLimits lets transformers use
-      // their built-in defaults.
-    }
+    // Derive per-request content limits from the already-resolved model route
+    // for this step. Do not re-read `state.activeModelId` here: users may
+    // switch models while a step is preparing, and the context transformer must
+    // stay aligned with the same model/options object passed to `streamText`.
+    const contentLimits: ContentLimits = {
+      maxReadChars: deriveMaxReadChars(modelContextWindowSize),
+      maxPreviewLines: 30,
+    };
 
     const shellInfo = this.toolbox.getShellInfo();
     const skills = await this.toolbox.getSkillsList(this.instanceId);
@@ -1261,6 +1259,7 @@ export abstract class BaseAgent<
       fileReadCache,
       this.toolbox.getMountedPathsForAgent(this.instanceId),
       contentLimits,
+      reasoningSignatureSource,
     );
   }
 
@@ -1574,6 +1573,9 @@ export abstract class BaseAgent<
     try {
       modelMessages = await this.generateContextForNewStep(
         queueFlushIndex >= 0 ? queueFlushIndex : undefined,
+        stepModelId,
+        modelWithOptions.contextWindowSize,
+        modelWithOptions.reasoningSignatureSource,
       );
       tools = await this.getToolsForStep();
       this._toolCallDurations.clear();
@@ -1841,7 +1843,10 @@ export abstract class BaseAgent<
       // populateReasoningDetailsOnAssistantMessage for details.
       if (finishedResult && this._stepGeneration === stepGen) {
         try {
-          this.populateReasoningDetailsOnAssistantMessage(finishedResult);
+          this.populateReasoningDetailsOnAssistantMessage(
+            finishedResult,
+            modelWithOptions.reasoningSignatureSource,
+          );
         } catch (err) {
           this.logger.debug(
             `[BaseAgent:${this.instanceId}] Failed to populate reasoningDetails: ${this.formatError(err as Error)}`,
@@ -2331,7 +2336,10 @@ export abstract class BaseAgent<
    * rather than at the end — env-changes appear before user content.
    */
   private async generateContextForNewStep(
-    queueFlushStart?: number,
+    queueFlushStart: number | undefined,
+    modelId: ModelId,
+    modelContextWindowSize: number,
+    reasoningSignatureSource?: ReasoningSignatureSource,
   ): Promise<ModelMessage[]> {
     // ─── Capture & attach snapshot to last message ────────────────────
     const fullSnapshot = (await this.toolbox.captureEnvironmentSnapshot(
@@ -2377,6 +2385,9 @@ export abstract class BaseAgent<
     const modelMessages = await this.transformMessagesToModelMessages(
       filteredUIMsgs,
       systemPrompt,
+      modelId,
+      modelContextWindowSize,
+      reasoningSignatureSource,
     );
 
     // Then, we allow another step to modify the final model messages
@@ -2539,19 +2550,19 @@ export abstract class BaseAgent<
 
   /**
    * Persist the provider's signed `reasoning_details` array into the
-   * last assistant message's metadata so it can be re-injected on
-   * subsequent requests.
+   * last assistant message's metadata with the semantic route that
+   * produced it so conversion can re-inject it only for compatible
+   * future requests.
    *
    * Context: OpenRouter / Bedrock-hosted Claude refuses to extend a
    * thinking process when the conversation carries unsigned reasoning
    * blocks. We capture the per-step signatures here (extracted by the
-   * stagewise metadata extractor under
-   * `providerMetadata.openaiCompatible.reasoningDetails`) and later
-   * spread them back onto the outbound assistant message via
-   * `providerOptions.openaiCompatible.reasoning_details`.
+   * stagewise metadata extractor under the OpenAI-compatible transport
+   * metadata key) and later spread matching groups back onto outbound
+   * assistant messages via `providerOptions.openaiCompatible.reasoning_details`.
    *
-   * Multi-step continuations append to the existing array so the full
-   * thinking history stays intact across tool-call rounds.
+   * Multi-step continuations append to the existing source-owned group
+   * so the full thinking history stays intact across tool-call rounds.
    *
    * Must be called AFTER `handleUiStream` has drained. `handleUiStream`
    * is the only site that pushes the assistant message into
@@ -2566,6 +2577,7 @@ export abstract class BaseAgent<
    */
   private populateReasoningDetailsOnAssistantMessage(
     step: StepResult<StagewiseToolSet>,
+    reasoningSignatureSource: ReasoningSignatureSource,
   ): void {
     const meta = step.providerMetadata as StagewiseProviderMetadata | undefined;
     const details = meta?.openaiCompatible?.reasoningDetails;
@@ -2582,11 +2594,28 @@ export abstract class BaseAgent<
         createdAt: new Date(),
         partsMetadata: [],
       };
-      const existing = target.metadata.reasoningDetails ?? [];
-      target.metadata.reasoningDetails = [
-        ...existing,
-        ...(details as Record<string, unknown>[]),
-      ];
+      const detailRecords = details as Record<string, unknown>[];
+      const existing = target.metadata.ownedReasoningDetails ?? [];
+      const matchingIdx = existing.findIndex((group) =>
+        reasoningSourcesMatch(group.source, reasoningSignatureSource),
+      );
+
+      if (matchingIdx >= 0) {
+        const group = existing[matchingIdx]!;
+        target.metadata.ownedReasoningDetails = existing.map((entry, idx) =>
+          idx === matchingIdx
+            ? { ...group, details: [...group.details, ...detailRecords] }
+            : entry,
+        );
+      } else {
+        target.metadata.ownedReasoningDetails = [
+          ...existing,
+          {
+            source: reasoningSignatureSource,
+            details: detailRecords,
+          },
+        ];
+      }
     });
   }
 

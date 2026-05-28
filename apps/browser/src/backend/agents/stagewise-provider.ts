@@ -107,9 +107,10 @@ function extractReasoningDetailsFromMessage(
  *     reasoning details array OR returns on the response. Required for
  *     Anthropic (Bedrock) and Google models to validate chain-of-thought
  *     signatures on subsequent turns. The SDK does not map this field
- *     natively (see vercel/ai#11342), so we capture it here and
- *     `base-agent` re-injects it via `providerOptions.openaiCompatible`
- *     on each outgoing assistant message.
+ *     natively (see vercel/ai#11342), so we capture it here. The key is
+ *     the transport hook, not the semantic owner; `base-agent` stores the
+ *     current route alongside these details and only re-injects matching
+ *     groups via `providerOptions.openaiCompatible` on future requests.
  *
  *  2. `stagewise` — any `provider_metadata` riding on the response
  *     message/delta. Preserved as-is for existing usage-limit/plan
@@ -233,12 +234,13 @@ export type StagewiseProviderSettings = {
  * chat completions endpoints.
  *
  * Provider options are forwarded under the `stagewise` key and
- * response metadata is extracted under the same key.
+ * response metadata is extracted from gateway responses.
  *
  * Message-level metadata (e.g. `cache_control`, signed
  * `reasoning_details`) is forwarded via the built-in
- * `openaiCompatible` providerOptions key which the SDK spreads
- * directly onto each message in the request body.
+ * `openaiCompatible` providerOptions transport key which the SDK spreads
+ * directly onto each message in the request body. Semantic ownership for
+ * signed reasoning details is tracked separately in assistant metadata.
  */
 export function createStagewise(
   settings: StagewiseProviderSettings,

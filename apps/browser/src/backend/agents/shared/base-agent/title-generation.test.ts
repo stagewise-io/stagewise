@@ -40,6 +40,11 @@ function makeMockModelProviderService(): ModelProviderService {
       headers: {},
       contextWindowSize: 100_000,
       providerMode: 'stagewise',
+      reasoningSignatureSource: {
+        providerMode: 'stagewise',
+        provider: 'anthropic',
+        modelId: 'anthropic/claude-sonnet-4.6',
+      },
     }),
   } as unknown as ModelProviderService;
 }

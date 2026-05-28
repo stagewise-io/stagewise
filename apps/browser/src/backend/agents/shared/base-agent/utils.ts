@@ -12,6 +12,7 @@ import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { SkillDefinition } from '@shared/skills';
 import type {
   FullEnvironmentSnapshot,
+  ReasoningSignatureSource,
   TabMentionMeta,
 } from '@shared/karton-contracts/ui/agent/metadata';
 
@@ -26,6 +27,7 @@ import {
 } from '../prompts/utils/environment-renderer';
 import type { SkillInfo } from '../prompts/utils/skills';
 import { deepMergeProviderOptions } from '@/agents/model-provider';
+import { reasoningSourcesMatch } from '@/agents/reasoning-signatures';
 import {
   extractSlashIdsFromText,
   inlineSlashLinksAsText,
@@ -157,6 +159,7 @@ export const convertAgentMessagesToModelMessages = async (
   fileReadCache?: FileReadCacheService,
   mountPaths?: Map<string, string>,
   contentLimits?: ContentLimits,
+  reasoningSignatureSource?: ReasoningSignatureSource,
 ): Promise<ModelMessage[]> => {
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -258,7 +261,11 @@ export const convertAgentMessagesToModelMessages = async (
         });
       }
 
-      const assistantMsgs = await convertAssistantMessage(message, tools);
+      const assistantMsgs = await convertAssistantMessage(
+        message,
+        tools,
+        reasoningSignatureSource,
+      );
       modelMessages.push(...assistantMsgs);
 
       // Inject file contents from pathReferences (from readFile tool calls).
@@ -737,26 +744,96 @@ function buildCompressedHistoryPart(
  * Returns only the assistant-role message(s). Sandbox file attachments
  * are handled by the main loop alongside env-changes.
  *
- * Also round-trips signed `reasoning_details` through the outbound
- * `providerOptions.openaiCompatible.reasoning_details` hook that the
- * SDK spreads onto the OpenAI-compatible request body. Without this,
- * Bedrock-hosted Claude silently refuses to extend the thinking
- * process because the history carries unsigned `reasoning_content`
- * strings. See `plans/rehydrate-reasoning-signatures-openrouter.md`.
+ * Also round-trips matching provider-owned signed `reasoning_details`
+ * through the outbound `providerOptions.openaiCompatible.reasoning_details`
+ * transport hook that the SDK spreads onto the OpenAI-compatible request
+ * body. Semantic ownership lives in assistant metadata and is checked here
+ * before replay so signatures are never sent across provider boundaries.
  */
+// Legacy flat `reasoningDetails` predate source ownership and were only
+// captured from the stagewise OpenAI-compatible gateway. Replay them only when
+// their signature shape clearly identifies the current stagewise provider;
+// unknown or mixed shapes are unsafe and must be dropped.
+function inferLegacyReasoningProvider(
+  details: Record<string, unknown>[],
+): ReasoningSignatureSource['provider'] | null {
+  let inferred: ReasoningSignatureSource['provider'] | null = null;
+  for (const detail of details) {
+    const hasGoogleSignature = typeof detail.thought_signature === 'string';
+    const hasAnthropicSignature = typeof detail.signature === 'string';
+    const provider =
+      hasGoogleSignature === hasAnthropicSignature
+        ? null
+        : hasGoogleSignature
+          ? 'google'
+          : 'anthropic';
+    if (!provider) return null;
+    if (inferred && inferred !== provider) return null;
+    inferred = provider;
+  }
+  return inferred;
+}
+
+function selectReasoningDetailsForSource(
+  message: AgentMessage,
+  reasoningSignatureSource?: ReasoningSignatureSource,
+): {
+  signedDetails: Record<string, unknown>[];
+  shouldStripReasoningParts: boolean;
+} {
+  const ownedGroups = message.metadata?.ownedReasoningDetails ?? [];
+  const hasOwnedReasoningDetails = ownedGroups.some(
+    (group) => group.details.length > 0,
+  );
+
+  if (reasoningSignatureSource) {
+    const matchingOwned = ownedGroups.filter(
+      (group) =>
+        group.details.length > 0 &&
+        reasoningSourcesMatch(group.source, reasoningSignatureSource),
+    );
+    if (matchingOwned.length > 0) {
+      return {
+        signedDetails: matchingOwned.flatMap((group) => group.details),
+        shouldStripReasoningParts: true,
+      };
+    }
+  }
+
+  const legacyDetails = message.metadata?.reasoningDetails ?? [];
+  if (legacyDetails.length === 0) {
+    return {
+      signedDetails: [],
+      shouldStripReasoningParts: hasOwnedReasoningDetails,
+    };
+  }
+
+  const legacyProvider = inferLegacyReasoningProvider(legacyDetails);
+  const canReplayLegacy =
+    reasoningSignatureSource?.providerMode === 'stagewise' &&
+    legacyProvider === reasoningSignatureSource.provider;
+
+  return {
+    signedDetails: canReplayLegacy ? legacyDetails : [],
+    shouldStripReasoningParts: true,
+  };
+}
+
 async function convertAssistantMessage(
   message: AgentMessage,
   tools: ToolSet,
+  reasoningSignatureSource?: ReasoningSignatureSource,
 ): Promise<ModelMessage[]> {
-  const signedDetails = message.metadata?.reasoningDetails ?? [];
+  const { signedDetails, shouldStripReasoningParts } =
+    selectReasoningDetailsForSource(message, reasoningSignatureSource);
   const hasSignatures = signedDetails.length > 0;
 
   const cleanedMessage = {
     ...message,
     parts: message.parts
-      // Drop `reasoning` UI parts from the outbound conversion ONLY
-      // when we have signed `reasoning_details` to replace them with
-      // (the stagewise / OpenRouter path).
+      // Drop `reasoning` UI parts from the outbound conversion when
+      // provider-signed reasoning details are being replayed or when
+      // stagewise/legacy signature metadata makes UI reasoning unsafe.
       //
       // Rationale: for the openai-compatible SDK path,
       // `convertToOpenAICompatibleChatMessages` concatenates reasoning
@@ -766,26 +843,30 @@ async function convertAssistantMessage(
       // `reasoning_details` array causes Anthropic/Bedrock to reject
       // the turn with `thinking blocks ... cannot be modified`.
       //
-      // When signatures ARE present, we rely purely on
+      // When matching signatures ARE present, we rely purely on
       // `providerOptions.openaiCompatible.reasoning_details` (attached
-      // below) to round-trip signed reasoning. OpenRouter reconstructs
-      // Anthropic `thinking` / Gemini `thought` blocks from that
-      // structured array.
+      // below) to round-trip signed reasoning. When only mismatched
+      // stagewise or legacy signatures exist, we still drop UI reasoning
+      // parts so unsigned or foreign-provider reasoning content is not
+      // sent. UI reasoning text is not a safe substitute for the provider
+      // signed details.
       //
-      // When signatures are NOT present we leave reasoning parts
-      // alone. This matters for BYOK with native SDKs
+      // When no stagewise/legacy signature metadata exists we leave
+      // reasoning parts alone. This matters for BYOK with native SDKs
       // (@ai-sdk/anthropic, @ai-sdk/google) which consume reasoning
       // parts via their own signature mechanism
       // (`providerMetadata.anthropic.signature`,
       // `providerMetadata.google.thoughtSignature`) and would
       // otherwise lose cross-turn chain-of-thought. It also preserves
-      // pre-fix stagewise messages' reasoning text in outbound history
+      // legacy messages without captured signatures in outbound history
       // — no worse than before.
       //
       // UI visibility is unaffected — this filter only touches the
       // throwaway copy used for model conversion; persisted UI parts
       // still carry reasoning for transcript display.
-      .filter((part) => !(hasSignatures && part.type === 'reasoning'))
+      .filter(
+        (part) => !(shouldStripReasoningParts && part.type === 'reasoning'),
+      )
       .map((part) => {
         const isToolPart =
           part.type.startsWith('tool-') || part.type === 'dynamic-tool';
@@ -845,10 +926,10 @@ async function convertAssistantMessage(
   //    modified. These blocks must remain as they were in the
   //    original response.`
   //
-  // The UI parts and the accumulated `reasoningDetails` array are both
-  // ordered by (step, position-in-step), so counting reasoning parts
-  // per step block and slicing the details array the same way keeps
-  // them aligned.
+  // The UI parts and the selected provider-owned details array are both
+  // ordered by (step, position-in-step), so counting reasoning parts per
+  // step block and slicing the details array the same way keeps them
+  // aligned.
   if (hasSignatures) {
     const reasoningCountsPerStep = countReasoningPartsPerStep(message.parts);
     const totalReasoningParts = reasoningCountsPerStep.reduce(
