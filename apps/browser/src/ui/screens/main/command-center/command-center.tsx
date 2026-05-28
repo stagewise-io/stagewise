@@ -85,6 +85,10 @@ export function CommandCenter() {
       optimisticPinnedAgentIds,
       pendingRemovalAgentIds,
     });
+  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const activeTab = useKartonState((s) =>
+    activeTabId ? (s.contentTabs.tabs[activeTabId] ?? null) : null,
+  );
   const [openAgent, setOpenAgent] = useOpenAgent();
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
@@ -105,7 +109,7 @@ export function CommandCenter() {
   const setTabAgentInstance = useKartonProcedure(
     (p) => p.browser.setTabAgentInstance,
   );
-  const { removeTabUiState } = useTabUIState();
+  const { removeTabUiState, requestTerminalFocus } = useTabUIState();
   const pinnedAgentIds = useKartonState(
     useComparingSelector(
       (s) => s.preferences.sidebar.pinnedAgentIds,
@@ -142,8 +146,12 @@ export function CommandCenter() {
 
   const restoreTabContentFocus = useCallback(() => {
     void movePanelToForegroundRef.current('tab-content');
-    void togglePanelKeyboardFocusRef.current('tab-content');
-  }, []);
+    void togglePanelKeyboardFocusRef.current('tab-content').then(() => {
+      if (activeTab?.type === 'terminal' && activeTabId) {
+        requestTerminalFocus(activeTabId);
+      }
+    });
+  }, [activeTab, activeTabId]);
 
   const dismissCommandCenter = useCallback(() => {
     close();
