@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-alpha100 (2026-05-28)
+
+### Features
+
+* add migrate-to-stable dialog (9622107)
+
+### Bug Fixes
+
+* release from triggering commit (24110f9)
+* apply release version before packaging (d23fc49)
+
 ## 1.0.0-alpha099 (2026-05-28)
 
 ### Features
