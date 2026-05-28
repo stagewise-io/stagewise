@@ -577,6 +577,7 @@ export class GitService extends DisposableService {
     return {
       ok: true,
       path: targetPath,
+      branchName: worktreeName,
       git: await this.getMountedWorkspaceSummary(targetPath),
     };
   }

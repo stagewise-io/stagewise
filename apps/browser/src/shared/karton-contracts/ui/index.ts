@@ -126,6 +126,29 @@ export type WorkspaceGitCleanupState = {
   lastResult: WorkspaceGitCleanupResult | null;
 };
 
+export type WorkspaceGitSetupStatus = 'running' | 'succeeded' | 'failed';
+
+export type WorkspaceGitSetupRun = {
+  id: string;
+  workspacePath: string;
+  mainWorktreePath: string;
+  repositoryId: string;
+  sourceBranch: string;
+  worktreeBranch: string;
+  scriptPath: string;
+  status: WorkspaceGitSetupStatus;
+  startedAt: number;
+  finishedAt: number | null;
+  exitCode: number | null;
+  message: string | null;
+  stdoutTail: string;
+  stderrTail: string;
+};
+
+export type WorkspaceGitSetupState = {
+  runsByPath: Record<string, WorkspaceGitSetupRun>;
+};
+
 export type WorkspaceGitFailureReason =
   | 'not-git-repo'
   | 'branch-not-found'
@@ -147,7 +170,12 @@ export type WorkspaceGitMutationResult =
   | WorkspaceGitFailure;
 
 export type WorkspaceGitCreateWorktreeResult =
-  | { ok: true; path: string; git: WorkspaceGitSummary | null }
+  | {
+      ok: true;
+      path: string;
+      branchName: string;
+      git: WorkspaceGitSummary | null;
+    }
   | WorkspaceGitFailure;
 
 export type WorkspaceGitCreateBranchOptions = {
@@ -621,6 +649,7 @@ export type AppState = {
     };
   };
   workspaceGitCleanup: WorkspaceGitCleanupState;
+  workspaceGitSetup: WorkspaceGitSetupState;
   toolbox: {
     [agentInstanceId: string]: {
       workspace: {
@@ -1378,6 +1407,9 @@ export const defaultState: KartonContract['state'] = {
     cleaning: false,
     candidates: [],
     lastResult: null,
+  },
+  workspaceGitSetup: {
+    runsByPath: {},
   },
   toolbox: {},
   userAccount: {
