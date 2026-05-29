@@ -4,6 +4,7 @@ import type {
 } from '@/agents/shared/base-agent';
 import {
   type AgentHistoryEntry,
+  type AgentHistoryWorkspaceEntry,
   AgentTypes,
 } from '@shared/karton-contracts/ui/agent';
 import { DisposableService } from '../disposable';
@@ -232,6 +233,7 @@ export class AgentManagerService extends DisposableService {
         modelId?: ModelId,
         toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
+        preserveWorkspacePaths?: boolean,
       ) => {
         const normalizedToolApprovalMode =
           toolApprovalMode === 'alwaysAllow' ? 'smart' : toolApprovalMode;
@@ -255,7 +257,9 @@ export class AgentManagerService extends DisposableService {
         if (workspacePaths) {
           try {
             for (const wp of workspacePaths) {
-              const mountPath = await this.getNewAgentWorkspaceMountPath(wp);
+              const mountPath = preserveWorkspacePaths
+                ? wp
+                : await this.getNewAgentWorkspaceMountPath(wp);
               await this.toolbox.handleMountWorkspace(
                 agent.instanceId,
                 mountPath,
@@ -1409,6 +1413,46 @@ export class AgentManagerService extends DisposableService {
     });
   }
 
+  private async enrichHistoryEntryWorkspaces(
+    entries: AgentHistoryEntry[],
+  ): Promise<AgentHistoryEntry[]> {
+    const gitSummaryByPath = new Map<
+      string,
+      Promise<AgentHistoryWorkspaceEntry['git']>
+    >();
+
+    const getGitSummary = (workspacePath: string) => {
+      let promise = gitSummaryByPath.get(workspacePath);
+      if (!promise) {
+        promise = this.gitService
+          .getMountedWorkspaceSummary(workspacePath)
+          .catch((error) => {
+            this.logger.warn(
+              `[AgentManager] Failed to resolve Git summary for history workspace ${workspacePath}`,
+              { error },
+            );
+            return null;
+          });
+        gitSummaryByPath.set(workspacePath, promise);
+      }
+      return promise;
+    };
+
+    return await Promise.all(
+      entries.map(async (entry) => ({
+        ...entry,
+        mountedWorkspaces: entry.mountedWorkspaces
+          ? await Promise.all(
+              entry.mountedWorkspaces.map(async (workspace) => ({
+                ...workspace,
+                git: await getGitSummary(workspace.path),
+              })),
+            )
+          : entry.mountedWorkspaces,
+      })),
+    );
+  }
+
   /**
    * Responds with a list of agent history entries. Includes all existing agents (including currently active ones) and is sorted by agents (newest first).
    *
@@ -1430,7 +1474,7 @@ export class AgentManagerService extends DisposableService {
       return [];
     }
 
-    return await db.getAgentHistoryEntries(
+    const entries = await db.getAgentHistoryEntries(
       limit,
       offset,
       [],
@@ -1438,6 +1482,8 @@ export class AgentManagerService extends DisposableService {
         ? `%${searchString.trim()}%`
         : undefined,
     );
+
+    return await this.enrichHistoryEntryWorkspaces(entries);
   }
 
   private async getAgentHistoryEntriesByIds(
@@ -1445,6 +1491,7 @@ export class AgentManagerService extends DisposableService {
   ): Promise<AgentHistoryEntry[]> {
     const db = await this.ensureDBReady();
     if (!db) return [];
-    return await db.getAgentHistoryEntriesByIds(ids);
+    const entries = await db.getAgentHistoryEntriesByIds(ids);
+    return await this.enrichHistoryEntryWorkspaces(entries);
   }
 }

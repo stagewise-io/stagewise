@@ -182,6 +182,7 @@ export function useAgentCommandItems(
                 ? new Date(history[0].metadata.createdAt).getTime()
                 : 0,
               messageCount: history.length,
+              mountedWorkspaces: s.toolbox[id]?.workspace?.mounts ?? [],
             };
           }),
       activeAgentCardsEqual,

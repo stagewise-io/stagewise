@@ -16,6 +16,7 @@ import type {
   GitMutationResult,
   GitMergedTargetResult,
   GitRepositoryInfo,
+  GitRepositoryRemoteInfo,
   GitServiceDeps,
   GitStatusSummary,
   GitStrictCommandResult,
@@ -38,6 +39,7 @@ export type {
   GitMutationResult,
   GitMergedTargetResult,
   GitRepositoryInfo,
+  GitRepositoryRemoteInfo,
   GitServiceDeps,
   GitStatusSummary,
   GitStrictCommandResult,
@@ -54,6 +56,72 @@ const MUTATION_GIT_TIMEOUT_MS = 30_000;
 function normalizeGitPath(value: string): string {
   const resolved = path.resolve(value);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function stripGitSuffix(value: string): string {
+  return value.replace(/\.git\/?$/, '').replace(/\/$/, '');
+}
+
+function normalizeRemotePathname(pathname: string): string {
+  const withoutSuffix = stripGitSuffix(pathname);
+  return withoutSuffix.startsWith('/') ? withoutSuffix : `/${withoutSuffix}`;
+}
+
+function remoteUrlToWebUrl(remoteUrl: string): string | null {
+  const trimmed = remoteUrl.trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      parsed.username = '';
+      parsed.password = '';
+      parsed.pathname = normalizeRemotePathname(parsed.pathname);
+      parsed.search = '';
+      parsed.hash = '';
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  if (/^(ssh|git):\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (!parsed.hostname || !parsed.pathname) return null;
+      return `https://${parsed.hostname}${normalizeRemotePathname(
+        parsed.pathname,
+      )}`;
+    } catch {
+      return null;
+    }
+  }
+
+  const scpLikeMatch = trimmed.match(/^(?:[^@\s]+@)?([^:\s]+):(.+)$/);
+  if (scpLikeMatch) {
+    const [, host, repoPath] = scpLikeMatch;
+    if (!host || !repoPath || repoPath.startsWith('/')) return null;
+    return `https://${host}${normalizeRemotePathname(repoPath)}`;
+  }
+
+  return null;
+}
+
+function parseRemoteList(output: string): GitRepositoryRemoteInfo | null {
+  const remotes = output
+    .split('\n')
+    .map((line) => line.trim().match(/^(\S+)\s+(\S+)\s+\(fetch\)$/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => ({
+      remoteName: match[1]!,
+      url: match[2]!,
+    }));
+
+  return (
+    remotes.find((remote) => remote.remoteName === 'origin') ??
+    remotes[0] ??
+    null
+  );
 }
 
 const defaultRunGitCommand: GitCommandRunner = async (cwd, args, env) => {
@@ -183,6 +251,16 @@ export class GitService extends DisposableService {
 
     const worktrees = await this.listWorktrees(workspacePath);
     return worktrees.find((worktree) => worktree.isMainWorktree)?.path ?? null;
+  }
+
+  public async getRepositoryRemoteUrl(
+    workspacePath: string,
+  ): Promise<string | null> {
+    const remotesOutput = await this.runGit(workspacePath, ['remote', '-v']);
+    if (!remotesOutput) return null;
+
+    const remote = parseRemoteList(remotesOutput);
+    return remote ? remoteUrlToWebUrl(remote.url) : null;
   }
 
   public async getRepositoryInfo(
@@ -410,12 +488,14 @@ export class GitService extends DisposableService {
 
   public async removeWorktree(
     workspacePath: string,
+    options: { force?: boolean } = {},
   ): Promise<GitWorktreeRemoveResult> {
     const repositoryInfo = await this.getRepositoryInfo(workspacePath);
     const cwd = repositoryInfo?.repoRoot ?? workspacePath;
     const result = await this.runGitStrict(cwd, [
       'worktree',
       'remove',
+      ...(options.force ? ['--force'] : []),
       workspacePath,
     ]);
     if (result.exitCode === 0) return { ok: true };

@@ -492,9 +492,15 @@ export const DEFAULT_TOOL_APPROVAL_MODE: ToolApprovalMode = 'alwaysAsk';
 export const updateChannelSchema = z.enum(['alpha', 'beta']);
 export type UpdateChannel = z.infer<typeof updateChannelSchema>;
 
+const agentListGroupingModeSchema = z.enum(['age', 'workspace']);
+export type AgentListGroupingMode = z.infer<typeof agentListGroupingModeSchema>;
+
 const defaultSidebarPreferences = {
   showActiveAgents: true,
   pinnedAgentIds: [],
+  agentListGroupingMode: 'age' as AgentListGroupingMode,
+  workspaceGroupOrder: [],
+  collapsedWorkspaceGroupKeys: [],
 };
 
 const sidebarPreferencesSchema = z
@@ -503,6 +509,12 @@ const sidebarPreferencesSchema = z
     showActiveAgents: z.boolean().default(true),
     /** Ordered agent IDs pinned to the top of the sidebar */
     pinnedAgentIds: z.array(z.string()).default([]),
+    /** How the unpinned agent list is grouped in the sidebar */
+    agentListGroupingMode: agentListGroupingModeSchema.default('age'),
+    /** Ordered workspace group keys in the sidebar workspace grouping mode */
+    workspaceGroupOrder: z.array(z.string()).default([]),
+    /** Collapsed workspace/worktree group keys in the sidebar workspace grouping mode */
+    collapsedWorkspaceGroupKeys: z.array(z.string()).default([]),
   })
   .default(defaultSidebarPreferences)
   .catch(defaultSidebarPreferences);
