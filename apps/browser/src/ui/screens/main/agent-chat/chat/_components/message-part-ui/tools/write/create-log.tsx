@@ -3,7 +3,7 @@ import type { WritePart } from '.';
 import { ToolPartUINotCollapsible } from '../shared/tool-part-ui-not-collapsible';
 import { IconBugOutline18 } from 'nucleo-ui-outline-18';
 import { stripMountPrefix } from '@ui/utils';
-import { LOGS_PREFIX } from '@shared/log-ownership';
+import { LOGS_PREFIX } from '@stagewise/agent-core/logs';
 
 export const CreateLogToolPart = ({ part }: { part: WritePart }) => {
   const channelName = useMemo(() => {

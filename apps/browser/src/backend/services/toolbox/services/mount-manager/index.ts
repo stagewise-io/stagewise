@@ -1,12 +1,35 @@
+/**
+ * Host-side `MountManager` shell.
+ *
+ * After Phase 8, all reasoning / state / watcher / mention-search
+ * logic lives inside `@stagewise/agent-core`. This file is a thin
+ * Electron-aware wrapper that:
+ *
+ *   - Owns per-workspace `ClientRuntimeNode` and `LspService`.
+ *   - Resolves a file-picker dialog when the UI requests a mount
+ *     without a path.
+ *   - Persists recently-opened workspaces.
+ *   - Tracks per-agent-per-prefix sandbox permissions (not part of
+ *     the core `MountEntry`).
+ *   - Registers the three `toolbox.*` Karton procedures.
+ *   - Delegates registry / cache / watcher / mention-search work to
+ *     the core `MountManager` and `MentionSearchService`.
+ *
+ * The public surface used by `ToolboxService` is preserved so no
+ * callers outside this folder need to change.
+ */
 import { DisposableService } from '@/services/disposable';
 import type { Logger } from '@/services/logger';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { LspService } from '../lsp';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { pickOwningWorkspace } from '@/utils/workspace-resolution';
-import { createHash } from 'node:crypto';
-import chokidar, { type FSWatcher } from 'chokidar';
+import {
+  MentionSearchService,
+  MountManager,
+  mountPrefixForPath,
+  type MentionSearchContext,
+} from '@stagewise/agent-core/mount-manager';
 import type { FilePickerService } from '@/services/file-picker';
 import type { KartonService } from '@/services/karton';
 import type { UserExperienceService } from '@/services/experience';
@@ -26,16 +49,8 @@ import type {
 } from '@shared/karton-contracts/ui';
 import type { WorkspaceSnapshot } from '../../types';
 import { FULL_PERMISSIONS, type MountPermission } from '@/services/sandbox/ipc';
-import {
-  MentionSearchService,
-  type MentionSearchContext,
-} from './mention-search';
-import {
-  readWorkspaceMd,
-  WORKSPACE_MD_FILENAME,
-} from '@/agents/shared/prompts/utils/read-workspace-md';
-import { readAgentsMd } from '@/agents/shared/prompts/utils/read-agents-md';
-import { getSkills } from '@/agents/shared/prompts/utils/get-skills';
+import type { MountsStateController } from '@/services/agent-core-bridge/state/toolbox-mounts';
+import { createBrowserTelemetrySink } from '@/services/agent-core-bridge/host-telemetry';
 import { getRipgrepBasePath, getWorktreesDir } from '@/utils/paths';
 import {
   WorktreeSetupRunner,
@@ -61,6 +76,13 @@ const WORKTREE_CLEANUP_UNUSED_MS =
 const WORKTREE_CLEANUP_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const PENDING_WORKTREE_SETUP_TTL_MS = 10 * 60 * 1000;
 
+// Re-export the canonical workspace resolver so the existing import
+// path `from '@/services/toolbox/services/mount-manager'` keeps
+// working (notably for the `index.test.ts` unit tests in this folder
+// and for `DiffHistoryService`). The single implementation lives in
+// `@stagewise/agent-core/workspace`.
+export { pickOwningWorkspace } from '@stagewise/agent-core/mount-manager';
+
 type AgentInstanceId = string;
 type MountPrefix = string;
 type WorkspacePath = string;
@@ -74,25 +96,14 @@ async function safeRealpath(targetPath: string): Promise<string | null> {
   }
 }
 
-function mountPrefixForPath(workspacePath: string): MountPrefix {
-  const hash = createHash('sha256')
-    .update(workspacePath)
-    .digest('hex')
-    .slice(0, 4);
-  return `w${hash}`;
-}
-
 export type MountedClientRuntimes = Map<MountPrefix, ClientRuntimeNode>;
 export type MountedLspServices = Map<MountPrefix, LspService>;
 
-// Re-export the canonical workspace resolver so the existing import
-// path `from '@/services/toolbox/services/mount-manager'` keeps
-// working for code that already uses it (including this file's own
-// tests). The single implementation lives in the shared utility at
-// `@/utils/workspace-resolution` so `DiffHistoryService` can use it
-// too without introducing a toolbox→diff-history import cycle.
-export { pickOwningWorkspace } from '@/utils/workspace-resolution';
-
+/**
+ * Thin host adapter around the core `MountManager`. Keeps all
+ * Electron / Karton / ClientRuntime / LSP coupling on this side and
+ * forwards pure registry + watcher work into the core.
+ */
 export class MountManagerService extends DisposableService {
   private readonly logger: Logger;
   private readonly filePickerService: FilePickerService;
@@ -101,36 +112,41 @@ export class MountManagerService extends DisposableService {
   private readonly telemetryService: TelemetryService;
   private readonly gitService: GitService;
   private readonly preferencesService: PreferencesService;
-  private readonly mentionSearch: MentionSearchService;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
   private readonly worktreeSetupRunner: WorktreeSetupRunner;
   private readonly pendingWorktreeSetups = new Map<
     string,
     PendingWorktreeSetup
   >();
-  private onMountsChanged?: (agentInstanceId: string) => void;
+  /**
+   * Resolver injected by `ToolboxService` post-construction so the
+   * Git-cleanup candidate scanner can look up workspace last-used
+   * timestamps from `AgentPersistenceDB` without taking a direct
+   * dependency on the agent manager. Defaults to an empty map.
+   */
   private getWorkspaceLastUsedAtByPath: (
     workspacePaths: string[],
   ) => Promise<Map<string, number>> = async () => new Map();
 
-  private agentMounts: Map<
+  private readonly core: MountManager;
+  private readonly mentionSearch: MentionSearchService;
+
+  /**
+   * Per-agent-per-prefix sandbox permissions. Not part of the core
+   * `MountEntry` slice — only the sandbox isolation layer consumes
+   * it, via `getMountedPathsWithRuntimes`.
+   */
+  private agentPermissions: Map<
     AgentInstanceId,
     Map<MountPrefix, MountPermission[]>
   > = new Map();
-  private workspacePathsPerMount: Map<MountPrefix, WorkspacePath> = new Map();
 
   private clientRuntimesPerPath: Map<string, ClientRuntimeNode> = new Map();
   private lspServicesPerPath: Map<string, LspService> = new Map();
-
   /** Promise that resolves when LSP service is ready (or null if no workspace) */
   private lspReady: Map<string, Promise<LspService | null>> = new Map();
 
-  /** Per-workspace chokidar watchers for reactive skill/MD file updates */
-  private watchersPerPath: Map<WorkspacePath, FSWatcher> = new Map();
-  private watcherDebounceTimers: Map<
-    WorkspacePath,
-    ReturnType<typeof setTimeout>
-  > = new Map();
+  private onMountsChanged?: (agentInstanceId: string) => void;
 
   public constructor(
     logger: Logger,
@@ -140,6 +156,7 @@ export class MountManagerService extends DisposableService {
     telemetryService: TelemetryService,
     gitService: GitService,
     preferencesService: PreferencesService,
+    mountsController: MountsStateController,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ) {
     super();
@@ -158,21 +175,37 @@ export class MountManagerService extends DisposableService {
       resolvedEnvPromise: this.resolvedEnvPromise,
     });
 
+    this.core = new MountManager({
+      store: mountsController,
+      logger: this.logger,
+      telemetry: createBrowserTelemetrySink(this.telemetryService, {
+        logger: this.logger,
+      }),
+      hooks: {
+        onWorkspaceAttached: (wsPath) => this.attachWorkspaceRuntime(wsPath),
+        onWorkspaceReleased: (wsPath) => this.releaseWorkspaceRuntime(wsPath),
+        onMountsChanged: (agentId) => this.onMountsChanged?.(agentId),
+        getWorkspaceGitSummary: (wsPath) =>
+          this.gitService.getMountedWorkspaceSummary(wsPath),
+      },
+      getAgentType: (agentInstanceId) =>
+        this.uiKarton.state.agents.instances[agentInstanceId]?.type ??
+        'unknown',
+    });
+
     const searchCtx: MentionSearchContext = {
       getWorkspacePathForPrefix: (prefix) =>
-        this.workspacePathsPerMount.get(prefix),
+        this.core.getWorkspacePathForPrefix(prefix),
       getClientRuntimeForPrefix: (prefix) => {
-        const wsPath = this.workspacePathsPerMount.get(prefix);
+        const wsPath = this.core.getWorkspacePathForPrefix(prefix);
         return wsPath ? this.clientRuntimesPerPath.get(wsPath) : undefined;
       },
       getToolboxState: (agentInstanceId) =>
         this.uiKarton.state.toolbox[agentInstanceId],
-      getMountPrefixes: (agentInstanceId) => {
-        const mounts = this.agentMounts.get(agentInstanceId);
-        return mounts ? [...mounts.keys()] : undefined;
-      },
+      getMountPrefixes: (agentInstanceId) =>
+        this.core.getMountPrefixes(agentInstanceId),
     };
-    this.mentionSearch = new MentionSearchService(logger, searchCtx);
+    this.mentionSearch = new MentionSearchService(this.logger, searchCtx);
   }
 
   public static async create(
@@ -183,6 +216,7 @@ export class MountManagerService extends DisposableService {
     telemetryService: TelemetryService,
     gitService: GitService,
     preferencesService: PreferencesService,
+    mountsController: MountsStateController,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ): Promise<MountManagerService> {
     const instance = new MountManagerService(
@@ -193,6 +227,7 @@ export class MountManagerService extends DisposableService {
       telemetryService,
       gitService,
       preferencesService,
+      mountsController,
       resolvedEnvPromise,
     );
     await instance.initialize();
@@ -207,6 +242,15 @@ export class MountManagerService extends DisposableService {
     resolver: (workspacePaths: string[]) => Promise<Map<string, number>>,
   ): void {
     this.getWorkspaceLastUsedAtByPath = resolver;
+  }
+
+  /**
+   * Expose the package-owned `MountManager` so core-side environment
+   * providers (e.g. `WorkspaceProvider`, `AgentsMdProvider`) can read
+   * mount state directly without routing through this host shell.
+   */
+  public getCoreMountManager(): MountManager {
+    return this.core;
   }
 
   private async initialize(): Promise<void> {
@@ -457,7 +501,7 @@ export class MountManagerService extends DisposableService {
     const resolvedPath = await safeRealpath(workspacePath);
     if (!resolvedPath) return false;
 
-    for (const mountedPath of this.workspacePathsPerMount.values()) {
+    for (const mountedPath of this.core.getAllMountedPaths()) {
       const resolvedMountedPath = await safeRealpath(mountedPath);
       if (resolvedMountedPath === resolvedPath) return true;
     }
@@ -581,6 +625,12 @@ export class MountManagerService extends DisposableService {
     this.onMountsChanged?.(agentInstanceId);
   }
 
+  /**
+   * Handle the UI's mount request: resolve the path (opening the file
+   * picker if none was supplied), persist it to the recents list,
+   * stash host-side permissions, then delegate the actual registry /
+   * cache / watcher work to the core `MountManager`.
+   */
   public async handleMountWorkspace(
     agentInstanceId: string,
     workspacePath?: string,
@@ -604,169 +654,54 @@ export class MountManagerService extends DisposableService {
     }
     if (!resolvedWorkspacePath) return;
 
-    if (!this.clientRuntimesPerPath.has(resolvedWorkspacePath)) {
-      this.clientRuntimesPerPath.set(
-        resolvedWorkspacePath,
-        new ClientRuntimeNode({
-          workingDirectory: resolvedWorkspacePath,
-          rgBinaryBasePath: getRipgrepBasePath(),
-        }),
-      );
-      const resolvedEnv = await this.resolvedEnvPromise;
-      const lspPromise = LspService.create(
-        this.logger,
-        this.clientRuntimesPerPath.get(resolvedWorkspacePath)!,
-        resolvedEnv,
-      );
-      this.lspReady.set(resolvedWorkspacePath, lspPromise);
-      const lspService = await lspPromise;
-      this.lspServicesPerPath.set(resolvedWorkspacePath, lspService);
-
-      this.startWorkspaceWatcher(
-        resolvedWorkspacePath,
-        this.clientRuntimesPerPath.get(resolvedWorkspacePath)!,
-      );
-    }
-
     await this.userExperienceService.saveRecentlyOpenedWorkspace({
       path: resolvedWorkspacePath,
       name: path.basename(resolvedWorkspacePath),
       openedAt: Date.now(),
     });
 
-    if (!this.uiKarton.state.toolbox[agentInstanceId]) {
-      this.uiKarton.setState((draft: KartonStateDraft) => {
-        draft.toolbox[agentInstanceId] = {
-          workspace: { mounts: [] },
-          pendingFileDiffs: [],
-          editSummary: [],
-          pendingUserQuestion: null,
-        };
-      });
-    }
-
-    const mounts =
-      this.agentMounts.get(agentInstanceId) ??
-      new Map<MountPrefix, MountPermission[]>();
-    const alreadyMounted = [...mounts.keys()].some(
-      (prefix) =>
-        this.workspacePathsPerMount.get(prefix) === resolvedWorkspacePath,
-    );
-    if (alreadyMounted) return;
-
     const prefix = mountPrefixForPath(resolvedWorkspacePath);
-    mounts.set(prefix, resolvedPermissions);
-    this.agentMounts.set(agentInstanceId, mounts);
-    this.workspacePathsPerMount.set(prefix, resolvedWorkspacePath);
+    let perAgent = this.agentPermissions.get(agentInstanceId);
+    if (!perAgent) {
+      perAgent = new Map<MountPrefix, MountPermission[]>();
+      this.agentPermissions.set(agentInstanceId, perAgent);
+    }
+    // Record permissions up-front so `getMountedPathsWithRuntimes`
+    // can observe them in the `onMountsChanged` callback that fires
+    // from within `core.mountWorkspace`.
+    perAgent.set(prefix, resolvedPermissions);
 
-    const clientRuntime = this.clientRuntimesPerPath.get(
-      resolvedWorkspacePath,
-    )!;
+    await this.core.mountWorkspace(agentInstanceId, resolvedWorkspacePath);
 
-    const [workspaceMdContent, agentsMdContent, skills] = await Promise.all([
-      readWorkspaceMd(resolvedWorkspacePath),
-      readAgentsMd(clientRuntime),
-      getSkills(clientRuntime),
-    ]);
-    const git = await this.gitService.getMountedWorkspaceSummary(
-      resolvedWorkspacePath,
-    );
-
-    this.uiKarton.setState((draft: KartonStateDraft) => {
-      draft.toolbox[agentInstanceId].workspace.mounts.push({
-        prefix,
-        path: resolvedWorkspacePath,
-        git,
-        skills: skills.map((s) => ({
-          name: s.name,
-          description: s.description,
-        })),
-        workspaceMdContent,
-        agentsMdContent,
-      });
-    });
-
-    this.onMountsChanged?.(agentInstanceId);
-
+    // Worktree-setup is host-side git tooling: if this mount corresponds
+    // to a worktree we just created, kick off its setup commands now that
+    // the workspace is mounted and its runtime is available.
     const pendingSetup = await this.takePendingWorktreeSetup(
       resolvedWorkspacePath,
     );
     if (pendingSetup) {
       void this.worktreeSetupRunner.start(pendingSetup);
     }
-
-    const agentType =
-      this.uiKarton.state.agents.instances[agentInstanceId]?.type ?? 'unknown';
-    this.telemetryService.capture('workspace-mounted', {
-      agent_type: agentType,
-      agent_instance_id: agentInstanceId,
-    });
   }
 
   public async handleUnmountWorkspace(
     agentInstanceId: string,
     mountPrefix: string,
   ): Promise<void> {
-    const agentType =
-      this.uiKarton.state.agents.instances[agentInstanceId]?.type ?? 'unknown';
-    const mounts = this.agentMounts.get(agentInstanceId);
-    if (!mounts?.has(mountPrefix)) return;
-
-    mounts.delete(mountPrefix);
-    this.releaseMountIfUnused(mountPrefix);
-
-    this.uiKarton.setState((draft: KartonStateDraft) => {
-      draft.toolbox[agentInstanceId].workspace.mounts = draft.toolbox[
-        agentInstanceId
-      ].workspace.mounts.filter((m: MountEntry) => m.prefix !== mountPrefix);
-    });
-
-    this.onMountsChanged?.(agentInstanceId);
-    this.telemetryService.capture('workspace-unmounted', {
-      agent_type: agentType,
-      agent_instance_id: agentInstanceId,
-    });
+    this.agentPermissions.get(agentInstanceId)?.delete(mountPrefix);
+    this.core.unmountWorkspace(agentInstanceId, mountPrefix);
   }
 
-  /**
-   * If `mountPrefix` is no longer referenced by any agent, tears down
-   * all resources keyed on its workspace path: watcher, LSP service,
-   * client runtime, and the `workspacePathsPerMount` entry itself.
-   *
-   * Central helper for both `handleUnmountWorkspace` (explicit unmount)
-   * and `clearAgentMounts` (agent teardown). Without this cleanup in
-   * `clearAgentMounts`, orphaned workspace paths would stick around in
-   * `workspacePathsPerMount` indefinitely, which (a) leaks watchers /
-   * LSP processes across the app session and (b) causes
-   * `getAllMountedPaths()` to return stale roots, making
-   * `DiffHistoryService.findWorkspaceRoot` pick the wrong workspace's
-   * `.gitignore` matcher for later edits.
-   */
-  private releaseMountIfUnused(mountPrefix: string): void {
-    const stillInUse = [...this.agentMounts.values()].some((m) =>
-      m.has(mountPrefix),
-    );
-    if (stillInUse) return;
-    const workspacePath = this.workspacePathsPerMount.get(mountPrefix);
-    if (!workspacePath) return;
-    this.workspacePathsPerMount.delete(mountPrefix);
-    this.stopWorkspaceWatcher(workspacePath);
-    const lspService = this.lspServicesPerPath.get(workspacePath);
-    if (lspService) {
-      // Fire-and-forget is fine here — the workspace is already
-      // detached. But the rejection must be caught so it doesn't
-      // surface as an unhandled rejection when a client teardown
-      // races the server exit.
-      lspService.teardown().catch((err) => {
-        this.logger.warn(
-          `[MountManager] Failed to teardown LSP for ${workspacePath}`,
-          err,
-        );
-      });
-    }
-    this.clientRuntimesPerPath.delete(workspacePath);
-    this.lspServicesPerPath.delete(workspacePath);
-    this.lspReady.delete(workspacePath);
+  public clearAgentMounts(agentInstanceId: string): void {
+    this.agentPermissions.delete(agentInstanceId);
+    this.core.clearAgentMounts(agentInstanceId);
+  }
+
+  public setWorkspaceMdContent(
+    workspacePath: string,
+    content: string | null,
+  ): void {
+    this.core.setWorkspaceMdContent(workspacePath, content);
   }
 
   public getMountedPathsWithRuntimes(agentInstanceId: string): Array<{
@@ -775,17 +710,20 @@ export class MountManagerService extends DisposableService {
     permissions: MountPermission[];
     clientRuntime: ClientRuntimeNode;
   }> {
-    const mounts = this.agentMounts.get(agentInstanceId);
-    if (!mounts) return [];
+    const prefixes = this.core.getMountPrefixes(agentInstanceId);
+    if (!prefixes) return [];
+    const perAgent = this.agentPermissions.get(agentInstanceId);
     const result: Array<{
       prefix: string;
       path: string;
       permissions: MountPermission[];
       clientRuntime: ClientRuntimeNode;
     }> = [];
-    for (const [prefix, permissions] of mounts) {
-      const wsPath = this.workspacePathsPerMount.get(prefix);
+    for (const prefix of prefixes) {
+      const wsPath = this.core.getWorkspacePathForPrefix(prefix);
       const rt = wsPath ? this.clientRuntimesPerPath.get(wsPath) : undefined;
+      const permissions =
+        perAgent?.get(prefix) ?? ([...FULL_PERMISSIONS] as MountPermission[]);
       if (wsPath && rt) {
         result.push({ prefix, path: wsPath, permissions, clientRuntime: rt });
       }
@@ -797,18 +735,19 @@ export class MountManagerService extends DisposableService {
     agentInstanceId: string,
     filePath: string,
   ): string | undefined {
-    const mounts = this.agentMounts.get(agentInstanceId);
-    if (!mounts) return undefined;
-    const candidates: string[] = [];
-    for (const prefix of mounts.keys()) {
-      const wsPath = this.workspacePathsPerMount.get(prefix);
-      if (wsPath) candidates.push(wsPath);
-    }
-    return pickOwningWorkspace(filePath, candidates);
+    return this.core.findWorkspaceForFile(agentInstanceId, filePath);
+  }
+
+  public getMountPrefixes(agentInstanceId: string): string[] | undefined {
+    return this.core.getMountPrefixes(agentInstanceId);
+  }
+
+  public getWorkspacePathForPrefix(prefix: string): string | undefined {
+    return this.core.getWorkspacePathForPrefix(prefix);
   }
 
   public getAllMountedPaths(): Set<string> {
-    return new Set(this.workspacePathsPerMount.values());
+    return this.core.getAllMountedPaths();
   }
 
   public async scanWorkspaceGitCleanupCandidatesOnStartup(): Promise<void> {
@@ -1108,7 +1047,7 @@ export class MountManagerService extends DisposableService {
   private async isCurrentlyMounted(workspacePath: string): Promise<boolean> {
     const normalizedPath =
       (await safeRealpath(workspacePath)) ?? path.resolve(workspacePath);
-    for (const mountedPath of this.workspacePathsPerMount.values()) {
+    for (const mountedPath of this.core.getAllMountedPaths()) {
       const normalizedMountedPath =
         (await safeRealpath(mountedPath)) ?? path.resolve(mountedPath);
       if (normalizedMountedPath === normalizedPath) return true;
@@ -1117,10 +1056,10 @@ export class MountManagerService extends DisposableService {
   }
 
   public getMountedRuntimes(agentInstanceId: string): MountedClientRuntimes {
-    const mounts = this.agentMounts.get(agentInstanceId);
+    const prefixes = this.core.getMountPrefixes(agentInstanceId) ?? [];
     const result: MountedClientRuntimes = new Map();
-    for (const prefix of mounts?.keys() ?? []) {
-      const wsPath = this.workspacePathsPerMount.get(prefix);
+    for (const prefix of prefixes) {
+      const wsPath = this.core.getWorkspacePathForPrefix(prefix);
       if (!wsPath) continue;
       const rt = this.clientRuntimesPerPath.get(wsPath);
       if (rt) result.set(prefix, rt);
@@ -1129,39 +1068,15 @@ export class MountManagerService extends DisposableService {
   }
 
   public getMountedLspServices(agentInstanceId: string): MountedLspServices {
-    const mounts = this.agentMounts.get(agentInstanceId);
+    const prefixes = this.core.getMountPrefixes(agentInstanceId) ?? [];
     const result: MountedLspServices = new Map();
-    for (const prefix of mounts?.keys() ?? []) {
-      const wsPath = this.workspacePathsPerMount.get(prefix);
+    for (const prefix of prefixes) {
+      const wsPath = this.core.getWorkspacePathForPrefix(prefix);
       if (!wsPath) continue;
       const lsp = this.lspServicesPerPath.get(wsPath);
       if (lsp) result.set(prefix, lsp);
     }
     return result;
-  }
-
-  public clearAgentMounts(agentInstanceId: string): void {
-    const mounts = this.agentMounts.get(agentInstanceId);
-    this.agentMounts.delete(agentInstanceId);
-    if (!mounts) return;
-    // Release every mount this agent was holding so orphaned
-    // workspace paths (and their watcher / LSP / runtime state) do
-    // not leak when an agent is torn down without going through
-    // `handleUnmountWorkspace` first. See `releaseMountIfUnused`.
-    for (const prefix of mounts.keys()) this.releaseMountIfUnused(prefix);
-  }
-
-  public setWorkspaceMdContent(
-    workspacePath: string,
-    content: string | null,
-  ): void {
-    this.uiKarton.setState((draft: KartonStateDraft) => {
-      for (const agentId in draft.toolbox) {
-        const mounts = draft.toolbox[agentId].workspace.mounts;
-        for (const mount of mounts)
-          if (mount.path === workspacePath) mount.workspaceMdContent = content;
-      }
-    });
   }
 
   public getClientRuntimeForPath(
@@ -1171,15 +1086,15 @@ export class MountManagerService extends DisposableService {
   }
 
   public getWorkspaceSnapshot(agentInstanceId: string): WorkspaceSnapshot {
-    const mounts = this.agentMounts.get(agentInstanceId);
-    if (!mounts || mounts.size === 0) return { mounts: [] };
-
+    const prefixes = this.core.getMountPrefixes(agentInstanceId);
+    if (!prefixes || prefixes.length === 0) return { mounts: [] };
+    const perAgent = this.agentPermissions.get(agentInstanceId);
     return {
-      mounts: [...mounts.entries()]
-        .map(([prefix, permissions]) => ({
+      mounts: prefixes
+        .map((prefix) => ({
           prefix,
-          path: this.workspacePathsPerMount.get(prefix) ?? '',
-          permissions,
+          path: this.core.getWorkspacePathForPrefix(prefix) ?? '',
+          permissions: perAgent?.get(prefix),
         }))
         .filter((m) => m.path !== ''),
     };
@@ -1208,7 +1123,11 @@ export class MountManagerService extends DisposableService {
         error: err,
         path: filePath,
       });
-      this.report(err as Error, 'syncFileWithLsp', { path: filePath });
+      this.telemetryService.captureException(err as Error, {
+        service: 'mount-manager',
+        operation: 'syncFileWithLsp',
+        path: filePath,
+      });
     }
   }
 
@@ -1232,162 +1151,43 @@ export class MountManagerService extends DisposableService {
         error: err,
         path: filePath,
       });
-      this.report(err as Error, 'syncFileCloseWithLsp', {
+      this.telemetryService.captureException(err as Error, {
+        service: 'mount-manager',
+        operation: 'syncFileCloseWithLsp',
         path: filePath,
       });
     }
   }
 
   /**
-   * Watches the workspace root for changes to skills and MD files.
-   *
-   * We watch the root with an `ignored` filter rather than specific subdirectory
-   * paths because chokidar v4 silently drops non-existent watch targets. By
-   * watching the root, we reliably detect newly created directories (e.g. when
-   * `.stagewise/skills/` is created for the first time).
-   *
-   * The `ignored` filter aggressively prunes the tree at depth 1 so only
-   * `.stagewise/`, `.agents/`, and `AGENTS.md` are traversed — keeping the
-   * number of active fs.watch handles to ~15-20 regardless of workspace size.
+   * Core hook: first agent to reference `wsPath` — spin up the host
+   * `ClientRuntimeNode` + `LspService`. Awaited by core before it
+   * issues its first workspace-info read so the runtime is ready.
    */
-  private startWorkspaceWatcher(
-    wsPath: WorkspacePath,
-    clientRuntime: ClientRuntimeNode,
-  ): void {
-    if (this.watchersPerPath.has(wsPath)) return;
-
-    const allowedTopLevel = new Set([
-      '.stagewise',
-      '.agents',
-      '.git',
-      'AGENTS.md',
-    ]);
-    const allowedChildren: Record<string, Set<string>> = {
-      '.stagewise': new Set(['skills', WORKSPACE_MD_FILENAME]),
-      '.agents': new Set(['skills']),
-      '.git': new Set(['HEAD']),
-    };
-
-    const watcher = chokidar.watch(wsPath, {
-      persistent: true,
-      ignoreInitial: true,
-      // depth 4 = .stagewise/skills/<skill-name>/SKILL.md
-      depth: 4,
-      awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
-      ignored: (filePath: string) => {
-        if (filePath === wsPath) return false;
-        const rel = path.relative(wsPath, filePath);
-        const segments = rel.split(path.sep);
-        if (segments.length === 1) return !allowedTopLevel.has(segments[0]);
-        if (segments.length === 2) {
-          const allowed = allowedChildren[segments[0]];
-          return !allowed?.has(segments[1]);
-        }
-        return !(
-          (segments[0] === '.stagewise' || segments[0] === '.agents') &&
-          segments[1] === 'skills'
-        );
-      },
+  private async attachWorkspaceRuntime(wsPath: string): Promise<void> {
+    if (this.clientRuntimesPerPath.has(wsPath)) return;
+    const runtime = new ClientRuntimeNode({
+      workingDirectory: wsPath,
+      rgBinaryBasePath: getRipgrepBasePath(),
     });
-
-    const scheduleRefresh = () => {
-      const existing = this.watcherDebounceTimers.get(wsPath);
-      if (existing) clearTimeout(existing);
-      this.watcherDebounceTimers.set(
-        wsPath,
-        setTimeout(() => {
-          this.watcherDebounceTimers.delete(wsPath);
-          void this.refreshWorkspaceInfo(wsPath, clientRuntime);
-        }, 400),
-      );
-    };
-
-    watcher
-      .on('add', scheduleRefresh)
-      .on('change', scheduleRefresh)
-      .on('unlink', scheduleRefresh)
-      .on('addDir', scheduleRefresh)
-      .on('unlinkDir', scheduleRefresh)
-      .on('error', (error) => {
-        this.logger.debug('[MountManager] Workspace watcher error', {
-          error,
-          path: wsPath,
-        });
-      });
-
-    this.watchersPerPath.set(wsPath, watcher);
-    this.logger.debug('[MountManager] Started workspace watcher', {
-      path: wsPath,
-    });
+    this.clientRuntimesPerPath.set(wsPath, runtime);
+    const resolvedEnv = await this.resolvedEnvPromise;
+    const lspPromise = LspService.create(this.logger, runtime, resolvedEnv);
+    this.lspReady.set(wsPath, lspPromise);
+    const lspService = await lspPromise;
+    this.lspServicesPerPath.set(wsPath, lspService);
   }
 
-  private stopWorkspaceWatcher(wsPath: WorkspacePath): void {
-    const timer = this.watcherDebounceTimers.get(wsPath);
-    if (timer) {
-      clearTimeout(timer);
-      this.watcherDebounceTimers.delete(wsPath);
-    }
-    const watcher = this.watchersPerPath.get(wsPath);
-    if (watcher) {
-      void watcher.close();
-      this.watchersPerPath.delete(wsPath);
-      this.logger.debug('[MountManager] Stopped workspace watcher', {
-        path: wsPath,
-      });
-    }
-  }
-
-  /** Re-reads skills and MD files from disk, then pushes updated data to UI state. */
-  private async refreshWorkspaceInfo(
-    wsPath: WorkspacePath,
-    clientRuntime: ClientRuntimeNode,
-  ): Promise<void> {
-    try {
-      const [workspaceMdContent, agentsMdContent, skills] = await Promise.all([
-        readWorkspaceMd(wsPath),
-        readAgentsMd(clientRuntime),
-        getSkills(clientRuntime),
-      ]);
-
-      const skillEntries = skills.map((s) => ({
-        name: s.name,
-        description: s.description,
-      }));
-
-      const git = await this.gitService.getMountedWorkspaceSummary(wsPath);
-
-      this.uiKarton.setState((draft: KartonStateDraft) => {
-        for (const agentId in draft.toolbox) {
-          for (const mount of draft.toolbox[agentId].workspace.mounts) {
-            if (mount.path !== wsPath) continue;
-            mount.skills = skillEntries;
-            mount.git = git;
-            mount.workspaceMdContent = workspaceMdContent;
-            mount.agentsMdContent = agentsMdContent;
-          }
-        }
-      });
-
-      // Skills inside this workspace may have changed (added/removed/edited)
-      // — notify every agent that mounts this workspace so the unified
-      // slash-command list (`draft.skills`) gets rebuilt. Without this,
-      // workspace skill additions only become visible after a
-      // mount/unmount or preference change.
-      for (const [agentId, mounts] of this.agentMounts) {
-        for (const prefix of mounts.keys()) {
-          if (this.workspacePathsPerMount.get(prefix) === wsPath) {
-            this.onMountsChanged?.(agentId);
-            break;
-          }
-        }
-      }
-    } catch (error) {
-      this.logger.debug('[MountManager] Failed to refresh workspace info', {
-        error,
-        path: wsPath,
-      });
-      this.report(error as Error, 'refreshWorkspaceInfo', { path: wsPath });
-    }
+  /**
+   * Core hook: last reference to `wsPath` released — tear down the
+   * host runtime + LSP. Fire-and-forget from the core's perspective.
+   */
+  private releaseWorkspaceRuntime(wsPath: string): void {
+    const lspService = this.lspServicesPerPath.get(wsPath);
+    if (lspService) void lspService.teardown();
+    this.clientRuntimesPerPath.delete(wsPath);
+    this.lspServicesPerPath.delete(wsPath);
+    this.lspReady.delete(wsPath);
   }
 
   private async getPendingWorktreeSetupKey(
@@ -1431,42 +1231,15 @@ export class MountManagerService extends DisposableService {
     return metadata;
   }
 
-  private report(
-    error: Error,
-    operation: string,
-    extra?: Record<string, unknown>,
-  ): void {
-    this.telemetryService.captureException(error, {
-      service: 'mount-manager',
-      operation,
-      ...extra,
-    });
-  }
-
-  protected async onTeardown(): Promise<void> {
+  protected onTeardown(): Promise<void> | void {
     this.pendingWorktreeSetups.clear();
     this.worktreeSetupRunner.teardown();
-
-    for (const wsPath of this.watchersPerPath.keys())
-      this.stopWorkspaceWatcher(wsPath);
-
-    // Await every LSP teardown so the overall shutdown chain (main
-    // process -> toolbox -> mount-manager -> lsp -> client) is fully
-    // sequenced. Per-service rejections are caught individually to
-    // prevent one failing LSP from aborting the aggregate teardown.
-    const teardownPromises = Array.from(this.lspServicesPerPath.values()).map(
-      (lspService) =>
-        lspService.teardown().catch((err) => {
-          this.logger.warn(
-            '[MountManager] Failed to teardown LSP during onTeardown',
-            err,
-          );
-        }),
-    );
-    await Promise.all(teardownPromises);
-
+    void this.core.teardownWatchers();
+    for (const lspService of this.lspServicesPerPath.values())
+      void lspService.teardown();
     this.lspServicesPerPath.clear();
     this.clientRuntimesPerPath.clear();
+    this.lspReady.clear();
     this.uiKarton.removeServerProcedureHandler('toolbox.mountWorkspace');
     this.uiKarton.removeServerProcedureHandler('toolbox.unmountWorkspace');
     this.uiKarton.removeServerProcedureHandler('toolbox.listGitBranchesByPath');
@@ -1502,3 +1275,7 @@ export class MountManagerService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('toolbox.searchMentionFiles');
   }
 }
+
+// Keep the prefix helper available via the old import path for any
+// remaining host-side callers.
+export { mountPrefixForPath };

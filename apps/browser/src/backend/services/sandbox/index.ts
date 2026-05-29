@@ -12,8 +12,9 @@ import {
 } from './ipc';
 import type { KartonService } from '@/services/karton';
 import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
-import { writeBlob } from '@/utils/attachment-blobs';
+import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
+import type { ActiveAppStateController } from '../agent-core-bridge/state/toolbox-active-app';
 
 /**
  * Callback type for handling file diff notifications from the sandbox worker.
@@ -83,6 +84,15 @@ export class SandboxService extends DisposableService {
   private readonly mountResolver?: MountResolver;
   private readonly credentialResolver?: CredentialResolver;
   private readonly kartonService?: KartonService;
+  /**
+   * Injected post-construction by `main.ts` once the AgentCoreBridge is
+   * wired. Writes for the migrated `activeApp` / `pendingAppMessage`
+   * slice must go through this controller (Phase 1d, D-KB-1) so
+   * `AgentStore` stays the single source of truth. If unset at the time
+   * an app lifecycle event arrives, migrated writes fail fast instead of
+   * silently falling back to direct Karton writes.
+   */
+  private activeAppController: ActiveAppStateController | null = null;
   private workers: WorkerInfo[] = [];
   private agentToWorker = new Map<string, WorkerInfo>();
   private pendingRequests = new Map<string, PendingRequest>();
@@ -99,9 +109,12 @@ export class SandboxService extends DisposableService {
   /** Per-agent CDP event subscriptions. Outer key = agentId, inner key = "tabId\0event", value = unsubscribe fn from WindowLayoutService. */
   private cdpSubscriptions = new Map<string, Map<string, () => void>>();
 
+  private readonly attachments: AttachmentsService;
+
   constructor(
     windowLayoutService: WindowLayoutService,
     logger: Logger,
+    attachments: AttachmentsService,
     fileDiffHandler?: FileDiffHandler,
     mountResolver?: MountResolver,
     credentialResolver?: CredentialResolver,
@@ -111,6 +124,7 @@ export class SandboxService extends DisposableService {
     super();
     this.windowLayoutService = windowLayoutService;
     this.logger = logger;
+    this.attachments = attachments;
     this.fileDiffHandler = fileDiffHandler;
     this.mountResolver = mountResolver;
     this.credentialResolver = credentialResolver;
@@ -120,6 +134,7 @@ export class SandboxService extends DisposableService {
   public static async create(
     windowLayoutService: WindowLayoutService,
     logger: Logger,
+    attachments: AttachmentsService,
     fileDiffHandler?: FileDiffHandler,
     mountResolver?: MountResolver,
     credentialResolver?: CredentialResolver,
@@ -128,6 +143,7 @@ export class SandboxService extends DisposableService {
     const instance = new SandboxService(
       windowLayoutService,
       logger,
+      attachments,
       fileDiffHandler,
       mountResolver,
       credentialResolver,
@@ -259,17 +275,23 @@ export class SandboxService extends DisposableService {
 
     this.cleanupCdpSubscriptions(agentId);
 
-    if (this.kartonService) {
-      const hasActiveApp =
-        this.kartonService.state.toolbox[agentId]?.activeApp != null;
-      if (hasActiveApp) {
-        this.kartonService.setState((draft) => {
-          if (draft.toolbox[agentId]) {
-            draft.toolbox[agentId].activeApp = null;
-          }
-        });
-      }
+    // Clear the migrated `activeApp` slice through AgentStore. The bridge
+    // mirror propagates to Karton. If the controller isn't registered yet
+    // (very early teardown, before main.ts wiring), silently no-op — the
+    // store has no entry to clear either.
+    if (this.activeAppController?.getActiveApp(agentId) != null) {
+      this.activeAppController.clearActiveApp(agentId);
     }
+  }
+
+  /**
+   * Injects the active-app state controller. Called once from `main.ts`
+   * after `createAgentCoreBridge` returns its handles. Idempotent: a
+   * second call replaces the controller, which is safe because writes
+   * through the old controller would land in the same `AgentStore`.
+   */
+  public setActiveAppController(controller: ActiveAppStateController): void {
+    this.activeAppController = controller;
   }
 
   async execute(
@@ -407,7 +429,7 @@ export class SandboxService extends DisposableService {
         try {
           const fileName = generateAttachmentFilename(msg.originalFileName);
           const data = Buffer.from(msg.data, 'base64');
-          await writeBlob(msg.agentId, fileName, data);
+          await this.attachments.write(msg.agentId, fileName, data);
           // Stream attachment preview immediately so the UI can show it mid-execution
           const toolCallId = this.agentToolCallIds.get(msg.agentId);
           if (toolCallId && this.kartonService) {
@@ -464,29 +486,26 @@ export class SandboxService extends DisposableService {
       }
       case 'open-app': {
         try {
+          if (!this.activeAppController) {
+            this.safeSend(worker, {
+              type: 'open-app-result',
+              id: msg.id,
+              success: false,
+              error: 'Active-app controller is not wired',
+            });
+            return;
+          }
           const base = msg.pluginId
             ? `app://plugins/${msg.pluginId}/${msg.appId}/index.html`
             : `app://agents/${msg.agentId}/${msg.appId}/index.html`;
           const src = `${base}?_t=${Date.now()}`;
 
-          if (this.kartonService) {
-            this.kartonService.setState((draft) => {
-              if (!draft.toolbox[msg.agentId]) {
-                draft.toolbox[msg.agentId] = {
-                  workspace: { mounts: [] },
-                  pendingFileDiffs: [],
-                  editSummary: [],
-                  pendingUserQuestion: null,
-                };
-              }
-              draft.toolbox[msg.agentId].activeApp = {
-                appId: msg.appId,
-                pluginId: msg.pluginId,
-                src,
-                height: msg.height,
-              };
-            });
-          }
+          this.activeAppController.setActiveApp(msg.agentId, {
+            appId: msg.appId,
+            pluginId: msg.pluginId,
+            src,
+            height: msg.height,
+          });
           this.safeSend(worker, {
             type: 'open-app-result',
             id: msg.id,
@@ -504,13 +523,16 @@ export class SandboxService extends DisposableService {
       }
       case 'close-app': {
         try {
-          if (this.kartonService) {
-            this.kartonService.setState((draft) => {
-              if (draft.toolbox[msg.agentId]) {
-                draft.toolbox[msg.agentId].activeApp = null;
-              }
+          if (!this.activeAppController) {
+            this.safeSend(worker, {
+              type: 'close-app-result',
+              id: msg.id,
+              success: false,
+              error: 'Active-app controller is not wired',
             });
+            return;
           }
+          this.activeAppController.clearActiveApp(msg.agentId);
           this.safeSend(worker, {
             type: 'close-app-result',
             id: msg.id,
@@ -528,17 +550,16 @@ export class SandboxService extends DisposableService {
       }
       case 'send-app-message': {
         try {
-          if (!this.kartonService) {
+          if (!this.activeAppController) {
             this.safeSend(worker, {
               type: 'send-app-message-result',
               id: msg.id,
               success: false,
-              error: 'No Karton service configured',
+              error: 'Active-app controller is not wired',
             });
             return;
           }
-          const activeApp =
-            this.kartonService.state.toolbox[msg.agentId]?.activeApp;
+          const activeApp = this.activeAppController.getActiveApp(msg.agentId);
           if (
             !activeApp ||
             activeApp.appId !== msg.appId ||
@@ -552,14 +573,10 @@ export class SandboxService extends DisposableService {
             });
             return;
           }
-          this.kartonService.setState((draft) => {
-            if (draft.toolbox[msg.agentId]) {
-              draft.toolbox[msg.agentId].pendingAppMessage = {
-                appId: msg.appId,
-                pluginId: msg.pluginId,
-                data: msg.data,
-              };
-            }
+          this.activeAppController.setPendingAppMessage(msg.agentId, {
+            appId: msg.appId,
+            pluginId: msg.pluginId,
+            data: msg.data,
           });
           this.safeSend(worker, {
             type: 'send-app-message-result',
@@ -707,7 +724,7 @@ export class SandboxService extends DisposableService {
 
   clearPendingOutputs(agentId: string, toolCallId: string) {
     // Flush any remaining attachment buffers to Karton state so
-    // drainSandboxAttachments (called later in handlePostStep) sees them.
+    // drainPendingAttachments (called later in handlePostStep) sees them.
     const remainingAttachments = this.attachmentBuffers.get(toolCallId);
     if (
       remainingAttachments &&
@@ -751,7 +768,7 @@ export class SandboxService extends DisposableService {
 
     // Only clear streaming outputs from Karton state. Attachments are
     // intentionally preserved — they are consumed later by
-    // drainSandboxAttachments() in handlePostStep.
+    // drainPendingAttachments() in handlePostStep.
     if (!this.kartonService) return;
     const agentToolbox = this.kartonService.state.toolbox[agentId];
     if (!agentToolbox) return;

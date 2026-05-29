@@ -44,7 +44,7 @@ import {
   readPersistedDataSync,
   writePersistedDataSync,
 } from '@/utils/persisted-data';
-import { writeBlob } from '@/utils/attachment-blobs';
+import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import { generateAttachmentFilename } from '@shared/utils/attachment-filename';
 import sharp from 'sharp';
 
@@ -399,6 +399,7 @@ export class WindowLayoutService extends DisposableService {
   private uiZoomPreferenceListener:
     | ((newPrefs: UserPreferences, oldPrefs: UserPreferences) => void)
     | null = null;
+  private readonly attachments: AttachmentsService;
 
   private constructor(
     logger: Logger,
@@ -406,6 +407,7 @@ export class WindowLayoutService extends DisposableService {
     faviconService: FaviconService,
     pagesService: PagesService,
     preferencesService: PreferencesService,
+    attachments: AttachmentsService,
     telemetryService?: TelemetryService,
   ) {
     super();
@@ -417,6 +419,7 @@ export class WindowLayoutService extends DisposableService {
     this.pagesService = pagesService;
     this.preferencesService = preferencesService;
     this.telemetryService = telemetryService ?? null;
+    this.attachments = attachments;
   }
 
   public static async create(
@@ -425,6 +428,7 @@ export class WindowLayoutService extends DisposableService {
     faviconService: FaviconService,
     pagesService: PagesService,
     preferencesService: PreferencesService,
+    attachments: AttachmentsService,
     telemetryService?: TelemetryService,
   ): Promise<WindowLayoutService> {
     const instance = new WindowLayoutService(
@@ -433,6 +437,7 @@ export class WindowLayoutService extends DisposableService {
       faviconService,
       pagesService,
       preferencesService,
+      attachments,
       telemetryService,
     );
     await instance.initialize();
@@ -456,6 +461,7 @@ export class WindowLayoutService extends DisposableService {
 
     this.uiController = await UIController.create(
       this.logger,
+      this.attachments,
       this.telemetryService ?? undefined,
     );
     this.uiController.setCheckFrameValidityHandler(
@@ -2365,7 +2371,7 @@ export class WindowLayoutService extends DisposableService {
 
       // Store as an agent attachment blob
       const blobKey = generateAttachmentFilename(screenshotFileName);
-      await writeBlob(agentId, blobKey, webpBuffer);
+      await this.attachments.write(agentId, blobKey, webpBuffer);
 
       this.logger.debug(
         `[WindowLayout] Stored element screenshot: ${blobKey} (${Math.round(webpBuffer.length / 1024)}KB WebP)`,

@@ -1,111 +1,56 @@
-import type { ToolUIPart, UIDataTypes, UIMessage } from 'ai';
+import type {
+  AgentHistoryEntry,
+  AgentMessage as CoreAgentMessage,
+  AgentRuntimeError,
+  AgentState as CoreAgentState,
+  AgentToolUIPart as CoreAgentToolUIPart,
+  AgentTypes,
+  ExceededWindow,
+  StoredAgentPreview as CoreStoredAgentPreview,
+  ToolboxState,
+} from '@stagewise/agent-core/types/agent';
+import { AgentTypes as CoreAgentTypes } from '@stagewise/agent-core/types/agent';
 import type { ModelId } from '@shared/available-models';
 import type { MountedWorkspaceGitSummary } from '..';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
 import type { MountPermission, UserMessageMetadata } from './metadata';
 import type { UIAgentTools } from './tools/types';
 
-export enum AgentTypes {
-  CHAT = 'chat',
-  WORKSPACE_MD = 'project-md',
-}
-
-export type AgentMessage = UIMessage<
-  UserMessageMetadata,
-  UIDataTypes,
-  UIAgentTools
->;
-
-export type AgentToolUIPart = ToolUIPart<UIAgentTools>;
-
-export type ExceededWindow = {
-  type: string;
-  resetsAt: string;
+export { CoreAgentTypes as AgentTypes };
+export type {
+  AgentHistoryEntry,
+  AgentRuntimeError,
+  ExceededWindow,
+  ToolboxState,
 };
 
-export type AgentRuntimeError =
-  | { kind?: undefined; code?: number; message: string; stack?: string }
-  | {
-      kind: 'plan-limit-exceeded';
-      message: string;
-      plan?: string;
-      exceededWindows: ExceededWindow[];
-    }
-  | {
-      kind: 'upstream-overload';
-      message: string;
-      providerName?: string;
-      statusCode?: number;
-      /** Snapshot of the model that was active when the error occurred.
-       *  Captured so the UI can name the failed model even if the user
-       *  switches models while the error card is still visible. */
-      modelId?: string;
-    };
+export type AgentMessage = CoreAgentMessage<UIAgentTools, UserMessageMetadata>;
 
-export type AgentState = {
-  title: string; // The title of the agent - may not be necessary
-  titleLockedByUser?: boolean; // Whether the user manually set the title (prevents auto-regeneration)
-  isWorking: boolean; // Whether the agent is currently working on a task or if it's idling (either finished or waiting for user input).
-  history: AgentMessage[]; // The message history of the agent (visible to user)
-  queuedMessages: (AgentMessage & { role: 'user' })[]; // Queued messages that have not yet been sent to the agent.
-  activeModelId: ModelId; // The model ID that the agent last used
+export type AgentToolUIPart = CoreAgentToolUIPart<UIAgentTools>;
+
+export type AgentState = Omit<
+  CoreAgentState<AgentMessage>,
+  'activeModelId' | 'toolApprovalMode'
+> & {
+  activeModelId: ModelId;
   /**
-   * Per-agent tool-call approval policy. Controls whether tools with
-   * `needsApproval` require explicit user confirmation before execution.
-   * Defaults to `DEFAULT_TOOL_APPROVAL_MODE` ('alwaysAsk') for new agents
-   * (safe behaviour).
+   * Tool approval preference persisted per agent row.
+   *
+   * Since Phase 6, this field is store-canonical on `AgentState` in
+   * `@stagewise/agent-core` as `toolApprovalMode: string`. The host
+   * narrows it to the `ToolApprovalMode` union so UI, telemetry, and
+   * persistence can rely on the closed set of values.
+   *
+   * @see `packages/agent-core/SPEC.md` D22 (superseded by Phase 6).
    */
   toolApprovalMode: ToolApprovalMode;
-  /**
-   * Smart-approval classifier context keyed by tool call ID.
-   *
-   * Despite the legacy name, this is NOT the canonical source for whether a
-   * tool approval is pending. The canonical pending-approval state is stored
-   * on assistant history tool parts as `state === 'approval-requested'`, which
-   * exists for every approval mode/tool service. This record only stores the
-   * smart classifier explanation shown by the UI next to approval buttons.
-   * It is populated by smart shell approval and cleared when the user responds.
-   */
-  pendingApprovals: Record<string, { explanation: string }>;
-  inputState: string; // Serialized input state - may be simple text or some stringified object if our input field needs that.
-  usedTokens: number;
-  error?: AgentRuntimeError; // Current error state (not persisted, only available during runtime for UI display)
-  unread?: boolean; // Whether the agent has unseen output (not persisted, set on finish/error, cleared by markAsRead)
-  usageWarning?: {
-    windowType: string;
-    usedPercent: number;
-    resetsAt: string;
-  };
 };
 
-export type ToolboxState = {
-  pendingFiles: string[];
-  // Later on, tool calls that involve interaction with the user should also be placed here!!!
-};
-
-export type AgentHistoryEntry = {
-  id: string; // agent instance ID
-  title: string; // agent title
-  createdAt: Date; // agent creation timestamp
-  lastMessageAt: Date; // last message timestamp
-  messageCount: number; // number of messages in the agent's history
-  parentAgentInstanceId: string | null; // parent agent instance ID
-};
-
-/**
- * Trimmed preview DTO for a persisted agent instance, returned on-demand by
- * `agents.getStoredInstance` for the sidebar preview panel. Only includes the
- * fields the UI consumes today (or is expected to consume imminently) to keep
- * wire payload small.
- */
-export type StoredAgentPreview = {
-  id: string;
-  type: AgentTypes;
-  title: string;
-  createdAt: Date;
-  lastMessageAt: Date;
+export type StoredAgentPreview = Omit<
+  CoreStoredAgentPreview<AgentTypes>,
+  'activeModelId' | 'mountedWorkspaces'
+> & {
   activeModelId: ModelId;
-  messageCount: number;
   mountedWorkspaces: Array<{
     path: string;
     permissions: MountPermission[];

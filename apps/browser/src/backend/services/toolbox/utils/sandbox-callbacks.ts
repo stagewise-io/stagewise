@@ -1,5 +1,5 @@
 import type { Logger } from '@/services/logger';
-import type { DiffHistoryService } from '@/services/diff-history';
+import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { TelemetryService } from '@/services/telemetry';
 import type { MountManagerService } from '../services/mount-manager';
 import type { FileDiffHandler } from '../../sandbox';

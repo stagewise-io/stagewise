@@ -1,0 +1,1 @@
+export { AttachmentsService } from './service';

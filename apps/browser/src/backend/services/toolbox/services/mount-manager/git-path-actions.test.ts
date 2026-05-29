@@ -139,6 +139,11 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     pruneWorkspaceGitCleanupSnoozes: vi.fn(),
   };
 
+  const mountsController = {
+    setMounts: vi.fn(),
+    getMounts: vi.fn(() => [] as never[]),
+  };
+
   const service = new MountManagerService(
     {
       debug: vi.fn(),
@@ -155,6 +160,7 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     } as unknown as TelemetryService,
     gitService,
     preferencesService as never,
+    mountsController as never,
   );
 
   services.push(service);
@@ -172,8 +178,9 @@ function setWorkspacePathForMount(
   mountPrefix: string,
   workspacePath: string,
 ) {
+  const core = service.getCoreMountManager();
   const workspacePathsPerMount = Reflect.get(
-    service,
+    core,
     'workspacePathsPerMount',
   ) as Map<string, string>;
   workspacePathsPerMount.set(mountPrefix, workspacePath);
@@ -483,10 +490,10 @@ describe('MountManagerService path-based Git actions', () => {
         'failed',
       );
     });
-    expect(
-      state.toolbox.agent1.workspace.mounts.some(
-        (mount) => mount.path === createdPath,
-      ),
-    ).toBe(true);
+    // A failed setup must not unmount the worktree: the core mount
+    // registry still tracks it after the run resolves to `failed`.
+    expect(service.getCoreMountManager().getAllMountedPaths()).toContain(
+      createdPath,
+    );
   });
 });

@@ -7,7 +7,7 @@ import {
   parsePlanContent,
   type PlanTask,
   type TaskGroup,
-} from '@shared/plan-parsing';
+} from '@stagewise/agent-core/plans';
 import { getBaseName } from '@shared/path-utils';
 import { stripMountPrefix } from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';

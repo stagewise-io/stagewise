@@ -1,23 +1,16 @@
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import type { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
-import { capToolOutput } from '@/services/toolbox/utils';
-import { resolve } from 'node:path';
+import { readAgentsMd as readAgentsMdCore } from '@stagewise/agent-core/mount-manager';
 
-const AGENTS_MD_FILENAME = 'AGENTS.md';
-
+/**
+ * `ClientRuntimeNode`-flavored adapter around the canonical
+ * `readAgentsMd` implementation that lives in `@stagewise/agent-core`.
+ * Existing callers still pass a `ClientRuntimeNode`; the shim resolves
+ * its working directory and delegates to the core reader (which
+ * enforces the 40 KB cap internally).
+ */
 export async function readAgentsMd(
   clientRuntime: ClientRuntimeNode,
 ): Promise<string | null> {
   const path = clientRuntime.fileSystem.getCurrentWorkingDirectory();
-  const agentsMdPath = resolve(path, AGENTS_MD_FILENAME);
-  const exists = existsSync(agentsMdPath);
-  if (!exists) return null;
-  try {
-    const content = await readFile(agentsMdPath, 'utf-8');
-    const output = capToolOutput(content).result;
-    return output;
-  } catch (_e) {
-    return null;
-  }
+  return readAgentsMdCore(path);
 }

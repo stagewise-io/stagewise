@@ -2,7 +2,7 @@ import type { MultiEditPart } from '.';
 import type { WithDiff } from '@shared/karton-contracts/ui/agent/tools/types';
 import { useMemo } from 'react';
 import { useKartonState } from '@ui/hooks/use-karton';
-import { parsePlanContent } from '@shared/plan-parsing';
+import { parsePlanContent } from '@stagewise/agent-core/plans';
 import { getBaseName } from '@shared/path-utils';
 import { stripMountPrefix } from '@ui/utils';
 import { ToolPartUINotCollapsible } from '../shared/tool-part-ui-not-collapsible';

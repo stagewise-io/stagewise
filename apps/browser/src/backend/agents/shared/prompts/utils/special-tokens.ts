@@ -1,10 +1,9 @@
-const specialTokens = {
-  userMsgUserContentXmlTag: 'user-msg',
-  userMsgAttachmentXmlTag: 'attach',
-  userMsgCompressedHistoryXmlTag: 'compressed-history',
-  slashCommandXmlTag: 'slash-command',
-  truncated: (count?: number, type: 'line' | 'char' | 'file' = 'line') =>
-    `{{[TRUNCATED${count ? `${count} ${type}${count > 1 ? 's' : ''}` : ''}]}}`,
-};
+/**
+ * Compatibility shim. The canonical implementation now lives in
+ * `@stagewise/agent-core/agents` as the named `specialTokens` export.
+ * Kept here so existing `import specialTokens from './special-tokens'`
+ * sites in the browser keep working while Phase 10 is in flight.
+ */
+import { specialTokens } from '@stagewise/agent-core/agents';
 
 export default specialTokens;

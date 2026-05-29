@@ -6,7 +6,7 @@ import {
   index,
 } from 'drizzle-orm/sqlite-core';
 import { bigintTimestamp } from '../chrome-db-utils';
-import { metaTable } from '@/utils/migrate-database/types';
+import { metaTable } from '@stagewise/agent-core/migrate-database';
 
 // -------------------------------------------------------------------
 // Chrome Favicons Database Schema

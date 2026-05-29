@@ -17,6 +17,7 @@ import {
 } from '@shared/karton-contracts/ui/agent';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import { getWorkspaceMountsFromMessage } from '@shared/env-metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import {
@@ -35,9 +36,12 @@ import {
   type WorkspaceMdStatus,
 } from './workspace-md-section';
 import { UserQuestionSection } from './user-question-section';
-import { getAgentOwnedPlanPaths, PLANS_PREFIX } from '@shared/plan-ownership';
 import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
-import { getAgentOwnedLogPaths, LOGS_PREFIX } from '@shared/log-ownership';
+import {
+  getAgentOwnedPlanPaths,
+  PLANS_PREFIX,
+} from '@stagewise/agent-core/plans';
+import { getAgentOwnedLogPaths, LOGS_PREFIX } from '@stagewise/agent-core/logs';
 import { buildPlanSections, type PlanEntry } from './plan-section';
 import {
   buildLogChannelSections,
@@ -153,7 +157,7 @@ export function StatusCard() {
         if (!history || history.length === 0) return EMPTY_MOUNTS_SNAPSHOT;
         const mountsByPrefix = new Map<string, Mount>();
         for (const msg of history) {
-          const mounts = msg?.metadata?.environmentSnapshot?.workspace?.mounts;
+          const mounts = getWorkspaceMountsFromMessage(msg);
           if (!mounts) continue;
           for (const mount of mounts) {
             if (!mountsByPrefix.has(mount.prefix)) {

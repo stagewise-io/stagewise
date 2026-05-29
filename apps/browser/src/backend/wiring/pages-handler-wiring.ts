@@ -1,6 +1,6 @@
 import type { KartonService } from '../services/karton';
 import type { PagesService } from '../services/pages';
-import type { DiffHistoryService } from '../services/diff-history';
+import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { WindowLayoutService } from '../services/window-layout';
 import type { Logger } from '../services/logger';
 

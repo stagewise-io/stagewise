@@ -2,7 +2,10 @@ import { memo, useMemo } from 'react';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { IconClipboardContent } from 'nucleo-micro-bold';
-import { getLastOwnedPlanPath, PLANS_PREFIX } from '@shared/plan-ownership';
+import {
+  getLastOwnedPlanPath,
+  PLANS_PREFIX,
+} from '@stagewise/agent-core/plans';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 
 const EMPTY_HISTORY: AgentMessage[] = [];

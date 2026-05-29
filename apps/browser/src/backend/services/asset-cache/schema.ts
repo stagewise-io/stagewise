@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { metaTable } from '@/utils/migrate-database/types';
+import { metaTable } from '@stagewise/agent-core/migrate-database';
 
 export const meta = metaTable;
 

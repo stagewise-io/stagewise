@@ -5,7 +5,7 @@ import {
   blob,
   index,
 } from 'drizzle-orm/sqlite-core';
-import { metaTable } from '../../utils/migrate-database/types';
+import { metaTable } from '@stagewise/agent-core/migrate-database';
 
 // -------------------------------------------------------------------
 // Chrome Web Data Database Schema - Keywords Table

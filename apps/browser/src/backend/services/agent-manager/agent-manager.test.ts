@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { collectWorkspaceLastUsedAtByPath } from './persistence/db';
+import { collectWorkspaceLastUsedAtByPath } from '@stagewise/agent-core/agent-persistence';
 import { resolveNewAgentWorkspaceMountPath } from './workspace-mount-normalization';
 
 describe('collectWorkspaceLastUsedAtByPath', () => {

@@ -22,7 +22,7 @@
     "clear-vite-cache": "tsx scripts/clear-vite-cache.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
+    "typecheck": "pnpm -F @stagewise/agent-core build && concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "^0.0.27",
@@ -85,6 +85,7 @@
     "@posthog/ai": "7.18.1",
     "@posthog/cli": "^0.7.11",
     "@react-three/fiber": "^9.6.1",
+    "@stagewise/agent-core": "workspace:*",
     "@shikijs/colorized-brackets": "3.21.0",
     "@smithy/shared-ini-file-loader": "^4.4.9",
     "@stagewise/agent-runtime-node": "workspace:*",

@@ -186,6 +186,32 @@
           }
         }
       }
+    },
+    {
+      // Per SPEC D24: all filesystem access inside @stagewise/agent-core
+      // must flow through packages/agent-core/src/fs/. Non-test source
+      // files in the package may not import node:fs / node:fs/promises
+      // directly. Test files and src/fs/ itself are exempt.
+      "includes": [
+        "packages/agent-core/src/**/*.ts",
+        "!packages/agent-core/src/**/*.test.ts",
+        "!packages/agent-core/src/fs/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "node:fs": "Import from '../fs' (packages/agent-core/src/fs) instead. See SPEC D24.",
+                  "node:fs/promises": "Import from '../fs' (packages/agent-core/src/fs) instead. See SPEC D24."
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
