@@ -18,6 +18,9 @@ import type {
   WorkspaceGitCleanupCandidate,
   WorkspaceGitCleanupResult,
   WorkspaceGitCleanupState,
+  WorkspaceGitWorktreeDeleteOptions,
+  WorkspaceGitWorktreeDeleteResult,
+  WorkspaceGitWorktreeDeletionInfo,
   MountEntry,
   WorkspaceGitCreateBranchOptions,
   WorkspaceGitCreateWorktreeOptions,
@@ -252,6 +255,13 @@ export class MountManagerService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getGitRepositoryRemoteUrlByPath',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.getGitRepositoryRemoteUrlByPath(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'toolbox.switchGitBranchByPath',
       async (
         _callingClientId: string,
@@ -406,6 +416,24 @@ export class MountManagerService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getGitWorktreeDeletionInfo',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.getGitWorktreeDeletionInfo(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.deleteGitWorktreeByPath',
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        options?: WorkspaceGitWorktreeDeleteOptions,
+      ) => {
+        return this.deleteGitWorktreeByPath(workspacePath, options);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'toolbox.searchMentionFiles',
       async (
         _callingClientId: string,
@@ -508,6 +536,13 @@ export class MountManagerService extends DisposableService {
   private async listGitWorktreesByPath(workspacePath: string) {
     if (!(await this.isTrustedGitPath(workspacePath))) return null;
     return this.gitService.listWorkspaceWorktrees(workspacePath);
+  }
+
+  private async getGitRepositoryRemoteUrlByPath(
+    workspacePath: string,
+  ): Promise<string | null> {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+    return this.gitService.getRepositoryRemoteUrl(workspacePath);
   }
 
   private async switchGitBranchByPath(
@@ -848,6 +883,80 @@ export class MountManagerService extends DisposableService {
         draft.workspaceGitCleanup.cleaning = false;
       });
     }
+  }
+
+  private async getGitWorktreeDeletionInfo(
+    workspacePath: string,
+  ): Promise<WorkspaceGitWorktreeDeletionInfo | null> {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+
+    const resolvedWorkspacePath = await safeRealpath(workspacePath);
+    if (!resolvedWorkspacePath) return null;
+
+    const summary = await this.gitService.getMountedWorkspaceSummary(
+      resolvedWorkspacePath,
+    );
+    if (!summary?.isWorktree) return null;
+
+    const worktrees = await this.gitService.listWorktrees(
+      resolvedWorkspacePath,
+    );
+    let currentWorktree = null;
+    for (const worktree of worktrees) {
+      const resolvedWorktreePath =
+        (await safeRealpath(worktree.path)) ?? path.resolve(worktree.path);
+      if (resolvedWorktreePath === resolvedWorkspacePath) {
+        currentWorktree = worktree;
+        break;
+      }
+    }
+    if (!currentWorktree) return null;
+
+    const status = await this.gitService.getWorktreeStatus(
+      resolvedWorkspacePath,
+    );
+
+    return {
+      path: resolvedWorkspacePath,
+      branch: currentWorktree.branch,
+      isMainWorktree: currentWorktree.isMainWorktree,
+      status,
+      hasUncommittedChanges: status?.dirty ?? true,
+    };
+  }
+
+  private async deleteGitWorktreeByPath(
+    workspacePath: string,
+    options: WorkspaceGitWorktreeDeleteOptions = {},
+  ): Promise<WorkspaceGitWorktreeDeleteResult> {
+    const info = await this.getGitWorktreeDeletionInfo(workspacePath);
+    if (!info) {
+      return { ok: false, message: 'Worktree is no longer available.' };
+    }
+    if (info.isMainWorktree) {
+      return { ok: false, message: 'Cannot delete the root worktree.' };
+    }
+    if (info.hasUncommittedChanges && !options.force) {
+      return {
+        ok: false,
+        message: 'Worktree has uncommitted changes. Confirm force deletion.',
+      };
+    }
+
+    const result = await this.gitService.removeWorktree(info.path, {
+      force: options.force,
+    });
+    if (!result.ok) return result;
+
+    this.uiKarton.setState((draft: KartonStateDraft) => {
+      draft.workspaceGitCleanup.candidates =
+        draft.workspaceGitCleanup.candidates.filter(
+          (candidate: WorkspaceGitCleanupCandidate) =>
+            candidate.path !== info.path,
+        );
+    });
+
+    return { ok: true, path: info.path, branch: info.branch };
   }
 
   private async cleanWorkspaceGitWorktrees(
@@ -1472,6 +1581,9 @@ export class MountManagerService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('toolbox.listGitBranchesByPath');
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.listGitWorktreesByPath',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.getGitRepositoryRemoteUrlByPath',
     );
     this.uiKarton.removeServerProcedureHandler('toolbox.switchGitBranchByPath');
     this.uiKarton.removeServerProcedureHandler('toolbox.createGitBranchByPath');

@@ -130,6 +130,22 @@ export type WorkspaceGitCleanupResult = {
   failed: Array<{ path: string; message: string }>;
 };
 
+export type WorkspaceGitWorktreeDeletionInfo = {
+  path: string;
+  branch: string | null;
+  isMainWorktree: boolean;
+  status: MountedWorkspaceGitStatusSummary | null;
+  hasUncommittedChanges: boolean;
+};
+
+export type WorkspaceGitWorktreeDeleteResult =
+  | { ok: true; path: string; branch: string | null }
+  | { ok: false; message: string };
+
+export type WorkspaceGitWorktreeDeleteOptions = {
+  force?: boolean;
+};
+
 export type WorkspaceGitCleanupState = {
   checkedAt: number | null;
   dismissed: boolean;
@@ -929,6 +945,7 @@ export type KartonContract = {
         modelId?: ModelId,
         toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
+        preserveWorkspacePaths?: boolean,
       ) => Promise<string>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
@@ -1036,6 +1053,9 @@ export type KartonContract = {
       listGitWorktreesByPath: (
         workspacePath: string,
       ) => Promise<WorkspaceGitWorktreesResult | null>;
+      getGitRepositoryRemoteUrlByPath: (
+        workspacePath: string,
+      ) => Promise<string | null>;
       switchGitBranchByPath: (
         workspacePath: string,
         branchName: string,
@@ -1052,6 +1072,13 @@ export type KartonContract = {
       cleanWorkspaceGitWorktrees: (
         paths: string[],
       ) => Promise<WorkspaceGitCleanupResult>;
+      getGitWorktreeDeletionInfo: (
+        path: string,
+      ) => Promise<WorkspaceGitWorktreeDeletionInfo | null>;
+      deleteGitWorktreeByPath: (
+        path: string,
+        options?: WorkspaceGitWorktreeDeleteOptions,
+      ) => Promise<WorkspaceGitWorktreeDeleteResult>;
       listWorkspaceGitBranches: (
         agentInstanceId: string,
         mountPrefix: string,

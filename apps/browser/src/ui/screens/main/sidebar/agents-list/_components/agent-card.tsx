@@ -63,7 +63,7 @@ export function AgentCardSkeleton() {
     <div
       className={cn(
         buttonVariants({ variant: 'ghost', size: 'sm' }),
-        'justify-start pl-1.5 text-muted-foreground hover:bg-base-500/10',
+        'justify-start pr-3.5 pl-2 text-muted-foreground hover:bg-base-500/10',
       )}
     >
       <div className="h-4 w-2/5 animate-pulse rounded bg-surface-3" />
@@ -148,7 +148,7 @@ export const AgentCard = memo(
         }}
         className={cn(
           buttonVariants({ variant: 'ghost', size: 'sm' }),
-          'group/card relative justify-start pl-1.5 text-start text-muted-foreground hover:bg-foreground/8',
+          'group/card relative justify-start gap-1 pr-3.5 pl-2 text-start text-muted-foreground hover:bg-foreground/8',
           isPreviewActive && !isActive && 'bg-foreground/8 text-foreground',
           isActive && 'bg-foreground/5 text-foreground',
         )}

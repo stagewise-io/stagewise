@@ -121,6 +121,62 @@ describe('GitService', () => {
     ).resolves.toBeNull();
   });
 
+  it('returns normalized web URL for HTTPS Git remotes', async () => {
+    const { service } = await createGitService({
+      'remote -v':
+        'origin\thttps://github.com/stagewise-io/stagewise.git (fetch)\n' +
+        'origin\thttps://github.com/stagewise-io/stagewise.git (push)\n',
+    });
+
+    await expect(service.getRepositoryRemoteUrl('/repo')).resolves.toBe(
+      'https://github.com/stagewise-io/stagewise',
+    );
+  });
+
+  it('returns normalized web URL for SSH Git remotes', async () => {
+    const { service } = await createGitService({
+      'remote -v':
+        'origin\tgit@gitlab.com:stagewise-io/stagewise.git (fetch)\n' +
+        'origin\tgit@gitlab.com:stagewise-io/stagewise.git (push)\n',
+    });
+
+    await expect(service.getRepositoryRemoteUrl('/repo')).resolves.toBe(
+      'https://gitlab.com/stagewise-io/stagewise',
+    );
+  });
+
+  it('returns normalized web URL for ssh protocol Git remotes', async () => {
+    const { service } = await createGitService({
+      'remote -v':
+        'origin\tssh://git@bitbucket.org/stagewise-io/stagewise.git (fetch)\n' +
+        'origin\tssh://git@bitbucket.org/stagewise-io/stagewise.git (push)\n',
+    });
+
+    await expect(service.getRepositoryRemoteUrl('/repo')).resolves.toBe(
+      'https://bitbucket.org/stagewise-io/stagewise',
+    );
+  });
+
+  it('prefers the origin remote web URL', async () => {
+    const { service } = await createGitService({
+      'remote -v':
+        'upstream\thttps://github.com/stagewise-io/upstream.git (fetch)\n' +
+        'origin\thttps://github.com/stagewise-io/stagewise.git (fetch)\n',
+    });
+
+    await expect(service.getRepositoryRemoteUrl('/repo')).resolves.toBe(
+      'https://github.com/stagewise-io/stagewise',
+    );
+  });
+
+  it('returns null when no parseable Git remote exists', async () => {
+    const { service } = await createGitService({
+      'remote -v': 'origin\tfile:///tmp/repo.git (fetch)\n',
+    });
+
+    await expect(service.getRepositoryRemoteUrl('/repo')).resolves.toBeNull();
+  });
+
   it('returns branch summary for a normal repo', async () => {
     const { service } = await createGitService(baseReadResponses);
 

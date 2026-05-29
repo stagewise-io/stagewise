@@ -1248,6 +1248,27 @@ export type WorkspaceActionPayload =
       targetBranch: string;
     };
 
+export function applyMountedWorkspaceActionDefault(
+  config: WorkspaceActionConfig,
+  mount: MountEntry,
+): WorkspaceActionConfig {
+  if (!mount.git) return config;
+
+  if (mount.git.isWorktree) {
+    return {
+      ...config,
+      selectedAction: 'switch-worktree',
+      switchWorktreeTarget: mount.path,
+    };
+  }
+
+  return {
+    ...config,
+    selectedAction: 'create-worktree',
+    ...(mount.git.branch ? { createWorktreeFrom: mount.git.branch } : {}),
+  };
+}
+
 export function toWorkspaceActionPayload(
   config: WorkspaceActionConfig,
 ): WorkspaceActionPayload {
@@ -1821,18 +1842,21 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
 
   const [open, setOpen] = useState(false);
   const [localConfig, setLocalConfig] = useState(() =>
-    applyWorkspaceGitActionPreferences(
-      createDefaultWorkspaceActionConfig(
+    applyMountedWorkspaceActionDefault(
+      applyWorkspaceGitActionPreferences(
+        createDefaultWorkspaceActionConfig(
+          sourceBranchItems,
+          worktreeItems,
+          checkoutBranchItems,
+          defaultBranch,
+          checkoutDefaultBranch,
+        ),
         sourceBranchItems,
         worktreeItems,
-        checkoutBranchItems,
-        defaultBranch,
-        checkoutDefaultBranch,
+        generalWorkspaceGitActionPreference,
+        repositoryWorkspaceGitActionPreference,
       ),
-      sourceBranchItems,
-      worktreeItems,
-      generalWorkspaceGitActionPreference,
-      repositoryWorkspaceGitActionPreference,
+      mount,
     ),
   );
   const config = controlledConfig ?? localConfig;
@@ -1860,18 +1884,21 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   useEffect(() => {
     if (!gitDataLoaded) return;
 
-    const defaults = applyWorkspaceGitActionPreferences(
-      createDefaultWorkspaceActionConfig(
+    const defaults = applyMountedWorkspaceActionDefault(
+      applyWorkspaceGitActionPreferences(
+        createDefaultWorkspaceActionConfig(
+          sourceBranchItems,
+          worktreeItems,
+          checkoutBranchItems,
+          defaultBranch,
+          checkoutDefaultBranch,
+        ),
         sourceBranchItems,
         worktreeItems,
-        checkoutBranchItems,
-        defaultBranch,
-        checkoutDefaultBranch,
+        generalWorkspaceGitActionPreference,
+        repositoryWorkspaceGitActionPreference,
       ),
-      sourceBranchItems,
-      worktreeItems,
-      generalWorkspaceGitActionPreference,
-      repositoryWorkspaceGitActionPreference,
+      mount,
     );
     const previousCurrentBranchDefault = getCurrentBranchValue(null, gitRef);
     const previousDefaultBranchDefault = getDefaultBranchValue(null, gitRef);

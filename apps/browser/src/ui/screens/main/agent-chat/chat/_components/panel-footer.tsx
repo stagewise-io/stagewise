@@ -35,6 +35,7 @@ import {
 } from './chat-input';
 import {
   WorkspaceSelect,
+  applyMountedWorkspaceActionDefault,
   createDefaultWorkspaceActionConfig,
   executeWorkspaceGitAction,
   type WorkspaceActionConfig,
@@ -1542,8 +1543,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         const gitRef = formatWorkspaceGitRef(mount.git);
         const sourceBranchItems = getBranchSelectItems(gitRef);
         const worktreeItems = getWorktreeSelectItems();
-        next.set(
-          mount.prefix,
+        const baseConfig = applyMountedWorkspaceActionDefault(
           applyWorkspaceGitActionPreferences(
             createDefaultWorkspaceActionConfig(
               sourceBranchItems,
@@ -1554,7 +1554,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             workspaceGitActionPreferences.general,
             workspaceGitActionPreferences.repositories[mount.git.repositoryId],
           ),
+          mount,
         );
+        next.set(mount.prefix, baseConfig);
         changed = true;
       }
 

@@ -21,6 +21,7 @@ import type { Logger } from '@/services/logger';
 import {
   AgentTypes,
   type AgentHistoryEntry,
+  type AgentHistoryWorkspaceEntry,
   type AgentMessage,
 } from '@shared/karton-contracts/ui/agent';
 import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
@@ -178,6 +179,7 @@ export class AgentPersistenceDB {
         lastMessageAt: schema.agentInstances.lastMessageAt,
         messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
+        mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
       // Order by lastMessageAt so the sidebar's time-bucket grouping
@@ -203,7 +205,12 @@ export class AgentPersistenceDB {
 
     this._logger.debug(`[AgentPersistenceDB] Fetched agent history entries`);
 
-    return results;
+    return results.map((entry) => ({
+      ...entry,
+      mountedWorkspaces: entry.mountedWorkspaces as
+        | AgentHistoryWorkspaceEntry[]
+        | null,
+    }));
   }
 
   /**
@@ -230,6 +237,7 @@ export class AgentPersistenceDB {
         lastMessageAt: schema.agentInstances.lastMessageAt,
         messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
+        mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
       .where(
@@ -244,7 +252,16 @@ export class AgentPersistenceDB {
       `[AgentPersistenceDB] Fetched agent history entries by ids`,
     );
 
-    const resultById = new Map(results.map((entry) => [entry.id, entry]));
+    const normalizedResults: AgentHistoryEntry[] = results.map((entry) => ({
+      ...entry,
+      mountedWorkspaces: entry.mountedWorkspaces as
+        | AgentHistoryWorkspaceEntry[]
+        | null,
+    }));
+
+    const resultById = new Map(
+      normalizedResults.map((entry) => [entry.id, entry]),
+    );
     return ids
       .map((id) => resultById.get(id))
       .filter((entry): entry is AgentHistoryEntry => entry !== undefined);

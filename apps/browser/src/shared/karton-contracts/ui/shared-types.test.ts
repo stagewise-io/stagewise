@@ -8,6 +8,9 @@ describe('userPreferencesSchema sidebar defaults', () => {
     expect(parsed.sidebar).toEqual({
       showActiveAgents: true,
       pinnedAgentIds: [],
+      agentListGroupingMode: 'age',
+      workspaceGroupOrder: [],
+      collapsedWorkspaceGroupKeys: [],
     });
   });
 
@@ -19,6 +22,9 @@ describe('userPreferencesSchema sidebar defaults', () => {
     expect(parsed.sidebar).toEqual({
       showActiveAgents: false,
       pinnedAgentIds: [],
+      agentListGroupingMode: 'age',
+      workspaceGroupOrder: [],
+      collapsedWorkspaceGroupKeys: [],
     });
   });
 
@@ -30,17 +36,43 @@ describe('userPreferencesSchema sidebar defaults', () => {
     expect(parsed.sidebar).toEqual({
       showActiveAgents: true,
       pinnedAgentIds: ['agent-b', 'agent-a'],
+      agentListGroupingMode: 'age',
+      workspaceGroupOrder: [],
+      collapsedWorkspaceGroupKeys: [],
+    });
+  });
+
+  it('defaults invalid grouping mode values', () => {
+    const parsed = userPreferencesSchema.parse({
+      sidebar: { agentListGroupingMode: 'invalid' },
+    });
+
+    expect(parsed.sidebar).toEqual({
+      showActiveAgents: true,
+      pinnedAgentIds: [],
+      agentListGroupingMode: 'age',
+      workspaceGroupOrder: [],
+      collapsedWorkspaceGroupKeys: [],
     });
   });
 
   it('preserves complete sidebar preferences', () => {
     const parsed = userPreferencesSchema.parse({
-      sidebar: { showActiveAgents: false, pinnedAgentIds: ['agent-a'] },
+      sidebar: {
+        showActiveAgents: false,
+        pinnedAgentIds: ['agent-a'],
+        agentListGroupingMode: 'workspace',
+        workspaceGroupOrder: ['repo:b', 'repo:a'],
+        collapsedWorkspaceGroupKeys: ['repo:a', 'repo:a:root'],
+      },
     });
 
     expect(parsed.sidebar).toEqual({
       showActiveAgents: false,
       pinnedAgentIds: ['agent-a'],
+      agentListGroupingMode: 'workspace',
+      workspaceGroupOrder: ['repo:b', 'repo:a'],
+      collapsedWorkspaceGroupKeys: ['repo:a', 'repo:a:root'],
     });
   });
 });
