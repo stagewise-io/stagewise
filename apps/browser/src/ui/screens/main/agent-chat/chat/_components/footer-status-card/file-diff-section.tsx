@@ -293,8 +293,8 @@ export function FileDiffSection(
   return {
     // Change key when transitioning from pending to summary - forces remount with new defaultOpen
     key: hasPendingDiffs ? 'file-diff-pending' : 'file-diff-summary',
-    // Expand when there are pending diffs to review, collapse for summary view
-    defaultOpen: hasPendingDiffs,
+    // Keep both pending diffs and summary collapsed by default.
+    defaultOpen: false,
     trigger: (isOpen: boolean) => (
       <div className="flex w-full flex-row items-center justify-between gap-2 pl-1.5 text-muted-foreground text-xs hover:text-foreground has-[button:hover]:text-muted-foreground">
         <ChevronDownIcon
@@ -312,7 +312,7 @@ export function FileDiffSection(
           </span>
         )}
 
-        {pendingDiffs?.length > 0 ? (
+        {pendingDiffs?.length > 0 && isOpen ? (
           <div className="ml-auto flex flex-row items-center justify-start gap-1">
             <Button
               variant="ghost"
