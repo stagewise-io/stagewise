@@ -96,6 +96,17 @@ export interface LspServerInfo {
     projectRoot: string,
     resolvedEnv?: Record<string, string> | null,
   ) => Promise<LspServerHandle | undefined>;
+
+  /**
+   * Optional override for how long `waitForDiagnostics` waits for a fresh
+   * diagnostics publish before giving up (milliseconds). The wait still
+   * resolves early the moment a matching receipt arrives — this is only the
+   * safety-net cap. Servers backed by a slow external checker (e.g.
+   * rust-analyzer's `cargo check` flycheck, which can take several seconds on
+   * a cold cache) need a larger value than the default so a cold first open
+   * does not report an empty result. Defaults to 3000ms when unset.
+   */
+  diagnosticsTimeoutMs?: number;
 }
 
 /**
