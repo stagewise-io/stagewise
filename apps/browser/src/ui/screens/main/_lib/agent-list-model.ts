@@ -156,6 +156,11 @@ export function mergeAgentEntries({
       return {
         ...a,
         title: a.title || h?.title || a.title,
+        // Live toolbox mounts win once present. While an agent is still
+        // (re)mounting its toolbox entry briefly reports zero mounts, so fall
+        // back to the persisted history mounts to avoid flicker. The history
+        // list is filtered to existing paths (and refetched after worktree
+        // deletions), so this fallback never resurrects a deleted workspace.
         mountedWorkspaces:
           a.mountedWorkspaces.length > 0
             ? a.mountedWorkspaces

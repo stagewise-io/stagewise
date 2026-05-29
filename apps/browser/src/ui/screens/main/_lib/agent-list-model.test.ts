@@ -123,7 +123,7 @@ describe('agent list workspace model', () => {
     });
 
     expect(groups[0]?.worktrees.map((group) => group.label)).toEqual([
-      'Root',
+      'Root (main)',
       'feature',
     ]);
     expect(groups[0]?.severity).toBe('warning');

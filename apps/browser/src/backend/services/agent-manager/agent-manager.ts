@@ -940,6 +940,17 @@ export class AgentManagerService extends DisposableService {
 
     if (agent.mountedWorkspaces && Array.isArray(agent.mountedWorkspaces)) {
       for (const ws of agent.mountedWorkspaces) {
+        // Skip workspaces whose directory no longer exists on disk (e.g. a
+        // worktree that was deleted between sessions). The agent and its
+        // history are kept — it simply restores with that mount dropped
+        // and falls into the "No workspace" group rather than re-creating
+        // a runtime / watcher / LSP for a path that's gone.
+        if (!existsSync(ws.path)) {
+          this.logger.debug(
+            `[AgentManager] Skipping re-mount of missing workspace ${ws.path} for agent ${instanceId}`,
+          );
+          continue;
+        }
         try {
           await this.toolbox.handleMountWorkspace(
             createdAgent.instanceId,
@@ -1443,10 +1454,17 @@ export class AgentManagerService extends DisposableService {
         ...entry,
         mountedWorkspaces: entry.mountedWorkspaces
           ? await Promise.all(
-              entry.mountedWorkspaces.map(async (workspace) => ({
-                ...workspace,
-                git: await getGitSummary(workspace.path),
-              })),
+              entry.mountedWorkspaces
+                // Drop persisted mounts whose directory no longer exists on
+                // disk (e.g. a deleted worktree). Otherwise the agent would
+                // keep showing under a workspace/worktree group that points
+                // at a path that's gone. Mirrors the re-mount skip in
+                // resumeAgent so list and runtime stay consistent.
+                .filter((workspace) => existsSync(workspace.path))
+                .map(async (workspace) => ({
+                  ...workspace,
+                  git: await getGitSummary(workspace.path),
+                })),
             )
           : entry.mountedWorkspaces,
       })),

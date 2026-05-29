@@ -77,6 +77,7 @@ import type {
   ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import {
   Tooltip,
   TooltipContent,
@@ -914,6 +915,8 @@ export function AgentsList() {
     loading: boolean;
     error: string | null;
     anchorPoint: { x: number; y: number };
+    agentIds: string[];
+    deleteAgents: boolean;
   } | null>(null);
 
   const handleDeleteWorktree = useCallback(
@@ -921,6 +924,7 @@ export function AgentsList() {
       worktreePath: string,
       label: string,
       anchorPoint: { x: number; y: number },
+      agentIds: string[],
     ) => {
       setWorktreeDelete({
         path: worktreePath,
@@ -929,6 +933,8 @@ export function AgentsList() {
         loading: true,
         error: null,
         anchorPoint,
+        agentIds,
+        deleteAgents: false,
       });
       void getGitWorktreeDeletionInfo(worktreePath)
         .then((info) => {
@@ -960,15 +966,43 @@ export function AgentsList() {
     const target = worktreeDelete;
     if (!target?.info || target.info.isMainWorktree) return;
 
+    const { agentIds, deleteAgents } = target;
+    const worktreePath = target.info.path;
+    const force = target.info.hasUncommittedChanges;
+
     setWorktreeDelete(null);
-    void deleteGitWorktreeByPath(target.info.path, {
-      force: target.info.hasUncommittedChanges,
-    }).then((result) => {
+    void (async () => {
+      // Optionally delete the agents that live in this worktree before
+      // removing it. Default keeps agents — the backend detaches the
+      // dead mount from any survivors automatically.
+      if (deleteAgents && agentIds.length > 0) {
+        await Promise.allSettled(agentIds.map((id) => deleteAgent(id)));
+      }
+      const result = await deleteGitWorktreeByPath(worktreePath, { force });
       if (!result.ok) {
         console.error('Failed to delete worktree:', result.message);
+        return;
       }
-    });
-  }, [deleteGitWorktreeByPath, worktreeDelete]);
+      // Refetch history so surviving agents drop the now-deleted worktree from
+      // their persisted mounts (getAgentsHistoryList filters missing paths).
+      // Without this the stale mount lingers in the history fallback and the
+      // agent keeps showing under the deleted worktree group.
+      try {
+        const entries = await getAgentsHistoryList(0, fetchLimitRef.current);
+        setHistoryList(entries);
+      } catch (err) {
+        console.error(
+          'Failed to refetch agent history after worktree deletion:',
+          err,
+        );
+      }
+    })();
+  }, [
+    deleteAgent,
+    deleteGitWorktreeByPath,
+    getAgentsHistoryList,
+    worktreeDelete,
+  ]);
 
   const handleCreateAgentForWorkspace = useCallback(
     (workspacePath: string) => {
@@ -1986,10 +2020,15 @@ export function AgentsList() {
   const renderNoWorkspaceSection = useCallback(() => {
     if (visibleNoWorkspaceAgents.length === 0) return null;
 
-    const collapsed = collapsedWorkspaceGroups.has(NO_WORKSPACE_GROUP_KEY);
     const containsOpenAgent = visibleNoWorkspaceAgents.some(
       (agent) => agent.id === openAgent,
     );
+    // Force the section open whenever it holds the active agent — otherwise
+    // an agent that moves here (e.g. after its worktree is deleted) stays
+    // hidden behind a persisted-collapsed, non-collapsible header.
+    const collapsed =
+      collapsedWorkspaceGroups.has(NO_WORKSPACE_GROUP_KEY) &&
+      !containsOpenAgent;
     const severity = maxSeverity(
       visibleNoWorkspaceAgents.map((agent) => getAgentStateSeverity(agent)),
     );
@@ -2025,10 +2064,12 @@ export function AgentsList() {
   const renderWorktreeGroup = useCallback(
     (repo: WorkspaceRepoGroup, worktree: WorkspaceWorktreeGroup) => {
       const key = `${repo.key}:${worktree.key}`;
-      const collapsed = collapsedWorkspaceGroups.has(key);
       const containsOpenAgent = worktree.agents.some(
         (row) => row.agent.id === openAgent,
       );
+      // Force open when it holds the active agent so a non-collapsible
+      // header can never hide the currently open agent.
+      const collapsed = collapsedWorkspaceGroups.has(key) && !containsOpenAgent;
 
       return (
         <div key={key} className="contents">
@@ -2057,6 +2098,15 @@ export function AgentsList() {
                       worktree.path,
                       worktree.label,
                       anchorPoint,
+                      // Only agents that live *exclusively* in this worktree
+                      // are candidates for deletion. Agents also connected to
+                      // other workspaces must be preserved — the backend just
+                      // detaches the dead mount from them.
+                      worktree.agents
+                        .filter(
+                          (row) => row.agent.mountedWorkspaces.length <= 1,
+                        )
+                        .map((row) => row.agent.id),
                     )
             }
             onCreateAgent={() => handleCreateAgentForWorkspace(worktree.path)}
@@ -2084,7 +2134,6 @@ export function AgentsList() {
 
   const renderWorkspaceGroup = useCallback(
     (repo: WorkspaceRepoGroup, sortable = false) => {
-      const collapsed = collapsedWorkspaceGroups.has(repo.key);
       const hasContent =
         repo.directAgents.length > 0 ||
         repo.worktrees.some((worktree) => worktree.agents.length > 0);
@@ -2093,6 +2142,10 @@ export function AgentsList() {
         repo.worktrees.some((worktree) =>
           worktree.agents.some((row) => row.agent.id === openAgent),
         );
+      // Force open when it holds the active agent so a non-collapsible
+      // header can never hide the currently open agent.
+      const collapsed =
+        collapsedWorkspaceGroups.has(repo.key) && !containsOpenAgent;
       const content = (
         <>
           <WorkspaceGroupHeader
@@ -2475,6 +2528,33 @@ export function AgentsList() {
                 {worktreeDelete.info?.branch ?? 'Detached'}
               </div>
             </div>
+          )}
+          {worktreeDelete && worktreeDelete.agentIds.length > 0 && (
+            <button
+              type="button"
+              className="mt-1 flex w-full cursor-pointer items-center gap-2 text-left text-foreground text-xs"
+              onClick={() =>
+                setWorktreeDelete((current) =>
+                  current
+                    ? { ...current, deleteAgents: !current.deleteAgents }
+                    : current,
+                )
+              }
+            >
+              <Checkbox
+                size="xs"
+                tabIndex={-1}
+                className="pointer-events-none"
+                checked={worktreeDelete.deleteAgents}
+              />
+              <span>
+                Also delete{' '}
+                {worktreeDelete.agentIds.length === 1
+                  ? 'the 1 agent'
+                  : `all ${worktreeDelete.agentIds.length} agents`}{' '}
+                in this worktree
+              </span>
+            </button>
           )}
         </div>
       </DeleteConfirmPopover>

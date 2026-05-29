@@ -948,6 +948,12 @@ export class MountManagerService extends DisposableService {
     });
     if (!result.ok) return result;
 
+    // The worktree directory no longer exists on disk. Detach it from
+    // every agent that still mounts it so the sidebar stops showing the
+    // dead path and follow-up actions (open path, create agent) can't
+    // target a workspace that's gone. Agents themselves are preserved.
+    await this.detachWorkspacePathFromAgents(info.path);
+
     this.uiKarton.setState((draft: KartonStateDraft) => {
       draft.workspaceGitCleanup.candidates =
         draft.workspaceGitCleanup.candidates.filter(
@@ -957,6 +963,61 @@ export class MountManagerService extends DisposableService {
     });
 
     return { ok: true, path: info.path, branch: info.branch };
+  }
+
+  /**
+   * Removes every active mount that points at `workspacePath` from all
+   * agents — both the internal runtime maps (so watcher / LSP / runtime
+   * resources are released via `releaseMountIfUnused`) and the Karton UI
+   * state (so the sidebar stops grouping agents under the now-deleted
+   * path). Agents themselves are intentionally preserved; an agent left
+   * with no remaining mounts simply moves to the "No workspace" group.
+   *
+   * Paths are compared after `realpath` resolution because mount paths
+   * may differ from `workspacePath` by symlink or trailing separators.
+   * Returns the distinct agent instance ids that lost a mount.
+   */
+  private async detachWorkspacePathFromAgents(
+    workspacePath: string,
+  ): Promise<string[]> {
+    const resolvedTarget =
+      (await safeRealpath(workspacePath)) ?? path.resolve(workspacePath);
+
+    const affected: Array<{ agentId: string; prefix: string }> = [];
+    for (const [agentId, mounts] of this.agentMounts) {
+      for (const prefix of mounts.keys()) {
+        const mountedPath = this.workspacePathsPerMount.get(prefix);
+        if (!mountedPath) continue;
+        const resolvedMounted =
+          (await safeRealpath(mountedPath)) ?? path.resolve(mountedPath);
+        if (resolvedMounted === resolvedTarget) {
+          affected.push({ agentId, prefix });
+        }
+      }
+    }
+
+    if (affected.length === 0) return [];
+
+    for (const { agentId, prefix } of affected) {
+      this.agentMounts.get(agentId)?.delete(prefix);
+      this.releaseMountIfUnused(prefix);
+    }
+
+    this.uiKarton.setState((draft: KartonStateDraft) => {
+      for (const { agentId, prefix } of affected) {
+        const toolbox = draft.toolbox[agentId];
+        if (!toolbox) continue;
+        toolbox.workspace.mounts = toolbox.workspace.mounts.filter(
+          (mount: MountEntry) => mount.prefix !== prefix,
+        );
+      }
+    });
+
+    const affectedAgentIds = [...new Set(affected.map((a) => a.agentId))];
+    for (const agentId of affectedAgentIds) {
+      this.onMountsChanged?.(agentId);
+    }
+    return affectedAgentIds;
   }
 
   private async cleanWorkspaceGitWorktrees(
