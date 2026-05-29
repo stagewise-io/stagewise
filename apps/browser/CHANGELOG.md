@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 (2026-05-29)
+
+### Features
+
+* add rust and clang lsp (6ecb708)
+
 ## 1.2.1 (2026-05-29)
 
 ### Bug Fixes
