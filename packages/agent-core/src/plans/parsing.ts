@@ -24,11 +24,18 @@ export interface TaskGroup {
 // Regex patterns
 // ---------------------------------------------------------------------------
 
-/** Matches the first `# heading` in markdown content. */
-const H1_RE = /^#\s+(.+)$/m;
+// The capture groups start with `\S` (rather than `.`) so the leading
+// whitespace separator (`\s+`) and the captured text never compete for the
+// same characters. Without this, a run of tabs can be split between the two
+// adjacent quantifiers in many ways — the polynomial-backtracking (ReDoS)
+// pattern CodeQL flags. The captured text is trimmed by callers anyway, so
+// requiring a non-whitespace first character is behavior-preserving.
 
-const CHECKBOX_RE = /^([ \t]*)-\s+\[([ xX])\]\s+(.+)$/;
-const HEADING_RE = /^#{2,6}\s+(.+)$/;
+/** Matches the first `# heading` in markdown content. */
+const H1_RE = /^#\s+(\S.*)$/m;
+
+const CHECKBOX_RE = /^([ \t]*)-\s+\[([ xX])\]\s+(\S.*)$/;
+const HEADING_RE = /^#{2,6}\s+(\S.*)$/;
 
 // ---------------------------------------------------------------------------
 // Parsing

@@ -535,7 +535,10 @@ export async function grepSearchToolExecute(
 
   const rawMatches = r.matches ?? [];
   const matches = rawMatches.map((m) => ({
-    path: m.relativePath,
+    // Normalize to POSIX separators so results are stable across OSes
+    // (the runtime returns native separators on Windows, e.g. `src\a.ts`)
+    // and consistent with glob's already-normalized `relativePaths`.
+    path: m.relativePath.replace(/\\/g, '/'),
     line: m.line,
     preview: truncatePreview(m.preview ?? m.match ?? '', 500),
   }));
