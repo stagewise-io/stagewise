@@ -107,6 +107,25 @@ export interface LspServerInfo {
    * does not report an empty result. Defaults to 3000ms when unset.
    */
   diagnosticsTimeoutMs?: number;
+
+  /**
+   * Force the client to treat this server as push-only for diagnostics,
+   * ignoring any advertised `diagnosticProvider` (pull) capability.
+   *
+   * Some native servers advertise pull support but deliver their authoritative
+   * diagnostics exclusively via push (`textDocument/publishDiagnostics`).
+   * rust-analyzer is the canonical example: its pull endpoint
+   * (`textDocument/diagnostic`) only returns syntax/proc-macro diagnostics and
+   * always omits the `cargo check` (flycheck) results, which arrive solely via
+   * push after a delay. Querying the pull endpoint therefore returns an empty
+   * report that resolves `waitForDiagnostics` prematurely — before the real
+   * push lands — surfacing an empty result. clangd is likewise push-native.
+   *
+   * When true, the client skips the pull path entirely and does not advance the
+   * document to a no-op second version, so the wait resolves on the genuine
+   * push (or the safety-net timeout) instead of an empty pull.
+   */
+  pushDiagnosticsOnly?: boolean;
 }
 
 /**

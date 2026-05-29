@@ -25,7 +25,16 @@ type LintingDiagnosticsResult = {
   summary: DiagnosticsSummary;
 };
 
-const TOOL_TIMEOUT_MS = 15_000;
+// Outer safety-net cap for the whole request (touch + wait + collect across all
+// files). This MUST stay strictly greater than the largest per-server
+// `diagnosticsTimeoutMs` (currently rust-analyzer at 15_000ms) plus headroom for
+// the diagnostics debounce and result collection. If it merely equals the inner
+// wait, a valid publish landing right at the boundary is resolved by the inner
+// wait only after the debounce window — just as this outer race fires — and the
+// caller would receive the empty timeout fallback instead of the real results.
+// The 5s margin keeps the inner wait the binding constraint for slow (cold
+// flycheck) servers while reserving room to actually return their diagnostics.
+const TOOL_TIMEOUT_MS = 20_000;
 
 export const getLintingDiagnosticsToolExecute = async (
   mountedLspServices: MountedLspServices,
@@ -75,8 +84,10 @@ async function doGetLintingDiagnostics(
   mountedLspServices: MountedLspServices,
   paths: string[],
 ) {
-  // Touch all files in parallel so LSP servers open and analyze them,
-  // then wait for diagnostics to arrive (3s timeout per file).
+  // Touch all files in parallel so LSP servers open and analyze them, then wait
+  // for diagnostics to arrive. Each wait is bounded by the server's own
+  // `diagnosticsTimeoutMs` safety net (default 3s; rust-analyzer 15s for cold
+  // cargo-check flycheck), always below the outer TOOL_TIMEOUT_MS above.
   await Promise.all(
     paths.map(async (mountedPath) => {
       try {
