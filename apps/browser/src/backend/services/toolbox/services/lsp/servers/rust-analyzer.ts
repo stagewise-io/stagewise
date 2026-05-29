@@ -36,6 +36,13 @@ export const rustAnalyzerServer: LspServerInfo = {
   // arrives.
   diagnosticsTimeoutMs: 15_000,
 
+  // rust-analyzer advertises pull diagnostics (`diagnosticProvider`) but its
+  // pull endpoint only returns syntax diagnostics and always omits the
+  // `cargo check` (flycheck) results, which arrive exclusively via push. Using
+  // the pull path would resolve the diagnostics wait with an empty report
+  // before the real push lands, so force the push-only model.
+  pushDiagnosticsOnly: true,
+
   async shouldActivate(projectRoot: string): Promise<boolean> {
     return hasFileInTree(projectRoot, ['Cargo.toml']);
   },

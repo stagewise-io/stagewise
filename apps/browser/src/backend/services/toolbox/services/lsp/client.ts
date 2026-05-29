@@ -140,6 +140,19 @@ export class LspClient extends EventEmitter {
     this.emit('diagnosticsReceived', filePath, version);
   }
 
+  /**
+   * Whether this client should use the pull-diagnostics model
+   * (`textDocument/diagnostic`). True only when the server advertises
+   * `diagnosticProvider` AND is not flagged push-only. Push-native servers
+   * such as rust-analyzer and clangd advertise pull support but deliver their
+   * authoritative diagnostics via push, so their pull endpoint must not be
+   * used (see `LspServerInfo.pushDiagnosticsOnly`).
+   */
+  private usesPullDiagnostics(): boolean {
+    if (this.serverInfo.pushDiagnosticsOnly) return false;
+    return !!(this.capabilities as Record<string, unknown>)?.diagnosticProvider;
+  }
+
   private readonly resolvedEnv: Record<string, string> | null;
 
   private constructor(
@@ -370,11 +383,7 @@ export class LspClient extends EventEmitter {
    * Called when server sends workspace/diagnostic/refresh notification.
    */
   private refreshAllDiagnostics(): void {
-    if (
-      !this.connection ||
-      this.disposed ||
-      !(this.capabilities as Record<string, unknown>)?.diagnosticProvider
-    ) {
+    if (!this.connection || this.disposed || !this.usesPullDiagnostics()) {
       return;
     }
 
@@ -508,7 +517,7 @@ export class LspClient extends EventEmitter {
     filePath: string,
     delays: number[],
   ): void {
-    if (!(this.capabilities as Record<string, unknown>)?.diagnosticProvider) {
+    if (!this.usesPullDiagnostics()) {
       return;
     }
     for (const delay of delays) {
@@ -614,8 +623,7 @@ export class LspClient extends EventEmitter {
       const params: DidOpenTextDocumentParams = { textDocument };
       await conn.sendNotification(DidOpenTextDocumentNotification.type, params);
 
-      const isPullServer = !!(this.capabilities as Record<string, unknown>)
-        ?.diagnosticProvider;
+      const isPullServer = this.usesPullDiagnostics();
 
       // Pull-model servers (e.g. ESLint with run: "onType") validate in
       // response to changes, not bare opens, so nudge them with a no-op change

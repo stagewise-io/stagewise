@@ -39,6 +39,11 @@ export const clangdServer: LspServerInfo = {
   name: 'clangd',
   extensions: CLANGD_EXTENSIONS,
 
+  // clangd publishes diagnostics via push on didOpen/didChange. It is
+  // push-native, so never route it through the pull path (which advances the
+  // document to a no-op second version and can resolve the wait early).
+  pushDiagnosticsOnly: true,
+
   async shouldActivate(projectRoot: string): Promise<boolean> {
     return hasFileInTree(projectRoot, CLANGD_MARKERS);
   },
