@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 (2026-05-29)
+
+### Bug Fixes
+
+* harden renderer error handling (6145fde)
+
 ## 1.2.0 (2026-05-28)
 
 ### Features
