@@ -144,6 +144,13 @@ export type WorkspaceGitWorktreeDeleteResult =
 
 export type WorkspaceGitWorktreeDeleteOptions = {
   force?: boolean;
+  /**
+   * When true, callers are responsible for deleting the agents that live
+   * in this worktree before invoking deletion. The mount manager always
+   * detaches the deleted path from surviving agents regardless of this
+   * flag; it exists so the UI can record intent / telemetry.
+   */
+  deleteAgents?: boolean;
 };
 
 export type WorkspaceGitCleanupState = {
