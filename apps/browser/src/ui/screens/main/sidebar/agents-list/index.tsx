@@ -972,16 +972,19 @@ export function AgentsList() {
 
     setWorktreeDelete(null);
     void (async () => {
-      // Optionally delete the agents that live in this worktree before
-      // removing it. Default keeps agents — the backend detaches the
-      // dead mount from any survivors automatically.
-      if (deleteAgents && agentIds.length > 0) {
-        await Promise.allSettled(agentIds.map((id) => deleteAgent(id)));
-      }
+      // Remove the worktree FIRST. Deleting agents is destructive and
+      // irreversible, so we only do it once git confirms the worktree is
+      // actually gone. If we deleted agents first and the worktree removal
+      // then failed (lock, fs error, race), we'd have permanently destroyed
+      // chat histories while the worktree still sat on disk. By default we
+      // keep agents — the backend detaches the dead mount from survivors.
       const result = await deleteGitWorktreeByPath(worktreePath, { force });
       if (!result.ok) {
         console.error('Failed to delete worktree:', result.message);
         return;
+      }
+      if (deleteAgents && agentIds.length > 0) {
+        await Promise.allSettled(agentIds.map((id) => deleteAgent(id)));
       }
       // Refetch history so surviving agents drop the now-deleted worktree from
       // their persisted mounts (getAgentsHistoryList filters missing paths).
