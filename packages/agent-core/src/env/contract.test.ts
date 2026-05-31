@@ -59,7 +59,7 @@ describe('DomainAdapterRegistry.captureAll', () => {
       }),
     );
 
-    const result = await registry.captureAll({}, 'inst-1');
+    const result = await registry.captureAll({}, 'inst-1', ['a', 'b']);
     expect([...result.entries.keys()].sort()).toEqual(['a', 'b']);
     const a = result.entries.get('a')!;
     expect(a.state).toEqual({ v: 'a-curr' });
@@ -86,6 +86,7 @@ describe('DomainAdapterRegistry.captureAll', () => {
     const result = await registry.captureAll(
       { static: { v: 1 }, changing: { v: 1 } },
       'inst-2',
+      ['static', 'changing'],
     );
     expect([...result.entries.keys()]).toEqual(['changing']);
     expect(result.entries.get('changing')!.renderedStateChange).toBe('delta=2');
@@ -104,6 +105,7 @@ describe('DomainAdapterRegistry.captureAll', () => {
     const result = await registry.captureAll(
       { counter: { count: 3 } },
       'inst-3',
+      ['counter'],
     );
     const entry = result.entries.get('counter')!;
     expect(entry.renderedState).toBe('=5');
@@ -124,6 +126,7 @@ describe('DomainAdapterRegistry.captureAll', () => {
     const result = await registry.captureAll(
       { 'with-equals': { stamp: 1 } },
       'inst-4',
+      ['with-equals'],
     );
     expect(equalsSpy).toHaveBeenCalledOnce();
     expect(result.entries.size).toBe(0);
@@ -151,7 +154,10 @@ describe('DomainAdapterRegistry.captureAll', () => {
       }),
     );
 
-    const result = await registry.captureAll({}, 'inst-5');
+    const result = await registry.captureAll({}, 'inst-5', [
+      'healthy',
+      'flaky',
+    ]);
     expect([...result.entries.keys()]).toEqual(['healthy']);
     expect(logger.error).toHaveBeenCalledOnce();
   });
@@ -182,9 +188,55 @@ describe('DomainAdapterRegistry.captureAll', () => {
         renderState: () => 'X',
       }),
     );
-    const result = await registry.captureAll({}, 'inst-6');
+    const result = await registry.captureAll({}, 'inst-6', [
+      'versioned',
+      'default-version',
+    ]);
     expect(result.entries.get('versioned')!.schemaVersion).toBe(7);
     expect(result.entries.get('default-version')!.schemaVersion).toBe(1);
+  });
+
+  it('returns an empty result when allowedDomainIds is undefined', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(
+      makeAdapter('a', 0, {
+        getState: () => 'x',
+        renderState: () => 'X',
+      }),
+    );
+    const result = await registry.captureAll({}, 'inst-7');
+    expect(result.entries.size).toBe(0);
+  });
+
+  it('returns an empty result when allowedDomainIds is an empty array', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(
+      makeAdapter('a', 0, {
+        getState: () => 'x',
+        renderState: () => 'X',
+      }),
+    );
+    const result = await registry.captureAll({}, 'inst-8', []);
+    expect(result.entries.size).toBe(0);
+  });
+
+  it('captures only the subset listed in allowedDomainIds', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(
+      makeAdapter('keep', 0, {
+        getState: () => ({ v: 'keep' }),
+        renderState: () => 'KEEP',
+      }),
+    );
+    registry.register(
+      makeAdapter('drop', 1, {
+        getState: () => ({ v: 'drop' }),
+        renderState: () => 'DROP',
+      }),
+    );
+
+    const result = await registry.captureAll({}, 'inst-9', ['keep']);
+    expect([...result.entries.keys()]).toEqual(['keep']);
   });
 });
 

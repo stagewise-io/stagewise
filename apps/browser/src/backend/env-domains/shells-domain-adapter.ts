@@ -139,11 +139,14 @@ function computeShellsChanges(
   return changes;
 }
 
+/** Stable env-domain id for the shells adapter. */
+export const SHELLS_DOMAIN_ID = 'shells';
+
 export function createShellsDomainAdapter(
   deps: ShellsDomainAdapterDeps,
 ): DomainAdapter<ShellsDomainState> {
   return {
-    domainId: 'shells',
+    domainId: SHELLS_DOMAIN_ID,
     renderOrder: 2,
     schemaVersion: SHELLS_DOMAIN_SCHEMA_VERSION,
     promptSection: ShellsDomainPromptSection,

@@ -143,11 +143,14 @@ function computeWorkspaceChanges(
   return changes;
 }
 
+/** Stable env-domain id for the workspace adapter. */
+export const WORKSPACE_DOMAIN_ID = 'workspace';
+
 export function createWorkspaceDomainAdapter(
   deps: WorkspaceDomainAdapterDeps,
 ): DomainAdapter<WorkspaceSnapshot> {
   return {
-    domainId: 'workspace',
+    domainId: WORKSPACE_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 1,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection: WorkspacePromptSection,

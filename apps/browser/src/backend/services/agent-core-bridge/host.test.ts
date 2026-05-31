@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Logger } from '@stagewise/agent-core';
+import { AgentTypes, type Logger } from '@stagewise/agent-core';
+import {
+  AGENTS_MD_DOMAIN_ID,
+  ENABLED_SKILLS_DOMAIN_ID,
+  FILE_DIFFS_DOMAIN_ID,
+  PLANS_DOMAIN_ID,
+  WORKSPACE_DOMAIN_ID,
+} from '@stagewise/agent-core/env/adapters';
+// See host.ts for why we bypass the `@/env-domains` barrel here.
+import { ACTIVE_APP_DOMAIN_ID } from '@/env-domains/active-app-domain-adapter';
+import { BROWSER_DOMAIN_ID } from '@/env-domains/browser-domain-adapter';
+import { LOG_INGEST_DOMAIN_ID } from '@/env-domains/log-ingest-domain-adapter';
+import { SANDBOX_DOMAIN_ID } from '@/env-domains/sandbox-domain-adapter';
+import { SHELLS_DOMAIN_ID } from '@/env-domains/shells-domain-adapter';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { Logger as BrowserLogger } from '@/services/logger';
 import type { TelemetryService, UIEventName } from '@/services/telemetry';
@@ -276,6 +289,54 @@ describe('createBrowserAgentHost', () => {
     // Smoke-check path + models slots round-trip through the adapters.
     expect(host.paths.dataDir()).toBe('/tmp/data');
     expect(host.models.has('anything')).toBe(true);
+  });
+
+  it('defines a full-surface CHAT profile and a curated WORKSPACE_MD profile', () => {
+    const logger = makeLogger();
+    const mp = {
+      modelExists: vi.fn(() => true),
+      getModelWithOptions: vi.fn(),
+    };
+    const tel = {
+      capture: vi.fn(),
+      captureException: vi.fn(),
+    };
+
+    const host = createBrowserAgentHost({
+      logger: logger as unknown as BrowserLogger,
+      modelProviderService: mp as unknown as ModelProviderService,
+      telemetryService: tel as unknown as TelemetryService,
+    });
+
+    const chat = host.getAgentProfile(AgentTypes.CHAT);
+    expect(chat).toBeDefined();
+    expect(new Set(chat?.envDomainIds)).toEqual(
+      new Set([
+        BROWSER_DOMAIN_ID,
+        SHELLS_DOMAIN_ID,
+        SANDBOX_DOMAIN_ID,
+        ACTIVE_APP_DOMAIN_ID,
+        LOG_INGEST_DOMAIN_ID,
+        WORKSPACE_DOMAIN_ID,
+        AGENTS_MD_DOMAIN_ID,
+        ENABLED_SKILLS_DOMAIN_ID,
+        PLANS_DOMAIN_ID,
+        FILE_DIFFS_DOMAIN_ID,
+      ]),
+    );
+    expect(chat?.outputProtocols?.map((p) => p.name)).toEqual(['tab', 'shell']);
+    expect(chat?.systemPromptFragments?.intro).toBeTypeOf('string');
+    expect(chat?.systemPromptFragments?.soul).toBeTypeOf('string');
+    expect(chat?.systemPromptFragments?.environmentPreamble).toBeTypeOf(
+      'string',
+    );
+
+    const workspaceMd = host.getAgentProfile(AgentTypes.WORKSPACE_MD);
+    expect(workspaceMd).toBeDefined();
+    expect(workspaceMd?.envDomainIds).toEqual([WORKSPACE_DOMAIN_ID]);
+    expect(workspaceMd?.outputProtocols).toBeUndefined();
+    expect(workspaceMd?.outputAliases).toBeUndefined();
+    expect(workspaceMd?.systemPromptFragments).toBeUndefined();
   });
 
   it('reuses a caller-supplied HostPaths when provided', () => {

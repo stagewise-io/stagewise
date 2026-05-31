@@ -174,12 +174,15 @@ function computeBrowserChanges(
   return changes;
 }
 
+/** Stable env-domain id for the browser adapter. */
+export const BROWSER_DOMAIN_ID = 'browser';
+
 export function createBrowserDomainAdapter(
   deps: BrowserDomainAdapterDeps,
 ): DomainAdapter<BrowserDomainState> {
   const resolveSessionId = deps.getBrowserSessionId ?? getBrowserSessionId;
   return {
-    domainId: 'browser',
+    domainId: BROWSER_DOMAIN_ID,
     renderOrder: 0,
     schemaVersion: BROWSER_DOMAIN_SCHEMA_VERSION,
     promptSection: BrowserDomainPromptSection,

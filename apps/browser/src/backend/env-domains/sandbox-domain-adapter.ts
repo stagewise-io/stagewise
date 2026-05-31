@@ -39,11 +39,14 @@ function computeSandboxChanges(
   return [{ type: 'sandbox-restarted' }];
 }
 
+/** Stable env-domain id for the sandbox adapter. */
+export const SANDBOX_DOMAIN_ID = 'sandboxSessionId';
+
 export function createSandboxDomainAdapter(
   deps: SandboxDomainAdapterDeps,
 ): DomainAdapter<SandboxDomainState> {
   return {
-    domainId: 'sandboxSessionId',
+    domainId: SANDBOX_DOMAIN_ID,
     renderOrder: 10,
     schemaVersion: SANDBOX_DOMAIN_SCHEMA_VERSION,
     promptSection: SandboxDomainPromptSection,

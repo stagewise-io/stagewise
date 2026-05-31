@@ -194,6 +194,93 @@ describe('convertAgentMessagesToModelMessages – env-state pipeline', () => {
     expect(text).toContain('compressed-stuff');
   });
 
+  it('filters keyframe and delta blocks by allowedEnvDomainIds', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(makeAdapter('browser', 0));
+    registry.register(makeAdapter('workspace', 1));
+
+    const m1 = makeMessage('user', 'first', {
+      browser: {
+        schemaVersion: 1,
+        state: null,
+        renderedState: '<open-tabs>BROWSER_FULL</open-tabs>',
+        renderedStateChange: '<open-tabs>BROWSER_FULL</open-tabs>',
+      },
+      workspace: {
+        schemaVersion: 1,
+        state: null,
+        renderedState: '<symlinks>WORKSPACE_FULL</symlinks>',
+        renderedStateChange: '<symlinks>WORKSPACE_FULL</symlinks>',
+      },
+    });
+    const m2 = makeMessage('assistant', 'ok');
+    const m3 = makeMessage('user', 'second', {
+      browser: {
+        schemaVersion: 1,
+        state: null,
+        renderedState: '<open-tabs>BROWSER_M3</open-tabs>',
+        renderedStateChange: '<env-changes>browser-delta</env-changes>',
+      },
+      workspace: {
+        schemaVersion: 1,
+        state: null,
+        renderedState: '<symlinks>WORKSPACE_M3</symlinks>',
+        renderedStateChange: '<env-changes>workspace-delta</env-changes>',
+      },
+    });
+
+    const result = await convertAgentMessagesToModelMessages(
+      [m1, m2, m3],
+      'SYS',
+      {},
+      'agent-1',
+      {
+        host: HOST_PATHS,
+        blobReader: BLOB_READER,
+        domainAdapterRegistry: registry,
+        allowedEnvDomainIds: ['workspace'],
+      },
+    );
+
+    const firstUserText = extractUserContent(result[1]);
+    expect(firstUserText).toContain('<symlinks>WORKSPACE_FULL</symlinks>');
+    expect(firstUserText).not.toContain('BROWSER_FULL');
+
+    const m3UserText = extractUserContent(result[result.length - 1]);
+    expect(m3UserText).toContain('<env-changes>workspace-delta</env-changes>');
+    expect(m3UserText).not.toContain('browser-delta');
+  });
+
+  it('emits no env block when allowedEnvDomainIds is an empty array', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(makeAdapter('browser', 0));
+
+    const m1 = makeMessage('user', 'first', {
+      browser: {
+        schemaVersion: 1,
+        state: null,
+        renderedState: '<open-tabs>FULL</open-tabs>',
+        renderedStateChange: '<open-tabs>FULL</open-tabs>',
+      },
+    });
+
+    const result = await convertAgentMessagesToModelMessages(
+      [m1],
+      'SYS',
+      {},
+      'agent-1',
+      {
+        host: HOST_PATHS,
+        blobReader: BLOB_READER,
+        domainAdapterRegistry: registry,
+        allowedEnvDomainIds: [],
+      },
+    );
+
+    const text = extractUserContent(result[1]);
+    expect(text).not.toContain('<open-tabs>FULL</open-tabs>');
+  });
+
   it('emits no env block when envState is empty across the window', async () => {
     const m1 = makeMessage('user', 'hello');
     const m2 = makeMessage('assistant', 'ok');

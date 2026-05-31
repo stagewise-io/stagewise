@@ -26,30 +26,35 @@ export {
 } from './host-environment-sources';
 
 export {
+  ACTIVE_APP_DOMAIN_ID,
   ACTIVE_APP_DOMAIN_SCHEMA_VERSION,
   createActiveAppDomainAdapter,
   type ActiveAppDomainAdapterDeps,
   type ActiveAppDomainState,
 } from './active-app-domain-adapter';
 export {
+  BROWSER_DOMAIN_ID,
   BROWSER_DOMAIN_SCHEMA_VERSION,
   createBrowserDomainAdapter,
   renderBrowserTabsXml,
   type BrowserDomainAdapterDeps,
 } from './browser-domain-adapter';
 export {
+  LOG_INGEST_DOMAIN_ID,
   LOG_INGEST_DOMAIN_SCHEMA_VERSION,
   createLogIngestDomainAdapter,
   type LogIngestDomainAdapterDeps,
   type LogIngestDomainState,
 } from './log-ingest-domain-adapter';
 export {
+  SANDBOX_DOMAIN_ID,
   SANDBOX_DOMAIN_SCHEMA_VERSION,
   createSandboxDomainAdapter,
   type SandboxDomainAdapterDeps,
   type SandboxDomainState,
 } from './sandbox-domain-adapter';
 export {
+  SHELLS_DOMAIN_ID,
   SHELLS_DOMAIN_SCHEMA_VERSION,
   createShellsDomainAdapter,
   type ShellsDomainAdapterDeps,

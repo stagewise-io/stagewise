@@ -156,6 +156,9 @@ function computeAgentsMdChanges(
   return changes;
 }
 
+/** Stable env-domain id for the AGENTS.md adapter. */
+export const AGENTS_MD_DOMAIN_ID = 'agentsMd';
+
 export function createAgentsMdDomainAdapter(
   deps: AgentsMdDomainAdapterDeps,
 ): DomainAdapter<AgentsMdSnapshot> {
@@ -166,7 +169,7 @@ export function createAgentsMdDomainAdapter(
     relativePath,
   );
   return {
-    domainId: 'agentsMd',
+    domainId: AGENTS_MD_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 4,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection,

@@ -44,6 +44,7 @@ export class ChatAgent extends BaseAgent<never, undefined> {
     return buildChatSystemPrompt({
       host: this.host,
       domainAdapterRegistry: this.domainAdapterRegistry,
+      agentType: this.agentType,
     });
   };
 

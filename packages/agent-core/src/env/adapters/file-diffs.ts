@@ -203,6 +203,9 @@ function computeFileDiffChanges(
   return changes;
 }
 
+/** Stable env-domain id for the file-diffs adapter. */
+export const FILE_DIFFS_DOMAIN_ID = 'fileDiffs';
+
 export function createFileDiffsDomainAdapter(
   deps: FileDiffsDomainAdapterDeps,
 ): DomainAdapter<EnvironmentDiffSnapshot> {
@@ -214,7 +217,7 @@ export function createFileDiffsDomainAdapter(
   // `renderState` per agent so this scoping is safe.
   let lastAgentId: string | null = null;
   return {
-    domainId: 'fileDiffs',
+    domainId: FILE_DIFFS_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 12,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection: FileDiffsPromptSection,

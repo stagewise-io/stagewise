@@ -115,7 +115,8 @@ export class DomainAdapterRegistry {
   }
 
   /**
-   * Run every registered adapter in parallel.
+   * Run registered adapters in parallel, optionally restricted to a
+   * caller-supplied allow-list of domain ids.
    *
    * For each adapter:
    *  1. `getState(agentInstanceId)` produces `curr`.
@@ -128,14 +129,25 @@ export class DomainAdapterRegistry {
    *     `renderState(prev, curr)` (which collapses to `renderedState` when
    *     `prev === null`).
    *
+   * `allowedDomainIds` filters the working set before capture:
+   *  - `undefined` → no adapters run (empty result). Profiles are mandatory;
+   *    callers must opt in by listing the domains they want.
+   *  - empty array → no adapters run.
+   *  - non-empty array → only adapters whose `domainId` is in the set run.
+   *
    * Per-adapter failures are isolated: a thrown error is logged and the
    * adapter is omitted from `entries` (its prior state remains effective).
    */
   async captureAll(
     prev: Record<DomainId, unknown>,
     agentInstanceId: string,
+    allowedDomainIds?: readonly DomainId[],
   ): Promise<CaptureAllResult> {
-    const adapters = this.list();
+    if (allowedDomainIds === undefined || allowedDomainIds.length === 0) {
+      return { entries: new Map<DomainId, EnvStateEntry>() };
+    }
+    const allowed = new Set<DomainId>(allowedDomainIds);
+    const adapters = this.list().filter((a) => allowed.has(a.domainId));
     const results = await Promise.all(
       adapters.map(async (adapter) => {
         try {

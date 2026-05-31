@@ -158,6 +158,20 @@ export interface ConvertAgentMessagesOptions {
    * emitted in insertion order of the message's `envState` record.
    */
   domainAdapterRegistry?: DomainAdapterRegistry;
+  /**
+   * Optional allow-list of env-domain ids the conversion pipeline is
+   * permitted to render. Mirrors the same value passed into
+   * {@link DomainAdapterRegistry.captureAll} on this turn so a shrunk
+   * profile cannot replay historical residue from domains the agent
+   * type is no longer allowed to see.
+   *
+   * - `undefined` → no filtering (legacy/no-profile callers; render
+   *   every domain present in history).
+   * - empty array → no env-context is rendered.
+   * - non-empty array → only domains in the set are rendered (both the
+   *   keyframe and per-turn delta blocks).
+   */
+  allowedEnvDomainIds?: readonly DomainId[];
 }
 
 /**
@@ -243,7 +257,11 @@ export const convertAgentMessagesToModelMessages = async <
     domainAdapterRegistry,
     fileReadTransformers,
     reasoningSignatureSource,
+    allowedEnvDomainIds,
   } = options;
+  const allowedEnvDomainIdSet = allowedEnvDomainIds
+    ? new Set<DomainId>(allowedEnvDomainIds)
+    : null;
 
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -277,6 +295,7 @@ export const convertAgentMessagesToModelMessages = async <
       i,
       keyframeEmitted,
       renderOrder,
+      allowedEnvDomainIdSet,
     );
     if (envParts.emittedKeyframe) keyframeEmitted = true;
 
@@ -771,6 +790,12 @@ interface EnvContextResult {
  *
  * `renderOrder` controls per-domain emission order; when absent, domains
  * are emitted in object-iteration order.
+ *
+ * `allowedDomainIds` (when non-null) filters both passes — the running
+ * agent type only renders domains its {@link AgentProfile} opted into,
+ * so a shrunk profile cannot replay historical entries from domains it
+ * no longer consumes. `null` means "no filtering" (every domain in
+ * history is renderable).
  */
 function buildEnvContextParts<
   TMessage extends AgentMessage<UITools, ConvertibleMessageMetadata>,
@@ -779,9 +804,12 @@ function buildEnvContextParts<
   msgIndex: number,
   keyframeEmitted: boolean,
   renderOrder: readonly DomainId[] | null,
+  allowedDomainIds: ReadonlySet<DomainId> | null,
 ): EnvContextResult {
   const parts: UserContent = [];
   const message = messages[msgIndex];
+  const isAllowed = (id: DomainId): boolean =>
+    allowedDomainIds === null || allowedDomainIds.has(id);
 
   if (!keyframeEmitted) {
     // First message in the conversion window: render the full
@@ -791,7 +819,10 @@ function buildEnvContextParts<
     // no env-state), we still build the keyframe from messages up to
     // and including `msgIndex`.
     const effective = resolveEffectiveEnvStateEntries(messages, msgIndex);
-    const domains = sortDomainIds(Object.keys(effective), renderOrder);
+    const domains = sortDomainIds(
+      Object.keys(effective).filter(isAllowed),
+      renderOrder,
+    );
     if (domains.length === 0) {
       return { parts, emittedKeyframe: false };
     }
@@ -809,7 +840,10 @@ function buildEnvContextParts<
   // stamped on this exact message.
   const envState = message?.metadata?.envState;
   if (!envState) return { parts, emittedKeyframe: false };
-  const domains = sortDomainIds(Object.keys(envState), renderOrder);
+  const domains = sortDomainIds(
+    Object.keys(envState).filter(isAllowed),
+    renderOrder,
+  );
   const sections = domains
     .map((id) => envState[id]?.renderedStateChange ?? '')
     .filter((s) => s.length > 0);

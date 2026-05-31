@@ -70,11 +70,14 @@ function computeActiveAppChanges(
   return [];
 }
 
+/** Stable env-domain id for the active-app adapter. */
+export const ACTIVE_APP_DOMAIN_ID = 'activeApp';
+
 export function createActiveAppDomainAdapter(
   deps: ActiveAppDomainAdapterDeps,
 ): DomainAdapter<ActiveAppDomainState> {
   return {
-    domainId: 'activeApp',
+    domainId: ACTIVE_APP_DOMAIN_ID,
     renderOrder: 9,
     schemaVersion: ACTIVE_APP_DOMAIN_SCHEMA_VERSION,
     promptSection: ActiveAppDomainPromptSection,

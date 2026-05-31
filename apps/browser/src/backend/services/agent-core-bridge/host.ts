@@ -1,10 +1,30 @@
 import {
   AgentHost,
+  AgentTypes,
+  type DomainId,
   type HostEnvironmentSources,
   type HostModels,
   type HostPaths,
   type OutputProtocol,
 } from '@stagewise/agent-core';
+import {
+  AGENTS_MD_DOMAIN_ID,
+  ENABLED_SKILLS_DOMAIN_ID,
+  FILE_DIFFS_DOMAIN_ID,
+  PLANS_DOMAIN_ID,
+  WORKSPACE_DOMAIN_ID,
+} from '@stagewise/agent-core/env/adapters';
+// NOTE: import each `*_DOMAIN_ID` from its adapter module directly,
+// not via `@/env-domains`. The barrel re-exports adapter factories
+// that transitively load the toolbox + terminal stack, which depends
+// on Vite-injected `__APP_*` globals and breaks plain-Node test
+// loaders. The per-module imports are pure string constants and have
+// no side effects.
+import { ACTIVE_APP_DOMAIN_ID } from '@/env-domains/active-app-domain-adapter';
+import { BROWSER_DOMAIN_ID } from '@/env-domains/browser-domain-adapter';
+import { LOG_INGEST_DOMAIN_ID } from '@/env-domains/log-ingest-domain-adapter';
+import { SANDBOX_DOMAIN_ID } from '@/env-domains/sandbox-domain-adapter';
+import { SHELLS_DOMAIN_ID } from '@/env-domains/shells-domain-adapter';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { Logger as BrowserLogger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
@@ -97,18 +117,57 @@ export function createBrowserAgentHost(deps: BrowserAgentHostDeps): AgentHost {
     workspaceMdRelativePath: BROWSER_WORKSPACE_MD_RELATIVE_PATH,
   });
   host.registerFileReadTransformers(BROWSER_FILE_READ_TRANSFORMERS);
-  for (const protocol of BROWSER_OUTPUT_PROTOCOLS) {
-    host.registerOutputProtocol(protocol);
-  }
   host.registerToolPartSerializers(browserToolPartSerializers);
-  host.setSystemPromptFragment('intro', browserIntroPrompt);
-  host.setSystemPromptFragment('soul', browserSoulPrompt);
-  host.setSystemPromptFragment(
-    'environmentPreamble',
-    browserEnvironmentPreamblePrompt,
-  );
+
+  // CHAT — the full main-thread experience: every host + core
+  // adapter, the browser-specific output protocols, and the
+  // browser's intro/soul/environment fragments. Listed explicitly
+  // (one entry per registered adapter) so a missing adapter or a
+  // renamed domain id surfaces here at the wiring site rather than
+  // silently dropping a prompt section.
+  host.defineAgentProfile(AgentTypes.CHAT, {
+    envDomainIds: BROWSER_CHAT_ENV_DOMAIN_IDS,
+    outputProtocols: BROWSER_OUTPUT_PROTOCOLS,
+    systemPromptFragments: {
+      intro: browserIntroPrompt,
+      soul: browserSoulPrompt,
+      environmentPreamble: browserEnvironmentPreamblePrompt,
+    },
+  });
+
+  // WORKSPACE_MD — the thin "edit `.stagewise/WORKSPACE.md` only"
+  // agent. It supplies its own system prompt (so prompt fragments
+  // are inert here) and only needs the workspace snapshot to
+  // resolve mount prefixes against; everything else (browser tabs,
+  // shells, sandbox, diffs, plans, ...) is intentionally absent.
+  host.defineAgentProfile(AgentTypes.WORKSPACE_MD, {
+    envDomainIds: [WORKSPACE_DOMAIN_ID],
+  });
+
   return host;
 }
+
+/**
+ * Full env-domain allow-list for {@link AgentTypes.CHAT} on the browser
+ * host. Composed from the `*_DOMAIN_ID` constants exported by each
+ * registered adapter (host-owned `apps/browser/src/backend/env-domains`
+ * + core `packages/agent-core/src/env/adapters`) so the source of truth
+ * for the id lives next to the adapter, not duplicated here. The set
+ * order is informational; the registry's per-adapter `renderOrder`
+ * controls prompt-section composition.
+ */
+const BROWSER_CHAT_ENV_DOMAIN_IDS: readonly DomainId[] = [
+  BROWSER_DOMAIN_ID,
+  SHELLS_DOMAIN_ID,
+  SANDBOX_DOMAIN_ID,
+  ACTIVE_APP_DOMAIN_ID,
+  LOG_INGEST_DOMAIN_ID,
+  WORKSPACE_DOMAIN_ID,
+  AGENTS_MD_DOMAIN_ID,
+  ENABLED_SKILLS_DOMAIN_ID,
+  PLANS_DOMAIN_ID,
+  FILE_DIFFS_DOMAIN_ID,
+];
 
 /**
  * Browser-owned file-read transformers. `.textclip` (pasted text) and

@@ -114,11 +114,14 @@ function computePlansChanges(
   return changes;
 }
 
+/** Stable env-domain id for the plans adapter. */
+export const PLANS_DOMAIN_ID = 'plans';
+
 export function createPlansDomainAdapter(
   deps: PlansDomainAdapterDeps,
 ): DomainAdapter<PlansSnapshot> {
   return {
-    domainId: 'plans',
+    domainId: PLANS_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 6,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection: PlansPromptSection,

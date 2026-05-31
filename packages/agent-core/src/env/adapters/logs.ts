@@ -102,11 +102,14 @@ function computeLogsChanges(
   return changes;
 }
 
+/** Stable env-domain id for the logs adapter. */
+export const LOGS_DOMAIN_ID = 'logs';
+
 export function createLogsDomainAdapter(
   deps: LogsDomainAdapterDeps,
 ): DomainAdapter<LogsSnapshot> {
   return {
-    domainId: 'logs',
+    domainId: LOGS_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 7,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection: LogsPromptSection,

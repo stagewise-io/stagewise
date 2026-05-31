@@ -55,11 +55,14 @@ function computeLogIngestChanges(
   return [];
 }
 
+/** Stable env-domain id for the log-ingest adapter. */
+export const LOG_INGEST_DOMAIN_ID = 'logIngest';
+
 export function createLogIngestDomainAdapter(
   deps: LogIngestDomainAdapterDeps,
 ): DomainAdapter<LogIngestDomainState> {
   return {
-    domainId: 'logIngest',
+    domainId: LOG_INGEST_DOMAIN_ID,
     renderOrder: 8,
     schemaVersion: LOG_INGEST_DOMAIN_SCHEMA_VERSION,
     promptSection: LogIngestDomainPromptSection,

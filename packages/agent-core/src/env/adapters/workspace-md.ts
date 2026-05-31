@@ -126,6 +126,9 @@ function computeWorkspaceMdChanges(
   return changes;
 }
 
+/** Stable env-domain id for the workspace-md adapter. */
+export const WORKSPACE_MD_DOMAIN_ID = 'workspaceMd';
+
 export function createWorkspaceMdDomainAdapter(
   deps: WorkspaceMdDomainAdapterDeps,
 ): DomainAdapter<WorkspaceMdSnapshot> {
@@ -136,7 +139,7 @@ export function createWorkspaceMdDomainAdapter(
     relativePath,
   );
   return {
-    domainId: 'workspaceMd',
+    domainId: WORKSPACE_MD_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 5,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection,

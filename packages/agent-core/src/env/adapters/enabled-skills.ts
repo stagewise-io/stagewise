@@ -86,6 +86,9 @@ function computeEnabledSkillsChanges(
   return changes;
 }
 
+/** Stable env-domain id for the enabled-skills adapter. */
+export const ENABLED_SKILLS_DOMAIN_ID = 'enabledSkills';
+
 export function createEnabledSkillsDomainAdapter(
   deps: EnabledSkillsDomainAdapterDeps,
 ): DomainAdapter<EnabledSkillsSnapshot> {
@@ -94,7 +97,7 @@ export function createEnabledSkillsDomainAdapter(
   // turn. Cleared when `getState` runs to keep memory bounded.
   let detailsForCurrentTurn: Map<string, SkillInfo> | undefined;
   return {
-    domainId: 'enabledSkills',
+    domainId: ENABLED_SKILLS_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 3,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
     promptSection: EnabledSkillsPromptSection,

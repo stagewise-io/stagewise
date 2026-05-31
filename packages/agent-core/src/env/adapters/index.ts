@@ -17,30 +17,37 @@ export {
   type EnvironmentChangeEntry,
 } from './shared';
 export {
+  AGENTS_MD_DOMAIN_ID,
   createAgentsMdDomainAdapter,
   type AgentsMdDomainAdapterDeps,
 } from './agents-md';
 export {
+  ENABLED_SKILLS_DOMAIN_ID,
   createEnabledSkillsDomainAdapter,
   type EnabledSkillsDomainAdapterDeps,
 } from './enabled-skills';
 export {
+  FILE_DIFFS_DOMAIN_ID,
   createFileDiffsDomainAdapter,
   type FileDiffsDomainAdapterDeps,
 } from './file-diffs';
 export {
+  LOGS_DOMAIN_ID,
   createLogsDomainAdapter,
   type LogsDomainAdapterDeps,
 } from './logs';
 export {
+  PLANS_DOMAIN_ID,
   createPlansDomainAdapter,
   type PlansDomainAdapterDeps,
 } from './plans';
 export {
+  WORKSPACE_DOMAIN_ID,
   createWorkspaceDomainAdapter,
   type WorkspaceDomainAdapterDeps,
 } from './workspace';
 export {
+  WORKSPACE_MD_DOMAIN_ID,
   createWorkspaceMdDomainAdapter,
   type WorkspaceMdDomainAdapterDeps,
 } from './workspace-md';

@@ -1,5 +1,7 @@
+import type { DomainId } from '../env/contract';
 import type { FileTransformer } from '../file-read-transformer/types';
 import { DEFAULT_WORKSPACE_MD_RELATIVE_PATH } from '../services/mount-manager/workspace-info';
+import type { AgentTypes } from '../types/agent';
 import type { HostEnvironmentSources } from './environment-sources';
 import type { Logger } from './logger';
 import type { HostModels } from './models';
@@ -103,6 +105,46 @@ export type SystemPromptFragmentKey =
   | 'authorities';
 
 /**
+ * Per-agent-type context profile. Hosts call
+ * {@link AgentHost.defineAgentProfile} once per agent type to declare:
+ *  - which env domains its turns may consume,
+ *  - which host-specific output protocols/aliases the chat prompt builder
+ *    appends to the baseline,
+ *  - which system-prompt slot overrides the chat prompt builder uses.
+ *
+ * Profiles are explicit by design: an agent type with no registered
+ * profile receives no env state and only the agent-core baseline prompt.
+ * Output protocols/aliases/system-prompt-fragments only apply when an
+ * agent uses the chat system-prompt builder (e.g. `ChatAgent`); thin
+ * agents that build their own prompt (e.g. `WorkspaceMdAgent`) ignore
+ * those slots.
+ */
+export interface AgentProfile {
+  /**
+   * Allow-list of env-state {@link DomainId}s this agent type may
+   * capture per turn. The order is informational; the registry's
+   * `renderOrder` still controls prompt-section composition.
+   */
+  envDomainIds: readonly DomainId[];
+  /**
+   * Host-declared output protocols appended to the baseline in the
+   * chat agent's `<output-style>` table. Omit to use only the baseline.
+   */
+  outputProtocols?: readonly OutputProtocol[];
+  /**
+   * Host-declared output aliases appended to the baseline in the chat
+   * agent's `<output-style>` table. Omit to use only the baseline.
+   */
+  outputAliases?: readonly OutputAlias[];
+  /**
+   * Host-supplied overrides for the four chat system-prompt slots.
+   * Unset slots fall back to the agent-core default at prompt-build
+   * time.
+   */
+  systemPromptFragments?: Partial<Record<SystemPromptFragmentKey, string>>;
+}
+
+/**
  * Construction-time configuration for {@link AgentHost}.
  *
  * Holds only the capability singletons (one implementation per slot).
@@ -181,11 +223,7 @@ export class AgentHost {
   private readonly _workspaceMdRelativePath: string;
   private readonly fileReadTransformers: Record<string, FileTransformer> = {};
   private readonly toolPartSerializers: Record<string, ToolPartSerializer> = {};
-  private readonly outputProtocols: OutputProtocol[] = [];
-  private readonly outputAliases: OutputAlias[] = [];
-  private readonly systemPromptFragments: Partial<
-    Record<SystemPromptFragmentKey, string>
-  > = {};
+  private readonly profiles = new Map<AgentTypes, AgentProfile>();
 
   constructor(cfg: AgentHostConfig) {
     this.paths = cfg.paths;
@@ -283,67 +321,35 @@ export class AgentHost {
   }
 
   /**
-   * Register a host-declared markdown link protocol the agent may emit
-   * (e.g. `tab:`, `shell:`). agent-core ships baseline protocols
-   * (`color`, `path`); host entries are **appended** to the baseline
-   * in the chat agent's system prompt by the prompt builder.
+   * Define the {@link AgentProfile} for a given agent type. Replaces
+   * any previously-registered profile for the same type. Hosts MUST
+   * call this for every agent type they plan to instantiate — there is
+   * no implicit "default" profile.
    *
-   * Preserves registration order.
-   */
-  registerOutputProtocol(protocol: OutputProtocol): void {
-    this.outputProtocols.push(protocol);
-  }
-
-  /**
-   * Host-registered output protocols, in registration order. agent-core
-   * baseline protocols (`color`, `path`) are **not** included; the
-   * prompt builder prepends them.
-   */
-  getOutputProtocols(): readonly OutputProtocol[] {
-    return this.outputProtocols;
-  }
-
-  /**
-   * Register a host-declared markdown link alias the agent may emit
-   * (e.g. `report-bug-here`). agent-core ships baseline stagewise
-   * product aliases (`report-agent-issue`, `socials-*`, ...); host
-   * entries are **appended** to the baseline in the chat agent's
-   * system prompt by the prompt builder.
+   * Scope:
+   *  - `envDomainIds` filters env-state capture at the start of every
+   *    turn (per {@link DomainAdapterRegistry.captureAll}) and what the
+   *    chat prompt builder lists in the `<environment>` block.
+   *  - `outputProtocols`/`outputAliases` are appended to the baselines
+   *    in the chat agent's `<output-style>` table.
+   *  - `systemPromptFragments` override the chat agent's `<intro>`,
+   *    `<soul>`, `<environment>` preamble, and `<authorities>` slots.
    *
-   * Preserves registration order.
+   * Agents that build their own system prompt (e.g.
+   * `WorkspaceMdAgent`) ignore the protocol/alias/fragment slots — for
+   * those agents only `envDomainIds` is meaningful.
    */
-  registerOutputAlias(alias: OutputAlias): void {
-    this.outputAliases.push(alias);
+  defineAgentProfile(type: AgentTypes, profile: AgentProfile): void {
+    this.profiles.set(type, profile);
   }
 
   /**
-   * Host-registered output aliases, in registration order. agent-core
-   * baseline aliases are **not** included; the prompt builder prepends
-   * them.
+   * Lookup the registered profile for `type`, or `undefined` if the
+   * host did not define one. Consumers (env capture, prompt builder,
+   * message-conversion env render) treat `undefined` as "empty" — no
+   * env domains, no host protocol/alias/fragment overlays.
    */
-  getOutputAliases(): readonly OutputAlias[] {
-    return this.outputAliases;
-  }
-
-  /**
-   * Override the free-form Markdown fragment for one of the chat
-   * agent's system-prompt slots (see {@link SystemPromptFragmentKey}).
-   * Replaces the slot's body wholesale; unset slots fall back to the
-   * agent-core default at prompt-build time.
-   */
-  setSystemPromptFragment<K extends SystemPromptFragmentKey>(
-    key: K,
-    value: string,
-  ): void {
-    this.systemPromptFragments[key] = value;
-  }
-
-  /**
-   * Snapshot of all host-overridden system-prompt fragments. Slots the
-   * host has not set are absent from the returned object; the prompt
-   * builder falls back to the agent-core default for those.
-   */
-  getSystemPromptFragments(): Partial<Record<SystemPromptFragmentKey, string>> {
-    return this.systemPromptFragments;
+  getAgentProfile(type: AgentTypes): AgentProfile | undefined {
+    return this.profiles.get(type);
   }
 }

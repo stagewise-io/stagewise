@@ -1163,6 +1163,7 @@ export abstract class BaseAgent<
     messages: AgentMessage[],
     systemPrompt: string,
     reasoningSignatureSource?: ReasoningSignatureSource,
+    allowedEnvDomainIds?: readonly string[],
   ): Promise<ModelMessage[]> {
     const activeModelId = this.state.get().activeModelId;
     const fileReadCache = this.fileReadCacheService;
@@ -1234,6 +1235,7 @@ export abstract class BaseAgent<
         domainAdapterRegistry: this.domainAdapterRegistry,
         fileReadTransformers: this.host.getFileReadTransformers(),
         reasoningSignatureSource,
+        allowedEnvDomainIds,
       },
     );
   }
@@ -2314,6 +2316,18 @@ export abstract class BaseAgent<
     queueFlushStart?: number,
     reasoningSignatureSource?: ReasoningSignatureSource,
   ): Promise<ModelMessage[]> {
+    // ─── Resolve env-domain allow-list from this agent type's profile ─
+    // Hosts opt agent types into env capture explicitly via
+    // `AgentHost.defineAgentProfile(...)`. If no profile is registered,
+    // the agent gets no env adapters (and the chat prompt builder also
+    // omits per-domain sections). Filtering happens here once and is
+    // threaded into both env capture and message conversion so a
+    // shrunk profile cannot leak historical entries into the rendered
+    // prompt.
+    const allowedEnvDomainIds = this.host.getAgentProfile(
+      this.agentType,
+    )?.envDomainIds;
+
     // ─── Capture & attach per-domain env state to target message ──────
     const history = this.state.get().history;
     const targetIdx =
@@ -2325,6 +2339,7 @@ export abstract class BaseAgent<
     const { entries } = await this.domainAdapterRegistry.captureAll(
       prevStates,
       this.instanceId,
+      allowedEnvDomainIds,
     );
     if (entries.size > 0) {
       this.state.commands.attachEnvState({
@@ -2350,6 +2365,7 @@ export abstract class BaseAgent<
       filteredUIMsgs,
       systemPrompt,
       reasoningSignatureSource,
+      allowedEnvDomainIds,
     );
 
     // Then, we allow another step to modify the final model messages
