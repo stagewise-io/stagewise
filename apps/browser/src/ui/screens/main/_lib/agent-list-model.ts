@@ -374,7 +374,19 @@ export function buildWorkspaceAgentGroups({
         const key = item.isMainWorktree
           ? 'root'
           : `worktree:${item.worktreeId}`;
-        if (repo.worktrees.some((group) => group.key === key)) return;
+        const existing = repo.worktrees.find((group) => group.key === key);
+        if (existing) {
+          // Worktree groups created from agent mounts carry the branch that was
+          // captured in Karton state at mount time, which goes stale when the
+          // branch is switched outside the app. The worktree list is refetched
+          // whenever the HEAD watcher bumps the repo revision, so it is the
+          // authoritative source for the *current* branch — overlay it onto the
+          // existing group so the label tracks external `git switch`es.
+          existing.branch = item.branch;
+          existing.label = formatWorktreeLabel(item);
+          existing.isRoot = item.isMainWorktree;
+          return;
+        }
         repo.worktrees.push({
           key,
           label: formatWorktreeLabel(item),
