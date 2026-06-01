@@ -1903,14 +1903,20 @@ export function AgentsList() {
     fadeDistance: 16,
   });
 
-  /** Scroll a card into the safe (non-masked) area of the scroll container. */
-  const scrollCardIntoView = useCallback((agentId: string) => {
+  /**
+   * Scroll a card into the safe (non-masked) area of the scroll container.
+   * The same agent can be rendered in multiple groups; `querySelector` returns
+   * the first instance in DOM (top-to-bottom) order, so we always reveal the
+   * topmost one. Returns `true` once a matching card exists in the DOM (whether
+   * or not a scroll was needed), `false` if it has not mounted yet.
+   */
+  const scrollCardIntoView = useCallback((agentId: string): boolean => {
     const container = scrollRef.current?.getViewport();
-    if (!container) return;
+    if (!container) return false;
     const card = container.querySelector<HTMLElement>(
       `[data-agent-id="${agentId}"]`,
     );
-    if (!card) return;
+    if (!card) return false;
 
     const fadeZone = 8;
     const cRect = container.getBoundingClientRect();
@@ -1922,6 +1928,7 @@ export function AgentsList() {
     ) {
       card.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
+    return true;
   }, []);
 
   // Expand containing groups and scroll when the shown agent instance changes.
@@ -1954,10 +1961,24 @@ export function AgentsList() {
       if (changed) updateCollapsedWorkspaceGroupKeys(Array.from(next));
     }
 
-    lastRevealedOpenAgentRef.current = openAgent;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => scrollCardIntoView(openAgent));
+    // The card may mount a frame or two after groups expand and history data
+    // settles. Retry across a few frames and only mark the agent as revealed
+    // once its (first) card instance is actually in the DOM, so a missed early
+    // frame doesn't leave us permanently un-scrolled.
+    let cancelled = false;
+    let attempts = 0;
+    let raf = requestAnimationFrame(function tryReveal() {
+      if (cancelled) return;
+      if (scrollCardIntoView(openAgent)) {
+        lastRevealedOpenAgentRef.current = openAgent;
+        return;
+      }
+      if (attempts++ < 12) raf = requestAnimationFrame(tryReveal);
     });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
   }, [
     agentListGroupingMode,
     effectiveVisible,
