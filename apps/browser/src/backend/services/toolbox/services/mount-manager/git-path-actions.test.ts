@@ -187,6 +187,31 @@ function setWorkspacePathForMount(
   workspacePathsPerMount.set(mountPrefix, workspacePath);
 }
 
+function setAgentMount(
+  service: MountManagerService,
+  agentId: string,
+  mountPrefix: string,
+) {
+  const core = service.getCoreMountManager();
+  const agentMounts = Reflect.get(core, 'agentMounts') as Map<
+    string,
+    Set<string>
+  >;
+  const mounts = agentMounts.get(agentId) ?? new Set<string>();
+  mounts.add(mountPrefix);
+  agentMounts.set(agentId, mounts);
+}
+
+function detachWorkspacePathFromAgents(
+  service: MountManagerService,
+  workspacePath: string,
+): Promise<string[]> {
+  const fn = Reflect.get(service, 'detachWorkspacePathFromAgents') as (
+    p: string,
+  ) => Promise<string[]>;
+  return fn.call(service, workspacePath);
+}
+
 describe('MountManagerService path-based Git actions', () => {
   it('accepts a recent workspace path', async () => {
     const recentPath = await fs.mkdtemp(path.join(os.tmpdir(), 'recent-repo-'));
@@ -496,5 +521,88 @@ describe('MountManagerService path-based Git actions', () => {
     expect(service.getCoreMountManager().getAllMountedPaths()).toContain(
       createdPath,
     );
+  });
+
+  it('detaches a deleted worktree path from agent mounts', async () => {
+    const worktreePath = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'deleted-worktree-'),
+    );
+    const { service, state } = createHarness();
+    await initializeService(service);
+
+    state.toolbox.agent1.workspace.mounts.push({
+      prefix: 'w1234',
+      path: worktreePath,
+      git: null,
+      skills: [],
+      workspaceMdContent: null,
+      agentsMdContent: null,
+    });
+    setWorkspacePathForMount(service, 'w1234', worktreePath);
+    setAgentMount(service, 'agent1', 'w1234');
+
+    const affected = await detachWorkspacePathFromAgents(service, worktreePath);
+
+    expect(affected).toEqual(['agent1']);
+    expect(state.toolbox.agent1.workspace.mounts).toHaveLength(0);
+
+    const core = service.getCoreMountManager();
+    const agentMounts = Reflect.get(core, 'agentMounts') as Map<
+      string,
+      Set<string>
+    >;
+    expect(agentMounts.get('agent1')?.has('w1234')).toBe(false);
+
+    const workspacePathsPerMount = Reflect.get(
+      core,
+      'workspacePathsPerMount',
+    ) as Map<string, string>;
+    expect(workspacePathsPerMount.has('w1234')).toBe(false);
+  });
+
+  it('leaves unrelated agent mounts untouched when detaching', async () => {
+    const deletedPath = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'deleted-worktree-'),
+    );
+    const keptPath = await fs.mkdtemp(path.join(os.tmpdir(), 'kept-worktree-'));
+    const { service, state } = createHarness();
+    await initializeService(service);
+
+    state.toolbox.agent1.workspace.mounts.push(
+      {
+        prefix: 'wdead',
+        path: deletedPath,
+        git: null,
+        skills: [],
+        workspaceMdContent: null,
+        agentsMdContent: null,
+      },
+      {
+        prefix: 'wkeep',
+        path: keptPath,
+        git: null,
+        skills: [],
+        workspaceMdContent: null,
+        agentsMdContent: null,
+      },
+    );
+    setWorkspacePathForMount(service, 'wdead', deletedPath);
+    setWorkspacePathForMount(service, 'wkeep', keptPath);
+    setAgentMount(service, 'agent1', 'wdead');
+    setAgentMount(service, 'agent1', 'wkeep');
+
+    await detachWorkspacePathFromAgents(service, deletedPath);
+
+    expect(
+      state.toolbox.agent1.workspace.mounts.map((mount) => mount.prefix),
+    ).toEqual(['wkeep']);
+
+    const core = service.getCoreMountManager();
+    const agentMounts = Reflect.get(core, 'agentMounts') as Map<
+      string,
+      Set<string>
+    >;
+    expect(agentMounts.get('agent1')?.has('wkeep')).toBe(true);
+    expect(agentMounts.get('agent1')?.has('wdead')).toBe(false);
   });
 });

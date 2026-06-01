@@ -37,6 +37,11 @@ export type GitRepositoryInfo = {
   commonGitDir: string;
 };
 
+export type GitRepositoryRemoteInfo = {
+  remoteName: string;
+  url: string;
+};
+
 export type GitWorktreeInfo = {
   worktreeId: string;
   path: string;

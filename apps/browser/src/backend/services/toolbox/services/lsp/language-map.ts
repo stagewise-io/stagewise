@@ -21,6 +21,20 @@ export function getLanguageId(filePath: string): string {
     case '.mts':
     case '.cts':
       return 'typescript';
+    case '.rs':
+      return 'rust';
+    case '.c':
+    case '.h':
+      return 'c';
+    case '.cc':
+    case '.cpp':
+    case '.cxx':
+    case '.c++':
+    case '.hpp':
+    case '.hh':
+    case '.hxx':
+    case '.h++':
+      return 'cpp';
     default:
       // Remove the dot: .ts → typescript, .json → json, etc.
       return ext ? ext.slice(1) : 'plaintext';
@@ -84,3 +98,27 @@ export const BIOME_EXTENSIONS = [
   '.json',
   '.jsonc',
 ];
+
+/**
+ * Extensions handled by clangd (C/C++).
+ *
+ * clangd re-derives the true language from compile flags / compile_commands;
+ * these IDs only route files to the server.
+ */
+export const CLANGD_EXTENSIONS = [
+  '.c',
+  '.cc',
+  '.cpp',
+  '.cxx',
+  '.c++',
+  '.h',
+  '.hh',
+  '.hpp',
+  '.hxx',
+  '.h++',
+];
+
+/**
+ * Extensions handled by rust-analyzer.
+ */
+export const RUST_EXTENSIONS = ['.rs'];

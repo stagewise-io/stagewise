@@ -101,20 +101,22 @@ export class LspService extends DisposableService {
       return;
     }
 
-    // Start waiting for diagnostics BEFORE opening (to not miss fast responses)
-    const waitPromises = waitForDiagnostics
-      ? clients.map((client) => client.waitForDiagnostics(absoluteFilePath))
-      : [];
-
-    // Open document in all clients
-    const openPromises = clients.map((client) =>
-      client.openDocument(absoluteFilePath),
+    // Open (or re-sync) the document in every client first, capturing the
+    // document version each server will report diagnostics against. Opening
+    // before waiting is safe: waitForDiagnostics has a fast path that catches a
+    // publish that arrived during the open, and it is version-gated so it only
+    // completes on diagnostics produced for the current content.
+    const versions = await Promise.all(
+      clients.map((client) => client.openDocument(absoluteFilePath)),
     );
-    await Promise.all(openPromises);
 
     // Wait for all diagnostics if requested
     if (waitForDiagnostics) {
-      await Promise.all(waitPromises);
+      await Promise.all(
+        clients.map((client, index) =>
+          client.waitForDiagnostics(absoluteFilePath, versions[index]),
+        ),
+      );
     }
   }
 

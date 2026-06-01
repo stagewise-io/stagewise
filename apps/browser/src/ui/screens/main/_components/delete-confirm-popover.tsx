@@ -11,6 +11,7 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { useEffect, useMemo, useRef } from 'react';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { useFloatingIsolation } from './use-floating-isolation';
+import type { ReactNode } from 'react';
 
 /**
  * Top viewport padding reserved for the macOS traffic-light controls when
@@ -39,12 +40,24 @@ export function DeleteConfirmPopover({
   onConfirm,
   isolated = false,
   anchorPoint,
+  title = 'Delete agent?',
+  description = 'This will permanently delete this agent and its chat history.',
+  confirmLabel = 'Delete',
+  confirmVariant = 'primary',
+  confirmDisabled = false,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   isolated?: boolean;
   anchorPoint?: { x: number; y: number };
+  title?: ReactNode;
+  description?: ReactNode;
+  confirmLabel?: ReactNode;
+  confirmVariant?: 'primary' | 'destructive';
+  confirmDisabled?: boolean;
+  children?: ReactNode;
 }) {
   // On macOS with a hidden titlebar, keep the popover clear of the
   // traffic-light overlay that sits at the top of the window.
@@ -108,14 +121,19 @@ export function DeleteConfirmPopover({
         collisionPadding={collisionPadding}
       >
         <div ref={shieldRef} className="contents">
-          <PopoverTitle>Delete agent?</PopoverTitle>
-          <PopoverDescription>
-            This will permanently delete this agent and its chat history.
-          </PopoverDescription>
+          <PopoverTitle>{title}</PopoverTitle>
+          <PopoverDescription>{description}</PopoverDescription>
+          {children}
           <PopoverClose />
           <PopoverFooter>
-            <Button variant="primary" size="xs" onClick={onConfirm} autoFocus>
-              Delete
+            <Button
+              variant={confirmVariant}
+              size="xs"
+              disabled={confirmDisabled}
+              onClick={onConfirm}
+              autoFocus
+            >
+              {confirmLabel}
             </Button>
             <Button
               variant="ghost"

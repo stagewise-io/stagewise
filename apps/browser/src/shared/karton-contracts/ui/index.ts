@@ -119,6 +119,29 @@ export type WorkspaceGitCleanupResult = {
   failed: Array<{ path: string; message: string }>;
 };
 
+export type WorkspaceGitWorktreeDeletionInfo = {
+  path: string;
+  branch: string | null;
+  isMainWorktree: boolean;
+  status: MountedWorkspaceGitStatusSummary | null;
+  hasUncommittedChanges: boolean;
+};
+
+export type WorkspaceGitWorktreeDeleteResult =
+  | { ok: true; path: string; branch: string | null }
+  | { ok: false; message: string };
+
+export type WorkspaceGitWorktreeDeleteOptions = {
+  force?: boolean;
+  /**
+   * When true, callers are responsible for deleting the agents that live
+   * in this worktree before invoking deletion. The mount manager always
+   * detaches the deleted path from surviving agents regardless of this
+   * flag; it exists so the UI can record intent / telemetry.
+   */
+  deleteAgents?: boolean;
+};
+
 export type WorkspaceGitCleanupState = {
   checkedAt: number | null;
   dismissed: boolean;
@@ -695,6 +718,15 @@ export type AppState = {
   };
   workspaceGitCleanup: WorkspaceGitCleanupState;
   workspaceGitSetup: WorkspaceGitSetupState;
+  /**
+   * Monotonic per-repository revision counters, bumped whenever the backend
+   * detects an external git worktree add/remove (e.g. `git worktree add` or
+   * `git worktree remove` run from a terminal outside the app). Keyed by
+   * repositoryId, which equals the repository's common git dir. The sidebar
+   * watches these to invalidate its cached worktree lists so the UI stays in
+   * sync with the filesystem.
+   */
+  gitWorktreeRevisions: Record<string, number>;
   toolbox: {
     [agentInstanceId: string]: {
       workspace: {
@@ -915,6 +947,7 @@ export type KartonContract = {
         modelId?: ModelId,
         toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
+        preserveWorkspacePaths?: boolean,
       ) => Promise<string>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
@@ -1022,6 +1055,9 @@ export type KartonContract = {
       listGitWorktreesByPath: (
         workspacePath: string,
       ) => Promise<WorkspaceGitWorktreesResult | null>;
+      getGitRepositoryRemoteUrlByPath: (
+        workspacePath: string,
+      ) => Promise<string | null>;
       switchGitBranchByPath: (
         workspacePath: string,
         branchName: string,
@@ -1038,6 +1074,13 @@ export type KartonContract = {
       cleanWorkspaceGitWorktrees: (
         paths: string[],
       ) => Promise<WorkspaceGitCleanupResult>;
+      getGitWorktreeDeletionInfo: (
+        path: string,
+      ) => Promise<WorkspaceGitWorktreeDeletionInfo | null>;
+      deleteGitWorktreeByPath: (
+        path: string,
+        options?: WorkspaceGitWorktreeDeleteOptions,
+      ) => Promise<WorkspaceGitWorktreeDeleteResult>;
       listWorkspaceGitBranches: (
         agentInstanceId: string,
         mountPrefix: string,
@@ -1574,6 +1617,7 @@ export const defaultState: KartonContract['state'] = {
   workspaceGitSetup: {
     runsByPath: {},
   },
+  gitWorktreeRevisions: {},
   toolbox: {},
   userAccount: {
     status: 'unauthenticated',

@@ -24,6 +24,7 @@ import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { LspService } from '../lsp';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import chokidar, { type FSWatcher } from 'chokidar';
 import {
   MentionSearchService,
   MountManager,
@@ -41,6 +42,9 @@ import type {
   WorkspaceGitCleanupCandidate,
   WorkspaceGitCleanupResult,
   WorkspaceGitCleanupState,
+  WorkspaceGitWorktreeDeleteOptions,
+  WorkspaceGitWorktreeDeleteResult,
+  WorkspaceGitWorktreeDeletionInfo,
   MountEntry,
   WorkspaceGitCreateBranchOptions,
   WorkspaceGitCreateWorktreeOptions,
@@ -59,6 +63,7 @@ import {
 
 type KartonStateDraft = {
   workspaceGitCleanup: WorkspaceGitCleanupState;
+  gitWorktreeRevisions: Record<string, number>;
   toolbox: Record<
     string,
     {
@@ -85,6 +90,7 @@ export { pickOwningWorkspace } from '@stagewise/agent-core/mount-manager';
 
 type AgentInstanceId = string;
 type MountPrefix = string;
+type WorkspacePath = string;
 type PendingWorktreeSetup = WorktreeSetupMetadata & { createdAt: number };
 
 async function safeRealpath(targetPath: string): Promise<string | null> {
@@ -93,6 +99,66 @@ async function safeRealpath(targetPath: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * chokidar `ignored` predicate for the git worktree watcher.
+ *
+ * The watcher is rooted at a repository's common git dir and must only ever
+ * keep watch handles on a tiny allow-list — returning `true` (ignore) for
+ * everything else keeps chokidar (which places one non-recursive `fs.watch`
+ * per traversed directory) off the large/noisy parts of the git dir
+ * (`objects/`, `refs/`, `logs/`, root `index`/`config`, per-worktree `index`,
+ * etc.), so heavy git activity does not generate useless filesystem reads.
+ *
+ * Allowed (watched), so the sidebar can react to worktree topology *and*
+ * branch changes made outside the app:
+ * - the common git dir root itself (so `worktrees/` creation is seen even
+ *   before it exists);
+ * - `HEAD` at the root (the main worktree's checked-out ref — changes on
+ *   `git switch`/detach, not on commits since `HEAD` is a symref);
+ * - the `worktrees/` directory and each `worktrees/<name>/` directory
+ *   (add/remove is the topology signal; we must descend to reach HEAD);
+ * - `worktrees/<name>/HEAD` (a linked worktree's checked-out ref).
+ *
+ * Everything deeper (e.g. `worktrees/<name>/logs/HEAD` reflog, `index`) is
+ * ignored. Combined with `depth: 2`, the deepest watched path is
+ * `worktrees/<name>/HEAD`.
+ *
+ * Exported for unit testing; pure and platform-aware via the injectable
+ * `sep`/`relative` (defaults to the host `path`).
+ */
+export function shouldIgnoreForGitWorktreeWatch(
+  commonGitDir: string,
+  filePath: string,
+  pathLike: { sep: string; relative: (from: string, to: string) => string } = {
+    sep: path.sep,
+    relative: path.relative,
+  },
+): boolean {
+  // Always watch the root itself so worktrees/ creation is detected even when
+  // it does not exist yet.
+  if (filePath === commonGitDir) return false;
+  const rel = pathLike.relative(commonGitDir, filePath);
+  // The dir itself ('') is watched; anything resolving outside (`..`) is not.
+  if (rel === '') return false;
+  if (rel === '..' || rel.startsWith(`..${pathLike.sep}`)) return true;
+  const segments = rel.split(pathLike.sep);
+
+  if (segments[0] !== 'worktrees') {
+    // Root-level entries: allow only the main worktree's HEAD; ignore
+    // objects/, refs/, logs/, config, index, ORIG_HEAD, packed-refs, etc.
+    return !(segments.length === 1 && segments[0] === 'HEAD');
+  }
+
+  // Under `worktrees/`:
+  // - depth 1 (`worktrees`) and depth 2 (`worktrees/<name>`) dirs: watch so
+  //   topology changes fire and we can descend to reach HEAD.
+  // - depth 3: allow only `worktrees/<name>/HEAD`; ignore index/commondir/etc.
+  // - depth 4+ (e.g. logs/HEAD reflog): ignore.
+  if (segments.length <= 2) return false;
+  if (segments.length === 3) return segments[2] !== 'HEAD';
+  return true;
 }
 
 export type MountedClientRuntimes = Map<MountPrefix, ClientRuntimeNode>;
@@ -147,6 +213,24 @@ export class MountManagerService extends DisposableService {
 
   private onMountsChanged?: (agentInstanceId: string) => void;
 
+  /**
+   * Watchers on each repository's common git dir that detect worktrees
+   * created/removed externally (e.g. `git worktree add/remove` in a terminal).
+   * Keyed by common git dir (== repositoryId). Multiple mounted worktrees of
+   * the same repo share one watcher, ref-counted by workspace path so it is
+   * only torn down once every mount referencing the repo is gone.
+   */
+  private gitWorktreeWatchersPerRepo: Map<
+    string,
+    { watcher: FSWatcher; refs: Set<WorkspacePath> }
+  > = new Map();
+  private gitWorktreeWatcherDebounceTimers: Map<
+    string,
+    ReturnType<typeof setTimeout>
+  > = new Map();
+  /** Maps a mounted workspace path to the common git dir it references. */
+  private commonGitDirPerPath: Map<WorkspacePath, string> = new Map();
+
   public constructor(
     logger: Logger,
     filePickerService: FilePickerService,
@@ -184,8 +268,17 @@ export class MountManagerService extends DisposableService {
         onWorkspaceAttached: (wsPath) => this.attachWorkspaceRuntime(wsPath),
         onWorkspaceReleased: (wsPath) => this.releaseWorkspaceRuntime(wsPath),
         onMountsChanged: (agentId) => this.onMountsChanged?.(agentId),
-        getWorkspaceGitSummary: (wsPath) =>
-          this.gitService.getMountedWorkspaceSummary(wsPath),
+        getWorkspaceGitSummary: async (wsPath) => {
+          const git = await this.gitService.getMountedWorkspaceSummary(wsPath);
+          // Start (or ref-count) the per-repository worktree-topology watcher
+          // whenever core resolves a mount's git summary — covers both the
+          // initial mount and later refreshes. The watcher is browser-side
+          // (chokidar + Karton), so it is owned here rather than in core.
+          if (git?.commonGitDir) {
+            this.ensureGitWorktreeWatcher(wsPath, git.commonGitDir);
+          }
+          return git;
+        },
       },
       getAgentType: (agentInstanceId) =>
         this.uiKarton.state.agents.instances[agentInstanceId]?.type ??
@@ -291,6 +384,13 @@ export class MountManagerService extends DisposableService {
       'toolbox.listGitWorktreesByPath',
       async (_callingClientId: string, workspacePath: string) => {
         return this.listGitWorktreesByPath(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getGitRepositoryRemoteUrlByPath',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.getGitRepositoryRemoteUrlByPath(workspacePath);
       },
     );
 
@@ -449,6 +549,24 @@ export class MountManagerService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getGitWorktreeDeletionInfo',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.getGitWorktreeDeletionInfo(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.deleteGitWorktreeByPath',
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        options?: WorkspaceGitWorktreeDeleteOptions,
+      ) => {
+        return this.deleteGitWorktreeByPath(workspacePath, options);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'toolbox.searchMentionFiles',
       async (
         _callingClientId: string,
@@ -551,6 +669,13 @@ export class MountManagerService extends DisposableService {
   private async listGitWorktreesByPath(workspacePath: string) {
     if (!(await this.isTrustedGitPath(workspacePath))) return null;
     return this.gitService.listWorkspaceWorktrees(workspacePath);
+  }
+
+  private async getGitRepositoryRemoteUrlByPath(
+    workspacePath: string,
+  ): Promise<string | null> {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+    return this.gitService.getRepositoryRemoteUrl(workspacePath);
   }
 
   private async switchGitBranchByPath(
@@ -786,6 +911,146 @@ export class MountManagerService extends DisposableService {
         draft.workspaceGitCleanup.cleaning = false;
       });
     }
+  }
+
+  private async getGitWorktreeDeletionInfo(
+    workspacePath: string,
+  ): Promise<WorkspaceGitWorktreeDeletionInfo | null> {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+
+    const resolvedWorkspacePath = await safeRealpath(workspacePath);
+    if (!resolvedWorkspacePath) return null;
+
+    const summary = await this.gitService.getMountedWorkspaceSummary(
+      resolvedWorkspacePath,
+    );
+    if (!summary?.isWorktree) return null;
+
+    const worktrees = await this.gitService.listWorktrees(
+      resolvedWorkspacePath,
+    );
+    let currentWorktree = null;
+    for (const worktree of worktrees) {
+      const resolvedWorktreePath =
+        (await safeRealpath(worktree.path)) ?? path.resolve(worktree.path);
+      if (resolvedWorktreePath === resolvedWorkspacePath) {
+        currentWorktree = worktree;
+        break;
+      }
+    }
+    if (!currentWorktree) return null;
+
+    const status = await this.gitService.getWorktreeStatus(
+      resolvedWorkspacePath,
+    );
+
+    return {
+      path: resolvedWorkspacePath,
+      branch: currentWorktree.branch,
+      isMainWorktree: currentWorktree.isMainWorktree,
+      status,
+      hasUncommittedChanges: status?.dirty ?? true,
+    };
+  }
+
+  private async deleteGitWorktreeByPath(
+    workspacePath: string,
+    options: WorkspaceGitWorktreeDeleteOptions = {},
+  ): Promise<WorkspaceGitWorktreeDeleteResult> {
+    const info = await this.getGitWorktreeDeletionInfo(workspacePath);
+    if (!info) {
+      return { ok: false, message: 'Worktree is no longer available.' };
+    }
+    if (info.isMainWorktree) {
+      return { ok: false, message: 'Cannot delete the root worktree.' };
+    }
+    if (info.hasUncommittedChanges && !options.force) {
+      return {
+        ok: false,
+        message: 'Worktree has uncommitted changes. Confirm force deletion.',
+      };
+    }
+
+    const result = await this.gitService.removeWorktree(info.path, {
+      force: options.force,
+    });
+    if (!result.ok) return result;
+
+    // The worktree directory no longer exists on disk. Detach it from
+    // every agent that still mounts it so the sidebar stops showing the
+    // dead path and follow-up actions (open path, create agent) can't
+    // target a workspace that's gone. Agents themselves are preserved.
+    await this.detachWorkspacePathFromAgents(info.path);
+
+    this.uiKarton.setState((draft: KartonStateDraft) => {
+      draft.workspaceGitCleanup.candidates =
+        draft.workspaceGitCleanup.candidates.filter(
+          (candidate: WorkspaceGitCleanupCandidate) =>
+            candidate.path !== info.path,
+        );
+    });
+
+    return { ok: true, path: info.path, branch: info.branch };
+  }
+
+  /**
+   * Removes every active mount that points at `workspacePath` from all
+   * agents — both the internal runtime maps (so watcher / LSP / runtime
+   * resources are released via `releaseMountIfUnused`) and the Karton UI
+   * state (so the sidebar stops grouping agents under the now-deleted
+   * path). Agents themselves are intentionally preserved; an agent left
+   * with no remaining mounts simply moves to the "No workspace" group.
+   *
+   * Paths are compared after `realpath` resolution because mount paths
+   * may differ from `workspacePath` by symlink or trailing separators.
+   * Returns the distinct agent instance ids that lost a mount.
+   */
+  private async detachWorkspacePathFromAgents(
+    workspacePath: string,
+  ): Promise<string[]> {
+    const resolvedTarget =
+      (await safeRealpath(workspacePath)) ?? path.resolve(workspacePath);
+
+    const affected: Array<{ agentId: string; prefix: string }> = [];
+    for (const agentId of Object.keys(this.uiKarton.state.toolbox)) {
+      const prefixes = this.core.getMountPrefixes(agentId);
+      if (!prefixes) continue;
+      for (const prefix of prefixes) {
+        const mountedPath = this.core.getWorkspacePathForPrefix(prefix);
+        if (!mountedPath) continue;
+        const resolvedMounted =
+          (await safeRealpath(mountedPath)) ?? path.resolve(mountedPath);
+        if (resolvedMounted === resolvedTarget) {
+          affected.push({ agentId, prefix });
+        }
+      }
+    }
+
+    if (affected.length === 0) return [];
+
+    // Unmount via core so the shared per-workspace runtime / LSP / git
+    // worktree watcher are released through the `onWorkspaceReleased`
+    // hook once the final referencing mount is gone.
+    for (const { agentId, prefix } of affected) {
+      this.agentPermissions.get(agentId)?.delete(prefix);
+      this.core.unmountWorkspace(agentId, prefix);
+    }
+
+    this.uiKarton.setState((draft: KartonStateDraft) => {
+      for (const { agentId, prefix } of affected) {
+        const toolbox = draft.toolbox[agentId];
+        if (!toolbox) continue;
+        toolbox.workspace.mounts = toolbox.workspace.mounts.filter(
+          (mount: MountEntry) => mount.prefix !== prefix,
+        );
+      }
+    });
+
+    const affectedAgentIds = [...new Set(affected.map((a) => a.agentId))];
+    for (const agentId of affectedAgentIds) {
+      this.onMountsChanged?.(agentId);
+    }
+    return affectedAgentIds;
   }
 
   private async cleanWorkspaceGitWorktrees(
@@ -1187,6 +1452,117 @@ export class MountManagerService extends DisposableService {
     this.clientRuntimesPerPath.delete(wsPath);
     this.lspServicesPerPath.delete(wsPath);
     this.lspReady.delete(wsPath);
+    this.releaseGitWorktreeWatcher(wsPath);
+  }
+
+  /**
+   * Ensures a watcher exists for the repository's worktree metadata so that
+   * worktrees added/removed outside the app are reflected in the sidebar.
+   *
+   * Git stores one directory per linked worktree under
+   * `<commonGitDir>/worktrees/<name>`; `git worktree add/remove/prune` create
+   * and delete these directories. Watching the common git dir (shared by every
+   * worktree of the repo) means a single watcher detects changes regardless of
+   * which worktree happens to be mounted. On a relevant change we bump a
+   * per-repository revision in UI state; the sidebar invalidates its cached
+   * worktree list when that revision changes.
+   */
+  private ensureGitWorktreeWatcher(
+    wsPath: WorkspacePath,
+    commonGitDir: string,
+  ): void {
+    this.commonGitDirPerPath.set(wsPath, commonGitDir);
+
+    const existing = this.gitWorktreeWatchersPerRepo.get(commonGitDir);
+    if (existing) {
+      existing.refs.add(wsPath);
+      return;
+    }
+
+    const scheduleBump = () => {
+      const pending = this.gitWorktreeWatcherDebounceTimers.get(commonGitDir);
+      if (pending) clearTimeout(pending);
+      this.gitWorktreeWatcherDebounceTimers.set(
+        commonGitDir,
+        setTimeout(() => {
+          this.gitWorktreeWatcherDebounceTimers.delete(commonGitDir);
+          this.bumpGitWorktreeRevision(commonGitDir);
+        }, 400),
+      );
+    };
+
+    const watcher = chokidar.watch(commonGitDir, {
+      persistent: true,
+      ignoreInitial: true,
+      // chokidar counts depth from the watched root: root = 0, `worktrees/` = 1,
+      // `worktrees/<name>` = 2, `worktrees/<name>/HEAD` = 3. `depth` is the
+      // deepest level chokidar *descends into* (places an fs.watch on). depth: 2
+      // descends into each `worktrees/<name>` so its `HEAD` (depth 3) is
+      // watched for branch switches, while never descending deeper (no watch on
+      // per-worktree `index`/`logs/` churn). The `ignored` predicate further
+      // prunes everything except the HEAD allow-list, so only `HEAD` writes and
+      // worktree dir add/remove ever reach us — even though depth: 2 reads each
+      // worktree dir once on setup.
+      depth: 2,
+      // No awaitWriteFinish: it polls file writes to detect stability, but we
+      // react to discrete events (dir add/remove, HEAD change), so polling here
+      // would be pure overhead. Stay fully event-driven (no usePolling) for
+      // low CPU on all platforms; chokidar v4 uses native fs.watch per dir.
+      ignored: (filePath: string) =>
+        shouldIgnoreForGitWorktreeWatch(commonGitDir, filePath),
+    });
+
+    // The `ignored` predicate restricts watched paths to the worktree topology
+    // (`worktrees/<name>` dirs) and the checked-out refs (`HEAD` files), so any
+    // event from this watcher is relevant: dir add/remove = worktree created or
+    // destroyed; HEAD add/change/unlink = a branch switch / detach (incl. the
+    // atomic `HEAD.lock` → `HEAD` rename git uses). Bump on all of them.
+    watcher.on('all', scheduleBump).on('error', (error) => {
+      this.logger.debug('[MountManager] Git worktree watcher error', {
+        error,
+        commonGitDir,
+      });
+    });
+
+    this.gitWorktreeWatchersPerRepo.set(commonGitDir, {
+      watcher,
+      refs: new Set([wsPath]),
+    });
+    this.logger.debug('[MountManager] Started git worktree watcher', {
+      commonGitDir,
+    });
+  }
+
+  private releaseGitWorktreeWatcher(wsPath: WorkspacePath): void {
+    const commonGitDir = this.commonGitDirPerPath.get(wsPath);
+    if (!commonGitDir) return;
+    this.commonGitDirPerPath.delete(wsPath);
+
+    const entry = this.gitWorktreeWatchersPerRepo.get(commonGitDir);
+    if (!entry) return;
+    entry.refs.delete(wsPath);
+    if (entry.refs.size > 0) return;
+
+    const timer = this.gitWorktreeWatcherDebounceTimers.get(commonGitDir);
+    if (timer) {
+      clearTimeout(timer);
+      this.gitWorktreeWatcherDebounceTimers.delete(commonGitDir);
+    }
+    void entry.watcher.close();
+    this.gitWorktreeWatchersPerRepo.delete(commonGitDir);
+    this.logger.debug('[MountManager] Stopped git worktree watcher', {
+      commonGitDir,
+    });
+  }
+
+  private bumpGitWorktreeRevision(repositoryId: string): void {
+    this.uiKarton.setState((draft: KartonStateDraft) => {
+      draft.gitWorktreeRevisions[repositoryId] =
+        (draft.gitWorktreeRevisions[repositoryId] ?? 0) + 1;
+    });
+    this.logger.debug('[MountManager] Detected external worktree change', {
+      repositoryId,
+    });
   }
 
   private async getPendingWorktreeSetupKey(
@@ -1234,6 +1610,17 @@ export class MountManagerService extends DisposableService {
     this.pendingWorktreeSetups.clear();
     this.worktreeSetupRunner.teardown();
     void this.core.teardownWatchers();
+
+    // Close browser-side git worktree watchers (the generic per-workspace
+    // watchers are owned by the core MountManager via teardownWatchers above).
+    for (const timer of this.gitWorktreeWatcherDebounceTimers.values())
+      clearTimeout(timer);
+    this.gitWorktreeWatcherDebounceTimers.clear();
+    for (const { watcher } of this.gitWorktreeWatchersPerRepo.values())
+      void watcher.close();
+    this.gitWorktreeWatchersPerRepo.clear();
+    this.commonGitDirPerPath.clear();
+
     for (const lspService of this.lspServicesPerPath.values())
       void lspService.teardown();
     this.lspServicesPerPath.clear();
@@ -1244,6 +1631,9 @@ export class MountManagerService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('toolbox.listGitBranchesByPath');
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.listGitWorktreesByPath',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.getGitRepositoryRemoteUrlByPath',
     );
     this.uiKarton.removeServerProcedureHandler('toolbox.switchGitBranchByPath');
     this.uiKarton.removeServerProcedureHandler('toolbox.createGitBranchByPath');

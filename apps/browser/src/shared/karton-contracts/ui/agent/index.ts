@@ -1,5 +1,6 @@
 import type {
   AgentHistoryEntry,
+  AgentHistoryWorkspaceEntry,
   AgentMessage as CoreAgentMessage,
   AgentRuntimeError,
   AgentState as CoreAgentState,
@@ -19,6 +20,7 @@ import type { UIAgentTools } from './tools/types';
 export { CoreAgentTypes as AgentTypes };
 export type {
   AgentHistoryEntry,
+  AgentHistoryWorkspaceEntry,
   AgentRuntimeError,
   ExceededWindow,
   ToolboxState,
@@ -46,6 +48,12 @@ export type AgentState = Omit<
   toolApprovalMode: ToolApprovalMode;
 };
 
+/**
+ * Trimmed preview DTO for a persisted agent instance, returned on-demand by
+ * `agents.getStoredInstance` for the sidebar preview panel. Derived from the
+ * core preview shape, narrowing `activeModelId` to the host `ModelId` union
+ * and `mountedWorkspaces` to the host git-summary alias.
+ */
 export type StoredAgentPreview = Omit<
   CoreStoredAgentPreview<AgentTypes>,
   'activeModelId' | 'mountedWorkspaces'

@@ -96,6 +96,36 @@ export interface LspServerInfo {
     projectRoot: string,
     resolvedEnv?: Record<string, string> | null,
   ) => Promise<LspServerHandle | undefined>;
+
+  /**
+   * Optional override for how long `waitForDiagnostics` waits for a fresh
+   * diagnostics publish before giving up (milliseconds). The wait still
+   * resolves early the moment a matching receipt arrives — this is only the
+   * safety-net cap. Servers backed by a slow external checker (e.g.
+   * rust-analyzer's `cargo check` flycheck, which can take several seconds on
+   * a cold cache) need a larger value than the default so a cold first open
+   * does not report an empty result. Defaults to 3000ms when unset.
+   */
+  diagnosticsTimeoutMs?: number;
+
+  /**
+   * Force the client to treat this server as push-only for diagnostics,
+   * ignoring any advertised `diagnosticProvider` (pull) capability.
+   *
+   * Some native servers advertise pull support but deliver their authoritative
+   * diagnostics exclusively via push (`textDocument/publishDiagnostics`).
+   * rust-analyzer is the canonical example: its pull endpoint
+   * (`textDocument/diagnostic`) only returns syntax/proc-macro diagnostics and
+   * always omits the `cargo check` (flycheck) results, which arrive solely via
+   * push after a delay. Querying the pull endpoint therefore returns an empty
+   * report that resolves `waitForDiagnostics` prematurely — before the real
+   * push lands — surfacing an empty result. clangd is likewise push-native.
+   *
+   * When true, the client skips the pull path entirely and does not advance the
+   * document to a no-op second version, so the wait resolves on the genuine
+   * push (or the safety-net timeout) instead of an empty pull.
+   */
+  pushDiagnosticsOnly?: boolean;
 }
 
 /**

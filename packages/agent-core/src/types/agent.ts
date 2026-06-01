@@ -106,6 +106,12 @@ export type ToolboxState = {
   pendingFiles: string[];
 };
 
+export type AgentHistoryWorkspaceEntry = {
+  path: string;
+  permissions: MountPermission[];
+  git: WorkspaceGitSummary | null;
+};
+
 export type AgentHistoryEntry = {
   id: string;
   title: string;
@@ -113,6 +119,7 @@ export type AgentHistoryEntry = {
   lastMessageAt: Date;
   messageCount: number;
   parentAgentInstanceId: string | null;
+  mountedWorkspaces?: AgentHistoryWorkspaceEntry[] | null;
 };
 
 export type StoredAgentPreview<TAgentTypes extends AgentTypes = AgentTypes> = {

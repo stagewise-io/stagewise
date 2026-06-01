@@ -2,6 +2,8 @@ import type { LspServerInfo } from '../types';
 import { typescriptServer } from './typescript';
 import { eslintServer } from './eslint';
 import { biomeServer } from './biome';
+import { clangdServer } from './clangd';
+import { rustAnalyzerServer } from './rust-analyzer';
 
 /**
  * Registry of all available LSP servers
@@ -18,6 +20,12 @@ export const servers: LspServerInfo[] = [
 
   // Biome (linting, formatting - alternative to ESLint/Prettier)
   biomeServer,
+
+  // clangd (C/C++ diagnostics, types, navigation) - native binary
+  clangdServer,
+
+  // rust-analyzer (Rust diagnostics, types, navigation) - native binary
+  rustAnalyzerServer,
 ];
 
 /**
@@ -45,3 +53,5 @@ export function getAllServerIds(): string[] {
 export { typescriptServer } from './typescript';
 export { eslintServer } from './eslint';
 export { biomeServer } from './biome';
+export { clangdServer } from './clangd';
+export { rustAnalyzerServer } from './rust-analyzer';

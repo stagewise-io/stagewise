@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { getBaseName } from '@shared/path-utils';
@@ -62,6 +63,11 @@ export class LspClient extends EventEmitter {
   public readonly root: string;
 
   private static readonly DIAGNOSTICS_DEBOUNCE_MS = 150;
+  /**
+   * Default safety-net cap for `waitForDiagnostics`. Individual servers can
+   * override it via `LspServerInfo.diagnosticsTimeoutMs` (e.g. rust-analyzer,
+   * whose cargo-backed flycheck is slower than this default on a cold cache).
+   */
   private static readonly DIAGNOSTICS_TIMEOUT_MS = 3000;
   private static readonly CLIENT_INIT_TIMEOUT_MS = 15_000;
   private static readonly SHUTDOWN_TIMEOUT_MS = 5_000;
@@ -72,6 +78,8 @@ export class LspClient extends EventEmitter {
   private openDocuments = new Map<string, number>(); // uri -> version
   private diagnostics = new Map<string, Diagnostic[]>(); // absoluteFilePath -> diagnostics
   private diagnosticsHash = new Map<string, string>(); // absoluteFilePath -> hash for deduplication
+  private lastDiagnosticsVersion = new Map<string, number>(); // absoluteFilePath -> last published document version
+  private sentContentHash = new Map<string, string>(); // uri -> hash of the last content sent to the server
   private initializePromise: Promise<void> | null = null;
   private initializationOptions: Record<string, unknown> | undefined;
   private disposed = false;
@@ -92,21 +100,57 @@ export class LspClient extends EventEmitter {
   }
 
   /**
+   * Compute a hash of file content for change detection between re-lints.
+   */
+  private computeContentHash(content: string): string {
+    return createHash('sha1').update(content).digest('hex');
+  }
+
+  /**
    * Update diagnostics and emit event only if they changed
    */
   private updateDiagnostics(
     filePath: string,
     newDiagnostics: Diagnostic[],
+    version?: number,
   ): void {
     const newHash = this.computeDiagnosticsHash(newDiagnostics);
     const oldHash = this.diagnosticsHash.get(filePath);
 
-    // Only emit if diagnostics actually changed
+    // Only emit the (deduped) 'diagnostics' change event if the set actually
+    // changed — downstream consumers use it for change propagation.
     if (newHash !== oldHash) {
       this.diagnostics.set(filePath, newDiagnostics);
       this.diagnosticsHash.set(filePath, newHash);
       this.emit('diagnostics', filePath, newDiagnostics);
     }
+
+    // Track the document version these diagnostics were computed against, when
+    // the server reports it (clangd and rust-analyzer both do). waitForDiagnostics
+    // uses this to ignore stale publishes from an earlier analysis.
+    if (typeof version === 'number') {
+      this.lastDiagnosticsVersion.set(filePath, version);
+    }
+
+    // Always signal that the server delivered a fresh diagnostic set for this
+    // file, even when the content was identical and the change event above was
+    // suppressed by dedup. waitForDiagnostics relies on this receipt (paired
+    // with the version) so it can resolve on an actual server response rather
+    // than guessing with a timer.
+    this.emit('diagnosticsReceived', filePath, version);
+  }
+
+  /**
+   * Whether this client should use the pull-diagnostics model
+   * (`textDocument/diagnostic`). True only when the server advertises
+   * `diagnosticProvider` AND is not flagged push-only. Push-native servers
+   * such as rust-analyzer and clangd advertise pull support but deliver their
+   * authoritative diagnostics via push, so their pull endpoint must not be
+   * used (see `LspServerInfo.pushDiagnosticsOnly`).
+   */
+  private usesPullDiagnostics(): boolean {
+    if (this.serverInfo.pushDiagnosticsOnly) return false;
+    return !!(this.capabilities as Record<string, unknown>)?.diagnosticProvider;
   }
 
   private readonly resolvedEnv: Record<string, string> | null;
@@ -231,7 +275,7 @@ export class LspClient extends EventEmitter {
       PublishDiagnosticsNotification.type,
       (params) => {
         const filePath = fileURLToPath(params.uri);
-        this.updateDiagnostics(filePath, params.diagnostics);
+        this.updateDiagnostics(filePath, params.diagnostics, params.version);
       },
     );
 
@@ -339,40 +383,16 @@ export class LspClient extends EventEmitter {
    * Called when server sends workspace/diagnostic/refresh notification.
    */
   private refreshAllDiagnostics(): void {
-    if (
-      !this.connection ||
-      this.disposed ||
-      !(this.capabilities as Record<string, unknown>)?.diagnosticProvider
-    ) {
+    if (!this.connection || this.disposed || !this.usesPullDiagnostics()) {
       return;
     }
 
-    for (const [uri, _version] of this.openDocuments) {
+    for (const uri of this.openDocuments.keys()) {
       const filePath = fileURLToPath(uri);
-
-      const requestPullDiagnostics = async () => {
-        // Snapshot the connection so a concurrent dispose() that nulls
-        // `this.connection` mid-flight cannot cause a null-deref here.
-        const conn = this.connection;
-        if (!conn || this.disposed) return;
-
-        try {
-          const diagResult = await conn.sendRequest('textDocument/diagnostic', {
-            textDocument: { uri },
-          });
-          if (this.disposed) return;
-          const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
-          this.updateDiagnostics(filePath, items);
-        } catch (error) {
-          this.logger.debug(
-            `[LspClient:${this.serverID}] Pull diagnostics failed during refresh for ${filePath}:`,
-            error,
-          );
-        }
-      };
-
-      // Small delay to avoid overwhelming the server
-      requestPullDiagnostics().catch(() => {});
+      // Re-pull through the shared helper: it snapshots and tags the current
+      // document version, so a refresh racing a concurrent change cannot emit a
+      // version-less receipt that resolves a wait with stale data.
+      this.schedulePullDiagnostics(uri, filePath, [0]);
     }
   }
 
@@ -450,7 +470,7 @@ export class LspClient extends EventEmitter {
         workspaceFolders: [
           {
             uri: pathToFileURL(this.root).toString(),
-            name: this.root.split('/').pop() || 'workspace',
+            name: getBaseName(this.root) || 'workspace',
           },
         ],
       };
@@ -481,10 +501,62 @@ export class LspClient extends EventEmitter {
   }
 
   /**
+   * Request pull diagnostics (`textDocument/diagnostic`) for a pull-model
+   * server (one advertising `diagnosticProvider`, e.g. ESLint) and feed the
+   * result through updateDiagnostics. Several delayed attempts give the server
+   * time to validate after an open/change.
+   *
+   * Each result is tagged with the document version current at send time. The
+   * server processes messages in order, so the response reflects at least that
+   * version; a pull issued before a newer change is therefore tagged with the
+   * older version and gated out by waitForDiagnostics instead of resolving a
+   * wait with stale data.
+   */
+  private schedulePullDiagnostics(
+    uri: string,
+    filePath: string,
+    delays: number[],
+  ): void {
+    if (!this.usesPullDiagnostics()) {
+      return;
+    }
+    for (const delay of delays) {
+      void (async () => {
+        if (this.disposed) return;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        // Snapshot the connection after the timeout so dispose() nulling
+        // `this.connection` mid-flight cannot cause a null-deref here.
+        const conn = this.connection;
+        if (!conn || this.disposed) return;
+        // Read the document version at send time (see method doc).
+        const version = this.openDocuments.get(uri);
+        try {
+          const diagResult = await conn.sendRequest('textDocument/diagnostic', {
+            textDocument: { uri },
+          });
+          if (this.disposed) return;
+          const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
+          // Always update (even when empty) to clear stale diagnostics and emit
+          // a receipt so a clean file's wait resolves promptly.
+          this.updateDiagnostics(filePath, items, version);
+        } catch (pullError) {
+          // Server may not support pull diagnostics despite advertising, or
+          // dispose() may have torn the connection down between the timeout and
+          // the sendRequest resolving.
+          this.logger.debug(
+            `[LspClient:${this.serverID}] Pull diagnostics failed for ${filePath}:`,
+            pullError,
+          );
+        }
+      })();
+    }
+  }
+
+  /**
    * Open a document in the LSP server
    */
-  public async openDocument(filePath: string): Promise<void> {
-    if (!this.connection || this.disposed) return;
+  public async openDocument(filePath: string): Promise<number | undefined> {
+    if (!this.connection || this.disposed) return undefined;
 
     const uri = pathToFileURL(filePath).toString();
 
@@ -497,19 +569,37 @@ export class LspClient extends EventEmitter {
         // dispose() (which synchronously nulls `this.connection`) cannot
         // cause a null-deref on the sendNotification below.
         const conn = this.connection;
-        if (!conn || this.disposed) return;
+        if (!conn || this.disposed) return undefined;
         const currentVersion = this.openDocuments.get(uri)!;
         const newVersion = currentVersion + 1;
         this.openDocuments.set(uri, newVersion);
+        const contentHash = this.computeContentHash(content);
+        const contentChanged = this.sentContentHash.get(uri) !== contentHash;
+        this.sentContentHash.set(uri, contentHash);
         await conn.sendNotification(DidChangeTextDocumentNotification.type, {
           textDocument: { uri, version: newVersion },
           contentChanges: [{ text: content }],
         });
+        // Pull-model servers don't push on didChange — request a refresh when
+        // the content actually changed so new diagnostics are produced (and
+        // tagged with the new version).
+        if (contentChanged) {
+          this.schedulePullDiagnostics(uri, filePath, [100, 500]);
+        }
+        // If the on-disk content is unchanged, the server may not re-publish
+        // (clangd, for one, skips identical re-analyses) and the cached
+        // diagnostics are already current — so wait against the last published
+        // version, which the fast path in waitForDiagnostics satisfies
+        // immediately. Only when the content actually changed do we wait for a
+        // publish at the new version.
+        return contentChanged
+          ? newVersion
+          : this.lastDiagnosticsVersion.get(filePath);
       } catch {
         // File may have been deleted between open and re-read, or the
         // connection was disposed while we were reading.
+        return undefined;
       }
-      return;
     }
 
     try {
@@ -518,8 +608,9 @@ export class LspClient extends EventEmitter {
       // dispose() (which synchronously nulls `this.connection`) cannot
       // cause a null-deref on the sendNotification calls below.
       const conn = this.connection;
-      if (!conn || this.disposed) return;
+      if (!conn || this.disposed) return undefined;
       const languageId = getLanguageId(filePath);
+      this.sentContentHash.set(uri, this.computeContentHash(content));
 
       const textDocument: TextDocumentItem = {
         uri,
@@ -532,68 +623,32 @@ export class LspClient extends EventEmitter {
       const params: DidOpenTextDocumentParams = { textDocument };
       await conn.sendNotification(DidOpenTextDocumentNotification.type, params);
 
-      // ESLint's run: "onType" setting responds to changes, not just opens
-      // Send a no-op change to trigger validation
-      const changeParams: DidChangeTextDocumentParams = {
-        textDocument: {
-          uri,
-          version: 2,
-        },
-        contentChanges: [{ text: content }],
-      };
-      this.openDocuments.set(uri, 2);
-      await conn.sendNotification(
-        DidChangeTextDocumentNotification.type,
-        changeParams,
-      );
+      const isPullServer = this.usesPullDiagnostics();
 
-      // If server supports pull diagnostics (diagnosticProvider), request diagnostics
-      // ESLint uses pull diagnostics - we need to explicitly request them
-      if (
-        (this.capabilities as Record<string, unknown>)?.diagnosticProvider &&
-        !this.disposed
-      ) {
-        const requestPullDiagnostics = async (delay: number) => {
-          if (this.disposed) return;
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          // Snapshot the connection after the timeout so dispose() nulling
-          // `this.connection` mid-flight cannot cause a null-deref here.
-          const conn = this.connection;
-          if (!conn || this.disposed) return;
-
-          try {
-            const diagResult = await conn.sendRequest(
-              'textDocument/diagnostic',
-              {
-                textDocument: { uri },
-              },
-            );
-            if (this.disposed) return;
-            // Process pull diagnostics result (deduplication handled by updateDiagnostics)
-            const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
-            if (items.length > 0) {
-              this.updateDiagnostics(filePath, items);
-            }
-          } catch (pullError) {
-            // Server may not support pull diagnostics despite advertising,
-            // or dispose() may have torn the connection down between the
-            // timeout and the sendRequest resolving.
-            this.logger.debug(
-              `[LspClient:${this.serverID}] Pull diagnostics failed for ${filePath}:`,
-              pullError,
-            );
-          }
-        };
-        // Request pull diagnostics after delays to give ESLint time to validate
-        requestPullDiagnostics(500).catch(() => {});
-        requestPullDiagnostics(2000).catch(() => {});
-        requestPullDiagnostics(5000).catch(() => {});
+      // Pull-model servers (e.g. ESLint with run: "onType") validate in
+      // response to changes, not bare opens, so nudge them with a no-op change
+      // and request diagnostics explicitly. Push servers publish on didOpen, so
+      // we deliberately do NOT advance them to a second version: clangd
+      // suppresses re-analysis of byte-identical changes and would never
+      // publish that version, which would hang the wait below until timeout.
+      if (isPullServer) {
+        this.openDocuments.set(uri, 2);
+        await conn.sendNotification(DidChangeTextDocumentNotification.type, {
+          textDocument: { uri, version: 2 },
+          contentChanges: [{ text: content }],
+        });
+        this.schedulePullDiagnostics(uri, filePath, [500, 2000, 5000]);
       }
+
+      // Wait for diagnostics at the latest version we actually sent: 1 for push
+      // servers (didOpen only) or 2 for pull servers (didOpen + no-op change).
+      return this.openDocuments.get(uri);
     } catch (error) {
       this.logger.error(
         `[LspClient:${this.serverID}] Failed to open document: ${filePath}`,
         error,
       );
+      return undefined;
     }
   }
 
@@ -603,20 +658,20 @@ export class LspClient extends EventEmitter {
   public async updateDocument(
     filePath: string,
     content: string,
-  ): Promise<void> {
-    if (!this.connection || this.disposed) return;
+  ): Promise<number | undefined> {
+    if (!this.connection || this.disposed) return undefined;
 
     const uri = pathToFileURL(filePath).toString();
     const currentVersion = this.openDocuments.get(uri);
 
     if (currentVersion === undefined) {
       // Document not open, open it instead
-      await this.openDocument(filePath);
-      return;
+      return await this.openDocument(filePath);
     }
 
     const newVersion = currentVersion + 1;
     this.openDocuments.set(uri, newVersion);
+    this.sentContentHash.set(uri, this.computeContentHash(content));
 
     const params: DidChangeTextDocumentParams = {
       textDocument: {
@@ -630,39 +685,12 @@ export class LspClient extends EventEmitter {
       params,
     );
 
-    // Request pull diagnostics after update for servers that use pull model (e.g., ESLint)
-    // Without this, servers with diagnosticProvider won't re-validate after content changes
-    if (
-      (this.capabilities as Record<string, unknown>)?.diagnosticProvider &&
-      this.connection
-    ) {
-      const requestPullDiagnostics = async (delay: number) => {
-        if (this.disposed) return;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        // Snapshot the connection after the timeout so dispose() nulling
-        // `this.connection` mid-flight cannot cause a null-deref here.
-        const conn = this.connection;
-        if (!conn || this.disposed) return;
+    // Pull-model servers (e.g. ESLint) won't re-validate on didChange — request
+    // diagnostics explicitly so the change is reflected (tagged with the new
+    // version).
+    this.schedulePullDiagnostics(uri, filePath, [100, 500]);
 
-        try {
-          const diagResult = await conn.sendRequest('textDocument/diagnostic', {
-            textDocument: { uri },
-          });
-          if (this.disposed) return;
-          const items = (diagResult as { items?: Diagnostic[] })?.items ?? [];
-          // Always update diagnostics (even if empty) to clear stale ones
-          this.updateDiagnostics(filePath, items);
-        } catch (pullError) {
-          this.logger.debug(
-            `[LspClient:${this.serverID}] Pull diagnostics failed after update for ${filePath}:`,
-            pullError,
-          );
-        }
-      };
-      // Request pull diagnostics with delays to give the server time to process the change
-      requestPullDiagnostics(100).catch(() => {});
-      requestPullDiagnostics(500).catch(() => {});
-    }
+    return newVersion;
   }
 
   /**
@@ -678,6 +706,8 @@ export class LspClient extends EventEmitter {
     this.openDocuments.delete(uri);
     this.diagnostics.delete(filePath);
     this.diagnosticsHash.delete(filePath);
+    this.lastDiagnosticsVersion.delete(filePath);
+    this.sentContentHash.delete(uri);
 
     const params: DidCloseTextDocumentParams = {
       textDocument: { uri },
@@ -692,20 +722,66 @@ export class LspClient extends EventEmitter {
    * Wait for diagnostics to be received for a file.
    * Uses debouncing to handle multiple rapid diagnostic updates.
    */
-  public async waitForDiagnostics(filePath: string): Promise<void> {
+  /**
+   * Wait for diagnostics produced by the current open/change of `filePath`.
+   *
+   * `minVersion` is the document version dispatched by the open/change that
+   * preceded this call (returned by openDocument/updateDocument). We resolve
+   * on a diagnostics *receipt* whose published document version is at least
+   * `minVersion`, which ties the wait to the current touch:
+   *
+   *  - A delayed publish from an earlier analysis carries a lower version and
+   *    is ignored, so we never resolve against a stale cache.
+   *  - Servers that do not report a version (publish `null`) cannot be
+   *    correlated, so their receipts are accepted as a best effort.
+   *  - When `minVersion` is undefined (e.g. unchanged content whose cached
+   *    diagnostics are already current, or a server that has not reported a
+   *    version yet) any receipt completes the wait.
+   *
+   * A receipt is emitted on every server response — including ones the hash
+   * dedup suppresses — so an unchanged re-lint resolves promptly instead of
+   * hanging. The overall timeout is a safety net for servers that never
+   * publish (unsupported file or a slow cold index).
+   */
+  public async waitForDiagnostics(
+    filePath: string,
+    minVersion?: number,
+  ): Promise<void> {
+    // A receipt is current when its document version is at least the version
+    // dispatched by the open/change preceding this wait. Both push servers
+    // (clangd, rust-analyzer) and our pull requests tag receipts with a
+    // version, so stale results from an earlier analysis are gated out. A
+    // truly version-less receipt (a server that reports no version at all)
+    // cannot be correlated and is accepted as a best effort rather than
+    // hanging to the timeout.
+    const isFresh = (version: number | undefined): boolean =>
+      minVersion === undefined ||
+      version === undefined ||
+      version >= minVersion;
+
+    // Fast path: the matching publish may already have arrived between the
+    // open/change dispatch and this call.
+    if (minVersion !== undefined) {
+      const last = this.lastDiagnosticsVersion.get(filePath);
+      if (last !== undefined && last >= minVersion) return;
+    }
+
     return new Promise((resolve) => {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
       const cleanup = (timer: ReturnType<typeof setTimeout>) => {
         if (debounceTimer) clearTimeout(debounceTimer);
         clearTimeout(timer);
-        this.off('diagnostics', onDiagnostics);
+        this.off('diagnosticsReceived', onReceived);
       };
 
-      const onDiagnostics = (path: string) => {
+      const onReceived = (path: string, version?: number) => {
         if (path !== filePath) return;
+        // Ignore stale publishes from an earlier analysis.
+        if (!isFresh(version)) return;
 
-        // Debounce to allow follow-up diagnostics (syntax errors first, then semantic)
+        // Debounce to coalesce follow-up publishes (e.g. syntax diagnostics
+        // first, then semantic) into a single resolve.
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           cleanup(timeoutTimer);
@@ -713,14 +789,18 @@ export class LspClient extends EventEmitter {
         }, LspClient.DIAGNOSTICS_DEBOUNCE_MS);
       };
 
-      // Subscribe to diagnostics events
-      this.on('diagnostics', onDiagnostics);
+      // Subscribe to diagnostics receipts
+      this.on('diagnosticsReceived', onReceived);
 
-      // Overall timeout - resolve anyway to avoid hanging
+      // Safety net: a server that never publishes (unsupported file, or a slow
+      // cold index) must not hang the caller forever. Cargo-backed servers like
+      // rust-analyzer override the default with a larger window so a cold
+      // flycheck (several seconds) is not cut off into an empty result.
       const timeoutTimer = setTimeout(() => {
         cleanup(timeoutTimer);
         resolve();
-      }, LspClient.DIAGNOSTICS_TIMEOUT_MS);
+      }, this.serverInfo.diagnosticsTimeoutMs ??
+        LspClient.DIAGNOSTICS_TIMEOUT_MS);
     });
   }
 
@@ -1090,6 +1170,8 @@ export class LspClient extends EventEmitter {
     this.openDocuments.clear();
     this.diagnostics.clear();
     this.diagnosticsHash.clear();
+    this.lastDiagnosticsVersion.clear();
+    this.sentContentHash.clear();
 
     // Emit 'close' after all teardown work completes so observers
     // (LspService.on('close'), tests) see the client in its final
