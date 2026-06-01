@@ -586,11 +586,34 @@ export class TerminalService extends DisposableService {
         createdAt,
         lastFocusedAt: createdAt,
       };
+
+      // A tab id must live in exactly ONE order array. This is the only tab
+      // mutation that does not route through WindowLayoutService.addToTabOrder
+      // (which does a full cleanup-then-add), so we enforce the invariant
+      // here too: defensively strip any pre-existing entry of this id from
+      // every order array before inserting. Without this, a stale or
+      // interleaved entry would leave the id in two arrays at once, which
+      // makes the tab bar render two <Tabs.Tab> with the same `value` and
+      // triggers an infinite Base UI highlight-effect loop (React #185 ->
+      // whole-UI crash). For a brand-new id every filter is a no-op.
+      draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
+        (id) => id !== terminalId,
+      );
+      for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
+        const filtered = draft.contentTabs.agentOrders[agentId]!.filter(
+          (id) => id !== terminalId,
+        );
+        if (filtered.length === 0) {
+          delete draft.contentTabs.agentOrders[agentId];
+        } else {
+          draft.contentTabs.agentOrders[agentId] = filtered;
+        }
+      }
+
       if (tabAgentInstanceId) {
         draft.contentTabs.agentOrders[tabAgentInstanceId] ??= [];
-        const order = draft.contentTabs.agentOrders[tabAgentInstanceId];
-        if (!order.includes(terminalId)) order.push(terminalId);
-      } else if (!draft.contentTabs.globalOrder.includes(terminalId)) {
+        draft.contentTabs.agentOrders[tabAgentInstanceId]!.push(terminalId);
+      } else {
         draft.contentTabs.globalOrder.push(terminalId);
       }
     });

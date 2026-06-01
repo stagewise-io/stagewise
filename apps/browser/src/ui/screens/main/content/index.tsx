@@ -360,12 +360,27 @@ export function MainSection({
   // ---------------------------------------------------------------------------
 
   const tabIdsSelector = useComparingSelector<KartonContract, string[]>(
-    (s) => [
-      ...s.contentTabs.globalOrder,
-      ...Object.keys(s.contentTabs.agentOrders)
-        .sort()
-        .flatMap((agentId) => s.contentTabs.agentOrders[agentId] ?? []),
-    ],
+    (s) => {
+      // De-duplicate ids across the global + per-agent order arrays.
+      // A tab id must NEVER appear twice in the rendered tab list: two
+      // <Tabs.Tab> with the same `value` both match the active value and
+      // their Base UI highlight effects ping-pong setHighlightedTabIndex
+      // forever (React error #185 → whole-UI crash). The backend can
+      // transiently hold an id in two arrays, so we mirror the dedupe
+      // already done in WindowLayoutService.getAllOrderedTabIds().
+      const seen = new Set<string>();
+      const ids: string[] = [];
+      const push = (id: string) => {
+        if (seen.has(id)) return;
+        seen.add(id);
+        ids.push(id);
+      };
+      for (const id of s.contentTabs.globalOrder) push(id);
+      for (const agentId of Object.keys(s.contentTabs.agentOrders).sort()) {
+        for (const id of s.contentTabs.agentOrders[agentId] ?? []) push(id);
+      }
+      return ids;
+    },
     (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
   );
   const serverTabIds = useKartonState(tabIdsSelector);
@@ -393,10 +408,20 @@ export function MainSection({
 
   // Visible tab IDs filtered to current agent (global + this agent's tabs)
   const visibleTabIds = useMemo(() => {
+    // Final dedupe guard at the render boundary: even if the optimistic
+    // order ever contains a duplicate id (e.g. from a reorder edge case),
+    // never emit it twice. Rendering duplicate <Tabs.Tab value> crashes
+    // the whole UI via an infinite Base UI highlight-effect loop (#185).
+    const seen = new Set<string>();
     return optimisticTabIds.filter((id) => {
+      if (seen.has(id)) return false;
       const tab = tabs[id];
       if (!tab) return false;
-      return tab.agentInstanceId === null || tab.agentInstanceId === openAgent;
+      if (tab.agentInstanceId !== null && tab.agentInstanceId !== openAgent) {
+        return false;
+      }
+      seen.add(id);
+      return true;
     });
   }, [optimisticTabIds, tabs, openAgent]);
 
