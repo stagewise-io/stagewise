@@ -5,6 +5,7 @@
 import { app, dialog } from 'electron';
 import { AuthService } from './services/auth';
 import { AgentManagerService } from './services/agent-manager';
+import { enrichHistoryEntryWorkspaces } from './services/agent-manager/history-workspace-enrichment';
 import { UserExperienceService } from './services/experience';
 import { FilePickerService } from './services/file-picker';
 import { AppMenuService } from './services/app-menu';
@@ -561,6 +562,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     processedImageCacheService,
     (event, agentId) =>
       notificationSoundsService.notifyAgentEvent(event, agentId),
+    (entries) =>
+      enrichHistoryEntryWorkspaces(
+        entries,
+        (workspacePath) => gitService.getMountedWorkspaceSummary(workspacePath),
+        logger,
+      ),
   );
 
   toolboxService.setWorkspaceLastUsedAtResolver(

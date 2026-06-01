@@ -23,6 +23,7 @@ import type { Logger } from '@/services/logger';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import { LspService } from '../lsp';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import {
@@ -777,6 +778,18 @@ export class MountManagerService extends DisposableService {
       resolvedWorkspacePath = workspacePath;
     }
     if (!resolvedWorkspacePath) return;
+
+    // Skip mounting when the target directory is gone (e.g. a worktree
+    // that was deleted between sessions). Without this guard, resume /
+    // startup auto-mount would spin up a ClientRuntime / LSP / watcher
+    // for a path that no longer exists; the agent stays alive and falls
+    // into the "No workspace" group instead.
+    if (!existsSync(resolvedWorkspacePath)) {
+      this.logger.debug(
+        `[MountManager] Skipping mount of missing workspace ${resolvedWorkspacePath} for agent ${agentInstanceId}`,
+      );
+      return;
+    }
 
     await this.userExperienceService.saveRecentlyOpenedWorkspace({
       path: resolvedWorkspacePath,

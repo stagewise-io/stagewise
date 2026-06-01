@@ -114,6 +114,16 @@ export class AgentManager extends DisposableService {
     event: AgentNotificationEvent,
     agentId: string,
   ) => void | Promise<void>;
+  /**
+   * Optional host hook that augments raw {@link AgentHistoryEntry}
+   * rows from {@link AgentPersistenceDB} with data only the host can
+   * resolve (live git summaries, on-disk path validation). Invoked
+   * from {@link getAgentsHistoryList}; when absent, rows are passed
+   * through unmodified so core stays host-agnostic.
+   */
+  private readonly enrichHistoryEntries?: (
+    entries: AgentHistoryEntry[],
+  ) => Promise<AgentHistoryEntry[]>;
   private readonly imageCache?: ProcessedImageCacheService;
   /**
    * App-wide `FileReadCacheService` shared across all agent instances.
@@ -191,6 +201,7 @@ export class AgentManager extends DisposableService {
     this.agentsMap = toAgentsMap(agentTypeRegistry);
     this.renderHostMention = hooks?.renderHostMention;
     this.onAgentEvent = hooks?.onAgentEvent;
+    this.enrichHistoryEntries = hooks?.enrichHistoryEntries;
     this.getSkillsForSlashRedaction =
       hooks?.skillsForSlashRedaction ?? (() => []);
 
@@ -1372,7 +1383,7 @@ export class AgentManager extends DisposableService {
     limit: number,
     searchString?: string,
   ): Promise<AgentHistoryEntry[]> {
-    return await this.persistenceDb.getAgentHistoryEntries(
+    const entries = await this.persistenceDb.getAgentHistoryEntries(
       limit,
       offset,
       [],
@@ -1380,5 +1391,8 @@ export class AgentManager extends DisposableService {
         ? `%${searchString.trim()}%`
         : undefined,
     );
+    return this.enrichHistoryEntries
+      ? await this.enrichHistoryEntries(entries)
+      : entries;
   }
 }

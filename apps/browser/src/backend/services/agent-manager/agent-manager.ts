@@ -18,6 +18,7 @@ import type { FileReadCacheService } from '@stagewise/agent-core/file-read-cache
 import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import type { AgentPersistenceDB } from '@stagewise/agent-core/agent-persistence';
 import type { DomainAdapter, DomainId } from '@stagewise/agent-core/env';
+import type { AgentHistoryEntry } from '@stagewise/agent-core/types/agent';
 import { DisposableService } from '../disposable';
 import type { KartonService } from '../karton';
 import type { SkillDefinitionUI } from '@shared/skills';
@@ -75,6 +76,9 @@ export class AgentManagerService extends DisposableService {
       event: AgentNotificationEvent,
       agentId: string,
     ) => void | Promise<void>,
+    enrichHistoryEntries?: (
+      entries: AgentHistoryEntry[],
+    ) => Promise<AgentHistoryEntry[]>,
   ) {
     super();
     this.commandRegistry = commandRegistry;
@@ -101,6 +105,7 @@ export class AgentManagerService extends DisposableService {
         onAgentEvent: notificationEventHandler,
         renderHostMention: renderBrowserExtraMention,
         skillsForSlashRedaction: getSkillsForSlashRedaction,
+        enrichHistoryEntries,
       },
     });
     this.registerKartonForwarders();

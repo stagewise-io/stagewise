@@ -11,6 +11,7 @@ import type { AgentPersistenceDB } from '../agent-persistence/db';
 import type { AttachmentsService } from '../attachments';
 import type { FileReadCacheService } from '../file-read-cache';
 import type { ProcessedImageCacheService } from '../processed-image-cache';
+import type { AgentHistoryEntry } from '../../types/agent';
 import type { AgentManagerToolboxPort } from './ports';
 import type { AgentManagerStartupPolicy } from './startup-policy';
 
@@ -90,6 +91,19 @@ export interface AgentManagerHooksOptions {
     id: string;
     source: unknown;
   }>;
+  /**
+   * Enrich the agent history list with host-resolvable data that core
+   * cannot compute itself (e.g. live git summaries via the host's
+   * git service, or filtering out workspaces whose directory no
+   * longer exists on disk). Called once per `agents.getAgentsHistoryList`
+   * RPC with the raw rows from {@link AgentPersistenceDB}.
+   *
+   * When omitted, history rows are returned verbatim from persistence
+   * — agent-core stays fully host-agnostic (no fs/git access).
+   */
+  enrichHistoryEntries?: (
+    entries: AgentHistoryEntry[],
+  ) => Promise<AgentHistoryEntry[]>;
 }
 
 /**
