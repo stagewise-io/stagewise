@@ -46,6 +46,7 @@ import type {
   AgentInstancesWriterPort,
   AgentInstanceWriterEnvelope,
 } from './agent-instances-writer-port';
+import { createInMemoryAgentInstancesWriter } from './in-memory-agent-instances-writer';
 import { generateAttachmentFilename } from './attachment-filename';
 import { randomUUID } from 'node:crypto';
 import type { UITools } from 'ai';
@@ -186,11 +187,9 @@ export class AgentManager<
     agentRuntimeToolbox: BaseAgentToolboxView,
     logger: Logger,
     modelCatalog: AgentManagerModelCatalogPort,
-    agentInstances: AgentInstancesWriterPort<
-      TUITools,
-      TMessageMetadata,
-      TState
-    >,
+    agentInstances:
+      | AgentInstancesWriterPort<TUITools, TMessageMetadata, TState>
+      | undefined,
     agentStore: AgentStore,
     getSkillsForSlashRedaction: () => ReadonlyArray<{
       id: string;
@@ -216,7 +215,11 @@ export class AgentManager<
     this.agentRuntimeToolbox = agentRuntimeToolbox;
     this.logger = logger;
     this.modelCatalog = modelCatalog;
-    this.agentInstances = agentInstances;
+    this.agentInstances =
+      agentInstances ??
+      createInMemoryAgentInstancesWriter<TUITools, TMessageMetadata, TState>({
+        store: agentStore,
+      });
     this.agentStore = agentStore;
     this.getSkillsForSlashRedaction = getSkillsForSlashRedaction;
     this.startupPolicy = startupPolicy;

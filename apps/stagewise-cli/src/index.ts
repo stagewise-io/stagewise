@@ -12,7 +12,6 @@ import {
   ChatAgent,
   CommandRegistry,
   WorkspaceMdAgent,
-  createInMemoryAgentInstancesWriter,
   createUniversalToolbox,
   createInitialAgentSystemState,
 } from '@stagewise/agent-core';
@@ -177,7 +176,6 @@ async function main() {
   ensureRuntimeDirs(host);
 
   const store = new AgentStore(createInitialAgentSystemState());
-  const agentInstances = createInMemoryAgentInstancesWriter({ store });
   const mountsController = createMountsStateController(store);
   const workspaceMdRelativePath = host.workspaceMdRelativePath();
   const mountManager = new MountManager({
@@ -212,7 +210,7 @@ async function main() {
     agentRuntimeToolbox,
     logger,
     { modelExists: () => true },
-    agentInstances,
+    undefined,
     store,
     () => [],
     { kind: 'none' },
