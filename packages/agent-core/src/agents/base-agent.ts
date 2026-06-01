@@ -24,7 +24,7 @@ import type {
 } from '../types/agent';
 import type { AgentTypes } from '../types/agent';
 import type { ModelCapabilities } from '../types/models';
-import type { AgentInstanceCommands } from '../types/agent-commands';
+import type { AgentStateMutations } from '../services/agent-manager/state-mutations';
 import type { AgentHost } from '../host/host';
 import type { ModelWithOptions } from '../host/models';
 import type { AgentCtor, AgentTypeRegistry } from './agents-registry';
@@ -166,7 +166,7 @@ export interface BaseAgentDependencies<
   instanceId: string;
   state: {
     get: () => AgentState;
-    commands: AgentInstanceCommands;
+    commands: AgentStateMutations;
     persist: (dirtyMessageIndices?: number[]) => Promise<void>;
   };
   host: AgentHost;
@@ -501,7 +501,7 @@ export abstract class BaseAgent<
    */
   private readonly state: {
     get: () => AgentState;
-    commands: AgentInstanceCommands;
+    commands: AgentStateMutations;
     persist: (dirtyMessageIndices?: number[]) => Promise<void>;
   };
 

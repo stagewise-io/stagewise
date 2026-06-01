@@ -21,8 +21,8 @@ import {
   type MountsStateController,
 } from './state/toolbox-mounts';
 import {
-  createAgentInstancesStateController,
-  type AgentInstancesStateController,
+  createHostAgentStateMutations,
+  type HostAgentStateMutations,
 } from './state/agent-instances';
 
 export interface AgentCoreBridgeContext {
@@ -51,14 +51,14 @@ export interface AgentCoreSeamHandles {
   activeAppController: ActiveAppStateController;
   mountsController: MountsStateController;
   /**
-   * Phase 6 controller for the `agents.instances` slice. Threaded into
-   * `AgentManagerService` and `ToolboxService` via `main.ts` so they
-   * write migrated state through the store instead of Karton. Handlers
-   * registered on the seam (`agents.markAsRead`) also consume it. The
-   * bridge forward-mirror projects store-canonical updates back into
-   * `uiKarton` for legacy readers.
+   * Browser-only setters that extend the core `state-mutations`
+   * surface (`setUnread`, `recordPendingApproval`, plus a typed
+   * `getInstance` peek). Threaded into `AgentManagerService` and
+   * `ToolboxService` via `main.ts`, plus the seam-phase
+   * `agents.markAsRead` handler. CRUD and per-instance intents go
+   * through `AgentManager` directly against the same `AgentStore`.
    */
-  agentInstancesController: AgentInstancesStateController;
+  hostAgentStateMutations: HostAgentStateMutations;
 }
 
 export interface AgentCoreBridgeHandles extends AgentCoreSeamHandles {
@@ -95,12 +95,12 @@ export function createAgentCoreSeam(ctx: {
   const store = new AgentStore(createInitialAgentSystemState());
   const activeAppController = createActiveAppStateController(store);
   const mountsController = createMountsStateController(store);
-  const agentInstancesController = createAgentInstancesStateController(store);
+  const hostAgentStateMutations = createHostAgentStateMutations(store);
   const registry = new CommandRegistry();
 
   registerToolboxSeamHandlers(registry, { activeApp: activeAppController });
   registerAgentsSeamHandlers(registry, {
-    agentInstances: agentInstancesController,
+    hostAgentStateMutations,
   });
 
   return {
@@ -108,7 +108,7 @@ export function createAgentCoreSeam(ctx: {
     registry,
     activeAppController,
     mountsController,
-    agentInstancesController,
+    hostAgentStateMutations,
     karton,
   };
 }
@@ -133,7 +133,7 @@ export function attachAgentCoreBridge(
     registry,
     activeAppController,
     mountsController,
-    agentInstancesController,
+    hostAgentStateMutations,
   } = seam;
   const { host, diffHistory } = ctx;
 
@@ -155,7 +155,7 @@ export function attachAgentCoreBridge(
     bridge,
     activeAppController,
     mountsController,
-    agentInstancesController,
+    hostAgentStateMutations,
     host,
   };
 }

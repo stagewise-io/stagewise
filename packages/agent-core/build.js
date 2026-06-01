@@ -22,7 +22,6 @@ await esbuild.build({
     'types/models': 'src/types/models.ts',
     'types/tool-approval': 'src/types/tool-approval.ts',
     'types/tools': 'src/types/tools.ts',
-    'types/agent-commands': 'src/types/agent-commands.ts',
     'store/index': 'src/store/index.ts',
     'commands/index': 'src/commands/index.ts',
     'host/index': 'src/host/index.ts',

@@ -38,17 +38,18 @@ import {
 } from '../../agents/shared/metadata-converter/slash-items';
 import type { AgentManagerStartupPolicy } from './startup-policy';
 import type { AgentManagerToolboxPort } from './ports';
-import type {
-  AgentInstancesWriterPort,
-  AgentInstanceWriterEnvelope,
-} from './agent-instances-writer-port';
-import { createInMemoryAgentInstancesWriter } from './in-memory-agent-instances-writer';
+import {
+  bindStateMutations,
+  deleteAgentInstance,
+  getAgentInstance,
+  setToolApprovalMode,
+  upsertAgentInstance,
+  type AgentInstanceEnvelope,
+} from './state-mutations';
 import type { AgentManagerOptions } from './options';
 import { generateAttachmentFilename } from './attachment-filename';
 import { randomUUID } from 'node:crypto';
-import type { UITools } from 'ai';
 import type { UserMessageMetadata } from '../../types/metadata';
-import type { UniversalTools } from '../../types/tools';
 
 function toFiniteTimestamp(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -73,13 +74,7 @@ function toFiniteTimestamp(value: unknown): number | undefined {
  *       This is a bit of a hack, but it's the best we can do for now.
  */
 
-export class AgentManager<
-  TUITools extends UITools = UniversalTools,
-  TMessageMetadata = UserMessageMetadata,
-  TState extends AgentState<
-    AgentMessage<TUITools, TMessageMetadata>
-  > = AgentState<AgentMessage<TUITools, TMessageMetadata>>,
-> extends DisposableService {
+export class AgentManager extends DisposableService {
   /** Server-side bounds for user-editable agent titles. Slightly more permissive
    * than the UI's 2–80 range so minor client/server drift never silently drops
    * a valid title. */
@@ -133,19 +128,11 @@ export class AgentManager<
    */
   private readonly attachments: AttachmentsService;
   /**
-   * Write seam onto the live `agents.instances` slice of
-   * {@link AgentStore}. Defaults to an in-memory writer when the host
-   * does not supply its own.
-   */
-  private readonly agentInstances: AgentInstancesWriterPort<
-    TUITools,
-    TMessageMetadata,
-    TState
-  >;
-  /**
-   * Canonical in-memory state container shared with the host. Direct
-   * reads back enumeration / `toolbox`-slice / quick by-id field
-   * lookups that the narrow writer port does not expose.
+   * Canonical in-memory state container shared with the host. All
+   * per-instance writes flow through the
+   * `services/agent-manager/state-mutations` utilities so the
+   * one-`store.update`-per-intent discipline (D18) is enforced in one
+   * place.
    */
   private readonly agentStore: AgentStore;
   /**
@@ -176,9 +163,7 @@ export class AgentManager<
    */
   private readonly domainAdapterRegistry: DomainAdapterRegistry;
 
-  public constructor(
-    options: AgentManagerOptions<TUITools, TMessageMetadata, TState>,
-  ) {
+  public constructor(options: AgentManagerOptions) {
     super();
     const {
       host,
@@ -197,11 +182,6 @@ export class AgentManager<
     this.managerToolbox = tools.managerToolbox;
     this.agentToolbox = tools.agentToolbox;
     this.agentStore = state.store;
-    this.agentInstances =
-      state.instancesWriter ??
-      createInMemoryAgentInstancesWriter<TUITools, TMessageMetadata, TState>({
-        store: state.store,
-      });
     this.persistenceDb = storage.persistenceDb;
     this.attachments = storage.attachments;
     this.fileReadCache = storage.fileReadCache;
@@ -459,9 +439,9 @@ export class AgentManager<
     this.wrapAgentRpc('agents.archive', async (instanceId: string) => {
       await this.archiveAgent(instanceId);
     });
-    // `agents.markAsRead` migrated to the AgentCoreBridge in Phase 6 —
-    // handler lives in `agent-core-bridge/handlers/agents.ts` and
-    // writes through `AgentInstancesStateController.setUnread`.
+    // `agents.markAsRead` lives on the AgentCoreBridge — handler is
+    // in `agent-core-bridge/handlers/agents.ts` and writes through
+    // the host `HostAgentStateMutations.setUnread` helper.
     this.wrapAgentRpc(
       'agents.setActiveModelId',
       async (instanceId: string, modelId: string) => {
@@ -722,18 +702,18 @@ export class AgentManager<
       usedTokens: 0,
     };
 
-    // Phase 6: seed the new envelope through the AgentStore-canonical
-    // controller. The bridge forward-mirror projects the result back
-    // to Karton for existing readers.
-    this.agentInstances.upsertInstance(agentInstanceId, {
+    // Seed the new envelope on the canonical AgentStore. The bridge
+    // forward-mirror projects the result back to Karton for existing
+    // readers.
+    upsertAgentInstance(this.agentStore, agentInstanceId, {
       type: type,
       canSelectModel: (this.agentsMap as any)[type].config.allowModelSelection,
       requiredModelCapabilities: (this.agentsMap as any)[type].config
         .requiredCapabilities,
       allowUserInput: (this.agentsMap as any)[type].config.allowUserInput,
       parentAgentInstanceId: parent?.parentInstanceId ?? null,
-      state: { ...defaultState, ...(initialState ?? {}) } as TState,
-    } as AgentInstanceWriterEnvelope<TUITools, TMessageMetadata, TState>);
+      state: { ...defaultState, ...(initialState ?? {}) } as AgentState,
+    } as AgentInstanceEnvelope);
 
     this.logger.info(
       `[AgentManager] Creating agent. ID: ${agentInstanceId}, Type: ${type}`,
@@ -759,18 +739,17 @@ export class AgentManager<
       ) => BaseAgent<any, any, any>
     )({
       instanceId: agentInstanceId,
-      // The host's `AgentState`/`AgentMessage`/`AgentInstanceCommands`
-      // carry the host's wider `UserMessageMetadata` (browser-tab
-      // mentions) and the `ToolApprovalMode` literal, while core's
-      // defaults are structurally narrower. The runtime shapes are
-      // compatible — cast the whole `state` envelope at the seam.
+      // The host's `AgentState` / `AgentMessage` / `AgentStateMutations`
+      // bundle carry the host's wider `UserMessageMetadata` (browser-
+      // tab mentions) and the `ToolApprovalMode` literal, while
+      // core's defaults are structurally narrower. The runtime shapes
+      // are compatible — cast the whole `state` envelope at the seam.
       state: {
-        // Phase 6: `BaseAgent.set` / `.get` are the runloop's sole
-        // write/read channel. They now route through the
-        // AgentStore-canonical controller; readers still observe the
-        // slice through Karton via the bridge forward-mirror.
+        // `BaseAgent.set` / `.get` route through the canonical
+        // AgentStore; readers still observe the slice through Karton
+        // via the bridge forward-mirror.
         get: () => {
-          const instance = this.agentInstances.getInstance(agentInstanceId);
+          const instance = getAgentInstance(this.agentStore, agentInstanceId);
           if (!instance) {
             throw new Error(
               `AgentManager: missing agent instance ${agentInstanceId} at BaseAgent.get`,
@@ -778,9 +757,9 @@ export class AgentManager<
           }
           return instance.state as AgentState;
         },
-        // Phase 7: the recipe channel is retired. The runloop writes
-        // through the typed command surface built once per agent.
-        commands: this.agentInstances.buildCommands(agentInstanceId),
+        // The recipe channel is retired. The runloop writes through
+        // the bound state-mutation bundle built once per agent.
+        commands: bindStateMutations(this.agentStore, agentInstanceId),
         persist: (dirtyMessageIndices?: number[]) =>
           this.persistAgentState(agentInstanceId, dirtyMessageIndices),
       } as unknown as BaseAgentDependencies<any, any>['state'],
@@ -933,7 +912,7 @@ export class AgentManager<
     // Store agent state into DB.
     const agent = this.activeAgents.get(instanceId);
 
-    const envelope = this.agentInstances.getInstance(instanceId);
+    const envelope = getAgentInstance(this.agentStore, instanceId);
     const agentState = envelope?.state;
 
     if (!agent || !agentState) {
@@ -1061,7 +1040,7 @@ export class AgentManager<
 
     // Clear the AgentStore-canonical agent + toolbox envelopes. The
     // bridge forward-mirror deletes the same keys in Karton.
-    this.agentInstances.deleteInstance(instanceId);
+    deleteAgentInstance(this.agentStore, instanceId);
 
     this.host.telemetry?.capture('agent-archived', {
       agent_type: agent.agentType,
@@ -1191,7 +1170,7 @@ export class AgentManager<
     // firing on a reselection would emit spurious events.
     if (currentMode === mode) return;
 
-    this.agentInstances.setToolApprovalMode(instanceId, mode);
+    setToolApprovalMode(this.agentStore, instanceId, mode);
 
     await this.persistenceDb.updateToolApprovalMode(instanceId, mode);
 

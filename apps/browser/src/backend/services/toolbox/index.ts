@@ -34,7 +34,7 @@ import type { CredentialsService } from '@/services/credentials';
 import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
 import type { MountsStateController } from '@/services/agent-core-bridge/state/toolbox-mounts';
-import type { AgentInstancesStateController } from '@/services/agent-core-bridge/state/agent-instances';
+import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
@@ -134,7 +134,7 @@ export class ToolboxService extends DisposableService {
   private readonly detectedShell: DetectedShell | null;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
   private readonly mountsController: MountsStateController;
-  private readonly agentInstancesController: AgentInstancesStateController;
+  private readonly hostAgentStateMutations: HostAgentStateMutations;
   private readonly attachments: AttachmentsService;
 
   private sandboxService: SandboxService | null = null;
@@ -453,7 +453,7 @@ export class ToolboxService extends DisposableService {
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
     mountsController: MountsStateController,
-    agentInstancesController: AgentInstancesStateController,
+    hostAgentStateMutations: HostAgentStateMutations,
     attachments: AttachmentsService,
   ) {
     super();
@@ -471,7 +471,7 @@ export class ToolboxService extends DisposableService {
     this.detectedShell = detectedShell;
     this.resolvedEnvPromise = resolvedEnvPromise;
     this.mountsController = mountsController;
-    this.agentInstancesController = agentInstancesController;
+    this.hostAgentStateMutations = hostAgentStateMutations;
     this.attachments = attachments;
   }
 
@@ -490,7 +490,7 @@ export class ToolboxService extends DisposableService {
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
     mountsController: MountsStateController,
-    agentInstancesController: AgentInstancesStateController,
+    hostAgentStateMutations: HostAgentStateMutations,
     attachments: AttachmentsService,
   ): Promise<ToolboxService> {
     const instance = new ToolboxService(
@@ -508,7 +508,7 @@ export class ToolboxService extends DisposableService {
       detectedShell,
       resolvedEnvPromise,
       mountsController,
-      agentInstancesController,
+      hostAgentStateMutations,
       attachments,
     );
     await instance.initialize();
@@ -592,7 +592,7 @@ export class ToolboxService extends DisposableService {
       case 'askUserQuestions':
         return askUserQuestionsTool(
           this.uiKarton,
-          this.agentInstancesController,
+          this.hostAgentStateMutations,
           agentInstanceId,
           (id) => {
             void Promise.resolve(
@@ -635,7 +635,7 @@ export class ToolboxService extends DisposableService {
             // Legacy field name: this is smart-approval explanation metadata,
             // not the canonical approval-pending state. The canonical state
             // is the assistant tool part with state === 'approval-requested'.
-            this.agentInstancesController.recordPendingApproval(
+            this.hostAgentStateMutations.recordPendingApproval(
               agentInstanceId,
               toolCallId,
               explanation,

@@ -2,6 +2,9 @@ import {
   CommandRegistry,
   createInitialAgentSystemState,
   AgentStore,
+  upsertAgentInstance,
+  deleteAgentInstance,
+  type AgentInstanceEnvelope,
   type AgentSystemState,
   type FileDiff,
   type MountEntry,
@@ -19,10 +22,7 @@ import {
 } from './state/toolbox-active-app';
 import { createMountsStateController } from './state/toolbox-mounts';
 import { ensureToolboxEntry } from './state/ensure-toolbox-entry';
-import {
-  createAgentInstancesStateController,
-  type HostAgentInstanceState,
-} from './state/agent-instances';
+import type { HostAgentInstanceEnvelope } from './state/agent-instances';
 import { AgentTypes } from '@stagewise/agent-core';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
 
@@ -989,9 +989,9 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
  */
 describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
   function makeEnvelope(
-    overrides: Partial<HostAgentInstanceState> = {},
+    overrides: Partial<HostAgentInstanceEnvelope> = {},
     stateOverrides: Partial<AgentState> = {},
-  ): HostAgentInstanceState {
+  ): HostAgentInstanceEnvelope {
     const baseState: AgentState = {
       title: '',
       titleLockedByUser: false,
@@ -1036,7 +1036,6 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     const mock = createKartonMock(initialState);
     const store = new AgentStore(createInitialAgentSystemState());
     const activeApp = createActiveAppStateController(store);
-    const agentInstances = createAgentInstancesStateController(store);
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp });
     registerAttachHandlerNoOps(registry);
@@ -1048,10 +1047,21 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     });
     bridge.attach();
 
+    const upsert = (id: string, envelope: HostAgentInstanceEnvelope) =>
+      upsertAgentInstance(
+        store,
+        id,
+        envelope as unknown as AgentInstanceEnvelope,
+      );
+    const remove = (id: string) => deleteAgentInstance(store, id);
+
     return {
       store,
       activeApp,
-      agentInstances,
+      // Direct shims onto the core state-mutation utilities so the
+      // mirror tests exercise the same write paths the production
+      // runloop uses.
+      agentInstances: { upsertInstance: upsert, deleteInstance: remove },
       setState: mock.setState,
       getKartonState: mock.getState,
       bridge,
@@ -1179,7 +1189,7 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
   });
 
   it('co-emits with a toolbox mirror write in the same karton.setState call', () => {
-    const { store, agentInstances, setState, getKartonState } =
+    const { store, setState, getKartonState } =
       createAgentInstancesMirrorHarness();
 
     // Drive a single store.update that mutates both `agents.instances`
@@ -1207,7 +1217,5 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     expect(
       (getKartonState().toolbox.a1?.activeApp as { appId: string }).appId,
     ).toBe('app-c');
-
-    void agentInstances;
   });
 });

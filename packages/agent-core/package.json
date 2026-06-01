@@ -20,10 +20,6 @@
       "types": "./dist/types/agent.d.ts",
       "import": "./dist/types/agent.js"
     },
-    "./types/agent-commands": {
-      "types": "./dist/types/agent-commands.d.ts",
-      "import": "./dist/types/agent-commands.js"
-    },
     "./types/diff-history": {
       "types": "./dist/types/diff-history.d.ts",
       "import": "./dist/types/diff-history.js"

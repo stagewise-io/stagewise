@@ -22,15 +22,13 @@ function createDeps() {
   return {
     registry: new CommandRegistry(),
     toolbox,
-    agentInstances: {
-      upsertInstance: vi.fn(),
-      deleteInstance: vi.fn(),
-      getInstance: vi.fn(),
-      buildCommands: vi.fn(() => ({})),
-      setToolApprovalMode: vi.fn(),
-    },
+    // Minimal `AgentStore`-shaped stub. `AgentManager` only reaches
+    // `get` / `update` on the store via the `state-mutations` helpers,
+    // and the startup-policy paths covered here never call the
+    // per-instance setters — so no-op `update` is sufficient.
     agentStore: {
       get: vi.fn(() => ({ agents: { instances: {} }, toolbox: {} })),
+      update: vi.fn(),
     },
     host: createTestAgentHost(),
     agentTypeRegistry: new AgentTypeRegistry(),
@@ -55,7 +53,6 @@ describe('AgentManager startup policy', () => {
       startupPolicy: { kind: 'none' },
       state: {
         store: deps.agentStore as any,
-        instancesWriter: deps.agentInstances as any,
       },
       storage: {
         persistenceDb: {} as any,
@@ -96,7 +93,6 @@ describe('AgentManager startup policy', () => {
       },
       state: {
         store: deps.agentStore as any,
-        instancesWriter: deps.agentInstances as any,
       },
       storage: {
         persistenceDb: agentDb as any,

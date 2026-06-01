@@ -20,11 +20,7 @@ import type { AgentPersistenceDB } from '@stagewise/agent-core/agent-persistence
 import type { DomainAdapter, DomainId } from '@stagewise/agent-core/env';
 import { DisposableService } from '../disposable';
 import type { KartonService } from '../karton';
-import type { AgentState } from '@shared/karton-contracts/ui/agent';
-import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
-import type { UIAgentTools } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { SkillDefinitionUI } from '@shared/skills';
-import type { AgentInstancesStateController } from '../agent-core-bridge/state/agent-instances';
 import { renderBrowserExtraMention } from '@/agents/shared/base-agent/utils';
 
 const AGENT_RPC_COMMANDS = [
@@ -55,11 +51,7 @@ const AGENT_RPC_COMMANDS = [
 ] as const satisfies ReadonlyArray<CommandName>;
 
 export class AgentManagerService extends DisposableService {
-  private readonly manager: AgentManager<
-    UIAgentTools,
-    UserMessageMetadata,
-    AgentState
-  >;
+  private readonly manager: AgentManager;
   private readonly commandRegistry: CommandRegistry;
   private readonly karton: KartonService;
 
@@ -67,7 +59,6 @@ export class AgentManagerService extends DisposableService {
     karton: KartonService,
     commandRegistry: CommandRegistry,
     toolbox: AgentManagerToolboxPort,
-    agentInstancesController: AgentInstancesStateController,
     agentStore: AgentStore,
     getSkillsForSlashRedaction: () => ReadonlyArray<
       Pick<SkillDefinitionUI, 'id' | 'source'>
@@ -88,18 +79,13 @@ export class AgentManagerService extends DisposableService {
     super();
     this.commandRegistry = commandRegistry;
     this.karton = karton;
-    this.manager = new AgentManager<
-      UIAgentTools,
-      UserMessageMetadata,
-      AgentState
-    >({
+    this.manager = new AgentManager({
       host: agentCoreHost,
       commandRegistry,
       agentTypeRegistry,
       startupPolicy,
       state: {
         store: agentStore,
-        instancesWriter: agentInstancesController,
       },
       storage: {
         persistenceDb: agentDb,

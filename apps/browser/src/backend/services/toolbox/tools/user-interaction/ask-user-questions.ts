@@ -7,7 +7,7 @@ import {
   type QuestionAnswerValue,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { KartonService } from '@/services/karton';
-import type { AgentInstancesStateController } from '@/services/agent-core-bridge/state/agent-instances';
+import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
 
 export const DESCRIPTION = `Ask the user structured questions via a multi-step form.
 
@@ -154,7 +154,7 @@ export function cleanupQuestionsForAgent(
 
 export const askUserQuestions = (
   uiKarton: KartonService,
-  agentInstancesController: AgentInstancesStateController,
+  hostAgentStateMutations: HostAgentStateMutations,
   agentInstanceId: string,
   onQuestionRequested?: (agentId: string) => void | Promise<void>,
 ) => {
@@ -201,7 +201,7 @@ export const askUserQuestions = (
           };
         }
       });
-      agentInstancesController.setUnread(agentInstanceId, true);
+      hostAgentStateMutations.setUnread(agentInstanceId, true);
 
       void Promise.resolve(onQuestionRequested?.(agentInstanceId)).catch(
         () => {},

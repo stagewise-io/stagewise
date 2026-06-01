@@ -152,8 +152,10 @@ export class AgentCoreBridge {
    *     references only when content changes, so identity-based dedup is
    *     both correct and O(1).
    *   - `agents.instances[id]`: reference identity on the whole
-   *     envelope. `AgentInstancesStateController` always allocates a
-   *     fresh envelope per mutation (Immer), so a preserved reference
+   *     envelope. The core `state-mutations` utilities (and any host
+   *     setters built on `updateAgentInstanceState`) always allocate
+   *     a fresh envelope per mutation via Immer, so a preserved
+   *     reference
    *     means "no change." Deletions (`id` in prev but not next) project
    *     as Karton `delete`.
    */
@@ -308,7 +310,7 @@ export class AgentCoreBridge {
    * snapshots. Returns `null` when nothing changed so the caller can
    * skip the `karton.setState` round-trip entirely.
    *
-   * Writers (`AgentInstancesStateController`) always allocate a fresh
+   * The `state-mutations` utilities always allocate a fresh
    * envelope per mutation via Immer, so identity equality on the
    * envelope is both correct and O(1).
    */

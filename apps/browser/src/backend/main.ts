@@ -464,7 +464,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     detectedShell,
     resolvedEnvPromise,
     agentCoreSeam.mountsController,
-    agentCoreSeam.agentInstancesController,
+    agentCoreSeam.hostAgentStateMutations,
     attachments,
   );
 
@@ -549,7 +549,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     uiKarton,
     agentCoreSeam.registry,
     toolboxService,
-    agentCoreSeam.agentInstancesController,
     agentCoreSeam.store,
     () => uiKarton.state.skills ?? [],
     electronAgentManagerStartupPolicy,

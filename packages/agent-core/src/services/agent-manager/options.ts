@@ -1,4 +1,3 @@
-import type { UITools } from 'ai';
 import type {
   AgentNotificationEvent,
   BaseAgentToolboxView,
@@ -8,43 +7,25 @@ import type { ExtraMentionRenderer } from '../../agents/shared/message-conversio
 import type { CommandRegistry } from '../../commands/command-registry';
 import type { AgentHost } from '../../host/host';
 import type { AgentStore } from '../../store/agent-store';
-import type { AgentMessage, AgentState } from '../../types/agent';
-import type { UserMessageMetadata } from '../../types/metadata';
-import type { UniversalTools } from '../../types/tools';
 import type { AgentPersistenceDB } from '../agent-persistence/db';
 import type { AttachmentsService } from '../attachments';
 import type { FileReadCacheService } from '../file-read-cache';
 import type { ProcessedImageCacheService } from '../processed-image-cache';
-import type { AgentInstancesWriterPort } from './agent-instances-writer-port';
 import type { AgentManagerToolboxPort } from './ports';
 import type { AgentManagerStartupPolicy } from './startup-policy';
 
 /**
  * Live-state seam for the canonical {@link AgentStore} agent slice.
  *
- * `store` is required; `instancesWriter` defaults to an in-memory
- * writer over `store` when omitted (matching the behavior most hosts
- * want). Hosts that need a richer writer (e.g. branded types or extra
- * setters consumed outside `AgentManager`) supply their own.
+ * Per-instance writes flow through `AgentManager` directly against
+ * `store` via the `services/agent-manager/state-mutations` utilities;
+ * hosts that need additional setters (e.g. browser's `setUnread`,
+ * `recordPendingApproval`) build them on the exported
+ * `updateAgentInstanceState` helper rather than swapping out a writer.
  */
-export interface AgentManagerStateOptions<
-  TUITools extends UITools = UniversalTools,
-  TMessageMetadata = UserMessageMetadata,
-  TState extends AgentState<
-    AgentMessage<TUITools, TMessageMetadata>
-  > = AgentState<AgentMessage<TUITools, TMessageMetadata>>,
-> {
+export interface AgentManagerStateOptions {
   /** Canonical in-memory state container shared with the host. */
   store: AgentStore;
-  /**
-   * Optional write seam onto the live `agents.instances` slice. Omit to
-   * let `AgentManager` build a default in-memory writer over `store`.
-   */
-  instancesWriter?: AgentInstancesWriterPort<
-    TUITools,
-    TMessageMetadata,
-    TState
-  >;
 }
 
 /**
@@ -126,13 +107,7 @@ export interface AgentManagerHooksOptions {
  *     clearer names (`managerToolbox` vs. `agentToolbox`).
  *   - Optional host callbacks live under {@link hooks}.
  */
-export interface AgentManagerOptions<
-  TUITools extends UITools = UniversalTools,
-  TMessageMetadata = UserMessageMetadata,
-  TState extends AgentState<
-    AgentMessage<TUITools, TMessageMetadata>
-  > = AgentState<AgentMessage<TUITools, TMessageMetadata>>,
-> {
+export interface AgentManagerOptions {
   /**
    * Capability seam threaded into every `BaseAgent`. Also the sole
    * source for {@link AgentHost.logger}, {@link AgentHost.telemetry},
@@ -148,7 +123,7 @@ export interface AgentManagerOptions<
    * CLI/tests and `'auto-create-default'` for the desktop app.
    */
   startupPolicy: AgentManagerStartupPolicy;
-  state: AgentManagerStateOptions<TUITools, TMessageMetadata, TState>;
+  state: AgentManagerStateOptions;
   storage: AgentManagerStorageOptions;
   tools: AgentManagerToolsOptions;
   hooks?: AgentManagerHooksOptions;

@@ -1,207 +1,91 @@
 import {
-  createInMemoryAgentInstancesWriter,
-  type AgentInstanceWriterEnvelope,
-  type AgentInstanceState as CoreAgentInstanceState,
-  type AgentInstanceCommands as CoreAgentInstanceCommands,
+  getAgentInstance,
+  updateAgentInstanceState,
+  type AgentInstanceEnvelope,
   type AgentStore,
-  type AgentSystemState,
 } from '@stagewise/agent-core';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
-import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
-import type { UIAgentTools } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { ModelSettings } from '@shared/karton-contracts/ui/shared-types';
 
 /**
- * Host-specialized envelope shape written to the store.
+ * Host-narrowed envelope exposed to browser call sites.
  *
- * The core `AgentInstanceState<UIAgentTools>` specializes the `state`
- * field to `AgentState<AgentMessage<UIAgentTools>>`, whose
- * `activeModelId` / `toolApprovalMode` stay `string`. The host's
- * {@link AgentState} narrows both to branded union types (D14 / D22).
- * We re-type `state` here so the narrowed unions remain visible at the
- * controller surface; the underlying store still type-checks because
- * the host state is a subtype of the core state.
+ * The core {@link AgentInstanceEnvelope} keeps `state` and
+ * `requiredModelCapabilities` deliberately wide so different hosts can
+ * specialize them. Re-typing both here surfaces the branded
+ * `activeModelId` / `toolApprovalMode` (D14 / D22) and the structured
+ * Karton `ModelSettings['capabilities']` at the controller boundary;
+ * the underlying store is unaffected because the host state is a
+ * structural subtype of the core state.
  */
-export type HostAgentInstanceState = Omit<
-  CoreAgentInstanceState<UIAgentTools>,
+export type HostAgentInstanceEnvelope = Omit<
+  AgentInstanceEnvelope,
   'state' | 'requiredModelCapabilities'
 > & {
   state: AgentState;
-  /**
-   * Host-narrowed: Karton's `AppState.agents.instances[id]` carries
-   * structured modality capabilities, while the core store type widens
-   * to `Record<string, boolean | undefined>`. The runtime shape is
-   * identical; writers always build the envelope from the structured
-   * host source of truth.
-   */
   requiredModelCapabilities: ModelSettings['capabilities'];
 };
 
 /**
- * Host specialization of {@link CoreAgentInstanceCommands}.
- *
- * The full Phase 7 contract lives in
- * `@stagewise/agent-core/types/agent-commands`. The host parameterizes
- * the generic with its narrowed `AgentMessage` (which carries
- * `UserMessageMetadata`) and the union-typed `AgentState` so command
- * arguments and return-types match every existing call site.
+ * Host-only setters that extend the core `state-mutations` surface
+ * with browser-specific intents (`setUnread`, `recordPendingApproval`)
+ * and a typed `getInstance` peek. Each setter is built on the
+ * exported {@link updateAgentInstanceState} helper so it preserves the
+ * D18 one-`store.update`-per-intent transactional guarantee.
  */
-export type AgentInstanceCommands = CoreAgentInstanceCommands<
-  UIAgentTools,
-  UserMessageMetadata,
-  AgentState
->;
-
-/**
- * Host surface that owns the migrated `agents.instances` slice.
- *
- * Phase 6 moves canonical ownership of every field on
- * `agents.instances[agentId]` from Karton to `AgentStore`. Every
- * previous `karton.setState(draft => draft.agents.instances...)` call
- * site routes through a method on this controller instead. The
- * `AgentCoreBridge` mirrors the rebuilt envelope back into Karton for
- * every existing reader.
- *
- * Phase 7 narrows the former `applyStateRecipe` escape hatch into a
- * typed per-intent surface. See {@link AgentInstanceCommands} and
- * {@link buildCommands}.
- *
- * Contract notes:
- *   - Writes are whole-envelope replacement on upsert. The bridge
- *     forward-mirror dedups on reference identity at the
- *     `agents.instances[id]` level — Immer allocates a fresh envelope
- *     on any mutation, so writers never need to diff sub-fields.
- *   - `deleteInstance` removes both `agents.instances[id]` and
- *     `toolbox[id]` in a single `store.update()` call, matching the
- *     existing paired delete pattern in `AgentManager.archiveAgent`.
- *   - Missing agent ids: per-command methods are defensive no-ops
- *     except where the original recipe explicitly threw (noted on the
- *     relevant command). Field-level setters
- *     ({@link setToolApprovalMode}, {@link setUnread},
- *     {@link recordPendingApproval}) stay as defensive no-ops so late
- *     writes from outlived subscribers do not crash the process.
- */
-export interface AgentInstancesStateController {
-  /**
-   * Creates or replaces an agent envelope. Wraps one `store.update()`.
-   *
-   * Callers MUST always allocate a fresh envelope object for every
-   * write — the bridge forward-mirror dedups on reference identity and
-   * will silently drop mutations that reuse the previous reference.
-   */
-  upsertInstance(
-    agentInstanceId: string,
-    envelope: AgentInstanceWriterEnvelope<
-      UIAgentTools,
-      UserMessageMetadata,
-      AgentState
-    >,
-  ): void;
-
-  /**
-   * Removes `agents.instances[id]` AND `toolbox[id]` atomically.
-   *
-   * Idempotent: no-op if the agent id is not present. Matches the
-   * existing paired delete pattern in `AgentManager.archiveAgent`.
-   */
-  deleteInstance(agentInstanceId: string): void;
-
-  /**
-   * Field-level write for the `agents.setToolApprovalMode` procedure
-   * path. No-op if the agent id is not present.
-   */
-  setToolApprovalMode(
-    agentInstanceId: string,
-    mode: AgentState['toolApprovalMode'],
-  ): void;
-
+export interface HostAgentStateMutations {
   /**
    * Field-level write for the `agents.markAsRead` procedure and for
    * the unread-on-question side effect in the `askUserQuestions`
    * tool. No-op if the agent id is not present.
    */
   setUnread(agentInstanceId: string, value: boolean): void;
-
   /**
    * Field-level write for `ToolboxService.recordPendingApproval`.
-   * No-op if the agent id is not present.
+   * Stores the smart-approval explanation under the `toolCallId` key
+   * of `state.pendingApprovals`. No-op if the agent id is not
+   * present.
    */
   recordPendingApproval(
     agentInstanceId: string,
     toolCallId: string,
     explanation: string,
   ): void;
-
   /**
-   * Returns an {@link AgentInstanceCommands} bundle whose methods are
-   * pre-bound to `agentInstanceId`. Each method wraps a single
-   * `store.update()` and performs the narrowed equivalent of a former
-   * `BaseAgent.state.set` recipe. Phase 7 contract: this is the
-   * single write channel the runloop uses; no opaque recipe function
-   * crosses the seam.
+   * Typed re-export of the core `getAgentInstance` peek, narrowed to
+   * the host envelope shape so call sites can read host fields without
+   * casting.
    */
-  buildCommands(agentInstanceId: string): AgentInstanceCommands;
-
-  /**
-   * Read-only peek for services that want to observe their own writes
-   * or read the canonical envelope without going through Karton.
-   */
-  getInstance(
-    agentInstanceId: string,
-  ):
-    | AgentInstanceWriterEnvelope<UIAgentTools, UserMessageMetadata, AgentState>
-    | undefined;
+  getInstance(agentInstanceId: string): HostAgentInstanceEnvelope | undefined;
 }
 
 /**
- * Builds an {@link AgentInstancesStateController} backed by the given
- * {@link AgentStore}.
+ * Build the bundle of host-specific agent-state mutations.
  *
- * The CRUD + per-intent command surface is delegated to the core
- * `createInMemoryAgentInstancesWriter` (single source of truth for the
- * D18 one-`store.update`-per-intent transactional guarantee). The
- * host-specific setters ({@link AgentInstancesStateController.setUnread}
- * and {@link AgentInstancesStateController.recordPendingApproval}) are
- * implemented inline because they back browser-only call sites
+ * Stays separate from the core `state-mutations` barrel because
+ * `setUnread` / `recordPendingApproval` back browser-only call sites
  * (`agents.markAsRead`, `askUserQuestions`, smart-approval metadata)
- * that are outside the core writer contract.
- *
- * The controller is host-specialized with {@link UIAgentTools},
- * {@link UserMessageMetadata}, and the narrowed {@link AgentState}.
- * The host state is a structural subtype of the core
- * `AgentState<AgentMessage<UIAgentTools>>`, so the composed object is
- * cast at the controller boundary.
+ * and have no counterpart in the CLI. CRUD + per-instance intents
+ * live on `@stagewise/agent-core` and `AgentManager` calls them
+ * directly against the same `AgentStore`.
  */
-export function createAgentInstancesStateController(
+export function createHostAgentStateMutations(
   store: AgentStore,
-): AgentInstancesStateController {
-  const base = createInMemoryAgentInstancesWriter<
-    UIAgentTools,
-    UserMessageMetadata,
-    AgentState
-  >({ store });
-
+): HostAgentStateMutations {
   return {
-    ...base,
-    setUnread(agentInstanceId: string, value: boolean) {
-      store.update((draft) => {
-        const systemDraft = draft as AgentSystemState;
-        const entry = systemDraft.agents.instances[agentInstanceId];
-        if (!entry) return;
-        entry.state.unread = value;
+    setUnread(agentInstanceId, value) {
+      updateAgentInstanceState(store, agentInstanceId, (state) => {
+        state.unread = value;
       });
     },
-    recordPendingApproval(
-      agentInstanceId: string,
-      toolCallId: string,
-      explanation: string,
-    ) {
-      store.update((draft) => {
-        const systemDraft = draft as AgentSystemState;
-        const entry = systemDraft.agents.instances[agentInstanceId];
-        if (!entry) return;
-        entry.state.pendingApprovals[toolCallId] = { explanation };
+    recordPendingApproval(agentInstanceId, toolCallId, explanation) {
+      updateAgentInstanceState(store, agentInstanceId, (state) => {
+        state.pendingApprovals[toolCallId] = { explanation };
       });
     },
-  } as unknown as AgentInstancesStateController;
+    getInstance(agentInstanceId) {
+      const entry = getAgentInstance(store, agentInstanceId);
+      return entry as HostAgentInstanceEnvelope | undefined;
+    },
+  };
 }
