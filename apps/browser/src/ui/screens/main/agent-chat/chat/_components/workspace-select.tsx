@@ -1017,6 +1017,9 @@ function WorkspacePreviewCardContent({
   const createTerminal = useKartonProcedure(
     (p: KartonProcedures) => p.browser.createTerminal,
   );
+  const copyText = useKartonProcedure(
+    (p: KartonProcedures) => p.browser.copyText,
+  );
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
     useContentCollapsed();
   const setupTitle = setupRun
@@ -1031,9 +1034,12 @@ function WorkspacePreviewCardContent({
     (event: React.MouseEvent) => {
       event.stopPropagation();
       event.preventDefault();
-      void navigator.clipboard?.writeText(mount.path);
+      // Route through the main process: the renderer's `navigator.clipboard`
+      // rejects when focus is inside a web-content view, which silently
+      // dropped the copy here.
+      void copyText(mount.path);
     },
-    [mount.path],
+    [mount.path, copyText],
   );
 
   const handleOpenTerminal = useCallback(
