@@ -281,6 +281,75 @@ describe('convertAgentMessagesToModelMessages – env-state pipeline', () => {
     expect(text).not.toContain('<open-tabs>FULL</open-tabs>');
   });
 
+  it('renders no env block across many messages when allowedEnvDomainIds is empty (short-circuit)', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(makeAdapter('browser', 0));
+
+    const history: AgentMessage[] = [];
+    for (let i = 0; i < 10; i++) {
+      history.push(
+        makeMessage('user', `u${i}`, {
+          browser: {
+            schemaVersion: 1,
+            state: null,
+            renderedState: `<open-tabs>FULL_${i}</open-tabs>`,
+            renderedStateChange: `<env-changes>delta_${i}</env-changes>`,
+          },
+        }),
+        makeMessage('assistant', `a${i}`),
+      );
+    }
+
+    const result = await convertAgentMessagesToModelMessages(
+      history,
+      'SYS',
+      {},
+      'agent-1',
+      {
+        host: HOST_PATHS,
+        blobReader: BLOB_READER,
+        domainAdapterRegistry: registry,
+        allowedEnvDomainIds: [],
+      },
+    );
+
+    const allUserText = result
+      .filter((m) => m.role === 'user')
+      .map((m) => extractUserContent(m))
+      .join('\n');
+    expect(allUserText).not.toContain('<open-tabs');
+    expect(allUserText).not.toContain('<env-changes');
+  });
+
+  it('treats allowedEnvDomainIds: undefined as no filter (legacy callers still render)', async () => {
+    const registry = new DomainAdapterRegistry();
+    registry.register(makeAdapter('browser', 0));
+
+    const m1 = makeMessage('user', 'first', {
+      browser: {
+        schemaVersion: 1,
+        state: null,
+        renderedState: '<open-tabs>LEGACY_RENDER</open-tabs>',
+        renderedStateChange: '<open-tabs>LEGACY_RENDER</open-tabs>',
+      },
+    });
+
+    const result = await convertAgentMessagesToModelMessages(
+      [m1],
+      'SYS',
+      {},
+      'agent-1',
+      {
+        host: HOST_PATHS,
+        blobReader: BLOB_READER,
+        domainAdapterRegistry: registry,
+        // allowedEnvDomainIds intentionally omitted (undefined).
+      },
+    );
+
+    expect(extractUserContent(result[1])).toContain('LEGACY_RENDER');
+  });
+
   it('emits no env block when envState is empty across the window', async () => {
     const m1 = makeMessage('user', 'hello');
     const m2 = makeMessage('assistant', 'ok');

@@ -131,6 +131,51 @@ describe('state-mutations/approvals', () => {
     expect(updated.pendingApprovals).toEqual({});
   });
 
+  it('terminateNonTerminalToolPartsInLastAssistant leaves already-terminal tool parts untouched', () => {
+    const store = new AgentStore(emptySystemState());
+    const deniedPart = {
+      type: 'tool-doThing',
+      toolCallId: 'tc_denied',
+      state: 'output-denied',
+      input: { foo: 'bar' },
+      approval: {
+        id: 'ap_denied',
+        explanation: 'why',
+        approved: false,
+        reason: 'user-cancel',
+      },
+    } as unknown as AgentToolUIPart;
+    const respondedPart = {
+      type: 'tool-doThing',
+      toolCallId: 'tc_responded',
+      state: 'approval-responded',
+      input: { foo: 'bar' },
+      approval: {
+        id: 'ap_responded',
+        explanation: 'why',
+        approved: true,
+        reason: 'looks good',
+      },
+    } as unknown as AgentToolUIPart;
+    const lastMsg: AgentMessage = {
+      id: 'a-tail',
+      role: 'assistant',
+      parts: [deniedPart, respondedPart],
+      metadata: { createdAt: new Date(), partsMetadata: [{}, {}] },
+    };
+    upsertAgentInstance(store, 'a1', makeEnvelope(makeBaseState([lastMsg])));
+
+    terminateNonTerminalToolPartsInLastAssistant(store, 'a1', {
+      approvalDenyReason: 'stop',
+      outputErrorText: 'stop',
+    });
+
+    const after = store.get().agents.instances.a1!.state;
+    const parts = after.history[0]!.parts as AgentToolUIPart[];
+    expect(parts[0]!.state).toBe('output-denied');
+    expect(parts[1]!.state).toBe('approval-responded');
+  });
+
   it('terminateNonTerminalToolPartsInLastAssistant removes the empty assistant tail', () => {
     const store = new AgentStore(emptySystemState());
     const lastMsg: AgentMessage = {

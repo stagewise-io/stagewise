@@ -88,6 +88,63 @@ describe('state-mutations/streaming', () => {
     expect(merged.metadata!.partsMetadata[0]?.endedAt).toBeInstanceOf(Date);
   });
 
+  it('mergeUIMessageStream truncates partsMetadata when parts shrink so reused indexes get fresh timestamps', () => {
+    const store = new AgentStore(emptySystemState());
+    upsertAgentInstance(store, 'a1', makeEnvelope(baseState([])));
+
+    // Round 1 — two text parts, both fully timestamped.
+    const startedAt = new Date(1_000);
+    const endedAt = new Date(2_000);
+    const round1: AgentMessage = {
+      id: 'asst-1',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'a', state: 'done' },
+        { type: 'text', text: 'b', state: 'done' },
+      ],
+      metadata: {
+        createdAt: startedAt,
+        partsMetadata: [
+          { startedAt, endedAt },
+          { startedAt, endedAt },
+        ],
+      },
+    };
+    mergeUIMessageStream(store, 'a1', { uiMessage: round1 });
+
+    // Round 2 — only one part. The second slot must be discarded so a
+    // later regrow does not reuse the stale timestamps via `??=`.
+    const round2: AgentMessage = {
+      id: 'asst-1',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'a', state: 'done' }],
+      metadata: { createdAt: startedAt, partsMetadata: [] },
+    };
+    mergeUIMessageStream(store, 'a1', { uiMessage: round2 });
+
+    let merged = store.get().agents.instances.a1!.state.history[0]!;
+    expect(merged.parts).toHaveLength(1);
+    expect(merged.metadata!.partsMetadata).toHaveLength(1);
+
+    // Round 3 — regrow with a new streaming part at the recycled index.
+    const round3: AgentMessage = {
+      id: 'asst-1',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'a', state: 'done' },
+        { type: 'text', text: 'c', state: 'streaming' },
+      ],
+      metadata: { createdAt: startedAt, partsMetadata: [] },
+    };
+    mergeUIMessageStream(store, 'a1', { uiMessage: round3 });
+
+    merged = store.get().agents.instances.a1!.state.history[0]!;
+    const recycled = merged.metadata!.partsMetadata[1]!;
+    expect(recycled.startedAt).toBeInstanceOf(Date);
+    expect(recycled.startedAt.getTime()).not.toBe(startedAt.getTime());
+    expect(recycled.endedAt).toBeUndefined();
+  });
+
   it('mergeUIMessageStream fires onApprovalRequested when a tool part enters approval-requested', () => {
     const store = new AgentStore(emptySystemState());
     upsertAgentInstance(store, 'a1', makeEnvelope(baseState([])));

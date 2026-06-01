@@ -1087,27 +1087,24 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     expect((mirrored!.state as AgentState).toolApprovalMode).toBe('smart');
   });
 
-  it('skips karton.setState when the envelope reference is unchanged', () => {
-    const { agentInstances, setState } = createAgentInstancesMirrorHarness();
+  it('does not re-upsert agents.instances when the envelope reference is unchanged', () => {
+    const { agentInstances, activeApp, getKartonState } =
+      createAgentInstancesMirrorHarness();
 
-    const envelope = makeEnvelope();
-    agentInstances.upsertInstance('a1', envelope);
-    const callsAfterFirst = setState.mock.calls.length;
+    agentInstances.upsertInstance('a1', makeEnvelope());
+    const envelopeBefore = getKartonState().agents?.instances.a1;
+    expect(envelopeBefore).toBeDefined();
 
-    // The controller always allocates a fresh envelope via Immer on
-    // every `upsertInstance` call, so the dedup path has to be
-    // exercised by an unrelated store mutation — e.g. setting the
-    // active app on the same agent. The mirror must skip the
-    // `agents.instances` branch because the envelope reference is
-    // unchanged.
-    const { activeApp } = createAgentInstancesMirrorHarness();
-    activeApp.setActiveApp('a1', {
-      appId: 'app-x',
-      src: 'blob:x',
-    });
-    // The first harness still sees no additional calls from the second
-    // harness — they are independent stores.
-    expect(setState.mock.calls.length).toBe(callsAfterFirst);
+    // An unrelated store mutation on the same agent — setting
+    // `activeApp` — triggers a Karton write for the toolbox slice but
+    // must NOT touch `agents.instances[a1]`, because the envelope
+    // reference is unchanged. Asserted via reference identity on the
+    // mirrored envelope (the mirror only rewrites the slot when
+    // `computeAgentInstanceChanges` detects a reference change).
+    activeApp.setActiveApp('a1', { appId: 'app-x', src: 'blob:x' });
+
+    const envelopeAfter = getKartonState().agents?.instances.a1;
+    expect(envelopeAfter).toBe(envelopeBefore);
   });
 
   it('mirrors on new envelope reference allocation', () => {

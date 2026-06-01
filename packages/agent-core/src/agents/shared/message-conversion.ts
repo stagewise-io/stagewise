@@ -262,6 +262,12 @@ export const convertAgentMessagesToModelMessages = async <
   const allowedEnvDomainIdSet = allowedEnvDomainIds
     ? new Set<DomainId>(allowedEnvDomainIds)
     : null;
+  // When the caller passed a non-null but empty allow-list, env
+  // rendering is intentionally disabled. Short-circuit so the
+  // per-message loop never invokes `resolveEffectiveEnvStateEntries`
+  // (an O(history) backward scan) for every message.
+  const envRenderingDisabled =
+    allowedEnvDomainIdSet !== null && allowedEnvDomainIdSet.size === 0;
 
   // ─── Step 1: Find compression boundary ──────────────────────────────
 
@@ -290,13 +296,15 @@ export const convertAgentMessagesToModelMessages = async <
     const message = messages[i];
     if (!message) continue;
 
-    const envParts = buildEnvContextParts(
-      messages,
-      i,
-      keyframeEmitted,
-      renderOrder,
-      allowedEnvDomainIdSet,
-    );
+    const envParts: EnvContextResult = envRenderingDisabled
+      ? EMPTY_ENV_CONTEXT_RESULT
+      : buildEnvContextParts(
+          messages,
+          i,
+          keyframeEmitted,
+          renderOrder,
+          allowedEnvDomainIdSet,
+        );
     if (envParts.emittedKeyframe) keyframeEmitted = true;
 
     const compressedPart = buildCompressedHistoryPart(
@@ -771,6 +779,17 @@ interface EnvContextResult {
   parts: UserContent;
   emittedKeyframe: boolean;
 }
+
+/**
+ * Shared zero-cost result returned when env rendering is disabled by
+ * an empty allow-list. The forward-pass loop reuses this object so
+ * `resolveEffectiveEnvStateEntries` is never called for unconfigured
+ * agents.
+ */
+const EMPTY_ENV_CONTEXT_RESULT: EnvContextResult = {
+  parts: [],
+  emittedKeyframe: false,
+};
 
 /**
  * Compute the environment context parts for the message at `msgIndex`.

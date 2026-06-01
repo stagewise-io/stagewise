@@ -84,7 +84,7 @@ export function recordStepError(
     if (args.error !== undefined) {
       state.error = args.error;
     }
-    if (args.markUnread === 'mark-unread') {
+    if (args.markUnread === 'always' || args.markUnread === 'mark-unread') {
       state.unread = true;
     } else if (args.markUnread === 'if-assistant-history') {
       if (state.history.some((m) => m.role === 'assistant')) {

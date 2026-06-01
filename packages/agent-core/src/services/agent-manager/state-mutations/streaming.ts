@@ -81,6 +81,12 @@ export function mergeUIMessageStream(
       partsMetadata: [],
     } as unknown as UserMessageMetadata;
     const emMeta = existingMessage.metadata as UserMessageMetadata;
+    // Keep `partsMetadata` index-aligned with `parts`. Without this,
+    // a shrunk-then-regrown stream reuses a stale `startedAt`/`endedAt`
+    // at the recycled index via the `??=` writes below.
+    if (emMeta.partsMetadata.length > incoming.length) {
+      emMeta.partsMetadata.length = incoming.length;
+    }
 
     uiMessage.parts.forEach(
       (part: (typeof uiMessage.parts)[number], index: number) => {

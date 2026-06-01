@@ -2324,9 +2324,13 @@ export abstract class BaseAgent<
     // threaded into both env capture and message conversion so a
     // shrunk profile cannot leak historical entries into the rendered
     // prompt.
-    const allowedEnvDomainIds = this.host.getAgentProfile(
-      this.agentType,
-    )?.envDomainIds;
+    // Missing profile means the agent type has not opted into any env
+    // domains: capture and prompt-builder already treat this as "none",
+    // and we default to an empty array here so message-conversion's
+    // rendering path applies the same allow-list (no historical env
+    // entries are replayed for unconfigured agents).
+    const allowedEnvDomainIds =
+      this.host.getAgentProfile(this.agentType)?.envDomainIds ?? [];
 
     // ─── Capture & attach per-domain env state to target message ──────
     const history = this.state.get().history;

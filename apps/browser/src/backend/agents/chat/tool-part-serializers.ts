@@ -126,11 +126,11 @@ export const browserToolPartSerializers = defineToolPartSerializers(
       `[docs-read: ${esc(input.libraryId)} → ${esc(input.topic)}${err ?? ''}]`,
 
     askUserQuestions: ({ input, output, err }) => {
-      if (err) return `[asked user: ${input.title ?? 'form'}${err}]`;
+      if (err) return `[asked user: ${esc(input.title ?? 'form')}${err}]`;
       if (output) {
         return formatAskUserAnswers(output, input);
       }
-      return `[asked user: ${input.title ?? 'form'}]`;
+      return `[asked user: ${esc(input.title ?? 'form')}]`;
     },
   },
 );

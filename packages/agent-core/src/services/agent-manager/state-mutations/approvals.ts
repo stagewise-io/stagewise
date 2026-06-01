@@ -103,10 +103,7 @@ export function terminateNonTerminalToolPartsInLastAssistant(
           } as AgentToolUIPart | DynamicToolUIPart;
           lastMsg.parts[index] =
             updatedToolPart as unknown as (typeof lastMsg.parts)[number];
-        } else if (
-          toolPart.state !== 'output-available' &&
-          toolPart.state !== 'output-error'
-        ) {
+        } else if (!TERMINAL_TOOL_STATES.has(toolPart.state)) {
           const updatedToolPart: AgentToolUIPart | DynamicToolUIPart = {
             ...toolPart,
             state: 'output-error',
