@@ -34,6 +34,7 @@ import type { CredentialsService } from '@/services/credentials';
 import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
 import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
+import { resolveNewAgentWorkspaceMountPath } from '@/services/agent-manager/workspace-mount-normalization';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
@@ -692,6 +693,27 @@ export class ToolboxService extends DisposableService {
       agentInstanceId,
       workspacePath,
       permissions,
+    );
+  }
+
+  /**
+   * `AgentManagerToolboxPort.resolveNewAgentMountPath` implementation.
+   *
+   * Defaults a new agent's mount to the repository's main worktree —
+   * users typically expect a fresh agent to start at the canonical
+   * checkout regardless of which linked worktree they happened to
+   * pick. Falls back to the input path when the host's `gitService`
+   * cannot determine a main worktree (non-git directory, error, ...).
+   * The `agents.create` handler bypasses this when
+   * `preserveWorkspacePaths` is set.
+   */
+  public async resolveNewAgentMountPath(
+    workspacePath: string,
+  ): Promise<string> {
+    return await resolveNewAgentWorkspaceMountPath(
+      workspacePath,
+      (input) => this.gitService.getWorkspaceMainWorktreePath(input),
+      this.logger,
     );
   }
 

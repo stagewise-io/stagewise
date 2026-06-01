@@ -232,9 +232,15 @@ export class AgentManager extends DisposableService {
       if (!lastWorkspaces) return;
       for (const ws of lastWorkspaces) {
         try {
+          // Default the startup-restored mount to the main worktree
+          // (idempotent for already-main paths) so a fresh app launch
+          // matches the `agents.create` default behavior.
+          const mountPath = this.managerToolbox.resolveNewAgentMountPath
+            ? await this.managerToolbox.resolveNewAgentMountPath(ws.path)
+            : ws.path;
           await this.managerToolbox.handleMountWorkspace(
             agent.instanceId,
-            ws.path,
+            mountPath,
             ws.permissions,
           );
         } catch (error) {
@@ -300,31 +306,65 @@ export class AgentManager extends DisposableService {
       async (
         initialInputState?: string,
         modelId?: string,
+        toolApprovalMode?: string,
         workspacePaths?: string[],
+        preserveWorkspacePaths?: boolean,
       ) => {
+        // Legacy `alwaysAllow` rows are silently promoted to `smart`
+        // — host UIs no longer expose the always-allow option and
+        // the backend treats it equivalently. Unknown / undefined
+        // values fall through to the default in `createAgent`.
+        const normalizedToolApprovalMode =
+          toolApprovalMode === 'alwaysAllow' ? 'smart' : toolApprovalMode;
+
+        const initialState: Partial<AgentState> = {};
+        if (modelId) initialState.activeModelId = modelId;
+        if (normalizedToolApprovalMode)
+          initialState.toolApprovalMode = normalizedToolApprovalMode;
+
         const agent = await this.createAgent(
           AgentTypes.CHAT,
           undefined,
           undefined,
-          modelId ? { activeModelId: modelId } : undefined,
+          Object.keys(initialState).length > 0 ? initialState : undefined,
           undefined,
           initialInputState,
         );
         if (workspacePaths) {
-          for (const wp of workspacePaths)
+          for (const wp of workspacePaths) {
+            // By default, mount the repository's main worktree rather
+            // than whichever linked worktree the user happened to pass
+            // — most users intuitively expect a new agent to start at
+            // the canonical checkout. Callers that want the exact
+            // path mounted (e.g. when explicitly creating an agent
+            // for a specific worktree) opt out via
+            // `preserveWorkspacePaths`.
+            const mountPath =
+              preserveWorkspacePaths ||
+              !this.managerToolbox.resolveNewAgentMountPath
+                ? wp
+                : await this.managerToolbox.resolveNewAgentMountPath(wp);
             await this.managerToolbox.handleMountWorkspace(
               agent.instanceId,
-              wp,
+              mountPath,
             );
+          }
         } else {
           const lastWorkspaces =
             await this.persistenceDb.getLastChatWorkspacePaths();
           if (lastWorkspaces) {
             for (const ws of lastWorkspaces) {
               try {
+                // Same remap applies to the last-workspaces fallback:
+                // if a previous session left a linked-worktree mount,
+                // a fresh agent should still default to the main
+                // worktree. Idempotent for already-main paths.
+                const mountPath = this.managerToolbox.resolveNewAgentMountPath
+                  ? await this.managerToolbox.resolveNewAgentMountPath(ws.path)
+                  : ws.path;
                 await this.managerToolbox.handleMountWorkspace(
                   agent.instanceId,
-                  ws.path,
+                  mountPath,
                   ws.permissions,
                 );
               } catch (error) {

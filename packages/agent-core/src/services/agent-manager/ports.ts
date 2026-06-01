@@ -26,4 +26,16 @@ export interface AgentManagerToolboxPort {
   acceptAllPendingEditsForAgent(agentInstanceId: string): Promise<void>;
   getEditedFilePathsForAgent(agentInstanceId: string): Promise<string[]>;
   getShellSnapshot?(agentInstanceId: string): unknown;
+  /**
+   * Optional host hook called from the `agents.create` handler to
+   * normalize a user-supplied workspace path before mounting. Hosts
+   * that wrap repositories with multiple worktrees typically remap
+   * a linked-worktree path to the repository's main worktree so the
+   * new agent's runtime / LSP starts at the canonical checkout.
+   *
+   * When omitted (or returning the input unchanged), `agents.create`
+   * mounts the path verbatim. Callers can bypass remapping per-call
+   * via the `preserveWorkspacePaths` argument on `agents.create`.
+   */
+  resolveNewAgentMountPath?(workspacePath: string): Promise<string>;
 }
