@@ -85,7 +85,6 @@ export { pickOwningWorkspace } from '@stagewise/agent-core/mount-manager';
 
 type AgentInstanceId = string;
 type MountPrefix = string;
-type WorkspacePath = string;
 type PendingWorktreeSetup = WorktreeSetupMetadata & { createdAt: number };
 
 async function safeRealpath(targetPath: string): Promise<string | null> {
