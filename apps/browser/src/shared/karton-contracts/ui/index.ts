@@ -732,6 +732,15 @@ export type AppState = {
   };
   workspaceGitCleanup: WorkspaceGitCleanupState;
   workspaceGitSetup: WorkspaceGitSetupState;
+  /**
+   * Monotonic per-repository revision counters, bumped whenever the backend
+   * detects an external git worktree add/remove (e.g. `git worktree add` or
+   * `git worktree remove` run from a terminal outside the app). Keyed by
+   * repositoryId, which equals the repository's common git dir. The sidebar
+   * watches these to invalidate its cached worktree lists so the UI stays in
+   * sync with the filesystem.
+   */
+  gitWorktreeRevisions: Record<string, number>;
   toolbox: {
     [agentInstanceId: string]: {
       workspace: {
@@ -1622,6 +1631,7 @@ export const defaultState: KartonContract['state'] = {
   workspaceGitSetup: {
     runsByPath: {},
   },
+  gitWorktreeRevisions: {},
   toolbox: {},
   userAccount: {
     status: 'unauthenticated',

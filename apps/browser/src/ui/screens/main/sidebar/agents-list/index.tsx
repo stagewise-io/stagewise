@@ -729,6 +729,12 @@ export function AgentsList() {
       (s) => s.preferences.sidebar.collapsedWorkspaceGroupKeys,
     ),
   );
+  // Per-repository revision counters bumped by the backend when a worktree is
+  // added/removed externally (e.g. `git worktree add/remove` in a terminal).
+  // Folded into the worktree-fetch signature below so the cached list refreshes.
+  const gitWorktreeRevisions = useKartonState(
+    useComparingSelector((s) => s.gitWorktreeRevisions),
+  );
 
   const [, emptyAgentIdRef] = useEmptyAgentId();
 
@@ -983,6 +989,13 @@ export function AgentsList() {
         console.error('Failed to delete worktree:', result.message);
         return;
       }
+      // Invalidate the cached git worktree lists so the fetch effect reloads
+      // them. The agent-mount signature only changes for worktrees that had
+      // agents; deleting an empty worktree leaves the signature untouched, so
+      // without an explicit reset the removed worktree would linger in the
+      // sidebar until the component remounts.
+      worktreeRefreshKeyByRepoRef.current.clear();
+      setWorktreeListsByRepo(new Map());
       if (deleteAgents && agentIds.length > 0) {
         await Promise.allSettled(agentIds.map((id) => deleteAgent(id)));
       }
@@ -1558,6 +1571,11 @@ export function AgentsList() {
     ReadonlyMap<string, string | null>
   >(new Map());
   const loadingWorktreeReposRef = useRef<Set<string>>(new Set());
+  // Per-repo signature of the worktrees its agents currently mount. Lets the
+  // worktree-list fetch effect detect when worktrees were created/removed
+  // while the sidebar stayed mounted, so the cached git list can be refreshed
+  // instead of staying frozen for the component's lifetime.
+  const worktreeRefreshKeyByRepoRef = useRef<Map<string, string>>(new Map());
   const loadingRemoteRepositoryReposRef = useRef<Set<string>>(new Set());
   const workspaceGroupOrderRef = useRef<WorkspaceGroupOrder>({
     repoKeys: workspaceGroupOrder,
@@ -1665,17 +1683,52 @@ export function AgentsList() {
   useEffect(() => {
     if (agentListGroupingMode !== 'workspace') return;
 
+    // Collect the worktree ids each repo's agents currently mount. When this
+    // set changes (a worktree was created and mounted, or an agent's mount was
+    // detached after a worktree deletion) the cached git worktree list is
+    // stale and must be refetched. Derived purely from agent mounts so it does
+    // not depend on — and therefore can't loop with — the cache itself.
+    const agentWorktreeIdsByRepo = new Map<string, Set<string>>();
+    for (const agent of filteredWorkspaceAgents) {
+      for (const ws of agent.mountedWorkspaces) {
+        if (!ws.git) continue;
+        let set = agentWorktreeIdsByRepo.get(ws.git.repositoryId);
+        if (!set) {
+          set = new Set<string>();
+          agentWorktreeIdsByRepo.set(ws.git.repositoryId, set);
+        }
+        set.add(ws.git.worktreeId);
+      }
+    }
+
     for (const group of workspaceGroups) {
       if (!group.git) continue;
-      if (worktreeListsByRepo.has(group.git.repositoryId)) continue;
-      if (loadingWorktreeReposRef.current.has(group.git.repositoryId)) continue;
+      const repoId = group.git.repositoryId;
+      if (loadingWorktreeReposRef.current.has(repoId)) continue;
 
-      loadingWorktreeReposRef.current.add(group.git.repositoryId);
+      // Combine the agent-mount worktree set with the backend's external-change
+      // revision. The revision catches worktrees added/removed outside the app
+      // (terminal git commands) that leave the agent-mount set unchanged.
+      const externalRevision = gitWorktreeRevisions[repoId] ?? 0;
+      const signature = `${externalRevision}::${Array.from(
+        agentWorktreeIdsByRepo.get(repoId) ?? [],
+      )
+        .sort()
+        .join('|')}`;
+      const hasCache = worktreeListsByRepo.has(repoId);
+      const signatureChanged =
+        worktreeRefreshKeyByRepoRef.current.get(repoId) !== signature;
+
+      // Already have a fresh list and nothing changed — skip.
+      if (hasCache && !signatureChanged) continue;
+
+      worktreeRefreshKeyByRepoRef.current.set(repoId, signature);
+      loadingWorktreeReposRef.current.add(repoId);
       listGitWorktreesByPath(group.path)
         .then((result) => {
           setWorktreeListsByRepo((current) => {
             const next = new Map(current);
-            next.set(group.git!.repositoryId, result);
+            next.set(repoId, result);
             return next;
           });
         })
@@ -1683,16 +1736,18 @@ export function AgentsList() {
           console.error('Failed to fetch workspace worktrees:', err);
           setWorktreeListsByRepo((current) => {
             const next = new Map(current);
-            next.set(group.git!.repositoryId, null);
+            next.set(repoId, null);
             return next;
           });
         })
         .finally(() => {
-          loadingWorktreeReposRef.current.delete(group.git!.repositoryId);
+          loadingWorktreeReposRef.current.delete(repoId);
         });
     }
   }, [
     agentListGroupingMode,
+    filteredWorkspaceAgents,
+    gitWorktreeRevisions,
     listGitWorktreesByPath,
     workspaceGroups,
     worktreeListsByRepo,
