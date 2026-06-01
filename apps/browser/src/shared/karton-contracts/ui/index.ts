@@ -1446,6 +1446,14 @@ export type KartonContract = {
         cwd?: string,
         agentInstanceId?: string | null,
       ) => Promise<string | null>;
+      /**
+       * Copy text to the system clipboard.
+       *
+       * Routed through the main process because the UI renderer's
+       * `navigator.clipboard` rejects when focus lives inside a web-content
+       * view (a separate WebContentsView), which silently dropped writes.
+       */
+      copyText: (text: string) => Promise<void>;
       /** Write keystroke data to a terminal's PTY. */
       terminalInput: (terminalId: string, data: string) => Promise<void>;
       /** Resize a terminal's PTY dimensions. */

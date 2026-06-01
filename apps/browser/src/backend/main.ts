@@ -2,7 +2,7 @@
  * This file stores the main setup for the CLI.
  */
 
-import { app, dialog } from 'electron';
+import { app, clipboard, dialog } from 'electron';
 import { AuthService } from './services/auth';
 import { AgentManagerService } from './services/agent-manager';
 import { UserExperienceService } from './services/experience';
@@ -583,6 +583,16 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         });
       });
       return { success: removed };
+    },
+  );
+
+  // browser.copyText - write text to the system clipboard from the main
+  // process. The UI renderer's navigator.clipboard rejects when focus is
+  // inside a web-content view, so clipboard writes are routed through here.
+  uiKarton.registerServerProcedureHandler(
+    'browser.copyText',
+    async (_cid: string, text: string) => {
+      clipboard.writeText(text);
     },
   );
 
