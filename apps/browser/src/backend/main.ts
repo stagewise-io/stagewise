@@ -74,10 +74,29 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   await ensureDataDirectories();
 
-  // Create PreferencesService, IdentifierService, and TelemetryService first
-  // so telemetryService can be passed to all downstream services
-  const preferencesService = await PreferencesService.create(logger);
-  const identifierService = await IdentifierService.create(logger);
+  // Bootstrap every service that has no inter-dependencies in parallel.
+  // These were previously awaited one-by-one, serializing independent
+  // disk/DB I/O and needlessly delaying the first window paint. They all
+  // only need `logger`, so they can be created concurrently. Services with
+  // dependencies are created in level order just below.
+  const [
+    preferencesService,
+    identifierService,
+    webDataService,
+    faviconService,
+    localPortsScannerService,
+  ] = await Promise.all([
+    PreferencesService.create(logger),
+    IdentifierService.create(logger),
+    // WebDataService must exist before HistoryService (history keyword IDs
+    // reference the keywords table owned by WebDataService).
+    WebDataService.create(logger),
+    FaviconService.create(logger),
+    // LocalPortsScannerService discovers local dev servers.
+    LocalPortsScannerService.create(logger),
+  ]);
+
+  // TelemetryService depends on identifier + preferences.
   const telemetryService = new TelemetryService(
     identifierService,
     preferencesService,
@@ -106,16 +125,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     });
   });
 
-  // Create database services early so they can be passed to other services
-  // WebDataService must be created first as HistoryService depends on it
-  // for search term extraction (keyword IDs reference the keywords table)
-  const webDataService = await WebDataService.create(logger);
+  // HistoryService depends on WebDataService (created above) + telemetry.
   const historyService = await HistoryService.create(
     logger,
     webDataService,
     telemetryService,
   );
-  const faviconService = await FaviconService.create(logger);
 
   // Create PagesService early so it can be passed to WindowLayoutService
   const pagesService = await PagesService.create(
@@ -124,10 +139,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     faviconService,
     telemetryService,
   );
-
-  // Create LocalPortsScannerService to discover local dev servers
-  const localPortsScannerService =
-    await LocalPortsScannerService.create(logger);
 
   // Create WindowLayoutService with all dependencies including PreferencesService
   // This also applies the startup page preference during initialization
