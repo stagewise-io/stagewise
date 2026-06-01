@@ -128,4 +128,65 @@ describe('agent list workspace model', () => {
     ]);
     expect(groups[0]?.severity).toBe('warning');
   });
+
+  it('overlays the freshly fetched worktree branch onto agent-derived groups', () => {
+    // The agent mount captured `branch: 'feature'` at mount time. After an
+    // external `git switch`, the HEAD watcher bumps the repo revision and the
+    // worktree list is refetched with the new branch. The list must win so the
+    // sidebar label tracks branch changes made outside the app.
+    const groups = buildWorkspaceAgentGroups({
+      entries: [
+        agent('feature', {
+          mountedWorkspaces: [
+            {
+              path: '/worktrees/feature',
+              git: {
+                repositoryId: '/repo/.git',
+                worktreeId: '/worktrees/feature',
+                repoRoot: '/worktrees/feature',
+                mainWorktreePath: '/repo',
+                commonGitDir: '/repo/.git',
+                isWorktree: true,
+                branch: 'feature',
+                headSha: 'def',
+                status: {
+                  dirty: false,
+                  stagedCount: 0,
+                  unstagedCount: 0,
+                  untrackedCount: 0,
+                },
+              },
+            },
+          ],
+        }),
+      ],
+      pinnedIds: new Set(),
+      worktreeLists: new Map([
+        [
+          '/repo/.git',
+          {
+            currentPath: '/worktrees/feature',
+            worktrees: [
+              {
+                worktreeId: '/worktrees/feature',
+                path: '/worktrees/feature',
+                branch: 'feature-renamed',
+                headSha: 'def',
+                isDetached: false,
+                isMainWorktree: false,
+                current: true,
+              },
+            ],
+          },
+        ],
+      ]),
+      groupOrder: { repoKeys: [], worktreeKeysByRepo: {} },
+    });
+
+    const worktree = groups[0]?.worktrees[0];
+    expect(worktree?.branch).toBe('feature-renamed');
+    expect(worktree?.label).toBe('feature (feature-renamed)');
+    // The agent stays attached to the (now relabeled) group.
+    expect(worktree?.agents.map((row) => row.agent.id)).toEqual(['feature']);
+  });
 });
