@@ -548,10 +548,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const agentManagerService = new AgentManagerService(
     uiKarton,
     agentCoreSeam.registry,
-    telemetryService,
     toolboxService,
-    logger,
-    modelProviderService,
     agentCoreSeam.agentInstancesController,
     agentCoreSeam.store,
     () => uiKarton.state.skills ?? [],

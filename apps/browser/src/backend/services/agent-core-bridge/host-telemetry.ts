@@ -27,7 +27,15 @@ export function createBrowserTelemetrySink(
   options: CreateBrowserTelemetrySinkOptions = {},
 ): TelemetrySink {
   const { logger } = options;
+  // The `level` field on `TelemetrySink` is `readonly` but resolved
+  // through a getter so agent-core observes the user's live preference
+  // (mirrors the previous behavior of reading `telemetryLevel` directly
+  // before logger/telemetry/modelCatalog were folded onto the
+  // `AgentHost`).
   return {
+    get level(): 'minimum' | 'full' {
+      return telemetryService.telemetryLevel === 'full' ? 'full' : 'minimum';
+    },
     capture(eventName, properties) {
       try {
         telemetryService.capture(eventName as UIEventName, properties as never);

@@ -199,29 +199,22 @@ async function main() {
   agentTypeRegistry.register(AgentTypes.CHAT, ChatAgent);
   agentTypeRegistry.register(AgentTypes.WORKSPACE_MD, WorkspaceMdAgent);
 
-  const manager = new AgentManager(
-    registry,
-    {
-      telemetryLevel: 'off',
-      capture: () => {},
-      captureException: () => {},
-    },
-    toolboxPort,
-    agentRuntimeToolbox,
-    logger,
-    { modelExists: () => true },
-    undefined,
-    store,
-    () => [],
-    { kind: 'none' },
-    persistence.fileReadCache,
-    persistence.attachments,
-    persistence.agentDb,
+  const manager = new AgentManager({
     host,
+    commandRegistry: registry,
     agentTypeRegistry,
-    undefined,
-    undefined,
-  );
+    startupPolicy: { kind: 'none' },
+    state: { store },
+    storage: {
+      persistenceDb: persistence.agentDb,
+      attachments: persistence.attachments,
+      fileReadCache: persistence.fileReadCache,
+    },
+    tools: {
+      managerToolbox: toolboxPort,
+      agentToolbox: agentRuntimeToolbox,
+    },
+  });
 
   manager.registerEnvAdapter(
     createWorkspaceDomainAdapter({ host, mountManager }),

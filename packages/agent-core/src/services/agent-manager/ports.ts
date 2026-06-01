@@ -27,21 +27,3 @@ export interface AgentManagerToolboxPort {
   getEditedFilePathsForAgent(agentInstanceId: string): Promise<string[]>;
   getShellSnapshot?(agentInstanceId: string): unknown;
 }
-
-/**
- * Telemetry used by agent lifecycle (names + loose payloads).
- * Browser `TelemetryService` satisfies this structurally.
- */
-export interface AgentManagerTelemetryPort {
-  readonly telemetryLevel: string;
-  capture(event: string, props: Record<string, unknown>): void;
-  captureException(
-    error: Error,
-    props: Record<string, unknown> | undefined,
-  ): void;
-}
-
-/** Model registry lookups for default/resume model validation. */
-export interface AgentManagerModelCatalogPort {
-  modelExists(modelId: string): boolean;
-}

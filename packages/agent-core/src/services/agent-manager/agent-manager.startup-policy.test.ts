@@ -21,21 +21,7 @@ function createDeps() {
   };
   return {
     registry: new CommandRegistry(),
-    telemetry: {
-      telemetryLevel: 'basic',
-      capture: vi.fn(),
-      captureException: vi.fn(),
-    },
     toolbox,
-    logger: {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
-    modelCatalog: {
-      modelExists: vi.fn(() => true),
-    },
     agentInstances: {
       upsertInstance: vi.fn(),
       deleteInstance: vi.fn(),
@@ -62,23 +48,25 @@ describe('AgentManager startup policy', () => {
       .mockResolvedValue({ instanceId: 'a' } as any);
 
     const deps = createDeps();
-    const manager = new AgentManager(
-      deps.registry,
-      deps.telemetry as any,
-      deps.toolbox as any,
-      deps.toolbox as any,
-      deps.logger as any,
-      deps.modelCatalog as any,
-      deps.agentInstances as any,
-      deps.agentStore as any,
-      () => [],
-      { kind: 'none' },
-      {} as any,
-      {} as any,
-      {} as any,
-      deps.host as any,
-      deps.agentTypeRegistry,
-    );
+    const manager = new AgentManager({
+      host: deps.host,
+      commandRegistry: deps.registry,
+      agentTypeRegistry: deps.agentTypeRegistry,
+      startupPolicy: { kind: 'none' },
+      state: {
+        store: deps.agentStore as any,
+        instancesWriter: deps.agentInstances as any,
+      },
+      storage: {
+        persistenceDb: {} as any,
+        attachments: {} as any,
+        fileReadCache: {} as any,
+      },
+      tools: {
+        managerToolbox: deps.toolbox as any,
+        agentToolbox: deps.toolbox as any,
+      },
+    });
 
     await flush();
     expect(createAgentSpy).not.toHaveBeenCalled();
@@ -97,27 +85,29 @@ describe('AgentManager startup policy', () => {
       .mockResolvedValue({ instanceId: 'seed-agent' } as any);
 
     const deps = createDeps();
-    const manager = new AgentManager(
-      deps.registry,
-      deps.telemetry as any,
-      deps.toolbox as any,
-      deps.toolbox as any,
-      deps.logger as any,
-      deps.modelCatalog as any,
-      deps.agentInstances as any,
-      deps.agentStore as any,
-      () => [],
-      {
+    const manager = new AgentManager({
+      host: deps.host,
+      commandRegistry: deps.registry,
+      agentTypeRegistry: deps.agentTypeRegistry,
+      startupPolicy: {
         kind: 'auto-create-default',
         agentType: AgentTypes.CHAT,
         mountLastWorkspaces: true,
       },
-      {} as any,
-      {} as any,
-      agentDb as any,
-      deps.host as any,
-      deps.agentTypeRegistry,
-    );
+      state: {
+        store: deps.agentStore as any,
+        instancesWriter: deps.agentInstances as any,
+      },
+      storage: {
+        persistenceDb: agentDb as any,
+        attachments: {} as any,
+        fileReadCache: {} as any,
+      },
+      tools: {
+        managerToolbox: deps.toolbox as any,
+        agentToolbox: deps.toolbox as any,
+      },
+    });
 
     for (let i = 0; i < 6; i++) {
       await flush();

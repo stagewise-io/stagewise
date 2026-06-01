@@ -37,16 +37,13 @@ import {
   redactSlashIdsForTelemetry,
 } from '../../agents/shared/metadata-converter/slash-items';
 import type { AgentManagerStartupPolicy } from './startup-policy';
-import type {
-  AgentManagerModelCatalogPort,
-  AgentManagerTelemetryPort,
-  AgentManagerToolboxPort,
-} from './ports';
+import type { AgentManagerToolboxPort } from './ports';
 import type {
   AgentInstancesWriterPort,
   AgentInstanceWriterEnvelope,
 } from './agent-instances-writer-port';
 import { createInMemoryAgentInstancesWriter } from './in-memory-agent-instances-writer';
+import type { AgentManagerOptions } from './options';
 import { generateAttachmentFilename } from './attachment-filename';
 import { randomUUID } from 'node:crypto';
 import type { UITools } from 'ai';
@@ -95,17 +92,16 @@ export class AgentManager<
   >();
 
   private readonly commandRegistry: CommandRegistry;
-  private readonly telemetry: AgentManagerTelemetryPort;
-  private readonly toolbox: AgentManagerToolboxPort;
-  private readonly agentRuntimeToolbox: BaseAgentToolboxView;
+  private readonly managerToolbox: AgentManagerToolboxPort;
+  private readonly agentToolbox: BaseAgentToolboxView;
   private readonly logger: Logger;
-  private readonly modelCatalog: AgentManagerModelCatalogPort;
   /**
    * The agent-core capability seam. Threaded into every `BaseAgent`
    * instance via `BaseAgentDependencies.host` so the core never imports
-   * browser services directly.
+   * browser services directly. Also the sole source of `logger`,
+   * `telemetry`, and `models` consumed by this manager.
    */
-  private readonly agentCoreHost: AgentHost;
+  private readonly host: AgentHost;
   /**
    * Registry of host-defined agent constructors. Used to satisfy the
    * core's spawn-child-agent path without the core having to import
@@ -113,22 +109,22 @@ export class AgentManager<
    */
   private readonly agentTypeRegistry: AgentTypeRegistry;
   private readonly agentsMap: AgentsMap;
-  private readonly renderExtraMention?: ExtraMentionRenderer;
+  private readonly renderHostMention?: ExtraMentionRenderer;
   /**
    * Optional host hook forwarded to every {@link BaseAgent} so the host
    * can surface user-facing lifecycle notifications (done/question/error)
    * without coupling core to host UI. See {@link AgentNotificationEvent}.
    */
-  private readonly notificationEventHandler?: (
+  private readonly onAgentEvent?: (
     event: AgentNotificationEvent,
     agentId: string,
   ) => void | Promise<void>;
-  private readonly processedImageCacheService?: ProcessedImageCacheService;
+  private readonly imageCache?: ProcessedImageCacheService;
   /**
    * App-wide `FileReadCacheService` shared across all agent instances.
    * Constructed once during bootstrap and threaded into every `BaseAgent`.
    */
-  private readonly fileReadCacheService: FileReadCacheService;
+  private readonly fileReadCache: FileReadCacheService;
   /**
    * Per-agent attachment blob store. Owned by `AgentCorePersistence`,
    * passed through to every `BaseAgent` instance, and used directly
@@ -137,9 +133,9 @@ export class AgentManager<
    */
   private readonly attachments: AttachmentsService;
   /**
-   * Phase 6: every write to `agents.instances` flows through this
-   * controller so `AgentStore` stays canonical. The bridge
-   * forward-mirror projects the slice back to Karton for readers.
+   * Write seam onto the live `agents.instances` slice of
+   * {@link AgentStore}. Defaults to an in-memory writer when the host
+   * does not supply its own.
    */
   private readonly agentInstances: AgentInstancesWriterPort<
     TUITools,
@@ -147,14 +143,14 @@ export class AgentManager<
     TState
   >;
   /**
-   * Canonical agent + toolbox slices (Phase 9 PR A). Prefer over
-   * `karton.state` for reads so lifecycle logic can move into agent-core
-   * without a Karton dependency.
+   * Canonical in-memory state container shared with the host. Direct
+   * reads back enumeration / `toolbox`-slice / quick by-id field
+   * lookups that the narrow writer port does not expose.
    */
   private readonly agentStore: AgentStore;
   /**
-   * Skill roster for slash-command telemetry redaction. Not yet on
-   * `AgentStore`; supplied by the host from Karton state.
+   * Skill roster for slash-command telemetry redaction. Defaults to
+   * `() => []` when the host does not supply skills.
    */
   private readonly getSkillsForSlashRedaction: () => ReadonlyArray<{
     id: string;
@@ -165,12 +161,12 @@ export class AgentManager<
   private readonly commandUnregisters: Array<() => void> = [];
 
   /**
-   * Owned by {@link AgentCorePersistence} (Phase D.3). Constructed
-   * before the manager and passed in fully initialised — every method
-   * can use the non-null happy path. If persistence is broken, the
-   * facade fails boot before this manager is ever instantiated.
+   * Owned by `AgentCorePersistence`. Constructed before the manager
+   * and passed in fully initialised — every method can use the
+   * non-null happy path. If persistence is broken, the facade fails
+   * boot before this manager is ever instantiated.
    */
-  private readonly agentDb: AgentPersistenceDB;
+  private readonly persistenceDb: AgentPersistenceDB;
 
   /**
    * Registry of {@link DomainAdapter}s threaded into every `BaseAgent`.
@@ -181,66 +177,51 @@ export class AgentManager<
   private readonly domainAdapterRegistry: DomainAdapterRegistry;
 
   public constructor(
-    commandRegistry: CommandRegistry,
-    telemetry: AgentManagerTelemetryPort,
-    toolbox: AgentManagerToolboxPort,
-    agentRuntimeToolbox: BaseAgentToolboxView,
-    logger: Logger,
-    modelCatalog: AgentManagerModelCatalogPort,
-    agentInstances:
-      | AgentInstancesWriterPort<TUITools, TMessageMetadata, TState>
-      | undefined,
-    agentStore: AgentStore,
-    getSkillsForSlashRedaction: () => ReadonlyArray<{
-      id: string;
-      source: unknown;
-    }>,
-    startupPolicy: AgentManagerStartupPolicy,
-    fileReadCacheService: FileReadCacheService,
-    attachments: AttachmentsService,
-    agentDb: AgentPersistenceDB,
-    agentCoreHost: AgentHost,
-    agentTypeRegistry: AgentTypeRegistry,
-    renderExtraMention?: ExtraMentionRenderer,
-    processedImageCacheService?: ProcessedImageCacheService,
-    notificationEventHandler?: (
-      event: AgentNotificationEvent,
-      agentId: string,
-    ) => void | Promise<void>,
+    options: AgentManagerOptions<TUITools, TMessageMetadata, TState>,
   ) {
     super();
+    const {
+      host,
+      commandRegistry,
+      agentTypeRegistry,
+      startupPolicy,
+      state,
+      storage,
+      tools,
+      hooks,
+    } = options;
+
+    this.host = host;
+    this.logger = host.logger;
     this.commandRegistry = commandRegistry;
-    this.telemetry = telemetry;
-    this.toolbox = toolbox;
-    this.agentRuntimeToolbox = agentRuntimeToolbox;
-    this.logger = logger;
-    this.modelCatalog = modelCatalog;
+    this.managerToolbox = tools.managerToolbox;
+    this.agentToolbox = tools.agentToolbox;
+    this.agentStore = state.store;
     this.agentInstances =
-      agentInstances ??
+      state.instancesWriter ??
       createInMemoryAgentInstancesWriter<TUITools, TMessageMetadata, TState>({
-        store: agentStore,
+        store: state.store,
       });
-    this.agentStore = agentStore;
-    this.getSkillsForSlashRedaction = getSkillsForSlashRedaction;
+    this.persistenceDb = storage.persistenceDb;
+    this.attachments = storage.attachments;
+    this.fileReadCache = storage.fileReadCache;
+    this.imageCache = storage.imageCache;
     this.startupPolicy = startupPolicy;
-    this.renderExtraMention = renderExtraMention;
-    this.notificationEventHandler = notificationEventHandler;
-    this.processedImageCacheService = processedImageCacheService;
-    this.fileReadCacheService = fileReadCacheService;
-    this.attachments = attachments;
-    this.agentDb = agentDb;
-    this.agentCoreHost = agentCoreHost;
     this.agentTypeRegistry = agentTypeRegistry;
     this.agentsMap = toAgentsMap(agentTypeRegistry);
+    this.renderHostMention = hooks?.renderHostMention;
+    this.onAgentEvent = hooks?.onAgentEvent;
+    this.getSkillsForSlashRedaction =
+      hooks?.skillsForSlashRedaction ?? (() => []);
 
-    this.domainAdapterRegistry = new DomainAdapterRegistry(logger);
+    this.domainAdapterRegistry = new DomainAdapterRegistry(host.logger);
 
     this.unregisterCommands = this.registerCommandHandlers();
 
-    // The persistence DB is owned by `AgentCorePersistence` (Phase
-    // D.3) and is fully migrated by the time the host hands it to us,
-    // so the startup-policy fire-and-forget can run immediately
-    // instead of chaining off a `dbReadyPromise`.
+    // The persistence DB is owned by `AgentCorePersistence` and is
+    // fully migrated by the time the host hands it to us, so the
+    // startup-policy fire-and-forget can run immediately instead of
+    // chaining off a `dbReadyPromise`.
     this.applyStartupPolicy();
   }
 
@@ -255,11 +236,12 @@ export class AgentManager<
     void (async () => {
       const agent = await this.createAgent(agentType, undefined);
       if (!mountLastWorkspaces) return;
-      const lastWorkspaces = await this.agentDb.getLastChatWorkspacePaths();
+      const lastWorkspaces =
+        await this.persistenceDb.getLastChatWorkspacePaths();
       if (!lastWorkspaces) return;
       for (const ws of lastWorkspaces) {
         try {
-          await this.toolbox.handleMountWorkspace(
+          await this.managerToolbox.handleMountWorkspace(
             agent.instanceId,
             ws.path,
             ws.permissions,
@@ -279,7 +261,7 @@ export class AgentManager<
     operation: string,
     extra?: Record<string, unknown>,
   ) {
-    this.telemetry.captureException(error, {
+    this.host.telemetry?.captureException(error, {
       service: 'agent-manager',
       operation,
       ...extra,
@@ -339,13 +321,17 @@ export class AgentManager<
         );
         if (workspacePaths) {
           for (const wp of workspacePaths)
-            await this.toolbox.handleMountWorkspace(agent.instanceId, wp);
+            await this.managerToolbox.handleMountWorkspace(
+              agent.instanceId,
+              wp,
+            );
         } else {
-          const lastWorkspaces = await this.agentDb.getLastChatWorkspacePaths();
+          const lastWorkspaces =
+            await this.persistenceDb.getLastChatWorkspacePaths();
           if (lastWorkspaces) {
             for (const ws of lastWorkspaces) {
               try {
-                await this.toolbox.handleMountWorkspace(
+                await this.managerToolbox.handleMountWorkspace(
                   agent.instanceId,
                   ws.path,
                   ws.permissions,
@@ -386,7 +372,7 @@ export class AgentManager<
         try {
           await this.sendUserMessage(instanceId, message);
         } finally {
-          this.toolbox.cancelQuestion(
+          this.managerToolbox.cancelQuestion(
             instanceId,
             questionId,
             'user_sent_message',
@@ -500,7 +486,7 @@ export class AgentManager<
         // The raw title is only transmitted at `full` telemetry. Titles
         // frequently contain project names, snippets, or other identifying
         // strings — `basic` should stay content-free.
-        const isFullTelemetry = this.telemetry.telemetryLevel === 'full';
+        const isFullTelemetry = this.host.telemetry?.level === 'full';
 
         const agent = this.activeAgents.get(instanceId);
         if (agent) {
@@ -510,7 +496,7 @@ export class AgentManager<
           // avoid coupling telemetry to a specific BaseAgent subclass shape.
           const agentType =
             this.agentStore.get().agents.instances[instanceId]?.type;
-          this.telemetry.capture('agent-renamed', {
+          this.host.telemetry?.capture('agent-renamed', {
             agent_instance_id: instanceId,
             was_active: true,
             new_title_length: trimmed.length,
@@ -523,14 +509,14 @@ export class AgentManager<
         // Inactive path: update the persisted row directly — no hydration,
         // no Karton fan-out; the UI's optimistic local update is authoritative
         // until the next history refetch.
-        const updated = await this.agentDb.updateAgentTitle(
+        const updated = await this.persistenceDb.updateAgentTitle(
           instanceId,
           trimmed,
         );
         if (!updated) {
           throw new Error(`Agent with instance id ${instanceId} not found`);
         }
-        this.telemetry.capture('agent-renamed', {
+        this.host.telemetry?.capture('agent-renamed', {
           agent_instance_id: instanceId,
           was_active: false,
           new_title_length: trimmed.length,
@@ -582,7 +568,7 @@ export class AgentManager<
       },
     );
     this.wrapAgentRpc('agents.getStoredInstance', async (agentId: string) => {
-      const row = await this.agentDb.getStoredAgentInstanceById(agentId);
+      const row = await this.persistenceDb.getStoredAgentInstanceById(agentId);
       if (!row) return null;
 
       const mountedWorkspaces = row.mountedWorkspaces
@@ -605,7 +591,7 @@ export class AgentManager<
       };
     });
     this.wrapAgentRpc('agents.getTouchedFiles', async (agentId: string) => {
-      return this.toolbox.getEditedFilePathsForAgent(agentId);
+      return this.managerToolbox.getEditedFilePathsForAgent(agentId);
     });
     this.wrapAgentRpc(
       'agents.revealWorkingDirectory',
@@ -615,8 +601,8 @@ export class AgentManager<
           // the mounted user project. This is the dev-option "working dir"
           // exposed via the context menu: where the agent's attachments,
           // shell logs, apps, etc. live on disk.
-          const dir = this.agentCoreHost.paths.agentDir(agentId);
-          const desktop = this.agentCoreHost.desktop;
+          const dir = this.host.paths.agentDir(agentId);
+          const desktop = this.host.desktop;
           if (!desktop) {
             return {
               success: false,
@@ -679,14 +665,17 @@ export class AgentManager<
       {
         parentInstanceId: parentAgentId ?? '',
         onFinish: async () => {
-          const readMd = this.agentCoreHost.readWorkspaceMdFromDisk;
+          const readMd = this.host.readWorkspaceMdFromDisk;
           if (!readMd) {
             throw new Error(
               'AgentHost.readWorkspaceMdFromDisk is required for workspace-md generation',
             );
           }
           const content = await readMd(workspacePath);
-          this.toolbox.setWorkspaceMdContent(workspacePath, content ?? '');
+          this.managerToolbox.setWorkspaceMdContent(
+            workspacePath,
+            content ?? '',
+          );
         },
         onError: (error) => {
           this.report(error, 'workspaceMdGenerationFailed');
@@ -715,9 +704,9 @@ export class AgentManager<
 
     // For new chat agents (not resumed), use the model from the last persisted chat
     // Validate the model still exists (it may have been a deleted custom model)
-    const lastChatModelId = await this.agentDb.getLastChatModelId();
+    const lastChatModelId = await this.persistenceDb.getLastChatModelId();
     const lastModelValid =
-      lastChatModelId && this.modelCatalog.modelExists(lastChatModelId);
+      lastChatModelId && this.host.models.has(lastChatModelId);
 
     // Build state object outside setState to avoid "Type instantiation is excessively deep" error
     // caused by complex Draft<[]> inference from the 'ai' package's UIMessage type
@@ -795,11 +784,11 @@ export class AgentManager<
         persist: (dirtyMessageIndices?: number[]) =>
           this.persistAgentState(agentInstanceId, dirtyMessageIndices),
       } as unknown as BaseAgentDependencies<any, any>['state'],
-      host: this.agentCoreHost,
-      toolbox: this.agentRuntimeToolbox,
+      host: this.host,
+      toolbox: this.agentToolbox,
       caches: {
-        fileReadCache: this.fileReadCacheService,
-        processedImageCache: this.processedImageCacheService,
+        fileReadCache: this.fileReadCache,
+        processedImageCache: this.imageCache,
       },
       attachments: this.attachments,
       domainAdapterRegistry: this.domainAdapterRegistry,
@@ -833,13 +822,13 @@ export class AgentManager<
             ? lastChatModelId
             : undefined,
       }) as BaseAgentDependencies<any, any>['initialState'],
-      renderExtraMention: this.renderExtraMention,
-      notificationEventHandler: this.notificationEventHandler,
+      renderExtraMention: this.renderHostMention,
+      notificationEventHandler: this.onAgentEvent,
     });
 
     this.activeAgents.set(agentInstanceId, agent);
 
-    this.telemetry.capture('agent-created', {
+    this.host.telemetry?.capture('agent-created', {
       agent_type: type,
       agent_instance_id: agentInstanceId,
       model_id:
@@ -875,7 +864,8 @@ export class AgentManager<
 
     this.logger.debug(`[AgentManager] Resuming agent. ID: ${instanceId}`);
 
-    const agent = await this.agentDb.getStoredAgentInstanceById(instanceId);
+    const agent =
+      await this.persistenceDb.getStoredAgentInstanceById(instanceId);
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
@@ -889,7 +879,7 @@ export class AgentManager<
 
     // Validate that the persisted model still exists (it may have been a deleted custom model)
     const resumedModelValid =
-      agent.activeModelId && this.modelCatalog.modelExists(agent.activeModelId);
+      agent.activeModelId && this.host.models.has(agent.activeModelId);
 
     const createdAgent = await this.createAgent(
       agent.type,
@@ -914,7 +904,7 @@ export class AgentManager<
     if (agent.mountedWorkspaces && Array.isArray(agent.mountedWorkspaces)) {
       for (const ws of agent.mountedWorkspaces) {
         try {
-          await this.toolbox.handleMountWorkspace(
+          await this.managerToolbox.handleMountWorkspace(
             instanceId,
             ws.path,
             ws.permissions,
@@ -928,7 +918,7 @@ export class AgentManager<
       }
     }
 
-    this.telemetry.capture('agent-resumed', {
+    this.host.telemetry?.capture('agent-resumed', {
       agent_type: agent.type,
       agent_instance_id: instanceId,
     });
@@ -955,11 +945,11 @@ export class AgentManager<
     }
 
     const mountedWorkspaces =
-      this.toolbox.getWorkspaceSnapshotForPersistence(instanceId);
+      this.managerToolbox.getWorkspaceSnapshotForPersistence(instanceId);
     const firstHistoryEntry = agentState.history[0];
     const lastHistoryEntry = agentState.history[agentState.history.length - 1];
 
-    await this.agentDb.storeAgentInstance(
+    await this.persistenceDb.storeAgentInstance(
       {
         id: instanceId,
         type: agent.agentType,
@@ -1010,13 +1000,13 @@ export class AgentManager<
     await this.archiveAgent(instanceId);
 
     // Clear the agent from the persistence layer
-    await this.agentDb.deleteAgentInstance(instanceId);
+    await this.persistenceDb.deleteAgentInstance(instanceId);
 
     // Permanently remove on-disk attachment blobs (archive intentionally
     // preserves them so a resumed agent can still access its attachments).
     void this.attachments.deleteAgentBlobs(instanceId);
 
-    this.telemetry.capture('agent-deleted', {
+    this.host.telemetry?.capture('agent-deleted', {
       agent_type: agentType,
       agent_instance_id: instanceId,
     });
@@ -1044,7 +1034,7 @@ export class AgentManager<
 
     // Accept all pending diffs before archiving so no "hanging" diffs remain
     try {
-      await this.toolbox.acceptAllPendingEditsForAgent(instanceId);
+      await this.managerToolbox.acceptAllPendingEditsForAgent(instanceId);
     } catch (error) {
       this.logger.error(
         `[AgentManager] Failed to accept pending edits for agent ${instanceId}`,
@@ -1073,7 +1063,7 @@ export class AgentManager<
     // bridge forward-mirror deletes the same keys in Karton.
     this.agentInstances.deleteInstance(instanceId);
 
-    this.telemetry.capture('agent-archived', {
+    this.host.telemetry?.capture('agent-archived', {
       agent_type: agent.agentType,
       agent_instance_id: instanceId,
     });
@@ -1122,7 +1112,7 @@ export class AgentManager<
     const msSinceLastMessage =
       lastMessageTs !== undefined ? Date.now() - lastMessageTs : undefined;
 
-    this.telemetry.capture('agent-message-sent', {
+    this.host.telemetry?.capture('agent-message-sent', {
       agent_type: instance?.type ?? 'unknown',
       agent_instance_id: instanceId,
       model_id: instance?.state.activeModelId ?? 'unknown',
@@ -1203,9 +1193,9 @@ export class AgentManager<
 
     this.agentInstances.setToolApprovalMode(instanceId, mode);
 
-    await this.agentDb.updateToolApprovalMode(instanceId, mode);
+    await this.persistenceDb.updateToolApprovalMode(instanceId, mode);
 
-    this.telemetry.capture('tool-approval-mode-changed', {
+    this.host.telemetry?.capture('tool-approval-mode-changed', {
       agent_instance_id: instanceId,
       previous_mode: currentMode as ToolApprovalMode,
       new_mode: mode,
@@ -1254,7 +1244,7 @@ export class AgentManager<
 
     await agent.stop();
 
-    this.telemetry.capture('agent-stopped', {
+    this.host.telemetry?.capture('agent-stopped', {
       agent_type: agent.agentType,
       agent_instance_id: instanceId,
       ms_since_last_user_message:
@@ -1373,7 +1363,7 @@ export class AgentManager<
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
-    if (!this.modelCatalog.modelExists(modelId)) {
+    if (!this.host.models.has(modelId)) {
       throw new Error(
         `Cannot set model: "${modelId}" does not exist (it may have been deleted)`,
       );
@@ -1382,7 +1372,7 @@ export class AgentManager<
       this.agentStore.get().agents.instances[instanceId]?.state.activeModelId ??
       'unknown';
     await agent.updateActiveModelId(modelId);
-    this.telemetry.capture('agent-model-changed', {
+    this.host.telemetry?.capture('agent-model-changed', {
       agent_type: agent.agentType,
       agent_instance_id: instanceId,
       from_model: fromModel,
@@ -1403,7 +1393,7 @@ export class AgentManager<
     limit: number,
     searchString?: string,
   ): Promise<AgentHistoryEntry[]> {
-    return await this.agentDb.getAgentHistoryEntries(
+    return await this.persistenceDb.getAgentHistoryEntries(
       limit,
       offset,
       [],

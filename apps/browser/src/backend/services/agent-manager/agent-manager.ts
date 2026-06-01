@@ -1,8 +1,6 @@
 import type {
   AgentManagerStartupPolicy,
   AgentManagerToolboxPort,
-  AgentManagerTelemetryPort,
-  AgentManagerModelCatalogPort,
   AgentNotificationEvent,
   AgentStore,
   CommandRegistry,
@@ -22,7 +20,6 @@ import type { AgentPersistenceDB } from '@stagewise/agent-core/agent-persistence
 import type { DomainAdapter, DomainId } from '@stagewise/agent-core/env';
 import { DisposableService } from '../disposable';
 import type { KartonService } from '../karton';
-import type { Logger } from '../logger';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
 import type { UserMessageMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 import type { UIAgentTools } from '@shared/karton-contracts/ui/agent/tools/types';
@@ -69,10 +66,7 @@ export class AgentManagerService extends DisposableService {
   public constructor(
     karton: KartonService,
     commandRegistry: CommandRegistry,
-    telemetryService: AgentManagerTelemetryPort,
     toolbox: AgentManagerToolboxPort,
-    logger: Logger,
-    modelCatalog: AgentManagerModelCatalogPort,
     agentInstancesController: AgentInstancesStateController,
     agentStore: AgentStore,
     getSkillsForSlashRedaction: () => ReadonlyArray<
@@ -98,26 +92,31 @@ export class AgentManagerService extends DisposableService {
       UIAgentTools,
       UserMessageMetadata,
       AgentState
-    >(
+    >({
+      host: agentCoreHost,
       commandRegistry,
-      telemetryService,
-      toolbox,
-      toolbox as unknown as BaseAgentToolboxView,
-      logger,
-      modelCatalog,
-      agentInstancesController,
-      agentStore,
-      getSkillsForSlashRedaction,
-      startupPolicy,
-      fileReadCacheService,
-      attachments,
-      agentDb,
-      agentCoreHost,
       agentTypeRegistry,
-      renderBrowserExtraMention,
-      processedImageCacheService,
-      notificationEventHandler,
-    );
+      startupPolicy,
+      state: {
+        store: agentStore,
+        instancesWriter: agentInstancesController,
+      },
+      storage: {
+        persistenceDb: agentDb,
+        attachments,
+        fileReadCache: fileReadCacheService,
+        imageCache: processedImageCacheService,
+      },
+      tools: {
+        managerToolbox: toolbox,
+        agentToolbox: toolbox as unknown as BaseAgentToolboxView,
+      },
+      hooks: {
+        onAgentEvent: notificationEventHandler,
+        renderHostMention: renderBrowserExtraMention,
+        skillsForSlashRedaction: getSkillsForSlashRedaction,
+      },
+    });
     this.registerKartonForwarders();
   }
 
