@@ -463,7 +463,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     preferencesService,
     detectedShell,
     resolvedEnvPromise,
-    agentCoreSeam.mountsController,
+    agentCoreSeam.store,
     agentCoreSeam.hostAgentStateMutations,
     attachments,
   );

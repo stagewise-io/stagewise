@@ -33,7 +33,6 @@ import type { SmartApprovalDeps } from './tools/shell/execute-shell-command';
 import type { CredentialsService } from '@/services/credentials';
 import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
-import type { MountsStateController } from '@/services/agent-core-bridge/state/toolbox-mounts';
 import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
@@ -53,6 +52,7 @@ import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-li
 import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
   makeUniversalTools,
+  type AgentStore,
   type MountPermission as CoreMountPermission,
 } from '@stagewise/agent-core';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
@@ -133,7 +133,7 @@ export class ToolboxService extends DisposableService {
   private readonly gitService: GitService;
   private readonly detectedShell: DetectedShell | null;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
-  private readonly mountsController: MountsStateController;
+  private readonly agentStore: AgentStore;
   private readonly hostAgentStateMutations: HostAgentStateMutations;
   private readonly attachments: AttachmentsService;
 
@@ -452,7 +452,7 @@ export class ToolboxService extends DisposableService {
     preferencesService: PreferencesService,
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
-    mountsController: MountsStateController,
+    agentStore: AgentStore,
     hostAgentStateMutations: HostAgentStateMutations,
     attachments: AttachmentsService,
   ) {
@@ -470,7 +470,7 @@ export class ToolboxService extends DisposableService {
     this.preferencesService = preferencesService;
     this.detectedShell = detectedShell;
     this.resolvedEnvPromise = resolvedEnvPromise;
-    this.mountsController = mountsController;
+    this.agentStore = agentStore;
     this.hostAgentStateMutations = hostAgentStateMutations;
     this.attachments = attachments;
   }
@@ -489,7 +489,7 @@ export class ToolboxService extends DisposableService {
     preferencesService: PreferencesService,
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
-    mountsController: MountsStateController,
+    agentStore: AgentStore,
     hostAgentStateMutations: HostAgentStateMutations,
     attachments: AttachmentsService,
   ): Promise<ToolboxService> {
@@ -507,7 +507,7 @@ export class ToolboxService extends DisposableService {
       preferencesService,
       detectedShell,
       resolvedEnvPromise,
-      mountsController,
+      agentStore,
       hostAgentStateMutations,
       attachments,
     );
@@ -1278,7 +1278,7 @@ export class ToolboxService extends DisposableService {
       this.telemetryService,
       this.gitService,
       this.preferencesService,
-      this.mountsController,
+      this.agentStore,
       this.resolvedEnvPromise,
     );
 

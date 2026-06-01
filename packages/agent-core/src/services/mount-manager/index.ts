@@ -16,6 +16,6 @@ export {
   type MentionSearchToolboxState,
 } from './mention-search';
 export type { MountManagerHostHooks } from './types';
-export type { MountsStateController } from './mounts-state-controller';
+export { setAgentMounts } from './mount-state';
 export { pickOwningWorkspace } from '../../workspace';
 export * from './workspace-info';

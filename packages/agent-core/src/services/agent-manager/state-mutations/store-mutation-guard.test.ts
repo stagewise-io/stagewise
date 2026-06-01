@@ -31,10 +31,14 @@ const ALLOWLIST = new Set([
   // `store.update()` per intent to match the D18 guarantee the bridge
   // mirror relies on.
   'packages/agent-core/src/services/diff-history/index.ts',
-  // Browser-only toolbox slice controllers. Each owns a single
-  // `toolbox.*` field (mounts / activeApp / pendingAppMessage) and
-  // writes through the same one-`store.update`-per-intent discipline.
-  'apps/browser/src/backend/services/agent-core-bridge/state/toolbox-mounts.ts',
+  // Core mount-manager state writer — owns `toolbox.workspace.mounts`
+  // for the `MountManager` registry; the one-`store.update`-per-intent
+  // discipline keeps the bridge mirror's reference-identity diff
+  // correct.
+  'packages/agent-core/src/services/mount-manager/mount-state.ts',
+  // Browser-only toolbox slice controller for `activeApp` /
+  // `pendingAppMessage`. Writes through the same
+  // one-`store.update`-per-intent discipline.
   'apps/browser/src/backend/services/agent-core-bridge/state/toolbox-active-app.ts',
 ]);
 

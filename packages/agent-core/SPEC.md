@@ -1432,13 +1432,13 @@ Maintain existing undo/revert behavior.
 
 ### Phase 6: Move MountManagerService — completed
 
-The mount registry, workspace-info readers (`readWorkspaceMd`, `readAgentsMd`, `getSkills`, `isGitRepo`, `getGitBranch`), chokidar-driven `.stagewise/WORKSPACE.md` refresh, `pickOwningWorkspace`, and `MentionSearchService` now live in `packages/agent-core/src/services/mount-manager/`. The core `MountManager` class accepts a `MountsStateController`, `Logger`, optional `TelemetrySink`, and a `MountManagerHostHooks` triad (`onWorkspaceAttached`, `onWorkspaceReleased`, `onMountsChanged`). All `node:fs` / `chokidar` access is routed through the `@stagewise/agent-core/fs` proxy.
+The mount registry, workspace-info readers (`readWorkspaceMd`, `readAgentsMd`, `getSkills`, `isGitRepo`, `getGitBranch`), chokidar-driven `.stagewise/WORKSPACE.md` refresh, `pickOwningWorkspace`, and `MentionSearchService` now live in `packages/agent-core/src/services/mount-manager/`. The core `MountManager` class accepts an `AgentStore`, `Logger`, optional `TelemetrySink`, and a `MountManagerHostHooks` triad (`onWorkspaceAttached`, `onWorkspaceReleased`, `onMountsChanged`); writes to `toolbox[agentId].workspace.mounts` flow through the colocated `setAgentMounts(store, agentId, mounts)` helper (one `store.update()` per intent, allowlisted in the store-mutation guard). All `node:fs` / `chokidar` access is routed through the `@stagewise/agent-core/fs` proxy.
 
 The host-side `MountManagerService` ([](path:w787f/apps/browser/src/backend/services/toolbox/services/mount-manager/index.ts)) is now a thin composition shell that constructs the core, implements the three hooks to manage `ClientRuntimeNode` + `LspService` lifecycle and call `userExperienceService.saveRecentlyOpenedWorkspace`, and registers the three Karton procedures (`toolbox.mountWorkspace` with file-picker fallback, `toolbox.unmountWorkspace`, `toolbox.searchMentionFiles`).
 
 File-picker behavior is resolved host-side before dispatch: when `toolbox.mountWorkspace` is invoked with `workspacePath === undefined`, the host shell calls `FilePickerService.pickDirectory()` and only then forwards the concrete absolute path into `MountManager.mountWorkspace`. Core only sees resolved paths.
 
-The Karton mirror for `toolbox[agentId].workspace.mounts` continues through `MountsStateController` / `AgentCoreBridge`; `pages-api` and `window-layout` observe the unchanged shape. Tests: 181 in `@stagewise/agent-core`, 841 in `apps/browser`.
+The Karton mirror for `toolbox[agentId].workspace.mounts` continues through `setAgentMounts` (writing into the shared `AgentStore`) + `AgentCoreBridge`; `pages-api` and `window-layout` observe the unchanged shape. Tests: 181 in `@stagewise/agent-core`, 841 in `apps/browser`.
 
 ### Phase 7: Move Toolbox core — completed
 

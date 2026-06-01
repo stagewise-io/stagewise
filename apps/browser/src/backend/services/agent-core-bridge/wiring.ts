@@ -17,10 +17,6 @@ import {
   type ActiveAppStateController,
 } from './state/toolbox-active-app';
 import {
-  createMountsStateController,
-  type MountsStateController,
-} from './state/toolbox-mounts';
-import {
   createHostAgentStateMutations,
   type HostAgentStateMutations,
 } from './state/agent-instances';
@@ -40,16 +36,15 @@ export interface AgentCoreBridgeContext {
 /**
  * Minimal seam that exposes the store + registry + controllers without
  * depending on the full `AgentHost`. Services that consume
- * store-canonical state (e.g. `MountManagerService` via
- * `mountsController`) construct long before the full `AgentHost` is
- * available in `main.ts`, so the seam is built early and the bridge is
- * attached later.
+ * store-canonical state (e.g. `MountManagerService` via the shared
+ * `store`) construct long before the full `AgentHost` is available in
+ * `main.ts`, so the seam is built early and the bridge is attached
+ * later.
  */
 export interface AgentCoreSeamHandles {
   store: AgentStore;
   registry: CommandRegistry;
   activeAppController: ActiveAppStateController;
-  mountsController: MountsStateController;
   /**
    * Browser-only setters that extend the core `state-mutations`
    * surface (`setUnread`, `recordPendingApproval`, plus a typed
@@ -94,7 +89,6 @@ export function createAgentCoreSeam(ctx: {
 
   const store = new AgentStore(createInitialAgentSystemState());
   const activeAppController = createActiveAppStateController(store);
-  const mountsController = createMountsStateController(store);
   const hostAgentStateMutations = createHostAgentStateMutations(store);
   const registry = new CommandRegistry();
 
@@ -107,7 +101,6 @@ export function createAgentCoreSeam(ctx: {
     store,
     registry,
     activeAppController,
-    mountsController,
     hostAgentStateMutations,
     karton,
   };
@@ -132,7 +125,6 @@ export function attachAgentCoreBridge(
     store,
     registry,
     activeAppController,
-    mountsController,
     hostAgentStateMutations,
   } = seam;
   const { host, diffHistory } = ctx;
@@ -154,7 +146,6 @@ export function attachAgentCoreBridge(
     registry,
     bridge,
     activeAppController,
-    mountsController,
     hostAgentStateMutations,
     host,
   };
@@ -167,7 +158,7 @@ export function attachAgentCoreBridge(
  * `AgentHost` is available may use this form.
  *
  * The production `main.ts` uses the two-phase form because
- * `MountManagerService` consumes `mountsController` before
+ * `MountManagerService` consumes the seam `store` before
  * `modelProviderService` (and therefore `agentCoreHost`) exists, and
  * `DiffHistoryService` (package-side since Phase 5) needs the full
  * `AgentHost` for paths + telemetry before it can be constructed.

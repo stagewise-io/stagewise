@@ -1,9 +1,9 @@
-import type {
-  AgentStore,
-  AgentSystemState,
-  ToolboxAgentState,
+import {
+  ensureToolboxEntry,
+  type AgentStore,
+  type AgentSystemState,
+  type ToolboxAgentState,
 } from '@stagewise/agent-core';
-import { ensureToolboxEntry } from './ensure-toolbox-entry';
 
 /**
  * Narrowed type for the `activeApp` slice managed by this controller.

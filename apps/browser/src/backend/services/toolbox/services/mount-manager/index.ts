@@ -49,7 +49,7 @@ import type {
 } from '@shared/karton-contracts/ui';
 import type { WorkspaceSnapshot } from '../../types';
 import { FULL_PERMISSIONS, type MountPermission } from '@/services/sandbox/ipc';
-import type { MountsStateController } from '@/services/agent-core-bridge/state/toolbox-mounts';
+import type { AgentStore } from '@stagewise/agent-core';
 import { createBrowserTelemetrySink } from '@/services/agent-core-bridge/host-telemetry';
 import { getRipgrepBasePath, getWorktreesDir } from '@/utils/paths';
 import {
@@ -155,7 +155,7 @@ export class MountManagerService extends DisposableService {
     telemetryService: TelemetryService,
     gitService: GitService,
     preferencesService: PreferencesService,
-    mountsController: MountsStateController,
+    agentStore: AgentStore,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ) {
     super();
@@ -175,7 +175,7 @@ export class MountManagerService extends DisposableService {
     });
 
     this.core = new MountManager({
-      store: mountsController,
+      store: agentStore,
       logger: this.logger,
       telemetry: createBrowserTelemetrySink(this.telemetryService, {
         logger: this.logger,
@@ -215,7 +215,7 @@ export class MountManagerService extends DisposableService {
     telemetryService: TelemetryService,
     gitService: GitService,
     preferencesService: PreferencesService,
-    mountsController: MountsStateController,
+    agentStore: AgentStore,
     resolvedEnvPromise?: Promise<Record<string, string> | null>,
   ): Promise<MountManagerService> {
     const instance = new MountManagerService(
@@ -226,7 +226,7 @@ export class MountManagerService extends DisposableService {
       telemetryService,
       gitService,
       preferencesService,
-      mountsController,
+      agentStore,
       resolvedEnvPromise,
     );
     await instance.initialize();

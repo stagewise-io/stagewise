@@ -1,7 +1,10 @@
 import {
+  AgentTypes,
   CommandRegistry,
   createInitialAgentSystemState,
   AgentStore,
+  ensureToolboxEntry,
+  setAgentMounts,
   upsertAgentInstance,
   deleteAgentInstance,
   type AgentInstanceEnvelope,
@@ -20,10 +23,7 @@ import {
   createActiveAppStateController,
   type ActiveAppStateController,
 } from './state/toolbox-active-app';
-import { createMountsStateController } from './state/toolbox-mounts';
-import { ensureToolboxEntry } from './state/ensure-toolbox-entry';
 import type { HostAgentInstanceEnvelope } from './state/agent-instances';
-import { AgentTypes } from '@stagewise/agent-core';
 import type { AgentState } from '@shared/karton-contracts/ui/agent';
 
 /**
@@ -841,7 +841,10 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
     const mock = createKartonMock(initialState);
     const store = new AgentStore(createInitialAgentSystemState());
     const activeApp = createActiveAppStateController(store);
-    const mounts = createMountsStateController(store);
+    const mounts = {
+      setMounts: (agentInstanceId: string, entries: MountEntry[]) =>
+        setAgentMounts(store, agentInstanceId, entries),
+    };
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp });
     registerAttachHandlerNoOps(registry);

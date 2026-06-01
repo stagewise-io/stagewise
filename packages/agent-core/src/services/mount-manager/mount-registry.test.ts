@@ -3,28 +3,54 @@ import path from 'node:path';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { MountManager, mountPrefixForPath } from './mount-registry';
-import type { MountsStateController } from './mounts-state-controller';
 import type { MountManagerHostHooks } from './types';
 import type { MountEntry } from '../../types/metadata';
 import type { Logger } from '../../host/logger';
 import type { TelemetrySink } from '../../host/telemetry';
+import { AgentStore, createInitialAgentSystemState } from '../../store';
 import { pickOwningWorkspace } from '../../workspace';
 
 // ---------------------------------------------------------------------------
 // Test doubles
 // ---------------------------------------------------------------------------
 
-class StubMountsController implements MountsStateController {
+/**
+ * Thin recorder over a real `AgentStore`. Captures each post-write
+ * snapshot of `toolbox[agentId].workspace.mounts` so the existing
+ * fresh-array / fresh-entry identity assertions still work after the
+ * `MountsStateController` removal — the underlying store mutation is
+ * what `MountManager` actually exercises.
+ */
+class MountWriteRecorder {
+  public readonly store: AgentStore;
   public writes: Array<{ agentId: string; mounts: MountEntry[] }> = [];
-  private state: Map<string, MountEntry[]> = new Map();
+  private unsubscribe: () => void;
 
-  setMounts(agentInstanceId: string, mounts: MountEntry[]): void {
-    this.writes.push({ agentId: agentInstanceId, mounts });
-    this.state.set(agentInstanceId, mounts);
+  constructor() {
+    this.store = new AgentStore(createInitialAgentSystemState());
+    let previous = this.snapshot();
+    this.unsubscribe = this.store.subscribe(() => {
+      const next = this.snapshot();
+      for (const [agentId, mounts] of next) {
+        if (previous.get(agentId) !== mounts) {
+          this.writes.push({ agentId, mounts });
+        }
+      }
+      previous = next;
+    });
   }
 
-  getMounts(agentInstanceId: string): MountEntry[] {
-    return this.state.get(agentInstanceId) ?? [];
+  private snapshot(): Map<string, MountEntry[]> {
+    const out = new Map<string, MountEntry[]>();
+    const toolbox = this.store.get().toolbox;
+    for (const [agentId, entry] of Object.entries(toolbox)) {
+      if (entry) out.set(agentId, entry.workspace.mounts);
+    }
+    return out;
+  }
+
+  dispose(): void {
+    this.unsubscribe();
   }
 }
 
@@ -52,7 +78,7 @@ interface MakeManagerOpts {
 }
 
 function makeManager(
-  store: StubMountsController,
+  recorder: MountWriteRecorder,
   telemetry: ReturnType<typeof makeTelemetry>,
   opts: MakeManagerOpts = {},
 ): { manager: MountManager; hooks: Required<MountManagerHostHooks> } {
@@ -64,7 +90,7 @@ function makeManager(
   } as Required<MountManagerHostHooks>;
 
   const manager = new MountManager({
-    store,
+    store: recorder.store,
     logger: makeLogger(),
     telemetry,
     hooks,
@@ -98,7 +124,7 @@ describe('MountManager registry (unit)', () => {
   }
 
   it('mountWorkspace writes a fresh array with a fresh entry through the store', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 
@@ -126,7 +152,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('mountWorkspace is idempotent per (agent, path) pair', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager, hooks } = makeManager(store, telemetry);
 
@@ -142,7 +168,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('onWorkspaceAttached fires exactly once per unique path across agents', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager, hooks } = makeManager(store, telemetry);
 
@@ -155,7 +181,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('onWorkspaceReleased fires exactly once when the last agent unmounts', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager, hooks } = makeManager(store, telemetry);
 
@@ -173,7 +199,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('unmountWorkspace removes the entry and writes a fresh array', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 
@@ -193,7 +219,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('clearAgentMounts releases orphan paths and drops every prefix', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager, hooks } = makeManager(store, telemetry);
 
@@ -215,7 +241,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('captures workspace-mounted / workspace-unmounted telemetry with agent_type + id', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 
@@ -234,7 +260,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('getMountPrefixes / getWorkspacePathForPrefix / findWorkspaceForFile return expected values', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 
@@ -261,7 +287,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('setWorkspaceMdContent rebuilds mount entries with a fresh MountEntry', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 
@@ -278,7 +304,7 @@ describe('MountManager registry (unit)', () => {
   });
 
   it('does not fire onMountsChanged when a redundant mount is requested', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager, hooks } = makeManager(store, telemetry);
 
@@ -308,7 +334,7 @@ describe('MountManager watcher refresh (integration)', () => {
   });
 
   it('rewriting .stagewise/WORKSPACE.md triggers a debounced second write with updated content', async () => {
-    const store = new StubMountsController();
+    const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 

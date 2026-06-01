@@ -36,7 +36,6 @@ import type {
 import { createCliHostModels } from './cli-host-models.js';
 import { createCliHostPaths } from './cli-host-paths.js';
 import { createCliToolboxPort } from './cli-toolbox-port.js';
-import { createMountsStateController } from './create-mounts-state-controller.js';
 
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 
@@ -176,10 +175,9 @@ async function main() {
   ensureRuntimeDirs(host);
 
   const store = new AgentStore(createInitialAgentSystemState());
-  const mountsController = createMountsStateController(store);
   const workspaceMdRelativePath = host.workspaceMdRelativePath();
   const mountManager = new MountManager({
-    store: mountsController,
+    store,
     logger,
     hooks: {},
     getAgentType: () => 'cli-chat',

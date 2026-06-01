@@ -3,7 +3,8 @@ import path from 'node:path';
 import type { MountEntry } from '../../types/metadata';
 import type { Logger } from '../../host/logger';
 import type { TelemetrySink } from '../../host/telemetry';
-import type { MountsStateController } from './mounts-state-controller';
+import type { AgentStore } from '../../store';
+import { setAgentMounts } from './mount-state';
 import { watch, type FSWatcher } from '../../fs';
 import type { WorkspaceSnapshot } from '../../types/metadata';
 import type { MountManagerHostHooks } from './types';
@@ -34,7 +35,7 @@ export function mountPrefixForPath(workspacePath: string): MountPrefix {
 }
 
 export interface MountManagerOptions {
-  store: MountsStateController;
+  store: AgentStore;
   logger: Logger;
   telemetry?: TelemetrySink;
   hooks: MountManagerHostHooks;
@@ -62,16 +63,16 @@ export interface MountManagerOptions {
  * `ClientRuntimeNode`, and `LspService` — the host supplies those via
  * `MountManagerHostHooks`.
  *
- * Writes always flow through the injected `MountsStateController` so
- * the bridge mirror can observe reference-identity diffs. Per-field
- * updates build a fresh `MountEntry` object; full refreshes build a
- * fresh array.
+ * Writes always flow through {@link setAgentMounts} against the
+ * injected `AgentStore` so the bridge mirror can observe
+ * reference-identity diffs. Per-field updates build a fresh
+ * `MountEntry` object; full refreshes build a fresh array.
  */
 export class MountManager {
   private readonly logger: Logger;
   private readonly telemetry: TelemetrySink | undefined;
   private readonly hooks: MountManagerHostHooks;
-  private readonly mountsController: MountsStateController;
+  private readonly store: AgentStore;
   private readonly getAgentType: (agentInstanceId: string) => string;
   private readonly workspaceMdRelativePath: string;
   private readonly workspaceMdDir: string;
@@ -94,7 +95,7 @@ export class MountManager {
     this.logger = options.logger;
     this.telemetry = options.telemetry;
     this.hooks = options.hooks;
-    this.mountsController = options.store;
+    this.store = options.store;
     this.getAgentType = options.getAgentType ?? (() => 'unknown');
     this.workspaceMdRelativePath =
       options.workspaceMdRelativePath ?? DEFAULT_WORKSPACE_MD_RELATIVE_PATH;
@@ -284,7 +285,7 @@ export class MountManager {
     const mounts = this.agentMounts.get(agentInstanceId);
     const entries = this.mountEntriesPerAgent.get(agentInstanceId);
     if (!mounts || !entries) {
-      this.mountsController.setMounts(agentInstanceId, []);
+      setAgentMounts(this.store, agentInstanceId, []);
       return;
     }
     const fresh: MountEntry[] = [];
@@ -292,7 +293,7 @@ export class MountManager {
       const entry = entries.get(prefix);
       if (entry) fresh.push(entry);
     }
-    this.mountsController.setMounts(agentInstanceId, fresh);
+    setAgentMounts(this.store, agentInstanceId, fresh);
   }
 
   private releaseMountIfUnused(mountPrefix: string): void {

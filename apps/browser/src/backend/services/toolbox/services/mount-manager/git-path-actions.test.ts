@@ -21,6 +21,10 @@ import type { TelemetryService } from '@/services/telemetry';
 import type { UserExperienceService } from '@/services/experience';
 import { getWorktreesDir } from '@/utils/paths';
 import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
+import {
+  AgentStore,
+  createInitialAgentSystemState,
+} from '@stagewise/agent-core';
 
 const services: MountManagerService[] = [];
 
@@ -139,10 +143,7 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     pruneWorkspaceGitCleanupSnoozes: vi.fn(),
   };
 
-  const mountsController = {
-    setMounts: vi.fn(),
-    getMounts: vi.fn(() => [] as never[]),
-  };
+  const agentStore = new AgentStore(createInitialAgentSystemState());
 
   const service = new MountManagerService(
     {
@@ -160,7 +161,7 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     } as unknown as TelemetryService,
     gitService,
     preferencesService as never,
-    mountsController as never,
+    agentStore,
   );
 
   services.push(service);
