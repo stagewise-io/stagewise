@@ -58,6 +58,8 @@ import {
   getRipgrepBasePath,
 } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
+import { readPersistedDataSync } from './utils/persisted-data';
+import { z } from 'zod';
 import { discoverPlugins } from './utils/discover-plugins';
 import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
@@ -555,6 +557,19 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     kind: 'auto-create-default',
     agentType: AgentTypes.CHAT,
     mountLastWorkspaces: true,
+    // Restore the last-active agent on cold start instead of always
+    // booting into a blank CHAT. `WindowLayoutService.loadTabState`
+    // owns writing this id; we read the same file synchronously here
+    // so the manager's startup policy can attempt a resume before
+    // falling through to its create-default fall-back.
+    getResumeAgentId: () => {
+      const state = readPersistedDataSync(
+        'tab-state',
+        z.object({ lastOpenAgentId: z.string().nullable().catch(null) }),
+        { lastOpenAgentId: null },
+      );
+      return state.lastOpenAgentId;
+    },
   };
 
   const agentManagerService = new AgentManagerService(

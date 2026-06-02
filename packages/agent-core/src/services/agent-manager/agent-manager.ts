@@ -223,8 +223,39 @@ export class AgentManager extends DisposableService {
    */
   private applyStartupPolicy(): void {
     if (this.startupPolicy.kind === 'none') return;
-    const { agentType, mountLastWorkspaces } = this.startupPolicy;
+    const { agentType, mountLastWorkspaces, getResumeAgentId } =
+      this.startupPolicy;
     void (async () => {
+      // 1. Resume the previously-active agent when the host advertises
+      //    one. This restores the agent's own mounted workspaces from
+      //    DB, so the create-and-mount fall-through below is skipped on
+      //    success — otherwise we'd double-mount stale "last workspace"
+      //    paths from a different agent on top of the resumed session.
+      if (getResumeAgentId) {
+        let resumeId: string | null = null;
+        try {
+          resumeId = (await getResumeAgentId()) ?? null;
+        } catch (error) {
+          this.logger.warn(
+            '[AgentManager] startup getResumeAgentId() threw; falling back to create',
+            { error },
+          );
+        }
+        if (resumeId) {
+          try {
+            await this.resumeAgent(resumeId);
+            return;
+          } catch (error) {
+            this.logger.warn(
+              `[AgentManager] startup resume of ${resumeId} failed; falling back to create`,
+              { error },
+            );
+          }
+        }
+      }
+
+      // 2. No last agent (or resume failed): create a fresh default
+      //    agent and optionally seed its workspaces from the last chat.
       const agent = await this.createAgent(agentType, undefined);
       if (!mountLastWorkspaces) return;
       const lastWorkspaces =
