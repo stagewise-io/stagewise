@@ -59,7 +59,7 @@ export class AgentManagerService extends DisposableService {
   public constructor(
     karton: KartonService,
     commandRegistry: CommandRegistry,
-    toolbox: AgentManagerToolboxPort,
+    toolbox: AgentManagerToolboxPort & BaseAgentToolboxView,
     agentStore: AgentStore,
     getSkillsForSlashRedaction: () => ReadonlyArray<
       Pick<SkillDefinitionUI, 'id' | 'source'>
@@ -99,7 +99,7 @@ export class AgentManagerService extends DisposableService {
       },
       tools: {
         managerToolbox: toolbox,
-        agentToolbox: toolbox as unknown as BaseAgentToolboxView,
+        agentToolbox: toolbox,
       },
       hooks: {
         onAgentEvent: notificationEventHandler,

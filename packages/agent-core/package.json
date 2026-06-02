@@ -147,7 +147,7 @@
     "@libsql/client": "^0.15.15",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@vscode/tree-sitter-wasm": "^0.3.0",
-    "ai": "6.0.116",
+    "ai": "6.0.177",
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
     "drizzle-orm": "^0.45.1",

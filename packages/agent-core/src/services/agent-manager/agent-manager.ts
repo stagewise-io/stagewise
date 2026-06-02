@@ -310,17 +310,9 @@ export class AgentManager extends DisposableService {
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,
       ) => {
-        // Legacy `alwaysAllow` rows are silently promoted to `smart`
-        // — host UIs no longer expose the always-allow option and
-        // the backend treats it equivalently. Unknown / undefined
-        // values fall through to the default in `createAgent`.
-        const normalizedToolApprovalMode =
-          toolApprovalMode === 'alwaysAllow' ? 'smart' : toolApprovalMode;
-
         const initialState: Partial<AgentState> = {};
         if (modelId) initialState.activeModelId = modelId;
-        if (normalizedToolApprovalMode)
-          initialState.toolApprovalMode = normalizedToolApprovalMode;
+        if (toolApprovalMode) initialState.toolApprovalMode = toolApprovalMode;
 
         const agent = await this.createAgent(
           AgentTypes.CHAT,

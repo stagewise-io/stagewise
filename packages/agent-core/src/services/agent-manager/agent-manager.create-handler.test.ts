@@ -90,7 +90,7 @@ describe('AgentManager agents.create handler', () => {
     await manager.teardown();
   });
 
-  it('normalizes the legacy `alwaysAllow` toolApprovalMode to `smart`', async () => {
+  it('preserves an explicit alwaysAllow toolApprovalMode', async () => {
     const createAgentSpy = vi
       .spyOn(AgentManager.prototype, 'createAgent')
       .mockResolvedValue({ instanceId: 'a2' } as any);
@@ -106,7 +106,7 @@ describe('AgentManager agents.create handler', () => {
     );
 
     expect(createAgentSpy.mock.calls[0]?.[3]).toEqual({
-      toolApprovalMode: 'smart',
+      toolApprovalMode: 'alwaysAllow',
     });
 
     await manager.teardown();

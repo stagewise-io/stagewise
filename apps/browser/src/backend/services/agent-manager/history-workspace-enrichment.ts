@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { access } from 'node:fs/promises';
 import type { Logger } from '@/services/logger';
 import type {
   AgentHistoryEntry,
@@ -20,6 +20,10 @@ import type {
  *     pages with many agents that mount the same workspaces only pay
  *     for one git read.
  *
+ * Existence checks are async (`fs.promises.access`) and deduplicated by
+ * path so the sidebar history fetch never blocks the event loop, even
+ * with large histories that share many mounts.
+ *
  * Exposed as a plain function so it can be wired into agent-core's
  * `hooks.enrichHistoryEntries` from `main.ts` without leaking host
  * dependencies into the agent-core package.
@@ -31,10 +35,23 @@ export async function enrichHistoryEntryWorkspaces(
   ) => Promise<AgentHistoryWorkspaceEntry['git']>,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<AgentHistoryEntry[]> {
+  const existsByPath = new Map<string, Promise<boolean>>();
   const gitSummaryByPath = new Map<
     string,
     Promise<AgentHistoryWorkspaceEntry['git']>
   >();
+
+  const resolveExists = (workspacePath: string) => {
+    let promise = existsByPath.get(workspacePath);
+    if (!promise) {
+      promise = access(workspacePath).then(
+        () => true,
+        () => false,
+      );
+      existsByPath.set(workspacePath, promise);
+    }
+    return promise;
+  };
 
   const resolveGitSummary = (workspacePath: string) => {
     let promise = gitSummaryByPath.get(workspacePath);
@@ -52,18 +69,25 @@ export async function enrichHistoryEntryWorkspaces(
   };
 
   return await Promise.all(
-    entries.map(async (entry) => ({
-      ...entry,
-      mountedWorkspaces: entry.mountedWorkspaces
-        ? await Promise.all(
-            entry.mountedWorkspaces
-              .filter((workspace) => existsSync(workspace.path))
-              .map(async (workspace) => ({
-                ...workspace,
-                git: await resolveGitSummary(workspace.path),
-              })),
-          )
-        : entry.mountedWorkspaces,
-    })),
+    entries.map(async (entry) => {
+      if (!entry.mountedWorkspaces) {
+        return entry;
+      }
+      const annotated = await Promise.all(
+        entry.mountedWorkspaces.map(async (workspace) => ({
+          workspace,
+          exists: await resolveExists(workspace.path),
+        })),
+      );
+      const surviving = await Promise.all(
+        annotated
+          .filter(({ exists }) => exists)
+          .map(async ({ workspace }) => ({
+            ...workspace,
+            git: await resolveGitSummary(workspace.path),
+          })),
+      );
+      return { ...entry, mountedWorkspaces: surviving };
+    }),
   );
 }

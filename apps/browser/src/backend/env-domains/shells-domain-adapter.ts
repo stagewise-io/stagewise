@@ -59,7 +59,9 @@ function renderFullShells(state: ShellsDomainState): string {
   const parts: string[] = [];
   if (state.shellInfo) {
     parts.push(
-      `<shell>\nPlatform: ${state.shellInfo.platform}\nShell: ${state.shellInfo.type} (${state.shellInfo.path})\n</shell>`,
+      `<shell>\nPlatform: ${escAttr(state.shellInfo.platform)}\nShell: ${escAttr(
+        state.shellInfo.type,
+      )} (${escAttr(state.shellInfo.path)})\n</shell>`,
     );
   }
   const activeSessions = state.shells.sessions.filter((s) => !s.exited);

@@ -53,9 +53,11 @@ import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-li
 import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
   makeUniversalTools,
+  type AgentManagerToolboxPort,
   type AgentStore,
   type MountPermission as CoreMountPermission,
 } from '@stagewise/agent-core';
+import type { BaseAgentToolboxView } from '@stagewise/agent-core/agents';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
 import {
   executeShellCommand as executeShellCommandTool,
@@ -121,7 +123,10 @@ export function getGlobalSkillsMounts(): Array<{
   ];
 }
 
-export class ToolboxService extends DisposableService {
+export class ToolboxService
+  extends DisposableService
+  implements BaseAgentToolboxView, AgentManagerToolboxPort
+{
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
   private readonly diffHistoryService: DiffHistoryService;

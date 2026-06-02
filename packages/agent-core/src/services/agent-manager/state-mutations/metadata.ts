@@ -95,6 +95,7 @@ export function setUserPathReferences(
     for (const { idx, pathReferences } of args.populated) {
       const target = state.history[idx];
       if (!target) continue;
+      if (target.role !== 'user') continue;
       target.metadata ??= {
         createdAt: new Date(),
         partsMetadata: [],
