@@ -309,7 +309,10 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
 
         return new Response(fileResponse.body, {
           status: 200,
-          headers: { 'Content-Type': mediaType },
+          headers: {
+            'Content-Type': mediaType,
+            'Cache-Control': 'no-store',
+          },
         });
       } catch (err) {
         this.logger.error('[UIController] attachment protocol error', {
