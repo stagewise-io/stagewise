@@ -21,6 +21,7 @@ import {
   createContext,
   useRef,
   useCallback,
+  useEffect,
   type AnchorHTMLAttributes,
   type InputHTMLAttributes,
   useMemo,
@@ -54,13 +55,10 @@ import {
 import { resolveLinkAlias } from './link-aliases';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 
-function isInternalTabUrl(url: string): boolean {
-  try {
-    const protocol = new URL(url).protocol;
-    return protocol === 'stagewise:' || protocol === 'app:';
-  } catch {
-    return false;
-  }
+const ChatLinkModifierContext = createContext(false);
+
+function getChatLinkTooltipText(isAltPressed: boolean): string {
+  return isAltPressed ? 'Open in content tab' : 'Open in browser';
 }
 
 type AttachmentData =
@@ -427,6 +425,7 @@ const AnchorComponent = ({
 > &
   ExtraProps) => {
   const [openAgent] = useOpenAgent();
+  const isAltPressed = useContext(ChatLinkModifierContext);
 
   // Parse href for attachment links (path:, color:, tab:)
   const attachmentLink = useMemo(() => parseAttachmentLink(href), [href]);
@@ -451,21 +450,6 @@ const AnchorComponent = ({
     );
   }, [openAgent, href]);
 
-  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
-
-  const handleLinkClick = useCallback(
-    (url: string) => (event: MouseEvent<HTMLAnchorElement>) => {
-      event.preventDefault();
-      if (isInternalTabUrl(url)) {
-        void createTab(url, true);
-      } else {
-        void openExternalUrl(url);
-      }
-    },
-    [createTab, openExternalUrl],
-  );
-
   // If it's an attachment link, render the appropriate component
   if (attachmentLink) return <AttachmentLinkRouter linkData={attachmentLink} />;
 
@@ -477,8 +461,9 @@ const AnchorComponent = ({
           <a
             {...props}
             href={resolvedAlias}
+            target="_blank"
             rel="noopener noreferrer"
-            onClick={handleLinkClick(resolvedAlias)}
+            data-chat-link="true"
             className={cn(
               'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-foreground hover:text-hover-derived',
               className,
@@ -487,7 +472,7 @@ const AnchorComponent = ({
             {children}
           </a>
         </TooltipTrigger>
-        <TooltipContent>{decodeURI(resolvedAlias)}</TooltipContent>
+        <TooltipContent>{getChatLinkTooltipText(isAltPressed)}</TooltipContent>
       </Tooltip>
     );
   }
@@ -499,8 +484,9 @@ const AnchorComponent = ({
         <a
           {...props}
           href={processedHref}
+          target="_blank"
           rel="noopener noreferrer"
-          onClick={handleLinkClick(processedHref)}
+          data-chat-link="true"
           className={cn(
             'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-foreground hover:text-hover-derived',
             className,
@@ -509,7 +495,7 @@ const AnchorComponent = ({
           {children}
         </a>
       </TooltipTrigger>
-      <TooltipContent>{decodeURI(processedHref)}</TooltipContent>
+      <TooltipContent>{getChatLinkTooltipText(isAltPressed)}</TooltipContent>
     </Tooltip>
   );
 };
@@ -1000,21 +986,74 @@ const STREAMDOWN_REHYPE_PLUGINS = [defaultRehypePlugins.raw!];
 export const Streamdown = memo(
   ({ isAnimating, children }: { isAnimating: boolean; children: string }) => {
     const processed = useMemo(() => preprocessMarkdown(children), [children]);
+    const createTab = useKartonProcedure((p) => p.browser.createTab);
+    const [isAltPressed, setIsAltPressed] = useState(false);
+
+    useEffect(() => {
+      const handleKeyChange = (event: KeyboardEvent) => {
+        setIsAltPressed(event.altKey);
+      };
+      const handleBlur = () => {
+        setIsAltPressed(false);
+      };
+
+      window.addEventListener('keydown', handleKeyChange);
+      window.addEventListener('keyup', handleKeyChange);
+      window.addEventListener('blur', handleBlur);
+
+      return () => {
+        window.removeEventListener('keydown', handleKeyChange);
+        window.removeEventListener('keyup', handleKeyChange);
+        window.removeEventListener('blur', handleBlur);
+      };
+    }, []);
+
+    const handleMouseMoveCapture = useCallback(
+      (event: MouseEvent<HTMLDivElement>) => {
+        setIsAltPressed(event.altKey);
+      },
+      [],
+    );
+
+    const handleClickCapture = useCallback(
+      (event: MouseEvent<HTMLDivElement>) => {
+        if (!event.altKey || event.button !== 0) return;
+
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const link = target.closest<HTMLAnchorElement>('a[data-chat-link]');
+        const href = link?.getAttribute('href');
+        if (!href) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        void createTab(href, true);
+      },
+      [createTab],
+    );
 
     return (
       <StreamdownProvider isStreaming={isAnimating}>
-        <StreamdownBase
-          animated={STREAMDOWN_ANIMATED}
-          isAnimating={isAnimating}
-          mode={isAnimating ? 'streaming' : 'static'}
-          shikiTheme={STREAMDOWN_SHIKI_THEME}
-          controls={STREAMDOWN_CONTROLS}
-          plugins={STREAMDOWN_PLUGINS}
-          components={STREAMDOWN_COMPONENTS}
-          rehypePlugins={STREAMDOWN_REHYPE_PLUGINS}
-        >
-          {processed}
-        </StreamdownBase>
+        <ChatLinkModifierContext.Provider value={isAltPressed}>
+          <div
+            onClickCapture={handleClickCapture}
+            onMouseMoveCapture={handleMouseMoveCapture}
+          >
+            <StreamdownBase
+              animated={STREAMDOWN_ANIMATED}
+              isAnimating={isAnimating}
+              mode={isAnimating ? 'streaming' : 'static'}
+              shikiTheme={STREAMDOWN_SHIKI_THEME}
+              controls={STREAMDOWN_CONTROLS}
+              plugins={STREAMDOWN_PLUGINS}
+              components={STREAMDOWN_COMPONENTS}
+              rehypePlugins={STREAMDOWN_REHYPE_PLUGINS}
+            >
+              {processed}
+            </StreamdownBase>
+          </div>
+        </ChatLinkModifierContext.Provider>
       </StreamdownProvider>
     );
   },

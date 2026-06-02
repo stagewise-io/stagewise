@@ -111,6 +111,9 @@ export enum HotkeyActions {
   // Dev tools
   DEV_TOOLS = 'dev_tools',
 
+  // Color scheme
+  CYCLE_COLOR_SCHEME = 'cycle_color_scheme',
+
   // Zoom
   ZOOM_IN = 'zoom_in',
   ZOOM_OUT = 'zoom_out',
@@ -326,8 +329,8 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
 
   // URL bar
   [HotkeyActions.FOCUS_URL_BAR]: {
-    accelerator: 'Mod+Alt+L',
-    aliases: ['Alt+D', 'F6'],
+    accelerator: 'Alt+D',
+    aliases: ['F6'],
     captureDominantly: true,
   },
 
@@ -359,10 +362,17 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
 
   // Dev tools
   [HotkeyActions.DEV_TOOLS]: {
-    accelerator: 'Ctrl+Shift+I',
-    aliases: ['F12', 'Ctrl+Shift+J'],
+    accelerator: 'Ctrl+Alt+I',
+    aliases: ['F12', 'Ctrl+Shift+I', 'Ctrl+Shift+J'],
     mac: 'Mod+Alt+I',
     macAliases: ['F12'],
+    captureDominantly: true,
+  },
+
+  // Color scheme
+  [HotkeyActions.CYCLE_COLOR_SCHEME]: {
+    accelerator: 'Ctrl+Alt+L',
+    mac: 'Mod+Alt+L',
     captureDominantly: true,
   },
 
