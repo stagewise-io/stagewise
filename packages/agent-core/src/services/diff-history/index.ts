@@ -5,6 +5,7 @@ import { type Client, createClient } from '@libsql/client';
 import * as schema from './schema';
 import {
   createReadStream,
+  mkdir,
   readFile,
   stat,
   unlink,
@@ -1209,6 +1210,9 @@ export class DiffHistoryService extends DisposableService {
     try {
       // Copy content from blob to file system
       if (isExternal && typeof fileResult.newCurrentOid === 'string') {
+        // Recreate any parent directories the rejected hunks may have
+        // removed; symmetric with the `undoToolCalls` restore path.
+        await mkdir(path.dirname(filePath), { recursive: true });
         await copyContentToPath(
           this.blobsDir,
           fileResult.newCurrentOid,
@@ -1216,6 +1220,7 @@ export class DiffHistoryService extends DisposableService {
         );
         newCurrentOid = fileResult.newCurrentOid;
       } else if (!isExternal && typeof fileResult.newCurrent === 'string') {
+        await mkdir(path.dirname(filePath), { recursive: true });
         await writeFile(filePath, fileResult.newCurrent, 'utf8');
         newCurrentOid = await storeFileContent(
           this.db,
@@ -1317,18 +1322,26 @@ export class DiffHistoryService extends DisposableService {
         // Write the restored content to disk
         if (copiedOp.snapshot_oid === null) {
           await unlink(filePath);
-        } else if (copiedOp.isExternal) {
-          await copyContentToPath(
-            this.blobsDir,
-            copiedOp.snapshot_oid,
-            filePath,
-          );
         } else {
-          const content = await retrieveContentForOid(
-            this.db,
-            copiedOp.snapshot_oid,
-          );
-          if (content) await writeFile(filePath, content, 'utf8');
+          // Recreate any parent directories the original tool call may
+          // have removed. Undoing a directory delete or the source side
+          // of a directory move targets nested paths whose ancestors
+          // were just `rm -rf`'d; a naked write here ENOENTs and the
+          // restore is silently lost.
+          await mkdir(path.dirname(filePath), { recursive: true });
+          if (copiedOp.isExternal) {
+            await copyContentToPath(
+              this.blobsDir,
+              copiedOp.snapshot_oid,
+              filePath,
+            );
+          } else {
+            const content = await retrieveContentForOid(
+              this.db,
+              copiedOp.snapshot_oid,
+            );
+            if (content) await writeFile(filePath, content, 'utf8');
+          }
         }
 
         // Handle init baseline edge case:
