@@ -6,6 +6,7 @@ import { GeneralSettingsSection } from './sections/general-settings-section';
 import { SkillsContextSection } from './sections/skills-context-section';
 import { PluginsSection } from './sections/plugins-section';
 import { BrowsingSettingsSection } from './sections/browsing-settings-section';
+import { PersonalizationSettingsSection } from './sections/personalization-settings-section';
 import { WebsitePermissionsSection } from './sections/website-permissions-section';
 import { ClearDataSection } from './sections/clear-data-section';
 import { AccountSection } from './sections/account-section';
@@ -30,6 +31,8 @@ export function SettingsContent() {
       return <WorktreeSetupSection />;
     case 'plugins':
       return <PluginsSection />;
+    case 'personalization':
+      return <PersonalizationSettingsSection />;
     case 'browsing':
       return <BrowsingSettingsSection />;
     case 'website-permissions':

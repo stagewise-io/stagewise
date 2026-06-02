@@ -5,6 +5,7 @@ export type SettingsSection =
   | 'skills-context'
   | 'worktree-setup'
   | 'plugins'
+  | 'personalization'
   | 'browsing'
   | 'history'
   | 'website-permissions'
@@ -23,6 +24,7 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   'skills-context': 'Skills & Context files',
   'worktree-setup': 'Worktrees',
   plugins: 'Plugins',
+  personalization: 'Personalization',
   browsing: 'General',
   history: 'History',
   'website-permissions': 'Website Permissions',

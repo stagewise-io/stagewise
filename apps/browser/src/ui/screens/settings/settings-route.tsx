@@ -10,6 +10,7 @@ import {
   ClockIcon,
   UserIcon,
   InfoIcon,
+  PaletteIcon,
 } from 'lucide-react';
 import type { SettingsSection, SettingsRoute } from '@shared/settings-route';
 import { SETTINGS_SECTION_LABELS } from '@shared/settings-route';
@@ -52,6 +53,15 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
       {
         section: 'plugins',
         icon: <PuzzleIcon className="size-4 shrink-0" />,
+      },
+    ],
+  },
+  {
+    label: 'Personal',
+    items: [
+      {
+        section: 'personalization',
+        icon: <PaletteIcon className="size-4 shrink-0" />,
       },
     ],
   },

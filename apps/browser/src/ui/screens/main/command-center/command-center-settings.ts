@@ -14,7 +14,8 @@ export type CommandCenterSettingDefinition = Omit<
     | 'worktrees'
     | 'plugins'
     | 'browser'
-    | 'history';
+    | 'history'
+    | 'personalization';
   settingsRoute?: SettingsRoute;
 };
 
@@ -24,6 +25,7 @@ const ROUTE_AGENT_GENERAL: SettingsRoute = { section: 'agent-general' };
 const ROUTE_SKILLS_CONTEXT: SettingsRoute = { section: 'skills-context' };
 const ROUTE_WORKTREE_SETUP: SettingsRoute = { section: 'worktree-setup' };
 const ROUTE_PLUGINS: SettingsRoute = { section: 'plugins' };
+const ROUTE_PERSONALIZATION: SettingsRoute = { section: 'personalization' };
 const ROUTE_BROWSING: SettingsRoute = { section: 'browsing' };
 const ROUTE_HISTORY: SettingsRoute = { section: 'history' };
 
@@ -100,6 +102,16 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     url: '',
     settingsRoute: ROUTE_PLUGINS,
     iconName: 'plugins',
+  },
+  {
+    id: 'setting:personalization',
+    title: 'Personalization',
+    subtitle:
+      'Configure UI size, theme colors, notifications, and dock behavior',
+    keywords: ['personalization', 'theme', 'colors', 'ui size', 'sound'],
+    url: '',
+    settingsRoute: ROUTE_PERSONALIZATION,
+    iconName: 'personalization',
   },
   {
     id: 'setting:browsing',

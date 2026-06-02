@@ -2029,6 +2029,7 @@ export const defaultState: KartonContract['state'] = {
     packDisplayNames: {},
     dockBounceEnabled: true,
     blockAppSuspensionWhenAgentsActive: true,
+    personalizationThemeId: 'default',
   },
   userExperience: {
     storedExperienceData: {
