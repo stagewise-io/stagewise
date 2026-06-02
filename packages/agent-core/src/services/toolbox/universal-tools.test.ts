@@ -70,6 +70,7 @@ function makeDeps(root: string, workspace: string): UniversalToolboxDeps {
       ignoreFileForWatcher: vi.fn(),
       unignoreFileForWatcher: vi.fn(),
       registerAgentEdit: vi.fn(async () => {}),
+      registerAgentEditBatch: vi.fn(async () => {}),
     } as never,
     logger: {
       debug: vi.fn(),
@@ -259,10 +260,24 @@ describe('universal toolbox', () => {
   // ---------------------------------------------------------------------------
 
   function getRegisteredEditPaths(): string[] {
-    const mock = deps.diffHistoryService?.registerAgentEdit as ReturnType<
+    const single = deps.diffHistoryService?.registerAgentEdit as ReturnType<
       typeof vi.fn
     >;
-    return mock.mock.calls.map((call) => (call[0] as { path: string }).path);
+    const batch = deps.diffHistoryService?.registerAgentEditBatch as ReturnType<
+      typeof vi.fn
+    >;
+    // Multi-file ops (directory move/copy/remove) flow through
+    // `registerAgentEditBatch` so the per-toolCall fan-out cap of
+    // `registerAgentEdit` does not silently drop the tail entries.
+    // Aggregate both so callers can assert on the registered set
+    // without knowing which code path was taken.
+    const singlePaths = single.mock.calls.map(
+      (call) => (call[0] as { path: string }).path,
+    );
+    const batchPaths = batch.mock.calls.flatMap((call) =>
+      (call[0] as Array<{ path: string }>).map((edit) => edit.path),
+    );
+    return [...singlePaths, ...batchPaths];
   }
 
   it('move (single file): registers an edit for src deletion AND dest creation', async () => {
@@ -384,5 +399,77 @@ describe('universal toolbox', () => {
 
     const paths = getRegisteredEditPaths();
     expect(paths).toEqual([path.join(workspace, 'lone.txt')]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Diff-history fan-out cap regression. `DiffHistoryService.registerAgentEdit`
+  // silently drops edits past `MAX_EDITS_PER_TOOL_CALL` (50) for any one tool
+  // call — a guard against runaway iterative tools. Directory move/copy/remove
+  // however emit one edit per child file under a single tool call, and a tree
+  // with >25 files used to lose the tail of those records, leaving undo
+  // unable to restore the dropped paths. The universal-tools port routes
+  // directory ops through `registerAgentEditBatch`, which bypasses the cap
+  // for coherent multi-file payloads. These tests lock that contract in so a
+  // future refactor cannot re-introduce the partial-undo regression.
+  // ---------------------------------------------------------------------------
+
+  it('move (directory, >50 files): records every src AND dest edit via the batch API (regression guard for fan-out cap)', async () => {
+    const TREE_SIZE = 60;
+    mkdirSync(path.join(workspace, 'big-src'), { recursive: true });
+    for (let i = 0; i < TREE_SIZE; i++) {
+      writeFileSync(path.join(workspace, 'big-src', `file-${i}.txt`), `${i}`);
+    }
+
+    await copyToolExecute(
+      {
+        input_path: 'wtest/big-src',
+        output_path: 'wtest/big-dst',
+        move: true,
+      },
+      deps,
+      { toolCallId: 'tc-move-big-dir' },
+    );
+
+    const paths = getRegisteredEditPaths();
+    // Every source file must be recorded as a deletion, every destination
+    // file as a creation. Without the batch routing, the per-toolCall cap
+    // would truncate this list at 50 and leave 70 entries unrestorable.
+    for (let i = 0; i < TREE_SIZE; i++) {
+      expect(paths).toContain(path.join(workspace, 'big-src', `file-${i}.txt`));
+      expect(paths).toContain(path.join(workspace, 'big-dst', `file-${i}.txt`));
+    }
+
+    // Directory ops must flow through the batch API in a single call;
+    // looping the iterative API would re-introduce the cap bug.
+    const batchMock = deps.diffHistoryService
+      ?.registerAgentEditBatch as ReturnType<typeof vi.fn>;
+    expect(batchMock).toHaveBeenCalledTimes(1);
+    const batchPayload = batchMock.mock.calls[0]?.[0] as Array<unknown>;
+    expect(batchPayload.length).toBe(TREE_SIZE * 2);
+  });
+
+  it('delete (directory, >50 files): records every child edit via the batch API (regression guard for fan-out cap)', async () => {
+    const TREE_SIZE = 60;
+    mkdirSync(path.join(workspace, 'big-tree'), { recursive: true });
+    for (let i = 0; i < TREE_SIZE; i++) {
+      writeFileSync(path.join(workspace, 'big-tree', `file-${i}.txt`), `${i}`);
+    }
+
+    await deleteToolExecute({ path: 'wtest/big-tree' }, deps, {
+      toolCallId: 'tc-delete-big-tree',
+    });
+
+    const paths = getRegisteredEditPaths();
+    for (let i = 0; i < TREE_SIZE; i++) {
+      expect(paths).toContain(
+        path.join(workspace, 'big-tree', `file-${i}.txt`),
+      );
+    }
+
+    const batchMock = deps.diffHistoryService
+      ?.registerAgentEditBatch as ReturnType<typeof vi.fn>;
+    expect(batchMock).toHaveBeenCalledTimes(1);
+    const batchPayload = batchMock.mock.calls[0]?.[0] as Array<unknown>;
+    expect(batchPayload.length).toBe(TREE_SIZE);
   });
 });

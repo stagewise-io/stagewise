@@ -46,6 +46,7 @@ import {
   writeToolInputSchema,
   writeToolOutputSchema,
 } from '../../types/tools';
+import type { AgentFileEdit } from '../diff-history';
 import type { UniversalToolboxDeps } from './types';
 import { findWorkspaceRootForPath, resolveToolPath } from './path-resolution';
 import {
@@ -172,6 +173,90 @@ async function registerSingleEdit(
   return !beforeState.isExternal && !afterState.isExternal
     ? { before: beforeState.content, after: afterState.content }
     : null;
+}
+
+interface BatchEditItem {
+  absolutePath: string;
+  beforeState: Awaited<ReturnType<typeof captureFileState>>;
+  afterState: Awaited<ReturnType<typeof captureFileState>>;
+}
+
+/**
+ * Registers a multi-file edit batch (every entry shares `toolCallId`)
+ * via `DiffHistoryService.registerAgentEditBatch`, bypassing the
+ * per-toolCall fan-out cap that would otherwise truncate the tail of
+ * a directory move/copy/remove and leave `undoToolCalls` unable to
+ * restore the dropped files. Per-item errors (e.g. failure to build
+ * edit content) are isolated so one bad path never aborts the batch.
+ */
+async function registerEditBatch(
+  deps: UniversalToolboxDeps,
+  toolCallId: string,
+  items: ReadonlyArray<BatchEditItem>,
+): Promise<void> {
+  if (!deps.diffHistoryService || items.length === 0) return;
+
+  const edits: AgentFileEdit[] = [];
+  const tempFilesToCleanup: string[] = [];
+  for (const item of items) {
+    try {
+      const built = await buildAgentFileEditContent(
+        item.beforeState,
+        item.afterState,
+        tempDir(deps),
+      );
+      const { editContent } = built;
+      tempFilesToCleanup.push(...built.tempFilesToCleanup);
+
+      if (!editContent.isExternal && editContent.contentAfter !== null) {
+        void deps.mutations?.onTextFileWritten?.(
+          deps.agentInstanceId,
+          item.absolutePath,
+          editContent.contentAfter,
+        );
+      } else if (
+        !editContent.isExternal &&
+        editContent.contentBefore !== null
+      ) {
+        void deps.mutations?.onTextFileClosed?.(
+          deps.agentInstanceId,
+          item.absolutePath,
+        );
+      }
+
+      edits.push({
+        agentInstanceId: deps.agentInstanceId,
+        path: item.absolutePath,
+        toolCallId,
+        workspaceRoot: findWorkspaceRootForPath(deps, item.absolutePath),
+        ...editContent,
+      });
+    } catch (error) {
+      deps.logger?.error(
+        '[UniversalToolbox] Failed to build agent edit for batch',
+        {
+          error,
+          path: item.absolutePath,
+          toolCallId,
+        },
+      );
+    }
+  }
+
+  try {
+    await deps.diffHistoryService.registerAgentEditBatch(edits);
+  } catch (error) {
+    deps.logger?.error(
+      '[UniversalToolbox] Failed to register agent edit batch',
+      {
+        error,
+        toolCallId,
+        batchSize: edits.length,
+      },
+    );
+  }
+
+  for (const tempFile of tempFilesToCleanup) void cleanupTempFile(tempFile);
 }
 
 async function mutateSinglePath<T extends object>(
@@ -429,18 +514,22 @@ export async function deleteToolExecute(
 
   try {
     await rm(resolved.absolutePath, { recursive: true, force: true });
+    const items: BatchEditItem[] = [];
     for (const childFile of childFiles) {
       const before = beforeStates.get(childFile);
       if (!before) continue;
       const after = await captureFileState(childFile, tempDir(deps));
-      await registerSingleEdit(
-        deps,
-        childFile,
-        getToolCallId(options),
-        before,
-        after,
-      );
+      items.push({
+        absolutePath: childFile,
+        beforeState: before,
+        afterState: after,
+      });
     }
+    // Directory remove can exceed the per-toolCall fan-out cap (50)
+    // for any non-trivial tree; route through the batch API so undo
+    // can restore every child file. Single-file deletions go through
+    // `mutateSinglePath` higher up, not this path.
+    await registerEditBatch(deps, getToolCallId(options), items);
     return { _diff: null };
   } finally {
     for (const childFile of childFiles) {
@@ -543,37 +632,67 @@ export async function copyToolExecute(
     }
 
     let firstDestDiff: WithDiff<object>['_diff'] = null;
-    for (const destFile of destFiles) {
-      const before = destBeforeStates.get(destFile);
-      if (!before) continue;
-      const after = await captureFileState(destFile, tempDir(deps));
-      const diff = await registerSingleEdit(
-        deps,
-        destFile,
-        toolCallId,
-        before,
-        after,
-      );
-      // Preserve the existing `_diff` return shape for single-file ops
-      // (`destFiles.length === 1`) — return the only diff captured.
-      // For directory ops there are multiple deltas; surfacing only the
-      // first would be misleading, so leave `_diff` null and rely on
-      // the registered diff-history entries.
-      if (destFiles.length === 1) firstDestDiff = diff;
-    }
-
-    if (params.move) {
-      for (const srcFile of srcFiles) {
-        const srcBefore = srcBeforeStates.get(srcFile);
-        if (!srcBefore) continue;
-        const srcAfter = await captureFileState(srcFile, tempDir(deps));
-        await registerSingleEdit(
+    if (srcIsDir) {
+      // Directory ops can fan out beyond the per-toolCall cap of
+      // `registerAgentEdit` (50 entries); a 30-file move with the
+      // iterative path silently drops the last 10 source deletions
+      // and leaves undo unable to restore them. Route through the
+      // batch API so the full dest + src delta is tracked atomically.
+      // For directory ops there are multiple deltas; surfacing only
+      // the first would be misleading, so leave `_diff` null and
+      // rely on the registered diff-history entries.
+      const batchItems: BatchEditItem[] = [];
+      for (const destFile of destFiles) {
+        const before = destBeforeStates.get(destFile);
+        if (!before) continue;
+        const after = await captureFileState(destFile, tempDir(deps));
+        batchItems.push({
+          absolutePath: destFile,
+          beforeState: before,
+          afterState: after,
+        });
+      }
+      if (params.move) {
+        for (const srcFile of srcFiles) {
+          const srcBefore = srcBeforeStates.get(srcFile);
+          if (!srcBefore) continue;
+          const srcAfter = await captureFileState(srcFile, tempDir(deps));
+          batchItems.push({
+            absolutePath: srcFile,
+            beforeState: srcBefore,
+            afterState: srcAfter,
+          });
+        }
+      }
+      await registerEditBatch(deps, toolCallId, batchItems);
+    } else {
+      // Single-file copy/move: keep the iterative path so the returned
+      // `_diff` reflects the only delta the caller cares about.
+      for (const destFile of destFiles) {
+        const before = destBeforeStates.get(destFile);
+        if (!before) continue;
+        const after = await captureFileState(destFile, tempDir(deps));
+        firstDestDiff = await registerSingleEdit(
           deps,
-          srcFile,
+          destFile,
           toolCallId,
-          srcBefore,
-          srcAfter,
+          before,
+          after,
         );
+      }
+      if (params.move) {
+        for (const srcFile of srcFiles) {
+          const srcBefore = srcBeforeStates.get(srcFile);
+          if (!srcBefore) continue;
+          const srcAfter = await captureFileState(srcFile, tempDir(deps));
+          await registerSingleEdit(
+            deps,
+            srcFile,
+            toolCallId,
+            srcBefore,
+            srcAfter,
+          );
+        }
       }
     }
 

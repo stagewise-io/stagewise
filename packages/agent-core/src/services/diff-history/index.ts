@@ -67,7 +67,7 @@ import { migrateDatabase } from '../../migrate-database';
 import { registry, schemaVersion } from './migrations';
 import initSql from './schema.sql?raw';
 
-type AgentFileEdit = {
+export type AgentFileEdit = {
   agentInstanceId: string;
   path: string;
   toolCallId: string;
@@ -268,6 +268,19 @@ export class DiffHistoryService extends DisposableService {
    * exceedingly unlikely in practice because tool calls are short-lived.
    */
   private static readonly MAX_TRACKED_TOOL_CALLS = 10_000;
+
+  /**
+   * Hard upper bound applied by {@link registerAgentEditBatch}. Batch
+   * registration intentionally bypasses {@link MAX_EDITS_PER_TOOL_CALL}
+   * — the iterative cap is a runaway-detection mechanism for tools
+   * that call `registerAgentEdit` in a loop, but a single coherent
+   * multi-file operation (directory move/copy/remove) is bounded by
+   * user input and must be tracked atomically for `undoToolCalls` to
+   * restore the full delta. The batch cap is sized for the actual
+   * failure mode (OOM-on-payload, not rogue iteration) and well above
+   * any realistic project subtree.
+   */
+  private static readonly MAX_EDITS_PER_BATCH = 10_000;
 
   /** Per-tool-call running count of registered edits. */
   private _toolCallEditCounts = new Map<string, number>();
@@ -664,6 +677,12 @@ export class DiffHistoryService extends DisposableService {
    * on-disk write has already succeeded; we just refuse to store
    * untrackable / runaway entries in the ops table.
    *
+   * For multi-file operations that share one tool call (directory
+   * move/copy/remove), prefer {@link registerAgentEditBatch} — the
+   * per-toolCallId cap above is a runaway-detection mechanism for
+   * iterative tools, not a payload cap, and applying it to coherent
+   * directory operations causes partial undo on the tail entries.
+   *
    * @param edit - The edit to register
    * @returns void
    */
@@ -709,6 +728,76 @@ export class DiffHistoryService extends DisposableService {
       return;
     }
 
+    await this._writeEditOp(edit);
+  }
+
+  /**
+   * Registers a coherent batch of agent edits that all share one tool
+   * call (e.g. every child file of a directory move/copy/remove).
+   * Bypasses the per-`toolCallId` fan-out cap enforced by
+   * {@link registerAgentEdit} — that cap targets iterative tools and
+   * applying it to a bounded directory operation truncates the tail,
+   * leaving `undoToolCalls` unable to restore the dropped files.
+   *
+   * Safety:
+   *   - {@link shouldTrackFilepath} is still applied per edit, so
+   *     gitignored / denylisted paths are skipped exactly as in the
+   *     iterative path.
+   *   - A separate hard upper bound (`MAX_EDITS_PER_BATCH`) protects
+   *     against pathological payloads. Edits beyond the bound are
+   *     dropped from the batch with a logged warning and telemetry
+   *     event; on-disk writes (which already happened) are unaffected.
+   *   - Batch registrations do NOT increment `_toolCallEditCounts`:
+   *     the iterative cap accounting stays independent so a mixed
+   *     pattern (batch + later iterative edits under the same id) keeps
+   *     each path's protection unimpaired.
+   *
+   * @param edits - The edits to register, all expected to share one tool call.
+   */
+  public async registerAgentEditBatch(
+    edits: ReadonlyArray<AgentFileEdit>,
+  ): Promise<void> {
+    if (edits.length === 0) return;
+
+    let processed = 0;
+    let truncatedWarned = false;
+    for (const edit of edits) {
+      if (processed >= DiffHistoryService.MAX_EDITS_PER_BATCH) {
+        if (!truncatedWarned) {
+          truncatedWarned = true;
+          this.logger.warn(
+            `[DiffHistory] Batch for tool call ${edit.toolCallId} exceeded ` +
+              `payload cap (${DiffHistoryService.MAX_EDITS_PER_BATCH} edits). ` +
+              `Further edits in this batch are dropped from diff history; ` +
+              `on-disk writes are unaffected.`,
+          );
+          this.telemetry?.capture('diff-history-batch-cap-hit', {
+            tool_call_id: edit.toolCallId,
+            agent_instance_id: edit.agentInstanceId,
+            // Intentionally NOT `edit.path` — see `FanoutPathCategory`.
+            path_category: categorizeFanoutPath(edit.path),
+            cap: DiffHistoryService.MAX_EDITS_PER_BATCH,
+            batch_size: edits.length,
+          });
+        }
+        break;
+      }
+      if (!(await this.shouldTrackFilepath(edit.path, edit.workspaceRoot))) {
+        this.logDebug(`Skipping ignored path: ${edit.path}`);
+        continue;
+      }
+      await this._writeEditOp(edit);
+      processed++;
+    }
+  }
+
+  /**
+   * Writes a single agent edit's baseline + edit ops into the diff DB.
+   * Shared body of {@link registerAgentEdit} and
+   * {@link registerAgentEditBatch}; does NOT apply the gitignore
+   * filter or any cap — callers must enforce both before invoking.
+   */
+  private async _writeEditOp(edit: AgentFileEdit): Promise<void> {
     // If path is null, it's a newly created blob
     const hasPendingEdits = edit.path
       ? await hasPendingEditsForFilepath(this.db, edit.path)
