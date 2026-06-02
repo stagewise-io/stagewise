@@ -370,7 +370,7 @@ export function HistorySection() {
   const getFaviconBitmaps = useKartonProcedure(
     (p) => p.browser.getFaviconBitmaps,
   );
-  const createTab = useKartonProcedure((p) => p.browser.createTab);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const getHistoryRef = useRef(getHistory);
   const getFaviconBitmapsRef = useRef(getFaviconBitmaps);
   const listRef = useRef<{
@@ -569,12 +569,12 @@ export function HistorySection() {
     [hasMore, isLoadingMore, isLoading, rows.length, loadMoreHistory],
   );
 
-  // Handle opening URL in new tab
+  // Handle opening URL in the user's default browser.
   const handleOpenUrl = useCallback(
     (url: string) => {
-      void createTab(url, true);
+      void openExternalUrl(url);
     },
-    [createTab],
+    [openExternalUrl],
   );
 
   // Row props

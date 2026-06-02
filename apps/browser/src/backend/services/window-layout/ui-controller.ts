@@ -14,9 +14,9 @@ import type { SelectedElement } from '@shared/selected-elements';
 import type { SettingsRoute } from '@shared/settings-route';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  canBrowserHandleUrl,
   openFolderFirstFileInIde,
   revealPathInFileManager,
+  shouldOpenUiUrlInInternalTab,
 } from './protocol-utils';
 import {
   default as installExtension,
@@ -304,6 +304,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.registerAttachmentProtocol();
     this.registerWorkspaceFileProtocol();
     this.registerAppProtocol();
+    this.registerAppProtocol('persist:browser-content');
     this.view = this.createView();
     this.loadApp();
     this.registerKartonProcedures();
@@ -403,10 +404,10 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
    *   app://agents/{agentId}/{appId}/{relativePath}
    *   app://plugins/{pluginId}/{appId}/{relativePath}
    */
-  private registerAppProtocol(): void {
-    const uiSession = session.fromPartition(UI_SESSION_PARTITION);
+  private registerAppProtocol(partition = UI_SESSION_PARTITION): void {
+    const targetSession = session.fromPartition(partition);
 
-    uiSession.protocol.handle('app', async (request) => {
+    targetSession.protocol.handle('app', async (request) => {
       try {
         const url = new URL(request.url);
         const namespace = url.hostname;
@@ -540,24 +541,24 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         return { action: 'deny' };
       }
 
-      // Check if the browser can handle this URL's protocol
-      if (!canBrowserHandleUrl(details.url)) {
-        // Open in external application (mailto:, tel:, vscode:, etc.)
-        this.logger.debug(
-          `[UIController] Opening URL with external handler: ${details.url}`,
-        );
-        if (details.url.startsWith('file://')) {
-          const filePath = fileURLToPath(details.url).replace(/:\d+$/, '');
-          revealPathInFileManager(filePath);
-        } else shell.openExternal(details.url);
-
+      if (shouldOpenUiUrlInInternalTab(details.url)) {
+        // Check disposition to determine if tab should be opened in background
+        // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
+        const setActive = details.disposition !== 'background-tab';
+        this.emit('createTab', details.url, setActive);
         return { action: 'deny' };
       }
 
-      // Check disposition to determine if tab should be opened in background
-      // disposition can be: 'default', 'foreground-tab', 'background-tab', 'new-window', etc.
-      const setActive = details.disposition !== 'background-tab';
-      this.emit('createTab', details.url, setActive);
+      // UI links should not create internal browsing tabs by default.
+      // External web links and custom external protocols go to the OS handler.
+      this.logger.debug(
+        `[UIController] Opening URL with external handler: ${details.url}`,
+      );
+      if (details.url.startsWith('file://')) {
+        const filePath = fileURLToPath(details.url).replace(/:\d+$/, '');
+        revealPathInFileManager(filePath);
+      } else shell.openExternal(details.url);
+
       return { action: 'deny' };
     });
 

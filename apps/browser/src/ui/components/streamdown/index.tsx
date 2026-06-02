@@ -24,6 +24,7 @@ import {
   type AnchorHTMLAttributes,
   type InputHTMLAttributes,
   useMemo,
+  type MouseEvent,
 } from 'react';
 import { cn } from '@ui/utils';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -51,6 +52,16 @@ import {
   ColorBadge,
 } from './attachment-links';
 import { resolveLinkAlias } from './link-aliases';
+import { useKartonProcedure } from '@ui/hooks/use-karton';
+
+function isInternalTabUrl(url: string): boolean {
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === 'stagewise:' || protocol === 'app:';
+  } catch {
+    return false;
+  }
+}
 
 type AttachmentData =
   | {
@@ -440,6 +451,21 @@ const AnchorComponent = ({
     );
   }, [openAgent, href]);
 
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+  const createTab = useKartonProcedure((p) => p.browser.createTab);
+
+  const handleLinkClick = useCallback(
+    (url: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      if (isInternalTabUrl(url)) {
+        void createTab(url, true);
+      } else {
+        void openExternalUrl(url);
+      }
+    },
+    [createTab, openExternalUrl],
+  );
+
   // If it's an attachment link, render the appropriate component
   if (attachmentLink) return <AttachmentLinkRouter linkData={attachmentLink} />;
 
@@ -449,14 +475,14 @@ const AnchorComponent = ({
       <Tooltip>
         <TooltipTrigger>
           <a
+            {...props}
             href={resolvedAlias}
-            target="_blank"
             rel="noopener noreferrer"
+            onClick={handleLinkClick(resolvedAlias)}
             className={cn(
               'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-foreground hover:text-hover-derived',
               className,
             )}
-            {...props}
           >
             {children}
           </a>
@@ -471,14 +497,14 @@ const AnchorComponent = ({
     <Tooltip>
       <TooltipTrigger>
         <a
+          {...props}
           href={processedHref}
-          target="_blank"
           rel="noopener noreferrer"
+          onClick={handleLinkClick(processedHref)}
           className={cn(
             'inline-flex items-baseline justify-start gap-0.5 break-all font-medium text-primary-foreground hover:text-hover-derived',
             className,
           )}
-          {...props}
         >
           {children}
         </a>

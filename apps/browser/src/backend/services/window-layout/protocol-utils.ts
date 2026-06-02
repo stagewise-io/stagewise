@@ -7,10 +7,21 @@ import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import { getIDEFileUrl } from '@shared/ide-url';
 
 /**
- * Protocols that the browser can natively handle and should open in a tab.
+ * Protocols that browsing tabs can natively handle.
  * Other protocols (mailto:, tel:, vscode:, etc.) will be opened externally.
  */
-const BROWSER_HANDLED_PROTOCOLS = new Set(['http:', 'https:', 'stagewise:']);
+const BROWSER_HANDLED_PROTOCOLS = new Set([
+  'http:',
+  'https:',
+  'stagewise:',
+  'app:',
+]);
+
+/**
+ * Protocols that app UI links may open in internal browsing tabs.
+ * External web links from the UI should use the user's default browser.
+ */
+const UI_INTERNAL_TAB_PROTOCOLS = new Set(['stagewise:', 'app:']);
 
 /**
  * Check if the browser can handle the given URL's protocol.
@@ -19,6 +30,7 @@ const BROWSER_HANDLED_PROTOCOLS = new Set(['http:', 'https:', 'stagewise:']);
  * Supported protocols:
  * - http: and https: (standard web protocols)
  * - stagewise: (internal app protocol)
+ * - app: (agent/plugin mini-app protocol)
  * - Any custom protocol registered on the browser-content session
  *
  * @param url The URL to check
@@ -40,6 +52,14 @@ export function canBrowserHandleUrl(url: string): boolean {
     return false;
   } catch {
     // Invalid URL - can't be handled
+    return false;
+  }
+}
+
+export function shouldOpenUiUrlInInternalTab(url: string): boolean {
+  try {
+    return UI_INTERNAL_TAB_PROTOCOLS.has(new URL(url).protocol);
+  } catch {
     return false;
   }
 }

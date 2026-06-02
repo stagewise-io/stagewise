@@ -127,6 +127,7 @@ function PlanLimitExceededError({
 }) {
   const subscription = useKartonState((s) => s.userAccount.subscription);
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const plan = subscription?.plan;
 
   const resetsAt = error.exceededWindows[0]?.resetsAt;
@@ -185,7 +186,7 @@ function PlanLimitExceededError({
         <Button
           variant={canRetry ? 'secondary' : 'primary'}
           size="xs"
-          onClick={() => window.open(ctaHref, '_blank', 'noopener,noreferrer')}
+          onClick={() => void openExternalUrl(ctaHref)}
         >
           {ctaLabel}
           <ArrowUpRightIcon className="size-3" />
@@ -298,6 +299,7 @@ function GenericError({
   onRetry: () => void;
 }) {
   const [helpExpanded, setHelpExpanded] = useState(false);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [hasCopied, setHasCopied] = useState(false);
   const [openAgent] = useOpenAgent();
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
@@ -328,6 +330,8 @@ function GenericError({
     setHasCopied(true);
     setTimeout(() => setHasCopied(false), 2000);
   };
+
+  const reportIssueUrl = `https://github.com/stagewise-io/stagewise/issues/new?template=5.agent_issue.yml&conversation-id=${agentInstanceId}&error-data=${encodeURIComponent(JSON.stringify(error))}`;
 
   return (
     <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-derived-strong p-2 text-sm">
@@ -388,9 +392,12 @@ function GenericError({
           <div className="mt-0.5 text-muted-foreground text-xs">
             If this error continues to occur, you can{' '}
             <a
-              href={`https://github.com/stagewise-io/stagewise/issues/new?template=5.agent_issue.yml&conversation-id=${agentInstanceId}&error-data=${encodeURIComponent(JSON.stringify(error))}`}
-              target="_blank"
+              href={reportIssueUrl}
               rel="noopener noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                void openExternalUrl(reportIssueUrl);
+              }}
               className="text-primary-foreground underline hover:text-primary-foreground/80"
             >
               report it on GitHub
