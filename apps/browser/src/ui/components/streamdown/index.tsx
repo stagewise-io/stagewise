@@ -21,7 +21,7 @@ import {
   createContext,
   useRef,
   useCallback,
-  useEffect,
+  useSyncExternalStore,
   type AnchorHTMLAttributes,
   type InputHTMLAttributes,
   useMemo,
@@ -56,6 +56,68 @@ import { resolveLinkAlias } from './link-aliases';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 
 const ChatLinkModifierContext = createContext(false);
+
+const chatLinkModifierListeners = new Set<() => void>();
+let isChatLinkAltPressed = false;
+let cleanupChatLinkModifierWindowListeners: (() => void) | null = null;
+
+function setChatLinkAltPressed(nextValue: boolean): void {
+  if (isChatLinkAltPressed === nextValue) return;
+
+  isChatLinkAltPressed = nextValue;
+  chatLinkModifierListeners.forEach((listener) => {
+    listener();
+  });
+}
+
+function getChatLinkAltPressedSnapshot(): boolean {
+  return isChatLinkAltPressed;
+}
+
+function subscribeToChatLinkAltPressed(listener: () => void): () => void {
+  chatLinkModifierListeners.add(listener);
+
+  if (
+    chatLinkModifierListeners.size === 1 &&
+    cleanupChatLinkModifierWindowListeners === null &&
+    typeof window !== 'undefined'
+  ) {
+    const handleKeyChange = (event: KeyboardEvent) => {
+      setChatLinkAltPressed(event.altKey);
+    };
+    const handleBlur = () => {
+      setChatLinkAltPressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyChange);
+    window.addEventListener('keyup', handleKeyChange);
+    window.addEventListener('blur', handleBlur);
+
+    cleanupChatLinkModifierWindowListeners = () => {
+      window.removeEventListener('keydown', handleKeyChange);
+      window.removeEventListener('keyup', handleKeyChange);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }
+
+  return () => {
+    chatLinkModifierListeners.delete(listener);
+
+    if (chatLinkModifierListeners.size === 0) {
+      cleanupChatLinkModifierWindowListeners?.();
+      cleanupChatLinkModifierWindowListeners = null;
+      setChatLinkAltPressed(false);
+    }
+  };
+}
+
+function useChatLinkAltPressed(): boolean {
+  return useSyncExternalStore(
+    subscribeToChatLinkAltPressed,
+    getChatLinkAltPressedSnapshot,
+    () => false,
+  );
+}
 
 function getChatLinkTooltipText(isAltPressed: boolean): string {
   return isAltPressed ? 'Open in content tab' : 'Open in browser';
@@ -987,30 +1049,11 @@ export const Streamdown = memo(
   ({ isAnimating, children }: { isAnimating: boolean; children: string }) => {
     const processed = useMemo(() => preprocessMarkdown(children), [children]);
     const createTab = useKartonProcedure((p) => p.browser.createTab);
-    const [isAltPressed, setIsAltPressed] = useState(false);
-
-    useEffect(() => {
-      const handleKeyChange = (event: KeyboardEvent) => {
-        setIsAltPressed(event.altKey);
-      };
-      const handleBlur = () => {
-        setIsAltPressed(false);
-      };
-
-      window.addEventListener('keydown', handleKeyChange);
-      window.addEventListener('keyup', handleKeyChange);
-      window.addEventListener('blur', handleBlur);
-
-      return () => {
-        window.removeEventListener('keydown', handleKeyChange);
-        window.removeEventListener('keyup', handleKeyChange);
-        window.removeEventListener('blur', handleBlur);
-      };
-    }, []);
+    const isAltPressed = useChatLinkAltPressed();
 
     const handleMouseMoveCapture = useCallback(
       (event: MouseEvent<HTMLDivElement>) => {
-        setIsAltPressed(event.altKey);
+        setChatLinkAltPressed(event.altKey);
       },
       [],
     );
