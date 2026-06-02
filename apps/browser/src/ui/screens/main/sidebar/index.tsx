@@ -76,11 +76,18 @@ export function Sidebar() {
   }, [openSettings, track]);
 
   const handleToggleClosedLidSleep = useCallback(() => {
+    if (closedLidSleep.isChanging) return;
+
     track('closed-lid-sleep-toggled', {
       enabled: !closedLidSleep.isSleepDisabled,
     });
     void toggleClosedLidSleep();
-  }, [closedLidSleep.isSleepDisabled, toggleClosedLidSleep, track]);
+  }, [
+    closedLidSleep.isChanging,
+    closedLidSleep.isSleepDisabled,
+    toggleClosedLidSleep,
+    track,
+  ]);
 
   // Sync context-driven collapse state to the imperative panel handle.
   // Guards prevent infinite loops with onCollapse/onExpand callbacks.
@@ -184,15 +191,15 @@ export function Sidebar() {
                             : 'Prevent sleep on closed lid'
                         }
                         className="app-no-drag shrink-0"
-                        disabled={closedLidSleep.isChanging}
+                        aria-disabled={closedLidSleep.isChanging}
                         onClick={handleToggleClosedLidSleep}
                       >
                         <IconHotDrinkOutline18
                           className={cn(
-                            'size-4',
+                            'size-4 transition-[color,filter] duration-150 ease-out',
                             closedLidSleep.isSleepDisabled
                               ? 'text-[oklch(0.66_0.169_var(--H-yellow))] drop-shadow-[0_0_1.5px_oklch(from_var(--color-warning-solid)_l_c_h_/_0.5)] dark:text-[oklch(0.78_0.112_var(--H-yellow))]'
-                              : 'text-muted-foreground',
+                              : 'text-muted-foreground drop-shadow-[0_0_1.5px_oklch(from_var(--color-warning-solid)_l_c_h_/_0)]',
                           )}
                         />
                       </Button>

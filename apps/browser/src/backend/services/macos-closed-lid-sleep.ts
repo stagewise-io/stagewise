@@ -45,7 +45,7 @@ async function readDisableSleepState(): Promise<boolean> {
 }
 
 function shellQuote(value: string): string {
-  return `'${value.split("'").join(`'\\''`)}`;
+  return `'${value.split("'").join(`'\\''`)}'`;
 }
 
 function escapeSudoersUser(value: string): string {
@@ -94,20 +94,6 @@ async function setDisableSleepState(disabled: boolean): Promise<void> {
     await installPasswordlessPmsetRule();
     await runPasswordlessPmset(disabled);
   }
-}
-
-async function removePasswordlessPmsetRule(): Promise<void> {
-  const command = [
-    `/bin/rm -f ${shellQuote(SUDOERS_RULE_PATH)}`,
-    `/usr/sbin/visudo -cf /etc/sudoers`,
-  ].join(' && ');
-
-  await execFileAsync(OSASCRIPT_PATH, [
-    '-e',
-    `do shell script ${JSON.stringify(command)} with prompt ${JSON.stringify(
-      'stagewise wants to remove its restricted closed-lid sleep sudoers rule.',
-    )} with administrator privileges`,
-  ]);
 }
 
 export class MacOSClosedLidSleepService extends DisposableService {
@@ -226,12 +212,6 @@ export class MacOSClosedLidSleepService extends DisposableService {
       this.ownedByStagewise = false;
       this.previousDisabledState = null;
       await this.syncState();
-      await removePasswordlessPmsetRule().catch((error) => {
-        this.logger.warn(
-          '[MacOSClosedLidSleepService] Failed to remove closed-lid sleep sudoers rule',
-          error,
-        );
-      });
 
       this.logger.info(
         '[MacOSClosedLidSleepService] Closed-lid sleep re-enabled',
