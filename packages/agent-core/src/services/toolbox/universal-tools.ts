@@ -215,6 +215,33 @@ async function copyDirectoryRecursive(
   }
 }
 
+/**
+ * Enumerate every regular file under `absolutePath`. Used by `delete` and
+ * `move` to register per-file diff-history entries for structural fs
+ * operations (matches origin/main behavior — without this, watcher
+ * notifications surface as "external" changes and the agent's edit
+ * summary loses every child of a directory delete / the source side of
+ * a move).
+ *
+ * Returns `[absolutePath]` for single files and `[]` when the path is
+ * missing entirely (the caller still proceeds; downstream ops handle the
+ * missing case).
+ */
+async function collectAllFiles(absolutePath: string): Promise<string[]> {
+  const out: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else out.push(full);
+    }
+  }
+  if (await isDirectory(absolutePath)) await walk(absolutePath);
+  else if (await exists(absolutePath)) out.push(absolutePath);
+  return out;
+}
+
 export async function readToolExecute(
   params: readToolInput,
   deps: UniversalToolboxDeps,
@@ -368,15 +395,61 @@ export async function deleteToolExecute(
   const resolved = resolveToolPath(deps, params.path, 'delete');
   if (!(await exists(resolved.absolutePath)))
     throw new Error('File or directory not found');
-  return mutateSinglePath(
-    deps,
-    resolved.absolutePath,
-    getToolCallId(options),
-    async () => {
-      await rm(resolved.absolutePath, { recursive: true, force: true });
-      return {};
-    },
-  );
+
+  // Single-file delete keeps the simple `mutateSinglePath` flow (capture →
+  // rm → register one edit). Directory delete needs per-child tracking
+  // so each removed file shows up in the agent's edit history and the
+  // watcher does not surface them as "external" deletions. Matches
+  // origin/main's split between single-file and directory delete.
+  const targetIsDir = await isDirectory(resolved.absolutePath);
+  if (!targetIsDir) {
+    return mutateSinglePath(
+      deps,
+      resolved.absolutePath,
+      getToolCallId(options),
+      async () => {
+        await rm(resolved.absolutePath, { recursive: true, force: true });
+        return {};
+      },
+    );
+  }
+
+  const childFiles = await collectAllFiles(resolved.absolutePath);
+  const beforeStates = new Map<
+    string,
+    Awaited<ReturnType<typeof captureFileState>>
+  >();
+  for (const childFile of childFiles) {
+    beforeStates.set(
+      childFile,
+      await captureFileState(childFile, tempDir(deps)),
+    );
+    deps.diffHistoryService?.ignoreFileForWatcher(childFile);
+  }
+
+  try {
+    await rm(resolved.absolutePath, { recursive: true, force: true });
+    for (const childFile of childFiles) {
+      const before = beforeStates.get(childFile);
+      if (!before) continue;
+      const after = await captureFileState(childFile, tempDir(deps));
+      await registerSingleEdit(
+        deps,
+        childFile,
+        getToolCallId(options),
+        before,
+        after,
+      );
+    }
+    return { _diff: null };
+  } finally {
+    for (const childFile of childFiles) {
+      setTimeout(
+        () => deps.diffHistoryService?.unignoreFileForWatcher(childFile),
+        500,
+      );
+    }
+  }
 }
 
 export async function copyToolExecute(
@@ -395,8 +468,42 @@ export async function copyToolExecute(
   let finalDest = dest.absolutePath;
   if (!srcIsDir && destIsDir)
     finalDest = path.join(dest.absolutePath, path.basename(src.absolutePath));
-  const beforeState = await captureFileState(finalDest, tempDir(deps));
-  deps.diffHistoryService?.ignoreFileForWatcher(finalDest);
+
+  // Single-path dest tracking only makes sense for file copies/moves —
+  // `captureFileState` throws EISDIR on a directory path. Directory
+  // dest-side tracking would require enumerating every dest child file
+  // (origin/main does this); explicitly out of scope for this fix,
+  // which targets the flagged src-side regression. Behavior parity for
+  // file copies/moves is preserved.
+  const trackDest = !srcIsDir;
+  const beforeState = trackDest
+    ? await captureFileState(finalDest, tempDir(deps))
+    : null;
+  if (trackDest) deps.diffHistoryService?.ignoreFileForWatcher(finalDest);
+
+  // For moves we must record every source file that disappears so the
+  // watcher does not surface them as "external" changes and so the
+  // agent's edit summary shows the removal. Origin/main captured these
+  // before-states explicitly; the universal-tools port lost it.
+  // `collectAllFiles` returns `[src.absolutePath]` for single files
+  // and an empty array if the path is missing (already guarded above).
+  const srcFilesForMove = params.move
+    ? await collectAllFiles(src.absolutePath)
+    : [];
+  const srcBeforeStates = new Map<
+    string,
+    Awaited<ReturnType<typeof captureFileState>>
+  >();
+  if (params.move) {
+    for (const srcFile of srcFilesForMove) {
+      srcBeforeStates.set(
+        srcFile,
+        await captureFileState(srcFile, tempDir(deps)),
+      );
+      deps.diffHistoryService?.ignoreFileForWatcher(srcFile);
+    }
+  }
+
   try {
     if (srcIsDir) {
       if ((await exists(dest.absolutePath)) && !destIsDir) {
@@ -420,14 +527,34 @@ export async function copyToolExecute(
         await copyFile(src.absolutePath, finalDest);
       }
     }
-    const afterState = await captureFileState(finalDest, tempDir(deps));
-    const _diff = await registerSingleEdit(
-      deps,
-      finalDest,
-      getToolCallId(options),
-      beforeState,
-      afterState,
-    );
+
+    let _diff: WithDiff<object>['_diff'] = null;
+    if (trackDest && beforeState) {
+      const afterState = await captureFileState(finalDest, tempDir(deps));
+      _diff = await registerSingleEdit(
+        deps,
+        finalDest,
+        getToolCallId(options),
+        beforeState,
+        afterState,
+      );
+    }
+
+    if (params.move) {
+      for (const srcFile of srcFilesForMove) {
+        const srcBefore = srcBeforeStates.get(srcFile);
+        if (!srcBefore) continue;
+        const srcAfter = await captureFileState(srcFile, tempDir(deps));
+        await registerSingleEdit(
+          deps,
+          srcFile,
+          getToolCallId(options),
+          srcBefore,
+          srcAfter,
+        );
+      }
+    }
+
     const action = params.move ? 'Moved' : 'Copied';
     return {
       message: `${action} ${srcIsDir ? 'directory' : 'file'}: ${params.input_path} → ${params.output_path}`,
@@ -436,10 +563,20 @@ export async function copyToolExecute(
   } catch (error) {
     rethrowCappedToolOutputError(error);
   } finally {
-    setTimeout(
-      () => deps.diffHistoryService?.unignoreFileForWatcher(finalDest),
-      500,
-    );
+    if (trackDest) {
+      setTimeout(
+        () => deps.diffHistoryService?.unignoreFileForWatcher(finalDest),
+        500,
+      );
+    }
+    if (params.move) {
+      for (const srcFile of srcFilesForMove) {
+        setTimeout(
+          () => deps.diffHistoryService?.unignoreFileForWatcher(srcFile),
+          500,
+        );
+      }
+    }
   }
 }
 

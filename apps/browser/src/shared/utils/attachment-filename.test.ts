@@ -84,4 +84,23 @@ describe('generateAttachmentFilename', () => {
     const result = generateAttachmentFilename('.env');
     expect(result).not.toMatch(/^\./);
   });
+
+  it('strips path separators from a traversal-style extension', () => {
+    const result = generateAttachmentFilename('image.svg/../../secret');
+    expect(result).not.toContain('/');
+    expect(result).not.toContain('..');
+    expect(result).not.toMatch(/\.{2,}/);
+  });
+
+  it('strips backslashes from a windows-style traversal extension', () => {
+    const result = generateAttachmentFilename('name.\\..\\etc\\passwd');
+    expect(result).not.toContain('\\');
+    expect(result).not.toContain('/');
+    expect(result).not.toMatch(/\.{2,}/);
+  });
+
+  it('strips whitespace from extensions', () => {
+    const result = generateAttachmentFilename('image. png');
+    expect(result).toMatch(/\.png$/);
+  });
 });

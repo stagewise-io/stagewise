@@ -18,7 +18,10 @@ export function generateAttachmentFilename(
     ? originalFilename.slice(0, lastDotIdx)
     : originalFilename;
   const extension = hasExtension
-    ? originalFilename.slice(lastDotIdx + 1).toLowerCase()
+    ? originalFilename
+        .slice(lastDotIdx + 1)
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '')
     : '';
 
   const sanitized = baseName

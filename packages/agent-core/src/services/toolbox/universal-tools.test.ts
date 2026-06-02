@@ -9,6 +9,8 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
+  copyToolExecute,
+  deleteToolExecute,
   globToolExecute,
   grepSearchToolExecute,
   mkdirToolExecute,
@@ -246,5 +248,112 @@ describe('universal toolbox', () => {
       deps,
     );
     expect(overridden.result.relativePaths).toContain('secrets/leak.md');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Move / delete diff-history tracking — guards against the regression
+  // introduced when copy/delete were ported from the browser toolbox to the
+  // shared universal-tools helper. Origin/main captured every removed file
+  // individually so the watcher would not surface them as "external"
+  // changes; without these tests the regression silently re-lands.
+  // ---------------------------------------------------------------------------
+
+  function getRegisteredEditPaths(): string[] {
+    const mock = deps.diffHistoryService?.registerAgentEdit as ReturnType<
+      typeof vi.fn
+    >;
+    return mock.mock.calls.map((call) => (call[0] as { path: string }).path);
+  }
+
+  it('move (single file): registers an edit for src deletion AND dest creation', async () => {
+    writeFileSync(path.join(workspace, 'a.txt'), 'hello');
+
+    const result = await copyToolExecute(
+      {
+        input_path: 'wtest/a.txt',
+        output_path: 'wtest/b.txt',
+        move: true,
+      },
+      deps,
+      { toolCallId: 'tc-move-single' },
+    );
+
+    expect(result?.message).toContain('Moved');
+    const paths = getRegisteredEditPaths();
+    expect(paths).toContain(path.join(workspace, 'a.txt'));
+    expect(paths).toContain(path.join(workspace, 'b.txt'));
+    // Watcher ignore should fire for BOTH paths, not just dest.
+    const ignoreMock = deps.diffHistoryService
+      ?.ignoreFileForWatcher as ReturnType<typeof vi.fn>;
+    const ignored = ignoreMock.mock.calls.map((c) => c[0]);
+    expect(ignored).toContain(path.join(workspace, 'a.txt'));
+    expect(ignored).toContain(path.join(workspace, 'b.txt'));
+  });
+
+  it('move (directory): registers an edit for every src file under the moved tree', async () => {
+    mkdirSync(path.join(workspace, 'src', 'nested'), { recursive: true });
+    writeFileSync(path.join(workspace, 'src', 'a.txt'), 'a');
+    writeFileSync(path.join(workspace, 'src', 'b.txt'), 'b');
+    writeFileSync(path.join(workspace, 'src', 'nested', 'c.txt'), 'c');
+
+    await copyToolExecute(
+      {
+        input_path: 'wtest/src',
+        output_path: 'wtest/dst',
+        move: true,
+      },
+      deps,
+      { toolCallId: 'tc-move-dir' },
+    );
+
+    const paths = getRegisteredEditPaths();
+    expect(paths).toContain(path.join(workspace, 'src', 'a.txt'));
+    expect(paths).toContain(path.join(workspace, 'src', 'b.txt'));
+    expect(paths).toContain(path.join(workspace, 'src', 'nested', 'c.txt'));
+  });
+
+  it('copy (no move): does NOT register an edit for the source path', async () => {
+    writeFileSync(path.join(workspace, 'a.txt'), 'hello');
+
+    await copyToolExecute(
+      {
+        input_path: 'wtest/a.txt',
+        output_path: 'wtest/b.txt',
+        move: false,
+      },
+      deps,
+      { toolCallId: 'tc-copy-single' },
+    );
+
+    const paths = getRegisteredEditPaths();
+    expect(paths).not.toContain(path.join(workspace, 'a.txt'));
+    expect(paths).toContain(path.join(workspace, 'b.txt'));
+  });
+
+  it('delete (directory): registers an edit for every child file', async () => {
+    mkdirSync(path.join(workspace, 'tree', 'inner'), { recursive: true });
+    writeFileSync(path.join(workspace, 'tree', 'a.txt'), 'a');
+    writeFileSync(path.join(workspace, 'tree', 'b.txt'), 'b');
+    writeFileSync(path.join(workspace, 'tree', 'inner', 'c.txt'), 'c');
+
+    await deleteToolExecute({ path: 'wtest/tree' }, deps, {
+      toolCallId: 'tc-delete-dir',
+    });
+
+    const paths = getRegisteredEditPaths();
+    expect(paths).toContain(path.join(workspace, 'tree', 'a.txt'));
+    expect(paths).toContain(path.join(workspace, 'tree', 'b.txt'));
+    expect(paths).toContain(path.join(workspace, 'tree', 'inner', 'c.txt'));
+  });
+
+  it('delete (single file): registers exactly one edit and leaves the existing behavior intact', async () => {
+    writeFileSync(path.join(workspace, 'lone.txt'), 'bye');
+
+    await deleteToolExecute({ path: 'wtest/lone.txt' }, deps, {
+      toolCallId: 'tc-delete-file',
+    });
+
+    const paths = getRegisteredEditPaths();
+    expect(paths).toEqual([path.join(workspace, 'lone.txt')]);
   });
 });
