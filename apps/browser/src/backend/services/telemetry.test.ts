@@ -30,6 +30,21 @@ const METHOD_FAILURE_EVENTS = [
   'chat-auth-method-failed',
 ] as const;
 
+describe('main UI telemetry schemas', () => {
+  it('registers and validates closed-lid sleep toggle events', () => {
+    expect(isUIEventName('closed-lid-sleep-toggled')).toBe(true);
+    expect(
+      parseUIEventProperties('closed-lid-sleep-toggled', { enabled: true }),
+    ).toEqual({ enabled: true });
+    expect(
+      parseUIEventProperties('closed-lid-sleep-toggled', { enabled: false }),
+    ).toEqual({ enabled: false });
+    expect(
+      parseUIEventProperties('closed-lid-sleep-toggled', { enabled: 'true' }),
+    ).toBeNull();
+  });
+});
+
 describe('auth UI telemetry schemas', () => {
   it('registers all social auth UI event names', () => {
     for (const eventName of SOCIAL_AUTH_EVENTS) {

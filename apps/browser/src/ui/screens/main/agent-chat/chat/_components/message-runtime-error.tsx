@@ -94,6 +94,10 @@ export function MessageRuntimeError({
     );
   }
 
+  if (error.kind === 'waiting-for-connection') {
+    return <WaitingForConnectionError error={error} />;
+  }
+
   return (
     <GenericError
       agentInstanceId={agentInstanceId}
@@ -226,6 +230,32 @@ function UpstreamOverloadError({
   );
 }
 
+function WaitingForConnectionError({
+  error,
+}: {
+  error: Extract<AgentRuntimeError, { kind: 'waiting-for-connection' }>;
+}) {
+  return (
+    <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-warning-solid/30 bg-warning-background p-2 text-sm">
+      <div className="flex flex-row items-center gap-1.5">
+        <IconTriangleWarning className="size-3.5 shrink-0 text-warning-foreground" />
+        <span className="font-medium text-warning-foreground">
+          Waiting for connection...
+        </span>
+      </div>
+
+      <div className="text-foreground">
+        Your device appears to be offline. The agent will retry automatically
+        once internet access is available again.
+      </div>
+
+      <div className="text-muted-foreground text-xs">
+        Last network error: {error.originalMessage}
+      </div>
+    </div>
+  );
+}
+
 function GenericError({
   agentInstanceId,
   error,
@@ -342,8 +372,8 @@ function GenericError({
       </Collapsible>
 
       {canRetry && (
-        <div className="-mt-1 flex flex-row justify-end">
-          <Button variant="ghost" size="xs" onClick={onRetry}>
+        <div className="flex flex-row justify-end pt-1">
+          <Button variant="primary" size="xs" onClick={onRetry}>
             <RefreshCcwIcon className="size-3" />
             Retry
           </Button>

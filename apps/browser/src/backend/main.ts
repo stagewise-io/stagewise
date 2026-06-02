@@ -62,12 +62,15 @@ import { readPersistedDataSync } from './utils/persisted-data';
 import { z } from 'zod';
 import { discoverPlugins } from './utils/discover-plugins';
 import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
-import type { SkillDefinition } from '@shared/skills';
+import type { Skill } from './agents/shared/prompts/utils/get-skills';
+import type { SkillDefinition, SkillDefinitionUI } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
 import { detectShell, resolveShellEnv } from './utils/shell-env';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
 import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';
+import { AgentRuntimeRecoveryService } from './services/agent-runtime-recovery';
+import { MacOSClosedLidSleepService } from './services/macos-closed-lid-sleep';
 import type {
   HistoryFilter,
   HistoryResult,
@@ -499,7 +502,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     learn: 3,
   };
 
-  discoverSkills(getBuiltinSkillsPath()).then((skills) => {
+  discoverSkills(getBuiltinSkillsPath()).then((skills: Skill[]) => {
     const builtins: SkillDefinition[] = skills
       .map((s) => ({
         id: `command:${s.name.toLowerCase()}`,
@@ -672,8 +675,9 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   agentManagerService.registerEnvAdapter(
     createEnabledSkillsDomainAdapter({
       host: agentCoreHost,
-      getSkillDetails: async (agentInstanceId) => {
-        const skills = await toolboxService.getSkillsList(agentInstanceId);
+      getSkillDetails: async (agentInstanceId: string) => {
+        const skills: SkillDefinitionUI[] =
+          await toolboxService.getSkillsList(agentInstanceId);
         return new Map(
           skills
             .filter((s) => s.agentInvocable !== false && s.skillPath)
@@ -723,6 +727,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const agentPowerSaveBlockerService = AgentPowerSaveBlockerService.create(
     logger,
     uiKarton,
+  );
+  const macOSClosedLidSleepService = MacOSClosedLidSleepService.create(
+    logger,
+    uiKarton,
+  );
+  const agentRuntimeRecoveryService = AgentRuntimeRecoveryService.create(
+    logger,
+    agentManagerService,
   );
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
@@ -797,6 +809,16 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       }
 
       return imported;
+    },
+  );
+
+  uiKarton.registerServerProcedureHandler('closedLidSleep.toggle', async () => {
+    return macOSClosedLidSleepService.toggle();
+  });
+  uiKarton.registerServerProcedureHandler(
+    'closedLidSleep.refresh',
+    async () => {
+      return macOSClosedLidSleepService.refresh();
     },
   );
 
@@ -972,6 +994,12 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       runTeardown('autoUpdateService', () => autoUpdateService.teardown());
       runTeardown('agentPowerSaveBlockerService', () =>
         agentPowerSaveBlockerService.teardown(),
+      );
+      runTeardown('macOSClosedLidSleepService', () =>
+        macOSClosedLidSleepService.teardown(),
+      );
+      runTeardown('agentRuntimeRecoveryService', () =>
+        agentRuntimeRecoveryService.teardown(),
       );
 
       // Shared budget for async teardowns. Toolbox teardown kills live

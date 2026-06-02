@@ -5,7 +5,8 @@ import {
 import { useRef, useCallback, useEffect } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
-  IconGear2Outline18,
+  IconGear3Outline18,
+  IconHotDrinkOutline18,
   IconOpenRectArrowInOutline18,
 } from 'nucleo-ui-outline-18';
 import { AgentsList } from './agents-list';
@@ -15,6 +16,7 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useTrack } from '@ui/hooks/use-track';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
 import { TITLEBAR_HEIGHT } from '@shared/titlebar';
@@ -45,11 +47,16 @@ export function Sidebar() {
 
   const track = useTrack();
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+  const toggleClosedLidSleep = useKartonProcedure(
+    (p) => p.closedLidSleep.toggle,
+  );
   const counterScale = useUiZoomCounterScale();
 
   const { collapsed, setCollapsed } = useSidebarCollapsed();
 
   const userAccount = useKartonState((s) => s.userAccount);
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
+  const closedLidSleep = useKartonState((s) => s.closedLidSleep);
 
   const isAuthenticated =
     userAccount.status === 'authenticated' ||
@@ -67,6 +74,13 @@ export function Sidebar() {
     track('account-opened');
     void openSettings({ section: 'account' });
   }, [openSettings, track]);
+
+  const handleToggleClosedLidSleep = useCallback(() => {
+    track('closed-lid-sleep-toggled', {
+      enabled: !closedLidSleep.isSleepDisabled,
+    });
+    void toggleClosedLidSleep();
+  }, [closedLidSleep.isSleepDisabled, toggleClosedLidSleep, track]);
 
   // Sync context-driven collapse state to the imperative panel handle.
   // Guards prevent infinite loops with onCollapse/onExpand callbacks.
@@ -157,20 +171,55 @@ export function Sidebar() {
                 </button>
               )}
 
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Settings"
-                    className="app-no-drag shrink-0"
-                    onClick={handleOpenSettings}
-                  >
-                    <IconGear2Outline18 className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Settings</TooltipContent>
-              </Tooltip>
+              <div className="flex shrink-0 flex-row items-center gap-1">
+                {isMacOs && (
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={
+                          closedLidSleep.isSleepDisabled
+                            ? 'Re-enable sleep on closed lid'
+                            : 'Prevent sleep on closed lid'
+                        }
+                        className="app-no-drag shrink-0"
+                        disabled={closedLidSleep.isChanging}
+                        onClick={handleToggleClosedLidSleep}
+                      >
+                        <IconHotDrinkOutline18
+                          className={cn(
+                            'size-4',
+                            closedLidSleep.isSleepDisabled
+                              ? 'text-[oklch(0.66_0.169_var(--H-yellow))] drop-shadow-[0_0_1.5px_oklch(from_var(--color-warning-solid)_l_c_h_/_0.5)] dark:text-[oklch(0.78_0.112_var(--H-yellow))]'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {closedLidSleep.isSleepDisabled
+                        ? 'Re-enable sleep on closed lid'
+                        : 'Prevent sleep on closed lid'}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Settings"
+                      className="app-no-drag shrink-0"
+                      onClick={handleOpenSettings}
+                    >
+                      <IconGear3Outline18 className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Settings</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
           </div>
         </div>

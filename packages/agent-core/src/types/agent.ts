@@ -38,6 +38,13 @@ export type AgentRuntimeError =
       providerName?: string;
       statusCode?: number;
       modelId?: string;
+    }
+  | {
+      kind: 'waiting-for-connection';
+      message: string;
+      originalMessage: string;
+      code?: number;
+      stack?: string;
     };
 
 /**

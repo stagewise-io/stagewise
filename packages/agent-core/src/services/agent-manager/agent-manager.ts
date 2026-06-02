@@ -69,6 +69,62 @@ function toFiniteTimestamp(value: unknown): number | undefined {
   return undefined;
 }
 
+const NETWORK_RETRYABLE_ERROR_PATTERNS = [
+  'network',
+  'fetch failed',
+  'failed to fetch',
+  'socket',
+  'connection',
+  'timeout',
+  'timed out',
+  'econnreset',
+  'etimedout',
+  'enotfound',
+  'eai_again',
+  'econnrefused',
+  'und_err',
+  'terminated',
+];
+
+function getNetworkRetryableErrorMessage(
+  error: AgentState['error'],
+): string | null {
+  if (!error) return null;
+  if (error.kind === 'plan-limit-exceeded') return null;
+  if (error.kind === 'upstream-overload') return null;
+  if (error.kind === 'waiting-for-connection') return error.originalMessage;
+
+  const message = error.message.toLowerCase();
+  return NETWORK_RETRYABLE_ERROR_PATTERNS.some((pattern) =>
+    message.includes(pattern),
+  )
+    ? error.message
+    : null;
+}
+
+function messageHasPendingApproval(message: AgentMessage): boolean {
+  if (message.role !== 'assistant') return false;
+
+  return message.parts.some((part) => {
+    if (!(part.type === 'dynamic-tool' || part.type.startsWith('tool-'))) {
+      return false;
+    }
+
+    return (part as { state?: string }).state === 'approval-requested';
+  });
+}
+
+function hasPendingToolApproval(history: AgentMessage[]): boolean {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const message = history[i];
+    if (message?.role === 'assistant') {
+      return messageHasPendingApproval(message);
+    }
+  }
+
+  return false;
+}
+
 /**
  * @note Due to the complex type inference for all this stuff, we sometimes explicitly define types here to avoid errors.
  *       This is a bit of a hack, but it's the best we can do for now.
@@ -81,10 +137,21 @@ export class AgentManager extends DisposableService {
   private static readonly TITLE_MIN_LENGTH = 1;
   private static readonly TITLE_MAX_LENGTH = 200;
 
+  private static readonly NETWORK_RETRY_SCAN_INTERVAL_MS = 5_000;
+  private static readonly NETWORK_RETRY_BACKOFF_MS: [number, ...number[]] = [
+    5_000, 15_000, 30_000, 60_000, 120_000,
+  ];
+
   private activeAgents = new Map<
     string,
     BaseAgent<any, any> | BaseAgent<never, any>
   >();
+
+  private readonly pendingNetworkRetries = new Map<
+    string,
+    { retryCount: number; nextRetryAt: number; lastErrorMessage: string }
+  >();
+  private readonly networkRetryInterval: ReturnType<typeof setInterval>;
 
   private readonly commandRegistry: CommandRegistry;
   private readonly managerToolbox: AgentManagerToolboxPort;
@@ -124,6 +191,7 @@ export class AgentManager extends DisposableService {
   private readonly enrichHistoryEntries?: (
     entries: AgentHistoryEntry[],
   ) => Promise<AgentHistoryEntry[]>;
+  private readonly isNetworkOnline?: () => boolean;
   private readonly imageCache?: ProcessedImageCacheService;
   /**
    * App-wide `FileReadCacheService` shared across all agent instances.
@@ -202,12 +270,18 @@ export class AgentManager extends DisposableService {
     this.renderHostMention = hooks?.renderHostMention;
     this.onAgentEvent = hooks?.onAgentEvent;
     this.enrichHistoryEntries = hooks?.enrichHistoryEntries;
+    this.isNetworkOnline = hooks?.isNetworkOnline;
     this.getSkillsForSlashRedaction =
       hooks?.skillsForSlashRedaction ?? (() => []);
 
     this.domainAdapterRegistry = new DomainAdapterRegistry(host.logger);
 
     this.unregisterCommands = this.registerCommandHandlers();
+
+    this.networkRetryInterval = setInterval(() => {
+      void this.processNetworkRetries();
+    }, AgentManager.NETWORK_RETRY_SCAN_INTERVAL_MS);
+    this.networkRetryInterval.unref?.();
 
     // The persistence DB is owned by `AgentCorePersistence` and is
     // fully migrated by the time the host hands it to us, so the
@@ -702,11 +776,176 @@ export class AgentManager extends DisposableService {
   }
 
   protected async onTeardown(): Promise<void> {
+    clearInterval(this.networkRetryInterval);
+    this.pendingNetworkRetries.clear();
     this.unregisterCommands();
     for (const agent of this.activeAgents.values()) {
       await agent.onTeardown();
     }
     this.activeAgents.clear();
+  }
+
+  private getNetworkRetryBackoffMs(retryCount: number): number {
+    return (
+      AgentManager.NETWORK_RETRY_BACKOFF_MS[
+        Math.min(retryCount, AgentManager.NETWORK_RETRY_BACKOFF_MS.length - 1)
+      ] ?? AgentManager.NETWORK_RETRY_BACKOFF_MS[0]
+    );
+  }
+
+  public async retryNetworkFailedAgentsNow(reason: string): Promise<void> {
+    this.logger.info(
+      `[AgentManager] Triggering immediate network retry scan. reason=${reason}`,
+    );
+    await this.processNetworkRetries(true);
+  }
+
+  private async processNetworkRetries(force = false): Promise<void> {
+    if (!this.isNetworkOnline) return;
+
+    const now = Date.now();
+
+    for (const [agentInstanceId, agent] of this.activeAgents.entries()) {
+      const agentState =
+        this.agentStore.get().agents.instances[agentInstanceId]?.state;
+      if (!agentState) {
+        this.pendingNetworkRetries.delete(agentInstanceId);
+        continue;
+      }
+
+      if (agentState.isWorking) continue;
+
+      const errorMessage = getNetworkRetryableErrorMessage(agentState.error);
+      if (!errorMessage) {
+        if (this.pendingNetworkRetries.delete(agentInstanceId)) {
+          this.logger.info(
+            `[AgentManager] Cleared network retry tracking for agent ${agentInstanceId}`,
+          );
+        }
+        continue;
+      }
+
+      const isOnline = this.isNetworkOnline();
+      let pending = this.pendingNetworkRetries.get(agentInstanceId);
+      if (!pending) {
+        if (isOnline) {
+          this.logger.debug(
+            `[AgentManager] Not auto-retrying agent ${agentInstanceId}; retryable-looking error occurred while internet access is available: ${errorMessage}`,
+          );
+          continue;
+        }
+
+        pending = {
+          retryCount: 0,
+          nextRetryAt: now,
+          lastErrorMessage: errorMessage,
+        };
+        this.pendingNetworkRetries.set(agentInstanceId, pending);
+        this.setWaitingForConnectionError(agentInstanceId, errorMessage);
+        this.logger.info(
+          `[AgentManager] Registered offline agent ${agentInstanceId} for automatic retry when internet access returns: ${errorMessage}`,
+        );
+      } else if (pending.lastErrorMessage !== errorMessage) {
+        pending.lastErrorMessage = errorMessage;
+        pending.nextRetryAt = now;
+      }
+
+      if (!isOnline) {
+        pending.nextRetryAt = now;
+        this.setWaitingForConnectionError(agentInstanceId, errorMessage);
+        continue;
+      }
+
+      if (!force && now < pending.nextRetryAt) continue;
+
+      const attempt = pending.retryCount + 1;
+      pending.retryCount = attempt;
+      pending.nextRetryAt = now + this.getNetworkRetryBackoffMs(attempt);
+
+      this.logger.info(
+        `[AgentManager] Internet access restored; retrying offline-failed agent ${agentInstanceId}. attempt=${attempt}`,
+      );
+
+      try {
+        await agent.retryLastUserMessage();
+      } catch (error) {
+        this.logger.warn(
+          `[AgentManager] Failed to retry network-failed agent ${agentInstanceId}`,
+          { error },
+        );
+      }
+    }
+  }
+
+  private setWaitingForConnectionError(
+    agentInstanceId: string,
+    originalMessage: string,
+  ): void {
+    const currentError =
+      this.agentStore.get().agents.instances[agentInstanceId]?.state.error;
+    if (currentError?.kind === 'waiting-for-connection') return;
+
+    this.agentStore.update((draft) => {
+      const state = draft.agents.instances[agentInstanceId]?.state;
+      if (!state || state.isWorking) return;
+
+      const existingError = state.error;
+      state.error = {
+        kind: 'waiting-for-connection',
+        message: 'Waiting for internet connection...',
+        originalMessage,
+        code: existingError?.kind ? undefined : existingError?.code,
+        stack: existingError?.kind ? undefined : existingError?.stack,
+      };
+    });
+  }
+
+  private isRecoverableInterruptedAgent(agentInstanceId: string): boolean {
+    const state = this.agentStore.get();
+    const instance = state.agents.instances[agentInstanceId];
+    if (!instance?.state.isWorking) return false;
+
+    if (state.toolbox[agentInstanceId]?.pendingUserQuestion) {
+      return false;
+    }
+
+    return !hasPendingToolApproval(instance.state.history);
+  }
+
+  public async recoverInterruptedActiveAgents(
+    reason: 'system-resumed' | 'event-loop-stalled',
+    details?: { stalledForMs?: number },
+  ): Promise<void> {
+    const recoverableAgentIds = [...this.activeAgents.keys()].filter((id) =>
+      this.isRecoverableInterruptedAgent(id),
+    );
+
+    if (recoverableAgentIds.length === 0) {
+      this.logger.debug(
+        `[AgentManager] No active agents needed recovery after ${reason}`,
+      );
+      return;
+    }
+
+    this.logger.info(
+      `[AgentManager] Recovering ${recoverableAgentIds.length} interrupted active agent(s). reason=${reason}${
+        details?.stalledForMs ? `, stalledForMs=${details.stalledForMs}` : ''
+      }`,
+    );
+
+    for (const agentInstanceId of recoverableAgentIds) {
+      const agent = this.activeAgents.get(agentInstanceId);
+      if (!agent) continue;
+
+      try {
+        await agent.recoverInterruptedRun(reason);
+      } catch (error) {
+        this.logger.warn(
+          `[AgentManager] Failed to recover interrupted agent ${agentInstanceId}`,
+          { error },
+        );
+      }
+    }
   }
 
   /**

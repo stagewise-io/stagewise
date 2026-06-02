@@ -104,6 +104,13 @@ export interface AgentManagerHooksOptions {
   enrichHistoryEntries?: (
     entries: AgentHistoryEntry[],
   ) => Promise<AgentHistoryEntry[]>;
+  /**
+   * Optional host-provided network reachability check. When present,
+   * network-looking agent errors are auto-retried only after this returns
+   * `false` at least once, preventing provider-side failures from entering
+   * an offline retry loop.
+   */
+  isNetworkOnline?: () => boolean;
 }
 
 /**
