@@ -1,4 +1,5 @@
 import * as pty from 'node-pty';
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,6 +75,54 @@ export function stripAnsi(str: string): string {
   return str.replace(ANSI_RE, '');
 }
 
+function getProcessCwd(pid: number): string | null {
+  try {
+    if (process.platform === 'linux') {
+      return fs.readlinkSync(`/proc/${pid}/cwd`);
+    }
+
+    if (process.platform === 'darwin') {
+      const output = execFileSync(
+        'lsof',
+        ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'],
+        {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 250,
+        },
+      );
+      const cwdLine = output.split('\n').find((line) => line.startsWith('n'));
+      return cwdLine ? cwdLine.slice(1) : null;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function realpathOrNull(cwd: string): string | null {
+  try {
+    return fs.realpathSync.native(cwd);
+  } catch {
+    return null;
+  }
+}
+
+function areSameShellCwd(a: string, b: string): boolean {
+  if (path.resolve(a) === path.resolve(b)) return true;
+  const realA = realpathOrNull(a);
+  const realB = realpathOrNull(b);
+  return realA != null && realB != null && realA === realB;
+}
+
+export function injectBoundaryToken(
+  script: string,
+  boundaryToken: string | undefined,
+): string {
+  return script.replaceAll('__STAGEWISE_BOUNDARY_TOKEN__', boundaryToken ?? '');
+}
+
 // ─── Head/tail output capping ────────────────────────────────────
 
 export function applyHeadTailCap(lines: string[]): string {
@@ -100,12 +149,31 @@ HISTSIZE=0 2>/dev/null
 HISTFILESIZE=0 2>/dev/null
 set +o history 2>/dev/null
 __stagewise_command_executed=0
+__stagewise_boundary_token="__STAGEWISE_BOUNDARY_TOKEN__"
+__stagewise_file_uri_path() {
+  local path="$1"
+  local encoded=''
+  local i ch hex
+  local LC_ALL=C
+  for (( i = 0; i < \${#path}; i++ )); do
+    ch="\${path:i:1}"
+    case "$ch" in
+      [A-Za-z0-9._~/-]) encoded+="$ch" ;;
+      *) hex=$(printf '%%%02X' "'$ch"); encoded+="$hex" ;;
+    esac
+  done
+  printf '%s' "$encoded"
+}
+__stagewise_emit_cwd() {
+  printf '\\033]7;file://%s%s\\007' "\${HOSTNAME:-localhost}" "$(__stagewise_file_uri_path "$PWD")"
+}
 __stagewise_prompt_command() {
   local exit_code=$?
   if [ "$__stagewise_command_executed" = "1" ]; then
-    printf '\\033]133;D;%d\\007' "$exit_code"
+    printf '\\033]133;D;%d;%s\\007' "$exit_code" "$__stagewise_boundary_token"
     __stagewise_command_executed=0
   fi
+  __stagewise_emit_cwd
   printf '\\033]133;A\\007'
 }
 __stagewise_pre_exec() {
@@ -120,6 +188,7 @@ if [ -z "$PROMPT_COMMAND" ]; then
 else
   PROMPT_COMMAND="__stagewise_prompt_command;\${PROMPT_COMMAND}"
 fi
+__stagewise_emit_cwd
 printf '\\033]133;A\\007'
 `.trim();
 
@@ -132,13 +201,32 @@ SAVEHIST=0 2>/dev/null
 unsetopt SHARE_HISTORY INC_APPEND_HISTORY APPEND_HISTORY 2>/dev/null
 PROMPT_EOL_MARK=''
 __stagewise_command_executed=0
+__stagewise_boundary_token="__STAGEWISE_BOUNDARY_TOKEN__"
+__stagewise_file_uri_path() {
+  local path="$1"
+  local encoded=''
+  local i ch hex
+  local LC_ALL=C
+  for (( i = 1; i <= \${#path}; i++ )); do
+    ch="\${path[\$i]}"
+    case "$ch" in
+      [A-Za-z0-9._~/-]) encoded+="$ch" ;;
+      *) hex=$(printf '%%%02X' "'$ch"); encoded+="$hex" ;;
+    esac
+  done
+  printf '%s' "$encoded"
+}
+__stagewise_emit_cwd() {
+  printf '\\033]7;file://%s%s\\007' "\${HOST:-\${HOSTNAME:-localhost}}" "$(__stagewise_file_uri_path "$PWD")"
+}
 autoload -Uz add-zsh-hook 2>/dev/null
 __stagewise_precmd() {
   local exit_code=$?
   if [[ "$__stagewise_command_executed" == "1" ]]; then
-    printf '\\033]133;D;%d\\007' "$exit_code"
+    printf '\\033]133;D;%d;%s\\007' "$exit_code" "$__stagewise_boundary_token"
     __stagewise_command_executed=0
   fi
+  __stagewise_emit_cwd
   printf '\\033]133;A\\007'
 }
 __stagewise_preexec() {
@@ -153,6 +241,7 @@ else
   precmd_functions+=(__stagewise_precmd)
   preexec_functions+=(__stagewise_preexec)
 fi
+__stagewise_emit_cwd
 printf '\\033]133;A\\007'
 `.trim();
 
@@ -167,6 +256,7 @@ $Global:__StagewiseState = @{
   OriginalPrompt = $function:Prompt
   LastHistoryId  = -1
   IsInExecution  = $false
+  BoundaryToken  = "__STAGEWISE_BOUNDARY_TOKEN__"
 }
 function Global:Prompt() {
   $FakeCode = [int]!$global:?
@@ -176,11 +266,14 @@ function Global:Prompt() {
   if ($Global:__StagewiseState.LastHistoryId -ne -1 -and ($Global:__StagewiseState.HasPSReadLine -eq $false -or $Global:__StagewiseState.IsInExecution -eq $true)) {
     $Global:__StagewiseState.IsInExecution = $false
     if ($LastHistoryEntry.Id -eq $Global:__StagewiseState.LastHistoryId) {
-      $Result += "$([char]0x1b)]133;D\`a"
+      $Result += "$([char]0x1b)]133;D;0;$($Global:__StagewiseState.BoundaryToken)\`a"
     } else {
-      $Result += "$([char]0x1b)]133;D;$FakeCode\`a"
+      $Result += "$([char]0x1b)]133;D;$FakeCode;$($Global:__StagewiseState.BoundaryToken)\`a"
     }
   }
+  $Cwd = (Get-Location).ProviderPath.Replace('\\', '/')
+  if ($Cwd -match '^[A-Za-z]:/') { $Cwd = "/$Cwd" }
+  $Result += "$([char]0x1b)]7;file://localhost$Cwd\`a"
   $Result += "$([char]0x1b)]133;A\`a"
   if ($FakeCode -ne 0) { Write-Error "failure" -ea ignore }
   $Result += $Global:__StagewiseState.OriginalPrompt.Invoke()
@@ -218,6 +311,10 @@ interface PendingCommand {
   rawOutputCapped: boolean;
   /** Serialized buffer text captured at the moment of a buffer-based pattern match. */
   bufferSnapshot?: string;
+  /** Sanitized regex match captured from raw output when buffer matching fails. */
+  rawPatternSnapshot?: string;
+  /** Whether the first command-output start marker has already set markLine. */
+  hasCommandStart: boolean;
   /** Idle-detection state (see `DEFAULT_IDLE_MS`). */
   idleTimerHandle: NodeJS.Timeout | null;
   /** Silence threshold in ms (0 disables idle detection for this command). */
@@ -292,9 +389,20 @@ export class SessionManager {
       );
     }
 
-    const sessionId = randomUUID().slice(0, 8);
+    let sessionId: string | undefined;
+    for (let i = 0; i < 10; i++) {
+      const candidate = randomUUID().slice(0, 4);
+      if (!this.sessions.has(candidate)) {
+        sessionId = candidate;
+        break;
+      }
+    }
+    if (!sessionId) {
+      sessionId = randomUUID();
+    }
 
-    const spawnArgs = this.getSpawnArgs();
+    const boundaryToken = randomUUID().replace(/-/g, '');
+    const spawnArgs = this.getSpawnArgs(boundaryToken);
     const ptyProcess = pty.spawn(this.shell.path, spawnArgs, {
       name: 'xterm-256color',
       cols: DEFAULT_TERMINAL_COLS,
@@ -304,7 +412,13 @@ export class SessionManager {
       ...this.ptySpawnOptions,
     });
 
-    const parser = new OscParser();
+    const parser = new OscParser(boundaryToken, (cwdCandidate) => {
+      const processCwd = getProcessCwd(ptyProcess.pid);
+      if (processCwd == null) return 'unknown';
+      return areSameShellCwd(path.resolve(cwdCandidate), processCwd)
+        ? 'trusted'
+        : 'untrusted';
+    });
 
     const session: PtySession = {
       id: sessionId,
@@ -323,6 +437,7 @@ export class SessionManager {
       readyResolve: null!,
       onData: onData ?? null,
       cwd,
+      currentCwd: cwd,
       logger: this.getShellLogsDir
         ? new SessionLogger(
             path.join(
@@ -362,7 +477,35 @@ export class SessionManager {
       this.handleSessionExit(sessionId, exitCode);
     });
 
-    // Wire parser events
+    // Trust model for cwd tracking:
+    // - `session.cwd` is the single source of truth used by UI and smart
+    //   approval.
+    // - It represents the parent shell process cwd, not cwd-like bytes printed
+    //   by child commands.
+    // - OscParser strips and ignores OSC 7 from command output, and only trusts
+    //   OSC 133 command-end markers containing this session's boundary token.
+    //   That token is a guardrail, not the trust root: shell state is still
+    //   same-user command-controlled, so a cwd update is accepted only when it
+    //   matches the OS-reported cwd of the parent shell process. If the OS cwd
+    //   cannot be read, keep the last trusted cwd rather than trusting PTY bytes.
+    //   This keeps real `cd` behavior where validation is available while
+    //   preventing forged prompt metadata from moving smart approval into a
+    //   command-controlled directory.
+    parser.on('cwd', (cwd) => {
+      const normalizedCwd = path.resolve(cwd);
+      if (normalizedCwd === session.cwd) return;
+
+      const processCwd = getProcessCwd(session.pty.pid);
+      if (!processCwd || !areSameShellCwd(normalizedCwd, processCwd)) {
+        return;
+      }
+
+      session.cwd = normalizedCwd;
+      session.currentCwd = normalizedCwd;
+      session.lastActivityAt = Date.now();
+      this.onSessionStateChange?.(agentInstanceId);
+    });
+
     parser.on('integrationDetected', () => {
       // The bash/zsh integration scripts guard `133;D` emission on
       // `__stagewise_command_executed`, which is 0 at init, so no
@@ -389,9 +532,12 @@ export class SessionManager {
       const cid = this.sessionCommandMap.get(sessionId);
       if (!cid) return;
       const pending = this.pendingCommands.get(cid);
-      if (!pending) return;
+      if (!pending || pending.hasCommandStart) return;
       const newMark = session.logger?.getMarkPosition();
-      if (newMark !== undefined) pending.markLine = newMark;
+      if (newMark !== undefined) {
+        pending.markLine = newMark;
+        pending.hasCommandStart = true;
+      }
     });
 
     parser.on('sentinelDone', (id, exitCode) => {
@@ -500,6 +646,7 @@ export class SessionManager {
         waitUntil: request.waitUntil,
         rawOutput: '',
         rawOutputCapped: false,
+        hasCommandStart: false,
         idleTimerHandle: null,
         idleMs,
       };
@@ -537,8 +684,8 @@ export class SessionManager {
         // which will resolve any pending commands when the session exits.
       }
 
-      // Write the command to the PTY
       const command = request.command;
+
       if (request.rawInput) {
         // Raw stdin: write bytes verbatim — no \r, no sentinel
         session.pty.write(command);
@@ -547,7 +694,8 @@ export class SessionManager {
         // The agent is just waiting for output; the pending command will
         // resolve via timeout, pattern match, or session exit.
       } else if (session.shellIntegrationActive) {
-        // Shell integration handles boundaries via OSC 133
+        // Shell integration handles output boundaries via OSC 133 and emits
+        // OSC 7 cwd metadata at prompt time for session cwd tracking.
         session.pty.write(`${command}\r`);
       } else if (session.parser.currentMode === 'sentinel') {
         // Wrap with sentinel for exit code detection
@@ -654,6 +802,14 @@ export class SessionManager {
 
   getSession(sessionId: string): PtySession | undefined {
     return this.sessions.get(sessionId);
+  }
+
+  getCurrentCwd(sessionId: string): string | undefined {
+    return this.getSessionCwd(sessionId);
+  }
+
+  getSessionCwd(sessionId: string): string | undefined {
+    return this.sessions.get(sessionId)?.cwd;
   }
 
   /**
@@ -826,16 +982,26 @@ export class SessionManager {
   }
 
   private collectOutput(pending: PendingCommand): string {
+    const rawOutput = stripAnsi(pending.rawOutput).trimEnd();
+
     // If a buffer snapshot was captured at pattern-match time, return it
     // directly. This avoids a second serialization that may produce a
-    // different (possibly empty) range if the cursor moved since the match.
+    // different range if the cursor moved since the match.
     if (pending.bufferSnapshot != null) {
       const snapLines = pending.bufferSnapshot.split('\n');
       return applyHeadTailCap(snapLines).trimEnd();
     }
 
+    // If logger matching failed but sanitized raw command output matched the
+    // requested pattern, return only the matched visible text. Do not fall back
+    // to the full raw stream for logger-backed sessions: it can include text
+    // that the terminal later cleared or redrew away.
+    if (pending.rawPatternSnapshot != null) {
+      return pending.rawPatternSnapshot;
+    }
+
     const session = this.sessions.get(pending.sessionId);
-    if (!session?.logger) return stripAnsi(pending.rawOutput).trimEnd();
+    if (!session?.logger) return rawOutput;
 
     const logger = session.logger;
     const isAlt = logger.isAlternateBufferActive();
@@ -872,18 +1038,11 @@ export class SessionManager {
 
     const session = this.sessions.get(sessionId);
 
-    // Gate for the no-logger fallback path only: accumulate raw output
-    // (used by the regex matcher when no xterm is attached) exclusively
-    // while inside real command output. This prevents prompt text and
-    // the echoed command line from polluting `pending.rawOutput` and
-    // triggering spurious matches.
-    //
-    // NOTE: we intentionally do NOT gate the logger-based matcher below.
-    // On CI and minimal shells the parser may stay in `detecting` mode
-    // for the entire command (OSC 133 never arrives), and gating there
-    // would make patterns never resolve. The logger-based matcher scopes
-    // to `pending.markLine` and skips the first serialized line (the
-    // prompt + echoed command) to avoid echo-leak matches.
+    // Accumulate raw output exclusively while inside real command output.
+    // This prevents prompt text and the echoed command line from polluting
+    // `pending.rawOutput` and triggering spurious matches. The raw stream is
+    // used directly when no logger exists and as a fallback when logger-backed
+    // xterm serialization is stale or marked from the wrong row.
     const inUserOutput =
       session?.parser.inCommandOutput ||
       session?.parser.currentMode === 'sentinel';
@@ -934,13 +1093,21 @@ export class SessionManager {
           if (matchText && re.test(matchText)) {
             pending.bufferSnapshot = lines.join('\n');
             this.resolveCommand(pending.commandId, null);
+            return;
           }
-        } else if (inUserOutput && !pending.rawOutputCapped) {
-          // Fallback: no logger — match against raw ANSI stream.
-          // Gated on inUserOutput because `rawOutput` can only grow
-          // there (see above).
-          if (re.test(pending.rawOutput))
+        }
+
+        if (inUserOutput && !pending.rawOutputCapped) {
+          // Fallback: match against sanitized visible command output. Capture
+          // only the matched text so logger-backed results do not expose raw
+          // transient output that the terminal later cleared or redrew away.
+          const rawMatchText = stripAnsi(pending.rawOutput).trimEnd();
+          re.lastIndex = 0;
+          const match = re.exec(rawMatchText);
+          if (match?.[0]) {
+            pending.rawPatternSnapshot = match[0];
             this.resolveCommand(pending.commandId, null);
+          }
         }
       } catch {
         // Invalid regex — ignore
@@ -1045,7 +1212,11 @@ export class SessionManager {
       // timeout with rich prompt frameworks like starship/p10k).
       const nativeTempPath = path.join(tmpdir(), `sw-${session.id}.sh`);
       try {
-        fs.writeFileSync(nativeTempPath, script, { mode: 0o600 });
+        fs.writeFileSync(
+          nativeTempPath,
+          injectBoundaryToken(script, session.parser.boundaryToken),
+          { mode: 0o600 },
+        );
         session.initScriptPath = nativeTempPath;
         // Dot-source is POSIX (cannot be aliased). Cleanup handled by deactivateSession.
         // Single-quote to survive paths containing spaces (e.g. Windows
@@ -1056,7 +1227,11 @@ export class SessionManager {
         session.pty.write(`. '${shellPath}'\r`);
       } catch (_err) {
         // Temp file write failed — fall back to eval through the line editor.
-        session.pty.write(`eval $'${escapeForShell(script)}'\r`);
+        session.pty.write(
+          `eval $'${escapeForShell(
+            injectBoundaryToken(script, session.parser.boundaryToken),
+          )}'\r`,
+        );
       }
     }
   }
@@ -1068,9 +1243,13 @@ export class SessionManager {
     }
   }
 
-  private getSpawnArgs(): string[] {
+  private getSpawnArgs(boundaryToken: string): string[] {
     if (this.shell.type === 'powershell') {
-      return ['-NoExit', '-Command', POWERSHELL_INTEGRATION];
+      return [
+        '-NoExit',
+        '-Command',
+        injectBoundaryToken(POWERSHELL_INTEGRATION, boundaryToken),
+      ];
     }
     if (process.platform === 'win32' && this.shell.type === 'bash') {
       return ['--login', '-i'];
