@@ -19,6 +19,7 @@ import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import type { AgentPersistenceDB } from '@stagewise/agent-core/agent-persistence';
 import type { DomainAdapter, DomainId } from '@stagewise/agent-core/env';
 import type { AgentHistoryEntry } from '@stagewise/agent-core/types/agent';
+import { net } from 'electron';
 import { DisposableService } from '../disposable';
 import type { KartonService } from '../karton';
 import type { SkillDefinitionUI } from '@shared/skills';
@@ -106,6 +107,7 @@ export class AgentManagerService extends DisposableService {
         renderHostMention: renderBrowserExtraMention,
         skillsForSlashRedaction: getSkillsForSlashRedaction,
         enrichHistoryEntries,
+        isNetworkOnline: () => net.isOnline(),
       },
     });
     this.registerKartonForwarders();
@@ -134,6 +136,17 @@ export class AgentManagerService extends DisposableService {
     workspacePath: string,
   ): Promise<void> {
     await this.manager.generateWorkspaceMdForPath(workspacePath);
+  }
+
+  public async recoverInterruptedActiveAgents(
+    reason: 'system-resumed' | 'event-loop-stalled',
+    details?: { stalledForMs?: number },
+  ): Promise<void> {
+    await this.manager.recoverInterruptedActiveAgents(reason, details);
+  }
+
+  public async retryNetworkFailedAgentsNow(reason: string): Promise<void> {
+    await this.manager.retryNetworkFailedAgentsNow(reason);
   }
 
   private registerKartonForwarders(): void {

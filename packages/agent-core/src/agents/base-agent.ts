@@ -584,6 +584,15 @@ export abstract class BaseAgent<
   private _pendingContinue: boolean | null = null;
 
   /**
+   * Set only for runtime recovery after a suspend/resume or event-loop stall.
+   * It appends a transient model-only `continue` user message for the next
+   * step without writing anything to visible/persisted chat history.
+   */
+  private _pendingSyntheticContinuation: {
+    reason: 'system-resumed' | 'event-loop-stalled';
+  } | null = null;
+
+  /**
    * Tracks approval IDs for which we have already emitted a
    * `tool-approval-requested` telemetry event. The stream merge loop runs
    * per chunk, so the same `approval-requested` state is observed many
@@ -881,6 +890,31 @@ export abstract class BaseAgent<
   public async stop(): Promise<void> {
     await this.internalStop('user-stopped');
     this.state.commands.setIsWorkingFalse();
+  }
+
+  /**
+   * Stops a potentially stale in-flight step and asks the model to continue.
+   * Used after system suspend/resume or event-loop stalls where sockets and
+   * provider streams may have been torn down without a clean SDK error.
+   *
+   * @note DO NOT OVERRIDE
+   */
+  public async recoverInterruptedRun(
+    reason: 'system-resumed' | 'event-loop-stalled',
+  ): Promise<void> {
+    const historyLengthBefore = this.state.get().history.length;
+
+    this.logger.info(
+      `[BaseAgent:${this.instanceId}] Recovering interrupted run with synthetic continuation. reason=${reason}, historyLength=${historyLengthBefore}`,
+    );
+
+    await this.internalStop('system-interrupted');
+    this.state.set((draft) => {
+      draft.isWorking = false;
+    });
+
+    this._pendingSyntheticContinuation = { reason };
+    void this.runStep();
   }
 
   /**
@@ -1500,7 +1534,15 @@ export abstract class BaseAgent<
    */
   private async runStep(isApprovalContinuation = false): Promise<void> {
     // Check canRunStep BEFORE setting isWorking to avoid deadlock
-    if (!this.canRunStep()) return;
+    if (!this.canRunStep()) {
+      if (this._pendingSyntheticContinuation) {
+        this.logger.warn(
+          `[BaseAgent:${this.instanceId}] Dropping synthetic continuation because the agent cannot run a new step. reason=${this._pendingSyntheticContinuation.reason}`,
+        );
+        this._pendingSyntheticContinuation = null;
+      }
+      return;
+    }
 
     // Increment step generation so stale callbacks from previous steps are
     // ignored. Capture it in a local const for the closures below.
@@ -1553,6 +1595,7 @@ export abstract class BaseAgent<
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] Failed to resolve model "${stepModelId}": ${err.message}`,
       );
+      this._pendingSyntheticContinuation = null;
       this.report(err, 'resolveModel');
       this.state.commands.recordStepError({
         error: {
@@ -1591,6 +1634,7 @@ export abstract class BaseAgent<
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] Failed to prepare step context: ${this.formatError(error)}`,
       );
+      this._pendingSyntheticContinuation = null;
       this.report(error, 'prepareStepContext');
       this.state.commands.recordStepError({
         error: {
@@ -1922,6 +1966,7 @@ export abstract class BaseAgent<
       // Drop any deferred continuation decision — we must not schedule
       // the next step or fire onIdle after an error here.
       this._pendingContinue = null;
+      this._pendingSyntheticContinuation = null;
       try {
         this.stepAbortController?.abort();
       } catch {}
@@ -2373,10 +2418,37 @@ export abstract class BaseAgent<
     );
 
     // Then, we allow another step to modify the final model messages
-    const finalModelMessages =
+    const transformedModelMessages =
       await this.transformModelMessagesBeforeStep(modelMessages);
 
+    const finalModelMessages = this.appendSyntheticContinuationIfNeeded(
+      transformedModelMessages,
+    );
+
     return finalModelMessages;
+  }
+
+  private appendSyntheticContinuationIfNeeded(
+    modelMessages: ModelMessage[],
+  ): ModelMessage[] {
+    const continuation = this._pendingSyntheticContinuation;
+    if (!continuation) return modelMessages;
+
+    this._pendingSyntheticContinuation = null;
+
+    const lastMessage = modelMessages.at(-1);
+    if (lastMessage?.role === 'user' || lastMessage?.role === 'tool') {
+      this.logger.info(
+        `[BaseAgent:${this.instanceId}] Synthetic continuation not appended because model context already ends with ${lastMessage.role}. reason=${continuation.reason}`,
+      );
+      return modelMessages;
+    }
+
+    this.logger.info(
+      `[BaseAgent:${this.instanceId}] Appending synthetic model-only continuation. reason=${continuation.reason}, previousLastRole=${lastMessage?.role ?? 'none'}`,
+    );
+
+    return [...modelMessages, { role: 'user', content: 'continue' }];
   }
 
   /**
@@ -2688,15 +2760,20 @@ export abstract class BaseAgent<
   }
 
   private async internalStop(
-    stopReason: 'user-stopped' | 'user-flushed-queue' = 'user-stopped',
+    stopReason:
+      | 'user-stopped'
+      | 'user-flushed-queue'
+      | 'system-interrupted' = 'user-stopped',
   ): Promise<void> {
     // Invalidate pending callbacks BEFORE firing abort — onAbort fires
     // synchronously and must see the new generation to be ignored.
     this._stepGeneration++;
     // Discard any deferred continuation so runStep's tail cannot
     // schedule another step or flip to idle after we've already
-    // intervened.
+    // intervened. Also discard synthetic recovery continuations; the
+    // recovery path sets a fresh one after calling internalStop().
     this._pendingContinue = null;
+    this._pendingSyntheticContinuation = null;
     try {
       this.stepAbortController?.abort();
     } catch {}
@@ -2707,18 +2784,22 @@ export abstract class BaseAgent<
     this.toolbox.cancelPendingAgentDialogs(this.instanceId);
 
     const toolCallAbortReason =
-      stopReason === 'user-stopped'
-        ? (this.config.stopToolCallAbortReason ??
-          'User stopped agent before tool call finished.')
-        : (this.config.flushQueueToolCallAbortReason ??
-          'User sent new message before tool call finished.');
+      stopReason === 'system-interrupted'
+        ? 'System was suspended or stalled before tool call finished.'
+        : stopReason === 'user-stopped'
+          ? (this.config.stopToolCallAbortReason ??
+            'User stopped agent before tool call finished.')
+          : (this.config.flushQueueToolCallAbortReason ??
+            'User sent new message before tool call finished.');
 
     const toolCallRequestApprovalAbortReason =
-      stopReason === 'user-stopped'
-        ? (this.config.stopToolCallRequestApprovalReason ??
-          'User stopped agent before tool call approval was granted.')
-        : (this.config.flushQueueToolCallRequestApprovalReason ??
-          'User sent new message before tool call approval was granted.');
+      stopReason === 'system-interrupted'
+        ? 'System was suspended or stalled before tool call approval was granted.'
+        : stopReason === 'user-stopped'
+          ? (this.config.stopToolCallRequestApprovalReason ??
+            'User stopped agent before tool call approval was granted.')
+          : (this.config.flushQueueToolCallRequestApprovalReason ??
+            'User sent new message before tool call approval was granted.');
 
     this.state.commands.terminateNonTerminalToolPartsInLastAssistant({
       approvalDenyReason: toolCallRequestApprovalAbortReason,

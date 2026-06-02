@@ -10,6 +10,7 @@ import type { Logger } from './logger';
 type PowerSaveState = {
   enabled: boolean;
   hasActiveAgent: boolean;
+  activeAgentCount: number;
 };
 
 function messageHasPendingApproval(message: AgentMessage): boolean {
@@ -51,19 +52,23 @@ function derivePowerSaveState(state: AppState): PowerSaveState {
   const config: GlobalConfig = state.globalConfig;
   const enabled = config.blockAppSuspensionWhenAgentsActive ?? true;
 
-  if (!enabled) return { enabled, hasActiveAgent: false };
+  if (!enabled) return { enabled, hasActiveAgent: false, activeAgentCount: 0 };
+
+  const activeAgentCount = Object.keys(state.agents.instances).filter(
+    (agentId) => agentIsActiveForPowerSave(state, agentId),
+  ).length;
 
   return {
     enabled,
-    hasActiveAgent: Object.keys(state.agents.instances).some((agentId) =>
-      agentIsActiveForPowerSave(state, agentId),
-    ),
+    hasActiveAgent: activeAgentCount > 0,
+    activeAgentCount,
   };
 }
 
 export class AgentPowerSaveBlockerService extends DisposableService {
   private blockerId: number | null = null;
   private unsubscribe: (() => void) | null = null;
+  private lastState: PowerSaveState | null = null;
 
   private constructor(
     private readonly logger: Logger,
@@ -85,8 +90,9 @@ export class AgentPowerSaveBlockerService extends DisposableService {
     this.unsubscribe = syncDerivedState(
       this.uiKarton,
       derivePowerSaveState,
-      ({ enabled, hasActiveAgent }) => {
-        this.setBlocked(enabled && hasActiveAgent);
+      (state) => {
+        this.logStateTransition(state);
+        this.setBlocked(state.enabled && state.hasActiveAgent, state);
       },
       {
         fireImmediately: true,
@@ -94,7 +100,23 @@ export class AgentPowerSaveBlockerService extends DisposableService {
     );
   }
 
-  private setBlocked(shouldBlock: boolean): void {
+  private logStateTransition(state: PowerSaveState): void {
+    const previous = this.lastState;
+    this.lastState = state;
+
+    if (
+      previous?.enabled === state.enabled &&
+      previous?.activeAgentCount === state.activeAgentCount
+    ) {
+      return;
+    }
+
+    this.logger.debug(
+      `[AgentPowerSaveBlockerService] State changed: enabled=${state.enabled}, activeAgentCount=${state.activeAgentCount}`,
+    );
+  }
+
+  private setBlocked(shouldBlock: boolean, state: PowerSaveState): void {
     if (shouldBlock) {
       if (
         this.blockerId !== null &&
@@ -104,22 +126,24 @@ export class AgentPowerSaveBlockerService extends DisposableService {
       }
 
       this.blockerId = powerSaveBlocker.start('prevent-app-suspension');
-      this.logger.debug(
-        `[AgentPowerSaveBlockerService] Started power save blocker: ${this.blockerId}`,
+      this.logger.info(
+        `[AgentPowerSaveBlockerService] Started power save blocker: ${this.blockerId}. activeAgentCount=${state.activeAgentCount}`,
       );
       return;
     }
 
-    this.releaseBlocker();
+    this.releaseBlocker(state);
   }
 
-  private releaseBlocker(): void {
+  private releaseBlocker(state?: PowerSaveState): void {
     if (this.blockerId === null) return;
 
     if (powerSaveBlocker.isStarted(this.blockerId)) {
       powerSaveBlocker.stop(this.blockerId);
-      this.logger.debug(
-        `[AgentPowerSaveBlockerService] Stopped power save blocker: ${this.blockerId}`,
+      this.logger.info(
+        `[AgentPowerSaveBlockerService] Stopped power save blocker: ${this.blockerId}. enabled=${
+          state?.enabled ?? 'unknown'
+        }, activeAgentCount=${state?.activeAgentCount ?? 'unknown'}`,
       );
     }
 

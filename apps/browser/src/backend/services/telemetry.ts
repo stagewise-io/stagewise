@@ -378,6 +378,7 @@ export type EventProperties = {
   'settings-opened': undefined;
   'account-page-viewed': undefined;
   'chat-sidebar-toggled': { new_value: 'open' | 'closed' };
+  'closed-lid-sleep-toggled': { enabled: boolean };
   'chat-new-agent-clicked': {
     source: 'sidebar-top' | 'sidebar-active-agents' | 'hotkey';
   };
@@ -452,6 +453,7 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'account-page-viewed',
   'chat-new-agent-clicked',
   'chat-sidebar-toggled',
+  'closed-lid-sleep-toggled',
   'custom-model-add-aborted',
   'custom-model-add-finished',
   'custom-model-add-started',
@@ -505,6 +507,9 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'chat-sidebar-toggled': z.object({
     new_value: z.enum(['open', 'closed']),
+  }),
+  'closed-lid-sleep-toggled': z.object({
+    enabled: z.boolean(),
   }),
   'custom-model-add-aborted': z.object({
     had_validation_errors: z.boolean(),

@@ -787,6 +787,13 @@ export type AppState = {
     arch: string; // Architecture (e.g., 'x64', 'arm64').
     otherVersions: Record<string, string | undefined>; // Other versions of the app.
   };
+  closedLidSleep: {
+    isSupported: boolean;
+    isSleepDisabled: boolean;
+    ownedByStagewise: boolean;
+    isChanging: boolean;
+    error: string | null;
+  };
   /** Auto-update status synced from the backend AutoUpdateService */
   autoUpdate: {
     status:
@@ -1223,6 +1230,22 @@ export type KartonContract = {
       triggerAction: (id: string, actionIndex: number) => Promise<void>;
       dismiss: (id: string) => Promise<void>;
     };
+    closedLidSleep: {
+      toggle: () => Promise<{
+        isSupported: boolean;
+        isSleepDisabled: boolean;
+        ownedByStagewise: boolean;
+        isChanging: boolean;
+        error: string | null;
+      }>;
+      refresh: () => Promise<{
+        isSupported: boolean;
+        isSleepDisabled: boolean;
+        ownedByStagewise: boolean;
+        isChanging: boolean;
+        error: string | null;
+      }>;
+    };
     autoUpdate: {
       /** Manually trigger an update check */
       checkForUpdates: () => Promise<void>;
@@ -1643,6 +1666,13 @@ export const defaultState: KartonContract['state'] = {
     homepage: __APP_HOMEPAGE__,
     arch: __APP_ARCH__,
     otherVersions: {},
+  },
+  closedLidSleep: {
+    isSupported: __APP_PLATFORM__ === 'darwin',
+    isSleepDisabled: false,
+    ownedByStagewise: false,
+    isChanging: false,
+    error: null,
   },
   autoUpdate: {
     status: 'idle',

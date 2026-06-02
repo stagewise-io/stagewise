@@ -96,6 +96,7 @@ export const defaultState: PagesApiState = {
     availableSoundPacks: ['bubble-pops'],
     packDisplayNames: {},
     dockBounceEnabled: true,
+    blockAppSuspensionWhenAgentsActive: true,
   },
   workspaceMounts: [],
   plans: [],
