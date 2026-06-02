@@ -722,6 +722,10 @@ export class WindowLayoutService extends DisposableService {
     void this.handleCloseTab(tabId);
   }
 
+  public hasTab(tabId: string): boolean {
+    return Boolean(this.tabs[tabId]);
+  }
+
   /**
    * Trusts a certificate for a specific origin in a tab and reloads the page.
    * This is called from the pages API for the "Continue (UNSAFE!)" button on error pages.
@@ -743,7 +747,17 @@ export class WindowLayoutService extends DisposableService {
     url: string | undefined,
     agentInstanceId: string,
     setActive = true,
+    existingTabId?: string,
   ): Promise<string> {
+    if (existingTabId && this.tabs[existingTabId]) {
+      const tab = this.tabs[existingTabId]!;
+      tab.setAgentInstance(agentInstanceId);
+      if (setActive) await this.handleSwitchTab(existingTabId);
+      if (url) await tab.loadURL(url);
+      this.saveTabState();
+      return existingTabId;
+    }
+
     const tabId = await this.createTab(
       url,
       setActive,

@@ -227,7 +227,16 @@ let appReqId = 0;
 
 const pendingAppRequests = new Map<
   string,
-  { resolve: () => void; reject: (reason: unknown) => void }
+  | {
+      type: 'open';
+      resolve: (value: { tabId?: string }) => void;
+      reject: (reason: unknown) => void;
+    }
+  | {
+      type: 'close';
+      resolve: () => void;
+      reject: (reason: unknown) => void;
+    }
 >();
 
 const pendingSendMessage = new Map<
@@ -401,25 +410,32 @@ function getSandboxAPI(agentId: string) {
     },
     openApp(
       appId: string,
-      opts?: { pluginId?: string; height?: number },
-    ): Promise<void> {
+      opts?: {
+        pluginId?: string;
+        title?: string;
+        target?: 'tab';
+        setActive?: boolean;
+      },
+    ): Promise<{ tabId?: string }> {
       const id = `app_${appReqId++}`;
       return new Promise((resolve, reject) => {
-        pendingAppRequests.set(id, { resolve, reject });
+        pendingAppRequests.set(id, { type: 'open', resolve, reject });
         ipc.send({
           type: 'open-app',
           id,
           agentId,
           appId,
           pluginId: opts?.pluginId,
-          height: opts?.height,
+          title: opts?.title,
+          target: opts?.target,
+          setActive: opts?.setActive,
         });
       });
     },
     closeApp(): Promise<void> {
       const id = `app_${appReqId++}`;
       return new Promise((resolve, reject) => {
-        pendingAppRequests.set(id, { resolve, reject });
+        pendingAppRequests.set(id, { type: 'close', resolve, reject });
         ipc.send({ type: 'close-app', id, agentId });
       });
     },
@@ -791,11 +807,27 @@ ipc.onMessage(async (msg) => {
       }
       break;
     }
-    case 'open-app-result':
+    case 'open-app-result': {
+      const p = pendingAppRequests.get(msg.id);
+      if (!p) return;
+      pendingAppRequests.delete(msg.id);
+      if (p.type !== 'open') {
+        p.reject(new Error('Unexpected open-app result'));
+        return;
+      }
+      if (msg.success) p.resolve({ tabId: msg.tabId });
+      else p.reject(new Error(msg.error ?? 'App operation failed'));
+
+      break;
+    }
     case 'close-app-result': {
       const p = pendingAppRequests.get(msg.id);
       if (!p) return;
       pendingAppRequests.delete(msg.id);
+      if (p.type !== 'close') {
+        p.reject(new Error('Unexpected close-app result'));
+        return;
+      }
       if (msg.success) p.resolve();
       else p.reject(new Error(msg.error ?? 'App operation failed'));
 

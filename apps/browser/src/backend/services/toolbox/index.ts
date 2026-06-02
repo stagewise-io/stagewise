@@ -405,6 +405,10 @@ export class ToolboxService
     return this.sandboxService?.getSandboxSessionId(agentInstanceId) ?? null;
   }
 
+  public getSandboxService(): SandboxService | null {
+    return this.sandboxService;
+  }
+
   /**
    * Endpoint descriptor of the local log-ingest HTTP service, or
    * `null` when the service is not running. Used by the host

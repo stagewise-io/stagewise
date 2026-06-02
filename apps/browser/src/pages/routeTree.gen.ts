@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HomeRouteImport } from './routes/home'
+import { Route as PreviewAppIdRouteImport } from './routes/preview/$appId'
 import { Route as PlanFilenameRouteImport } from './routes/plan/$filename'
 import { Route as DiffReviewAgentInstanceIdRouteImport } from './routes/diff-review/$agentInstanceId'
 import { Route as ErrorPagesErrorPageLoadFailedRouteImport } from './routes/_error-pages/error.page-load-failed'
@@ -17,6 +18,11 @@ import { Route as ErrorPagesErrorPageLoadFailedRouteImport } from './routes/_err
 const HomeRoute = HomeRouteImport.update({
   id: '/home',
   path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAppIdRoute = PreviewAppIdRouteImport.update({
+  id: '/preview/$appId',
+  path: '/preview/$appId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanFilenameRoute = PlanFilenameRouteImport.update({
@@ -41,12 +47,14 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
+  '/preview/$appId': typeof PreviewAppIdRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
+  '/preview/$appId': typeof PreviewAppIdRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRoutesById {
@@ -54,6 +62,7 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
+  '/preview/$appId': typeof PreviewAppIdRoute
   '/_error-pages/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRouteTypes {
@@ -62,18 +71,21 @@ export interface FileRouteTypes {
     | '/home'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
+    | '/preview/$appId'
     | '/error/page-load-failed'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/home'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
+    | '/preview/$appId'
     | '/error/page-load-failed'
   id:
     | '__root__'
     | '/home'
     | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
+    | '/preview/$appId'
     | '/_error-pages/error/page-load-failed'
   fileRoutesById: FileRoutesById
 }
@@ -81,6 +93,7 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   DiffReviewAgentInstanceIdRoute: typeof DiffReviewAgentInstanceIdRoute
   PlanFilenameRoute: typeof PlanFilenameRoute
+  PreviewAppIdRoute: typeof PreviewAppIdRoute
   ErrorPagesErrorPageLoadFailedRoute: typeof ErrorPagesErrorPageLoadFailedRoute
 }
 
@@ -91,6 +104,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview/$appId': {
+      id: '/preview/$appId'
+      path: '/preview/$appId'
+      fullPath: '/preview/$appId'
+      preLoaderRoute: typeof PreviewAppIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plan/$filename': {
@@ -121,6 +141,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   DiffReviewAgentInstanceIdRoute: DiffReviewAgentInstanceIdRoute,
   PlanFilenameRoute: PlanFilenameRoute,
+  PreviewAppIdRoute: PreviewAppIdRoute,
   ErrorPagesErrorPageLoadFailedRoute: ErrorPagesErrorPageLoadFailedRoute,
 }
 export const routeTree = rootRouteImport

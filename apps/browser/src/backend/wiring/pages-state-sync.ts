@@ -44,6 +44,27 @@ export async function wirePagesStateSync(deps: {
     }
   });
 
+  // --- Pending app message sync (uiKarton -> pages) ---
+  syncDerivedState(
+    uiKarton,
+    (state) => {
+      const messages: Record<
+        string,
+        { appId: string; pluginId?: string; data: unknown } | null
+      > = {};
+      for (const agentId in state.toolbox) {
+        const message = state.toolbox[agentId]?.pendingAppMessage;
+        if (message !== undefined) messages[agentId] = message ?? null;
+      }
+      return messages;
+    },
+    (messages) => {
+      for (const [agentId, message] of Object.entries(messages)) {
+        pagesService.updatePendingAppMessageState(agentId, message);
+      }
+    },
+  );
+
   // --- Workspace mounts sync (uiKarton -> pages) ---
   syncDerivedState(
     uiKarton,

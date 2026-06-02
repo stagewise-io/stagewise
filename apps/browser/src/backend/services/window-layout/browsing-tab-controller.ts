@@ -475,7 +475,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
-  public loadURL(url: string, transition?: PageTransition) {
+  public loadURL(url: string, transition?: PageTransition): Promise<void> {
     // Default to LINK if not specified (covers programmatic navigation, external services, etc.)
     // Only use TYPED when explicitly passed from UI layer (omnibox)
     const navTransition = transition ?? PageTransition.LINK;
@@ -490,7 +490,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     };
     this.initialLoadCompleted = false;
     this.updateState({ url });
-    this.webContentsView.webContents.loadURL(url);
+    return this.webContentsView.webContents.loadURL(url);
   }
 
   public reload() {

@@ -21,7 +21,7 @@ The sandbox has exactly **two output channels** — everything else (including `
 | `API.output(data: any): void` | Emit visible output (also resets inactivity timer) |
 | `API.sendCDP(tabId, method, params?): Promise<any>` | Send CDP command to a browser tab |
 | `API.createAttachment(fileName, data): Promise<string>` | Save file to `att/`, returns obfuscated name |
-| `API.openApp(appId, opts?): Promise<void>` | Open mini-app in sidebar |
+| `API.openApp(appId, opts?): Promise<{ tabId?: string }>` | Open mini-app in a browser tab |
 | `API.getCredential(typeId): Promise<Record<string, string> \| null>` | Retrieve stored credential |
 | `API.onCDPEvent(tabId, event, callback): () => void` | Subscribe to CDP events (persistent across calls) |
 

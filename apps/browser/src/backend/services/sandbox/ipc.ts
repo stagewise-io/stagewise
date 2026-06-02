@@ -67,6 +67,7 @@ export type MainToWorkerMessage =
       type: 'open-app-result';
       id: string;
       success: boolean;
+      tabId?: string;
       error?: string;
     }
   | {
@@ -148,7 +149,9 @@ export type WorkerToMainMessage =
       agentId: string;
       appId: string;
       pluginId?: string;
-      height?: number;
+      title?: string;
+      target?: 'tab';
+      setActive?: boolean;
     }
   | {
       type: 'close-app';

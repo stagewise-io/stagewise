@@ -1,5 +1,6 @@
 import type { TabState } from '@shared/karton-contracts/ui';
 import {
+  IconBoxSparkleOutline18,
   IconEarthOutline18,
   IconSquareTerminalOutline18,
 } from 'nucleo-ui-outline-18';
@@ -8,6 +9,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
 
 export function TabFavicon({ tabState }: { tabState: TabState }) {
+  const isAppPreview = useMemo(
+    () => tabState?.url?.startsWith('stagewise://internal/preview/') ?? false,
+    [tabState?.url],
+  );
+
   const isStagewisePage = useMemo(
     () => tabState?.url?.startsWith('stagewise://internal/') ?? false,
     [tabState?.url],
@@ -34,7 +40,9 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
 
   return (
     <>
-      {isStagewisePage ? (
+      {isAppPreview ? (
+        <IconBoxSparkleOutline18 className="size-4 text-primary-solid" />
+      ) : isStagewisePage ? (
         <div className="flex size-4 items-center justify-center p-[1px]">
           <Logo color="current" className="size-full text-primary-solid" />
         </div>

@@ -3,12 +3,16 @@ import type { PagesService } from '../services/pages';
 import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { WindowLayoutService } from '../services/window-layout';
 import type { Logger } from '../services/logger';
+import type { SandboxService } from '../services/sandbox';
+import type { ActiveAppStateController } from '../services/agent-core-bridge/state/toolbox-active-app';
 
 export function wirePagesHandlers(deps: {
   uiKarton: KartonService;
   pagesService: PagesService;
   diffHistoryService: DiffHistoryService;
   windowLayoutService: WindowLayoutService;
+  getSandboxService: () => SandboxService | null;
+  activeAppController: ActiveAppStateController;
   logger: Logger;
 }): void {
   const {
@@ -16,6 +20,8 @@ export function wirePagesHandlers(deps: {
     pagesService,
     diffHistoryService,
     windowLayoutService,
+    getSandboxService,
+    activeAppController,
     logger,
   } = deps;
 
@@ -28,6 +34,29 @@ export function wirePagesHandlers(deps: {
       edits: pendingEdits,
     };
   });
+
+  // --- Mini-app message bridge handlers ---
+  pagesService.setForwardAppMessageHandler(
+    async (
+      agentInstanceId: string,
+      appId: string,
+      pluginId: string | undefined,
+      data: unknown,
+    ) => {
+      getSandboxService()?.forwardAppMessage(
+        agentInstanceId,
+        appId,
+        pluginId,
+        data,
+      );
+    },
+  );
+
+  pagesService.setClearPendingAppMessageHandler(
+    async (agentInstanceId: string) => {
+      activeAppController.clearPendingAppMessage(agentInstanceId);
+    },
+  );
 
   // --- External file content handler ---
   pagesService.setGetExternalFileContentHandler(async (oid: string) => {
