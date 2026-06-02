@@ -250,6 +250,20 @@ export class AgentManager extends DisposableService {
               `[AgentManager] startup resume of ${resumeId} failed; falling back to create`,
               { error },
             );
+            // `resumeAgent` delegates to `createAgent`, which writes the
+            // envelope into the in-memory `agentStore` BEFORE the
+            // `BaseAgent` constructor runs. If the constructor throws
+            // (unknown agent type / invariant violation) the envelope is
+            // left behind — without this cleanup, the fall-through
+            // `createAgent` below would seat a SECOND fresh envelope and
+            // the Karton mirror would surface both to the UI as a
+            // duplicate / phantom agent.
+            //
+            // The persisted DB row is untouched (resume only reads from
+            // DB) so this scrub is purely in-memory; idempotent if no
+            // orphan was ever written.
+            deleteAgentInstance(this.agentStore, resumeId);
+            this.activeAgents.delete(resumeId);
           }
         }
       }

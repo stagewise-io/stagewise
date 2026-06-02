@@ -208,18 +208,46 @@ describe('AgentManager startup policy', () => {
     await manager.teardown();
   });
 
-  it('falls through to create when resume fails', async () => {
+  it('falls through to create when resume fails and scrubs any orphan envelope', async () => {
     const agentDb = {
       getLastChatWorkspacePaths: vi.fn(async () => []),
     };
     const createAgentSpy = vi
       .spyOn(AgentManager.prototype, 'createAgent')
       .mockResolvedValue({ instanceId: 'fresh' } as any);
+    // Simulate the mid-create failure mode: resumeAgent reaches into
+    // createAgent (which writes the envelope to the store) and then a
+    // later step — BaseAgent ctor, telemetry, etc. — throws. The
+    // partial envelope is left behind in the store under the resumed
+    // id, and the policy must scrub it before falling through.
+    const deps = createDeps();
+    const storeWrites = new Map<string, unknown>();
+    deps.agentStore.update = vi.fn((updater: any) => {
+      const draft: any = { agents: { instances: {} }, toolbox: {} };
+      for (const [id, env] of storeWrites) {
+        draft.agents.instances[id] = env;
+        draft.toolbox[id] = {};
+      }
+      updater(draft);
+      storeWrites.clear();
+      for (const [id, env] of Object.entries(draft.agents.instances)) {
+        storeWrites.set(id, env);
+      }
+    });
+    deps.agentStore.get = vi.fn(() => {
+      const instances: Record<string, unknown> = {};
+      for (const [id, env] of storeWrites) instances[id] = env;
+      return { agents: { instances }, toolbox: {} } as any;
+    });
+
     const resumeAgentSpy = vi
       .spyOn(AgentManager.prototype, 'resumeAgent')
-      .mockRejectedValue(new Error('agent gone'));
+      .mockImplementation(async function (this: any, id: string) {
+        // Mimic createAgent's pre-ctor upsert before the failure.
+        storeWrites.set(id, { id });
+        throw new Error('boom mid-create');
+      });
 
-    const deps = createDeps();
     const manager = new AgentManager({
       host: deps.host,
       commandRegistry: deps.registry,
@@ -248,6 +276,10 @@ describe('AgentManager startup policy', () => {
     }
     expect(resumeAgentSpy).toHaveBeenCalledWith('dangling-id');
     expect(createAgentSpy).toHaveBeenCalledWith(AgentTypes.CHAT, undefined);
+    // The orphan envelope written by the failed mid-create resume must
+    // be scrubbed before the fresh agent is seated — otherwise the UI
+    // would see both `dangling-id` and the fresh agent.
+    expect(storeWrites.has('dangling-id')).toBe(false);
     await manager.teardown();
   });
 
