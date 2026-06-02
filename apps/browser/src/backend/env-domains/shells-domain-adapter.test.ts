@@ -88,6 +88,23 @@ describe('createShellsDomainAdapter', () => {
     expect(diff).toContain('exitCode="0"');
   });
 
+  it('escapes XML-significant characters in the <shell> text body', () => {
+    const adapter = createShellsDomainAdapter({
+      getSnapshot: () => ({ sessions: [] }),
+      getShellInfo: () => ({
+        platform: 'linux',
+        type: 'bash',
+        path: '/opt/sh<weird>&awful/bin/bash',
+      }),
+    });
+    const curr = adapter.getState('a1') as never;
+    const full = adapter.renderState(null, curr);
+    expect(full).toContain(
+      'Shell: bash (/opt/sh&lt;weird&gt;&amp;awful/bin/bash)',
+    );
+    expect(full).not.toContain('<weird>');
+  });
+
   it('exposes a non-empty promptSection covering shell usage keywords', () => {
     const adapter = createShellsDomainAdapter({
       getSnapshot: () => ({ sessions: [] }),

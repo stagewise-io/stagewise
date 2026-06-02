@@ -16,6 +16,7 @@ import type { DomainAdapter } from '@stagewise/agent-core/env';
 import {
   type EnvironmentChangeEntry,
   escAttr,
+  escXml,
   renderChangesXml,
 } from '@stagewise/agent-core/env';
 import type { ShellSnapshot } from '@shared/env-domain-schemas';
@@ -59,9 +60,9 @@ function renderFullShells(state: ShellsDomainState): string {
   const parts: string[] = [];
   if (state.shellInfo) {
     parts.push(
-      `<shell>\nPlatform: ${escAttr(state.shellInfo.platform)}\nShell: ${escAttr(
+      `<shell>\nPlatform: ${escXml(state.shellInfo.platform)}\nShell: ${escXml(
         state.shellInfo.type,
-      )} (${escAttr(state.shellInfo.path)})\n</shell>`,
+      )} (${escXml(state.shellInfo.path)})\n</shell>`,
     );
   }
   const activeSessions = state.shells.sessions.filter((s) => !s.exited);
