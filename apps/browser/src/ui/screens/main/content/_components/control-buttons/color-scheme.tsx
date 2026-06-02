@@ -1,3 +1,4 @@
+import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { IconSunOutline18, IconMoonOutline18 } from 'nucleo-ui-outline-18';
 import { cn } from '@stagewise/stage-ui/lib/utils';
@@ -9,6 +10,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 
 export function ColorSchemeWidget({ tab }: { tab: TabState }) {
   const cycleColorScheme = useKartonProcedure(
@@ -57,9 +59,11 @@ export function ColorSchemeWidget({ tab }: { tab: TabState }) {
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        Toggle color scheme
-        <br />
-        <span className="text-muted-foreground text-xs">
+        <span className="flex items-center gap-1.5">
+          <span>Toggle color scheme</span>
+          <HotkeyCombo action={HotkeyActions.CYCLE_COLOR_SCHEME} size="xs" />
+        </span>
+        <span className="mt-0.5 block text-muted-foreground text-xs">
           Current:{' '}
           {tab.colorScheme === 'light'
             ? 'Light'

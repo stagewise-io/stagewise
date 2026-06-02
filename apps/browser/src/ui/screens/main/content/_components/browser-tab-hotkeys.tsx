@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 /**
  * Browser-tab–scoped hotkeys — mounted per content panel. Handles
  * per-tab web actions: history navigation, page reload, find, dev tools,
- * tab-content zoom, and URL bar focus.
+ * color scheme, tab-content zoom, and URL bar focus.
  */
 export function BrowserTabHotkeys({
   onFocusUrlBar,
@@ -29,7 +29,12 @@ export function BrowserTabHotkeys({
   const goBack = useKartonProcedure((p) => p.browser.goBack);
   const goForward = useKartonProcedure((p) => p.browser.goForward);
   const reload = useKartonProcedure((p) => p.browser.reload);
-  const toggleDevTools = useKartonProcedure((p) => p.browser.devTools.toggle);
+  const toggleChromeDevTools = useKartonProcedure(
+    (p) => p.browser.devTools.chrome.toggle,
+  );
+  const cycleColorScheme = useKartonProcedure(
+    (p) => p.browser.cycleColorScheme,
+  );
   const setZoomPercentage = useKartonProcedure(
     (p) => p.browser.setZoomPercentage,
   );
@@ -72,7 +77,7 @@ export function BrowserTabHotkeys({
     setZoomPercentage(100, activeTabId);
   }, HotkeyActions.ZOOM_RESET);
 
-  // URL bar (Mod+Alt+L): always focus the omnibox.
+  // URL bar: always focus the omnibox.
   useHotKeyListener(async () => {
     if (isTerminalTab) return;
     const targetTabId = activeTabId;
@@ -114,11 +119,17 @@ export function BrowserTabHotkeys({
     reload(activeTabId);
   }, HotkeyActions.HARD_RELOAD);
 
-  // Dev tools
+  // Chrome DevTools
   useHotKeyListener(() => {
     if (!activeTabId || isTerminalTab) return;
-    toggleDevTools(activeTabId);
+    toggleChromeDevTools(activeTabId);
   }, HotkeyActions.DEV_TOOLS);
+
+  // Color scheme
+  useHotKeyListener(() => {
+    if (!activeTabId || isTerminalTab) return;
+    cycleColorScheme(activeTabId);
+  }, HotkeyActions.CYCLE_COLOR_SCHEME);
 
   return null;
 }

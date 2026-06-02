@@ -22,9 +22,7 @@ export function ChromeDevToolsWidget({ tab }: { tab: TabState }) {
           variant="ghost"
           size="icon-sm"
           aria-label={
-            tab.devTools.chromeOpen
-              ? 'Hide Stagewise DevTools'
-              : 'Show Stagewise DevTools'
+            tab.devTools.chromeOpen ? 'Hide DevTools' : 'Show DevTools'
           }
           onClick={() => toggleChromeDevTools(tab.id)}
           className={
@@ -38,9 +36,7 @@ export function ChromeDevToolsWidget({ tab }: { tab: TabState }) {
       <TooltipContent>
         <span className="flex items-center gap-1.5">
           <span>
-            {tab.devTools.chromeOpen
-              ? 'Hide Stagewise DevTools'
-              : 'Show Stagewise DevTools'}
+            {tab.devTools.chromeOpen ? 'Hide DevTools' : 'Show DevTools'}
           </span>
           <HotkeyCombo action={HotkeyActions.DEV_TOOLS} size="xs" />
         </span>
