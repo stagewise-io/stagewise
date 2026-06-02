@@ -67,7 +67,7 @@ Use `API.getCredential(typeId): Promise<string>` to retrieve stored credentials.
 
 ## Mini Apps
 
-Mini apps are interactive web UIs rendered in the chat sidebar. Use `API.openApp(appId, opts?)` to open one. See the **mini-apps** skill for full details on building, messaging, and best practices.
+Mini apps are interactive web UIs rendered in dedicated browser tabs. Use `API.openApp(appId, opts?)` to open one. See the **mini-apps** skill for full details on building, messaging, and best practices.
 
 ---
 

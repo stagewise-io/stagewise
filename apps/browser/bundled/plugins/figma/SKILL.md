@@ -8,7 +8,7 @@ description: Complete guide for the Figma plugin — REST API access, real-time 
 This plugin provides three capabilities:
 1. **Figma REST API** access for reading designs, components, and images.
 2. **Real-time selection monitoring** — watch which nodes the user selects in a Figma tab via CDP.
-3. **figma-app** — an interactive UI in the chat sidebar that displays the current selection as live badges.
+3. **figma-app** — an interactive UI in a browser tab that displays the current selection as live badges.
 
 ## Querying the Current Selection (IMPORTANT)
 
@@ -125,7 +125,7 @@ fire-and-forget — it does not block future IIFEs.
 
 ```js
 // 1. Open the figma-app so the user sees live selection badges
-await API.openApp('figma-app', { pluginId: 'figma', height: 120 });
+await API.openApp('figma-app', { pluginId: 'figma', title: 'Figma Selection' });
 
 // 2. Identify the Figma tab (use the tab whose URL contains figma.com/design/)
 const tabId = "<figma-tab-id>";
@@ -183,7 +183,7 @@ await API.sendCDP(tabId, "Runtime.evaluate", {
   `,
 });
 
-API.output("Figma selection monitoring active. Select elements in the Figma tab — they will appear as badges in the Figma App.");
+API.output("Figma selection monitoring active. Select elements in the Figma tab — they will appear in the Figma App preview tab.");
 ```
 
 ### Reading the current selection in a later IIFE
@@ -212,8 +212,7 @@ tab it came from.
 
 ## Available Apps
 
-This plugin provides interactive apps that can be opened inside the
-chat sidebar using `API.openApp()`.
+This plugin provides interactive apps that can be opened in browser tabs using `API.openApp()`.
 
 | App ID | Description |
 |--------|-------------|
@@ -222,7 +221,7 @@ chat sidebar using `API.openApp()`.
 ### Opening the app
 
 ```js
-await API.openApp('figma-app', { pluginId: 'figma', height: 120 });
+await API.openApp('figma-app', { pluginId: 'figma', title: 'Figma Selection' });
 ```
 
 ### Closing the app
@@ -231,8 +230,7 @@ await API.openApp('figma-app', { pluginId: 'figma', height: 120 });
 await API.closeApp();
 ```
 
-The app renders in a 300px iframe above the chat input. Only one app
-can be active at a time — opening a new app replaces the current one.
+The app renders in a dedicated preview tab. Calling `API.openApp()` again opens a refreshed preview tab.
 The user can also dismiss it manually.
 
 ### Sending data to the app

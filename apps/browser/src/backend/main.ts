@@ -766,7 +766,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     pagesService,
     diffHistoryService,
     windowLayoutService,
-
+    getSandboxService: () => toolboxService.getSandboxService(),
+    activeAppController: agentCoreBridge.activeAppController,
     logger,
   });
 

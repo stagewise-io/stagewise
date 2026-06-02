@@ -8,7 +8,6 @@ import {
 } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
-import { InternalAppFrame } from './internal-app-frame';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import {
@@ -129,14 +128,6 @@ export function ChatPanel() {
         )}
       </OpenAgentContext.Provider>
       <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
-        <div
-          className="mx-2 flex flex-col gap-2"
-          style={{
-            marginBottom: 'calc(var(--status-card-height, 0px) + 0.5rem)',
-          }}
-        >
-          <InternalAppFrame />
-        </div>
         <ChatPanelFooter key={openAgent} />
       </div>
     </div>

@@ -39,7 +39,7 @@ Create with `overwriteFile`:
 ### Open (sandbox)
 
 ```js
-await API.openApp("hello");
+await API.openApp("hello", { title: "Hello" });
 ```
 
 ---
@@ -99,7 +99,7 @@ root.innerHTML = `
 ### Open (sandbox)
 
 ```js
-await API.openApp("dashboard");
+await API.openApp("dashboard", { title: "Dashboard" });
 ```
 
 ### Iterating
@@ -107,7 +107,7 @@ await API.openApp("dashboard");
 After editing any file with `multiEdit`, reload:
 
 ```js
-await API.openApp("dashboard"); // reloads the iframe
+await API.openApp("dashboard", { title: "Dashboard" }); // opens a refreshed preview tab
 ```
 
 ---
@@ -187,7 +187,7 @@ Create with `overwriteFile`:
 ### Step 1: Open and register listener (sandbox)
 
 ```js
-await API.openApp("picker");
+await API.openApp("picker", { title: "Picker" });
 
 // Register listener for user selections
 globalThis.pickerMessages = [];

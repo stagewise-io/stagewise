@@ -1,7 +1,6 @@
 import { WebContentsView, shell, session, app, net } from 'electron';
 import { domCodeToElectronKeyCode } from '../../utils/dom-code-to-electron-key-code';
 import path from 'node:path';
-import fs from 'node:fs/promises';
 import contextMenu from 'electron-context-menu';
 import type { Logger } from '../logger';
 import type { TelemetryService } from '../telemetry';
@@ -25,8 +24,7 @@ import {
 import fsSync from 'node:fs';
 import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import { inferMimeType } from '@shared/mime-utils';
-import { getAgentAppsDir } from '@/utils/paths';
-import { getPluginsPath } from '@/utils/paths';
+import { registerAppProtocol } from '../app-protocol';
 
 const UI_SESSION_PARTITION = 'persist:stagewise-ui';
 
@@ -304,7 +302,6 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.registerAttachmentProtocol();
     this.registerWorkspaceFileProtocol();
     this.registerAppProtocol();
-    this.registerAppProtocol('persist:browser-content');
     this.view = this.createView();
     this.loadApp();
     this.registerKartonProcedures();
@@ -399,75 +396,12 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   /**
    * Register the app:// protocol handler on the UI session so
    * agent-created and plugin-provided apps can be served in iframes.
-   *
-   * URL format:
-   *   app://agents/{agentId}/{appId}/{relativePath}
-   *   app://plugins/{pluginId}/{appId}/{relativePath}
    */
-  private registerAppProtocol(partition = UI_SESSION_PARTITION): void {
-    const targetSession = session.fromPartition(partition);
-
-    targetSession.protocol.handle('app', async (request) => {
-      try {
-        const url = new URL(request.url);
-        const namespace = url.hostname;
-        const pathParts = decodeURIComponent(
-          url.pathname.replace(/^\//, ''),
-        ).split('/');
-
-        const entityId = pathParts[0];
-        const appId = pathParts[1];
-        const relativePath = pathParts.slice(2).join('/');
-
-        if (!entityId || !appId || !relativePath)
-          return new Response('Invalid app URL', { status: 400 });
-
-        let appDir: string;
-        if (namespace === 'agents')
-          appDir = path.join(getAgentAppsDir(entityId), appId);
-        else if (namespace === 'plugins')
-          appDir = path.join(getPluginsPath(), entityId, 'apps', appId);
-        else return new Response('Unknown app namespace', { status: 400 });
-
-        const absolutePath = path.resolve(appDir, relativePath);
-        if (!absolutePath.startsWith(appDir + path.sep))
-          return new Response('Path traversal denied', { status: 400 });
-
-        try {
-          await fs.access(absolutePath);
-        } catch {
-          return new Response('File not found', { status: 404 });
-        }
-
-        const mime = inferMimeType(relativePath);
-        const fileUrl = pathToFileURL(absolutePath).href;
-        const fileResponse = await net.fetch(fileUrl);
-
-        if (mime === 'text/html') {
-          const html = await fileResponse.text();
-          const snippet =
-            '<style>*,*::before,*::after{scrollbar-width:thin;scrollbar-color:var(--color-surface-2,rgba(255,255,255,.15)) transparent}</style>';
-          const patched = html.includes('</head>')
-            ? html.replace('</head>', `${snippet}</head>`)
-            : `${snippet}${html}`;
-          return new Response(patched, {
-            status: 200,
-            headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' },
-          });
-        }
-
-        return new Response(fileResponse.body, {
-          status: 200,
-          headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' },
-        });
-      } catch (err) {
-        this.logger.error('[UIController] app protocol error', {
-          error: err,
-          url: request.url,
-        });
-        return new Response('Internal error', { status: 500 });
-      }
-    });
+  private registerAppProtocol(): void {
+    registerAppProtocol(
+      session.fromPartition(UI_SESSION_PARTITION),
+      this.logger,
+    );
   }
 
   /**

@@ -9,6 +9,12 @@ import type { GlobalConfig } from '../ui/shared-types';
 import type { PlanEntry } from '../ui';
 import type { FileDiff } from '../ui/shared-types';
 
+type PendingAppMessage = {
+  appId: string;
+  pluginId?: string;
+  data: unknown;
+} | null;
+
 export type WorkspaceMountInfo = {
   prefix: string;
   path: string;
@@ -23,6 +29,8 @@ export type WorkspaceMountInfo = {
 export type PagesApiState = {
   /** Pending file edits by chat ID, pushed in real-time */
   pendingEditsByAgentInstanceId: Record<string, FileDiff[]>;
+  /** Pending mini-app messages by chat ID, pushed in real-time */
+  pendingAppMessagesByAgentInstanceId: Record<string, PendingAppMessage>;
   /** Global config (read-only sync, updated via backend state sync) */
   globalConfig: GlobalConfig;
   /** Currently mounted workspaces, deduplicated across all agents */
@@ -49,6 +57,15 @@ export type PagesApiContract = {
     ) => Promise<Record<string, FaviconBitmapResult>>;
     /** Get pending file edits for a specific chat */
     getPendingEdits: (agentInstanceId: string) => Promise<PendingEditsResult>;
+    /** Forward a mini-app iframe message to the sandbox worker. */
+    forwardAppMessage: (
+      agentInstanceId: string,
+      appId: string,
+      pluginId: string | undefined,
+      data: unknown,
+    ) => Promise<void>;
+    /** Clear the pending mini-app message for a specific chat. */
+    clearPendingAppMessage: (agentInstanceId: string) => Promise<void>;
     /** Accept all pending edits for a specific chat */
     acceptAllPendingEdits: (agentInstanceId: string) => Promise<void>;
     /** Reject all pending edits for a specific chat */
@@ -86,6 +103,7 @@ export type PagesApiContract = {
 
 export const defaultState: PagesApiState = {
   pendingEditsByAgentInstanceId: {},
+  pendingAppMessagesByAgentInstanceId: {},
   globalConfig: {
     telemetryLevel: 'full',
     openFilesInIde: 'other',

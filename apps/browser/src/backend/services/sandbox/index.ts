@@ -63,6 +63,12 @@ const SANDBOX_WORKER_PATH = path.join(
   'sandbox-worker.cjs',
 );
 
+function encodePreviewTitleParam(title: string | undefined): string | null {
+  const trimmedTitle = title?.trim();
+  if (!trimmedTitle) return null;
+  return Buffer.from(trimmedTitle, 'utf8').toString('base64url');
+}
+
 interface WorkerInfo {
   process: Electron.UtilityProcess;
   ipc: ReturnType<typeof createMainIPC>;
@@ -86,15 +92,17 @@ export class SandboxService extends DisposableService {
   private readonly kartonService?: KartonService;
   /**
    * Injected post-construction by `main.ts` once the AgentCoreBridge is
-   * wired. Writes for the migrated `activeApp` / `pendingAppMessage`
-   * slice must go through this controller (Phase 1d, D-KB-1) so
-   * `AgentStore` stays the single source of truth. If unset at the time
-   * an app lifecycle event arrives, migrated writes fail fast instead of
-   * silently falling back to direct Karton writes.
+   * wired. Pending app messages go through this controller so AgentStore
+   * remains the single source of truth before the Pages API mirrors them to
+   * preview tabs.
    */
   private activeAppController: ActiveAppStateController | null = null;
   private workers: WorkerInfo[] = [];
   private agentToWorker = new Map<string, WorkerInfo>();
+  private activeTabApps = new Map<
+    string,
+    { appId: string; pluginId?: string; tabId: string }
+  >();
   private pendingRequests = new Map<string, PendingRequest>();
   private agentToolCallIds = new Map<string, string>();
   private fileWriteCountPerExecution = new Map<string, number>();
@@ -269,23 +277,18 @@ export class SandboxService extends DisposableService {
     worker.agentIds.delete(agentId);
     worker.load--;
     this.agentToWorker.delete(agentId);
+    this.activeTabApps.delete(agentId);
     this.agentToolCallIds.delete(agentId);
     this.fileWriteCountPerExecution.delete(agentId);
     this.sandboxSessionIds.delete(agentId);
 
     this.cleanupCdpSubscriptions(agentId);
 
-    // Clear the migrated `activeApp` slice through AgentStore. The bridge
-    // mirror propagates to Karton. If the controller isn't registered yet
-    // (very early teardown, before main.ts wiring), silently no-op — the
-    // store has no entry to clear either.
-    if (this.activeAppController?.getActiveApp(agentId) != null) {
-      this.activeAppController.clearActiveApp(agentId);
-    }
+    this.activeAppController?.clearPendingAppMessage(agentId);
   }
 
   /**
-   * Injects the active-app state controller. Called once from `main.ts`
+   * Injects the app-message state controller. Called once from `main.ts`
    * after `createAgentCoreBridge` returns its handles. Idempotent: a
    * second call replaces the controller, which is safe because writes
    * through the old controller would land in the same `AgentStore`.
@@ -486,30 +489,53 @@ export class SandboxService extends DisposableService {
       }
       case 'open-app': {
         try {
+          const timestamp = Date.now();
           if (!this.activeAppController) {
             this.safeSend(worker, {
               type: 'open-app-result',
               id: msg.id,
               success: false,
-              error: 'Active-app controller is not wired',
+              error: 'App-message controller is not wired',
             });
             return;
           }
-          const base = msg.pluginId
-            ? `app://plugins/${msg.pluginId}/${msg.appId}/index.html`
-            : `app://agents/${msg.agentId}/${msg.appId}/index.html`;
-          const src = `${base}?_t=${Date.now()}`;
 
-          this.activeAppController.setActiveApp(msg.agentId, {
+          const params = new URLSearchParams({ t: String(timestamp) });
+          if (msg.pluginId) params.set('pluginId', msg.pluginId);
+          else params.set('agentId', msg.agentId);
+
+          const previewTitle = encodePreviewTitleParam(msg.title);
+          if (previewTitle) params.set('title', previewTitle);
+
+          const url = `stagewise://internal/preview/${encodeURIComponent(msg.appId)}?${params.toString()}`;
+          const setActive = msg.setActive ?? true;
+          const activeTabApp = this.activeTabApps.get(msg.agentId);
+          const reusableTabId =
+            activeTabApp?.appId === msg.appId &&
+            activeTabApp.pluginId === msg.pluginId &&
+            this.windowLayoutService.hasTab(activeTabApp.tabId)
+              ? activeTabApp.tabId
+              : undefined;
+          if (activeTabApp && !reusableTabId) {
+            this.activeTabApps.delete(msg.agentId);
+          }
+
+          const tabId = await this.windowLayoutService.createTabForAgent(
+            url,
+            msg.agentId,
+            setActive,
+            reusableTabId,
+          );
+          this.activeTabApps.set(msg.agentId, {
             appId: msg.appId,
             pluginId: msg.pluginId,
-            src,
-            height: msg.height,
+            tabId,
           });
           this.safeSend(worker, {
             type: 'open-app-result',
             id: msg.id,
             success: true,
+            tabId,
           });
         } catch (err) {
           this.safeSend(worker, {
@@ -523,16 +549,14 @@ export class SandboxService extends DisposableService {
       }
       case 'close-app': {
         try {
-          if (!this.activeAppController) {
-            this.safeSend(worker, {
-              type: 'close-app-result',
-              id: msg.id,
-              success: false,
-              error: 'Active-app controller is not wired',
-            });
-            return;
+          this.activeAppController?.clearPendingAppMessage(msg.agentId);
+          const activeTabApp = this.activeTabApps.get(msg.agentId);
+          if (activeTabApp) {
+            if (this.windowLayoutService.hasTab(activeTabApp.tabId)) {
+              this.windowLayoutService.closeTab(activeTabApp.tabId);
+            }
+            this.activeTabApps.delete(msg.agentId);
           }
-          this.activeAppController.clearActiveApp(msg.agentId);
           this.safeSend(worker, {
             type: 'close-app-result',
             id: msg.id,
@@ -555,16 +579,18 @@ export class SandboxService extends DisposableService {
               type: 'send-app-message-result',
               id: msg.id,
               success: false,
-              error: 'Active-app controller is not wired',
+              error: 'App-message controller is not wired',
             });
             return;
           }
-          const activeApp = this.activeAppController.getActiveApp(msg.agentId);
-          if (
-            !activeApp ||
-            activeApp.appId !== msg.appId ||
-            activeApp.pluginId !== msg.pluginId
-          ) {
+          const activeTabApp = this.activeTabApps.get(msg.agentId);
+          const isActiveTabApp =
+            activeTabApp?.appId === msg.appId &&
+            activeTabApp.pluginId === msg.pluginId &&
+            this.windowLayoutService.hasTab(activeTabApp.tabId);
+          if (!isActiveTabApp) {
+            if (activeTabApp) this.activeTabApps.delete(msg.agentId);
+
             this.safeSend(worker, {
               type: 'send-app-message-result',
               id: msg.id,

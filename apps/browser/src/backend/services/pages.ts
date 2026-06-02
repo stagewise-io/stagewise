@@ -33,6 +33,7 @@ import { DisposableService } from './disposable';
 import type { TelemetryService } from './telemetry';
 import { isUIEventName, parseUIEventProperties } from './telemetry';
 import { getPlansDir } from '@/utils/paths';
+import { registerAppProtocol } from './app-protocol';
 
 declare const PAGES_VITE_DEV_SERVER_URL: string;
 declare const PAGES_VITE_NAME: string;
@@ -53,6 +54,15 @@ export class PagesService extends DisposableService {
   private getPendingEditsHandler?: (
     agentInstanceId: string,
   ) => Promise<PendingEditsResult>;
+  private forwardAppMessageHandler?: (
+    agentInstanceId: string,
+    appId: string,
+    pluginId: string | undefined,
+    data: unknown,
+  ) => Promise<void>;
+  private clearPendingAppMessageHandler?: (
+    agentInstanceId: string,
+  ) => Promise<void>;
   private acceptAllPendingEditsHandler?: (
     agentInstanceId: string,
   ) => Promise<void>;
@@ -285,6 +295,11 @@ export class PagesService extends DisposableService {
     this.logger.debug(
       '[PagesService] Registered plans protocol handler for browsing session',
     );
+
+    registerAppProtocol(ses, this.logger);
+    this.logger.debug(
+      '[PagesService] Registered app protocol handler for browsing session',
+    );
   }
 
   private registerProcedureHandlers(): void {
@@ -319,6 +334,46 @@ export class PagesService extends DisposableService {
           ...result,
           faviconUrl: faviconMap.get(result.url) ?? null,
         }));
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'forwardAppMessage',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        appId: string,
+        pluginId: string | undefined,
+        data: unknown,
+      ): Promise<void> => {
+        if (!this.forwardAppMessageHandler) {
+          this.logger.warn(
+            '[PagesService] forwardAppMessage called but no handler is set',
+          );
+          return;
+        }
+        await this.forwardAppMessageHandler(
+          agentInstanceId,
+          appId,
+          pluginId,
+          data,
+        );
+      },
+    );
+
+    this.kartonServer.registerServerProcedureHandler(
+      'clearPendingAppMessage',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+      ): Promise<void> => {
+        if (!this.clearPendingAppMessageHandler) {
+          this.logger.warn(
+            '[PagesService] clearPendingAppMessage called but no handler is set',
+          );
+          return;
+        }
+        await this.clearPendingAppMessageHandler(agentInstanceId);
       },
     );
 
@@ -515,6 +570,23 @@ export class PagesService extends DisposableService {
     this.getPendingEditsHandler = handler;
   }
 
+  public setForwardAppMessageHandler(
+    handler: (
+      agentInstanceId: string,
+      appId: string,
+      pluginId: string | undefined,
+      data: unknown,
+    ) => Promise<void>,
+  ): void {
+    this.forwardAppMessageHandler = handler;
+  }
+
+  public setClearPendingAppMessageHandler(
+    handler: (agentInstanceId: string) => Promise<void>,
+  ): void {
+    this.clearPendingAppMessageHandler = handler;
+  }
+
   public setAcceptAllPendingEditsHandler(
     handler: (agentInstanceId: string) => Promise<void>,
   ): void {
@@ -583,6 +655,15 @@ export class PagesService extends DisposableService {
   ): void {
     this.kartonServer.setState((draft) => {
       draft.pendingEditsByAgentInstanceId[agentInstanceId] = edits;
+    });
+  }
+
+  public updatePendingAppMessageState(
+    agentInstanceId: string,
+    message: { appId: string; pluginId?: string; data: unknown } | null,
+  ): void {
+    this.kartonServer.setState((draft) => {
+      draft.pendingAppMessagesByAgentInstanceId[agentInstanceId] = message;
     });
   }
 
@@ -754,6 +835,8 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('openExternalUrl');
     this.kartonServer.removeServerProcedureHandler('captureTelemetry');
     this.kartonServer.removeServerProcedureHandler('getPendingEdits');
+    this.kartonServer.removeServerProcedureHandler('forwardAppMessage');
+    this.kartonServer.removeServerProcedureHandler('clearPendingAppMessage');
     this.kartonServer.removeServerProcedureHandler('acceptAllPendingEdits');
     this.kartonServer.removeServerProcedureHandler('rejectAllPendingEdits');
     this.kartonServer.removeServerProcedureHandler('acceptPendingEdit');
@@ -765,6 +848,7 @@ export class PagesService extends DisposableService {
     ses.protocol.unhandle('stagewise');
     ses.protocol.unhandle('workspace');
     ses.protocol.unhandle('plans');
+    ses.protocol.unhandle('app');
 
     for (const [port, listener] of this.portCloseListeners.entries()) {
       port.off('close', listener);
@@ -773,6 +857,8 @@ export class PagesService extends DisposableService {
     this.openTabHandler = undefined;
     this.trustCertificateAndReloadHandler = undefined;
     this.getExternalFileContentHandler = undefined;
+    this.forwardAppMessageHandler = undefined;
+    this.clearPendingAppMessageHandler = undefined;
 
     await this.transport.close();
     this.logger.debug('[PagesService] Teardown complete');
