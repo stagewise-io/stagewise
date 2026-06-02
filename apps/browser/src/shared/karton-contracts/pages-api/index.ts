@@ -113,6 +113,7 @@ export const defaultState: PagesApiState = {
     packDisplayNames: {},
     dockBounceEnabled: true,
     blockAppSuspensionWhenAgentsActive: true,
+    personalizationThemeId: 'default',
   },
   workspaceMounts: [],
   plans: [],

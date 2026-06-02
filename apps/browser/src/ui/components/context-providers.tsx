@@ -6,6 +6,7 @@ import { PostHogProvider } from '@ui/hooks/use-posthog';
 import { TabStateUIProvider } from '../hooks/use-tab-ui-state';
 import { ErrorBoundary } from './error-boundary';
 import { TutorialProvider } from '@ui/contexts/tutorial';
+import { PersonalizationThemeSyncer } from './personalization-theme-syncer';
 
 export function ContextProviders({ children }: { children?: ReactNode }) {
   return (
@@ -15,7 +16,10 @@ export function ContextProviders({ children }: { children?: ReactNode }) {
           <ErrorBoundary>
             <TutorialProvider>
               <MessageEditStateProvider>
-                <TabStateUIProvider>{children}</TabStateUIProvider>
+                <TabStateUIProvider>
+                  <PersonalizationThemeSyncer />
+                  {children}
+                </TabStateUIProvider>
               </MessageEditStateProvider>
             </TutorialProvider>
           </ErrorBoundary>

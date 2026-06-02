@@ -11,6 +11,7 @@ import {
   IconKey2Outline18,
   IconServerOutline18,
 } from 'nucleo-ui-outline-18';
+import { PaletteIcon } from 'lucide-react';
 import type { SettingCommandItem } from '../command-center-model';
 import {
   commandCenterSettings,
@@ -35,6 +36,8 @@ function iconForSetting(setting: CommandCenterSettingDefinition) {
       return <IconSpace3dFillDuo18 className={`${className} rotate-180`} />;
     case 'history':
       return <IconHistoryFillDuo18 className={className} />;
+    case 'personalization':
+      return <PaletteIcon className={className} />;
     case 'settings':
     case 'browser':
       return <IconGear3FillDuo18 className={className} />;

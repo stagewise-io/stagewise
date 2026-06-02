@@ -232,6 +232,20 @@ export const openFilesInIdeSchema = z.enum([
 
 export type OpenFilesInIde = z.infer<typeof openFilesInIdeSchema>;
 
+export const personalizationThemeIds = [
+  'default',
+  'lavender',
+  'mint',
+  'sky',
+  'fire',
+  'forest',
+  'bubblegum',
+] as const;
+export const personalizationThemeIdSchema = z.enum(personalizationThemeIds);
+export type PersonalizationThemeId = z.infer<
+  typeof personalizationThemeIdSchema
+>;
+
 export const globalConfigSchema = z
   .object({
     telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
@@ -244,6 +258,9 @@ export const globalConfigSchema = z
     packDisplayNames: z.record(z.string(), z.string()).default({}),
     dockBounceEnabled: z.boolean().default(true),
     blockAppSuspensionWhenAgentsActive: z.boolean().default(true),
+    personalizationThemeId: personalizationThemeIdSchema
+      .catch('default')
+      .default('default'),
   })
   .loose();
 

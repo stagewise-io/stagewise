@@ -73,7 +73,7 @@ const NOTIFICATION_LOUDNESS_OPTIONS = [
 
 type SoundLoudness = (typeof NOTIFICATION_LOUDNESS_OPTIONS)[number]['value'];
 
-function NotificationsSetting() {
+export function NotificationsSetting() {
   const globalConfig = useKartonState((s) => s.globalConfig);
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
@@ -302,12 +302,6 @@ export function GeneralSettingsSection() {
           </div>
           <section className="space-y-6">
             <PowerSaveBlockerSetting />
-          </section>
-
-          <hr className="border-derived-subtle border-t" />
-
-          <section className="space-y-6">
-            <NotificationsSetting />
           </section>
         </div>
       </OverlayScrollbar>
