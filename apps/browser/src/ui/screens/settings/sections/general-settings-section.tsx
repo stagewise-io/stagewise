@@ -9,7 +9,7 @@ import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { IdeLogo } from '@ui/components/ide-logo';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import { IDE_SELECTION_ITEMS } from '@ui/utils';
-import { PlayIcon, UploadIcon } from 'lucide-react';
+import { PlayIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
 
 // =============================================================================
 // IDE Selection Setting Component
@@ -79,6 +79,7 @@ function IdeSelectionSetting() {
 
 function PowerSaveBlockerSetting() {
   const globalConfig = useKartonState((s) => s.globalConfig);
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
 
   const isEnabled = globalConfig.blockAppSuspensionWhenAgentsActive ?? true;
@@ -90,23 +91,36 @@ function PowerSaveBlockerSetting() {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <label htmlFor="agent-power-save-blocker" className="min-w-0 flex-1">
-        <h3 className="font-medium text-base text-foreground">
-          Keep app awake while agents work
-        </h3>
-        <p className="text-muted-foreground text-sm">
-          Prevent app suspension while agents run tool loops or other active
-          work. Waiting for questions or tool approval still counts as idle.
-        </p>
-      </label>
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <label htmlFor="agent-power-save-blocker">
+          <h3 className="font-medium text-base text-foreground">
+            Keep app awake while agents work
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            Prevent app suspension while agents run tool loops or other active
+            work. Waiting for questions or tool approval still counts as idle.
+          </p>
+        </label>
+
+        {isMacOs && (
+          <div className="mt-2 flex items-start gap-1.5 rounded-md bg-warning-background/45 p-2 text-warning-foreground text-xs leading-snug ring-1 ring-warning-solid/20">
+            <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0 text-warning-foreground" />
+            <p>
+              To prevent sleep in battery mode on macOS devices, including when
+              the lid is closed, you must enable “Keep awake” mode in the
+              bottom-right corner of the sidebar.
+            </p>
+          </div>
+        )}
+      </div>
 
       <Switch
         id="agent-power-save-blocker"
         checked={isEnabled}
         onCheckedChange={handleChange}
-        size="sm"
-        className="shrink-0"
+        size="xs"
+        className="mt-1 shrink-0"
       />
     </div>
   );

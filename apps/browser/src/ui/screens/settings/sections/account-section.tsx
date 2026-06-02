@@ -76,7 +76,7 @@ function AuthenticatedView({
   machineId?: string;
   onLogout: () => void;
 }) {
-  const openTab = useKartonProcedure((p) => p.browser.createTab);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
 
   return (
     <>
@@ -162,7 +162,7 @@ function AuthenticatedView({
         <Button
           variant="primary"
           size="sm"
-          onClick={() => void openTab(CONSOLE_URL, true)}
+          onClick={() => void openExternalUrl(CONSOLE_URL)}
         >
           Open Console
         </Button>
