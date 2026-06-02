@@ -28,6 +28,31 @@ export class AgentRuntimeRecoveryService extends DisposableService {
     return instance;
   }
 
+  private recoverInterruptedActiveAgents(
+    reason: 'system-resumed' | 'event-loop-stalled',
+    details?: { stalledForMs?: number },
+  ): void {
+    void this.agentManager
+      .recoverInterruptedActiveAgents(reason, details)
+      .catch((error) => {
+        this.logger.warn(
+          `[AgentRuntimeRecoveryService] Failed to recover interrupted agents. reason=${reason}`,
+          error,
+        );
+      });
+  }
+
+  private retryNetworkFailedAgents(reason: string): void {
+    void this.agentManager
+      .retryNetworkFailedAgentsNow(reason)
+      .catch((error) => {
+        this.logger.warn(
+          `[AgentRuntimeRecoveryService] Failed to retry network-failed agents. reason=${reason}`,
+          error,
+        );
+      });
+  }
+
   private initialize(): void {
     const handleSuspend = () => {
       this.suspendedAt = Date.now();
@@ -49,10 +74,10 @@ export class AgentRuntimeRecoveryService extends DisposableService {
         }`,
       );
 
-      void this.agentManager.recoverInterruptedActiveAgents('system-resumed', {
+      this.recoverInterruptedActiveAgents('system-resumed', {
         stalledForMs: suspendedForMs,
       });
-      void this.agentManager.retryNetworkFailedAgentsNow('system-resumed');
+      this.retryNetworkFailedAgents('system-resumed');
     };
 
     powerMonitor.on('suspend', handleSuspend);
@@ -73,11 +98,10 @@ export class AgentRuntimeRecoveryService extends DisposableService {
         `[AgentRuntimeRecoveryService] Event loop stall detected. elapsedMs=${elapsedMs}`,
       );
 
-      void this.agentManager.recoverInterruptedActiveAgents(
-        'event-loop-stalled',
-        { stalledForMs: elapsedMs },
-      );
-      void this.agentManager.retryNetworkFailedAgentsNow('event-loop-stalled');
+      this.recoverInterruptedActiveAgents('event-loop-stalled', {
+        stalledForMs: elapsedMs,
+      });
+      this.retryNetworkFailedAgents('event-loop-stalled');
     }, EVENT_LOOP_CHECK_INTERVAL_MS);
     this.eventLoopCheckInterval.unref?.();
   }

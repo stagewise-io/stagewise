@@ -793,6 +793,7 @@ export type AppState = {
     ownedByStagewise: boolean;
     isChanging: boolean;
     error: string | null;
+    persistenceWarning: string | null;
   };
   /** Auto-update status synced from the backend AutoUpdateService */
   autoUpdate: {
@@ -1237,6 +1238,7 @@ export type KartonContract = {
         ownedByStagewise: boolean;
         isChanging: boolean;
         error: string | null;
+        persistenceWarning: string | null;
       }>;
       refresh: () => Promise<{
         isSupported: boolean;
@@ -1244,6 +1246,7 @@ export type KartonContract = {
         ownedByStagewise: boolean;
         isChanging: boolean;
         error: string | null;
+        persistenceWarning: string | null;
       }>;
     };
     autoUpdate: {
@@ -1673,6 +1676,7 @@ export const defaultState: KartonContract['state'] = {
     ownedByStagewise: false,
     isChanging: false,
     error: null,
+    persistenceWarning: null,
   },
   autoUpdate: {
     status: 'idle',

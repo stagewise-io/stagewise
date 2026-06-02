@@ -16,7 +16,7 @@ type PowerSaveState = {
 function messageHasPendingApproval(message: AgentMessage): boolean {
   if (message.role !== 'assistant') return false;
 
-  return message.parts.some((part) => {
+  return message.parts.some((part: AgentMessage['parts'][number]) => {
     if (!(part.type === 'dynamic-tool' || part.type.startsWith('tool-'))) {
       return false;
     }
