@@ -198,9 +198,18 @@ export function Sidebar() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      {closedLidSleep.isSleepDisabled
-                        ? 'Re-enable sleep on closed lid'
-                        : 'Prevent sleep on closed lid'}
+                      <div className="flex max-w-64 flex-col gap-1">
+                        <span>
+                          {closedLidSleep.isSleepDisabled
+                            ? 'Re-enable sleep on closed lid'
+                            : 'Prevent sleep on closed lid'}
+                        </span>
+                        {closedLidSleep.persistenceWarning && (
+                          <span className="text-muted-foreground text-xs">
+                            {closedLidSleep.persistenceWarning}
+                          </span>
+                        )}
+                      </div>
                     </TooltipContent>
                   </Tooltip>
                 )}

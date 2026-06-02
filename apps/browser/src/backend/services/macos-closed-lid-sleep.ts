@@ -20,7 +20,11 @@ type ClosedLidSleepState = {
   ownedByStagewise: boolean;
   isChanging: boolean;
   error: string | null;
+  persistenceWarning: string | null;
 };
+
+const CLOSED_LID_SLEEP_PERSISTENCE_WARNING =
+  'This setting changes a persistent macOS power setting. If stagewise quits unexpectedly, closed-lid sleep may remain disabled until you turn it off again.';
 
 function parseDisableSleepState(output: string): boolean | null {
   const match = output.match(
@@ -41,11 +45,11 @@ async function readDisableSleepState(): Promise<boolean> {
 }
 
 function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'\\''`)}'`;
+  return `'${value.split("'").join(`'\\''`)}`;
 }
 
 function escapeSudoersUser(value: string): string {
-  return value.replaceAll(/([\\,:=\s])/g, '\\$1');
+  return value.replace(/([\\,:=\s])/g, '\\$1');
 }
 
 function getSudoersRule(): string {
@@ -90,6 +94,20 @@ async function setDisableSleepState(disabled: boolean): Promise<void> {
     await installPasswordlessPmsetRule();
     await runPasswordlessPmset(disabled);
   }
+}
+
+async function removePasswordlessPmsetRule(): Promise<void> {
+  const command = [
+    `/bin/rm -f ${shellQuote(SUDOERS_RULE_PATH)}`,
+    `/usr/sbin/visudo -cf /etc/sudoers`,
+  ].join(' && ');
+
+  await execFileAsync(OSASCRIPT_PATH, [
+    '-e',
+    `do shell script ${JSON.stringify(command)} with prompt ${JSON.stringify(
+      'stagewise wants to remove its restricted closed-lid sleep sudoers rule.',
+    )} with administrator privileges`,
+  ]);
 }
 
 export class MacOSClosedLidSleepService extends DisposableService {
@@ -208,6 +226,13 @@ export class MacOSClosedLidSleepService extends DisposableService {
       this.ownedByStagewise = false;
       this.previousDisabledState = null;
       await this.syncState();
+      await removePasswordlessPmsetRule().catch((error) => {
+        this.logger.warn(
+          '[MacOSClosedLidSleepService] Failed to remove closed-lid sleep sudoers rule',
+          error,
+        );
+      });
+
       this.logger.info(
         '[MacOSClosedLidSleepService] Closed-lid sleep re-enabled',
       );
@@ -262,6 +287,9 @@ export class MacOSClosedLidSleepService extends DisposableService {
       ownedByStagewise: this.ownedByStagewise,
       isChanging: this.isChanging,
       error: this.error,
+      persistenceWarning: isSleepDisabled
+        ? CLOSED_LID_SLEEP_PERSISTENCE_WARNING
+        : null,
     };
 
     this.uiKarton.setState((draft) => {
@@ -280,6 +308,7 @@ export class MacOSClosedLidSleepService extends DisposableService {
       ownedByStagewise: false,
       isChanging: false,
       error: null,
+      persistenceWarning: null,
     };
   }
 

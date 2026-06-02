@@ -74,6 +74,8 @@ export function MessageRuntimeError({
    *  that bypass the `canRetry` last-message gate (e.g. upstream-overload). */
   isWorking?: boolean;
 }) {
+  const canShowRetry = canRetry || !isWorking;
+
   if (error.kind === 'upstream-overload') {
     return (
       <UpstreamOverloadError
@@ -88,21 +90,27 @@ export function MessageRuntimeError({
     return (
       <PlanLimitExceededError
         error={error}
-        canRetry={canRetry}
+        canRetry={canShowRetry}
         onRetry={onRetry}
       />
     );
   }
 
   if (error.kind === 'waiting-for-connection') {
-    return <WaitingForConnectionError error={error} />;
+    return (
+      <WaitingForConnectionError
+        error={error}
+        canRetry={canShowRetry}
+        onRetry={onRetry}
+      />
+    );
   }
 
   return (
     <GenericError
       agentInstanceId={agentInstanceId}
       error={error}
-      canRetry={canRetry}
+      canRetry={canShowRetry}
       onRetry={onRetry}
     />
   );
@@ -110,6 +118,8 @@ export function MessageRuntimeError({
 
 function PlanLimitExceededError({
   error,
+  canRetry,
+  onRetry,
 }: {
   error: Extract<AgentRuntimeError, { kind: 'plan-limit-exceeded' }>;
   canRetry: boolean;
@@ -165,8 +175,15 @@ function PlanLimitExceededError({
           Configure API keys
         </button>
 
+        {canRetry && (
+          <Button variant="primary" size="xs" onClick={onRetry}>
+            <RefreshCcwIcon className="size-3" />
+            Retry
+          </Button>
+        )}
+
         <Button
-          variant="primary"
+          variant={canRetry ? 'secondary' : 'primary'}
           size="xs"
           onClick={() => window.open(ctaHref, '_blank', 'noopener,noreferrer')}
         >
@@ -232,8 +249,12 @@ function UpstreamOverloadError({
 
 function WaitingForConnectionError({
   error,
+  canRetry,
+  onRetry,
 }: {
   error: Extract<AgentRuntimeError, { kind: 'waiting-for-connection' }>;
+  canRetry: boolean;
+  onRetry: () => void;
 }) {
   return (
     <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-warning-solid/30 bg-warning-background p-2 text-sm">
@@ -252,6 +273,15 @@ function WaitingForConnectionError({
       <div className="text-muted-foreground text-xs">
         Last network error: {error.originalMessage}
       </div>
+
+      {canRetry && (
+        <div className="flex flex-row justify-end pt-1">
+          <Button variant="primary" size="xs" onClick={onRetry}>
+            <RefreshCcwIcon className="size-3" />
+            Retry
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

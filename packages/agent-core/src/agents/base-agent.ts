@@ -904,14 +904,12 @@ export abstract class BaseAgent<
   ): Promise<void> {
     const historyLengthBefore = this.state.get().history.length;
 
-    this.logger.info(
+    this.host.logger.info(
       `[BaseAgent:${this.instanceId}] Recovering interrupted run with synthetic continuation. reason=${reason}, historyLength=${historyLengthBefore}`,
     );
 
     await this.internalStop('system-interrupted');
-    this.state.set((draft) => {
-      draft.isWorking = false;
-    });
+    this.state.commands.setIsWorkingFalse();
 
     this._pendingSyntheticContinuation = { reason };
     void this.runStep();
@@ -1536,7 +1534,7 @@ export abstract class BaseAgent<
     // Check canRunStep BEFORE setting isWorking to avoid deadlock
     if (!this.canRunStep()) {
       if (this._pendingSyntheticContinuation) {
-        this.logger.warn(
+        this.host.logger.warn(
           `[BaseAgent:${this.instanceId}] Dropping synthetic continuation because the agent cannot run a new step. reason=${this._pendingSyntheticContinuation.reason}`,
         );
         this._pendingSyntheticContinuation = null;
@@ -2438,13 +2436,13 @@ export abstract class BaseAgent<
 
     const lastMessage = modelMessages.at(-1);
     if (lastMessage?.role === 'user' || lastMessage?.role === 'tool') {
-      this.logger.info(
+      this.host.logger.info(
         `[BaseAgent:${this.instanceId}] Synthetic continuation not appended because model context already ends with ${lastMessage.role}. reason=${continuation.reason}`,
       );
       return modelMessages;
     }
 
-    this.logger.info(
+    this.host.logger.info(
       `[BaseAgent:${this.instanceId}] Appending synthetic model-only continuation. reason=${continuation.reason}, previousLastRole=${lastMessage?.role ?? 'none'}`,
     );
 
