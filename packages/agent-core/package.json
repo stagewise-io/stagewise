@@ -1,0 +1,176 @@
+{
+  "name": "@stagewise/agent-core",
+  "author": "stagewise GmbH",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
+    },
+    "./types/agent": {
+      "types": "./dist/types/agent.d.ts",
+      "import": "./dist/types/agent.js"
+    },
+    "./types/diff-history": {
+      "types": "./dist/types/diff-history.d.ts",
+      "import": "./dist/types/diff-history.js"
+    },
+    "./types/metadata": {
+      "types": "./dist/types/metadata.d.ts",
+      "import": "./dist/types/metadata.js"
+    },
+    "./types/models": {
+      "types": "./dist/types/models.d.ts",
+      "import": "./dist/types/models.js"
+    },
+    "./types/tool-approval": {
+      "types": "./dist/types/tool-approval.d.ts",
+      "import": "./dist/types/tool-approval.js"
+    },
+    "./types/tools": {
+      "types": "./dist/types/tools.d.ts",
+      "import": "./dist/types/tools.js"
+    },
+    "./store": {
+      "types": "./dist/store/index.d.ts",
+      "import": "./dist/store/index.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/index.d.ts",
+      "import": "./dist/commands/index.js"
+    },
+    "./host": {
+      "types": "./dist/host/index.d.ts",
+      "import": "./dist/host/index.js"
+    },
+    "./test-utils": {
+      "types": "./dist/host/test-utils.d.ts",
+      "import": "./dist/host/test-utils.js"
+    },
+    "./migrate-database": {
+      "types": "./dist/migrate-database/index.d.ts",
+      "import": "./dist/migrate-database/index.js"
+    },
+    "./workspace": {
+      "types": "./dist/workspace/index.d.ts",
+      "import": "./dist/workspace/index.js"
+    },
+    "./diff-history": {
+      "types": "./dist/services/diff-history/index-barrel.d.ts",
+      "import": "./dist/services/diff-history/index-barrel.js"
+    },
+    "./mount-manager": {
+      "types": "./dist/services/mount-manager/index.d.ts",
+      "import": "./dist/services/mount-manager/index.js"
+    },
+    "./toolbox": {
+      "types": "./dist/services/toolbox/index.d.ts",
+      "import": "./dist/services/toolbox/index.js"
+    },
+    "./ast": {
+      "types": "./dist/ast/index.d.ts",
+      "import": "./dist/ast/index.js"
+    },
+    "./plans": {
+      "types": "./dist/plans/index.d.ts",
+      "import": "./dist/plans/index.js"
+    },
+    "./plans/read": {
+      "types": "./dist/plans/read.d.ts",
+      "import": "./dist/plans/read.js"
+    },
+    "./logs": {
+      "types": "./dist/logs/index.d.ts",
+      "import": "./dist/logs/index.js"
+    },
+    "./logs/read": {
+      "types": "./dist/logs/read.d.ts",
+      "import": "./dist/logs/read.js"
+    },
+    "./attachments": {
+      "types": "./dist/services/attachments/index.d.ts",
+      "import": "./dist/services/attachments/index.js"
+    },
+    "./agent-persistence": {
+      "types": "./dist/services/agent-persistence/index.d.ts",
+      "import": "./dist/services/agent-persistence/index.js"
+    },
+    "./file-read-cache": {
+      "types": "./dist/services/file-read-cache/index.d.ts",
+      "import": "./dist/services/file-read-cache/index.js"
+    },
+    "./processed-image-cache": {
+      "types": "./dist/services/processed-image-cache/index.d.ts",
+      "import": "./dist/services/processed-image-cache/index.js"
+    },
+    "./persistence": {
+      "types": "./dist/services/persistence/index.d.ts",
+      "import": "./dist/services/persistence/index.js"
+    },
+    "./file-read-transformer": {
+      "types": "./dist/file-read-transformer/index.d.ts",
+      "import": "./dist/file-read-transformer/index.js"
+    },
+    "./env": {
+      "types": "./dist/env/index.d.ts",
+      "import": "./dist/env/index.js"
+    },
+    "./env/adapters": {
+      "types": "./dist/env/adapters/index.d.ts",
+      "import": "./dist/env/adapters/index.js"
+    },
+    "./agents": {
+      "types": "./dist/agents/index.d.ts",
+      "import": "./dist/agents/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "3.0.76",
+    "@ai-sdk/google": "3.0.71",
+    "@ai-sdk/openai": "3.0.63",
+    "@libsql/client": "^0.15.15",
+    "@stagewise/agent-runtime-node": "workspace:*",
+    "@vscode/tree-sitter-wasm": "^0.3.0",
+    "ai": "6.0.177",
+    "chokidar": "^4.0.3",
+    "diff": "^8.0.2",
+    "drizzle-orm": "^0.45.1",
+    "fzy.js": "^0.4.1",
+    "gray-matter": "^4.0.3",
+    "ignore": "^6.0.2",
+    "immer": "^10.1.1",
+    "superjson": "2.2.2",
+    "isbinaryfile": "^5.0.4",
+    "pdfjs-dist": "^5.5.207",
+    "sharp": "^0.34.5",
+    "web-tree-sitter": "^0.26.6",
+    "xml": "^1.0.1",
+    "yauzl": "^3.2.0",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@stagewise/typescript-config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/xml": "^1.0.11",
+    "@types/yauzl": "^2.10.3",
+    "esbuild": "0.25.9",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

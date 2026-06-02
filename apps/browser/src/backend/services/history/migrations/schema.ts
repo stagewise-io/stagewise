@@ -1,4 +1,4 @@
-import { metaTable } from '../../../utils/migrate-database/types';
+import { metaTable } from '@stagewise/agent-core/migrate-database';
 import {
   sqliteTable,
   integer,

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { eq, lt } from 'drizzle-orm';
 import { assetCache, meta } from './schema';
-import { migrateDatabase } from '@/utils/migrate-database';
+import { migrateDatabase } from '@stagewise/agent-core/migrate-database';
 import { registry, schemaVersion } from './migrations';
 import initSql from './schema.sql?raw';
 import { getDbPath } from '@/utils/paths';

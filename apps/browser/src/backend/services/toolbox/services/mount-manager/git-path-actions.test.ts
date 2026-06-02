@@ -21,6 +21,10 @@ import type { TelemetryService } from '@/services/telemetry';
 import type { UserExperienceService } from '@/services/experience';
 import { getWorktreesDir } from '@/utils/paths';
 import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
+import {
+  AgentStore,
+  createInitialAgentSystemState,
+} from '@stagewise/agent-core';
 
 const services: MountManagerService[] = [];
 
@@ -139,6 +143,8 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     pruneWorkspaceGitCleanupSnoozes: vi.fn(),
   };
 
+  const agentStore = new AgentStore(createInitialAgentSystemState());
+
   const service = new MountManagerService(
     {
       debug: vi.fn(),
@@ -155,6 +161,7 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     } as unknown as TelemetryService,
     gitService,
     preferencesService as never,
+    agentStore,
   );
 
   services.push(service);
@@ -172,8 +179,9 @@ function setWorkspacePathForMount(
   mountPrefix: string,
   workspacePath: string,
 ) {
+  const core = service.getCoreMountManager();
   const workspacePathsPerMount = Reflect.get(
-    service,
+    core,
     'workspacePathsPerMount',
   ) as Map<string, string>;
   workspacePathsPerMount.set(mountPrefix, workspacePath);
@@ -184,12 +192,13 @@ function setAgentMount(
   agentId: string,
   mountPrefix: string,
 ) {
-  const agentMounts = Reflect.get(service, 'agentMounts') as Map<
+  const core = service.getCoreMountManager();
+  const agentMounts = Reflect.get(core, 'agentMounts') as Map<
     string,
-    Map<string, string[]>
+    Set<string>
   >;
-  const mounts = agentMounts.get(agentId) ?? new Map<string, string[]>();
-  mounts.set(mountPrefix, ['read']);
+  const mounts = agentMounts.get(agentId) ?? new Set<string>();
+  mounts.add(mountPrefix);
   agentMounts.set(agentId, mounts);
 }
 
@@ -507,11 +516,11 @@ describe('MountManagerService path-based Git actions', () => {
         'failed',
       );
     });
-    expect(
-      state.toolbox.agent1.workspace.mounts.some(
-        (mount) => mount.path === createdPath,
-      ),
-    ).toBe(true);
+    // A failed setup must not unmount the worktree: the core mount
+    // registry still tracks it after the run resolves to `failed`.
+    expect(service.getCoreMountManager().getAllMountedPaths()).toContain(
+      createdPath,
+    );
   });
 
   it('detaches a deleted worktree path from agent mounts', async () => {
@@ -537,14 +546,15 @@ describe('MountManagerService path-based Git actions', () => {
     expect(affected).toEqual(['agent1']);
     expect(state.toolbox.agent1.workspace.mounts).toHaveLength(0);
 
-    const agentMounts = Reflect.get(service, 'agentMounts') as Map<
+    const core = service.getCoreMountManager();
+    const agentMounts = Reflect.get(core, 'agentMounts') as Map<
       string,
-      Map<string, string[]>
+      Set<string>
     >;
     expect(agentMounts.get('agent1')?.has('w1234')).toBe(false);
 
     const workspacePathsPerMount = Reflect.get(
-      service,
+      core,
       'workspacePathsPerMount',
     ) as Map<string, string>;
     expect(workspacePathsPerMount.has('w1234')).toBe(false);
@@ -587,9 +597,10 @@ describe('MountManagerService path-based Git actions', () => {
       state.toolbox.agent1.workspace.mounts.map((mount) => mount.prefix),
     ).toEqual(['wkeep']);
 
-    const agentMounts = Reflect.get(service, 'agentMounts') as Map<
+    const core = service.getCoreMountManager();
+    const agentMounts = Reflect.get(core, 'agentMounts') as Map<
       string,
-      Map<string, string[]>
+      Set<string>
     >;
     expect(agentMounts.get('agent1')?.has('wkeep')).toBe(true);
     expect(agentMounts.get('agent1')?.has('wdead')).toBe(false);

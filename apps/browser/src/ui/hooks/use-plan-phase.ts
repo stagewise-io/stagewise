@@ -7,7 +7,7 @@ import {
   type LivePlanData,
 } from '@shared/plan-lifecycle';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
-import { PLANS_PREFIX } from '@shared/plan-ownership';
+import { PLANS_PREFIX } from '@stagewise/agent-core/plans';
 
 // Stable empty array to avoid selector identity churn
 const EMPTY_HISTORY: AgentMessage[] = [];

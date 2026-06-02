@@ -1,4 +1,4 @@
-import type { MigrationScript } from '../../../utils/migrate-database/types';
+import type { MigrationScript } from '@stagewise/agent-core/migrate-database';
 import { up as v002Up } from './v002-backfill-default-search-engines';
 
 const registry: MigrationScript[] = [

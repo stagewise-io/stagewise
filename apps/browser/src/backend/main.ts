@@ -5,6 +5,7 @@
 import { app, clipboard, dialog } from 'electron';
 import { AuthService } from './services/auth';
 import { AgentManagerService } from './services/agent-manager';
+import { enrichHistoryEntryWorkspaces } from './services/agent-manager/history-workspace-enrichment';
 import { UserExperienceService } from './services/experience';
 import { FilePickerService } from './services/file-picker';
 import { AppMenuService } from './services/app-menu';
@@ -25,13 +26,26 @@ import { WindowLayoutService } from './services/window-layout';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { WebDataService } from './services/webdata';
-import { DiffHistoryService } from './services/diff-history';
+import { AttachmentsService } from '@stagewise/agent-core/attachments';
+import { AgentCorePersistence } from '@stagewise/agent-core/persistence';
+import type { AgentManagerStartupPolicy } from '@stagewise/agent-core';
+import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { AutoUpdateService } from './services/auto-update';
 import { LocalPortsScannerService } from './services/local-ports-scanner';
 import { DevToolAPIService } from './services/dev-tool-api';
 import { OmniboxSuggestionsService } from './services/omnibox-suggestions';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
 import { ToolboxService } from './services/toolbox';
+import { GitService } from './services/git';
+import {
+  createAgentCoreSeam,
+  attachAgentCoreBridge,
+} from './services/agent-core-bridge/wiring';
+import { registerToolboxGenerateWorkspaceMd } from './services/agent-core-bridge/handlers/toolbox';
+import { createBrowserHostPaths } from './services/agent-core-bridge/host-paths';
+import { createBrowserAgentHost } from './services/agent-core-bridge/host';
+import { createLazyBrowserHostModels } from './services/agent-core-bridge/host-models';
+import { createBrowserAgentTypeRegistry } from './agents/agents-registry';
 import { CredentialsService } from './services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { ModelProviderService } from './agents/model-provider';
@@ -44,12 +58,12 @@ import {
   getRipgrepBasePath,
 } from './utils/paths';
 import { migrateLegacyPaths } from './utils/migrate-legacy-paths';
+import { readPersistedDataSync } from './utils/persisted-data';
+import { z } from 'zod';
 import { discoverPlugins } from './utils/discover-plugins';
 import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
-import { ProcessedImageCacheService } from './services/processed-image-cache';
-import { GitService } from './services/git';
 import { detectShell, resolveShellEnv } from './utils/shell-env';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
@@ -58,6 +72,19 @@ import type {
   HistoryResult,
   FaviconBitmapResult,
 } from '@shared/karton-contracts/pages-api/types';
+import {
+  createAgentsMdDomainAdapter,
+  createEnabledSkillsDomainAdapter,
+  createFileDiffsDomainAdapter,
+  createLogsDomainAdapter,
+  createPlansDomainAdapter,
+  createWorkspaceDomainAdapter,
+  createWorkspaceMdDomainAdapter,
+} from '@stagewise/agent-core/env/adapters';
+import {
+  createBrowserHostEnvironmentSources,
+  registerHostEnvDomainAdapters,
+} from './env-domains';
 
 export type MainParameters = {
   launchOptions: {
@@ -73,6 +100,21 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   migrateLegacyPaths(logger);
 
   await ensureDataDirectories();
+
+  // Build the browser-backed `HostPaths` early (zero dependencies) so
+  // every subsequent service that wants path resolution receives it as
+  // an injected capability rather than importing `@/utils/paths`
+  // directly. The full `AgentHost` is assembled later — once
+  // `ModelProviderService`, `TelemetryService`, and the logger are all
+  // available — right before `attachAgentCoreBridge`.
+  const hostPaths = createBrowserHostPaths();
+
+  // The `AttachmentsService` is stateless (it just wraps `HostPaths`),
+  // so it can be constructed before the full `AgentHost` exists.
+  // Construct one early so `WindowLayoutService` can register the
+  // `attachment://` protocol handler against it; the same instance is
+  // handed to `AgentCorePersistence.create` below.
+  const attachments = new AttachmentsService(hostPaths);
 
   // Bootstrap every service that has no inter-dependencies in parallel.
   // These were previously awaited one-by-one, serializing independent
@@ -148,6 +190,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     faviconService,
     pagesService,
     preferencesService,
+    attachments,
     telemetryService,
   );
   const uiKarton = windowLayoutService.uiKarton;
@@ -178,6 +221,28 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       logger.warn('[Main] Failed to load search engines', error);
     });
 
+  // Phase 3a: build the agent-core seam (store + controllers + registry)
+  // early so services that consume store-canonical state — currently
+  // `DiffHistoryService` via the store itself — can receive their
+  // dependency as an injected capability. The bridge itself is attached
+  // later, once `agentCoreHost` exists (post-ModelProviderService).
+  const agentCoreSeam = createAgentCoreSeam({ karton: uiKarton });
+
+  // Phase 5: assemble a partial `AgentHost` early so `DiffHistoryService`
+  // (now a package-side service) can receive the host + store as
+  // injected dependencies. `ModelProviderService` does not exist yet —
+  // `createLazyBrowserHostModels()` returns a proxy whose `get()` throws
+  // until `setModelProviderService(...)` is called further down. The
+  // `DiffHistoryService` itself never consults `host.models`, so the
+  // lazy slot is invisible in practice.
+  const lazyHostModels = createLazyBrowserHostModels();
+  const agentCoreHost = createBrowserAgentHost({
+    logger,
+    telemetryService,
+    paths: hostPaths,
+    models: lazyHostModels.hostModels,
+  });
+
   // Push bundled plugin definitions to UI karton state
   discoverPlugins(getPluginsPath()).then((plugins) => {
     uiKarton.setState((draft) => {
@@ -189,11 +254,19 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       );
   });
 
-  const diffHistoryService = await DiffHistoryService.create(
-    logger,
-    uiKarton,
-    telemetryService,
-  );
+  // Phase D.2: the host enumerates `AgentCorePersistence` once instead
+  // of constructing each persistence service by name. The facade owns
+  // construction order, schema-migration sequencing, and teardown for
+  // `DiffHistoryService`, `FileReadCacheService`,
+  // `ProcessedImageCacheService`, `AttachmentsService`, and
+  // `AgentPersistenceDB`. `attachments` is passed in so we share the
+  // already-constructed instance with `WindowLayoutService`.
+  const persistence = await AgentCorePersistence.create({
+    host: agentCoreHost,
+    store: agentCoreSeam.store,
+    attachments,
+  });
+  const diffHistoryService = persistence.diffHistory;
 
   // Connect PreferencesService to Karton for reactive sync
   preferencesService.connectKarton(uiKarton, pagesService);
@@ -404,15 +477,16 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     preferencesService,
     detectedShell,
     resolvedEnvPromise,
+    agentCoreSeam.store,
+    agentCoreSeam.hostAgentStateMutations,
+    attachments,
   );
 
   // Give DiffHistoryService a way to resolve workspace roots for the
   // gitignore-aware filter in `registerAgentEdit`. Evaluated lazily per
   // call, so the (still-async) MountManager initialization inside
   // ToolboxService does not need to be awaited before wiring.
-  diffHistoryService.setMountPathsResolver(() =>
-    toolboxService.getAllMountedPaths(),
-  );
+  persistence.setMountPathsResolver(() => toolboxService.getAllMountedPaths());
 
   // Push bundled skill definitions via the toolbox so it can
   // merge them with workspace/plugin skills on mount changes.
@@ -470,28 +544,180 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
   );
 
-  let processedImageCacheService: ProcessedImageCacheService | undefined;
-  try {
-    processedImageCacheService =
-      await ProcessedImageCacheService.create(logger);
-  } catch (err) {
-    logger.warn(
-      `[main] ProcessedImageCacheService failed to initialise — image caching disabled: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
+  const processedImageCacheService = persistence.processedImageCache;
+
+  // Phase 4: a single app-wide `FileReadCacheService` backs every agent
+  // instance so repeated reads of the same file across agents benefit
+  // from a shared cache. Owned by `AgentCorePersistence` (Phase D.2).
+  const fileReadCacheService = persistence.fileReadCache;
+
+  const agentTypeRegistry = createBrowserAgentTypeRegistry();
+
+  const electronAgentManagerStartupPolicy: AgentManagerStartupPolicy = {
+    kind: 'auto-create-default',
+    agentType: AgentTypes.CHAT,
+    mountLastWorkspaces: true,
+    // Restore the last-active agent on cold start instead of always
+    // booting into a blank CHAT. `WindowLayoutService.loadTabState`
+    // owns writing this id; we read the same file synchronously here
+    // so the manager's startup policy can attempt a resume before
+    // falling through to its create-default fall-back.
+    getResumeAgentId: () => {
+      const state = readPersistedDataSync(
+        'tab-state',
+        z.object({ lastOpenAgentId: z.string().nullable().catch(null) }),
+        { lastOpenAgentId: null },
+      );
+      return state.lastOpenAgentId;
+    },
+  };
 
   const agentManagerService = new AgentManagerService(
     uiKarton,
-    telemetryService,
+    agentCoreSeam.registry,
     toolboxService,
-    logger,
-    modelProviderService,
-    gitService,
-    (event, agentId) =>
-      notificationSoundsService.notifyAgentEvent(event, agentId),
+    agentCoreSeam.store,
+    () => uiKarton.state.skills ?? [],
+    electronAgentManagerStartupPolicy,
+    fileReadCacheService,
+    attachments,
+    persistence.agentDb,
+    agentCoreHost,
+    agentTypeRegistry,
     assetCacheService,
     processedImageCacheService,
+    (event, agentId) =>
+      notificationSoundsService.notifyAgentEvent(event, agentId),
+    (entries) =>
+      enrichHistoryEntryWorkspaces(
+        entries,
+        (workspacePath) => gitService.getMountedWorkspaceSummary(workspacePath),
+        logger,
+      ),
   );
+
+  toolboxService.setWorkspaceLastUsedAtResolver(
+    async (workspacePaths) =>
+      (await persistence.agentDb.getWorkspaceLastUsedAtByPath(
+        workspacePaths,
+      )) ?? new Map(),
+  );
+
+  registerToolboxGenerateWorkspaceMd(agentCoreSeam.registry, uiKarton, {
+    store: agentCoreSeam.store,
+    generateWorkspaceMdForPath: (workspacePath) =>
+      agentManagerService.generateWorkspaceMdForPath(workspacePath),
+  });
+
+  // Phase 5: now that `ModelProviderService` exists, activate the lazy
+  // `HostModels` slot inside the already-assembled `agentCoreHost`. Must
+  // happen before `attachAgentCoreBridge` so any attach-phase handler
+  // that consults `host.models` sees a ready adapter.
+  lazyHostModels.setModelProviderService(modelProviderService);
+
+  // Phase 1c+1d+5: attach the bridge. Bridges every migrated Karton
+  // procedure (`toolbox.dismissActiveApp`, `toolbox.clearPendingAppMessage`,
+  // `toolbox.acceptHunks`, `toolbox.rejectHunks`) through the
+  // `CommandRegistry`, and starts mirroring the AgentStore-canonical
+  // `activeApp`, `pendingAppMessage`, `pendingFileDiffs`, `editSummary`,
+  // and `workspace.mounts` slices into Karton for the UI.
+  //
+  // Must run AFTER every legacy service has finished registering its own
+  // Karton handlers — the bridge's drift guard runs against the final
+  // registry, and Karton rejects double-registrations. Handles are kept
+  // alive for the host lifetime.
+  const agentCoreBridge = attachAgentCoreBridge(agentCoreSeam, {
+    host: agentCoreHost,
+    diffHistory: diffHistoryService,
+  });
+  // Phase 1d: route `SandboxService` app-lifecycle writes through the
+  // AgentStore-backed controller instead of Karton.
+  toolboxService.setActiveAppController(agentCoreBridge.activeAppController);
+
+  // Register every env-state {@link DomainAdapter} (core + host) on
+  // the agent manager. Core adapters are wired here so `AgentManager`
+  // stays host-agnostic; host adapters reuse the same `toolboxService`
+  // closures previously used by the legacy environment providers.
+  agentCoreHost.environmentSources = createBrowserHostEnvironmentSources({
+    karton: uiKarton,
+    toolbox: toolboxService,
+  });
+  const coreMountManager = toolboxService.getMountManager();
+  if (!coreMountManager) {
+    throw new Error(
+      '[Main] toolboxService.getMountManager() returned null — mount manager must be initialized before env-state adapter wiring',
+    );
+  }
+  agentManagerService.registerEnvAdapter(
+    createWorkspaceDomainAdapter({
+      host: agentCoreHost,
+      mountManager: coreMountManager,
+    }),
+  );
+  const workspaceMdRelativePath = agentCoreHost.workspaceMdRelativePath?.();
+  agentManagerService.registerEnvAdapter(
+    createAgentsMdDomainAdapter({
+      host: agentCoreHost,
+      mountManager: coreMountManager,
+      workspaceMdRelativePath,
+    }),
+  );
+  agentManagerService.registerEnvAdapter(
+    createWorkspaceMdDomainAdapter({
+      mountManager: coreMountManager,
+      workspaceMdRelativePath,
+    }),
+  );
+  agentManagerService.registerEnvAdapter(
+    createEnabledSkillsDomainAdapter({
+      host: agentCoreHost,
+      getSkillDetails: async (agentInstanceId) => {
+        const skills = await toolboxService.getSkillsList(agentInstanceId);
+        return new Map(
+          skills
+            .filter((s) => s.agentInvocable !== false && s.skillPath)
+            .map((s) => [
+              s.skillPath as string,
+              {
+                name: s.displayName,
+                description: s.description,
+                path: s.skillPath as string,
+              },
+            ]),
+        );
+      },
+    }),
+  );
+  agentManagerService.registerEnvAdapter(
+    createPlansDomainAdapter({
+      host: agentCoreHost,
+      store: agentCoreSeam.store,
+    }),
+  );
+  agentManagerService.registerEnvAdapter(
+    createLogsDomainAdapter({
+      host: agentCoreHost,
+      store: agentCoreSeam.store,
+    }),
+  );
+  agentManagerService.registerEnvAdapter(
+    createFileDiffsDomainAdapter({ store: agentCoreSeam.store }),
+  );
+
+  registerHostEnvDomainAdapters(agentManagerService, {
+    karton: uiKarton,
+    store: agentCoreSeam.store,
+    getShellSnapshot: (agentInstanceId) =>
+      toolboxService.getShellSnapshot(agentInstanceId),
+    getShellInfo: () => {
+      const info = toolboxService.getShellInfo();
+      if (!info) return null;
+      return { platform: process.platform, type: info.type, path: info.path };
+    },
+    getSandboxSessionId: (agentInstanceId) =>
+      toolboxService.getSandboxSessionId(agentInstanceId),
+    getLogIngestSnapshot: () => toolboxService.getLogIngestSnapshot(),
+  });
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
   // workspace-md generating, search engines, global config, auth)
@@ -735,10 +961,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       runTeardown('historyService', () => historyService.teardown());
       runTeardown('faviconService', () => faviconService.teardown());
       runTeardown('diffHistoryService', () => diffHistoryService.teardown());
+      runTeardown('agentCorePersistence', () => persistence.teardown());
       runTeardown('assetCacheService', () => assetCacheService.teardown());
-      runTeardown('processedImageCacheService', () =>
-        processedImageCacheService?.teardown(),
-      );
       runTeardown('autoUpdateService', () => autoUpdateService.teardown());
 
       // Shared budget for async teardowns. Toolbox teardown kills live

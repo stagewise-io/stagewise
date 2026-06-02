@@ -10,7 +10,7 @@ import {
 import { cn, resolveDisplayPath } from '@ui/utils';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 import { useKartonState } from '@ui/hooks/use-karton';
-import { isLogPath, LOGS_PREFIX } from '@shared/log-ownership';
+import { isLogPath, LOGS_PREFIX } from '@stagewise/agent-core/logs';
 
 const PLUGIN_SKILL_RE = /^plugins\/([^/]+)\/SKILL\.md$/;
 const WORKSPACE_SKILL_RE =

@@ -1,0 +1,30 @@
+{
+  "name": "@stagewise/stagewise-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal headless agent CLI for local smoke tests",
+  "bin": {
+    "stagewise-cli": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "pnpm build && node dist/index.js",
+    "typecheck": "pnpm -F @stagewise/agent-core build && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "3.0.76",
+    "@stagewise/agent-core": "workspace:*",
+    "ai": "6.0.177",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@stagewise/typescript-config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

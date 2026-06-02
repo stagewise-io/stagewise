@@ -1,8 +1,29 @@
+import { modelCapabilitiesSchema } from '@stagewise/agent-core/types';
 import { z } from 'zod';
-import type { ChangeObject, StructuredPatchHunk } from 'diff';
-import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import type { OpenAIResponsesProviderOptions } from '@ai-sdk/openai';
-import type { GoogleGenerativeAIProviderOptions } from '@ai-sdk/google';
+
+export {
+  environmentDiffSnapshotSchema,
+  fileDiffSnapshotSchema,
+  MAX_DIFF_TEXT_FILE_SIZE,
+  modelCapabilitiesSchema,
+  modalityConstraintSchema,
+} from '@stagewise/agent-core/types';
+export type {
+  BlamedHunk,
+  BlamedLineChange,
+  EnvironmentDiffSnapshot,
+  ExternalFileDiff,
+  ExternalFileResult,
+  FileDiff,
+  FileDiffSnapshot,
+  FileResult,
+  ModelCapabilities,
+  ModelSettings,
+  ModalityConstraint,
+  StagewiseProviderOptions,
+  TextFileDiff,
+  TextFileResult,
+} from '@stagewise/agent-core/types';
 
 // ============================================================================
 // Model Provider Configuration
@@ -114,67 +135,6 @@ export const customEndpointSchema = z.object({
 });
 export type CustomEndpoint = z.infer<typeof customEndpointSchema>;
 
-/** Per-modality constraint: accepted MIME types and max inline size */
-const modalityConstraintSchema = z.object({
-  mimeTypes: z.array(z.string()),
-  /**
-   * Maximum raw (decoded) file size in bytes. Providers enforce this against
-   * the actual image/file data, not the base64-encoded transport representation.
-   * The image processor compares raw buffer length against this value directly.
-   */
-  maxBytes: z.number(),
-  /** Maximum pixels on a single axis (width or height). Images exceeding this are downscaled. */
-  maxWidthPx: z.number().optional(),
-  maxHeightPx: z.number().optional(),
-  /** Maximum total pixel count (width × height). Applied after per-axis limits. */
-  maxTotalPixels: z.number().optional(),
-});
-export type ModalityConstraint = z.infer<typeof modalityConstraintSchema>;
-
-/** Capabilities that describe what a model can do */
-export const modelCapabilitiesSchema = z.object({
-  inputModalities: z
-    .object({
-      text: z.boolean().default(true),
-      audio: z.boolean().default(false),
-      image: z.boolean().default(false),
-      video: z.boolean().default(false),
-      file: z.boolean().default(false),
-    })
-    .default({
-      text: true,
-      audio: false,
-      image: false,
-      video: false,
-      file: false,
-    }),
-  outputModalities: z
-    .object({
-      text: z.boolean().default(true),
-      audio: z.boolean().default(false),
-      image: z.boolean().default(false),
-      video: z.boolean().default(false),
-      file: z.boolean().default(false),
-    })
-    .default({
-      text: true,
-      audio: false,
-      image: false,
-      video: false,
-      file: false,
-    }),
-  inputConstraints: z
-    .object({
-      image: modalityConstraintSchema.optional(),
-      file: modalityConstraintSchema.optional(),
-      video: modalityConstraintSchema.optional(),
-      audio: modalityConstraintSchema.optional(),
-    })
-    .optional(),
-  toolCalling: z.boolean().default(true),
-});
-export type ModelCapabilities = z.infer<typeof modelCapabilitiesSchema>;
-
 /** A user-defined model that routes to a built-in provider or custom endpoint */
 export const customModelSchema = z.object({
   modelId: z.string().min(1),
@@ -254,84 +214,6 @@ export const PROVIDER_DISPLAY_INFO: Record<
     name: 'MiniMax',
     description: 'MiniMax M-series models',
   },
-};
-
-export type StagewiseProviderOptions = {
-  reasoning?: {
-    enabled: boolean;
-    effort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
-  };
-  cache_control?: {
-    type: 'ephemeral' | 'persistent';
-  };
-  /**
-   * OpenRouter provider routing preferences (forwarded verbatim).
-   * See https://openrouter.ai/docs/provider-routing.
-   *
-   * Note: the ai-proxy's `applyStickyRouting` overlays its own `order`
-   * and `allow_fallbacks: false` when the model's prefix is listed in
-   * `BYOK_ORDER`. Existing keys set here are preserved via spread, but
-   * `order` / `allow_fallbacks` will be overwritten by the platform.
-   * `require_parameters` typically becomes redundant once the platform
-   * pins routing to a single BYOK upstream.
-   */
-  provider?: {
-    /** Only route to endpoints that support every parameter in the request (e.g. tools). */
-    require_parameters?: boolean;
-    /** Restrict routing to an allow-list of upstream providers (lower-case slugs). */
-    only?: string[];
-    /** Preferred ordering of upstream providers. */
-    order?: string[];
-  };
-};
-
-export type ModelSettings = {
-  modelId: string;
-  /** Which provider should be used for the official API option */
-  officialProvider?: ModelProvider;
-  modelDisplayName: string;
-  modelDescription: string;
-  modelContext: string;
-  modelContextRaw: number;
-  headers?: Record<string, string>;
-  /**
-   * Per-provider configuration options.
-   */
-  providerOptions: {
-    stagewise?: StagewiseProviderOptions;
-    google?: GoogleGenerativeAIProviderOptions;
-    anthropic?: AnthropicProviderOptions;
-    openai?: OpenAIResponsesProviderOptions;
-  } & Record<string, unknown>;
-  pricing?: {
-    inputPerMillion: number;
-    outputPerMillion: number;
-    relativeMultiplier: number;
-  };
-  thinkingEnabled: boolean; // Shows an thinking icon in the model card
-  capabilities: {
-    inputModalities: {
-      text: boolean;
-      audio: boolean;
-      image: boolean;
-      video: boolean;
-      file: boolean;
-    };
-    outputModalities: {
-      text: boolean;
-      audio: boolean;
-      image: boolean;
-      video: boolean;
-      file: boolean;
-    };
-    inputConstraints?: {
-      image?: ModalityConstraint;
-      file?: ModalityConstraint;
-      video?: ModalityConstraint;
-      audio?: ModalityConstraint;
-    };
-    toolCalling: boolean;
-  };
 };
 
 /**
@@ -469,24 +351,15 @@ const workspaceGitCleanupPreferencesSchema = z
   .default(defaultWorkspaceGitCleanupPreferences)
   .catch(defaultWorkspaceGitCleanupPreferences);
 
-/** Controls whether tool calls (shell, sandbox) require user approval */
-export const toolApprovalModeSchema = z.enum([
-  'alwaysAsk',
-  'alwaysAllow',
-  'smart',
-]);
-export type ToolApprovalMode = z.infer<typeof toolApprovalModeSchema>;
-
-/**
- * Safe default for new agents and corrupted / missing DB rows. Centralizes
- * the fallback so it can't silently drift across backend, UI, and
- * persistence schema.
- *
- * Historical SQL defaults in migrations intentionally inline the string
- * value (`alwaysAsk`) for replay stability — do not retrofit migrations
- * to use this constant.
- */
-export const DEFAULT_TOOL_APPROVAL_MODE: ToolApprovalMode = 'alwaysAsk';
+// Tool-approval enum / default were moved into `@stagewise/agent-core` so
+// the core's persistence layer can validate them without a back-reference
+// into this host-only contracts package. Re-exported here for callers that
+// still import via `@shared/karton-contracts/ui/shared-types`.
+export {
+  toolApprovalModeSchema,
+  DEFAULT_TOOL_APPROVAL_MODE,
+  type ToolApprovalMode,
+} from '@stagewise/agent-core/types/tool-approval';
 
 /** Update channel for prerelease builds ('alpha' or 'beta') */
 export const updateChannelSchema = z.enum(['alpha', 'beta']);
@@ -1001,91 +874,3 @@ export const defaultDevToolbarPreferences: DevToolbarPreferences = {
   originSettings: {},
   lastUsedOrigin: null,
 };
-
-type AgentInstanceId = string;
-type Contributor = 'user' | `agent-${AgentInstanceId}`;
-
-export type BlamedLineChange = ChangeObject<string> & {
-  hunkId: string | null; // null if the line change is not part of a hunk
-  contributor: Contributor;
-};
-
-/**
- * A unified-diff hunk enriched with an ID and contributor tracking.
- *
- * Because hunks are computed from a single baseline→current diff, a single hunk
- * can span changes made by different contributors (e.g. an agent edits line 5
- * and the user edits adjacent line 6 — both land in one hunk). The `contributors`
- * array lists every distinct contributor whose added lines fall within this hunk,
- * derived from the per-line blame in `BlamedLineChange`.
- */
-export type BlamedHunk = StructuredPatchHunk & {
-  id: string;
-  contributors: Contributor[];
-};
-
-type FileDiffBase = {
-  isExternal: boolean;
-  fileId: string;
-  path: string;
-};
-
-export type TextFileDiff = FileDiffBase & {
-  isExternal: false;
-  baseline: string | null;
-  current: string | null;
-  baselineOid: string | null;
-  currentOid: string | null;
-  lineChanges: BlamedLineChange[];
-  hunks: BlamedHunk[];
-};
-
-// External file diff - single atomic "hunk"
-export type ExternalFileDiff = FileDiffBase & {
-  isExternal: true;
-  changeType: 'created' | 'deleted' | 'modified';
-  baselineOid: string | null; // null = file didn't exist
-  currentOid: string | null; // null = file was deleted
-  contributor: Contributor; // who made this change
-  hunkId: string; // single ID for accept/reject
-};
-
-export type FileDiff = TextFileDiff | ExternalFileDiff;
-
-export const fileDiffSnapshotSchema = z.object({
-  path: z.string(),
-  fileId: z.string(),
-  isExternal: z.boolean(),
-  baselineOid: z.string().nullable(),
-  currentOid: z.string().nullable(),
-  hunkIds: z.array(z.string()),
-  contributors: z.array(z.string()),
-});
-
-export type FileDiffSnapshot = z.infer<typeof fileDiffSnapshotSchema>;
-
-export const environmentDiffSnapshotSchema = z.object({
-  pending: z.array(fileDiffSnapshotSchema),
-  summary: z.array(fileDiffSnapshotSchema),
-});
-
-export type EnvironmentDiffSnapshot = z.infer<
-  typeof environmentDiffSnapshotSchema
->;
-
-// Result types for acceptAndRejectHunks
-export type TextFileResult = {
-  isExternal: false;
-  newBaseline?: string | null;
-  newCurrent?: string | null;
-};
-
-export type ExternalFileResult = {
-  isExternal: true;
-  newBaselineOid?: string | null;
-  newCurrentOid?: string | null;
-};
-
-export type FileResult = TextFileResult | ExternalFileResult;
-
-export const MAX_DIFF_TEXT_FILE_SIZE = 2 * 1024 * 1024; // 2MB

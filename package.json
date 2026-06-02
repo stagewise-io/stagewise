@@ -1,5 +1,5 @@
 {
-  "name": "stagewise",
+  "name": "@stagewise/workspace",
   "private": true,
   "scripts": {
     "build": "turbo run build",

@@ -9,6 +9,10 @@ import type {
   AttachmentMetadata,
   ShellSessionSnapshot,
 } from './agent/metadata';
+import type {
+  MountEntry,
+  WorkspaceGitSummary,
+} from '@stagewise/agent-core/types/metadata';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
@@ -64,22 +68,7 @@ import type {
   StoredAgentPreview,
 } from './agent';
 
-export type WorkspaceGitSummary = {
-  repositoryId: string;
-  worktreeId: string;
-  repoRoot: string;
-  mainWorktreePath: string | null;
-  commonGitDir: string;
-  isWorktree: boolean;
-  branch: string | null;
-  headSha: string | null;
-  status: {
-    dirty: boolean;
-    stagedCount: number;
-    unstagedCount: number;
-    untrackedCount: number;
-  } | null;
-};
+export type { WorkspaceGitSummary } from '@stagewise/agent-core/types/metadata';
 
 export type WorkspaceGitBranchInfo = {
   name: string;
@@ -259,6 +248,7 @@ export type DownloadSummary = {
   speedHistory?: DownloadSpeedDataPoint[];
 };
 export type { UserMessageMetadata, ReactSelectedElementInfo };
+export type { MountEntry } from '@stagewise/agent-core/types/metadata';
 export type { SelectedElement } from '../../selected-elements';
 
 export type InspirationWebsite = NonNullable<
@@ -672,25 +662,21 @@ export type LogChannelEntry = {
   tailLines: string[];
 };
 
-export type MountedWorkspaceGitStatusSummary = {
-  dirty: boolean;
-  stagedCount: number;
-  unstagedCount: number;
-  untrackedCount: number;
-};
+/**
+ * Convenience alias used by host UI code. Identical to {@link
+ * WorkspaceGitSummary.status} — kept as a named type so call-sites
+ * reading just the status block don't have to pierce the parent shape.
+ */
+export type MountedWorkspaceGitStatusSummary = NonNullable<
+  WorkspaceGitSummary['status']
+>;
 
+/**
+ * Host-side alias for the canonical {@link WorkspaceGitSummary} carried
+ * on a mount. Re-exported for parity with the legacy naming used across
+ * the karton contract and UI.
+ */
 export type MountedWorkspaceGitSummary = WorkspaceGitSummary;
-
-export type MountEntry = {
-  prefix: string;
-  path: string;
-  git: MountedWorkspaceGitSummary | null;
-  skills: Array<{ name: string; description: string }>;
-  /** Full file content, or `null` when the file does not exist on disk. */
-  workspaceMdContent: string | null;
-  /** Full file content, or `null` when the file does not exist on disk. */
-  agentsMdContent: string | null;
-};
 
 export const EMPTY_MOUNTS: MountEntry[] = [];
 

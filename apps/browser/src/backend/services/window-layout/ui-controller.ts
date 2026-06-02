@@ -23,7 +23,7 @@ import {
   REACT_DEVELOPER_TOOLS,
 } from 'electron-devtools-installer';
 import fsSync from 'node:fs';
-import { getBlobPath, blobExists } from '@/utils/attachment-blobs';
+import type { AttachmentsService } from '@stagewise/agent-core/attachments';
 import { inferMimeType } from '@shared/mime-utils';
 import { getAgentAppsDir } from '@/utils/paths';
 import { getPluginsPath } from '@/utils/paths';
@@ -269,6 +269,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
    */
   public static async create(
     logger: Logger,
+    attachments: AttachmentsService,
     telemetryService?: TelemetryService,
   ): Promise<UIController> {
     // Register React DevTools on the UI session *before* constructing the
@@ -280,16 +281,23 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     // download and the background cache refresh stay off the critical path
     // (see installReactDevToolsOnUISession).
     await installReactDevToolsOnUISession(logger);
-    return new UIController(logger, telemetryService);
+    return new UIController(logger, attachments, telemetryService);
   }
+
+  private readonly attachments: AttachmentsService;
 
   /**
    * Creates a new UIController instance.
    * Use the static `create()` method instead of calling this directly.
    */
-  private constructor(logger: Logger, telemetryService?: TelemetryService) {
+  private constructor(
+    logger: Logger,
+    attachments: AttachmentsService,
+    telemetryService?: TelemetryService,
+  ) {
     super();
     this.logger = logger;
+    this.attachments = attachments;
     this.telemetryService = telemetryService ?? null;
     this.uiKarton = new KartonService(logger);
 
@@ -318,14 +326,14 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
           return new Response('Invalid attachment URL', { status: 400 });
         }
 
-        const exists = await blobExists(agentId, attachmentId);
+        const exists = await this.attachments.exists(agentId, attachmentId);
         if (!exists) {
           return new Response('Attachment not found', { status: 404 });
         }
 
         const mediaType = inferMimeType(attachmentId);
 
-        const filePath = getBlobPath(agentId, attachmentId);
+        const filePath = this.attachments.blobPath(agentId, attachmentId);
         const fileUrl = pathToFileURL(filePath).href;
         const fileResponse = await net.fetch(fileUrl);
 

@@ -39,6 +39,10 @@ import {
   type ChatHistoryScrollDirection,
 } from '../_lib/chat-history-scroll-event';
 import { CHAT_EDIT_USER_MESSAGE_REQUESTED_EVENT } from '../_lib/chat-edit-user-message-event';
+import {
+  getWorkspaceMountsFromMessage,
+  resolveBrowserContextFromMessages,
+} from '@shared/env-metadata';
 
 // Top inset reserved for titlebar-level chrome (sidebar toggle, future
 // top-right buttons). Sits as a sibling spacer ABOVE Virtuoso so items can
@@ -628,7 +632,7 @@ export const ChatHistory = () => {
   const resolvedMounts = useMemo<Mount[]>(() => {
     const mountsByPrefix = new Map<string, Mount>();
     for (const msg of filteredMessages) {
-      const mounts = msg?.metadata?.environmentSnapshot?.workspace?.mounts;
+      const mounts = getWorkspaceMountsFromMessage(msg);
       if (!mounts) continue;
       for (const mount of mounts) {
         if (!mountsByPrefix.has(mount.prefix)) {
@@ -1102,29 +1106,13 @@ export const ChatHistory = () => {
       const ctxCache = browserContextCacheRef.current;
       let browserCtx = ctxCache.get(message.id);
       if (!browserCtx) {
-        let messageBrowserSessionId: string | null = null;
-        let messageTabs: Map<string, BrowserTabSnapshot> | null = null;
-        for (let i = index; i >= 0; i--) {
-          const snapshot = msgs[i]?.metadata?.environmentSnapshot;
-          if (snapshot !== undefined) {
-            if (
-              messageBrowserSessionId === null &&
-              snapshot.browserSessionId !== undefined
-            )
-              messageBrowserSessionId = snapshot.browserSessionId;
-            // snapshot.browser is the EnvironmentSnapshot browser-domain
-            // field (not the deprecated Karton state.browser live state).
-            if (messageTabs === null && snapshot.browser?.tabs) {
-              messageTabs = new Map(
-                snapshot.browser.tabs.map((t) => [t.id, t]),
-              );
-            }
-            if (messageBrowserSessionId !== null && messageTabs !== null) break;
-          }
-        }
+        const { browserSessionId, tabs } = resolveBrowserContextFromMessages(
+          msgs,
+          index,
+        );
         browserCtx = {
-          sessionId: messageBrowserSessionId,
-          tabs: messageTabs,
+          sessionId: browserSessionId,
+          tabs,
         };
         ctxCache.set(message.id, browserCtx);
       }

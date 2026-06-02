@@ -13,7 +13,6 @@ import { ShellService, type DetectedShell } from './services/shell';
 import { TerminalService } from '@/services/terminal';
 import {
   FULL_PERMISSIONS,
-  NON_WORKSPACE_PREFIXES,
   READ_ONLY_PERMISSIONS,
   type MountDescriptor,
 } from '../sandbox/ipc';
@@ -25,9 +24,8 @@ import {
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
 import { DisposableService } from '@/services/disposable';
-import type { DiffHistoryService } from '@/services/diff-history';
+import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { WindowLayoutService } from '@/services/window-layout';
-import { getBrowserSessionId } from '@/services/window-layout/browser-session';
 import type { AuthService } from '@/services/auth';
 import type { TelemetryService } from '@/services/telemetry';
 import type { ModelProviderService } from '@/agents/model-provider';
@@ -35,44 +33,31 @@ import type { SmartApprovalDeps } from './tools/shell/execute-shell-command';
 import type { CredentialsService } from '@/services/credentials';
 import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
+import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
+import { resolveNewAgentWorkspaceMountPath } from '@/services/agent-manager/workspace-mount-normalization';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
-import { deleteAgentBlobs, getAgentBlobDir } from '@/utils/attachment-blobs';
+import type { AttachmentsService } from '@stagewise/agent-core/attachments';
+import { getBrowserHostPaths } from '@/services/agent-core-bridge/host-paths';
 import {
   getDataRoot,
   getLogsDir,
   getPlansDir,
-  getTempRoot,
   getAgentShellLogsDir,
 } from '@/utils/paths';
 import { existsSync, mkdirSync, truncateSync } from 'node:fs';
-import fsPromises from 'node:fs/promises';
 import type { ApiClient } from '@stagewise/api-client';
-import {
-  deleteToolExecute,
-  DESCRIPTION as DELETE_FILE_DESCRIPTION,
-} from './tools/file-modification/delete-file';
-import { glob as globTool } from './tools/file-modification/glob';
-import { readFile as readTool } from './tools/file-modification/read';
-import { ls as lsTool } from './tools/file-modification/ls';
 import { getLintingDiagnostics as getLintingDiagnosticsTool } from './tools/file-modification/get-linting-diagnostics';
 import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-library-docs';
 import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
-  writeToolExecute,
-  DESCRIPTION as WRITE_DESCRIPTION,
-} from './tools/file-modification/write';
-import {
-  multiEditToolExecute,
-  DESCRIPTION as MULTI_EDIT_DESCRIPTION,
-} from './tools/file-modification/multi-edit';
-import {
-  copyToolExecute,
-  DESCRIPTION as COPY_DESCRIPTION,
-} from './tools/file-modification/copy';
-import { mkdir as mkdirTool } from './tools/file-modification/mkdir';
-import { grepSearch as grepSearchTool } from './tools/file-modification/grep-search';
+  makeUniversalTools,
+  type AgentManagerToolboxPort,
+  type AgentStore,
+  type MountPermission as CoreMountPermission,
+} from '@stagewise/agent-core';
+import type { BaseAgentToolboxView } from '@stagewise/agent-core/agents';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
 import {
   executeShellCommand as executeShellCommandTool,
@@ -86,31 +71,13 @@ import {
   goBackQuestion,
   cleanupQuestionsForAgent,
 } from './tools/user-interaction/ask-user-questions';
-import { type Tool, tool } from 'ai';
-import {
-  buildAgentFileEditContent,
-  captureFileState,
-  cleanupTempFile,
-  type MountedClientRuntimes,
-} from './utils';
+import type { Tool } from 'ai';
+import type { MountedClientRuntimes } from './utils';
 import path from 'node:path';
-import type { z } from 'zod';
-import {
-  deleteToolInputSchema,
-  multiEditToolInputSchema,
-  writeToolInputSchema,
-  copyToolInputSchema,
-  type CopyToolInput,
-  type StagewiseToolSet,
-  type QuestionAnswerValue,
-} from '@shared/karton-contracts/ui/agent/tools/types';
+import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { TabState } from '@shared/karton-contracts/ui';
 import type { BrowserSnapshot, WorkspaceSnapshot } from './types';
-import type {
-  EnvironmentSnapshot,
-  MountPermission,
-} from '@shared/karton-contracts/ui/agent/metadata';
-import { createEnvironmentDiffSnapshot } from '@/services/diff-history/utils/diff';
+import type { MountPermission } from '@shared/karton-contracts/ui/agent/metadata';
 import type { WorkspaceInfo } from '@/agents/shared/prompts/utils/workspace-info';
 import { getWorkspaceInfo as getWorkspaceInfoUtil } from '@/agents/shared/prompts/utils/workspace-info';
 import { readAgentsMd } from '@/agents/shared/prompts/utils/read-agents-md';
@@ -127,13 +94,11 @@ import {
 } from '@/agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
 import { toSkillDefinitionUI } from '@shared/skills';
-import { readPlans } from '@/agents/shared/prompts/utils/read-plans';
-import { readLogChannels } from '@/agents/shared/prompts/utils/read-logs';
-import { PLANS_PREFIX, getAgentOwnedPlanPaths } from '@shared/plan-ownership';
-import { LOGS_PREFIX, getAgentOwnedLogPaths } from '@shared/log-ownership';
+import { PLANS_PREFIX } from '@stagewise/agent-core/plans';
+import { readPlans } from '@stagewise/agent-core/plans/read';
+import { LOGS_PREFIX } from '@stagewise/agent-core/logs';
+import { readLogChannels } from '@stagewise/agent-core/logs/read';
 import { LogIngestService } from '../log-ingest';
-import { resolveMountedRelativePath } from './utils/path-mounting';
-import { normalizePath } from '@shared/path-utils';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { homedir } from 'node:os';
@@ -141,7 +106,7 @@ import { homedir } from 'node:os';
 type MountedPrefix = string;
 type MountedPath = string;
 
-function getGlobalSkillsMounts(): Array<{
+export function getGlobalSkillsMounts(): Array<{
   prefix: string;
   absolutePath: string;
 }> {
@@ -158,7 +123,10 @@ function getGlobalSkillsMounts(): Array<{
   ];
 }
 
-export class ToolboxService extends DisposableService {
+export class ToolboxService
+  extends DisposableService
+  implements BaseAgentToolboxView, AgentManagerToolboxPort
+{
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
   private readonly diffHistoryService: DiffHistoryService;
@@ -171,6 +139,9 @@ export class ToolboxService extends DisposableService {
   private readonly gitService: GitService;
   private readonly detectedShell: DetectedShell | null;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
+  private readonly agentStore: AgentStore;
+  private readonly hostAgentStateMutations: HostAgentStateMutations;
+  private readonly attachments: AttachmentsService;
 
   private sandboxService: SandboxService | null = null;
   private shellService: ShellService | null = null;
@@ -230,6 +201,47 @@ export class ToolboxService extends DisposableService {
     runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
     runtimes.set('shells', this.getOrCreateShellsRuntime(agentInstanceId));
     return runtimes;
+  }
+
+  private hasMountedPaths(agentInstanceId: string): boolean {
+    return this.getMountedPathsForAgent(agentInstanceId).size > 0;
+  }
+
+  private getUniversalTool(
+    toolName: string,
+    agentInstanceId: string,
+  ): Tool | null {
+    if (!this.hasMountedPaths(agentInstanceId)) return null;
+    const tools = makeUniversalTools({
+      agentInstanceId,
+      hostPaths: getBrowserHostPaths(),
+      mountManager: this.mountManagerService,
+      staticMounts: getGlobalSkillsMounts()
+        .filter((mount) => existsSync(mount.absolutePath))
+        .map((mount) => ({
+          prefix: mount.prefix,
+          absolutePath: mount.absolutePath,
+          permissions: ['read'] satisfies readonly CoreMountPermission[],
+        })),
+      diffHistoryService: this.diffHistoryService,
+      logger: this.logger,
+      rgBinaryBasePath: getRipgrepBasePath(),
+      mutations: {
+        onTextFileWritten: (
+          agentId: string,
+          absolutePath: string,
+          content: string,
+        ) =>
+          this.mountManagerService?.syncFileWithLsp(
+            agentId,
+            absolutePath,
+            content,
+          ),
+        onTextFileClosed: (agentId: string, absolutePath: string) =>
+          this.mountManagerService?.syncFileCloseWithLsp(agentId, absolutePath),
+      },
+    });
+    return (tools as Record<string, Tool | undefined>)[toolName] ?? null;
   }
 
   /** Builtin commands discovered at startup — stored for refresh merging. */
@@ -304,7 +316,7 @@ export class ToolboxService extends DisposableService {
   private getOrCreateAttRuntime(agentInstanceId: string): ClientRuntimeNode {
     const existing = this.attRuntimes.get(agentInstanceId);
     if (existing) return existing;
-    const attDir = getAgentBlobDir(agentInstanceId);
+    const attDir = this.attachments.agentBlobDir(agentInstanceId);
     mkdirSync(attDir, { recursive: true });
     const runtime = new ClientRuntimeNode({
       workingDirectory: attDir,
@@ -325,11 +337,6 @@ export class ToolboxService extends DisposableService {
     });
     this.shellsRuntimes.set(agentInstanceId, runtime);
     return runtime;
-  }
-
-  /** Temp directory for capturing file state (external/binary files) */
-  private get tempDir(): string {
-    return path.join(getTempRoot(), 'agent-temp-files');
   }
 
   /**
@@ -372,6 +379,71 @@ export class ToolboxService extends DisposableService {
     );
   }
 
+  /**
+   * Snapshot of shell sessions associated with `agentInstanceId`.
+   *
+   * Narrow accessor used by the host `shells` domain adapter
+   * (see `apps/browser/src/backend/env-domains/shells-domain-adapter.ts`). Returns
+   * the canonical empty `{ sessions: [] }` when the shell service has
+   * not been initialized (defensive — production startup always
+   * mounts it).
+   */
+  public getShellSnapshot(
+    agentInstanceId: string,
+  ): import('@shared/env-domain-schemas').ShellSnapshot {
+    return (
+      this.shellService?.getShellSnapshot(agentInstanceId) ?? { sessions: [] }
+    );
+  }
+
+  /**
+   * Current sandbox session id bound to `agentInstanceId`, or `null`
+   * when no sandbox invocation has happened yet. Used by the host
+   * `sandbox` environment provider.
+   */
+  public getSandboxSessionId(agentInstanceId: string): string | null {
+    return this.sandboxService?.getSandboxSessionId(agentInstanceId) ?? null;
+  }
+
+  /**
+   * Endpoint descriptor of the local log-ingest HTTP service, or
+   * `null` when the service is not running. Used by the host
+   * `logIngest` environment provider.
+   */
+  public getLogIngestSnapshot(): import('@shared/env-domain-schemas').LogIngestSnapshot {
+    if (!this.logIngestService) return null;
+    return {
+      port: this.logIngestService.getPort(),
+      token: this.logIngestService.getToken(),
+    };
+  }
+
+  /**
+   * Forwards the `AgentCoreBridge` active-app controller (Phase 1d) to the
+   * owning `SandboxService`. Called once from `main.ts` after
+   * `createAgentCoreBridge` returns. The sandbox is already initialized by
+   * the time this is invoked because `ToolboxService.create` resolves
+   * before `main.ts` constructs the bridge.
+   */
+  public setActiveAppController(
+    controller: import('../agent-core-bridge/state/toolbox-active-app').ActiveAppStateController,
+  ): void {
+    this.sandboxService?.setActiveAppController(controller);
+  }
+
+  /**
+   * Expose the package-owned `MountManager` so `main.ts` can wire it
+   * into the core env-state {@link DomainAdapter}s (workspace,
+   * agentsMd, workspaceMd). Returns `null` when the mount manager has
+   * not yet been initialized (defensive — `ToolboxService.create`
+   * always initializes it).
+   */
+  public getMountManager():
+    | import('@stagewise/agent-core/mount-manager').MountManager
+    | null {
+    return this.mountManagerService?.getCoreMountManager() ?? null;
+  }
+
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -386,6 +458,9 @@ export class ToolboxService extends DisposableService {
     preferencesService: PreferencesService,
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
+    agentStore: AgentStore,
+    hostAgentStateMutations: HostAgentStateMutations,
+    attachments: AttachmentsService,
   ) {
     super();
     this.logger = logger;
@@ -401,6 +476,9 @@ export class ToolboxService extends DisposableService {
     this.preferencesService = preferencesService;
     this.detectedShell = detectedShell;
     this.resolvedEnvPromise = resolvedEnvPromise;
+    this.agentStore = agentStore;
+    this.hostAgentStateMutations = hostAgentStateMutations;
+    this.attachments = attachments;
   }
 
   public static async create(
@@ -417,6 +495,9 @@ export class ToolboxService extends DisposableService {
     preferencesService: PreferencesService,
     detectedShell: DetectedShell | null,
     resolvedEnvPromise: Promise<Record<string, string> | null>,
+    agentStore: AgentStore,
+    hostAgentStateMutations: HostAgentStateMutations,
+    attachments: AttachmentsService,
   ): Promise<ToolboxService> {
     const instance = new ToolboxService(
       logger,
@@ -432,6 +513,9 @@ export class ToolboxService extends DisposableService {
       preferencesService,
       detectedShell,
       resolvedEnvPromise,
+      agentStore,
+      hostAgentStateMutations,
+      attachments,
     );
     await instance.initialize();
     return instance;
@@ -449,528 +533,10 @@ export class ToolboxService extends DisposableService {
     });
   }
 
-  /**
-   * Wraps a file-modifying tool to capture before/after state and register with diff-history.
-   *
-   * @param description - Tool description for AI SDK
-   * @param inputSchema - Zod schema for tool input (must have path field)
-   * @param executeFn - The actual tool execute function
-   * @param agentInstanceId - The agent instance ID for diff-history attribution
-   * @returns A wrapped tool that registers edits with diff-history
-   */
-  private wrapFileModifyingTool<TParams extends { path: string }>(
-    description: string,
-    inputSchema: z.ZodType<TParams>,
-    executeFn: (
-      params: TParams,
-      mountedRuntimes: MountedClientRuntimes,
-    ) => Promise<unknown>,
+  public async getTool(
+    tool: string,
     agentInstanceId: string,
-  ) {
-    // Cast to any to bypass AI SDK's strict FlexibleSchema type inference
-    // The schemas are validated Zod schemas that work correctly at runtime
-    return tool({
-      description,
-      inputSchema: inputSchema as z.ZodType<TParams>,
-      strict: false,
-      execute: async (params, options) => {
-        const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
-        if (!mountedRuntimes) throw new Error('No mounted workspaces found');
-
-        const mountPrefix = normalizePath(params.path).split('/')[0];
-        if (NON_WORKSPACE_PREFIXES.has(mountPrefix))
-          return executeFn(params, mountedRuntimes);
-
-        const { clientRuntime, path } = resolveMountedRelativePath(
-          mountedRuntimes,
-          params.path,
-        );
-        const { toolCallId } = options as { toolCallId: string };
-        const absolutePath = clientRuntime.fileSystem.resolvePath(path);
-
-        const beforeState = await captureFileState(absolutePath, this.tempDir);
-        this.diffHistoryService.ignoreFileForWatcher(absolutePath);
-        // Execute the actual tool
-        const result = await executeFn(params, mountedRuntimes);
-        const afterState = await captureFileState(absolutePath, this.tempDir);
-
-        // Build AgentFileEdit and register with diff-history
-        try {
-          const { editContent, tempFilesToCleanup } =
-            await buildAgentFileEditContent(
-              beforeState,
-              afterState,
-              this.tempDir,
-            );
-
-          // Sync with LSP based on operation type
-          // File created/modified - update LSP
-          if (!editContent.isExternal && editContent.contentAfter !== null)
-            void this.mountManagerService?.syncFileWithLsp(
-              agentInstanceId,
-              absolutePath,
-              editContent.contentAfter,
-            );
-          // File deleted - close in LSP to clear diagnostics
-          else if (
-            !editContent.isExternal &&
-            editContent.contentBefore !== null
-          )
-            void this.mountManagerService?.syncFileCloseWithLsp(
-              agentInstanceId,
-              absolutePath,
-            );
-
-          await this.diffHistoryService.registerAgentEdit({
-            agentInstanceId,
-            path: absolutePath,
-            toolCallId,
-            workspaceRoot:
-              this.mountManagerService?.findWorkspaceForFile(
-                agentInstanceId,
-                absolutePath,
-              ) ?? null,
-            ...editContent,
-          });
-
-          // Clean up temp files after registration
-          for (const tempFile of tempFilesToCleanup)
-            void cleanupTempFile(tempFile);
-        } catch (error) {
-          this.logger.error('[ToolboxService] Failed to register agent edit', {
-            error,
-            path: absolutePath,
-            toolCallId,
-          });
-          this.report(error as Error, 'registerAgentEdit', {
-            path: absolutePath,
-            toolCallId,
-          });
-          // Don't fail the tool execution if diff-history registration fails
-        } finally {
-          setTimeout(
-            () => this.diffHistoryService.unignoreFileForWatcher(absolutePath),
-            500,
-          );
-        }
-
-        // Attach diff data for UI rendering (stripped before LLM sees it)
-        const _diff =
-          !beforeState.isExternal && !afterState.isExternal
-            ? { before: beforeState.content, after: afterState.content }
-            : null;
-
-        return { ...(result as object), _diff };
-      },
-    });
-  }
-
-  /**
-   * Wraps the delete tool with special handling for directory deletions.
-   * For single files, behaves like wrapFileModifyingTool.
-   * For directories, captures before-state for all files inside, deletes them,
-   * and registers individual diff-history entries for each file.
-   */
-  private wrapDeleteTool(agentInstanceId: string) {
-    return tool({
-      description: DELETE_FILE_DESCRIPTION,
-      inputSchema: deleteToolInputSchema as z.ZodType<{ path: string }>,
-      strict: false,
-      execute: async (params, options) => {
-        const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
-        if (!mountedRuntimes) throw new Error('No mounted workspaces found');
-
-        const mountPrefix = normalizePath(params.path).split('/')[0];
-        if (NON_WORKSPACE_PREFIXES.has(mountPrefix))
-          return deleteToolExecute(params, mountedRuntimes);
-
-        const { clientRuntime, path: resolvedPath } =
-          resolveMountedRelativePath(mountedRuntimes, params.path);
-        const { toolCallId } = options as { toolCallId: string };
-        const absolutePath = clientRuntime.fileSystem.resolvePath(resolvedPath);
-
-        // Check if target is a directory
-        const isDir = await clientRuntime.fileSystem.isDirectory(absolutePath);
-
-        if (!isDir) {
-          // Single file deletion — same logic as wrapFileModifyingTool
-          const beforeState = await captureFileState(
-            absolutePath,
-            this.tempDir,
-          );
-          this.diffHistoryService.ignoreFileForWatcher(absolutePath);
-
-          await deleteToolExecute(params, mountedRuntimes);
-          const afterState = await captureFileState(absolutePath, this.tempDir);
-
-          try {
-            const { editContent, tempFilesToCleanup } =
-              await buildAgentFileEditContent(
-                beforeState,
-                afterState,
-                this.tempDir,
-              );
-
-            if (!editContent.isExternal && editContent.contentBefore !== null)
-              void this.mountManagerService?.syncFileCloseWithLsp(
-                agentInstanceId,
-                absolutePath,
-              );
-
-            await this.diffHistoryService.registerAgentEdit({
-              agentInstanceId,
-              path: absolutePath,
-              toolCallId,
-              workspaceRoot:
-                this.mountManagerService?.findWorkspaceForFile(
-                  agentInstanceId,
-                  absolutePath,
-                ) ?? null,
-              ...editContent,
-            });
-
-            for (const tempFile of tempFilesToCleanup)
-              void cleanupTempFile(tempFile);
-          } catch (error) {
-            this.logger.error(
-              '[ToolboxService] Failed to register agent edit',
-              { error, path: absolutePath, toolCallId },
-            );
-            this.report(error as Error, 'registerAgentEdit', {
-              path: absolutePath,
-              toolCallId,
-            });
-          } finally {
-            setTimeout(
-              () =>
-                this.diffHistoryService.unignoreFileForWatcher(absolutePath),
-              500,
-            );
-          }
-
-          const _diff =
-            !beforeState.isExternal && !afterState.isExternal
-              ? { before: beforeState.content, after: afterState.content }
-              : null;
-
-          return { _diff };
-        }
-
-        // Directory deletion — capture before-state for all files
-        const filePaths = await this.collectAllFiles(absolutePath);
-
-        // All children share the same owning workspace — resolve once.
-        const dirWorkspaceRoot =
-          this.mountManagerService?.findWorkspaceForFile(
-            agentInstanceId,
-            absolutePath,
-          ) ?? null;
-
-        // Capture before-state for each file and ignore them in watcher
-        const beforeStates = new Map<
-          string,
-          Awaited<ReturnType<typeof captureFileState>>
-        >();
-        for (const filePath of filePaths) {
-          beforeStates.set(
-            filePath,
-            await captureFileState(filePath, this.tempDir),
-          );
-          this.diffHistoryService.ignoreFileForWatcher(filePath);
-        }
-
-        // Execute the directory deletion
-        await deleteToolExecute(params, mountedRuntimes);
-
-        // Register diff-history for each deleted file
-        try {
-          for (const filePath of filePaths) {
-            const beforeState = beforeStates.get(filePath);
-            if (!beforeState) continue;
-
-            // After deletion, file doesn't exist
-            const afterState = await captureFileState(filePath, this.tempDir);
-
-            const { editContent, tempFilesToCleanup } =
-              await buildAgentFileEditContent(
-                beforeState,
-                afterState,
-                this.tempDir,
-              );
-
-            // Close in LSP to clear diagnostics
-            if (!editContent.isExternal && editContent.contentBefore !== null)
-              void this.mountManagerService?.syncFileCloseWithLsp(
-                agentInstanceId,
-                filePath,
-              );
-
-            await this.diffHistoryService.registerAgentEdit({
-              agentInstanceId,
-              path: filePath,
-              toolCallId,
-              workspaceRoot: dirWorkspaceRoot,
-              ...editContent,
-            });
-
-            for (const tempFile of tempFilesToCleanup)
-              void cleanupTempFile(tempFile);
-          }
-        } catch (error) {
-          this.logger.error(
-            '[ToolboxService] Failed to register agent edit for directory deletion',
-            { error, path: absolutePath, toolCallId },
-          );
-          this.report(error as Error, 'registerAgentEdit', {
-            path: absolutePath,
-            toolCallId,
-          });
-        } finally {
-          for (const filePath of filePaths) {
-            setTimeout(
-              () => this.diffHistoryService.unignoreFileForWatcher(filePath),
-              500,
-            );
-          }
-        }
-
-        // For directory deletions, _diff is null (no single-file diff to show)
-        return { _diff: null };
-      },
-    });
-  }
-
-  /**
-   * Recursively collect all file paths in a directory.
-   */
-  private async collectAllFiles(dirPath: string): Promise<string[]> {
-    const files: string[] = [];
-    const entries = await fsPromises.readdir(dirPath, {
-      withFileTypes: true,
-    });
-    for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        const subFiles = await this.collectAllFiles(fullPath);
-        files.push(...subFiles);
-      } else {
-        files.push(fullPath);
-      }
-    }
-    return files;
-  }
-
-  /**
-   * Creates the copy/move tool with custom diff-history tracking.
-   * Unlike wrapFileModifyingTool, this handles two paths (input + output)
-   * and for moves also registers the source deletion.
-   */
-  private createCopyTool(agentInstanceId: string) {
-    return tool({
-      description: COPY_DESCRIPTION,
-      inputSchema: copyToolInputSchema,
-      strict: false,
-      execute: async (params: CopyToolInput, options) => {
-        const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
-        if (!mountedRuntimes) throw new Error('No mounted workspaces found');
-
-        const { toolCallId } = options as { toolCallId: string };
-        const { input_path, output_path, move } = params;
-
-        const srcMountPrefix = normalizePath(input_path).split('/')[0];
-        const destMountPrefix = normalizePath(output_path).split('/')[0];
-
-        // Block moves from read-only mounts (att, plugins)
-        if (move && NON_WORKSPACE_PREFIXES.has(srcMountPrefix)) {
-          throw new Error(
-            `Cannot move from read-only mount '${srcMountPrefix}'. Use copy instead.`,
-          );
-        }
-
-        // Block writes into read-only mounts
-        if (NON_WORKSPACE_PREFIXES.has(destMountPrefix)) {
-          throw new Error(
-            `Cannot copy/move into read-only mount '${destMountPrefix}'.`,
-          );
-        }
-
-        // Resolve both paths
-        const { clientRuntime: srcRuntime, path: srcRelative } =
-          resolveMountedRelativePath(mountedRuntimes, input_path);
-        const { clientRuntime: destRuntime, path: destRelative } =
-          resolveMountedRelativePath(mountedRuntimes, output_path);
-
-        const srcAbsolute = srcRuntime.fileSystem.resolvePath(srcRelative);
-        const destAbsolute = destRuntime.fileSystem.resolvePath(destRelative);
-        const srcIsDir = await srcRuntime.fileSystem.isDirectory(srcAbsolute);
-
-        // Collect all affected output files for diff-history
-        // For a directory copy, we need to track every file that gets created
-        let destFilePaths: string[];
-        let srcFilePaths: string[];
-
-        if (srcIsDir) {
-          srcFilePaths = await this.collectAllFiles(srcAbsolute);
-          // Map source file paths to their destination equivalents
-          destFilePaths = srcFilePaths.map((srcFile) => {
-            const relative = path.relative(srcAbsolute, srcFile);
-            return path.join(destAbsolute, relative);
-          });
-        } else {
-          // Single file — check if dest is a directory
-          const destIsDir =
-            await destRuntime.fileSystem.isDirectory(destAbsolute);
-          const finalDest = destIsDir
-            ? path.join(destAbsolute, path.basename(srcAbsolute))
-            : destAbsolute;
-          srcFilePaths = [srcAbsolute];
-          destFilePaths = [finalDest];
-        }
-
-        // Capture before-state for destination files
-        const destBeforeStates = new Map<
-          string,
-          Awaited<ReturnType<typeof captureFileState>>
-        >();
-        for (const destFile of destFilePaths) {
-          destBeforeStates.set(
-            destFile,
-            await captureFileState(destFile, this.tempDir),
-          );
-          this.diffHistoryService.ignoreFileForWatcher(destFile);
-        }
-
-        // For moves, also capture before-state for source files
-        const srcBeforeStates = new Map<
-          string,
-          Awaited<ReturnType<typeof captureFileState>>
-        >();
-        if (move) {
-          for (const srcFile of srcFilePaths) {
-            srcBeforeStates.set(
-              srcFile,
-              await captureFileState(srcFile, this.tempDir),
-            );
-            this.diffHistoryService.ignoreFileForWatcher(srcFile);
-          }
-        }
-
-        // Execute the copy/move
-        const result = await copyToolExecute(params, mountedRuntimes);
-
-        // All dest files share the dest workspace; all src files share the src
-        // workspace (src and dest may differ across a cross-workspace copy).
-        const destWorkspaceRoot =
-          this.mountManagerService?.findWorkspaceForFile(
-            agentInstanceId,
-            destAbsolute,
-          ) ?? null;
-        const srcWorkspaceRoot =
-          this.mountManagerService?.findWorkspaceForFile(
-            agentInstanceId,
-            srcAbsolute,
-          ) ?? null;
-
-        // Register diff-history for destination files (created/overwritten)
-        try {
-          for (const destFile of destFilePaths) {
-            const beforeState = destBeforeStates.get(destFile);
-            if (!beforeState) continue;
-
-            const afterState = await captureFileState(destFile, this.tempDir);
-            const { editContent, tempFilesToCleanup } =
-              await buildAgentFileEditContent(
-                beforeState,
-                afterState,
-                this.tempDir,
-              );
-
-            if (!editContent.isExternal && editContent.contentAfter !== null)
-              void this.mountManagerService?.syncFileWithLsp(
-                agentInstanceId,
-                destFile,
-                editContent.contentAfter,
-              );
-
-            await this.diffHistoryService.registerAgentEdit({
-              agentInstanceId,
-              path: destFile,
-              toolCallId,
-              workspaceRoot: destWorkspaceRoot,
-              ...editContent,
-            });
-
-            for (const tempFile of tempFilesToCleanup)
-              void cleanupTempFile(tempFile);
-          }
-
-          // For moves, register source file deletions
-          if (move) {
-            for (const srcFile of srcFilePaths) {
-              const beforeState = srcBeforeStates.get(srcFile);
-              if (!beforeState) continue;
-
-              const afterState = await captureFileState(srcFile, this.tempDir);
-              const { editContent, tempFilesToCleanup } =
-                await buildAgentFileEditContent(
-                  beforeState,
-                  afterState,
-                  this.tempDir,
-                );
-
-              if (!editContent.isExternal && editContent.contentBefore !== null)
-                void this.mountManagerService?.syncFileCloseWithLsp(
-                  agentInstanceId,
-                  srcFile,
-                );
-
-              await this.diffHistoryService.registerAgentEdit({
-                agentInstanceId,
-                path: srcFile,
-                toolCallId,
-                workspaceRoot: srcWorkspaceRoot,
-                ...editContent,
-              });
-
-              for (const tempFile of tempFilesToCleanup)
-                void cleanupTempFile(tempFile);
-            }
-          }
-        } catch (error) {
-          this.logger.error(
-            '[ToolboxService] Failed to register agent edit for copy/move',
-            { error, input_path, output_path, toolCallId },
-          );
-          this.report(error as Error, 'registerAgentEdit', {
-            path: output_path,
-            toolCallId,
-          });
-        } finally {
-          for (const destFile of destFilePaths) {
-            setTimeout(
-              () => this.diffHistoryService.unignoreFileForWatcher(destFile),
-              500,
-            );
-          }
-          if (move) {
-            for (const srcFile of srcFilePaths) {
-              setTimeout(
-                () => this.diffHistoryService.unignoreFileForWatcher(srcFile),
-                500,
-              );
-            }
-          }
-        }
-
-        return { ...(result as object), _diff: null };
-      },
-    });
-  }
-
-  public async getTool<TToolName extends keyof StagewiseToolSet>(
-    tool: TToolName,
-    agentInstanceId: string,
-  ): Promise<StagewiseToolSet[TToolName] | null>;
+  ): Promise<Tool | null>;
 
   /**
    * Used by the agent to get a tool that can be forwarded to the AI-SDK
@@ -987,8 +553,8 @@ export class ToolboxService extends DisposableService {
    * @note Based on the here provided `agentInstanceId` and the `toolCallId` provided at time of tool execution,
    *        the toolbox can clearly match a tool call to it's related agent and other tool calls made by the agent.
    */
-  public async getTool<TToolName extends keyof StagewiseToolSet>(
-    tool: TToolName,
+  public async getTool(
+    tool: string,
     agentInstanceId: string,
   ): Promise<Tool | null> {
     const mountedRuntimes = this.getAllMountedRuntimes(agentInstanceId);
@@ -1004,42 +570,15 @@ export class ToolboxService extends DisposableService {
 
     switch (tool) {
       case 'write':
-        if (mountedRuntimes.size === 0) return null;
-        return this.wrapFileModifyingTool(
-          WRITE_DESCRIPTION,
-          writeToolInputSchema,
-          writeToolExecute,
-          agentInstanceId,
-        );
       case 'read':
-        if (mountedRuntimes.size === 0) return null;
-        return readTool(mountedRuntimes);
       case 'ls':
-        if (mountedRuntimes.size === 0) return null;
-        return lsTool(mountedRuntimes);
       case 'delete':
-        if (mountedRuntimes.size === 0) return null;
-        return this.wrapDeleteTool(agentInstanceId);
       case 'glob':
-        if (mountedRuntimes.size === 0) return null;
-        return globTool(mountedRuntimes);
       case 'grepSearch':
-        if (mountedRuntimes.size === 0) return null;
-        return grepSearchTool(mountedRuntimes);
       case 'multiEdit':
-        if (mountedRuntimes.size === 0) return null;
-        return this.wrapFileModifyingTool(
-          MULTI_EDIT_DESCRIPTION,
-          multiEditToolInputSchema,
-          multiEditToolExecute,
-          agentInstanceId,
-        );
       case 'mkdir':
-        if (mountedRuntimes.size === 0) return null;
-        return mkdirTool(mountedRuntimes);
       case 'copy':
-        if (mountedRuntimes.size === 0) return null;
-        return this.createCopyTool(agentInstanceId);
+        return this.getUniversalTool(tool, agentInstanceId);
       case 'listLibraryDocs':
         if (!this.apiClient) return null;
         return listLibraryDocsTool(this.apiClient);
@@ -1057,15 +596,20 @@ export class ToolboxService extends DisposableService {
         if (!this.windowLayoutService) return null;
         return readConsoleLogsTool(this.windowLayoutService, agentInstanceId);
       case 'askUserQuestions':
-        return askUserQuestionsTool(this.uiKarton, agentInstanceId, (id) => {
-          void Promise.resolve(
-            this.notificationEventHandler?.('question', id),
-          ).catch((error) => {
-            this.logger.debug(
-              `[ToolboxService] Notification event failed: ${(error as Error).message}`,
-            );
-          });
-        });
+        return askUserQuestionsTool(
+          this.uiKarton,
+          this.hostAgentStateMutations,
+          agentInstanceId,
+          (id) => {
+            void Promise.resolve(
+              this.notificationEventHandler?.('question', id),
+            ).catch((error) => {
+              this.logger.debug(
+                `[ToolboxService] Notification event failed: ${(error as Error).message}`,
+              );
+            });
+          },
+        );
       case 'createShellSession': {
         if (!this.shellService?.isAvailable()) return null;
         return createShellSessionTool(this.shellService, agentInstanceId, () =>
@@ -1094,14 +638,14 @@ export class ToolboxService extends DisposableService {
           },
           telemetryService: this.telemetryService,
           recordPendingApproval: (toolCallId, explanation) => {
-            this.uiKarton.setState((draft) => {
-              const instance = draft.agents.instances[agentInstanceId];
-              if (!instance) return;
-              // Legacy field name: this is smart-approval explanation metadata,
-              // not the canonical approval-pending state. The canonical state
-              // is the assistant tool part with state === 'approval-requested'.
-              instance.state.pendingApprovals[toolCallId] = { explanation };
-            });
+            // Legacy field name: this is smart-approval explanation metadata,
+            // not the canonical approval-pending state. The canonical state
+            // is the assistant tool part with state === 'approval-requested'.
+            this.hostAgentStateMutations.recordPendingApproval(
+              agentInstanceId,
+              toolCallId,
+              explanation,
+            );
           },
         };
         return executeShellCommandTool(
@@ -1157,6 +701,27 @@ export class ToolboxService extends DisposableService {
     );
   }
 
+  /**
+   * `AgentManagerToolboxPort.resolveNewAgentMountPath` implementation.
+   *
+   * Defaults a new agent's mount to the repository's main worktree —
+   * users typically expect a fresh agent to start at the canonical
+   * checkout regardless of which linked worktree they happened to
+   * pick. Falls back to the input path when the host's `gitService`
+   * cannot determine a main worktree (non-git directory, error, ...).
+   * The `agents.create` handler bypasses this when
+   * `preserveWorkspacePaths` is set.
+   */
+  public async resolveNewAgentMountPath(
+    workspacePath: string,
+  ): Promise<string> {
+    return await resolveNewAgentWorkspaceMountPath(
+      workspacePath,
+      (input) => this.gitService.getWorkspaceMainWorktreePath(input),
+      this.logger,
+    );
+  }
+
   public async handleUnmountWorkspace(
     agentInstanceId: string,
     mountPrefix: string,
@@ -1181,7 +746,7 @@ export class ToolboxService extends DisposableService {
         permissions: m.permissions,
       })) ?? [];
 
-    const attDir = getAgentBlobDir(agentInstanceId);
+    const attDir = this.attachments.agentBlobDir(agentInstanceId);
     mkdirSync(attDir, { recursive: true });
     mounts.push({
       prefix: 'att',
@@ -1337,161 +902,6 @@ export class ToolboxService extends DisposableService {
     };
   }
 
-  public async captureEnvironmentSnapshot(
-    agentInstanceId: string,
-  ): Promise<EnvironmentSnapshot> {
-    const browserState = this.getBrowserSnapshot(agentInstanceId);
-    const workspaceState =
-      this.mountManagerService?.getWorkspaceSnapshot(agentInstanceId);
-    const toolboxState = this.uiKarton.state.toolbox[agentInstanceId];
-
-    const workspaceMounts = workspaceState?.mounts ?? [];
-    const allMounts = [
-      ...workspaceMounts,
-      {
-        prefix: 'att',
-        path: getAgentBlobDir(agentInstanceId),
-        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
-      },
-      {
-        prefix: 'shells',
-        path: getAgentShellLogsDir(agentInstanceId),
-        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
-      },
-      {
-        prefix: 'plugins',
-        path: getPluginsPath(),
-        permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
-      },
-      ...getGlobalSkillsMounts()
-        .filter((gs) => existsSync(gs.absolutePath))
-        .map((gs) => ({
-          prefix: gs.prefix,
-          path: gs.absolutePath,
-          permissions: [...READ_ONLY_PERMISSIONS] as MountPermission[],
-        })),
-      {
-        prefix: 'apps',
-        path: getAgentAppsDir(agentInstanceId),
-        permissions: [...FULL_PERMISSIONS] as MountPermission[],
-      },
-      {
-        prefix: PLANS_PREFIX,
-        path: getPlansDir(),
-        permissions: [...FULL_PERMISSIONS] as MountPermission[],
-      },
-      {
-        prefix: LOGS_PREFIX,
-        path: getLogsDir(),
-        permissions: [...FULL_PERMISSIONS] as MountPermission[],
-      },
-    ];
-
-    const [
-      agentsMdEntries,
-      workspaceMdEntries,
-      commands,
-      planEntries,
-      logEntries,
-    ] = await Promise.all([
-      this.getAllAgentsMdEntries(agentInstanceId),
-      this.getWorkspaceMd(agentInstanceId),
-      this.getSkillsList(agentInstanceId),
-      this.getPlansList(agentInstanceId),
-      this.getLogsList(agentInstanceId),
-    ]);
-
-    const mounts =
-      this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
-    const respectedMounts: string[] = [];
-    if (mounts) {
-      for (const mount of mounts) {
-        const settings = this.uiKarton.state.preferences?.agent
-          ?.workspaceSettings?.[mount.path] ?? {
-          respectAgentsMd: false,
-          disabledSkills: [],
-        };
-        if (settings.respectAgentsMd) {
-          respectedMounts.push(mount.prefix);
-        }
-      }
-    }
-
-    const snapshot: EnvironmentSnapshot = {
-      browser: {
-        tabs: browserState.tabs.map((t) => ({
-          id: t.id,
-          url: t.url,
-          title: t.title,
-          consoleErrorCount: t.consoleErrorCount,
-          consoleLogCount: t.consoleLogCount,
-          error: t.error,
-          lastFocusedAt: t.lastFocusedAt,
-          agentInstanceId: t.agentInstanceId,
-        })),
-        activeTabId: browserState.activeTab?.id ?? null,
-      },
-      workspace: { mounts: allMounts },
-      fileDiffs: toolboxState
-        ? createEnvironmentDiffSnapshot(
-            toolboxState.pendingFileDiffs,
-            toolboxState.editSummary,
-          )
-        : { pending: [], summary: [] },
-      sandboxSessionId:
-        this.sandboxService?.getSandboxSessionId(agentInstanceId) ?? null,
-      activeApp: toolboxState?.activeApp
-        ? {
-            appId: toolboxState.activeApp.appId,
-            pluginId: toolboxState.activeApp.pluginId,
-          }
-        : null,
-      agentsMd: {
-        entries: agentsMdEntries.map((e) => ({
-          mountPrefix: e.mountPrefix,
-          content: e.content,
-        })),
-        respectedMounts,
-      },
-      workspaceMd: {
-        entries: workspaceMdEntries.map((e) => ({
-          mountPrefix: e.mountPrefix,
-          content: e.content,
-        })),
-      },
-      enabledSkills: {
-        paths: commands
-          .filter((c) => c.agentInvocable !== false && c.skillPath)
-          .map((c) => c.skillPath!),
-      },
-      browserSessionId: getBrowserSessionId(),
-      plans: {
-        entries: planEntries,
-      },
-      logs: {
-        entries: logEntries,
-      },
-      logIngest: this.logIngestService
-        ? {
-            port: this.logIngestService.getPort(),
-            token: this.logIngestService.getToken(),
-          }
-        : null,
-      shells: (() => {
-        const shellSnap = this.shellService?.getShellSnapshot(
-          agentInstanceId,
-        ) ?? {
-          sessions: [],
-        };
-        return shellSnap;
-      })() ?? {
-        sessions: [],
-      },
-    };
-
-    return snapshot;
-  }
-
   /**
    * Store the builtin commands discovered at startup and push the
    * initial commands list to Karton state.
@@ -1633,51 +1043,6 @@ export class ToolboxService extends DisposableService {
     return result;
   }
 
-  private async getPlansList(agentInstanceId: string): Promise<
-    Array<{
-      name: string;
-      description: string | null;
-      filename: string;
-      totalTasks: number;
-      completedTasks: number;
-      taskGroups: Array<{
-        label: string;
-        tasks: Array<{ text: string; completed: boolean; depth: number }>;
-      }>;
-    }>
-  > {
-    const agentEntry = this.uiKarton.state.agents.instances[agentInstanceId];
-    const ownedPaths = agentEntry
-      ? getAgentOwnedPlanPaths(agentEntry.state.history)
-      : new Set<string>();
-
-    const plans = await readPlans(getPlansDir());
-    return plans.filter((plan) => {
-      const toolPath = `${PLANS_PREFIX}/${plan.filename}`;
-      return ownedPaths.has(toolPath);
-    });
-  }
-
-  private async getLogsList(agentInstanceId: string): Promise<
-    Array<{
-      filename: string;
-      byteSize: number;
-      lineCount: number;
-      tailLines: string[];
-    }>
-  > {
-    const agentEntry = this.uiKarton.state.agents.instances[agentInstanceId];
-    const ownedPaths = agentEntry
-      ? getAgentOwnedLogPaths(agentEntry.state.history)
-      : new Set<string>();
-
-    const logs = await readLogChannels(getLogsDir());
-    return logs.filter((log) => {
-      const toolPath = `${LOGS_PREFIX}/${log.filename}`;
-      return ownedPaths.has(toolPath);
-    });
-  }
-
   public getWorkspaceAgentSettings(
     agentInstanceId: string,
   ): Map<string, WorkspaceAgentSettings> {
@@ -1693,21 +1058,6 @@ export class ToolboxService extends DisposableService {
       );
     }
     return result;
-  }
-
-  private async getAllAgentsMdEntries(
-    agentInstanceId: string,
-  ): Promise<Array<{ mountPrefix: string; content: string }>> {
-    const mounts =
-      this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
-    if (!mounts) return [];
-    if (mounts.length === 0) return [];
-    const results: Array<{ mountPrefix: string; content: string }> = [];
-    for (const mount of mounts) {
-      const content = await readAgentsMd(mount.clientRuntime);
-      if (content) results.push({ mountPrefix: mount.prefix, content });
-    }
-    return results;
   }
 
   public async getWorkspaceMd(
@@ -1804,11 +1154,15 @@ export class ToolboxService extends DisposableService {
   }
 
   /**
-   * Drains all pending sandbox attachments (created via API.createAttachment()
-   * during this step) for the given agent and returns them as a flat array.
-   * Clears the pending buffers as a side effect.
+   * Drain pending tool-produced attachments for the given agent (today:
+   * blobs created via the sandbox `API.createAttachment()` side-channel).
+   * Returns them as a flat array; clears the pending buffers as a side
+   * effect.
+   *
+   * Satisfies the `BaseAgentToolboxView.drainPendingAttachments` seam
+   * consumed by `BaseAgent.handlePostStep`.
    */
-  public drainSandboxAttachments(agentInstanceId: string): Attachment[] {
+  public drainPendingAttachments(agentInstanceId: string): Attachment[] {
     if (!this.sandboxService) return [];
     return this.sandboxService.drainPendingAttachments(agentInstanceId);
   }
@@ -1828,7 +1182,7 @@ export class ToolboxService extends DisposableService {
     // agent apps (apps/) can be resolved during content injection.
     result.set('plugins', getPluginsPath());
     result.set('apps', getAgentAppsDir(agentInstanceId));
-    result.set('att', getAgentBlobDir(agentInstanceId));
+    result.set('att', this.attachments.agentBlobDir(agentInstanceId));
     result.set(PLANS_PREFIX, getPlansDir());
     result.set(LOGS_PREFIX, getLogsDir());
 
@@ -1881,14 +1235,14 @@ export class ToolboxService extends DisposableService {
   }
 
   /**
-   * Clear tracking data for a specific agent instance.
-   * Call this when an agent session ends.
+   * Cancel any pending host-side user-facing dialogs for the given
+   * agent (today: `askUserQuestions` form UI). Called when the agent
+   * is stopped to dismiss the dialog UI.
+   *
+   * Satisfies the `BaseAgentToolboxView.cancelPendingAgentDialogs`
+   * seam.
    */
-  /**
-   * Cancel any pending user questions for a specific agent instance.
-   * Call this when the agent is stopped to dismiss the question UI.
-   */
-  public cancelPendingQuestions(agentInstanceId: string): void {
+  public cancelPendingAgentDialogs(agentInstanceId: string): void {
     cleanupQuestionsForAgent(agentInstanceId, this.uiKarton);
   }
 
@@ -1925,10 +1279,10 @@ export class ToolboxService extends DisposableService {
     this.appsRuntimes.delete(agentInstanceId);
     this.shellsRuntimes.delete(agentInstanceId);
     if (deleteBlobs) {
-      void deleteAgentBlobs(agentInstanceId);
+      void this.attachments.deleteAgentBlobs(agentInstanceId);
       this.shellService?.deleteShellLogs(agentInstanceId);
     }
-    this.cancelPendingQuestions(agentInstanceId);
+    this.cancelPendingAgentDialogs(agentInstanceId);
   }
 
   private async initialize(): Promise<void> {
@@ -1951,6 +1305,7 @@ export class ToolboxService extends DisposableService {
       this.telemetryService,
       this.gitService,
       this.preferencesService,
+      this.agentStore,
       this.resolvedEnvPromise,
     );
 
@@ -2012,6 +1367,7 @@ export class ToolboxService extends DisposableService {
     this.sandboxService = await SandboxService.create(
       this.windowLayoutService,
       this.logger,
+      this.attachments,
       fileDiffHandler,
       (agentId) => this.getSandboxMounts(agentId),
       async (typeId) => {
@@ -2145,16 +1501,11 @@ export class ToolboxService extends DisposableService {
       },
     );
 
-    this.uiKarton.registerServerProcedureHandler(
-      'toolbox.dismissActiveApp',
-      async (_callingClientId: string, agentInstanceId: string) => {
-        this.uiKarton.setState((draft) => {
-          if (draft.toolbox[agentInstanceId]) {
-            draft.toolbox[agentInstanceId].activeApp = null;
-          }
-        });
-      },
-    );
+    // 'toolbox.dismissActiveApp' and 'toolbox.clearPendingAppMessage' are
+    // registered via AgentCoreBridge
+    // (apps/browser/src/backend/services/agent-core-bridge). Do not
+    // re-register them here — double-registration is undefined behaviour
+    // in Karton (see plans/phase-1c D-KB-6, plans/phase-1d).
 
     this.uiKarton.registerServerProcedureHandler(
       'toolbox.forwardAppMessage',
@@ -2171,17 +1522,6 @@ export class ToolboxService extends DisposableService {
           pluginId,
           data,
         );
-      },
-    );
-
-    this.uiKarton.registerServerProcedureHandler(
-      'toolbox.clearPendingAppMessage',
-      async (_callingClientId: string, agentInstanceId: string) => {
-        this.uiKarton.setState((draft) => {
-          if (draft.toolbox[agentInstanceId]) {
-            draft.toolbox[agentInstanceId].pendingAppMessage = null;
-          }
-        });
       },
     );
 

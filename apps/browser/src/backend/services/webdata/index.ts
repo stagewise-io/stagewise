@@ -1,6 +1,6 @@
 import type { Logger } from '../logger';
 import { registry, schemaVersion } from './migrations';
-import { migrateDatabase } from '../../utils/migrate-database';
+import { migrateDatabase } from '@stagewise/agent-core/migrate-database';
 import { eq, sql } from 'drizzle-orm';
 import * as schema from './schema';
 import { drizzle } from 'drizzle-orm/libsql';

@@ -4,7 +4,7 @@ import { ChevronDownIcon } from 'lucide-react';
 import { cn } from '@ui/utils';
 import type { MouseEvent } from 'react';
 import type { StatusCardSection } from './shared';
-import type { PlanTask, TaskGroup } from '@shared/plan-parsing';
+import type { PlanTask, TaskGroup } from '@stagewise/agent-core/plans';
 import type { PlanUIPhase } from '@shared/plan-lifecycle';
 import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
 

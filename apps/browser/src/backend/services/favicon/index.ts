@@ -8,7 +8,7 @@ import { getDbPath } from '@/utils/paths';
 import { toWebKitTimestamp } from '../chrome-db-utils';
 import type { FaviconBitmapResult } from '@shared/karton-contracts/pages-api/types';
 import initSql from './schema.sql?raw';
-import { migrateDatabase } from '@/utils/migrate-database';
+import { migrateDatabase } from '@stagewise/agent-core/migrate-database';
 import { registry, schemaVersion } from './migrations';
 
 // Icon types matching Chrome

@@ -22,6 +22,16 @@ export default defineConfig({
         'web-tree-sitter',
         '@vscode/tree-sitter-wasm',
       ],
+      output: {
+        // The ESM main bundle includes CJS dependencies (e.g.
+        // `proxy-from-env`, pulled in via `@stagewise/agent-runtime-node` ->
+        // `axios`) that call `require(...)` at load time. In an ES module
+        // `require` is undefined, so esbuild's dynamic-require shim throws
+        // ("Dynamic require of \"url\" is not supported"). Provide a real
+        // `require` via `createRequire` so those calls resolve Node builtins.
+        banner:
+          "import { createRequire as __stagewiseCreateRequire } from 'node:module'; var require = __stagewiseCreateRequire(import.meta.url);",
+      },
     },
   },
   resolve: {

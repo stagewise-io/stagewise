@@ -7,6 +7,7 @@ import {
   type QuestionAnswerValue,
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { KartonService } from '@/services/karton';
+import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
 
 export const DESCRIPTION = `Ask the user structured questions via a multi-step form.
 
@@ -153,6 +154,7 @@ export function cleanupQuestionsForAgent(
 
 export const askUserQuestions = (
   uiKarton: KartonService,
+  hostAgentStateMutations: HostAgentStateMutations,
   agentInstanceId: string,
   onQuestionRequested?: (agentId: string) => void | Promise<void>,
 ) => {
@@ -181,8 +183,11 @@ export const askUserQuestions = (
         });
       }
 
-      // Set the pending question in karton state and mark agent as unread
-      // so the active-agents UI shows a notification pulse.
+      // Set the pending question on the Karton-owned `toolbox` slice and
+      // mark the agent as unread via the store-owned `agents.instances`
+      // controller (Phase 6). Two separate writes because the two slices
+      // now have different canonical owners; the `pendingUserQuestion`
+      // slice migrates in a later phase with the tool-runtime path.
       uiKarton.setState((draft) => {
         const entry = draft.toolbox[agentInstanceId];
         if (entry) {
@@ -195,11 +200,8 @@ export const askUserQuestions = (
             answers: {},
           };
         }
-        const agent = draft.agents.instances[agentInstanceId];
-        if (agent) {
-          agent.state.unread = true;
-        }
       });
+      hostAgentStateMutations.setUnread(agentInstanceId, true);
 
       void Promise.resolve(onQuestionRequested?.(agentInstanceId)).catch(
         () => {},

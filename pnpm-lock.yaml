@@ -351,6 +351,9 @@ importers:
       '@smithy/shared-ini-file-loader':
         specifier: ^4.4.9
         version: 4.4.9
+      '@stagewise/agent-core':
+        specifier: workspace:*
+        version: link:../../packages/agent-core
       '@stagewise/agent-runtime-node':
         specifier: workspace:*
         version: link:../../agent/runtime-node
@@ -628,6 +631,37 @@ importers:
         specifier: ^0.25.0
         version: 0.25.9
 
+  apps/stagewise-cli:
+    dependencies:
+      '@ai-sdk/anthropic':
+        specifier: 3.0.76
+        version: 3.0.76(zod@4.3.5)
+      '@stagewise/agent-core':
+        specifier: workspace:*
+        version: link:../../packages/agent-core
+      ai:
+        specifier: 6.0.177
+        version: 6.0.177(zod@4.3.5)
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@stagewise/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.15.2
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.7.0)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
   apps/update-server:
     dependencies:
       express:
@@ -779,6 +813,97 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+
+  packages/agent-core:
+    dependencies:
+      '@ai-sdk/anthropic':
+        specifier: 3.0.76
+        version: 3.0.76(zod@4.3.5)
+      '@ai-sdk/google':
+        specifier: 3.0.71
+        version: 3.0.71(zod@4.3.5)
+      '@ai-sdk/openai':
+        specifier: 3.0.63
+        version: 3.0.63(zod@4.3.5)
+      '@libsql/client':
+        specifier: ^0.15.15
+        version: 0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@stagewise/agent-runtime-node':
+        specifier: workspace:*
+        version: link:../../agent/runtime-node
+      '@vscode/tree-sitter-wasm':
+        specifier: ^0.3.0
+        version: 0.3.1
+      ai:
+        specifier: 6.0.177
+        version: 6.0.177(zod@4.3.5)
+      chokidar:
+        specifier: ^4.0.3
+        version: 4.0.3
+      diff:
+        specifier: ^8.0.2
+        version: 8.0.2
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.2(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.17)(sql.js@1.14.1)
+      fzy.js:
+        specifier: ^0.4.1
+        version: 0.4.1
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      ignore:
+        specifier: ^6.0.2
+        version: 6.0.2
+      immer:
+        specifier: ^10.1.1
+        version: 10.2.0
+      isbinaryfile:
+        specifier: ^5.0.4
+        version: 5.0.7
+      pdfjs-dist:
+        specifier: ^5.5.207
+        version: 5.7.284
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
+      superjson:
+        specifier: 2.2.2
+        version: 2.2.2
+      web-tree-sitter:
+        specifier: ^0.26.6
+        version: 0.26.8
+      xml:
+        specifier: ^1.0.1
+        version: 1.0.1
+      yauzl:
+        specifier: ^3.2.0
+        version: 3.3.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@stagewise/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.15.2
+      '@types/xml':
+        specifier: ^1.0.11
+        version: 1.0.11
+      '@types/yauzl':
+        specifier: ^2.10.3
+        version: 2.10.3
+      esbuild:
+        specifier: 0.25.9
+        version: 0.25.9
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.2)(jiti@2.7.0)(jsdom@26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(lightningcss@1.32.0)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/karton:
     dependencies:
@@ -3061,8 +3186,14 @@ packages:
       zod-to-json-schema:
         optional: true
 
+  '@libsql/client@0.15.15':
+    resolution: {integrity: sha512-twC0hQxPNHPKfeOv3sNT6u2pturQjLcI+CnpTM0SjRpocEGgfiZ7DWKXLNnsothjyJmDqEsBQJ5ztq9Wlu470w==}
+
   '@libsql/client@0.17.3':
     resolution: {integrity: sha512-HXk9wiAoJbKFbyBH4O+aEhN6ir5ERXuXvwE5OD2eR4/5RUa3Pw/8L9zrnVdU+iNJitRvisPWaIwmhkO3bH7giA==}
+
+  '@libsql/core@0.15.15':
+    resolution: {integrity: sha512-C88Z6UKl+OyuKKPwz224riz02ih/zHYI3Ho/LAcVOgjsunIRZoBw7fjRfaH9oPMmSNeQfhGklSG2il1URoOIsA==}
 
   '@libsql/core@0.17.3':
     resolution: {integrity: sha512-2UjK1i7JBkMduJo4WdvvBxMMvVJ31pArBZNONyz/GCJJAH+1UHat2X6vn10S/WpY5fKzIT98WqYFl2vzWRLOfg==}
@@ -3079,6 +3210,13 @@ packages:
 
   '@libsql/hrana-client@0.10.0':
     resolution: {integrity: sha512-OoA4EMqRAC7kn7V2P6EQqRcpZf2W+AjsNIyCizBg339Tq/aMC7sRnzs3SklderhmQWAqEzvv8A2vhxVmWpkVvw==}
+
+  '@libsql/hrana-client@0.7.0':
+    resolution: {integrity: sha512-OF8fFQSkbL7vJY9rfuegK1R7sPgQ6kFMkDamiEccNUvieQ+3urzfDFI616oPl8V7T9zRmnTkSjMOImYCAVRVuw==}
+
+  '@libsql/isomorphic-fetch@0.3.1':
+    resolution: {integrity: sha512-6kK3SUK5Uu56zPq/Las620n5aS9xJq+jMBcNSOmjhNf/MUvdyji4vrMTqD7ptY7/4/CAVEAYDeotUz60LNQHtw==}
+    engines: {node: '>=18.0.0'}
 
   '@libsql/isomorphic-ws@0.1.5':
     resolution: {integrity: sha512-DtLWIH29onUYR00i0GlQ3UdcTRC6EP4u9w/h9LxpUZJWRMARk6dQwZ6Jkd+QdwVpuAOrdxt18v0K2uIYR3fwFg==}
@@ -6979,10 +7117,6 @@ packages:
     resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
     engines: {node: '>=0.8.x'}
 
-  eventsource-parser@3.0.6:
-    resolution: {integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==}
-    engines: {node: '>=18.0.0'}
-
   eventsource-parser@3.0.8:
     resolution: {integrity: sha512-70QWGkr4snxr0OXLRWsFLeRBIRPuQOvt4s8QYjmUlmlkyTZkRqS7EDVRZtzU3TiyDbXSzaOeF0XUKy8PchzukQ==}
     engines: {node: '>=18.0.0'}
@@ -7931,6 +8065,10 @@ packages:
   isbinaryfile@4.0.10:
     resolution: {integrity: sha512-iHrqe5shvBUcFbmZq9zOQHBoeOhZJu6RQGrDpBgenUm/Am+F3JM2MgQj+rK3Z601fzrL5gLZWtAPH2OBaSVcyw==}
     engines: {node: '>= 8.0.0'}
+
+  isbinaryfile@5.0.7:
+    resolution: {integrity: sha512-gnWD14Jh3FzS3CPhF0AxNOJ8CxqeblPTADzI38r0wt8ZyQl5edpy75myt08EG2oKvpyiqSqsx+Wkz9vtkbTqYQ==}
+    engines: {node: '>= 18.0.0'}
 
   isbot@5.1.32:
     resolution: {integrity: sha512-VNfjM73zz2IBZmdShMfAUg10prm6t7HFUQmNAEOAVS4YH92ZrZcvkMcGX6cIgBJAzWDzPent/EeAtYEHNPNPBQ==}
@@ -11487,7 +11625,7 @@ snapshots:
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@standard-schema/spec': 1.1.0
-      eventsource-parser: 3.0.6
+      eventsource-parser: 3.0.8
       zod: 4.3.6
 
   '@ai-sdk/provider-utils@4.0.27(zod@4.3.5)':
@@ -13751,6 +13889,17 @@ snapshots:
       - svelte
       - vue
 
+  '@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+    dependencies:
+      '@libsql/core': 0.15.15
+      '@libsql/hrana-client': 0.7.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      js-base64: 3.7.8
+      libsql: 0.5.29
+      promise-limit: 2.7.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@libsql/client@0.17.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       '@libsql/core': 0.17.3
@@ -13761,6 +13910,10 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@libsql/core@0.15.15':
+    dependencies:
+      js-base64: 3.7.8
 
   '@libsql/core@0.17.3':
     dependencies:
@@ -13779,6 +13932,18 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@libsql/hrana-client@0.7.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+    dependencies:
+      '@libsql/isomorphic-fetch': 0.3.1
+      '@libsql/isomorphic-ws': 0.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      js-base64: 3.7.8
+      node-fetch: 3.3.2
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@libsql/isomorphic-fetch@0.3.1': {}
 
   '@libsql/isomorphic-ws@0.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
@@ -17555,6 +17720,14 @@ snapshots:
       esbuild: 0.25.9
       tsx: 4.21.0
 
+  drizzle-orm@0.45.2(@libsql/client@0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.17)(sql.js@1.14.1):
+    optionalDependencies:
+      '@libsql/client': 0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@opentelemetry/api': 1.9.0
+      '@types/sql.js': 1.4.10
+      kysely: 0.28.17
+      sql.js: 1.14.1
+
   drizzle-orm@0.45.2(@libsql/client@0.17.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@opentelemetry/api@1.9.0)(@types/sql.js@1.4.10)(kysely@0.28.17)(sql.js@1.14.1):
     optionalDependencies:
       '@libsql/client': 0.17.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -18109,8 +18282,6 @@ snapshots:
   eventemitter3@5.0.4: {}
 
   events@3.3.0: {}
-
-  eventsource-parser@3.0.6: {}
 
   eventsource-parser@3.0.8: {}
 
@@ -19229,6 +19400,8 @@ snapshots:
   isarray@2.0.5: {}
 
   isbinaryfile@4.0.10: {}
+
+  isbinaryfile@5.0.7: {}
 
   isbot@5.1.32: {}
 

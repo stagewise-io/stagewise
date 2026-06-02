@@ -1,6 +1,6 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
-import { isPlanPath } from '@shared/plan-ownership';
-import { isLogPath } from '@shared/log-ownership';
+import { isPlanPath } from '@stagewise/agent-core/plans';
+import { isLogPath } from '@stagewise/agent-core/logs';
 import { CreatePlanToolPart } from './create-plan';
 import { CreateLogToolPart } from './create-log';
 import { GenericWriteToolPart } from './generic-write';

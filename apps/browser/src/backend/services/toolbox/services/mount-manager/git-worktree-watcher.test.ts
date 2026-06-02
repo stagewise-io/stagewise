@@ -122,6 +122,9 @@ function createHarness() {
     } as unknown as TelemetryService,
     gitService,
     preferencesService as never,
+    // agentStore: only used by the core MountManager on mount/unmount, which
+    // these watcher-only tests never drive — a stub is sufficient.
+    {} as never,
   );
 
   services.push(service);
