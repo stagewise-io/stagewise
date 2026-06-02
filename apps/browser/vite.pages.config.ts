@@ -78,7 +78,10 @@ export default defineConfig({
     target: 'es2022',
   },
   optimizeDeps: {
-    force: true,
+    // NOTE: `force: true` was removed — it re-bundled all deps on every dev
+    // start (the main dev-mode startup bottleneck). Vite re-optimizes
+    // automatically on lockfile/config changes; use `pnpm clear-vite-cache`
+    // for the rare stale-cache case.
     exclude: ['@tanstack/react-router', '@tanstack/react-router-devtools'],
     include: ['use-sync-external-store', 'use-sync-external-store/**/*'],
   },

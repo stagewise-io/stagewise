@@ -43,8 +43,11 @@ export default defineConfig({
     },
     target: 'es2022',
   },
-  optimizeDeps: {
-    force: true,
-  },
+  // NOTE: do NOT set `optimizeDeps.force: true` here. It discards Vite's
+  // dependency pre-bundle cache and re-optimizes the entire node_modules tree
+  // (ai-sdk, mermaid, shiki, three, recharts, tiptap, ...) on EVERY dev start,
+  // which is the dominant dev-mode startup cost. Vite already re-optimizes
+  // automatically when the lockfile or this config changes. For the rare
+  // pnpm-hoisting staleness case, run `pnpm clear-vite-cache` (selective).
   cacheDir: 'node_modules/.vite/ui',
 });

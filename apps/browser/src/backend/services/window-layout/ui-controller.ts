@@ -39,7 +39,14 @@ function getExtensionCachePath(extensionId: string): string {
 }
 
 /**
- * Installs React DevTools on the UI session without blocking startup.
+ * Registers React DevTools on the UI session, keeping the expensive work off
+ * the startup critical path.
+ *
+ * Only the cheap cached fast path (a local-filesystem `session.loadExtension`)
+ * is awaited, because the extension must be registered on the UI session
+ * *before* that session hosts any WebContentsView (see the Chromium constraint
+ * below). The first-launch network download and the background cache refresh
+ * are fired without awaiting, so they never block window creation.
  *
  * How electron-devtools-installer works (relevant to the perf decision):
  *   - It stores extensions at `{userData}/extensions/{extensionId}/`.
@@ -141,6 +148,9 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 export interface UIControllerEventMap {
+  // Fires on the renderer's `dom-ready` — React shell mounted, before the
+  // full `load` event (fonts/images). Used to show the OS window early.
+  domReady: [];
   uiReady: [];
   viewRecreated: [oldView: WebContentsView, newView: WebContentsView];
   createTab: [
@@ -262,6 +272,14 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     attachments: AttachmentsService,
     telemetryService?: TelemetryService,
   ): Promise<UIController> {
+    // Register React DevTools on the UI session *before* constructing the
+    // controller — the constructor creates the first WebContentsView on that
+    // same partition, and Chromium requires an extension to be loaded before
+    // the session hosts any WebContentsView, otherwise it won't attach to the
+    // UI window. Only the cached fast path (a local-filesystem
+    // session.loadExtension) is awaited here; the first-launch network
+    // download and the background cache refresh stay off the critical path
+    // (see installReactDevToolsOnUISession).
     await installReactDevToolsOnUISession(logger);
     return new UIController(logger, attachments, telemetryService);
   }
@@ -558,6 +576,14 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     if (process.env.NODE_ENV === 'development') {
       view.webContents.openDevTools();
     }
+
+    // Show the OS window as early as possible: `dom-ready` fires once the
+    // initial DOM (the React shell / connecting spinner) exists, before the
+    // `load`/`did-finish-load` event that also waits on fonts and images.
+    view.webContents.once('dom-ready', () => {
+      this.logger.debug('[UIController] UI DOM ready');
+      this.emit('domReady');
+    });
 
     // Listen for the UI finishing load to ensure proper rendering
     view.webContents.once('did-finish-load', () => {

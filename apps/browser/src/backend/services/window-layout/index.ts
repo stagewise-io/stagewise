@@ -380,6 +380,12 @@ export class WindowLayoutService extends DisposableService {
     isFullScreen: boolean;
   } = { isMaximized: false, isFullScreen: false };
 
+  // Guards against showing the window more than once. The window is revealed
+  // as early as possible (on the renderer's `dom-ready`, i.e. as soon as React
+  // has mounted the shell into the DOM) instead of waiting for the full `load`
+  // event, which also blocks on fonts/images and other subresources.
+  private windowShown = false;
+
   private kartonConnectListener:
     | ((event: Electron.IpcMainEvent, connectionId: string) => void)
     | null = null;
@@ -501,7 +507,7 @@ export class WindowLayoutService extends DisposableService {
       y: this.lastNonMaximizedBounds.y,
       title: __APP_NAME__,
       titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'hiddenInset',
-      show: false, // Don't show until UI is ready to prevent visual glitches
+      show: false, // Shown on the renderer's `dom-ready` (see showMainWindowOnce) to avoid an unstyled flash
       // fullscreenable: false,
       ...(process.platform === 'linux'
         ? {
@@ -977,6 +983,7 @@ export class WindowLayoutService extends DisposableService {
     if (!this.uiController) return;
 
     this.uiController.on('uiReady', this.handleUIReady);
+    this.uiController.on('domReady', this.handleDomReady);
     this.uiController.on('createTab', this.handleCreateTab);
     this.uiController.on('closeTab', this.handleCloseTab);
     this.uiController.on('switchTab', this.handleSwitchTab);
@@ -1724,8 +1731,39 @@ export class WindowLayoutService extends DisposableService {
     this.saveTabState();
   };
 
+  // Reveal the window as soon as the renderer DOM is ready (React shell
+  // mounted). This fires noticeably earlier than `did-finish-load`, which
+  // additionally waits for fonts/images/other subresources — the main cause
+  // of the "DevTools open but window still blank" gap. Idempotent via
+  // `windowShown`, so the later `uiReady` (load) path is a safe fallback
+  // (and covers crash-recovery reloads where `dom-ready` was already used).
+  private showMainWindowOnce() {
+    if (this.windowShown) return;
+    if (!this.baseWindow || this.baseWindow.isDestroyed()) return;
+
+    this.windowShown = true;
+    this.baseWindow.show();
+
+    // Apply initial window state after showing
+    if (this.initialWindowState.isMaximized) {
+      this.baseWindow.maximize();
+    }
+    if (this.initialWindowState.isFullScreen) {
+      this.baseWindow.setFullScreen(true);
+    }
+
+    this.logger.debug('[WindowLayoutService] Window shown');
+  }
+
+  private handleDomReady = () => {
+    this.logger.debug(
+      '[WindowLayoutService] UI DOM ready, showing window early',
+    );
+    this.showMainWindowOnce();
+  };
+
   private handleUIReady = async () => {
-    this.logger.debug('[WindowLayoutService] UI is ready, showing window');
+    this.logger.debug('[WindowLayoutService] UI finished loading');
 
     // Force a bounds update to ensure any tabs waiting for bounds get shown
     // This handles the race condition where tabs are created before UI is ready
@@ -1734,20 +1772,8 @@ export class WindowLayoutService extends DisposableService {
       this.activeTab.setBounds(this.currentWebContentBounds);
     }
 
-    // Now that everything is ready, show the window
-    if (this.baseWindow && !this.baseWindow.isDestroyed()) {
-      this.baseWindow.show();
-
-      // Apply initial window state after showing
-      if (this.initialWindowState.isMaximized) {
-        this.baseWindow.maximize();
-      }
-      if (this.initialWindowState.isFullScreen) {
-        this.baseWindow.setFullScreen(true);
-      }
-
-      this.logger.debug('[WindowLayoutService] Window shown');
-    }
+    // Fallback: ensure the window is shown even if `dom-ready` never fired.
+    this.showMainWindowOnce();
   };
 
   private handleLayoutUpdate = async (
