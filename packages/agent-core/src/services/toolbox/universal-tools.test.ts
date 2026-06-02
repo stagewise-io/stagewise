@@ -290,7 +290,7 @@ describe('universal toolbox', () => {
     expect(ignored).toContain(path.join(workspace, 'b.txt'));
   });
 
-  it('move (directory): registers an edit for every src file under the moved tree', async () => {
+  it('move (directory): registers an edit for every src AND dest file under the moved tree', async () => {
     mkdirSync(path.join(workspace, 'src', 'nested'), { recursive: true });
     writeFileSync(path.join(workspace, 'src', 'a.txt'), 'a');
     writeFileSync(path.join(workspace, 'src', 'b.txt'), 'b');
@@ -307,9 +307,38 @@ describe('universal toolbox', () => {
     );
 
     const paths = getRegisteredEditPaths();
+    // Source-side deletions
     expect(paths).toContain(path.join(workspace, 'src', 'a.txt'));
     expect(paths).toContain(path.join(workspace, 'src', 'b.txt'));
     expect(paths).toContain(path.join(workspace, 'src', 'nested', 'c.txt'));
+    // Destination-side creations (without these, undo restores src but
+    // leaves dst in place — duplicating the tree)
+    expect(paths).toContain(path.join(workspace, 'dst', 'a.txt'));
+    expect(paths).toContain(path.join(workspace, 'dst', 'b.txt'));
+    expect(paths).toContain(path.join(workspace, 'dst', 'nested', 'c.txt'));
+  });
+
+  it('copy (directory, no move): registers an edit for every dest file but NOT any src file', async () => {
+    mkdirSync(path.join(workspace, 'src', 'nested'), { recursive: true });
+    writeFileSync(path.join(workspace, 'src', 'a.txt'), 'a');
+    writeFileSync(path.join(workspace, 'src', 'nested', 'c.txt'), 'c');
+
+    await copyToolExecute(
+      {
+        input_path: 'wtest/src',
+        output_path: 'wtest/dst',
+        move: false,
+      },
+      deps,
+      { toolCallId: 'tc-copy-dir' },
+    );
+
+    const paths = getRegisteredEditPaths();
+    expect(paths).toContain(path.join(workspace, 'dst', 'a.txt'));
+    expect(paths).toContain(path.join(workspace, 'dst', 'nested', 'c.txt'));
+    // Source files must remain intact and not appear as deletions.
+    expect(paths).not.toContain(path.join(workspace, 'src', 'a.txt'));
+    expect(paths).not.toContain(path.join(workspace, 'src', 'nested', 'c.txt'));
   });
 
   it('copy (no move): does NOT register an edit for the source path', async () => {

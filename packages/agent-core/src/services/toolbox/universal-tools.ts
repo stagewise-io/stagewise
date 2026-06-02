@@ -469,33 +469,47 @@ export async function copyToolExecute(
   if (!srcIsDir && destIsDir)
     finalDest = path.join(dest.absolutePath, path.basename(src.absolutePath));
 
-  // Single-path dest tracking only makes sense for file copies/moves —
-  // `captureFileState` throws EISDIR on a directory path. Directory
-  // dest-side tracking would require enumerating every dest child file
-  // (origin/main does this); explicitly out of scope for this fix,
-  // which targets the flagged src-side regression. Behavior parity for
-  // file copies/moves is preserved.
-  const trackDest = !srcIsDir;
-  const beforeState = trackDest
-    ? await captureFileState(finalDest, tempDir(deps))
-    : null;
-  if (trackDest) deps.diffHistoryService?.ignoreFileForWatcher(finalDest);
-
-  // For moves we must record every source file that disappears so the
-  // watcher does not surface them as "external" changes and so the
-  // agent's edit summary shows the removal. Origin/main captured these
-  // before-states explicitly; the universal-tools port lost it.
-  // `collectAllFiles` returns `[src.absolutePath]` for single files
-  // and an empty array if the path is missing (already guarded above).
-  const srcFilesForMove = params.move
+  // Diff-history needs per-file tracking on BOTH sides of a copy/move so
+  // every created file shows up in the agent's edit summary and so undo
+  // can replay the full delta. Origin/main enumerated children for
+  // directory ops; the universal-tools port collapsed everything to a
+  // single path which (a) crashed with EISDIR on directory dest paths
+  // and (b) made dir-move undo asymmetric (src restored, dest left in
+  // place — duplicating the tree). Mirror main: collect src children
+  // up-front, derive dest equivalents by re-rooting under
+  // `dest.absolutePath`, then track each pair through the existing
+  // `registerSingleEdit` helper.
+  const toolCallId = getToolCallId(options);
+  const srcFiles = srcIsDir
     ? await collectAllFiles(src.absolutePath)
-    : [];
+    : [src.absolutePath];
+  const destFiles = srcIsDir
+    ? srcFiles.map((srcFile) => {
+        const rel = path.relative(src.absolutePath, srcFile);
+        return path.join(dest.absolutePath, rel);
+      })
+    : [finalDest];
+
+  const destBeforeStates = new Map<
+    string,
+    Awaited<ReturnType<typeof captureFileState>>
+  >();
+  for (const destFile of destFiles) {
+    destBeforeStates.set(
+      destFile,
+      await captureFileState(destFile, tempDir(deps)),
+    );
+    deps.diffHistoryService?.ignoreFileForWatcher(destFile);
+  }
+
+  // Source-side tracking is only meaningful for moves — copies leave
+  // the source intact, so registering it as a deletion would be wrong.
   const srcBeforeStates = new Map<
     string,
     Awaited<ReturnType<typeof captureFileState>>
   >();
   if (params.move) {
-    for (const srcFile of srcFilesForMove) {
+    for (const srcFile of srcFiles) {
       srcBeforeStates.set(
         srcFile,
         await captureFileState(srcFile, tempDir(deps)),
@@ -528,27 +542,35 @@ export async function copyToolExecute(
       }
     }
 
-    let _diff: WithDiff<object>['_diff'] = null;
-    if (trackDest && beforeState) {
-      const afterState = await captureFileState(finalDest, tempDir(deps));
-      _diff = await registerSingleEdit(
+    let firstDestDiff: WithDiff<object>['_diff'] = null;
+    for (const destFile of destFiles) {
+      const before = destBeforeStates.get(destFile);
+      if (!before) continue;
+      const after = await captureFileState(destFile, tempDir(deps));
+      const diff = await registerSingleEdit(
         deps,
-        finalDest,
-        getToolCallId(options),
-        beforeState,
-        afterState,
+        destFile,
+        toolCallId,
+        before,
+        after,
       );
+      // Preserve the existing `_diff` return shape for single-file ops
+      // (`destFiles.length === 1`) — return the only diff captured.
+      // For directory ops there are multiple deltas; surfacing only the
+      // first would be misleading, so leave `_diff` null and rely on
+      // the registered diff-history entries.
+      if (destFiles.length === 1) firstDestDiff = diff;
     }
 
     if (params.move) {
-      for (const srcFile of srcFilesForMove) {
+      for (const srcFile of srcFiles) {
         const srcBefore = srcBeforeStates.get(srcFile);
         if (!srcBefore) continue;
         const srcAfter = await captureFileState(srcFile, tempDir(deps));
         await registerSingleEdit(
           deps,
           srcFile,
-          getToolCallId(options),
+          toolCallId,
           srcBefore,
           srcAfter,
         );
@@ -558,19 +580,19 @@ export async function copyToolExecute(
     const action = params.move ? 'Moved' : 'Copied';
     return {
       message: `${action} ${srcIsDir ? 'directory' : 'file'}: ${params.input_path} → ${params.output_path}`,
-      _diff,
+      _diff: firstDestDiff,
     };
   } catch (error) {
     rethrowCappedToolOutputError(error);
   } finally {
-    if (trackDest) {
+    for (const destFile of destFiles) {
       setTimeout(
-        () => deps.diffHistoryService?.unignoreFileForWatcher(finalDest),
+        () => deps.diffHistoryService?.unignoreFileForWatcher(destFile),
         500,
       );
     }
     if (params.move) {
-      for (const srcFile of srcFilesForMove) {
+      for (const srcFile of srcFiles) {
         setTimeout(
           () => deps.diffHistoryService?.unignoreFileForWatcher(srcFile),
           500,
