@@ -444,7 +444,10 @@ export function wrapWithSentinel(
     return `try { ${command} } catch { }; Write-Host "__STAGE_DONE_${id}_$($LASTEXITCODE ?? 0)__"\r`;
   }
   // POSIX shells (bash, zsh, sh)
-  return `eval ${shellEscape(command)}; printf '__STAGE_DONE_${id}_%d__\n' $?\r`;
+  // NOTE: the newline must be an escaped \n (two chars) so printf expands it
+  // at runtime. A literal LF here would break the single-quoted format string
+  // mid-line and trigger PS2 continuation prompts (e.g. `quote>`) over the PTY.
+  return `eval ${shellEscape(command)}; printf '__STAGE_DONE_${id}_%d__\\n' $?\r`;
 }
 
 /**
