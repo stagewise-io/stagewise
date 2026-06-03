@@ -203,12 +203,12 @@ PROMPT_EOL_MARK=''
 __stagewise_command_executed=0
 __stagewise_boundary_token="__STAGEWISE_BOUNDARY_TOKEN__"
 __stagewise_file_uri_path() {
-  local path="$1"
+  local p="$1"
   local encoded=''
   local i ch hex
   local LC_ALL=C
-  for (( i = 0; i < \${#path}; i++ )); do
-    ch="\${path:i:1}"
+  for (( i = 0; i < \${#p}; i++ )); do
+    ch="\${p:$i:1}"
     case "$ch" in
       [A-Za-z0-9._~/-]) encoded+="$ch" ;;
       *) hex=$(printf '%%%02X' "'$ch"); encoded+="$hex" ;;
