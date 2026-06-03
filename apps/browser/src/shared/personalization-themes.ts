@@ -25,9 +25,9 @@ export const PERSONALIZATION_THEMES: PersonalizationTheme[] = [
     name: 'Fire',
     description: 'Warm neutral surfaces with vivid orange accents.',
     baseHue: 85,
-    baseChromaScale: 8,
-    primaryHue: 30,
-    primaryChromaScale: 1,
+    baseChromaScale: 10,
+    primaryHue: 25,
+    primaryChromaScale: 0.75,
   },
   {
     id: 'forest',
@@ -52,9 +52,9 @@ export const PERSONALIZATION_THEMES: PersonalizationTheme[] = [
     name: 'Titanium',
     description: 'Warm titanium surfaces with minimal olive accents.',
     baseHue: 110,
-    baseChromaScale: 1.25,
+    baseChromaScale: 1.5,
     primaryHue: 110,
-    primaryChromaScale: 0.0375,
+    primaryChromaScale: 0.045,
   },
 ];
 
