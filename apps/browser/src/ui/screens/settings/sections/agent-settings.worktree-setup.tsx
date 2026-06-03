@@ -21,6 +21,7 @@ import { toast } from '@stagewise/stage-ui/components/toaster';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+import { SettingsScrollTabs } from '../_components/settings-scroll-tabs';
 import type {
   KartonContract,
   WorktreeSetupManagedWorktree,
@@ -303,56 +304,21 @@ function RepositoryList({
   selectedRepositoryId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-  const viewportRef = useRef<HTMLElement | null>(null);
-  viewportRef.current = viewport;
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'horizontal',
-    fadeDistance: 24,
-  });
-
   return (
-    <OverlayScrollbar
-      className="scrollbar-subtle mask-alpha max-w-full"
-      style={maskStyle}
-      options={{ overflow: { x: 'scroll', y: 'hidden' } }}
-      onViewportRef={setViewport}
-      contentClassName="flex gap-2"
-    >
-      <nav className="flex gap-2">
-        {repositories.map((repository) => {
-          const selected = selectedRepositoryId === repository.id;
-          const worktreeCount = repository.managedWorktrees.length;
-          return (
-            <button
-              key={repository.id}
-              type="button"
-              onClick={() => onSelect(repository.id)}
-              className={cn(
-                buttonVariants({
-                  variant: 'ghost',
-                }),
-                'h-auto shrink-0 flex-col items-start px-3 py-2 text-left first:pl-0',
-                selected && 'font-medium text-foreground',
-              )}
-            >
-              <span className="block truncate text-sm">{repository.name}</span>
-              <span
-                className={cn(
-                  'block truncate text-xs',
-                  selected
-                    ? 'text-muted-foreground group-hover/button:text-foreground group-focus-visible/button:text-foreground'
-                    : 'text-subtle-foreground group-hover/button:text-muted-foreground group-focus-visible/button:text-muted-foreground',
-                )}
-              >
-                {worktreeCount} {worktreeCount === 1 ? 'worktree' : 'worktrees'}{' '}
-                used
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-    </OverlayScrollbar>
+    <SettingsScrollTabs
+      selectedId={selectedRepositoryId}
+      onSelect={onSelect}
+      items={repositories.map((repository) => {
+        const worktreeCount = repository.managedWorktrees.length;
+        return {
+          id: repository.id,
+          label: repository.name,
+          subLabel: `${worktreeCount} ${
+            worktreeCount === 1 ? 'worktree' : 'worktrees'
+          } used`,
+        };
+      })}
+    />
   );
 }
 
