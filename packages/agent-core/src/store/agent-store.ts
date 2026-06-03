@@ -1,14 +1,31 @@
-import { type Draft, produce } from 'immer';
+import {
+  type Draft,
+  type Patch,
+  enablePatches,
+  produceWithPatches,
+} from 'immer';
 import type { UITools } from 'ai';
 import type { UniversalTools } from '../types/tools';
 import type { AgentSystemState } from './state';
 
+// `produceWithPatches` requires Immer's patch machinery. Idempotent — safe to
+// call at module load.
+enablePatches();
+
 /**
  * Synchronous subscriber invoked on every committed state mutation.
  *
- * Subscribers receive the post-recipe `state` and the `previous` state that
- * was in effect just before the mutation. Per D18, subscribers never observe
- * intermediate Immer drafts — only the settled post-recipe state.
+ * Subscribers receive the post-recipe `state`, the `previous` state that
+ * was in effect just before the mutation, and the Immer patches that
+ * describe the change. Per D18, subscribers never observe intermediate
+ * Immer drafts — only the settled post-recipe state.
+ *
+ * `patches` enables downstream projections (notably the Karton bridge)
+ * to forward granular per-path changes instead of replacing whole
+ * subtrees, which is what restores per-chunk streaming payloads to
+ * pre-refactor size. Subscribers that don't need patches can declare
+ * fewer parameters — TypeScript's parameter bivariance accepts the
+ * shorter signature and the runtime ignores the extra argument.
  */
 export type StateListener<
   TTools extends UITools = UniversalTools,
@@ -17,6 +34,7 @@ export type StateListener<
 > = (
   state: AgentSystemState<TTools, TQuestionField, TQuestionAnswer>,
   previous: AgentSystemState<TTools, TQuestionField, TQuestionAnswer>,
+  patches: Patch[],
 ) => void;
 
 /**
@@ -104,7 +122,7 @@ export class AgentStore<
     this.isUpdating = true;
     try {
       const previous = this.state;
-      const next = produce(previous, recipe);
+      const [next, patches] = produceWithPatches(previous, recipe);
       this.state = next;
 
       if (next === previous) {
@@ -113,7 +131,7 @@ export class AgentStore<
 
       // Plain subscribers: synchronous, errors propagate.
       for (const listener of this.subscribers) {
-        listener(next, previous);
+        listener(next, previous, patches);
       }
 
       // Side-effect subscribers: synchronous dispatch, promise tracked.

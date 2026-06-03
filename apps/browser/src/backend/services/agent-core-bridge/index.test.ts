@@ -1188,6 +1188,76 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     expect(getKartonState().agents?.instances.a1).toBe(envelopeAfterSeed);
   });
 
+  it('forwards granular patches: per-chunk-style mutation preserves Karton structural sharing on untouched history slots', () => {
+    const { store, getKartonState } = createAgentInstancesMirrorHarness();
+
+    // Seed with three history messages so we can assert that the two
+    // unmodified slots keep their references through the mirror.
+    const msg0 = {
+      id: 'm0',
+      role: 'user',
+      parts: [{ type: 'text', text: 'one' }],
+    };
+    const msg1 = {
+      id: 'm1',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'partial' }],
+    };
+    const msg2 = {
+      id: 'm2',
+      role: 'user',
+      parts: [{ type: 'text', text: 'three' }],
+    };
+    const seeded = makeEnvelope(
+      {},
+      {
+        history: [msg0, msg1, msg2] as unknown as AgentState['history'],
+      },
+    );
+    store.update((draft) => {
+      const systemDraft = draft as AgentSystemState;
+      systemDraft.agents.instances.a1 =
+        seeded as unknown as (typeof systemDraft.agents.instances)[string];
+    });
+
+    const kartonBefore = getKartonState().agents?.instances.a1?.state as
+      | AgentState
+      | undefined;
+    expect(kartonBefore).toBeDefined();
+    const before0 = kartonBefore!.history[0];
+    const before2 = kartonBefore!.history[2];
+
+    // Per-chunk streaming pattern: mutate exactly one part on one
+    // message. With patch forwarding this should produce a single
+    // narrow patch (path ends in `history,1,parts,0,text`), leaving
+    // every other history slot referentially equal in Karton.
+    store.update((draft) => {
+      const systemDraft = draft as AgentSystemState;
+      const entry = systemDraft.agents.instances.a1!;
+      const inner = entry.state as unknown as AgentState;
+      (inner.history[1] as unknown as { parts: { text: string }[] })
+        .parts[0]!.text = 'updated';
+    });
+
+    const kartonAfter = getKartonState().agents?.instances.a1?.state as
+      | AgentState
+      | undefined;
+    expect(kartonAfter).toBeDefined();
+
+    // Mutation landed.
+    expect(
+      (kartonAfter!.history[1] as unknown as { parts: { text: string }[] })
+        .parts[0]!.text,
+    ).toBe('updated');
+
+    // Structural sharing: untouched history slots keep their original
+    // reference. This is the property that whole-envelope replacement
+    // would violate and is the reason the patch-forwarding refactor
+    // exists.
+    expect(kartonAfter!.history[0]).toBe(before0);
+    expect(kartonAfter!.history[2]).toBe(before2);
+  });
+
   it('co-emits with a toolbox mirror write in the same karton.setState call', () => {
     const { store, setState, getKartonState } =
       createAgentInstancesMirrorHarness();
