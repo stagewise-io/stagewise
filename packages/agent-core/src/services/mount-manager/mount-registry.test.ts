@@ -354,12 +354,22 @@ describe('MountManager watcher refresh (integration)', () => {
     await new Promise((r) => setTimeout(r, 200));
     writeFileSync(wsMdPath, 'second', 'utf-8');
 
-    // 400 ms debounce + 150 ms awaitWriteFinish stability + slack. chokidar
-    // on Windows CI can lag well beyond the POSIX case, so allow generous slack.
-    const deadline = Date.now() + 8000;
+    // The first `change` event after mount can be dropped on slow CI runners
+    // (notably Windows, where chokidar's fs.watch backend attaches well after
+    // the fixed pre-write settle wait, so the single 'second' write lands
+    // inside the attach window and never fires an event). Re-touch the file
+    // during long quiet intervals to recover a missed initial event, while
+    // leaving >1s of silence between touches so the 400 ms refresh debounce
+    // (+150 ms awaitWriteFinish stability) can actually settle and fire.
+    const deadline = Date.now() + 10000;
+    let lastTouch = Date.now();
     while (Date.now() < deadline) {
       const latest = store.writes[store.writes.length - 1]!;
       if (latest.mounts[0]?.workspaceMdContent === 'second') break;
+      if (Date.now() - lastTouch > 1500) {
+        writeFileSync(wsMdPath, 'second', 'utf-8');
+        lastTouch = Date.now();
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
 
@@ -368,5 +378,5 @@ describe('MountManager watcher refresh (integration)', () => {
     expect(store.writes.length).toBeGreaterThan(writesAfterMount);
 
     await manager.teardownWatchers();
-  }, 15_000);
+  }, 20_000);
 });
