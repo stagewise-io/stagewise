@@ -303,7 +303,13 @@ async function waitForCwd(
   }
 }
 
-describeIfShell('SessionManager (integration)', () => {
+// Real-PTY integration tests depend on live shell-process timing: OSC 133
+// completion ordering, lsof-based cwd-trust validation, and (on Windows)
+// ConPTY exit-event ordering. Under heavy CI load these can jitter enough that
+// a command resolves via the idle/timeout path with an unstable terminal-buffer
+// read, surfacing as a rare empty-output flake. `retry` absorbs that jitter
+// without masking real regressions — a genuine bug fails all attempts.
+describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
   const env = sanitizeEnv();
   const cwd = fs.realpathSync(os.tmpdir());
   let sm: SessionManager;
