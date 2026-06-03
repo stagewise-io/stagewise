@@ -41,7 +41,7 @@ Verbinde eines der folgenden Abos mit einem einzigen API-Schlüssel und erhalte 
 | GLM Coding Plan | [Z.ai](https://z.ai) | GLM-5.1, GLM-5V-Turbo | [API-Schlüssel holen](https://z.ai/manage-apikey/apikey-list) |
 | Kimi | [Moonshot AI](https://platform.moonshot.ai) | Kimi K2.6, Kimi K2.5 | [API-Schlüssel holen](https://platform.moonshot.ai/console/api-keys) |
 | Qwen Coding Plan | [Alibaba DashScope](https://dashscope.console.aliyun.com) | Qwen3-Coder-30B, Qwen3-32B | [API-Schlüssel holen](https://dashscope.console.aliyun.com/apiKey) |
-| MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M2.7 | [API-Schlüssel holen](https://platform.minimax.io/user-center/basic-information/interface-key) |
+| MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [API-Schlüssel holen](https://platform.minimax.io/user-center/basic-information/interface-key) |
 
 ### stagewise Account
 
@@ -62,7 +62,7 @@ Enthaltene Modelle:
 - **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
 - **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
 - **Z.ai**: GLM 5.1, GLM 5V-Turbo
-- **MiniMax**: MiniMax M2.7, MiniMax M2
+- **MiniMax**: MiniMax M3, MiniMax M2.7, MiniMax M2
 
 ## Lizenz
 

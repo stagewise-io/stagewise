@@ -96,8 +96,9 @@ const PROVIDERS: ProviderInfo[] = [
     description:
       'Agentic models tuned for multi-step reasoning and coding tasks.',
     models: [
-      { name: 'MiniMax M2.7', tier: 'frontier' },
-      { name: 'MiniMax M2', tier: 'general' },
+      { name: 'MiniMax M3', tier: 'frontier' },
+      { name: 'MiniMax M2.7', tier: 'general' },
+      { name: 'MiniMax M2', tier: 'lightweight' },
     ],
   },
   {
