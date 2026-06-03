@@ -3,6 +3,7 @@ export type SettingsSection =
   | 'custom-providers'
   | 'agent-general'
   | 'skills-context'
+  | 'worktree-setup'
   | 'plugins'
   | 'browsing'
   | 'history'
@@ -20,6 +21,7 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   'custom-providers': 'Custom Providers',
   'agent-general': 'General',
   'skills-context': 'Skills & Context files',
+  'worktree-setup': 'Worktrees',
   plugins: 'Plugins',
   browsing: 'General',
   history: 'History',

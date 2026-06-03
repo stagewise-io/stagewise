@@ -32,6 +32,7 @@ import type { AgentManagerStartupPolicy } from '@stagewise/agent-core';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { AutoUpdateService } from './services/auto-update';
 import { LocalPortsScannerService } from './services/local-ports-scanner';
+import { WorktreeSetupSettingsService } from './services/worktree-setup-settings';
 import { DevToolAPIService } from './services/dev-tool-api';
 import { OmniboxSuggestionsService } from './services/omnibox-suggestions';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
@@ -249,7 +250,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   // Push bundled plugin definitions to UI karton state
   discoverPlugins(getPluginsPath()).then((plugins) => {
-    uiKarton.setState((draft) => {
+    uiKarton.setState((draft: { plugins: typeof plugins }) => {
       draft.plugins = plugins;
     });
     if (verbose)
@@ -737,6 +738,18 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     agentManagerService,
   );
 
+  const getWorkspaceLastUsedAtByPath = async (workspacePaths: string[]) =>
+    (await persistence.agentDb.getWorkspaceLastUsedAtByPath(workspacePaths)) ??
+    new Map();
+
+  const worktreeSetupSettingsService = WorktreeSetupSettingsService.create({
+    logger,
+    userExperienceService,
+    gitService,
+    getWorkspaceLastUsedAtByPath,
+    getMountedWorkspacePaths: () => toolboxService.getAllMountedPaths(),
+  });
+
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
   // workspace-md generating, search engines, global config, auth)
   await wirePagesStateSync({
@@ -753,6 +766,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     pagesService,
     diffHistoryService,
     windowLayoutService,
+
     logger,
   });
 
@@ -926,6 +940,22 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     async (_cid: string, params: { days?: number }) => {
       return authService.getUsageHistory(params.days);
     },
+  );
+
+  // toolbox worktree setup settings procedures
+  uiKarton.registerServerProcedureHandler(
+    'toolbox.listWorktreeSetupRepositories',
+    async () => worktreeSetupSettingsService.listRepositories(),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'toolbox.saveWorktreeSetupScript',
+    async (_cid: string, mainWorktreePath: string, content: string) =>
+      worktreeSetupSettingsService.saveScript(mainWorktreePath, content),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'toolbox.deleteWorktreeSetupWorktree',
+    async (_cid: string, worktreePath: string) =>
+      worktreeSetupSettingsService.deleteManagedWorktree(worktreePath),
   );
 
   // credentials.set / credentials.delete / credentials.getConfiguredIds

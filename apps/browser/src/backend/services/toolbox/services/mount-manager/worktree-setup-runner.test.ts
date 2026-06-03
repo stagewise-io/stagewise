@@ -50,10 +50,8 @@ function createKarton() {
 function metadata(mainWorktreePath: string, workspacePath: string) {
   return {
     workspacePath,
+    sourceWorktreePath: mainWorktreePath,
     mainWorktreePath,
-    repositoryId: path.join(mainWorktreePath, '.git'),
-    sourceBranch: 'main',
-    worktreeBranch: 'feature-a',
   };
 }
 
@@ -126,13 +124,14 @@ describe('WorktreeSetupRunner', () => {
     expect(state.workspaceGitSetup.runsByPath[workspacePath]).toBeUndefined();
   });
 
-  it('ignores setup scripts that exist only in the main worktree', async () => {
+  it('falls back to setup scripts that exist only in the main worktree', async () => {
     const mainWorktreePath = path.join(tempDir, 'main');
     const workspacePath = path.join(tempDir, 'worktree');
     await fs.mkdir(workspacePath, { recursive: true });
-    await writeSetupScript(mainWorktreePath);
+    const scriptPath = await writeSetupScript(mainWorktreePath);
+    const child = createProcess();
     const { state, uiKarton } = createKarton();
-    const spawnProcess = vi.fn();
+    const spawnProcess = vi.fn(() => child);
     const runner = createRunner({
       logger: { warn: vi.fn() } as unknown as Logger,
       telemetryService: {
@@ -145,8 +144,20 @@ describe('WorktreeSetupRunner', () => {
 
     await runner.start(metadata(mainWorktreePath, workspacePath));
 
-    expect(spawnProcess).not.toHaveBeenCalled();
-    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toBeUndefined();
+    expect(spawnProcess).toHaveBeenCalledWith('/bin/sh', [scriptPath], {
+      cwd: workspacePath,
+      env: expect.not.objectContaining({
+        STAGEWISE_SETUP_SCRIPT: expect.any(String),
+      }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toMatchObject({
+      scriptPath,
+      status: 'running',
+    });
+
+    child.emit('close', 0);
+    runner.teardown();
   });
 
   it('spawns the setup script with expected cwd and environment', async () => {
@@ -155,7 +166,21 @@ describe('WorktreeSetupRunner', () => {
     await fs.mkdir(workspacePath, { recursive: true });
     const scriptPath = await writeSetupScript(workspacePath);
     const child = createProcess();
-    const spawnProcess = vi.fn(() => child);
+    let capturedEnv: NodeJS.ProcessEnv | undefined;
+    const spawnProcess = vi.fn(
+      (
+        _command: string,
+        _args: string[],
+        options: {
+          cwd: string;
+          env: NodeJS.ProcessEnv;
+          stdio: ['ignore', 'pipe', 'pipe'];
+        },
+      ) => {
+        capturedEnv = options.env;
+        return child;
+      },
+    );
     const { state, uiKarton } = createKarton();
     const runner = createRunner({
       logger: { warn: vi.fn() } as unknown as Logger,
@@ -173,16 +198,23 @@ describe('WorktreeSetupRunner', () => {
       cwd: workspacePath,
       env: expect.objectContaining({
         PATH: '/custom/bin',
-        STAGEWISE_MAIN_WORKTREE: mainWorktreePath,
-        STAGEWISE_NEW_WORKTREE: workspacePath,
-        STAGEWISE_WORKTREE: workspacePath,
-        STAGEWISE_SOURCE_BRANCH: 'main',
-        STAGEWISE_WORKTREE_BRANCH: 'feature-a',
-        STAGEWISE_REPOSITORY_ID: path.join(mainWorktreePath, '.git'),
-        STAGEWISE_SETUP_SCRIPT: scriptPath,
+        STAGEWISE_SOURCE_WORKTREE_PATH: mainWorktreePath,
+        STAGEWISE_TARGET_WORKTREE_PATH: workspacePath,
+        STAGEWISE_MAIN_WORKTREE_PATH: mainWorktreePath,
       }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    expect(capturedEnv).toEqual(
+      expect.not.objectContaining({
+        STAGEWISE_MAIN_WORKTREE: expect.any(String),
+        STAGEWISE_NEW_WORKTREE: expect.any(String),
+        STAGEWISE_WORKTREE: expect.any(String),
+        STAGEWISE_SOURCE_BRANCH: expect.any(String),
+        STAGEWISE_WORKTREE_BRANCH: expect.any(String),
+        STAGEWISE_REPOSITORY_ID: expect.any(String),
+        STAGEWISE_SETUP_SCRIPT: expect.any(String),
+      }),
+    );
     expect(state.workspaceGitSetup.runsByPath[workspacePath]?.status).toBe(
       'running',
     );

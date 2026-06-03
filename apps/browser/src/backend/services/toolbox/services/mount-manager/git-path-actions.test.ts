@@ -363,7 +363,15 @@ describe('MountManagerService path-based Git actions', () => {
     const linkedPath = await fs.mkdtemp(path.join(repoDir, 'linked-worktree-'));
     const mainPath = linkedPath.replace('linked-worktree', 'main-worktree');
     await fs.mkdir(mainPath, { recursive: true });
-    const { service, procedureHandlers, gitService } = createHarness({
+    const createdPath = path.join(mainPath, '..', 'created-worktree');
+    const scriptPath = path.join(
+      createdPath,
+      '.stagewise',
+      'worktree-setup.sh',
+    );
+    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+    await fs.writeFile(scriptPath, 'exit 0');
+    const { service, procedureHandlers, gitService, state } = createHarness({
       recentPaths: [linkedPath],
     });
     await initializeService(service);
@@ -379,6 +387,17 @@ describe('MountManagerService path-based Git actions', () => {
     expect(gitService.createWorktree).toHaveBeenCalledWith(mainPath, {
       worktreeName: 'feature-a',
       sourceBranch: 'main',
+    });
+
+    const mountHandler = procedureHandlers.get('toolbox.mountWorkspace');
+    await mountHandler?.('client1', 'agent1', createdPath);
+
+    await vi.waitFor(() => {
+      expect(state.workspaceGitSetup.runsByPath[createdPath]).toMatchObject({
+        workspacePath: createdPath,
+        sourceWorktreePath: linkedPath,
+        mainWorktreePath: mainPath,
+      });
     });
   });
 
