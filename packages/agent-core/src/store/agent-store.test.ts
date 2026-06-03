@@ -64,6 +64,35 @@ describe('AgentStore', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('passes Immer patches describing the mutation to subscribers', () => {
+    const store = new AgentStore(makeInitialState());
+    const listener = vi.fn();
+    store.subscribe(listener);
+
+    store.update((draft) => {
+      draft.agents.instances['agent-1']!.state.title = 'patched';
+    });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const [, , patches] = listener.mock.calls[0]!;
+    expect(Array.isArray(patches)).toBe(true);
+    expect(patches.length).toBeGreaterThan(0);
+
+    // Patches describe the exact mutation path so downstream
+    // projections (notably the Karton bridge) can forward granular
+    // changes instead of replacing whole subtrees.
+    const titlePatch = (patches as { path: (string | number)[] }[]).find(
+      (p) =>
+        p.path.length === 5 &&
+        p.path[0] === 'agents' &&
+        p.path[1] === 'instances' &&
+        p.path[2] === 'agent-1' &&
+        p.path[3] === 'state' &&
+        p.path[4] === 'title',
+    );
+    expect(titlePatch).toBeDefined();
+  });
+
   it('exposes multiple slice mutations atomically to subscribers', () => {
     const store = new AgentStore(makeInitialState());
     const seen: Array<AgentSystemState> = [];

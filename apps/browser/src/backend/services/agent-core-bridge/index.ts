@@ -4,9 +4,16 @@ import type {
   CommandName,
   CommandRegistry,
 } from '@stagewise/agent-core';
+import { applyPatches, enablePatches, type Patch } from 'immer';
 import type { KartonService } from '../karton';
 import { MIGRATED_PROCEDURES } from './contract-map';
 import { BridgeDriftError, serializeHandlerError } from './errors';
+
+// Immer's patches plugin must be enabled before any `applyPatches` call.
+// `agent-store.ts` also calls this on load — both are idempotent. Calling
+// it from the bridge module too keeps this file self-contained and removes
+// the implicit "AgentStore module must have loaded first" coupling.
+enablePatches();
 
 /**
  * Construction options for `AgentCoreBridge`.
@@ -32,9 +39,6 @@ type PendingFileDiffsValue = ToolboxEntry['pendingFileDiffs'];
 type EditSummaryValue = ToolboxEntry['editSummary'];
 type MountsValue = ToolboxEntry['workspace']['mounts'];
 
-type AgentsMap = AgentSystemState['agents']['instances'];
-type AgentEnvelope = AgentsMap[string];
-
 /**
  * Host-side adapter that routes Karton procedures through the
  * `CommandRegistry` in `@stagewise/agent-core` and mirrors AgentStore
@@ -53,11 +57,16 @@ type AgentEnvelope = AgentsMap[string];
  *      into Karton. Non-migrated Karton toolbox fields are never touched
  *      by the mirror.
  *
- * Phase 6 extends the mirror with whole-envelope projection of
+ * Phase 6 extends the mirror with projection of
  * `agents.instances[agentId]`. The store is canonical; Karton is
- * downstream. Dedup is reference-identity on the envelope — writers
- * always allocate a fresh envelope per mutation via Immer, so identity
- * equality is both correct and O(1).
+ * downstream. Projection is patch-forwarding: every `store.update()`
+ * yields the Immer patches that describe the mutation, and the
+ * bridge re-applies only the `agents.*` patches inside a single
+ * `karton.setState` call. Because `AgentSystemState.agents` is a
+ * path-equivalent subset of Karton `AppState.agents`, the patches
+ * apply verbatim with no re-rooting. Per-chunk streaming updates
+ * therefore broadcast `O(changed-path)` payloads instead of the
+ * full envelope, restoring origin/main's per-tick payload size.
  */
 export class AgentCoreBridge {
   private readonly karton: KartonService;
@@ -105,13 +114,46 @@ export class AgentCoreBridge {
 
     // Phase 1d mirror: store is canonical for `activeApp` and
     // `pendingAppMessage`; Karton is a per-field projection.
+    //
+    // Phase 6 + perf: `agents.instances` is forwarded as granular
+    // Immer patches (one patch per mutated path), so per-chunk
+    // streaming updates broadcast O(part_size) payloads instead of
+    // the full envelope.
     this.lastMirrored = this.store.get();
-    this.unsubscribeStore = this.store.subscribe((next) => {
-      this.mirrorToKarton(this.lastMirrored, next);
+    this.seedAgentInstancesIfAny();
+    this.unsubscribeStore = this.store.subscribe((next, _prev, patches) => {
+      this.mirrorToKarton(this.lastMirrored, next, patches);
       this.lastMirrored = next;
     });
 
     this.attached = true;
+  }
+
+  /**
+   * Defensive one-time seed: if the store already has agent instances
+   * at attach time, project them into Karton with a single
+   * `karton.setState`. Patch forwarding only kicks in on subsequent
+   * `store.update()` calls, so without this seed any pre-attach
+   * upsert would never reach Karton.
+   *
+   * In production and tests the store is empty at attach (the runtime
+   * order is `createAgentCoreSeam` → bridge construction → attach →
+   * `AgentManagerService` starts inserting agents), so this is a
+   * no-op in the happy path.
+   */
+  private seedAgentInstancesIfAny(): void {
+    const instances = this.store.get().agents.instances;
+    const ids = Object.keys(instances);
+    if (ids.length === 0) return;
+    this.karton.setState((draft) => {
+      const kInstances = draft.agents.instances as unknown as Record<
+        string,
+        unknown
+      >;
+      for (const id of ids) {
+        kInstances[id] = instances[id];
+      }
+    });
   }
 
   private registerProcedure(name: CommandName): void {
@@ -137,33 +179,43 @@ export class AgentCoreBridge {
   }
 
   /**
-   * Per-field mirror from AgentStore → Karton. Only fields for which the
-   * store is canonical (`activeApp`, `pendingAppMessage`, `pendingFileDiffs`,
-   * `editSummary`, `workspace.mounts`) are written. Unchanged fields skip
-   * `karton.setState` entirely so mirror traffic stays proportional to
-   * real state changes.
+   * Two-pronged mirror from AgentStore → Karton. Both prongs share a
+   * single `karton.setState` so each store emission produces at most
+   * one Karton broadcast, and emissions with no mirrorable change
+   * skip `karton.setState` entirely so mirror traffic stays
+   * proportional to real state changes.
    *
-   * Diff strategy:
+   * Toolbox (per-field diff): only fields for which the store is
+   * canonical (`activeApp`, `pendingAppMessage`, `pendingFileDiffs`,
+   * `editSummary`, `workspace.mounts`) are written.
    *   - `activeApp` / `pendingAppMessage`: shallow structural compare
    *     (fields that matter for the UI).
-   *   - `pendingFileDiffs` / `editSummary` / `workspace.mounts`: reference
-   *     identity. Writers (`DiffHistoryService.updateDiffKartonState`,
+   *   - `pendingFileDiffs` / `editSummary` / `workspace.mounts`:
+   *     reference identity. Writers (`DiffHistoryService.updateDiffKartonState`,
    *     `MountManagerService.rebuildMountsFor`) produce fresh array
    *     references only when content changes, so identity-based dedup is
    *     both correct and O(1).
-   *   - `agents.instances[id]`: reference identity on the whole
-   *     envelope. The core `state-mutations` utilities (and any host
-   *     setters built on `updateAgentInstanceState`) always allocate
-   *     a fresh envelope per mutation via Immer, so a preserved
-   *     reference
-   *     means "no change." Deletions (`id` in prev but not next) project
-   *     as Karton `delete`.
+   *
+   * `agents.instances` (patch forwarding): the Immer patches generated
+   * by `store.update()` are filtered to the `agents.*` subtree and
+   * re-applied to the Karton draft. `AgentSystemState.agents` mirrors
+   * `AppState.agents` path-for-path, so patches transfer verbatim —
+   * including granular paths like
+   * `['agents','instances',id,'state','history',i,'parts',j]` — and
+   * the Karton broadcast payload matches origin/main's per-chunk
+   * size instead of the whole envelope. Deletions arrive as `remove`
+   * patches and project as Karton `delete` automatically.
    */
   private mirrorToKarton(
     prev: AgentSystemState | null,
     next: AgentSystemState,
+    patches: Patch[],
   ): void {
-    const agentInstanceChanges = this.computeAgentInstanceChanges(prev, next);
+    // Granular projection for `agents.instances` — forward the exact
+    // Immer patches the store produced. `AgentSystemState.agents` is
+    // a path-equivalent subset of Karton `AppState.agents`, so the
+    // patches apply verbatim with no re-rooting.
+    const agentPatches = patches.filter((p) => p.path[0] === 'agents');
 
     const agentIds = new Set<string>();
     if (prev) for (const id of Object.keys(prev.toolbox)) agentIds.add(id);
@@ -241,28 +293,31 @@ export class AgentCoreBridge {
       changes.push(entry);
     }
 
-    if (changes.length === 0 && agentInstanceChanges === null) return;
+    if (changes.length === 0 && agentPatches.length === 0) return;
 
     this.karton.setState((draft) => {
-      if (agentInstanceChanges) {
+      if (agentPatches.length > 0) {
         // The store's envelope uses core types (`UniversalTools`,
         // `RequiredModelCapabilities = Record<string, boolean|undefined>`).
         // Karton's `AppState.agents.instances[id]` specializes to
         // `UIAgentTools` + a structured `ModelSettings['capabilities']`.
         // Runtime shape is identical because writers always build the
         // envelope from the host-narrowed source of truth before
-        // calling `controller.upsertInstance`. Cross the variance
-        // boundary through `unknown` at this single dedicated site.
-        const instances = draft.agents.instances as unknown as Record<
-          string,
-          unknown
-        >;
-        for (const id of agentInstanceChanges.deleted) {
-          delete instances[id];
-        }
-        for (const [id, envelope] of agentInstanceChanges.upserts) {
-          instances[id] = envelope;
-        }
+        // calling `upsertAgentInstance`. Cross the variance boundary
+        // through `unknown` at this single dedicated site.
+        //
+        // Structural drift between `AgentSystemState.agents` and
+        // `AppState.agents` is caught at typecheck by
+        // `apps/browser/src/shared/karton-contracts/ui/agent-core-parity.ts`
+        // (`_AgentsSliceParity`) — adding/renaming a field on either side
+        // without the other will fail compilation, so the cast here and
+        // the patch paths are safe.
+        //
+        // `applyPatches` mutates the draft in place — the surrounding
+        // `produce` records the same path-level patches against
+        // Karton's state, so the broadcast payload matches origin/main
+        // (one patch per mutated path, NOT the whole envelope).
+        applyPatches(draft as unknown as AgentSystemState, agentPatches);
       }
       for (const change of changes) {
         let kartonEntry = draft.toolbox[change.agentId];
@@ -303,43 +358,6 @@ export class AgentCoreBridge {
         }
       }
     });
-  }
-
-  /**
-   * Computes the diff of the `agents.instances` map between two store
-   * snapshots. Returns `null` when nothing changed so the caller can
-   * skip the `karton.setState` round-trip entirely.
-   *
-   * The `state-mutations` utilities always allocate a fresh
-   * envelope per mutation via Immer, so identity equality on the
-   * envelope is both correct and O(1).
-   */
-  private computeAgentInstanceChanges(
-    prev: AgentSystemState | null,
-    next: AgentSystemState,
-  ): {
-    upserts: Array<[string, AgentEnvelope]>;
-    deleted: string[];
-  } | null {
-    const prevMap = prev?.agents.instances ?? {};
-    const nextMap = next.agents.instances;
-
-    const upserts: Array<[string, AgentEnvelope]> = [];
-    for (const [id, envelope] of Object.entries(nextMap)) {
-      if (prevMap[id] !== envelope) {
-        upserts.push([id, envelope]);
-      }
-    }
-
-    const deleted: string[] = [];
-    for (const id of Object.keys(prevMap)) {
-      if (!(id in nextMap)) {
-        deleted.push(id);
-      }
-    }
-
-    if (upserts.length === 0 && deleted.length === 0) return null;
-    return { upserts, deleted };
   }
 
   /**
