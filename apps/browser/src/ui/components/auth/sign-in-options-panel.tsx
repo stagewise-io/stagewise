@@ -6,6 +6,7 @@ import { GithubMark } from '@ui/components/icons/github-mark';
 import { GoogleLogo } from '@ui/components/provider-logos/google';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { IconEnvelopeOutline18, IconKey2Outline18 } from 'nucleo-ui-outline-18';
+import { Loader2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
@@ -41,6 +42,7 @@ export type SignInOptionsPanelProps = {
 };
 
 const LAST_USED_SIGN_IN_METHOD_KEY = 'stagewise:last-used-sign-in-method';
+const SOCIAL_SIGN_IN_BUSY_MS = 5_000;
 
 function LastUsedBadge() {
   return (
@@ -125,6 +127,10 @@ export function SignInOptionsPanel({
   const pendingSocialAuth = !!socialLoading;
   const emailRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
+  const socialRequestIdRef = useRef(0);
+  const socialLoadingTimeoutRef = useRef<ReturnType<
+    typeof window.setTimeout
+  > | null>(null);
   const {
     containerRef: turnstileRef,
     token: turnstileToken,
@@ -170,15 +176,42 @@ export function SignInOptionsPanel({
     } catch {}
   }, []);
 
+  const clearSocialLoadingTimeout = useCallback(() => {
+    if (!socialLoadingTimeoutRef.current) return;
+    window.clearTimeout(socialLoadingTimeoutRef.current);
+    socialLoadingTimeoutRef.current = null;
+  }, []);
+
+  const stopSocialLoading = useCallback(
+    (requestId: number) => {
+      if (socialRequestIdRef.current !== requestId) return;
+      clearSocialLoadingTimeout();
+      setSocialLoading(null);
+    },
+    [clearSocialLoadingTimeout],
+  );
+
+  useEffect(() => () => clearSocialLoadingTimeout(), [
+    clearSocialLoadingTimeout,
+  ]);
+
   const handleSocialSignIn = useCallback(
     async (provider: SocialAuthProvider) => {
-      if (loading || socialLoading) return;
+      if (loading) return;
+      const requestId = socialRequestIdRef.current + 1;
+      socialRequestIdRef.current = requestId;
       setError(null);
       setSocialLoading(provider);
+      clearSocialLoadingTimeout();
+      socialLoadingTimeoutRef.current = window.setTimeout(
+        () => stopSocialLoading(requestId),
+        SOCIAL_SIGN_IN_BUSY_MS,
+      );
       rememberSignInMethod(provider);
       void track(`${trackingPrefix}-social-requested`, { provider });
       try {
         const result = await signInSocial(provider);
+        if (socialRequestIdRef.current !== requestId) return;
         if (result?.error) {
           void track(`${trackingPrefix}-method-failed`, {
             auth_method: 'stagewise',
@@ -192,6 +225,7 @@ export function SignInOptionsPanel({
         void track(`${trackingPrefix}-social-verified`, { provider });
         onAuthenticated?.(provider);
       } catch {
+        if (socialRequestIdRef.current !== requestId) return;
         void track(`${trackingPrefix}-method-failed`, {
           auth_method: 'stagewise',
           provider,
@@ -200,16 +234,17 @@ export function SignInOptionsPanel({
         clearRememberedSignInMethod();
         setError('Failed to complete social sign-in.');
       } finally {
-        setSocialLoading(null);
+        stopSocialLoading(requestId);
       }
     },
     [
       clearRememberedSignInMethod,
+      clearSocialLoadingTimeout,
       loading,
       onAuthenticated,
       rememberSignInMethod,
       signInSocial,
-      socialLoading,
+      stopSocialLoading,
       track,
       trackingPrefix,
     ],
@@ -356,7 +391,11 @@ export function SignInOptionsPanel({
               disabled={loading || !!socialLoading}
             >
               {lastUsedMethod === 'google' && <LastUsedBadge />}
-              <GoogleLogo className="size-4" aria-hidden />
+              {socialLoading === 'google' ? (
+                <Loader2Icon className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <GoogleLogo className="size-4" aria-hidden />
+              )}
               {socialLoading === 'google'
                 ? 'Opening Google…'
                 : 'Continue with Google'}
@@ -369,7 +408,11 @@ export function SignInOptionsPanel({
               disabled={loading || !!socialLoading}
             >
               {lastUsedMethod === 'github' && <LastUsedBadge />}
-              <GithubMark className="size-4" aria-hidden="true" />
+              {socialLoading === 'github' ? (
+                <Loader2Icon className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <GithubMark className="size-4" aria-hidden="true" />
+              )}
               {socialLoading === 'github'
                 ? 'Opening GitHub…'
                 : 'Continue with GitHub'}
