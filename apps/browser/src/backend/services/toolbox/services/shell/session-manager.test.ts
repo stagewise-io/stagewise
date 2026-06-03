@@ -9,6 +9,8 @@ import {
   getCommandIdleMs,
   getCommandTimeoutMs,
   injectBoundaryToken,
+  BASH_INTEGRATION,
+  ZSH_INTEGRATION,
 } from './session-manager';
 import { detectShell } from './detect-shell';
 import { sanitizeEnv } from './sanitize-env';
@@ -825,5 +827,29 @@ describeIfShell('SessionManager (integration)', () => {
     expect(sm.getSessionsForAgent('agent-x')).toHaveLength(2);
     expect(sm.getSessionsForAgent('agent-y')).toHaveLength(1);
     expect(sm.getSessionsForAgent('agent-z')).toHaveLength(0);
+  });
+});
+
+// ─── Shell integration scripts ───────────────────────────────────
+
+describe('shell integration scripts', () => {
+  it('zsh encoder uses zsh-safe substring syntax and a non-special variable', () => {
+    // Regression guard: zsh misparses bash-style `${path:i:1}` as a `:i`
+    // history modifier, and `path` is a reserved special variable in zsh
+    // (tied to the $PATH array). The encoder must use `${p:$i:1}` on a
+    // plain local var `p`.
+    expect(ZSH_INTEGRATION).toContain('local p="$1"');
+    expect(ZSH_INTEGRATION).toContain('${p:$i:1}');
+    expect(ZSH_INTEGRATION).not.toContain('local path=');
+    expect(ZSH_INTEGRATION).not.toMatch(/\$\{path:i:1\}/);
+  });
+
+  it('integration guard is set but not exported (no leak into child shells)', () => {
+    // Exporting the guard leaks it into every PTY child, tripping the
+    // first-line guard before OSC 133 hooks register -> sentinel fallback.
+    for (const script of [BASH_INTEGRATION, ZSH_INTEGRATION]) {
+      expect(script).toContain('__STAGEWISE_SHELL_INTEGRATION=1');
+      expect(script).not.toContain('export __STAGEWISE_SHELL_INTEGRATION');
+    }
   });
 });
