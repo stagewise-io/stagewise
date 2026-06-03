@@ -114,6 +114,15 @@ export function sanitizeEnv(
 
     if (key.startsWith('ELECTRON_') || key.startsWith('ELECTRON ')) continue;
 
+    // Never inherit the shell-integration guard. The integration scripts set
+    // this to prevent double-sourcing within a single shell, but if it leaks
+    // into the spawn env (e.g. the app was launched from a terminal that had
+    // integration active), the script's first-line guard short-circuits before
+    // registering OSC 133 hooks. The parser then never detects integration and
+    // every session falls back to sentinel mode. Each fresh PTY must start with
+    // a clean slate so its own sourcing can register the hooks.
+    if (key === '__STAGEWISE_SHELL_INTEGRATION') continue;
+
     if (!isWhitelisted(key) && isSensitive(key)) continue;
 
     env[key] = value;

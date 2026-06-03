@@ -68,6 +68,17 @@ describe('sanitizeEnv', () => {
     expect(env.SOME_NORMAL_VAR).toBe('hello');
   });
 
+  it('strips the inherited shell-integration guard so each PTY can re-source', () => {
+    // If this leaks into the spawn env, the integration script's first-line
+    // guard short-circuits before registering OSC 133 hooks and every session
+    // falls back to sentinel mode.
+    process.env.__STAGEWISE_SHELL_INTEGRATION = '1';
+
+    const env = sanitizeEnv();
+
+    expect(env.__STAGEWISE_SHELL_INTEGRATION).toBeUndefined();
+  });
+
   describe('windows locale overrides', () => {
     let originalPlatform: NodeJS.Platform;
 
