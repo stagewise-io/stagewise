@@ -514,7 +514,7 @@ function WorkspaceGroupHeader({
   return (
     <div
       className={cn(
-        'group/workspace-header flex shrink-0 items-center gap-1 py-1 pr-1 text-muted-foreground text-xs',
+        'group/workspace-header flex shrink-0 items-center gap-1 py-1 pr-1 text-subtle-foreground text-xs',
         depth === 0 ? 'pt-5 pl-1 font-medium' : 'pt-2 pl-2.5 font-medium',
       )}
     >
@@ -649,7 +649,7 @@ function AgentListGroupingToggle({
       <MenuTrigger>
         <button
           type="button"
-          className="flex h-5 shrink-0 items-center gap-1 rounded-md px-1 text-muted-foreground text-xs transition-colors hover:bg-foreground/8 hover:text-foreground"
+          className="flex h-5 shrink-0 cursor-pointer items-center gap-1 rounded-md bg-transparent px-1 text-subtle-foreground text-xs transition-colors hover:text-foreground"
           aria-label="Change agent grouping mode"
         >
           <span>{label}</span>
@@ -2284,7 +2284,7 @@ export function AgentsList() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="mt-1 ml-1 h-6 w-[calc(100%-0.25rem)] justify-start px-1.5 text-muted-foreground text-xs hover:bg-foreground/8"
+                      className="mt-1 ml-1 h-6 w-[calc(100%-0.25rem)] justify-start px-1.5 text-subtle-foreground text-xs transition-colors hover:bg-foreground/8 hover:text-muted-foreground"
                       onClick={() => handleShowMoreWorktrees(repo.key)}
                     >
                       Show more worktrees...
@@ -2349,7 +2349,7 @@ export function AgentsList() {
           />
         </Button>
         <div className="mt-2 flex items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1.5">
-          <IconMagnifierOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
+          <IconMagnifierOutline18 className="size-3.5 shrink-0 text-subtle-foreground" />
           <input
             type="text"
             aria-label="Search agents"
@@ -2363,7 +2363,7 @@ export function AgentsList() {
             onFocus={() => openCommandCenter({ initialMode: 'agents' })}
             onChange={() => {}}
             className={cn(
-              'w-full bg-transparent text-foreground text-sm placeholder:text-muted-foreground',
+              'w-full bg-transparent text-foreground text-sm placeholder:text-subtle-foreground',
               'outline-none',
             )}
           />
@@ -2389,7 +2389,7 @@ export function AgentsList() {
         onViewportRef={setScrollViewport}
       >
         <div className="flex shrink-0 items-center pt-0 pr-0 pb-1 pl-1.5">
-          <div className="min-w-0 flex-1 truncate font-medium text-muted-foreground text-xs">
+          <div className="min-w-0 flex-1 truncate font-medium text-subtle-foreground text-xs">
             {filteredPinnedAgents.length > 0 ? 'Pinned' : 'Agents'}
           </div>
           <AgentListGroupingToggle
@@ -2503,7 +2503,7 @@ export function AgentsList() {
               return (
                 <div
                   key={`h-${item.label}`}
-                  className="shrink-0 px-1.5 pt-3 pb-1 font-medium text-muted-foreground text-xs"
+                  className="shrink-0 px-1.5 pt-3 pb-1 font-medium text-subtle-foreground text-xs"
                 >
                   {item.label}
                 </div>
@@ -2520,7 +2520,7 @@ export function AgentsList() {
           <Button
             variant="ghost"
             size="sm"
-            className="mt-1 w-full justify-start pl-1.5 text-muted-foreground text-sm hover:bg-foreground/8"
+            className="mt-1 w-full justify-start pl-1.5 text-sm text-subtle-foreground transition-colors hover:bg-foreground/8 hover:text-muted-foreground"
             onClick={handleShowMore}
           >
             Show more...
