@@ -362,16 +362,20 @@ function GenericError({
       </div>
 
       {showSignInLink && (
-        <div className="text-muted-foreground text-xs">
-          Please{' '}
-          <button
-            type="button"
-            onClick={() => void openSettings({ section: 'account' })}
-            className="text-primary-foreground underline hover:text-primary-foreground/80"
-          >
-            sign in to stagewise
-          </button>{' '}
-          to continue.
+        <div className="flex flex-col gap-2 rounded-md border border-derived bg-surface-1 p-2 text-xs">
+          <span className="text-muted-foreground">
+            This model uses the stagewise API. Sign in from Account settings to
+            continue.
+          </span>
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={() => void openSettings({ section: 'account' })}
+            >
+              Open Account settings
+            </Button>
+          </div>
         </div>
       )}
 

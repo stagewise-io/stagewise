@@ -50,6 +50,7 @@ type StoredCredentials = z.infer<typeof credentialsSchema>;
 export type AuthState = KartonContract['state']['userAccount'];
 
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const SOCIAL_AUTH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export class AuthService extends DisposableService {
   private readonly identifierService: IdentifierService;
@@ -205,12 +206,9 @@ export class AuthService extends DisposableService {
       this._refreshInterval = null;
     }
 
-    if (this.pendingSocialAuth) {
-      clearTimeout(this.pendingSocialAuth.timeout);
-      const { resolve } = this.pendingSocialAuth;
-      this.pendingSocialAuth = null;
-      resolve({ error: 'Social sign-in was cancelled.' });
-    }
+    await this.cancelPendingSocialAuth({
+      error: 'Social sign-in was cancelled.',
+    });
 
     await this.disposeActiveLoopbackAuthServer();
 
@@ -313,6 +311,17 @@ export class AuthService extends DisposableService {
     const { resolve } = this.pendingSocialAuth;
     this.pendingSocialAuth = null;
     void this.disposeActiveLoopbackAuthServer();
+    resolve(result);
+  }
+
+  private async cancelPendingSocialAuth(result: {
+    error?: string;
+  }): Promise<void> {
+    if (!this.pendingSocialAuth) return;
+    clearTimeout(this.pendingSocialAuth.timeout);
+    const { resolve } = this.pendingSocialAuth;
+    this.pendingSocialAuth = null;
+    await this.disposeActiveLoopbackAuthServer();
     resolve(result);
   }
 
@@ -457,18 +466,20 @@ export class AuthService extends DisposableService {
     provider: SocialAuthProvider,
   ): Promise<{ error?: string }> {
     if (this.pendingSocialAuth) {
-      return { error: 'A social sign-in flow is already in progress.' };
+      this.logger.debug(
+        '[AuthService] Cancelling previous social sign-in before starting a new one',
+      );
+      await this.cancelPendingSocialAuth({
+        error: 'Social sign-in was cancelled.',
+      });
     }
 
     const completion = new Promise<{ error?: string }>((resolve) => {
-      const timeout = setTimeout(
-        () => {
-          this.pendingSocialAuth = null;
-          void this.disposeActiveLoopbackAuthServer();
-          resolve({ error: 'Social sign-in timed out.' });
-        },
-        5 * 60 * 1000,
-      );
+      const timeout = setTimeout(() => {
+        this.pendingSocialAuth = null;
+        void this.disposeActiveLoopbackAuthServer();
+        resolve({ error: 'Social sign-in timed out.' });
+      }, SOCIAL_AUTH_TIMEOUT_MS);
 
       this.pendingSocialAuth = { resolve, timeout };
     });
