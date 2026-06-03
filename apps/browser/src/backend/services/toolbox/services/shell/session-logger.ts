@@ -137,15 +137,19 @@ export class SessionLogger {
   }
 
   /**
-   * Append raw (unstripped) PTY bytes to the in-memory circular buffer.
-   * Oldest chunks are evicted when the total exceeds MAX_RAW_BUFFER_BYTES.
+   * Store raw (unstripped) PTY bytes in the in-memory circular buffer for
+   * future xterm replay. Oldest chunks are evicted when the total exceeds
+   * MAX_RAW_BUFFER_BYTES.
+   *
+   * NOTE: This intentionally does NOT render to the headless terminal.
+   * Rendering is driven incrementally by the OscParser's `output` events
+   * via `renderToTerminal`, so the cursor position is accurate at each
+   * structural marker (e.g. OSC 133;C). Rendering the whole chunk here
+   * up-front would advance the cursor past the command output before the
+   * parser fires `commandStart`, corrupting the captured mark line when a
+   * fast command's echo + output + done markers arrive in one PTY chunk.
    */
-  appendRaw(data: Buffer): void {
-    // MUST use writeSync so the terminal buffer is immediately up-to-date
-    // when the OscParser fires synchronous resolution events that read it
-    // via serializeFrom(). The async write() queues data internally and
-    // the buffer would still be stale at resolution time.
-    (this._terminal as any)._core.writeSync(data);
+  storeRawChunk(data: Buffer): void {
     this._rawChunks.push(data);
     this._rawBytes += data.byteLength;
     // Evict oldest chunks until we are within the cap.
@@ -156,6 +160,20 @@ export class SessionLogger {
       this._rawBytes -= this._rawChunks[0]!.byteLength;
       this._rawChunks.shift();
     }
+  }
+
+  /**
+   * Render a segment of (OSC-133/7-stripped) PTY text into the headless
+   * terminal emulator. Called incrementally from the parser's `output`
+   * event so the buffer is current — and the cursor correctly positioned —
+   * before the parser fires synchronous resolution events (commandStart,
+   * commandDone, sentinelDone) that read the buffer via serializeFrom().
+   *
+   * MUST use writeSync (not the async write()) so the buffer is updated
+   * synchronously within the same parser tick.
+   */
+  renderToTerminal(data: string): void {
+    (this._terminal as any)._core.writeSync(data);
   }
 
   /**

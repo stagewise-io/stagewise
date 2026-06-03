@@ -464,16 +464,15 @@ export class SessionManager {
     this.onSessionStateChange?.(agentInstanceId);
 
     // Wire PTY data → parser
-    // IMPORTANT: appendRaw feeds the headless terminal which must be current
-    // before the parser fires synchronous resolution events (commandDone,
-    // sentinelDone) that read the buffer via collectOutput.
+    // Terminal rendering is NOT done here. We only store raw bytes (for
+    // replay) and append to the on-disk log. The headless xterm is rendered
+    // incrementally from the parser's `output` event (see below) so the
+    // cursor is correctly positioned at each OSC marker. Rendering the whole
+    // chunk up-front advanced the cursor past the command output before
+    // `commandStart` fired, corrupting the captured mark line whenever a fast
+    // command's echo + output + done markers arrived in a single PTY chunk.
     ptyProcess.onData((data: string) => {
-      // FIX: always feed the headless xterm emulator + logger so markLine
-      // and serializeFrom stay accurate even during session startup.
-      // UI streaming is handled via the parser's `output` event below,
-      // which fires only for text between OSC 133;C and 133;D (i.e. real
-      // command output — no prompt redraws, no command echo).
-      session.logger?.appendRaw(Buffer.from(data, 'utf-8'));
+      session.logger?.storeRawChunk(Buffer.from(data, 'utf-8'));
       session.logger?.append(stripAnsi(data));
       parser.write(data);
     });
@@ -556,6 +555,14 @@ export class SessionManager {
     });
 
     parser.on('output', (data) => {
+      // Render incrementally FIRST so the headless terminal's cursor reflects
+      // exactly the bytes up to the current parser position. This keeps the
+      // command mark (captured at OSC 133;C in the commandStart handler) and
+      // serializeFrom() accurate even when a fast command's echo, output, and
+      // 133;D done marker all arrive in a single PTY chunk. It must run before
+      // appendToCommandOutput, whose pattern matching reads the buffer.
+      session.logger?.renderToTerminal(data);
+
       // Stream to UI only when inside a real command's output region.
       // In OSC mode, this is between 133;C and 133;D. In sentinel mode,
       // all output is user-command output (prompt/echo aren't framed
@@ -1086,8 +1093,9 @@ export class SessionManager {
 
         if (logger) {
           // Buffer-based matching: test against visible terminal state.
-          // The buffer is already up-to-date (writeSync in appendRaw
-          // runs before the parser emits the output event that calls us).
+          // The buffer is already up-to-date: renderToTerminal runs at the
+          // top of the parser's `output` handler, before this code (also
+          // invoked from that handler via appendToCommandOutput).
           //
           // Skip the first serialized line because it typically contains
           // the prompt and the echoed command itself — matching against

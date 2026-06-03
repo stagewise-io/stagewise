@@ -209,6 +209,31 @@ describe('OscParser — OSC 133 mode', () => {
       '/Users/test/very/long/path/inside/workspace',
     );
   });
+
+  it('emits interleaved output before commandStart/commandDone within a single chunk', () => {
+    const order: string[] = [];
+    let done: CommandDoneEvent | undefined;
+    parser.on('output', () => order.push('output'));
+    parser.on('commandStart', () => order.push('commandStart'));
+    parser.on('commandDone', (e) => {
+      order.push('commandDone');
+      done = e;
+    });
+
+    // Echo, command start, output, and done marker all arrive in ONE PTY
+    // chunk. This is the chunk-boundary race the render-decoupling fix
+    // addresses: the parser must emit the pre-133;C echo as `output` BEFORE
+    // `commandStart`, and the command body as `output` BEFORE `commandDone`,
+    // so the session manager's renderToTerminal positions the cursor
+    // correctly before serializeFrom(markLine) runs in the resolution
+    // handlers. If output were emitted after the resolution events (or the
+    // whole chunk rendered up-front), the captured mark line would be blank.
+    parser.write(`pwd\n${osc('C')}/home/user\n${osc('D', '0')}`);
+
+    expect(order).toEqual(['output', 'commandStart', 'output', 'commandDone']);
+    expect(done?.output).toBe('/home/user\n');
+    expect(done?.exitCode).toBe(0);
+  });
 });
 
 // ─── OSC 7 cwd parsing ───────────────────────────────────────────
