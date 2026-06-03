@@ -189,9 +189,13 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     }
 
     if (this.mode === 'sentinel') {
-      // Emit raw output so command output is accumulated
-      // by appendToCommandOutput even without OSC 133 framing.
-      this.emit('output', processable);
+      // Emit OSC-stripped output so command output is accumulated by
+      // appendToCommandOutput even without OSC 133 framing. Stripping here
+      // keeps the `output` event contract uniform with OSC mode (always
+      // OSC-stripped), so stray OSC bytes a program prints in sentinel mode
+      // never pollute the rendered grid or captured output. processSentinel
+      // still receives the RAW bytes below so sentinel detection is unaffected.
+      this.emit('output', stripOscSequences(processable));
       this.processSentinel(processable);
     }
 
