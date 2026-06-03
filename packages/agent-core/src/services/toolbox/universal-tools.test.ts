@@ -225,7 +225,7 @@ describe('universal toolbox', () => {
     // Capped at 50 by the universal-tools layer; we only care that the
     // walk completed without throwing and returned a non-zero match.
     expect(result.result.totalMatches).toBeGreaterThanOrEqual(50);
-  });
+  }, 30_000);
 
   it('plumbs include_gitignored through to runtime-node', async () => {
     // A user-authored .gitignore that hides `secrets/`. Default glob

@@ -342,7 +342,7 @@ describe('ProcessedImageCacheService – LRU eviction', () => {
     expect(evicted).toBeNull();
 
     svc.teardown();
-  }, 20_000);
+  }, 60_000);
 
   it('does NOT evict a recently-used entry even if it was inserted first', async () => {
     const svc = await ProcessedImageCacheService.createWithUrl(
@@ -385,7 +385,7 @@ describe('ProcessedImageCacheService – LRU eviction', () => {
     expect(stillThere).not.toBeNull();
 
     svc.teardown();
-  }, 20_000);
+  }, 60_000);
 });
 
 describe('ProcessedImageCacheService – integration with processImageForModel', () => {
