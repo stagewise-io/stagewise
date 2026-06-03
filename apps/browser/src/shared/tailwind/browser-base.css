@@ -63,8 +63,8 @@
   :root.theme-transitions-enabled *,
   :root.theme-transitions-enabled *::before,
   :root.theme-transitions-enabled *::after {
-    transition-duration: 500ms, 500ms, 500ms, 1s, 1s, 1s, 1s, 1s, 1s, 1s,
-      1s, 1s;
+    transition-duration: 250ms, 250ms, 250ms, 250ms, 250ms, 500ms, 500ms,
+      500ms, 500ms, 500ms, 500ms, 500ms;
     transition-property: --H, --H-primary, --H-base, --primary-chroma-scale,
       --base-chroma-scale, background-color, border-color, color, fill, stroke,
       outline-color, box-shadow;

@@ -240,6 +240,9 @@ export const personalizationThemeIds = [
   'fire',
   'forest',
   'bubblegum',
+  'zinc',
+  'titanium',
+  'desert',
 ] as const;
 export const personalizationThemeIdSchema = z.enum(personalizationThemeIds);
 export type PersonalizationThemeId = z.infer<
