@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.5.0 (2026-06-03)
+
+### Features
+
+* add worktree setup settings and env-var refactor (1a2baa0)
+* add minimax m3 (96f22e0)
+* improve agent wake handling (b2ba4e5)
+
+### Bug Fixes
+
+* fix patch-behaviour in karton x agent-core bridge (e3e899d)
+* capture command output across PTY chunk boundaries (5585308)
+* prevent PS2 prompt noise from sentinel command wrapper (803ccf4)
+* stop shell-integration guard leaking into child PTYs (6b53401)
+* use zsh-safe substring expansion in OSC 7 cwd encoder (8a01e25)
+* deduplicate streamdown link listeners (57874c1)
+* refine browser tab shortcuts (05064b5)
+* refine awake setting and link routing (b58b46f)
+* refine closed-lid sleep toggle (1f8a6c3)
+* make workspace copy-path button work (a13635f)
+* prevent duplicate tab ids from crashing the UI (c1fa2dd)
+
+### Other Changes
+
+* emit OSC-stripped output in sentinel parser mode (d2ac3bc)
+* speed up dev startup and show window earlier (e3e1252)
+
 ## 1.4.0 (2026-06-01)
 
 ### Features
