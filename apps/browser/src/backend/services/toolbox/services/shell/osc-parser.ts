@@ -189,12 +189,19 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
     }
 
     if (this.mode === 'sentinel') {
-      // Emit OSC-stripped output so command output is accumulated by
-      // appendToCommandOutput even without OSC 133 framing. Stripping here
-      // keeps the `output` event contract uniform with OSC mode (always
-      // OSC-stripped), so stray OSC bytes a program prints in sentinel mode
-      // never pollute the rendered grid or captured output. processSentinel
-      // still receives the RAW bytes below so sentinel detection is unaffected.
+      // Strip the shell-integration markers (OSC 133/7) before emitting so the
+      // `output` event has the same shape in both modes — in OSC mode
+      // handleTextOutput() strips exactly those markers too. Only 133/7 are
+      // removed here: they are integration metadata the parser consumes.
+      // Other OSCs (title, hyperlink, color) are intentionally left intact so
+      // the headless xterm grid renders the same state as the real terminal.
+      // This is NOT the sanitization boundary for surfaced output: the text
+      // the agent sees is sanitized independently — stripAnsi() removes ALL
+      // OSC for the on-disk log, recentOutput, and the raw-pattern fallback,
+      // and grid serialization only reflects sequences xterm already consumed.
+      // So no raw OSC reaches captured output regardless of what is stripped
+      // here. processSentinel still receives the RAW bytes below so sentinel
+      // detection is unaffected.
       this.emit('output', stripOscSequences(processable));
       this.processSentinel(processable);
     }
@@ -404,6 +411,16 @@ export function stripOsc133(text: string): string {
   return stripOscSequences(text);
 }
 
+/**
+ * Remove the shell-integration OSC markers (OSC 133 command/prompt markers and
+ * OSC 7 cwd reports) from text.
+ *
+ * This intentionally does NOT strip other OSC sequences (title, hyperlink,
+ * color, clipboard): those are valid terminal output that the headless xterm
+ * grid renders faithfully. Surfaced text is sanitized separately — stripAnsi()
+ * in the session manager removes ALL OSC for the log/recentOutput/raw-pattern
+ * paths, and grid serialization only re-emits sequences xterm has consumed.
+ */
 function stripOscSequences(text: string): string {
   return text.replace(OSC_STRIP_RE, '');
 }
