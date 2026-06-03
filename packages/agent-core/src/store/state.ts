@@ -1,5 +1,10 @@
 import type { UITools } from 'ai';
-import type { AgentMessage, AgentState, AgentTypes } from '../types/agent';
+import type {
+  AgentMessage,
+  AgentState,
+  AgentTypes,
+  ExternalCliAgentRuntimeState,
+} from '../types/agent';
 import type { FileDiff } from '../types/diff-history';
 import type { AttachmentMetadata, MountEntry } from '../types/metadata';
 import type { UniversalTools } from '../types/tools';
@@ -87,6 +92,8 @@ export type AgentInstanceState<TTools extends UITools = UniversalTools> = {
   parentAgentInstanceId: string | null;
   /** @persistence mixed — see field-level tags on `AgentState` below. */
   state: AgentState<AgentMessage<TTools>>;
+  /** @persistence ephemeral — browser-owned PTY metadata for external CLI agents. */
+  externalCli?: ExternalCliAgentRuntimeState;
 };
 
 /**

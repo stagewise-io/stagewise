@@ -1,4 +1,5 @@
 import { Chat } from './chat';
+import { ExternalCliAgentTerminal } from './external-cli-agent-terminal';
 import {
   ResizablePanel,
   type ImperativePanelHandle,
@@ -12,6 +13,7 @@ import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { useTrack } from '@ui/hooks/use-track';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 
 export function AgentChat() {
   const panelRef = useRef<ImperativePanelHandle>(null);
@@ -42,6 +44,9 @@ export function AgentChat() {
     openAgent
       ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
       : EMPTY_MOUNTS,
+  );
+  const openAgentRuntime = useKartonState((s) =>
+    openAgent ? (s.agents.instances[openAgent] ?? null) : null,
   );
 
   // Ref snapshots so the callback isn't re-created on every state change.
@@ -119,7 +124,12 @@ export function AgentChat() {
         />
       )}
       <div className="flex h-full flex-col items-stretch justify-between p-1">
-        <Chat />
+        {openAgentRuntime?.type === AgentTypes.CLAUDE ||
+        openAgentRuntime?.type === AgentTypes.CODEX ? (
+          <ExternalCliAgentTerminal agentId={openAgent} />
+        ) : (
+          <Chat />
+        )}
       </div>
     </ResizablePanel>
   );

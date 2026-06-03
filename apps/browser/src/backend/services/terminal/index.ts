@@ -34,6 +34,7 @@ import { getTerminalTabDefaults } from '@shared/karton-contracts/ui';
 interface UserTerminalSession {
   id: string;
   pty: pty.IPty;
+  owner: { type: 'content-tab' } | { type: 'agent'; agentInstanceId: string };
   /** Shared shell-integration OSC parser used by agent and user terminals. */
   parser: OscParser;
   /** Partial UI OSC escape sequence carried over from the previous
@@ -70,6 +71,12 @@ const OSC_TITLE_RE = /^\x1b\]([012]);([^\x07\x1b]*?)(\x07|\x1b\\)/;
 /** Regex matching OSC 11 background color queries: ESC ] 11 ; ? BEL | ST. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
 const OSC_BACKGROUND_QUERY_RE = /^\x1b\]11;\?(\x07|\x1b\\)/;
+
+// Claude/Codex emit OSC 777 when something needs user attention.
+// Match both BEL and ST terminators and strip the control sequence from
+// visible terminal output.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+const OSC_777_RE = /^\x1b\]777;[^\x07\x1b]*(\x07|\x1b\\)/;
 
 const TERMINAL_BACKGROUND_BY_THEME = {
   light: '#fdfcfc',
@@ -143,10 +150,12 @@ function isPartialOscSequence(tail: string): boolean {
     /^\x1b\]7;(file:\/\/[^\x07\x1b]*)$/.test(tail) ||
     // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
     /^\x1b\]11;\??$/.test(tail) ||
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
+    /^\x1b\]777(?:;[^\x07\x1b]*)?$/.test(tail) ||
     tail === '\x1b' ||
     tail === '\x1b]' ||
     // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal ESC sequences
-    /^\x1b\]([012]|7|11)$/.test(tail)
+    /^\x1b\]([012]|7|11|777)$/.test(tail)
   );
 }
 
@@ -244,6 +253,7 @@ function processOscData(
   prevOscBuffer: string,
   onTitle: (title: string) => void,
   onBackgroundQuery: () => void,
+  onExternalAgentEvent: () => void,
 ): { output: string; oscBuffer: string } {
   let combined = prevOscBuffer + chunk;
   let output = '';
@@ -270,6 +280,13 @@ function processOscData(
     if (backgroundQueryMatch) {
       onBackgroundQuery();
       combined = tail.slice(backgroundQueryMatch[0].length);
+      continue;
+    }
+
+    const externalAgentEventMatch = OSC_777_RE.exec(tail);
+    if (externalAgentEventMatch) {
+      onExternalAgentEvent();
+      combined = tail.slice(externalAgentEventMatch[0].length);
       continue;
     }
 
@@ -319,6 +336,10 @@ export class TerminalService extends DisposableService {
   /** Monotonic absolute offsets for outputBuffers. */
   private readonly outputBaseOffsets = new Map<string, number>();
   private readonly outputEndOffsets = new Map<string, number>();
+  private readonly agentTerminalIds = new Map<string, string>();
+  private notificationEventHandler:
+    | ((event: 'done' | 'question' | 'error', agentId: string) => void)
+    | null = null;
   /** Set during teardown so onPtyExit knows to skip state mutations
    *  — the persisted tab state must survive app shutdown unchanged. */
   private tearingDown = false;
@@ -334,6 +355,12 @@ export class TerminalService extends DisposableService {
   }
   public setOnTerminalTabRemoved(fn: (terminalId: string) => void): void {
     this.onTerminalTabRemoved = fn;
+  }
+
+  public setNotificationEventHandler(
+    handler: (event: 'done' | 'question' | 'error', agentId: string) => void,
+  ): void {
+    this.notificationEventHandler = handler;
   }
 
   /** Best-effort sync of live PTY working directories into Karton state.
@@ -398,7 +425,13 @@ export class TerminalService extends DisposableService {
       delete draft.terminals.outputBuffers[terminalId];
       delete draft.terminals.outputBufferOffsets[terminalId];
     });
-    const actualCwd = this.createPty(terminalId, cwd);
+    const actualCwd = this.createPtySession({
+      terminalId,
+      cwd,
+      command: this.shell.path,
+      args: this.getSpawnArgs(),
+      owner: { type: 'content-tab' },
+    });
     if (!actualCwd) return;
     this.uiKarton.setState((draft) => {
       const tab = draft.contentTabs.tabs[terminalId];
@@ -432,7 +465,13 @@ export class TerminalService extends DisposableService {
       });
       // tab.cwd is always set (required field), but guard against
       // empty-string edge case from legacy persisted state.
-      const actualCwd = this.createPty(id, tab.cwd);
+      const actualCwd = this.createPtySession({
+        terminalId: id,
+        cwd: tab.cwd,
+        command: this.shell.path,
+        args: this.getSpawnArgs(),
+        owner: { type: 'content-tab' },
+      });
       if (!actualCwd) continue;
       this.uiKarton.setState((draft) => {
         const restoredTab = draft.contentTabs.tabs[id];
@@ -567,7 +606,13 @@ export class TerminalService extends DisposableService {
     const title = shellDisplayName(this.shell);
     const createdAt = Date.now();
 
-    const actualCwd = this.createPty(terminalId, resolvedCwd);
+    const actualCwd = this.createPtySession({
+      terminalId,
+      cwd: resolvedCwd,
+      command: this.shell.path,
+      args: this.getSpawnArgs(),
+      owner: { type: 'content-tab' },
+    });
     if (!actualCwd) return null;
 
     // Insert the tab into contentTabs but do NOT set activeTabId here.
@@ -724,17 +769,77 @@ export class TerminalService extends DisposableService {
     return process.cwd();
   }
 
-  /** Spawn a PTY and wire up onData / onExit for an existing terminal
-   *  tab.  Shared by handleCreateTerminal and restoreFromState.
+  public hasTerminal(terminalId: string): boolean {
+    return this.sessions.has(terminalId);
+  }
+
+  public createAgentTerminal({
+    agentInstanceId,
+    cwd,
+    command,
+    args = [],
+  }: {
+    agentInstanceId: string;
+    cwd: string;
+    command: string;
+    args?: string[];
+  }): string | null {
+    if (this.disposed) return null;
+
+    const existingTerminalId = this.agentTerminalIds.get(agentInstanceId);
+    if (existingTerminalId) {
+      this.handleCloseTerminal(existingTerminalId);
+    }
+
+    this.terminalCounter++;
+    const terminalId = `term-${this.terminalCounter}`;
+    const actualCwd = this.createPtySession({
+      terminalId,
+      cwd,
+      command,
+      args,
+      owner: { type: 'agent', agentInstanceId },
+    });
+    if (!actualCwd) return null;
+
+    this.agentTerminalIds.set(agentInstanceId, terminalId);
+    this.uiKarton.setState((draft) => {
+      const instance = draft.agents.instances[agentInstanceId];
+      if (!instance?.externalCli) return;
+      instance.externalCli.terminalId = terminalId;
+      instance.externalCli.status = 'running';
+      instance.externalCli.unavailableReason = undefined;
+    });
+    return terminalId;
+  }
+
+  public closeAgentTerminal(agentInstanceId: string): void {
+    const terminalId = this.agentTerminalIds.get(agentInstanceId);
+    if (!terminalId) return;
+    this.handleCloseTerminal(terminalId);
+  }
+
+  /** Spawn a PTY and wire up onData / onExit for a terminal session.
    *  Guards against empty, stale, or deleted cwd values — node-pty can
    *  throw when cwd is invalid, which must not abort terminal creation. */
-  private createPty(terminalId: string, cwd: string): string | null {
+  private createPtySession({
+    terminalId,
+    cwd,
+    command,
+    args,
+    owner,
+  }: {
+    terminalId: string;
+    cwd: string;
+    command: string;
+    args: string[];
+    owner: UserTerminalSession['owner'];
+  }): string | null {
     const requestedCwd = cwd || this.getUserHomeDirectory();
     const resolvedCwd = this.resolveSafePtyCwd(requestedCwd);
-    const spawnArgs: string[] = this.getSpawnArgs();
 
     const spawnAtCwd = (spawnCwd: string) =>
-      pty.spawn(this.shell.path, spawnArgs, {
+      pty.spawn(command, args, {
         name: 'xterm-256color',
         cols: DEFAULT_TERMINAL_COLS,
         rows: DEFAULT_TERMINAL_ROWS,
@@ -797,6 +902,7 @@ export class TerminalService extends DisposableService {
 
     const parser = new OscParser();
     parser.on('cwd', (cwd) => {
+      if (owner.type !== 'content-tab') return;
       this.uiKarton.setState((draft) => {
         const tab = draft.contentTabs.tabs[terminalId];
         if (tab && tab.type === 'terminal') {
@@ -808,6 +914,7 @@ export class TerminalService extends DisposableService {
     const session: UserTerminalSession = {
       id: terminalId,
       pty: ptyProcess,
+      owner,
       parser,
       oscBuffer: '',
       headless,
@@ -830,6 +937,7 @@ export class TerminalService extends DisposableService {
         curSession.oscBuffer,
         (title) => {
           if (isShellExecutableTitle(title, this.shell)) return;
+          if (owner.type !== 'content-tab') return;
           this.uiKarton.setState((draft) => {
             const tab = draft.contentTabs.tabs[terminalId];
             if (tab && tab.type === 'terminal') {
@@ -842,6 +950,7 @@ export class TerminalService extends DisposableService {
             buildOsc11Response(this.getTerminalBackgroundColor()),
           );
         },
+        () => this.handleExternalAgentTerminalEvent(owner),
       );
 
       curSession.oscBuffer = oscBuffer;
@@ -893,6 +1002,27 @@ export class TerminalService extends DisposableService {
     return actualCwd;
   }
 
+  private handleExternalAgentTerminalEvent(
+    owner: UserTerminalSession['owner'],
+  ): void {
+    if (owner.type !== 'agent') return;
+    const agentId = owner.agentInstanceId;
+    const instance = this.uiKarton.state.agents.instances[agentId];
+    if (instance?.type !== 'claude' && instance?.type !== 'codex') {
+      return;
+    }
+
+    this.uiKarton.setState((draft) => {
+      const draftInstance = draft.agents.instances[agentId];
+      if (!draftInstance?.externalCli) return;
+      if (draftInstance.externalCli.status === 'exited') return;
+      draftInstance.externalCli.status = 'waiting';
+      draftInstance.state.unread = true;
+    });
+
+    this.notificationEventHandler?.('question', agentId);
+  }
+
   /** Kill the PTY and clean up session state. */
   public handleCloseTerminal(terminalId: string): void {
     const session = this.sessions.get(terminalId);
@@ -918,6 +1048,9 @@ export class TerminalService extends DisposableService {
     this.outputBuffers.delete(terminalId);
     this.outputBaseOffsets.delete(terminalId);
     this.outputEndOffsets.delete(terminalId);
+    if (session.owner.type === 'agent') {
+      this.agentTerminalIds.delete(session.owner.agentInstanceId);
+    }
 
     // Only remove the tab from Karton state and clean up PTY resources.
     // Active-tab selection is NOT our concern — the caller
@@ -925,16 +1058,26 @@ export class TerminalService extends DisposableService {
     // handleSwitchTab after we return.  This keeps all active-tab logic
     // centralized in one service.
     this.uiKarton.setState((draft) => {
-      delete draft.contentTabs.tabs[terminalId];
-      draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
-        (id) => id !== terminalId,
-      );
-      for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
-        draft.contentTabs.agentOrders[agentId] = draft.contentTabs.agentOrders[
-          agentId
-        ]!.filter((id) => id !== terminalId);
-        if (draft.contentTabs.agentOrders[agentId]!.length === 0) {
-          delete draft.contentTabs.agentOrders[agentId];
+      if (session.owner.type === 'content-tab') {
+        delete draft.contentTabs.tabs[terminalId];
+        draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
+          (id) => id !== terminalId,
+        );
+        for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
+          draft.contentTabs.agentOrders[agentId] =
+            draft.contentTabs.agentOrders[agentId]!.filter(
+              (id) => id !== terminalId,
+            );
+          if (draft.contentTabs.agentOrders[agentId]!.length === 0) {
+            delete draft.contentTabs.agentOrders[agentId];
+          }
+        }
+      }
+      if (session.owner.type === 'agent') {
+        const instance = draft.agents.instances[session.owner.agentInstanceId];
+        if (instance?.externalCli?.terminalId === terminalId) {
+          instance.externalCli.terminalId = null;
+          instance.externalCli.status = 'exited';
         }
       }
       delete draft.terminals.outputBuffers[terminalId];
@@ -954,32 +1097,47 @@ export class TerminalService extends DisposableService {
     this.outputBuffers.delete(terminalId);
     this.outputBaseOffsets.delete(terminalId);
     this.outputEndOffsets.delete(terminalId);
+    if (session.owner.type === 'agent') {
+      this.agentTerminalIds.delete(session.owner.agentInstanceId);
+    }
 
     if (this.tearingDown) return;
 
     this.uiKarton.setState((draft) => {
-      delete draft.contentTabs.tabs[terminalId];
-      draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
-        (id) => id !== terminalId,
-      );
-      for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
-        draft.contentTabs.agentOrders[agentId] = draft.contentTabs.agentOrders[
-          agentId
-        ]!.filter((id) => id !== terminalId);
-        if (draft.contentTabs.agentOrders[agentId]!.length === 0) {
-          delete draft.contentTabs.agentOrders[agentId];
+      if (session.owner.type === 'content-tab') {
+        delete draft.contentTabs.tabs[terminalId];
+        draft.contentTabs.globalOrder = draft.contentTabs.globalOrder.filter(
+          (id) => id !== terminalId,
+        );
+        for (const agentId of Object.keys(draft.contentTabs.agentOrders)) {
+          draft.contentTabs.agentOrders[agentId] =
+            draft.contentTabs.agentOrders[agentId]!.filter(
+              (id) => id !== terminalId,
+            );
+          if (draft.contentTabs.agentOrders[agentId]!.length === 0) {
+            delete draft.contentTabs.agentOrders[agentId];
+          }
+        }
+      }
+      if (session.owner.type === 'agent') {
+        const instance = draft.agents.instances[session.owner.agentInstanceId];
+        if (instance?.externalCli?.terminalId === terminalId) {
+          instance.externalCli.terminalId = null;
+          instance.externalCli.status = 'exited';
         }
       }
       delete draft.terminals.outputBuffers[terminalId];
       delete draft.terminals.outputBufferOffsets[terminalId];
     });
 
-    // The PTY exited asynchronously — WindowLayoutService had no part
-    // in this.  Fire onTerminalTabRemoved so it can pick a new active
-    // tab (via handleTerminalTabExited) and persist the changed state.
-    // We must NOT set activeTabId ourselves — that would bypass the
-    // Electron view management in handleSwitchTab.
-    this.onTerminalTabRemoved?.(terminalId);
+    if (session.owner.type === 'content-tab') {
+      // The PTY exited asynchronously — WindowLayoutService had no part
+      // in this.  Fire onTerminalTabRemoved so it can pick a new active
+      // tab (via handleTerminalTabExited) and persist the changed state.
+      // We must NOT set activeTabId ourselves — that would bypass the
+      // Electron view management in handleSwitchTab.
+      this.onTerminalTabRemoved?.(terminalId);
+    }
   }
 
   private handleTerminalInput(terminalId: string, data: string): void {

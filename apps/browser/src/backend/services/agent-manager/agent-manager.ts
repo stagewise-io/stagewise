@@ -3,9 +3,11 @@ import type {
   AgentManagerToolboxPort,
   AgentNotificationEvent,
   AgentStore,
-  CommandRegistry,
   CommandName,
   CommandContext,
+  CommandRegistry,
+  CreateExternalCliAgentInput,
+  ExternalCliAgentKind,
 } from '@stagewise/agent-core';
 import { AgentManager } from '@stagewise/agent-core';
 import type { AgentHost } from '@stagewise/agent-core/host';
@@ -27,6 +29,8 @@ import { renderBrowserExtraMention } from '@/agents/shared/base-agent/utils';
 
 const AGENT_RPC_COMMANDS = [
   'agents.create',
+  'agents.getExternalCliAgentAvailability',
+  'agents.createExternalCliAgent',
   'agents.resume',
   'agents.sendUserMessage',
   'agents.interruptQuestionWithMessage',
@@ -56,6 +60,7 @@ export class AgentManagerService extends DisposableService {
   private readonly manager: AgentManager;
   private readonly commandRegistry: CommandRegistry;
   private readonly karton: KartonService;
+  private readonly toolbox: AgentManagerToolboxPort & BaseAgentToolboxView;
 
   public constructor(
     karton: KartonService,
@@ -84,6 +89,7 @@ export class AgentManagerService extends DisposableService {
     super();
     this.commandRegistry = commandRegistry;
     this.karton = karton;
+    this.toolbox = toolbox;
     this.manager = new AgentManager({
       host: agentCoreHost,
       commandRegistry,
@@ -150,6 +156,44 @@ export class AgentManagerService extends DisposableService {
   }
 
   private registerKartonForwarders(): void {
+    this.commandRegistry.registerCommand<[], unknown>(
+      'agents.getExternalCliAgentAvailability',
+      async () => {
+        if (!this.toolbox.getExternalCliAgentAvailability) {
+          throw new Error('External CLI agents are not supported by this host');
+        }
+        return await this.toolbox.getExternalCliAgentAvailability();
+      },
+    );
+
+    this.commandRegistry.registerCommand<
+      [ExternalCliAgentKind, CreateExternalCliAgentInput],
+      string
+    >(
+      'agents.createExternalCliAgent',
+      async (_ctx: CommandContext, [kind, input]) => {
+        if (!this.toolbox.getExternalCliAgentAvailability) {
+          throw new Error('External CLI agents are not supported by this host');
+        }
+        if (!this.toolbox.createExternalCliAgent) {
+          throw new Error('External CLI agents are not supported by this host');
+        }
+
+        const availability =
+          await this.toolbox.getExternalCliAgentAvailability();
+        const executable = availability[kind];
+        if (!executable?.available || !executable.executablePath) {
+          throw new Error(`${kind} executable not found on PATH`);
+        }
+
+        return await this.toolbox.createExternalCliAgent(
+          kind,
+          input,
+          executable.executablePath,
+        );
+      },
+    );
+
     for (const name of AGENT_RPC_COMMANDS) {
       this.karton.registerServerProcedureHandler(
         name as any,

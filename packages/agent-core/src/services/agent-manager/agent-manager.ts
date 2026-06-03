@@ -25,6 +25,7 @@ import {
   type AgentMessage,
   type AgentState,
   AgentTypes,
+  type ExternalCliAgentInstanceConfig,
 } from '../../types/agent';
 import {
   DEFAULT_TOOL_APPROVAL_MODE,
@@ -1168,6 +1169,16 @@ export class AgentManager extends DisposableService {
       return this.activeAgents.get(instanceId);
     }
 
+    const runtimeAgent = this.agentStore.get().agents.instances[instanceId];
+    if (
+      runtimeAgent?.externalCli?.terminalId &&
+      (runtimeAgent.type === AgentTypes.CLAUDE ||
+        runtimeAgent.type === AgentTypes.CODEX) &&
+      this.managerToolbox.isExternalCliAgentRunning?.(instanceId)
+    ) {
+      return instanceId;
+    }
+
     this.logger.debug(`[AgentManager] Resuming agent. ID: ${instanceId}`);
 
     const agent =
@@ -1180,6 +1191,35 @@ export class AgentManager extends DisposableService {
     if (agent.parentAgentInstanceId) {
       throw new Error(
         `Agent with instance id ${instanceId} is a sub-agent and cannot be resumed`,
+      );
+    }
+
+    if (agent.type === AgentTypes.CLAUDE || agent.type === AgentTypes.CODEX) {
+      if (!this.managerToolbox.getExternalCliAgentAvailability) {
+        throw new Error('External CLI agents are not supported by this host');
+      }
+      if (!this.managerToolbox.createExternalCliAgent) {
+        throw new Error('External CLI agents are not supported by this host');
+      }
+
+      const config = agent.instanceConfig as ExternalCliAgentInstanceConfig;
+      const availability =
+        await this.managerToolbox.getExternalCliAgentAvailability();
+      const executable = availability[config.kind];
+      const executablePath = executable.executablePath ?? config.executablePath;
+      if (!executable.available || !executablePath) {
+        throw new Error(`${config.kind} executable not found on PATH`);
+      }
+
+      return await this.managerToolbox.createExternalCliAgent(
+        config.kind,
+        {
+          workspacePath: config.workspacePath,
+          workspaceAction: config.workspaceAction,
+          title: agent.title,
+        },
+        executablePath,
+        instanceId,
       );
     }
 
@@ -1302,8 +1342,13 @@ export class AgentManager extends DisposableService {
       await this.deleteAgent(childAgentInstanceId);
     }
 
-    // Archive this agent (stops it, tears down resources, removes from active state)
-    await this.archiveAgent(instanceId);
+    if (agentType === AgentTypes.CLAUDE || agentType === AgentTypes.CODEX) {
+      this.managerToolbox.closeAgentTerminal?.(instanceId);
+      deleteAgentInstance(this.agentStore, instanceId);
+    } else {
+      // Archive this agent (stops it, tears down resources, removes from active state)
+      await this.archiveAgent(instanceId);
+    }
 
     // Clear the agent from the persistence layer
     await this.persistenceDb.deleteAgentInstance(instanceId);
@@ -1328,6 +1373,14 @@ export class AgentManager extends DisposableService {
     const agent = this.activeAgents.get(instanceId);
 
     if (!agent) {
+      const instance = this.agentStore.get().agents.instances[instanceId];
+      if (
+        instance?.type === AgentTypes.CLAUDE ||
+        instance?.type === AgentTypes.CODEX
+      ) {
+        this.managerToolbox.closeAgentTerminal?.(instanceId);
+        deleteAgentInstance(this.agentStore, instanceId);
+      }
       return;
     }
 

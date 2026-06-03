@@ -67,6 +67,10 @@ import type {
   AgentHistoryEntry,
   AgentMessage,
   StoredAgentPreview,
+  ExternalCliAgentAvailability,
+  ExternalCliAgentKind,
+  CreateExternalCliAgentInput,
+  ExternalCliAgentRuntimeState,
 } from './agent';
 
 export type { WorkspaceGitSummary } from '@stagewise/agent-core/types/metadata';
@@ -758,6 +762,7 @@ export type AppState = {
         allowUserInput: boolean;
         parentAgentInstanceId: string | null;
         state: AgentState;
+        externalCli?: ExternalCliAgentRuntimeState;
       };
     };
   };
@@ -1001,6 +1006,11 @@ export type KartonContract = {
         toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,
+      ) => Promise<string>;
+      getExternalCliAgentAvailability: () => Promise<ExternalCliAgentAvailability>;
+      createExternalCliAgent: (
+        kind: ExternalCliAgentKind,
+        input: CreateExternalCliAgentInput,
       ) => Promise<string>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
