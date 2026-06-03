@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
+import { Select } from '@stagewise/stage-ui/components/select';
 import { Slider } from '@stagewise/stage-ui/components/slider';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import {
   PERSONALIZATION_THEMES,
   getPersonalizationTheme,
 } from '@shared/personalization-themes';
-import type { PersonalizationThemeId } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  AppColorScheme,
+  PersonalizationThemeId,
+} from '@shared/karton-contracts/ui/shared-types';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { applyPersonalizationThemeToRoot } from '@ui/components/personalization-theme-syncer';
 import { produceWithPatches, enablePatches } from 'immer';
@@ -51,38 +55,62 @@ function UiSizeSetting() {
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
   const uiZoomPercentage = preferences.general.uiZoomPercentage;
+  const [localUiZoomPercentage, setLocalUiZoomPercentage] =
+    useState(uiZoomPercentage);
+  const commitTimeoutRef = useRef<number | undefined>(undefined);
 
-  const handleUiSizeChange = async (value: number) => {
+  useEffect(() => {
+    setLocalUiZoomPercentage(uiZoomPercentage);
+  }, [uiZoomPercentage]);
+
+  useEffect(() => {
+    return () => {
+      if (commitTimeoutRef.current !== undefined) {
+        window.clearTimeout(commitTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const commitUiSizeChange = (value: number) => {
     const nextValue = Math.max(70, Math.min(130, Math.round(value)));
-    const [, patches] = produceWithPatches(preferences, (draft) => {
-      draft.general.uiZoomPercentage = nextValue;
-    });
-    await updatePreferences(patches);
+
+    if (commitTimeoutRef.current !== undefined) {
+      window.clearTimeout(commitTimeoutRef.current);
+    }
+
+    commitTimeoutRef.current = window.setTimeout(async () => {
+      commitTimeoutRef.current = undefined;
+
+      if (nextValue === preferences.general.uiZoomPercentage) {
+        return;
+      }
+
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.general.uiZoomPercentage = nextValue;
+      });
+      await updatePreferences(patches);
+    }, 10);
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-medium text-base text-foreground">UI size</h3>
-          <p className="text-muted-foreground text-sm">
-            Scale the stagewise interface independently from web page zoom.
-          </p>
-        </div>
-        <span className="shrink-0 rounded-md bg-surface-1 px-2 py-1 font-medium text-foreground text-sm">
-          {uiZoomPercentage}%
-        </span>
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h3 className="font-medium text-base text-foreground">UI size</h3>
+        <p className="text-muted-foreground text-sm">
+          Scale the stagewise interface independently from web page zoom.
+        </p>
       </div>
 
-      <div className="w-full max-w-sm space-y-1 pl-2">
+      <div className="w-36 space-y-1">
         <Slider
-          value={uiZoomPercentage}
+          value={localUiZoomPercentage}
           min={70}
           max={130}
           step={5}
           ariaLabel="UI size"
           thickness="default"
-          onValueChange={handleUiSizeChange}
+          onValueChange={setLocalUiZoomPercentage}
+          onValueCommitted={commitUiSizeChange}
         />
         <div className="flex justify-between text-[11px] text-muted-foreground">
           <span>Small</span>
@@ -222,6 +250,60 @@ function ThemeBadge({
   );
 }
 
+const APP_COLOR_SCHEME_ITEMS: {
+  value: AppColorScheme;
+  label: string;
+}[] = [
+  {
+    value: 'system',
+    label: 'System',
+  },
+  {
+    value: 'light',
+    label: 'Light',
+  },
+  {
+    value: 'dark',
+    label: 'Dark',
+  },
+];
+
+function AppColorSchemeSetting() {
+  const appColorScheme = useKartonState(
+    (s) => s.globalConfig.appColorScheme ?? 'system',
+  );
+  const setGlobalConfig = useKartonProcedure((p) => p.config.set);
+
+  const handleAppColorSchemeChange = async (value: AppColorScheme) => {
+    await setGlobalConfig({ appColorScheme: value });
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h3 className="font-medium text-base text-foreground">Appearance</h3>
+        <p className="text-muted-foreground text-sm">
+          Choose whether stagewise follows your system appearance or always uses
+          light or dark mode.
+        </p>
+      </div>
+
+      <Select
+        value={appColorScheme}
+        onValueChange={(value) =>
+          handleAppColorSchemeChange(value as AppColorScheme)
+        }
+        items={APP_COLOR_SCHEME_ITEMS}
+        triggerVariant="secondary"
+        size="xs"
+        triggerClassName="w-auto min-w-32 px-2 py-3"
+        side="bottom"
+        align="end"
+      />
+    </div>
+  );
+}
+
 function ThemeSetting() {
   const persistedThemeId = useKartonState(
     (s) => s.globalConfig.personalizationThemeId,
@@ -294,10 +376,9 @@ function ThemeSetting() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-medium text-base text-foreground">Theme colors</h3>
+        <h3 className="font-medium text-base text-foreground">Color scheme</h3>
         <p className="text-muted-foreground text-sm">
-          Choose a predefined color system. Theme changes transition smoothly
-          across surfaces, text, and controls.
+          Adapt the color style of your stagewise setup to your liking.
         </p>
       </div>
 
@@ -340,12 +421,7 @@ export function PersonalizationSettingsSection() {
           </div>
 
           <section className="space-y-6">
-            <UiSizeSetting />
-          </section>
-
-          <hr className="border-derived-subtle border-t" />
-
-          <section className="space-y-6">
+            <AppColorSchemeSetting />
             <ThemeSetting />
           </section>
 
@@ -353,6 +429,12 @@ export function PersonalizationSettingsSection() {
 
           <section className="space-y-6">
             <NotificationsSetting />
+          </section>
+
+          <hr className="border-derived-subtle border-t" />
+
+          <section className="space-y-6">
+            <UiSizeSetting />
           </section>
         </div>
       </OverlayScrollbar>

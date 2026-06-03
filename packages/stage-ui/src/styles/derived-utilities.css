@@ -49,8 +49,7 @@
   --border-derived-strong-c: -0.010;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+:root.dark {
     --hover-text-derived-l: 0.09;
     --hover-text-derived-c: 0.01;
 
@@ -79,7 +78,6 @@
     --border-derived-strong-l: 0.1;
     --border-derived-strong-c: 0.018;
 
-  }
 }
 
 /* Border utilities */

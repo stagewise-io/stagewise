@@ -75,8 +75,7 @@
 /* --------------------------------------------------------------------------
    Dark mode
    -------------------------------------------------------------------------- */
-@media (prefers-color-scheme: dark) {
-  :root {
+:root.dark {
     --example-syntax-editor-foreground: none; /* not defined in theme */
     --example-syntax-editor-background: none; /* not defined in theme */
     --example-syntax-bracket-highlight-foreground1: none; /* not defined in theme */
@@ -140,5 +139,4 @@
     --example-syntax-language-variable-style: none; /* not defined in theme */
     --example-syntax-variable-parameter-style: none; /* not defined in theme */
     --example-syntax-jsx-attribute-style: none; /* not defined in theme */
-  }
 }

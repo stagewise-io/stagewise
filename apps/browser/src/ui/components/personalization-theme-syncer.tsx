@@ -90,6 +90,16 @@ export function applyPersonalizationThemeToRoot(
 
 export function PersonalizationThemeSyncer() {
   const themeId = useKartonState((s) => s.globalConfig.personalizationThemeId);
+  const systemTheme = useKartonState((s) => s.systemTheme);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    document.documentElement.classList.toggle('dark', systemTheme === 'dark');
+    window.requestAnimationFrame(syncThemeColorsToMain);
+  }, [systemTheme]);
 
   useLayoutEffect(() => {
     applyPersonalizationThemeToRoot(themeId);

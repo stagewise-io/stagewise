@@ -180,7 +180,7 @@ export function PerTerminalContent({
 
   const getTheme = () => {
     const styles = getComputedStyle(document.documentElement);
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = document.documentElement.classList.contains('dark');
     const bg = styles.getPropertyValue('--color-background').trim();
     const fg = styles.getPropertyValue('--color-foreground').trim();
 
@@ -353,16 +353,13 @@ export function PerTerminalContent({
     };
   }, [terminalId, markTerminalFocused, focusTerminalIfReady]);
 
+  const systemTheme = useKartonState((s) => s.systemTheme);
+
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      if (terminalRef.current) {
-        terminalRef.current.options.theme = getTheme();
-      }
-    };
-    mq.addEventListener('change', handleChange);
-    return () => mq.removeEventListener('change', handleChange);
-  }, []);
+    if (terminalRef.current) {
+      terminalRef.current.options.theme = getTheme();
+    }
+  }, [systemTheme]);
 
   useEffect(() => {
     const term = terminalRef.current;

@@ -2030,6 +2030,7 @@ export const defaultState: KartonContract['state'] = {
     dockBounceEnabled: true,
     blockAppSuspensionWhenAgentsActive: true,
     personalizationThemeId: 'default',
+    appColorScheme: 'system',
   },
   userExperience: {
     storedExperienceData: {

@@ -69,7 +69,7 @@ function getComputedThemeColor(varName: string): string {
  * Check if the current color scheme is dark mode.
  */
 function isDarkMode(): boolean {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return document.documentElement.classList.contains('dark');
 }
 
 /**
@@ -118,12 +118,6 @@ export function initThemeColorSync(): void {
   setTimeout(() => {
     syncThemeColorsToMain();
   }, 100);
-
-  // Listen for color scheme changes
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  mediaQuery.addEventListener('change', () => {
-    syncThemeColorsToMain();
-  });
 
   // Hook into Vite HMR for CSS updates
   if (import.meta.hot) {
