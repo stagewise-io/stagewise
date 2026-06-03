@@ -110,6 +110,7 @@ Theme tokens are defined in [`theme.css`](./src/styles/theme.css) and automatica
 | `--color-foreground` | Primary readable text |
 | `--color-muted-foreground` | Secondary/less important text |
 | `--color-subtle-foreground` | Hints, placeholders, disabled text |
+| `--color-sidebar-foreground` | Sidebar-only secondary/label text. Between `subtle` and `muted` (leans muted) for legibility on the blurred sidebar surface |
 | `--color-primary-foreground` | Accent text (links, highlights) |
 | `--color-solid-foreground` | Text on solid/primary backgrounds |
 

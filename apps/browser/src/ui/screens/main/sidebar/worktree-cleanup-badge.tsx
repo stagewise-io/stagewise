@@ -91,15 +91,15 @@ export function WorktreeCleanupBadge() {
               <span className="min-w-0 truncate font-medium text-foreground">
                 {candidate.branch ?? getBaseName(candidate.path)}
               </span>
-              <span className="shrink-0 text-subtle-foreground">
+              <span className="shrink-0 text-sidebar-foreground">
                 merged into {candidate.mergedInto}
               </span>
-              <span className="ml-auto shrink-0 text-subtle-foreground">
+              <span className="ml-auto shrink-0 text-sidebar-foreground">
                 {formatLastUsedAge(candidate.lastUsedAt)}
               </span>
             </div>
             <div
-              className="mt-0.5 truncate text-[0.68rem] text-subtle-foreground"
+              className="mt-0.5 truncate text-[0.68rem] text-sidebar-foreground"
               title={candidate.path}
             >
               {candidate.path}

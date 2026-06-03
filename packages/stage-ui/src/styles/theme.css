@@ -8,6 +8,15 @@
   --color-foreground: var(--color-base-900);
   --color-muted-foreground: var(--color-base-500);
   --color-subtle-foreground: var(--color-base-350);
+  /* Sidebar-only text color. Sits between `subtle` and `muted`, leaning
+     toward `muted`, so secondary/label text stays legible on the slightly
+     blurred sidebar surface (notably in dark mode). Defined via color-mix on
+     the mode-aware tokens, so it auto-adapts to light/dark with no override. */
+  --color-sidebar-foreground: color-mix(
+    in oklch,
+    var(--color-muted-foreground) 70%,
+    var(--color-subtle-foreground)
+  );
 
   --color-surface-1: var(--color-base-100);
   --color-surface-2: var(--color-base-150);
