@@ -38,6 +38,11 @@ function toNativeAnthropicModelId(modelId: string): string {
   return modelId.replace(/\./g, '-');
 }
 
+function toNativeMiniMaxModelId(modelId: string): string {
+  if (modelId === 'minimax-m3') return 'MiniMax-M3';
+  return modelId;
+}
+
 /**
  * Middleware that tells the SDK all HTTP(S) URLs are natively supported by the
  * stagewise gateway. Without this the SDK downloads every image/file URL and
@@ -400,9 +405,13 @@ export class ModelProviderService {
         'amazon-bedrock',
         'google-vertex',
       ]);
+      const defaultModelId =
+        officialProvider === 'minimax'
+          ? toNativeMiniMaxModelId(modelSettings.modelId)
+          : modelSettings.modelId;
       const remappedModelId =
         resolved.customEndpoint.modelIdMapping?.[modelSettings.modelId] ??
-        modelSettings.modelId;
+        defaultModelId;
       if (
         incompatibleSpecs.has(resolved.customEndpoint.apiSpec) &&
         remappedModelId === modelSettings.modelId
@@ -601,7 +610,7 @@ export class ModelProviderService {
         return {
           model: this.telemetryService.withTracing(
             // MiniMax's OpenAI-compatible endpoint speaks Chat Completions.
-            p.chat(modelId as any),
+            p.chat(toNativeMiniMaxModelId(modelId) as any),
             posthogConfig,
           ),
           headers,

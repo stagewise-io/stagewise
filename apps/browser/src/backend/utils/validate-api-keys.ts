@@ -1,7 +1,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import { generateText, type ModelMessage } from 'ai';
 
 export type ApiKeyProvider =
   | 'anthropic'
@@ -25,12 +25,18 @@ export type ApiKeyValidationResults = Record<
 
 export type ApiKeysInput = Partial<Record<ApiKeyProvider, string>>;
 
+type ValidationModel = Parameters<typeof generateText>[0]['model'];
+
+const validationMessages: ModelMessage[] = [
+  {
+    role: 'user',
+    content: 'What is the capital of France? Respond with one word.',
+  },
+];
+
 const providerConfigs: Record<
   ApiKeyProvider,
-  (
-    apiKey: string,
-    baseURL?: string,
-  ) => Parameters<typeof generateText>[0]['model']
+  (apiKey: string, baseURL?: string) => ValidationModel
 > = {
   anthropic: (apiKey, baseURL) =>
     createAnthropic({ apiKey, baseURL })('claude-haiku-4-5'),
@@ -70,6 +76,39 @@ const providerConfigs: Record<
     }).chat('minimax-m2.7'),
 };
 
+async function validateModel(model: ValidationModel): Promise<void> {
+  await generateText({
+    model,
+    messages: validationMessages,
+  });
+}
+
+async function validateMiniMaxApiKey(
+  apiKey: string,
+  baseURL?: string,
+): Promise<ApiKeyValidationResult> {
+  const provider = createOpenAI({
+    apiKey,
+    baseURL: baseURL ?? 'https://api.minimax.io/v1',
+  });
+  const models = [provider.chat('minimax-m2.7'), provider.chat('MiniMax-M3')];
+  const errors: string[] = [];
+
+  for (const model of models) {
+    try {
+      await validateModel(model);
+      return { success: true };
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return {
+    success: false,
+    error: `Invalid minimax provider key: ${errors.join(' | ')}`,
+  };
+}
+
 /**
  * Validate API keys by making a lightweight test request to each provider.
  * Keys that are empty/undefined are skipped (result stays `null`).
@@ -98,26 +137,21 @@ export async function validateApiKeys(
     if (!apiKey) continue;
     const k = provider as ApiKeyProvider;
     if (!providerConfigs[k]) continue;
-    const model = providerConfigs[k](apiKey, baseUrl);
-
-    const p = generateText({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: 'What is the capital of France? Respond with one word.',
-        },
-      ],
-    })
-      .then(() => {
-        results[k] = { success: true };
-      })
-      .catch((err) => {
-        results[k] = {
-          success: false,
-          error: `Invalid ${k} provider key: ${err instanceof Error ? err.message : String(err)}`,
-        };
-      });
+    const p =
+      k === 'minimax'
+        ? validateMiniMaxApiKey(apiKey, baseUrl).then((result) => {
+            results[k] = result;
+          })
+        : validateModel(providerConfigs[k](apiKey, baseUrl))
+            .then(() => {
+              results[k] = { success: true };
+            })
+            .catch((err) => {
+              results[k] = {
+                success: false,
+                error: `Invalid ${k} provider key: ${err instanceof Error ? err.message : String(err)}`,
+              };
+            });
 
     promises.push(p);
   }

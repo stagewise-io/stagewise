@@ -107,6 +107,22 @@ const GEMINI35_INPUT_CONSTRAINTS: InputConstraints = {
   },
 };
 
+const MINIMAX_M3_INPUT_CONSTRAINTS: InputConstraints = {
+  image: {
+    mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxBytes: 10_485_760, // 10 MB per image
+  },
+  video: {
+    mimeTypes: [
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-matroska',
+    ],
+    maxBytes: 52_428_800, // 50 MB inline video input
+  },
+};
+
 export const availableModels = [
   // Anthropic Models
   {
@@ -1050,6 +1066,45 @@ export const availableModels = [
         ...GOOGLE_INPUT_CONSTRAINTS,
         file: undefined,
       },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'minimax',
+    modelId: 'minimax-m3',
+    modelDisplayName: 'MiniMax M3',
+    modelDescription:
+      'Frontier multimodal coding model with strong agentic reasoning, tool use, and long-context performance.',
+    modelContext: '1M context',
+    modelContextRaw: 1_000_000,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.3,
+      outputPerMillion: 1.2,
+      relativeMultiplier: 0.25,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: true,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: MINIMAX_M3_INPUT_CONSTRAINTS,
       toolCalling: true,
     },
   },
