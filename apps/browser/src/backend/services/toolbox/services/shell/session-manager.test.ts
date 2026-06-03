@@ -845,6 +845,7 @@ describe('shell integration scripts', () => {
     // (tied to the $PATH array). The encoder must use `${p:$i:1}` on a
     // plain local var `p`.
     expect(ZSH_INTEGRATION).toContain('local p="$1"');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: This is expected
     expect(ZSH_INTEGRATION).toContain('${p:$i:1}');
     expect(ZSH_INTEGRATION).not.toContain('local path=');
     expect(ZSH_INTEGRATION).not.toMatch(/\$\{path:i:1\}/);
