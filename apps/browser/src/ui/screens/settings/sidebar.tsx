@@ -3,7 +3,10 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { cn } from '@ui/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useUiZoomCounterScale } from '@ui/hooks/use-ui-zoom-counter-scale';
-import { TITLEBAR_HEIGHT } from '@shared/titlebar';
+import {
+  TITLEBAR_HEIGHT,
+  TITLEBAR_ICON_OPTICAL_OFFSET,
+} from '@shared/titlebar';
 import { SidebarTitlebarRow } from '../main/_components/sidebar-titlebar-row';
 import {
   SETTINGS_NAV_GROUPS,
@@ -14,6 +17,7 @@ import type { SettingsRootSection } from './settings-route';
 
 export function SettingsSidebar() {
   const counterScale = useUiZoomCounterScale();
+  const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const activeRoute = useKartonState((s) => s.appScreen.settingsRoute);
   const setSettingsRoute = useKartonProcedure(
     (p) => p.appScreen.setSettingsRoute,
@@ -35,6 +39,9 @@ export function SettingsSidebar() {
             variant="ghost"
             size="sm"
             className="app-no-drag shrink-0 px-1.5"
+            style={
+              isMacOs ? { marginTop: TITLEBAR_ICON_OPTICAL_OFFSET } : undefined
+            }
             onClick={() => closeSettings()}
           >
             ← Back
@@ -61,10 +68,10 @@ export function SettingsSidebar() {
                     key={item.section}
                     type="button"
                     className={cn(
-                      'app-no-drag flex h-8 w-full flex-row items-center gap-2 rounded-lg px-1.5 text-left text-sm transition-colors',
+                      'app-no-drag flex h-8 w-full cursor-pointer flex-row items-center gap-2 rounded-lg px-1.5 text-left text-sm transition-colors',
                       active
                         ? 'bg-foreground/5 text-foreground'
-                        : 'text-muted-foreground hover:bg-foreground/8',
+                        : 'text-muted-foreground hover:bg-foreground/8 hover:text-foreground',
                     )}
                     onClick={() => handleSelectSection(item.section)}
                   >
