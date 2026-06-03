@@ -11,7 +11,7 @@
     "generate:theme-colors": "tsx src/generate-theme-colors.ts"
   },
   "peerDependencies": {
-    "react": "^19.1.0",
+    "react": "^19.2.7",
     "react-dom": "^19.1.0"
   },
   "dependencies": {
@@ -42,7 +42,7 @@
     "@turbo/gen": "^2.9.12",
     "@types/culori": "^4.0.1",
     "@types/node": "22.15.2",
-    "@types/react": "19.2.14",
+    "@types/react": "19.2.16",
     "@types/react-dom": "19.2.3",
     "concurrently": "^9.2.1",
     "culori": "^4.0.2",
@@ -51,7 +51,7 @@
     "nodemon": "^3.1.14",
     "postcss": "^8.5.14",
     "postcss-cli": "^11.0.1",
-    "react": "^19.1.0",
+    "react": "^19.2.7",
     "react-dom": "^19.1.0",
     "sonner": "^2.0.7",
     "tailwindcss": "^4.3.0",
