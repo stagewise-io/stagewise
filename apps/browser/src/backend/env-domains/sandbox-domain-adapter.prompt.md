@@ -1,8 +1,8 @@
 ## Persistent JavaScript Sandbox (`executeSandboxJs`)
 
-Isolated Node.js VM running in a **separate worker process** — not inside any browser tab. No direct Web APIs (`document`, `window` unavailable). Browser interaction requires CDP (`API.sendCDP`). Data and functions stored on `globalThis` persist across calls and messages. Scripts run inside an async IIFE.
+Isolated Node.js VM running in a **separate worker process**. No direct Web APIs (`document`, `window` unavailable). Page interaction, when needed, uses CDP (`API.sendCDP`). Data and functions stored on `globalThis` persist across calls and messages. Scripts run inside an async IIFE.
 
-- **Use for:** browser/CDP tasks, processing dynamically fetched or computed content, mini-app scaffolding, and complex async workflows.
+- **Use for:** CDP tasks, processing dynamically fetched or computed content, Mini-app scaffolding, and complex async workflows.
 - **Do NOT use for:** reading, writing, searching, or modifying files — those operations are fully covered by native tools (`read`, `write`, `multiEdit`, `ls`, `glob`, `grepSearch`, `copy`, `delete`). Reaching for the sandbox when a native tool exists is always wrong.
 
 ### Output
@@ -12,14 +12,14 @@ The sandbox has exactly **two output channels** — everything else (including `
 1. **`API.output(data)`** — text/JSON streamed to the chat in real time. Can be called multiple times; outputs appear in order. The script's **`return` value** is appended as the final output.
 2. **`API.createAttachment(fileName, data)`** — binary/multimodal output. Saved files are **automatically injected as visual content** (images, PDFs, etc.) the agent can see on the next step. Use for screenshots, generated images, or any file the agent needs to inspect visually.
 
-**`console.log()` and all other console methods are silently lost.** Output goes to an internal worker process stdout that is invisible to both user and agent. Never use console methods for output. After sandbox execution, do **NOT** read console logs from browser tabs — the sandbox does not execute in any tab.
+**`console.log()` and all other console methods are silently lost.** Output goes to an internal worker process stdout that is invisible to both user and agent. Never use console methods for output. After sandbox execution, do **NOT** read page console logs — sandbox code does not execute in any page context.
 
 ### Core API
 
 | Method | Purpose |
 |--------|---------|
 | `API.output(data: any): void` | Emit visible output (also resets inactivity timer) |
-| `API.sendCDP(tabId, method, params?): Promise<any>` | Send CDP command to a browser tab |
+| `API.sendCDP(tabId, method, params?): Promise<any>` | Send a CDP command to a page target |
 | `API.createAttachment(fileName, data): Promise<string>` | Save file to `att/`, returns obfuscated name |
 | `API.openApp(appId, opts?): Promise<void>` | Open mini-app in sidebar |
 | `API.getCredential(typeId): Promise<Record<string, string> \| null>` | Retrieve stored credential |
