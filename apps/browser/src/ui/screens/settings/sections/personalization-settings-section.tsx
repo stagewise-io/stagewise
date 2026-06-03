@@ -65,27 +65,42 @@ function baseColor(
   lightness: number,
   chroma: number,
   themeId: PersonalizationThemeId,
+  alpha?: number,
 ) {
   const theme = getPersonalizationTheme(themeId);
   return `oklch(${lightness} ${chroma * theme.baseChromaScale} ${
     theme.baseHue
-  })`;
+  }${alpha === undefined ? '' : ` / ${alpha}`})`;
 }
 
 function primaryColor(
   lightness: number,
   chroma: number,
   themeId: PersonalizationThemeId,
+  alpha?: number,
 ) {
   const theme = getPersonalizationTheme(themeId);
   return `oklch(${lightness} ${chroma * theme.primaryChromaScale} ${
     theme.primaryHue
-  })`;
+  }${alpha === undefined ? '' : ` / ${alpha}`})`;
 }
 
-function ThemeBadge({ themeId }: { themeId: PersonalizationThemeId }) {
+function ThemeBadge({
+  themeId,
+  name,
+  active,
+}: {
+  themeId: PersonalizationThemeId;
+  name: string;
+  active: boolean;
+}) {
   return (
-    <span className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg ring-1 ring-muted-foreground/10">
+    <span
+      className={cn(
+        'relative flex h-16 w-32 shrink-0 items-start justify-end overflow-hidden rounded-lg p-2 ring-1 ring-muted-foreground/20 transition-opacity',
+        active ? 'opacity-100 ring-foreground/30' : 'opacity-60',
+      )}
+    >
       <span
         className="absolute inset-0 rounded-lg dark:opacity-0"
         style={{
@@ -99,17 +114,35 @@ function ThemeBadge({ themeId }: { themeId: PersonalizationThemeId }) {
         }}
       />
       <span
-        className="relative size-5 rounded-sm dark:opacity-0"
+        className="absolute -bottom-5 -left-5 h-[4.6875rem] w-[5.625rem] rounded-full dark:opacity-0"
         style={{
-          backgroundColor: primaryColor(0.5455, 0.25, themeId),
+          background: `linear-gradient(to bottom left, ${primaryColor(
+            0.49,
+            0.22,
+            themeId,
+          )}, ${primaryColor(0.7, 0.18, themeId)})`,
+          filter: 'blur(12px)',
         }}
       />
       <span
-        className="absolute size-5 rounded-sm opacity-0 dark:opacity-100"
+        className="absolute -bottom-8 -left-10 h-[4.6875rem] w-[5.625rem] rounded-full opacity-0 dark:opacity-100"
         style={{
-          backgroundColor: primaryColor(0.62, 0.23, themeId),
+          background: `linear-gradient(to bottom left, ${primaryColor(
+            0.49,
+            0.22,
+            themeId,
+          )}, ${primaryColor(0.7, 0.18, themeId)})`,
+          filter: 'blur(20px)',
         }}
       />
+      <span
+        className="relative z-10 max-w-20 truncate text-right font-normal text-foreground text-sm"
+        style={{
+          textShadow: `0 0 2px ${baseColor(0.92, 0.002, themeId, 0.5)}`,
+        }}
+      >
+        {name}
+      </span>
     </span>
   );
 }
@@ -120,10 +153,29 @@ function ThemeSetting() {
   );
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
   const latestSaveRequestIdRef = useRef(0);
+  const latestRequestedThemeIdRef = useRef<PersonalizationThemeId | undefined>(
+    undefined,
+  );
   const [currentThemeId, setCurrentThemeId] = useState(persistedThemeId);
+  const currentThemeIdRef = useRef(persistedThemeId);
+
+  const setCurrentTheme = (themeId: PersonalizationThemeId) => {
+    currentThemeIdRef.current = themeId;
+    setCurrentThemeId(themeId);
+  };
 
   useEffect(() => {
-    setCurrentThemeId(persistedThemeId);
+    const latestRequestedThemeId = latestRequestedThemeIdRef.current;
+
+    if (latestRequestedThemeId !== undefined) {
+      if (persistedThemeId !== latestRequestedThemeId) {
+        return;
+      }
+
+      latestRequestedThemeIdRef.current = undefined;
+    }
+
+    setCurrentTheme(persistedThemeId);
   }, [persistedThemeId]);
 
   const handleThemeChange = async (value: unknown) => {
@@ -135,7 +187,7 @@ function ThemeSetting() {
     }
 
     const nextThemeId = value as PersonalizationThemeId;
-    const previousThemeId = currentThemeId;
+    const previousThemeId = currentThemeIdRef.current;
 
     if (nextThemeId === previousThemeId) {
       return;
@@ -143,8 +195,9 @@ function ThemeSetting() {
 
     const saveRequestId = latestSaveRequestIdRef.current + 1;
     latestSaveRequestIdRef.current = saveRequestId;
+    latestRequestedThemeIdRef.current = nextThemeId;
 
-    setCurrentThemeId(nextThemeId);
+    setCurrentTheme(nextThemeId);
     applyPersonalizationThemeToRoot(nextThemeId, { transition: true });
 
     try {
@@ -156,7 +209,8 @@ function ThemeSetting() {
         return;
       }
 
-      setCurrentThemeId(previousThemeId);
+      latestRequestedThemeIdRef.current = undefined;
+      setCurrentTheme(previousThemeId);
       applyPersonalizationThemeToRoot(previousThemeId, { transition: true });
       console.error('Failed to save personalization theme', error);
     }
@@ -179,33 +233,18 @@ function ThemeSetting() {
             <button
               key={theme.id}
               type="button"
-              className={cn(
-                'group flex w-18 flex-col items-center gap-1.5 rounded-lg p-1.5 transition-colors',
-                'hover:bg-hover-derived active:bg-active-derived',
-                active && 'bg-surface-1',
-              )}
+              className="group rounded-lg"
               onClick={() => handleThemeChange(theme.id)}
               aria-checked={active}
               aria-label={`Use ${theme.name} theme`}
               role="radio"
               title={theme.name}
             >
-              <span
-                className={cn(
-                  'rounded-[calc(var(--radius-lg)+1px)] p-px transition-[box-shadow,background-color]',
-                  active && 'bg-primary-solid',
-                )}
-              >
-                <ThemeBadge themeId={theme.id} />
-              </span>
-              <span
-                className={cn(
-                  'max-w-16 truncate text-center text-muted-foreground text-xs',
-                  active && 'font-medium text-foreground',
-                )}
-              >
-                {theme.name}
-              </span>
+              <ThemeBadge
+                themeId={theme.id}
+                name={theme.name}
+                active={active}
+              />
             </button>
           );
         })}
