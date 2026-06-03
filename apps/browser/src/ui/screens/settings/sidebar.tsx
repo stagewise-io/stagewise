@@ -57,7 +57,7 @@ export function SettingsSidebar() {
           {SETTINGS_NAV_GROUPS.map((group, gi) => (
             <div key={gi} className="flex flex-col gap-px pt-4 first:pt-0">
               {group.label && (
-                <div className="shrink-0 px-1.5 pb-1 font-semibold text-subtle-foreground text-xs">
+                <div className="shrink-0 px-1.5 pb-1 font-normal text-sidebar-foreground text-xs">
                   {group.label}
                 </div>
               )}
