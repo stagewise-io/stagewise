@@ -51,8 +51,13 @@ export type GitWorktreeInfo = {
   isMainWorktree: boolean;
 };
 
+export type GitBranchKind = 'local' | 'remote';
+
 export type GitBranchInfo = {
   name: string;
+  kind: GitBranchKind;
+  remoteName?: string;
+  remoteBranchName?: string;
   current: boolean;
   checkedOut: boolean;
   checkedOutPath?: string;
@@ -61,6 +66,7 @@ export type GitBranchInfo = {
 export type GitBranchListResult = {
   current: string | null;
   defaultBranch: string | null;
+  defaultRemoteBranch: string | null;
   branches: GitBranchInfo[];
 };
 

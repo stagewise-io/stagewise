@@ -80,12 +80,22 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
     listBranches: vi.fn(async (workspacePath: string) => ({
       current: 'main',
       defaultBranch: 'main',
+      defaultRemoteBranch: 'origin/main',
       branches: [
         {
           name: 'main',
+          kind: 'local',
           current: true,
           checkedOut: true,
           checkedOutPath: workspacePath,
+        },
+        {
+          name: 'origin/main',
+          kind: 'remote',
+          remoteName: 'origin',
+          remoteBranchName: 'main',
+          current: false,
+          checkedOut: false,
         },
       ],
     })),

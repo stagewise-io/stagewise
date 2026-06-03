@@ -4,6 +4,7 @@ import {
   getBranchSelectItemsFromGit,
   getCurrentBranchValue,
   getDefaultBranchValue,
+  getDefaultSourceBranchValue,
   WORKTREE_NAME_ADJECTIVES,
   WORKTREE_NAME_NOUNS,
 } from './worktree-utils';
@@ -73,7 +74,12 @@ describe('getCurrentBranchValue', () => {
   it('uses the backend current branch when available', () => {
     expect(
       getCurrentBranchValue(
-        { current: 'feature/login', defaultBranch: 'develop', branches: [] },
+        {
+          current: 'feature/login',
+          defaultBranch: 'develop',
+          defaultRemoteBranch: 'origin/develop',
+          branches: [],
+        },
         'develop',
       ),
     ).toBe('feature/login');
@@ -82,7 +88,12 @@ describe('getCurrentBranchValue', () => {
   it('falls back to the mounted git ref when current branch is unavailable', () => {
     expect(
       getCurrentBranchValue(
-        { current: null, defaultBranch: 'main', branches: [] },
+        {
+          current: null,
+          defaultBranch: 'main',
+          defaultRemoteBranch: 'origin/main',
+          branches: [],
+        },
         'develop',
       ),
     ).toBe('develop');
@@ -91,7 +102,12 @@ describe('getCurrentBranchValue', () => {
   it('falls back to the default branch when no current branch or git ref exists', () => {
     expect(
       getCurrentBranchValue(
-        { current: null, defaultBranch: 'develop', branches: [] },
+        {
+          current: null,
+          defaultBranch: 'develop',
+          defaultRemoteBranch: 'origin/develop',
+          branches: [],
+        },
         null,
       ),
     ).toBe('develop');
@@ -109,9 +125,11 @@ describe('getBranchSelectItemsFromGit', () => {
         {
           current: 'detached-ref',
           defaultBranch: 'main',
+          defaultRemoteBranch: 'origin/main',
           branches: [
             {
               name: 'main',
+              kind: 'local',
               current: false,
               checkedOut: false,
             },
@@ -129,9 +147,11 @@ describe('getBranchSelectItemsFromGit', () => {
         {
           current: null,
           defaultBranch: 'main',
+          defaultRemoteBranch: 'origin/main',
           branches: [
             {
               name: 'main',
+              kind: 'local',
               current: false,
               checkedOut: false,
             },
@@ -142,13 +162,110 @@ describe('getBranchSelectItemsFromGit', () => {
       ).map((item) => item.value),
     ).toEqual(['main', 'fallback-ref']);
   });
+
+  it('groups source branches by local and remote name', () => {
+    expect(
+      getBranchSelectItemsFromGit(
+        {
+          current: 'main',
+          defaultBranch: 'main',
+          defaultRemoteBranch: 'origin/main',
+          branches: [
+            {
+              name: 'main',
+              kind: 'local',
+              current: true,
+              checkedOut: true,
+            },
+            {
+              name: 'origin/main',
+              kind: 'remote',
+              remoteName: 'origin',
+              remoteBranchName: 'main',
+              current: false,
+              checkedOut: false,
+            },
+            {
+              name: 'upstream/main',
+              kind: 'remote',
+              remoteName: 'upstream',
+              remoteBranchName: 'main',
+              current: false,
+              checkedOut: false,
+            },
+          ],
+        },
+        null,
+        'source',
+      ).map((item) => ({
+        value: item.value,
+        label: item.label,
+        triggerLabel: item.triggerLabel,
+        group: item.group,
+      })),
+    ).toEqual([
+      {
+        value: 'main',
+        label: 'main',
+        triggerLabel: 'main',
+        group: 'Local',
+      },
+      {
+        value: 'origin/main',
+        label: 'main',
+        triggerLabel: 'origin/main',
+        group: 'origin',
+      },
+      {
+        value: 'upstream/main',
+        label: 'main',
+        triggerLabel: 'upstream/main',
+        group: 'upstream',
+      },
+    ]);
+  });
+
+  it('excludes remote branches from checkout choices', () => {
+    expect(
+      getBranchSelectItemsFromGit(
+        {
+          current: 'main',
+          defaultBranch: 'main',
+          defaultRemoteBranch: 'origin/main',
+          branches: [
+            {
+              name: 'main',
+              kind: 'local',
+              current: true,
+              checkedOut: true,
+            },
+            {
+              name: 'origin/main',
+              kind: 'remote',
+              remoteName: 'origin',
+              remoteBranchName: 'main',
+              current: false,
+              checkedOut: false,
+            },
+          ],
+        },
+        null,
+        'checkout-target',
+      ).map((item) => item.value),
+    ).toEqual(['main']);
+  });
 });
 
 describe('getDefaultBranchValue', () => {
   it('uses the backend default branch when available', () => {
     expect(
       getDefaultBranchValue(
-        { current: 'feature/login', defaultBranch: 'develop', branches: [] },
+        {
+          current: 'feature/login',
+          defaultBranch: 'develop',
+          defaultRemoteBranch: 'origin/develop',
+          branches: [],
+        },
         'feature/login',
       ),
     ).toBe('develop');
@@ -160,5 +277,35 @@ describe('getDefaultBranchValue', () => {
 
   it('falls back to main when no branch data or git ref is available', () => {
     expect(getDefaultBranchValue(null, null)).toBe('main');
+  });
+});
+
+describe('getDefaultSourceBranchValue', () => {
+  it('prefers the default remote branch for source branch selection', () => {
+    expect(
+      getDefaultSourceBranchValue(
+        {
+          current: 'feature/login',
+          defaultBranch: 'develop',
+          defaultRemoteBranch: 'origin/develop',
+          branches: [],
+        },
+        'feature/login',
+      ),
+    ).toBe('origin/develop');
+  });
+
+  it('falls back to the default local branch when no remote branch exists', () => {
+    expect(
+      getDefaultSourceBranchValue(
+        {
+          current: 'feature/login',
+          defaultBranch: 'develop',
+          defaultRemoteBranch: null,
+          branches: [],
+        },
+        'feature/login',
+      ),
+    ).toBe('develop');
   });
 });

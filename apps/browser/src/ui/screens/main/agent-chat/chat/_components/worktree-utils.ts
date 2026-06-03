@@ -1,6 +1,7 @@
 import type { SelectItem } from '@stagewise/stage-ui/components/select';
 import type {
   WorkspaceGitBranchesResult,
+  WorkspaceGitBranchInfo,
   WorkspaceGitWorktreesResult,
 } from '@shared/karton-contracts/ui';
 import { getBaseName } from '@shared/path-utils';
@@ -19,6 +20,24 @@ type GenerateWorktreeNameOptions = {
   reservedNames?: Iterable<string | null | undefined>;
   random?: () => number;
 };
+
+function getRemoteBranchParts(branch: WorkspaceGitBranchInfo): {
+  remoteName: string;
+  branchName: string;
+} | null {
+  if (branch.kind !== 'remote') return null;
+  if (branch.remoteName && branch.remoteBranchName) {
+    return {
+      remoteName: branch.remoteName,
+      branchName: branch.remoteBranchName,
+    };
+  }
+
+  const [remoteName, ...branchNameParts] = branch.name.split('/');
+  const branchName = branchNameParts.join('/');
+  if (!remoteName || !branchName) return null;
+  return { remoteName, branchName };
+}
 
 function normalizeReservedWorktreeName(
   name: string | null | undefined,
@@ -90,6 +109,15 @@ export function getDefaultBranchValue(
   return result?.defaultBranch ?? fallbackGitRef ?? 'main';
 }
 
+export function getDefaultSourceBranchValue(
+  result: WorkspaceGitBranchesResult | null,
+  fallbackGitRef: string | null,
+): string {
+  return (
+    result?.defaultRemoteBranch ?? getDefaultBranchValue(result, fallbackGitRef)
+  );
+}
+
 export function getCurrentBranchValue(
   result: WorkspaceGitBranchesResult | null,
   fallbackGitRef: string | null,
@@ -106,16 +134,31 @@ export function getBranchSelectItemsFromGit(
 ): SelectItem<string>[] {
   if (!result) return getBranchSelectItems(fallbackGitRef);
 
-  const branches: SelectItem<string>[] = result.branches.map((branch) => ({
-    value: branch.name,
-    label: branch.name,
-    disabled:
-      intent === 'checkout-target' && branch.checkedOut && !branch.current,
-  }));
+  const branches: SelectItem<string>[] = result.branches
+    .filter((branch) => intent === 'source' || branch.kind === 'local')
+    .map((branch) => {
+      const remoteParts = getRemoteBranchParts(branch);
+
+      return {
+        value: branch.name,
+        label: remoteParts?.branchName ?? branch.name,
+        triggerLabel: branch.name,
+        group:
+          intent === 'source'
+            ? (remoteParts?.remoteName ?? 'Local')
+            : undefined,
+        disabled:
+          intent === 'checkout-target' && branch.checkedOut && !branch.current,
+      };
+    });
   const currentRef = result.current ?? fallbackGitRef;
 
   if (currentRef && !branches.some((branch) => branch.value === currentRef)) {
-    branches.push({ value: currentRef, label: currentRef });
+    branches.push({
+      value: currentRef,
+      label: currentRef,
+      group: intent === 'source' ? 'Local' : undefined,
+    });
   }
 
   if (branches.length > 0) return branches;
