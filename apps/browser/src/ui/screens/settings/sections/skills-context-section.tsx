@@ -28,6 +28,7 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import type { RefObject } from 'react';
+import { SettingsScrollTabs } from '../_components/settings-scroll-tabs';
 
 // =============================================================================
 // Vertical overflow detection (like useIsTruncated but for height)
@@ -57,22 +58,6 @@ function useIsOverflowing(ref: RefObject<HTMLElement | null>) {
 // =============================================================================
 // Workspace Subheader
 // =============================================================================
-
-function WorkspaceSubheader({ workspacePath }: { workspacePath: string }) {
-  const folderName = useMemo(
-    () => getBaseName(workspacePath) || workspacePath,
-    [workspacePath],
-  );
-
-  return (
-    <div className="flex flex-col">
-      <span className="font-medium text-foreground text-sm">{folderName}</span>
-      <span className="truncate text-subtle-foreground text-xs">
-        {workspacePath}
-      </span>
-    </div>
-  );
-}
 
 // =============================================================================
 // Skills Section
@@ -220,46 +205,55 @@ function SkillRow({
   );
 }
 
-function SkillsSection({
-  workspaceMounts,
+function WorkspaceDetails({
+  mount,
+  contextFiles,
 }: {
-  workspaceMounts: Array<{
-    path: string;
-    skills: Array<{ name: string; description: string }>;
-  }>;
+  mount: MountEntry;
+  contextFiles: ContextFilesResult | null;
 }) {
-  const hasSkills = workspaceMounts.some((m) => m.skills.length > 0);
-
   return (
-    <section className="space-y-6">
-      <div>
-        <h2 className="font-medium text-foreground text-lg">Skills</h2>
-        <p className="text-muted-foreground text-sm">
-          Enable or disable skills per workspace.
-        </p>
-      </div>
-      {hasSkills ? (
-        <div className="space-y-4">
-          {workspaceMounts
-            .filter((mount) => mount.skills.length > 0)
-            .map((mount) => (
-              <div key={mount.path} className="space-y-2">
-                <WorkspaceSubheader workspacePath={mount.path} />
-                <WorkspaceSkillsList
-                  workspacePath={mount.path}
-                  skills={mount.skills}
-                />
-              </div>
-            ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-derived-subtle p-4">
-          <p className="text-center text-muted-foreground text-sm">
-            No skills detected in any connected workspace.
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-medium text-foreground text-lg">Skills</h2>
+          <p className="text-muted-foreground text-sm">
+            Enable or disable skills for this workspace.
           </p>
         </div>
-      )}
-    </section>
+        {mount.skills.length > 0 ? (
+          <WorkspaceSkillsList
+            workspacePath={mount.path}
+            skills={mount.skills}
+          />
+        ) : (
+          <div className="rounded-lg border border-derived-subtle p-4">
+            <p className="text-center text-muted-foreground text-sm">
+              No skills detected in this workspace.
+            </p>
+          </div>
+        )}
+      </section>
+      <hr className="border-derived-subtle border-t" />
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-medium text-foreground text-lg">Context files</h2>
+          <p className="text-muted-foreground text-sm">
+            Manage workspace context files used by the AI agent.
+          </p>
+        </div>
+        <WorkspaceContextFilesList
+          workspacePath={mount.path}
+          workspaceMd={
+            contextFiles?.[mount.path]?.workspaceMd ?? {
+              exists: mount.workspaceMdContent !== null,
+              path: null,
+              content: null,
+            }
+          }
+        />
+      </section>
+    </div>
   );
 }
 
@@ -402,54 +396,6 @@ function WorkspaceContextFilesList({
   );
 }
 
-function ContextFilesSection({
-  workspaceMounts,
-  contextFiles,
-}: {
-  workspaceMounts: Array<{
-    path: string;
-    workspaceMdContent: string | null;
-    agentsMdContent: string | null;
-  }>;
-  contextFiles: ContextFilesResult | null;
-}) {
-  return (
-    <section className="space-y-6">
-      <div>
-        <h2 className="font-medium text-foreground text-lg">Context files</h2>
-        <p className="text-muted-foreground text-sm">
-          Manage workspace context files used by the AI agent.
-        </p>
-      </div>
-      {workspaceMounts.length > 0 ? (
-        <div className="space-y-4">
-          {workspaceMounts.map((mount) => (
-            <div key={mount.path} className="space-y-2">
-              <WorkspaceSubheader workspacePath={mount.path} />
-              <WorkspaceContextFilesList
-                workspacePath={mount.path}
-                workspaceMd={
-                  contextFiles?.[mount.path]?.workspaceMd ?? {
-                    exists: mount.workspaceMdContent !== null,
-                    path: null,
-                    content: null,
-                  }
-                }
-              />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-derived-subtle p-4">
-          <p className="text-center text-muted-foreground text-sm">
-            No context files available.
-          </p>
-        </div>
-      )}
-    </section>
-  );
-}
-
 // =============================================================================
 // Main Page Component
 // =============================================================================
@@ -515,6 +461,17 @@ export function SkillsContextSection() {
     }
   }, [workspaceMdGenerating]);
 
+  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState<
+    string | null
+  >(null);
+  const selectedMount = useMemo(
+    () =>
+      workspaceMounts.find((m) => m.path === selectedWorkspacePath) ??
+      workspaceMounts[0] ??
+      null,
+    [workspaceMounts, selectedWorkspacePath],
+  );
+
   const hasWorkspaces = workspaceMounts.length > 0;
 
   return (
@@ -541,12 +498,22 @@ export function SkillsContextSection() {
             </div>
           ) : (
             <div className="space-y-8">
-              <SkillsSection workspaceMounts={workspaceMounts} />
-              <hr className="border-derived-subtle border-t" />
-              <ContextFilesSection
-                workspaceMounts={workspaceMounts}
-                contextFiles={contextFiles}
+              <SettingsScrollTabs
+                selectedId={selectedMount?.path ?? null}
+                onSelect={setSelectedWorkspacePath}
+                truncateSubLabelFromStart
+                items={workspaceMounts.map((mount) => ({
+                  id: mount.path,
+                  label: getBaseName(mount.path) || mount.path,
+                  subLabel: mount.path,
+                }))}
               />
+              {selectedMount ? (
+                <WorkspaceDetails
+                  mount={selectedMount}
+                  contextFiles={contextFiles}
+                />
+              ) : null}
             </div>
           )}
         </div>
