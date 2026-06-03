@@ -155,10 +155,8 @@ export type WorkspaceGitSetupStatus = 'running' | 'succeeded' | 'failed';
 export type WorkspaceGitSetupRun = {
   id: string;
   workspacePath: string;
+  sourceWorktreePath: string;
   mainWorktreePath: string;
-  repositoryId: string;
-  sourceBranch: string;
-  worktreeBranch: string;
   scriptPath: string;
   status: WorkspaceGitSetupStatus;
   startedAt: number;
@@ -172,6 +170,41 @@ export type WorkspaceGitSetupRun = {
 export type WorkspaceGitSetupState = {
   runsByPath: Record<string, WorkspaceGitSetupRun>;
 };
+
+export type WorktreeSetupManagedWorktree = {
+  path: string;
+  name: string;
+  branch: string | null;
+  headSha: string | null;
+  lastUsedAt: number | null;
+  clean: boolean;
+  current: boolean;
+  removable: boolean;
+  disabledReason: string | null;
+};
+
+export type WorktreeSetupRepositorySettings = {
+  id: string;
+  name: string;
+  mainWorktreePath: string;
+  repositoryId: string | null;
+  scriptPath: string;
+  scriptExists: boolean;
+  scriptContent: string;
+  managedWorktrees: WorktreeSetupManagedWorktree[];
+};
+
+export type WorktreeSetupRepositoriesResult = {
+  repositories: WorktreeSetupRepositorySettings[];
+};
+
+export type SaveWorktreeSetupScriptResult =
+  | { ok: true; repository: WorktreeSetupRepositorySettings }
+  | { ok: false; message: string };
+
+export type DeleteWorktreeSetupWorktreeResult =
+  | { ok: true; repository: WorktreeSetupRepositorySettings | null }
+  | { ok: false; message: string };
 
 export type WorkspaceGitFailureReason =
   | 'not-git-repo'
@@ -1089,6 +1122,14 @@ export type KartonContract = {
         path: string,
         options?: WorkspaceGitWorktreeDeleteOptions,
       ) => Promise<WorkspaceGitWorktreeDeleteResult>;
+      listWorktreeSetupRepositories: () => Promise<WorktreeSetupRepositoriesResult>;
+      saveWorktreeSetupScript: (
+        mainWorktreePath: string,
+        content: string,
+      ) => Promise<SaveWorktreeSetupScriptResult>;
+      deleteWorktreeSetupWorktree: (
+        worktreePath: string,
+      ) => Promise<DeleteWorktreeSetupWorktreeResult>;
       listWorkspaceGitBranches: (
         agentInstanceId: string,
         mountPrefix: string,

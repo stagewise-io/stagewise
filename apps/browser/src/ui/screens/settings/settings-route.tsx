@@ -4,6 +4,7 @@ import {
   SettingsIcon,
   FileTextIcon,
   PuzzleIcon,
+  GitBranchIcon,
   GlobeIcon,
   Trash2Icon,
   ClockIcon,
@@ -43,6 +44,10 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
       {
         section: 'skills-context',
         icon: <FileTextIcon className="size-4 shrink-0" />,
+      },
+      {
+        section: 'worktree-setup',
+        icon: <GitBranchIcon className="size-4 shrink-0" />,
       },
       {
         section: 'plugins',

@@ -11,6 +11,7 @@ import { ClearDataSection } from './sections/clear-data-section';
 import { AccountSection } from './sections/account-section';
 import { AboutSection } from './sections/about-section';
 import { HistorySection } from './sections/history-section';
+import { WorktreeSetupSection } from './sections/agent-settings.worktree-setup';
 
 export function SettingsContent() {
   const settingsRoute = useKartonState((s) => s.appScreen.settingsRoute);
@@ -25,6 +26,8 @@ export function SettingsContent() {
       return <GeneralSettingsSection />;
     case 'skills-context':
       return <SkillsContextSection />;
+    case 'worktree-setup':
+      return <WorktreeSetupSection />;
     case 'plugins':
       return <PluginsSection />;
     case 'browsing':

@@ -45,10 +45,8 @@ type SpawnFn = (
 
 export type WorktreeSetupMetadata = {
   workspacePath: string;
+  sourceWorktreePath: string;
   mainWorktreePath: string;
-  repositoryId: string;
-  sourceBranch: string;
-  worktreeBranch: string;
 };
 
 type WorktreeSetupRunnerDeps = {
@@ -108,11 +106,20 @@ export class WorktreeSetupRunner {
   public async start(metadata: WorktreeSetupMetadata): Promise<void> {
     if (this.activeRuns.has(metadata.workspacePath)) return;
 
-    const scriptPath = path.join(
+    const workspaceScriptPath = path.join(
       metadata.workspacePath,
       WORKTREE_SETUP_SCRIPT_RELATIVE_PATH,
     );
-    if (!(await this.pathExists(scriptPath))) return;
+    const mainWorktreeScriptPath = path.join(
+      metadata.mainWorktreePath,
+      WORKTREE_SETUP_SCRIPT_RELATIVE_PATH,
+    );
+    const scriptPath = (await this.pathExists(workspaceScriptPath))
+      ? workspaceScriptPath
+      : (await this.pathExists(mainWorktreeScriptPath))
+        ? mainWorktreeScriptPath
+        : null;
+    if (!scriptPath) return;
 
     const runId = randomUUID();
     const startedAt = Date.now();
@@ -120,10 +127,8 @@ export class WorktreeSetupRunner {
       draft.workspaceGitSetup.runsByPath[metadata.workspacePath] = {
         id: runId,
         workspacePath: metadata.workspacePath,
+        sourceWorktreePath: metadata.sourceWorktreePath,
         mainWorktreePath: metadata.mainWorktreePath,
-        repositoryId: metadata.repositoryId,
-        sourceBranch: metadata.sourceBranch,
-        worktreeBranch: metadata.worktreeBranch,
         scriptPath,
         status: 'running',
         startedAt,
@@ -222,13 +227,9 @@ export class WorktreeSetupRunner {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       ...(resolvedEnv ?? {}),
-      STAGEWISE_MAIN_WORKTREE: metadata.mainWorktreePath,
-      STAGEWISE_NEW_WORKTREE: metadata.workspacePath,
-      STAGEWISE_WORKTREE: metadata.workspacePath,
-      STAGEWISE_SOURCE_BRANCH: metadata.sourceBranch,
-      STAGEWISE_WORKTREE_BRANCH: metadata.worktreeBranch,
-      STAGEWISE_REPOSITORY_ID: metadata.repositoryId,
-      STAGEWISE_SETUP_SCRIPT: scriptPath,
+      STAGEWISE_SOURCE_WORKTREE_PATH: metadata.sourceWorktreePath,
+      STAGEWISE_TARGET_WORKTREE_PATH: metadata.workspacePath,
+      STAGEWISE_MAIN_WORKTREE_PATH: metadata.mainWorktreePath,
     };
 
     try {

@@ -727,10 +727,8 @@ export class MountManagerService extends DisposableService {
     if (result.ok) {
       await this.setPendingWorktreeSetup(result.path, {
         workspacePath: result.path,
+        sourceWorktreePath: workspacePath,
         mainWorktreePath,
-        repositoryId: repositoryInfo.repositoryId,
-        sourceBranch: options.sourceBranch,
-        worktreeBranch: result.branchName,
       });
     }
     return result;
