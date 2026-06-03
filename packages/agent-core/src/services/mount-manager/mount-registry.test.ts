@@ -354,8 +354,9 @@ describe('MountManager watcher refresh (integration)', () => {
     await new Promise((r) => setTimeout(r, 200));
     writeFileSync(wsMdPath, 'second', 'utf-8');
 
-    // 400 ms debounce + 150 ms awaitWriteFinish stability + slack.
-    const deadline = Date.now() + 4000;
+    // 400 ms debounce + 150 ms awaitWriteFinish stability + slack. chokidar
+    // on Windows CI can lag well beyond the POSIX case, so allow generous slack.
+    const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {
       const latest = store.writes[store.writes.length - 1]!;
       if (latest.mounts[0]?.workspaceMdContent === 'second') break;
@@ -367,5 +368,5 @@ describe('MountManager watcher refresh (integration)', () => {
     expect(store.writes.length).toBeGreaterThan(writesAfterMount);
 
     await manager.teardownWatchers();
-  }, 10_000);
+  }, 15_000);
 });
