@@ -47,6 +47,7 @@ import {
   getBranchSelectItemsFromGit,
   getCurrentBranchValue,
   getDefaultBranchValue,
+  getDefaultSourceBranchValue,
   getWorktreeSelectItems,
   getWorktreeSelectItemsFromGit,
 } from './worktree-utils';
@@ -755,7 +756,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             sourceBranchItems,
             worktreeItems,
             checkoutBranchItems,
-            getDefaultBranchValue(branchesResult, fallbackGitRef),
+            getDefaultSourceBranchValue(branchesResult, fallbackGitRef),
             getCurrentBranchValue(branchesResult, fallbackGitRef),
           ),
           sourceBranchItems,

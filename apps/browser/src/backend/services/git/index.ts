@@ -124,6 +124,36 @@ function parseRemoteList(output: string): GitRepositoryRemoteInfo | null {
   );
 }
 
+function parseRemoteNames(output: string | null): string[] {
+  return (output ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function parseRemoteBranchRef(
+  refName: string,
+  remoteNames: string[],
+): { remoteName: string; branchName: string } | null {
+  const matchingRemote = [...remoteNames]
+    .sort((a, b) => b.length - a.length)
+    .find(
+      (remoteName) =>
+        refName === remoteName || refName.startsWith(`${remoteName}/`),
+    );
+
+  if (matchingRemote) {
+    const branchName = refName.slice(matchingRemote.length + 1);
+    if (!branchName || branchName === 'HEAD') return null;
+    return { remoteName: matchingRemote, branchName };
+  }
+
+  const [remoteName, ...branchParts] = refName.split('/');
+  const branchName = branchParts.join('/');
+  if (!remoteName || !branchName || branchName === 'HEAD') return null;
+  return { remoteName, branchName };
+}
+
 const defaultRunGitCommand: GitCommandRunner = async (cwd, args, env) => {
   const { stdout } = await execFileAsync('git', ['-C', cwd, ...args], {
     encoding: 'utf8',
@@ -341,15 +371,23 @@ export class GitService extends DisposableService {
     const summary = await this.getMountedWorkspaceSummary(workspacePath);
     if (!summary) return null;
 
-    const result = await this.runGit(workspacePath, [
-      'for-each-ref',
-      '--format=%(refname:short)%09%(HEAD)',
-      'refs/heads',
+    const [localResult, remoteResult, remoteNamesResult] = await Promise.all([
+      this.runGit(workspacePath, [
+        'for-each-ref',
+        '--format=%(refname:short)%09%(HEAD)',
+        'refs/heads',
+      ]),
+      this.runGit(workspacePath, [
+        'for-each-ref',
+        '--format=%(refname:short)',
+        'refs/remotes',
+      ]),
+      this.runGit(workspacePath, ['remote']),
     ]);
-    if (result === null) return null;
+    if (localResult === null) return null;
 
     const worktrees = await this.listWorktrees(workspacePath);
-    const branches = result
+    const localBranches = localResult
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
@@ -363,15 +401,46 @@ export class GitService extends DisposableService {
 
         return {
           name,
+          kind: 'local',
           current,
           checkedOut: checkedOutWorktree !== undefined,
           checkedOutPath: checkedOutWorktree?.path,
         };
       });
+    const remoteNames = parseRemoteNames(remoteNamesResult);
+    const remoteBranches = (remoteResult ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .map((name) => ({
+        name,
+        parsed: parseRemoteBranchRef(name, remoteNames),
+      }))
+      .filter(({ name, parsed }) => name && parsed)
+      .map(
+        ({ name, parsed }): GitBranchInfo => ({
+          name,
+          kind: 'remote',
+          remoteName: parsed?.remoteName,
+          remoteBranchName: parsed?.branchName,
+          current: false,
+          checkedOut: false,
+        }),
+      );
+    const branches = [...localBranches, ...remoteBranches];
+    const defaultBranch = await this.resolveDefaultBranch(
+      workspacePath,
+      localBranches,
+    );
 
     return {
       current: summary.branch,
-      defaultBranch: await this.resolveDefaultBranch(workspacePath, branches),
+      defaultBranch,
+      defaultRemoteBranch: await this.resolveDefaultRemoteBranch(
+        workspacePath,
+        branches,
+        summary.branch,
+        defaultBranch,
+      ),
       branches,
     };
   }
@@ -400,6 +469,109 @@ export class GitService extends DisposableService {
       branches.find((branch) => branch.current)?.name ??
       branches[0]?.name ??
       null
+    );
+  }
+
+  private async resolveDefaultRemoteBranch(
+    workspacePath: string,
+    branches: GitBranchInfo[],
+    currentBranch: string | null,
+    defaultBranch: string | null,
+  ): Promise<string | null> {
+    const remoteBranches = branches.filter(
+      (branch) => branch.kind === 'remote' && branch.remoteName,
+    );
+    if (remoteBranches.length === 0) return null;
+
+    const remoteNames = Array.from(
+      new Set(remoteBranches.map((branch) => branch.remoteName!)),
+    );
+    const configuredRemote = await this.resolveConfiguredDefaultRemote(
+      workspacePath,
+      [currentBranch, defaultBranch],
+      remoteNames,
+    );
+    const selectedRemote =
+      configuredRemote ??
+      (remoteNames.includes('origin') ? 'origin' : undefined) ??
+      remoteNames[0];
+    if (!selectedRemote) return null;
+
+    return this.resolveRemoteDefaultBranch(
+      workspacePath,
+      selectedRemote,
+      remoteBranches,
+    );
+  }
+
+  private async resolveConfiguredDefaultRemote(
+    workspacePath: string,
+    branchNames: Array<string | null>,
+    remoteNames: string[],
+  ): Promise<string | null> {
+    const uniqueBranchNames = Array.from(
+      new Set(branchNames.filter((name): name is string => Boolean(name))),
+    );
+
+    for (const branchName of uniqueBranchNames) {
+      const remoteName = await this.runGit(workspacePath, [
+        'config',
+        '--get',
+        `branch.${branchName}.remote`,
+      ]);
+      const trimmed = remoteName?.trim();
+      if (trimmed && remoteNames.includes(trimmed)) return trimmed;
+    }
+
+    return null;
+  }
+
+  private async resolveRemoteDefaultBranch(
+    workspacePath: string,
+    remoteName: string,
+    branches: GitBranchInfo[],
+  ): Promise<string | null> {
+    const branchNames = new Set(
+      branches
+        .filter((branch) => branch.remoteName === remoteName)
+        .map((branch) => branch.name),
+    );
+    if (branchNames.size === 0) return null;
+
+    const remoteHead = await this.runGit(workspacePath, [
+      'symbolic-ref',
+      '--quiet',
+      '--short',
+      `refs/remotes/${remoteName}/HEAD`,
+    ]);
+    if (remoteHead && branchNames.has(remoteHead)) return remoteHead;
+
+    for (const candidate of [`${remoteName}/main`, `${remoteName}/master`]) {
+      if (branchNames.has(candidate)) return candidate;
+    }
+
+    return branchNames.values().next().value ?? null;
+  }
+
+  private async fetchRemoteSourceBranch(
+    workspacePath: string,
+    sourceBranch: string,
+  ): Promise<GitActionFailure | null> {
+    const [remoteName, ...branchParts] = sourceBranch.split('/');
+    const branchName = branchParts.join('/');
+    if (!remoteName || !branchName) return null;
+
+    const result = await this.runGitStrict(workspacePath, [
+      'fetch',
+      '--prune',
+      remoteName,
+      `refs/heads/${branchName}:refs/remotes/${remoteName}/${branchName}`,
+    ]);
+    if (result.exitCode === 0) return null;
+
+    return this.failure(
+      'worktree-create-failed',
+      result.stderr || `Failed to update ${sourceBranch} from remote.`,
     );
   }
 
@@ -458,7 +630,9 @@ export class GitService extends DisposableService {
     if (!branches) return { merged: false, target: null };
 
     const availableBranches = new Set(
-      branches.branches.map((branch) => branch.name),
+      branches.branches
+        .filter((branch) => branch.kind === 'local')
+        .map((branch) => branch.name),
     );
     const candidateTargets = [
       branches.defaultBranch,
@@ -599,16 +773,21 @@ export class GitService extends DisposableService {
     if (!branches)
       return this.failure('not-git-repo', 'Workspace is not a Git repo.');
 
-    if (
-      !branches.branches.some((branch) => branch.name === options.sourceBranch)
-    ) {
+    const sourceBranch = branches.branches.find(
+      (branch) => branch.name === options.sourceBranch,
+    );
+    if (!sourceBranch) {
       return this.failure(
         'branch-not-found',
         `Source branch ${options.sourceBranch} does not exist.`,
       );
     }
 
-    if (branches.branches.some((branch) => branch.name === worktreeName)) {
+    if (
+      branches.branches.some(
+        (branch) => branch.kind === 'local' && branch.name === worktreeName,
+      )
+    ) {
       return this.failure(
         'branch-already-exists',
         `Branch ${worktreeName} already exists.`,
@@ -639,11 +818,20 @@ export class GitService extends DisposableService {
       return this.failure('worktree-create-failed', message);
     }
 
+    if (sourceBranch.kind === 'remote') {
+      const fetchFailure = await this.fetchRemoteSourceBranch(
+        workspacePath,
+        sourceBranch.name,
+      );
+      if (fetchFailure) return fetchFailure;
+    }
+
     const result = await this.runGitStrict(workspacePath, [
       'worktree',
       'add',
       '-b',
       worktreeName,
+      ...(sourceBranch.kind === 'remote' ? ['--no-track'] : []),
       targetPath,
       options.sourceBranch,
     ]);

@@ -15,6 +15,7 @@ import {
   getBranchSelectItemsFromGit,
   getCurrentBranchValue,
   getDefaultBranchValue,
+  getDefaultSourceBranchValue,
   getWorktreeSelectItems,
   getWorktreeSelectItemsFromGit,
 } from './worktree-utils';
@@ -1854,7 +1855,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
           sourceBranchItems,
           worktreeItems,
           checkoutBranchItems,
-          defaultBranch,
+          getDefaultSourceBranchValue(branchesResult, gitRef),
           checkoutDefaultBranch,
         ),
         sourceBranchItems,
@@ -1896,7 +1897,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
           sourceBranchItems,
           worktreeItems,
           checkoutBranchItems,
-          defaultBranch,
+          getDefaultSourceBranchValue(branchesResult, gitRef),
           checkoutDefaultBranch,
         ),
         sourceBranchItems,
@@ -2498,6 +2499,41 @@ function getSelectItemDisplayText(
   return item?.triggerLabel ?? item?.label ?? value;
 }
 
+function getSelectItemSearchText(item: SelectItem<string>): string {
+  return [item.value, item.label, item.triggerLabel]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
+}
+
+function groupSelectItems(
+  items: SelectItem<string>[],
+): Array<{ group: string | undefined; items: SelectItem<string>[] }> {
+  const groups: Array<{
+    group: string | undefined;
+    items: SelectItem<string>[];
+  }> = [];
+  let currentGroup: string | undefined;
+  let currentItems: SelectItem<string>[] = [];
+
+  for (const item of items) {
+    if (item.group !== currentGroup) {
+      if (currentItems.length > 0) {
+        groups.push({ group: currentGroup, items: currentItems });
+      }
+      currentGroup = item.group;
+      currentItems = [item];
+    } else {
+      currentItems.push(item);
+    }
+  }
+
+  if (currentItems.length > 0) {
+    groups.push({ group: currentGroup, items: currentItems });
+  }
+
+  return groups;
+}
+
 function ActionBranchSelect({
   items,
   value,
@@ -2522,12 +2558,11 @@ function ActionBranchSelect({
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return items;
-    return items.filter((item) => {
-      const haystack =
-        typeof item.label === 'string' ? item.label : String(item.value);
-      return haystack.toLowerCase().includes(needle);
-    });
+    return items.filter((item) =>
+      getSelectItemSearchText(item).toLowerCase().includes(needle),
+    );
   }, [items, query]);
+  const groupedFiltered = useMemo(() => groupSelectItems(filtered), [filtered]);
 
   const handleValueChange = useCallback(
     (next: string | null) => {
@@ -2611,36 +2646,45 @@ function ActionBranchSelect({
                 />
               </div>
               <ComboboxList className="scrollbar-subtle max-h-48 min-w-0 overflow-y-auto">
-                {filtered.map((item) => {
-                  const label =
-                    typeof item.label === 'string'
-                      ? item.label
-                      : String(item.value);
-                  const isSelected = item.value === value;
-                  return (
-                    <ComboboxItem
-                      key={String(item.value)}
-                      value={item.value}
-                      size="xs"
-                      disabled={item.disabled}
-                      onClick={() => {
-                        if (isSelected) onValueChange(item.value);
-                      }}
-                      // Selected item: already the current value, so a
-                      // default cursor signals "no-op". Other rows are
-                      // actionable — keep the pointer cursor.
-                      className={cn(
-                        'min-h-6 text-xs leading-4',
-                        isSelected ? 'cursor-default' : 'cursor-pointer',
-                      )}
-                    >
-                      <ComboboxItemIndicator />
-                      <span className="col-start-2 min-w-0 truncate">
-                        {label}
-                      </span>
-                    </ComboboxItem>
-                  );
-                })}
+                {groupedFiltered.map(({ group, items: groupItems }, index) => (
+                  <div key={group ?? `ungrouped-${index}`}>
+                    {group && (
+                      <div className="px-2 py-1 text-subtle-foreground text-xs">
+                        {group}
+                      </div>
+                    )}
+                    {groupItems.map((item) => {
+                      const label =
+                        typeof item.label === 'string'
+                          ? item.label
+                          : String(item.value);
+                      const isSelected = item.value === value;
+                      return (
+                        <ComboboxItem
+                          key={String(item.value)}
+                          value={item.value}
+                          size="xs"
+                          disabled={item.disabled}
+                          onClick={() => {
+                            if (isSelected) onValueChange(item.value);
+                          }}
+                          // Selected item: already the current value, so a
+                          // default cursor signals "no-op". Other rows are
+                          // actionable — keep the pointer cursor.
+                          className={cn(
+                            'min-h-6 text-xs leading-4',
+                            isSelected ? 'cursor-default' : 'cursor-pointer',
+                          )}
+                        >
+                          <ComboboxItemIndicator />
+                          <span className="col-start-2 min-w-0 truncate">
+                            {label}
+                          </span>
+                        </ComboboxItem>
+                      );
+                    })}
+                  </div>
+                ))}
                 {filtered.length === 0 && (
                   <div className="px-2 py-1.5 text-muted-foreground text-xs">
                     No results
@@ -3040,7 +3084,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         'checkout-target',
       );
       const worktreeItems = getWorktreeSelectItemsFromGit(worktreesResult);
-      const defaultBranch = getDefaultBranchValue(branchesResult, null);
+      const defaultBranch = getDefaultSourceBranchValue(branchesResult, null);
       const checkoutDefaultBranch = getCurrentBranchValue(branchesResult, null);
       const options = {
         sourceBranchItems,

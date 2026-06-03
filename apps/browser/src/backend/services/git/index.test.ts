@@ -307,6 +307,10 @@ describe('GitService', () => {
         'main\t*',
         'feature/test\t',
       ].join('\n'),
+      'for-each-ref --format=%(refname:short) refs/remotes': [
+        'origin/HEAD',
+        'origin/main',
+      ].join('\n'),
       'worktree list --porcelain': [
         'worktree /repo',
         'HEAD abc123',
@@ -321,25 +325,36 @@ describe('GitService', () => {
     await expect(service.listBranches('/repo')).resolves.toEqual({
       current: 'main',
       defaultBranch: 'main',
+      defaultRemoteBranch: 'origin/main',
       branches: [
         {
           name: 'main',
+          kind: 'local',
           current: true,
           checkedOut: true,
           checkedOutPath: repoPath,
         },
         {
           name: 'feature/test',
+          kind: 'local',
           current: false,
           checkedOut: true,
           checkedOutPath: repoLinkedPath,
+        },
+        {
+          name: 'origin/main',
+          kind: 'remote',
+          remoteName: 'origin',
+          remoteBranchName: 'main',
+          current: false,
+          checkedOut: false,
         },
       ],
     });
   });
 
   it('prefers origin HEAD as the default branch', async () => {
-    const { service } = await createGitService({
+    const { service, readCalls } = await createGitService({
       ...baseReadResponses,
       'rev-parse --show-toplevel --abbrev-ref HEAD HEAD':
         '/repo\ndevelop\nabc123\n',
@@ -349,12 +364,69 @@ describe('GitService', () => {
         'develop\t*',
         'main\t',
       ].join('\n'),
+      'for-each-ref --format=%(refname:short) refs/remotes': [
+        'origin/HEAD',
+        'origin/main',
+      ].join('\n'),
       'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
     });
 
     await expect(service.listBranches('/repo')).resolves.toMatchObject({
       current: 'develop',
       defaultBranch: 'main',
+      defaultRemoteBranch: 'origin/main',
+    });
+    expect(readCalls).toContain(
+      'symbolic-ref --quiet --short refs/remotes/origin/HEAD',
+    );
+  });
+
+  it('prefers the configured branch remote for remote defaults', async () => {
+    const { service, readCalls } = await createGitService({
+      ...baseReadResponses,
+      'rev-parse --show-toplevel --abbrev-ref HEAD HEAD':
+        '/repo\ndevelop\nabc123\n',
+      'worktree list --porcelain':
+        'worktree /repo\nHEAD abc123\nbranch refs/heads/develop\n',
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': [
+        'develop\t*',
+        'main\t',
+      ].join('\n'),
+      'for-each-ref --format=%(refname:short) refs/remotes': [
+        'origin/main',
+        'upstream/main',
+      ].join('\n'),
+      remote: ['origin', 'upstream'].join('\n'),
+      'config --get branch.develop.remote': 'upstream',
+      'symbolic-ref --quiet --short refs/remotes/upstream/HEAD':
+        'upstream/main',
+    });
+
+    await expect(service.listBranches('/repo')).resolves.toMatchObject({
+      current: 'develop',
+      defaultBranch: 'main',
+      defaultRemoteBranch: 'upstream/main',
+    });
+    expect(readCalls).toContain(
+      'symbolic-ref --quiet --short refs/remotes/upstream/HEAD',
+    );
+  });
+
+  it('falls back to the first available remote when origin is unavailable', async () => {
+    const { service } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+      'for-each-ref --format=%(refname:short) refs/remotes': [
+        'upstream/main',
+        'fork/main',
+      ].join('\n'),
+      remote: ['upstream', 'fork'].join('\n'),
+      'symbolic-ref --quiet --short refs/remotes/upstream/HEAD':
+        'upstream/main',
+    });
+
+    await expect(service.listBranches('/repo')).resolves.toMatchObject({
+      defaultRemoteBranch: 'upstream/main',
     });
   });
 
@@ -374,6 +446,7 @@ describe('GitService', () => {
     await expect(service.listBranches('/repo')).resolves.toMatchObject({
       current: 'develop',
       defaultBranch: 'main',
+      defaultRemoteBranch: null,
     });
   });
 
@@ -505,6 +578,27 @@ describe('GitService', () => {
         `^worktree add -b new-work ${expectedWorktreePathPattern}${escapeRegExp(path.sep)}[a-f0-9]{12}${escapeRegExp(path.sep)}new-work main$`,
       ),
     );
+  });
+
+  it('fetches remote source branches before creating worktrees', async () => {
+    const { service, mutationCalls } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+      'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+    });
+
+    const result = await service.createWorktree('/repo', {
+      worktreeName: 'new-work',
+      sourceBranch: 'origin/main',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mutationCalls).toContain(
+      'fetch --prune origin refs/heads/main:refs/remotes/origin/main',
+    );
+    expect(
+      mutationCalls.find((call) => call.startsWith('worktree add -b ')),
+    ).toContain('worktree add -b new-work --no-track ');
   });
 
   it('rejects create-worktree branch collisions', async () => {

@@ -70,8 +70,13 @@ import type {
 
 export type { WorkspaceGitSummary } from '@stagewise/agent-core/types/metadata';
 
+export type WorkspaceGitBranchKind = 'local' | 'remote';
+
 export type WorkspaceGitBranchInfo = {
   name: string;
+  kind: WorkspaceGitBranchKind;
+  remoteName?: string;
+  remoteBranchName?: string;
   current: boolean;
   checkedOut: boolean;
   checkedOutPath?: string;
@@ -80,6 +85,7 @@ export type WorkspaceGitBranchInfo = {
 export type WorkspaceGitBranchesResult = {
   current: string | null;
   defaultBranch: string | null;
+  defaultRemoteBranch: string | null;
   branches: WorkspaceGitBranchInfo[];
 };
 
