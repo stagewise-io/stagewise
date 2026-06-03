@@ -141,9 +141,12 @@ export function applyHeadTailCap(lines: string[]): string {
 // These are sourced inside the PTY to enable OSC 133 markers.
 // Inlined to avoid build-pipeline / path-resolution complexity.
 
-const BASH_INTEGRATION = `
+export const BASH_INTEGRATION = `
 if [ -n "$__STAGEWISE_SHELL_INTEGRATION" ]; then return 0 2>/dev/null || true; fi
-export __STAGEWISE_SHELL_INTEGRATION=1
+# Plain (non-exported) guard: prevents re-sourcing within THIS shell only.
+# Exporting it would leak into child shells, tripping their own guard before
+# they register OSC 133 hooks and forcing them into sentinel mode.
+__STAGEWISE_SHELL_INTEGRATION=1
 { unset HISTFILE; } 2>/dev/null
 HISTSIZE=0 2>/dev/null
 HISTFILESIZE=0 2>/dev/null
@@ -192,9 +195,12 @@ __stagewise_emit_cwd
 printf '\\033]133;A\\007'
 `.trim();
 
-const ZSH_INTEGRATION = `
+export const ZSH_INTEGRATION = `
 if [[ -n "$__STAGEWISE_SHELL_INTEGRATION" ]]; then return 0 2>/dev/null || true; fi
-export __STAGEWISE_SHELL_INTEGRATION=1
+# Plain (non-exported) guard: prevents re-sourcing within THIS shell only.
+# Exporting it would leak into child shells, tripping their own guard before
+# they register OSC 133 hooks and forcing them into sentinel mode.
+__STAGEWISE_SHELL_INTEGRATION=1
 { unset HISTFILE; } 2>/dev/null
 HISTSIZE=0 2>/dev/null
 SAVEHIST=0 2>/dev/null
