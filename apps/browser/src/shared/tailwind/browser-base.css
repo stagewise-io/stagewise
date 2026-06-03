@@ -18,6 +18,8 @@
 
 @plugin 'tailwind-scrollbar';
 
+@custom-variant dark (&:is(.dark *));
+
 @theme default {
   --font-sans: stagewise-builtin-geist, -apple-system, BlinkMacSystemFont,
               "Segoe UI", "Ubuntu", "Roboto", "Noto Sans", "Cantarell",
@@ -42,8 +44,12 @@
 
   :root {
     background-color: transparent;
-    color-scheme: normal;
+    color-scheme: light;
     font-feature-settings: 'liga' 1, 'calt' 1;
+  }
+
+  :root.dark {
+    color-scheme: dark;
   }
 
   body {

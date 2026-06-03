@@ -124,8 +124,7 @@
 /* --------------------------------------------------------------------------
    Dark mode
    -------------------------------------------------------------------------- */
-@media (prefers-color-scheme: dark) {
-  :root {
+:root.dark {
     /* Editor-level defaults (fallbacks only) */
     --syntax-editor-foreground: var(--color-foreground);
     --syntax-editor-background: transparent;
@@ -234,7 +233,6 @@
     --syntax-bracket-highlight-foreground4: var(--color-syntax-yellow-dark);
     --syntax-bracket-highlight-foreground5: var(--color-syntax-purple-dark);
     --syntax-bracket-highlight-foreground6: var(--color-syntax-blue-dark);
-  }
 }
 
 /* --------------------------------------------------------------------------
@@ -253,17 +251,15 @@
      !important is required because defaultColor:'light' sets inline style="color:...".
      - background-color only on .shiki (the <pre>), NOT on spans — preserves diff highlights.
      - color/font overrides only on .shiki code span — skips .line-number spans. */
-  @media (prefers-color-scheme: dark) {
-    .shiki {
-      color: var(--shiki-dark) !important;
-      background-color: var(--shiki-dark-bg) !important;
-    }
-    .shiki code span {
-      color: var(--shiki-dark) !important;
-      font-style: var(--shiki-dark-font-style) !important;
-      font-weight: var(--shiki-dark-font-weight) !important;
-      text-decoration: var(--shiki-dark-text-decoration) !important;
-    }
+  :root.dark .shiki {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+  }
+  :root.dark .shiki code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
   }
 
   /* User messages always use dark theme for code blocks */

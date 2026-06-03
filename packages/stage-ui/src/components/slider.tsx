@@ -17,11 +17,12 @@ export type SliderThickness = keyof typeof sliderThicknessStyles;
 
 export type SliderProps = Omit<
   React.ComponentProps<typeof BaseSlider.Root>,
-  'value' | 'defaultValue' | 'onValueChange'
+  'value' | 'defaultValue' | 'onValueChange' | 'onValueCommitted'
 > & {
   value?: number;
   defaultValue?: number;
   onValueChange?: (value: number) => void;
+  onValueCommitted?: (value: number) => void;
   ariaLabel?: string;
   controlClassName?: string;
   trackClassName?: string;
@@ -34,6 +35,7 @@ export function Slider({
   value,
   defaultValue,
   onValueChange,
+  onValueCommitted,
   ariaLabel,
   className,
   controlClassName,
@@ -52,6 +54,11 @@ export function Slider({
       defaultValue={defaultValue}
       onValueChange={(nextValue) => {
         onValueChange?.(
+          Array.isArray(nextValue) ? (nextValue[0] ?? 0) : nextValue,
+        );
+      }}
+      onValueCommitted={(nextValue) => {
+        onValueCommitted?.(
           Array.isArray(nextValue) ? (nextValue[0] ?? 0) : nextValue,
         );
       }}

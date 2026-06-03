@@ -1,3 +1,4 @@
+import { nativeTheme } from 'electron';
 import type { Logger } from './logger';
 import type { KartonService } from './karton';
 import {
@@ -36,6 +37,7 @@ export class GlobalConfigService extends DisposableService {
     );
 
     this.config = loadedConfig;
+    this.applyAppColorScheme(loadedConfig);
 
     this.uiKarton.setState((draft) => {
       draft.globalConfig = loadedConfig;
@@ -92,16 +94,21 @@ export class GlobalConfigService extends DisposableService {
     const oldConfig = structuredClone(this.config);
     const parsedConfig = globalConfigSchema.parse(newConfig);
     this.config = parsedConfig;
+    this.applyAppColorScheme(parsedConfig);
     await this.saveConfigFile();
     this.uiKarton.setState((draft) => {
       draft.globalConfig = parsedConfig;
     });
     this.configUpdatedListeners.forEach((listener) =>
-      listener(newConfig, oldConfig),
+      listener(parsedConfig, oldConfig),
     );
     this.logger.debug(
       `[GlobalConfigService] Global config set: ${JSON.stringify(this.config)}`,
     );
+  }
+
+  private applyAppColorScheme(config: GlobalConfig): void {
+    nativeTheme.themeSource = config.appColorScheme;
   }
 
   private async saveConfigFile(): Promise<void> {

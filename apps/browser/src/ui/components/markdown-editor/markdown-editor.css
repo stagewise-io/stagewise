@@ -127,13 +127,10 @@
 }
 
 /* Shiki dual-theme color switching */
-@media (prefers-color-scheme: dark) {
-  .markdown-editor-content .shiki,
-  .markdown-editor-content .shiki span {
-    color: var(--shiki-dark) !important;
-    background-color: var(--shiki-dark-bg) !important;
-  }
-
+:root.dark .markdown-editor-content .shiki,
+:root.dark .markdown-editor-content .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
 }
 
 /* Horizontal rule */

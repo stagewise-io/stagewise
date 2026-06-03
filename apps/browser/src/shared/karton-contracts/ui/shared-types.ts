@@ -249,6 +249,9 @@ export type PersonalizationThemeId = z.infer<
   typeof personalizationThemeIdSchema
 >;
 
+export const appColorSchemeSchema = z.enum(['system', 'light', 'dark']);
+export type AppColorScheme = z.infer<typeof appColorSchemeSchema>;
+
 export const globalConfigSchema = z
   .object({
     telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
@@ -264,6 +267,7 @@ export const globalConfigSchema = z
     personalizationThemeId: personalizationThemeIdSchema
       .catch('default')
       .default('default'),
+    appColorScheme: appColorSchemeSchema.catch('system').default('system'),
   })
   .loose();
 

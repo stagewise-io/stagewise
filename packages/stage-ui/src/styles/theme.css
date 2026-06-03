@@ -57,8 +57,7 @@
    Dark theme overrides
    Pick whatever mechanism you use: [data-theme="dark"], .dark, or prefers-color-scheme
    --------- */
-@media (prefers-color-scheme: dark) {
-    :root {
+:root.dark {
     --color-app-background: var(--color-base-800);
     --color-background: var(--color-base-800);
     --color-foreground: var(--color-base-200);
@@ -94,7 +93,6 @@
     --color-info-foreground: var(--color-info-foreground-dark);
     --color-info-background: var(--color-info-background-dark);
     --color-info-solid: var(--color-info-solid-dark);
-    }
 }
 
 /* Override Chrome's default double-ring focus indicator with a single primary-colored outline.
