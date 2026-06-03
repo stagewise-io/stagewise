@@ -43,7 +43,7 @@
     "conventional-recommended-bump": "^11.2.0",
     "git-raw-commits": "^5.0.1",
     "lefthook": "^1.12.2",
-    "semver": "^7.8.0",
+    "semver": "^7.8.1",
     "ts-node": "10.9.2",
     "turbo": "^2.9.12",
     "typescript": "^5.8.3"
