@@ -494,6 +494,15 @@ describe('wrapWithSentinel', () => {
     expect(wrapped.endsWith('\r')).toBe(true);
   });
 
+  it('does not embed a literal newline in the printf format string', () => {
+    // A literal LF inside the single-quoted printf format breaks the line
+    // mid-quote over the PTY and triggers PS2 continuation prompts (quote>).
+    // The newline must be an escaped \n that printf expands at runtime.
+    const wrapped = wrapWithSentinel('nl1', 'pwd');
+    expect(wrapped).not.toContain('\n');
+    expect(wrapped).toContain('%d__\\n');
+  });
+
   it('escapes single quotes in command', () => {
     const wrapped = wrapWithSentinel('id1', "echo 'quoted'");
     expect(wrapped).toContain("\\'");
