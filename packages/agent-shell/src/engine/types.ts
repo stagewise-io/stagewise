@@ -1,7 +1,7 @@
 import type { IPty } from 'node-pty';
 import type { OscParser } from './osc-parser';
 import type { SessionLogger } from './session-logger';
-export type { DetectedShell, ShellType } from '@/utils/shell-env';
+export type { DetectedShell, ShellType } from './shell-env';
 
 // ─── Output capping constants (unchanged) ─────────────────────────
 

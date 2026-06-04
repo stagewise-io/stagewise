@@ -1,14 +1,12 @@
-import { DisposableService } from '../../../disposable';
-import type { Logger } from '../../../logger';
-import type { KartonService } from '@/services/karton';
-import { detectShell } from './detect-shell';
-import { resolveShellEnv } from './resolve-shell-env';
+import { DisposableService } from './disposable';
+import type { Logger } from './logger';
+import type { ShellStreamSink } from './stream-sink';
+import { detectShell, resolveShellEnv } from './shell-env';
 import { sanitizeEnv } from './sanitize-env';
 import { SessionManager } from './session-manager';
-import { getAgentShellLogsDir } from '@/utils/paths';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { ShellSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
+import type { ShellSnapshot } from '../schemas';
 import type {
   DetectedShell,
   SessionCommandRequest,
@@ -17,7 +15,8 @@ import type {
 
 export class ShellService extends DisposableService {
   private readonly logger: Logger;
-  private readonly kartonService?: KartonService;
+  private readonly sink?: ShellStreamSink;
+  private readonly getShellLogsDir: (agentInstanceId: string) => string;
 
   private shell: DetectedShell | null = null;
   private sessionManager: SessionManager | null = null;
@@ -40,7 +39,7 @@ export class ShellService extends DisposableService {
   private readonly outputFlushTimers = new Map<string, NodeJS.Timeout>();
   private readonly outputMaxIntervalTimers = new Map<string, NodeJS.Timeout>();
 
-  /** Per-agent throttle timers for pushing the shells manifest to Karton. */
+  /** Per-agent throttle timers for pushing the shells manifest to the sink. */
   private readonly shellManifestTimers = new Map<string, NodeJS.Timeout>();
 
   private static readonly FLUSH_DEBOUNCE_MS = 100;
@@ -48,36 +47,40 @@ export class ShellService extends DisposableService {
   /**
    * Per-flush cap for the live UI snapshot. Grid serialization is already
    * bounded by `STREAMING_MAX_ROWS` (~24KB theoretical max at 120 cols),
-   * but 16KB is a snug safety rail that keeps Karton IPC payloads small
-   * without truncating realistic live previews. The final command output
-   * is unaffected — it uses the head+tail capped capture on a separate
-   * code path.
+   * but 16KB is a snug safety rail that keeps live-stream IPC payloads
+   * small without truncating realistic live previews. The final command
+   * output is unaffected — it uses the head+tail capped capture on a
+   * separate code path.
    */
   private static readonly MAX_STREAMING_BYTES = 16_384;
   private static readonly MANIFEST_THROTTLE_MS = 500;
 
   constructor(
     logger: Logger,
-    kartonService?: KartonService,
+    getShellLogsDir: (agentInstanceId: string) => string,
+    sink?: ShellStreamSink,
     preDetectedShell?: DetectedShell | null,
     preResolvedEnv?: Record<string, string> | null,
   ) {
     super();
     this.logger = logger;
-    this.kartonService = kartonService;
+    this.getShellLogsDir = getShellLogsDir;
+    this.sink = sink;
     this.preDetectedShell = preDetectedShell ?? null;
     this.preResolvedEnv = preResolvedEnv ?? null;
   }
 
   public static async create(
     logger: Logger,
-    kartonService?: KartonService,
+    getShellLogsDir: (agentInstanceId: string) => string,
+    sink?: ShellStreamSink,
     preDetectedShell?: DetectedShell | null,
     preResolvedEnv?: Record<string, string> | null,
   ): Promise<ShellService> {
     const instance = new ShellService(
       logger,
-      kartonService,
+      getShellLogsDir,
+      sink,
       preDetectedShell,
       preResolvedEnv,
     );
@@ -117,10 +120,10 @@ export class ShellService extends DisposableService {
       }
 
       this.sessionManager = new SessionManager(this.shell, (agentId) =>
-        getAgentShellLogsDir(agentId),
+        this.getShellLogsDir(agentId),
       );
       this.sessionManager.onSessionStateChange = (agentInstanceId) => {
-        this.pushShellsToKarton(agentInstanceId);
+        this.pushShellsToSink(agentInstanceId);
       };
     } else {
       this.logger.warn(
@@ -162,7 +165,7 @@ export class ShellService extends DisposableService {
 
     // Wire streaming callback
     this.sessionManager.setOnData(sessionId, (_sid: string, _chunk: string) => {
-      if (!this.kartonService) return;
+      if (!this.sink) return;
       const entry = this.outputBuffers.get(toolCallId);
       if (entry) {
         entry.dirty = true;
@@ -176,26 +179,11 @@ export class ShellService extends DisposableService {
       this.scheduleShellManifestPush(agentInstanceId);
     });
 
-    this.pushShellsToKarton(agentInstanceId);
+    this.pushShellsToSink(agentInstanceId);
 
-    // Publish session ID to Karton state
-    if (this.kartonService) {
-      this.kartonService.setState((draft) => {
-        if (!draft.toolbox[agentInstanceId]) {
-          draft.toolbox[agentInstanceId] = {
-            workspace: { mounts: [] },
-            pendingFileDiffs: [],
-            editSummary: [],
-            pendingUserQuestion: null,
-          };
-        }
-        if (!draft.toolbox[agentInstanceId].pendingShellSessionIds) {
-          draft.toolbox[agentInstanceId].pendingShellSessionIds = {};
-        }
-        draft.toolbox[agentInstanceId].pendingShellSessionIds![toolCallId] =
-          sessionId;
-      });
-    }
+    // Publish session ID to the stream sink so the UI can cancel in-flight
+    // commands.
+    this.sink?.publishSessionId(agentInstanceId, toolCallId, sessionId);
 
     return sessionId;
   }
@@ -231,7 +219,7 @@ export class ShellService extends DisposableService {
     // and let the flush read the current grid snapshot from the session.
     const makeOnData = (targetToolCallId: string, targetSessionId: string) => {
       return (_sid: string, _chunk: string) => {
-        if (!this.kartonService) return;
+        if (!this.sink) return;
         const entry = this.outputBuffers.get(targetToolCallId);
         if (entry) {
           entry.dirty = true;
@@ -283,29 +271,14 @@ export class ShellService extends DisposableService {
       );
     }
 
-    // Push updated session manifest to Karton state on new session creation
+    // Push updated session manifest on new session creation
     if (!request.sessionId) {
-      this.pushShellsToKarton(agentInstanceId);
+      this.pushShellsToSink(agentInstanceId);
     }
 
-    // Publish session ID to Karton state so the UI can cancel in-flight commands
-    if (this.kartonService) {
-      this.kartonService.setState((draft) => {
-        if (!draft.toolbox[agentInstanceId]) {
-          draft.toolbox[agentInstanceId] = {
-            workspace: { mounts: [] },
-            pendingFileDiffs: [],
-            editSummary: [],
-            pendingUserQuestion: null,
-          };
-        }
-        if (!draft.toolbox[agentInstanceId].pendingShellSessionIds) {
-          draft.toolbox[agentInstanceId].pendingShellSessionIds = {};
-        }
-        draft.toolbox[agentInstanceId].pendingShellSessionIds![toolCallId] =
-          sessionId!;
-      });
-    }
+    // Publish session ID to the stream sink so the UI can cancel in-flight
+    // commands.
+    this.sink?.publishSessionId(agentInstanceId, toolCallId, sessionId);
 
     return this.sessionManager.executeCommand(sessionId, request);
   }
@@ -352,21 +325,8 @@ export class ShellService extends DisposableService {
       this.outputMaxIntervalTimers.delete(toolCallId);
     }
 
-    if (!this.kartonService) return;
-    const agentToolbox = this.kartonService.state.toolbox[agentId];
-    const hasOutputs = !!agentToolbox?.pendingShellOutputs?.[toolCallId];
-    const hasSessionId = !!agentToolbox?.pendingShellSessionIds?.[toolCallId];
-    if (!hasOutputs && !hasSessionId) return;
-
-    this.kartonService.setState((draft) => {
-      const tb = draft.toolbox[agentId];
-      if (tb?.pendingShellOutputs?.[toolCallId]) {
-        delete tb.pendingShellOutputs[toolCallId];
-      }
-      if (tb?.pendingShellSessionIds?.[toolCallId]) {
-        delete tb.pendingShellSessionIds[toolCallId];
-      }
-    });
+    if (!this.sink) return;
+    this.sink.clearPending(agentId, toolCallId);
   }
 
   killSession(sessionId: string): boolean {
@@ -407,24 +367,14 @@ export class ShellService extends DisposableService {
     return snapshot;
   }
 
-  private pushShellsToKarton(agentInstanceId: string): void {
-    if (!this.kartonService) return;
+  private pushShellsToSink(agentInstanceId: string): void {
+    if (!this.sink) return;
     const snapshot = this.getShellSnapshot(agentInstanceId);
-    this.kartonService.setState((draft) => {
-      if (!draft.toolbox[agentInstanceId]) {
-        draft.toolbox[agentInstanceId] = {
-          workspace: { mounts: [] },
-          pendingFileDiffs: [],
-          editSummary: [],
-          pendingUserQuestion: null,
-        };
-      }
-      draft.toolbox[agentInstanceId].shells = snapshot;
-    });
+    this.sink.setManifest(agentInstanceId, snapshot);
   }
 
   /**
-   * Leading+trailing edge throttled push of the shells manifest to Karton.
+   * Leading+trailing edge throttled push of the shells manifest to the sink.
    * Pushes immediately on the first call, then suppresses for
    * MANIFEST_THROTTLE_MS, then pushes once more (trailing edge) to
    * capture the latest state.
@@ -432,19 +382,19 @@ export class ShellService extends DisposableService {
   private scheduleShellManifestPush(agentId: string): void {
     if (this.shellManifestTimers.has(agentId)) return;
     // Leading edge — push immediately
-    this.pushShellsToKarton(agentId);
+    this.pushShellsToSink(agentId);
     // Cooldown — trailing edge fires after the interval
     this.shellManifestTimers.set(
       agentId,
       setTimeout(() => {
         this.shellManifestTimers.delete(agentId);
-        this.pushShellsToKarton(agentId);
+        this.pushShellsToSink(agentId);
       }, ShellService.MANIFEST_THROTTLE_MS),
     );
   }
 
   deleteShellLogs(agentInstanceId: string): void {
-    void fs.rm(getAgentShellLogsDir(agentInstanceId), {
+    void fs.rm(this.getShellLogsDir(agentInstanceId), {
       recursive: true,
       force: true,
     });
@@ -457,7 +407,7 @@ export class ShellService extends DisposableService {
     this.outputFlushTimers.set(
       toolCallId,
       setTimeout(
-        () => this.flushToKarton(agentId, toolCallId),
+        () => this.flushToSink(agentId, toolCallId),
         ShellService.FLUSH_DEBOUNCE_MS,
       ),
     );
@@ -466,15 +416,15 @@ export class ShellService extends DisposableService {
       this.outputMaxIntervalTimers.set(
         toolCallId,
         setTimeout(
-          () => this.flushToKarton(agentId, toolCallId),
+          () => this.flushToSink(agentId, toolCallId),
           ShellService.FLUSH_MAX_INTERVAL_MS,
         ),
       );
     }
   }
 
-  private flushToKarton(agentId: string, toolCallId: string): void {
-    if (!this.kartonService) return;
+  private flushToSink(agentId: string, toolCallId: string): void {
+    if (!this.sink) return;
 
     const debounce = this.outputFlushTimers.get(toolCallId);
     if (debounce) {
@@ -492,18 +442,13 @@ export class ShellService extends DisposableService {
 
     // Read the current grid snapshot from the session. If the command has
     // already resolved (pattern match, timeout, exit) the snapshot will be
-    // null and we clear any stale Karton entry.
+    // null and we clear any stale live-output entry.
     const snapshot = this.sessionManager?.getLiveOutputSnapshot(
       entry.sessionId,
     );
 
     if (snapshot == null) {
-      this.kartonService.setState((draft) => {
-        const tb = draft.toolbox[agentId];
-        if (tb?.pendingShellOutputs?.[toolCallId]) {
-          delete tb.pendingShellOutputs[toolCallId];
-        }
-      });
+      this.sink.clearLiveOutput(agentId, toolCallId);
       entry.dirty = false;
       return;
     }
@@ -513,20 +458,7 @@ export class ShellService extends DisposableService {
         ? snapshot.slice(-ShellService.MAX_STREAMING_BYTES)
         : snapshot;
 
-    this.kartonService.setState((draft) => {
-      if (!draft.toolbox[agentId]) {
-        draft.toolbox[agentId] = {
-          workspace: { mounts: [] },
-          pendingFileDiffs: [],
-          editSummary: [],
-          pendingUserQuestion: null,
-        };
-      }
-      if (!draft.toolbox[agentId].pendingShellOutputs) {
-        draft.toolbox[agentId].pendingShellOutputs = {};
-      }
-      draft.toolbox[agentId].pendingShellOutputs![toolCallId] = [capped];
-    });
+    this.sink.publishLiveOutput(agentId, toolCallId, capped);
     entry.dirty = false;
   }
 
@@ -556,8 +488,3 @@ export class ShellService extends DisposableService {
     this.shellManifestTimers.clear();
   }
 }
-
-// Re-export for use by other services (e.g. LSP env resolution)
-export { detectShell } from './detect-shell';
-export { resolveShellEnv } from './resolve-shell-env';
-export type { DetectedShell } from './types';

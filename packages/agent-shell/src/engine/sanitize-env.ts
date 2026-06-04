@@ -1,4 +1,4 @@
-import { normalizeWindowsPath } from './normalize-windows-path';
+import { normalizeWindowsPath } from './shell-env/normalize-windows-path';
 import type { ShellType } from './types';
 
 const WHITELIST = new Set([

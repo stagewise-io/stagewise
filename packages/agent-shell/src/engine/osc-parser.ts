@@ -367,8 +367,8 @@ export class OscParser extends (EventEmitter as new () => OscParserEmitter) {
 
     const match = SENTINEL_RE.exec(combined);
     if (match) {
-      const id = match[1];
-      const exitCode = Number.parseInt(match[2], 10);
+      const id = match[1]!;
+      const exitCode = Number.parseInt(match[2]!, 10);
       this.emit('sentinelDone', id, Number.isNaN(exitCode) ? 0 : exitCode);
       return;
     }
@@ -440,7 +440,7 @@ function decodeFileUriPath(pathname: string | undefined): string | null {
     // also carry POSIX-style paths in tests or non-file-system contexts, and
     // those must not become \tmp\project on Windows.
     const drivePath = decoded.match(/^\/?([A-Za-z]:(?:\/.*)?)$/);
-    if (drivePath) return drivePath[1].replace(/\//g, '\\');
+    if (drivePath) return drivePath[1]!.replace(/\//g, '\\');
   }
 
   return decoded;

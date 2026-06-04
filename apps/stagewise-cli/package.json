@@ -8,15 +8,16 @@
     "stagewise-cli": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/index.ts",
+    "build": "pnpm -F @stagewise/agent-core build && pnpm -F @stagewise/agent-shell build && tsc -p tsconfig.json",
+    "dev": "pnpm -F @stagewise/agent-core build && pnpm -F @stagewise/agent-shell build && tsx src/index.ts",
     "start": "pnpm build && node dist/index.js",
-    "typecheck": "pnpm -F @stagewise/agent-core build && tsc -p tsconfig.json --noEmit",
+    "typecheck": "pnpm -F @stagewise/agent-core build && pnpm -F @stagewise/agent-shell build && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.76",
     "@stagewise/agent-core": "workspace:*",
+    "@stagewise/agent-shell": "workspace:*",
     "ai": "6.0.177",
     "zod": "4.3.5"
   },

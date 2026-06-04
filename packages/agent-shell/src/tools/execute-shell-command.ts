@@ -4,20 +4,17 @@ import {
   type ExecuteShellCommandToolInput,
   type ExecuteShellCommandToolOutput,
   executeShellCommandToolInputSchema,
-} from '@shared/karton-contracts/ui/agent/tools/types';
+} from '../schemas';
 import { tool } from 'ai';
-import { capToolOutput } from '../../utils';
-import type { ShellService } from '@/services/toolbox/services/shell';
+import { capToolOutput } from '@stagewise/agent-core/toolbox';
+import type { ShellService } from '../engine';
 import type {
   SessionCommandRequest,
   SessionCommandResult,
-} from '@/services/toolbox/services/shell/types';
-import type { ModelProviderService } from '@/agents/model-provider';
-import type { TelemetryService } from '@/services/telemetry';
+} from '../engine/types';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import type { ToolApprovalMode } from '@shared/karton-contracts/ui/shared-types';
-import { classifyShellCommand } from './smart-approval';
+import type { ToolApprovalMode } from '@stagewise/agent-core/types/tool-approval';
 
 /** Max lines of recent shell output fed to the smart-approval classifier. */
 const SMART_APPROVAL_TAIL_LINES = 30;
@@ -50,17 +47,41 @@ function buildResult(
 }
 
 /**
- * Dependencies the shell tool needs to run the smart-approval classifier
- * on demand. Injected at tool-factory build time so the tool itself
- * stays free of service lifecycle concerns.
+ * Input passed to the host's smart-approval classifier.
+ */
+export interface SmartApprovalClassifyInput {
+  command: string;
+  cwdPrefix: string;
+  agentExplanation: string;
+  shellTail: string;
+}
+
+/**
+ * Result returned by the host's smart-approval classifier.
+ */
+export interface SmartApprovalClassifyResult {
+  needsApproval: boolean;
+  explanation: string;
+}
+
+/**
+ * Host-supplied smart-approval hooks. The classifier itself (LLM model
+ * provider, telemetry, prompts) lives in the host so this package stays
+ * free of model-provider dependencies. When omitted, commands that would
+ * require classification fail closed (require manual approval).
  */
 export interface SmartApprovalDeps {
-  modelProviderService: Pick<ModelProviderService, 'getModelWithOptions'>;
-  telemetryService: TelemetryService;
   /**
-   * Invoked when the classifier flags a command. Lets the toolbox stash
-   * the classifier's explanation in Karton state so the UI can render it
-   * above the approve/skip buttons.
+   * Classify whether a command should require explicit user approval.
+   * Never expected to throw — the host should fail closed internally.
+   */
+  classify: (
+    input: SmartApprovalClassifyInput,
+  ) => Promise<SmartApprovalClassifyResult>;
+  /**
+   * Invoked when classification flags a command. Lets the host stash the
+   * explanation in UI state so it can render it above the approve/skip
+   * buttons.
    */
   recordPendingApproval: (toolCallId: string, explanation: string) => void;
 }
@@ -292,7 +313,7 @@ export const executeShellCommand = (
   agentInstanceId: string,
   getToolApprovalMode: () => ToolApprovalMode,
   getMountedPaths: MountedPathsGetter,
-  smartApproval: SmartApprovalDeps,
+  smartApproval?: SmartApprovalDeps,
 ) => {
   return tool({
     description: EXECUTE_SHELL_COMMAND_DESCRIPTION,
@@ -334,22 +355,31 @@ export const executeShellCommand = (
       if (!currentCwd) {
         const explanation =
           'Current terminal directory is unknown. Approving manually to stay safe.';
-        smartApproval.recordPendingApproval(toolCallId, explanation);
+        smartApproval?.recordPendingApproval(toolCallId, explanation);
         return true;
       }
       const cwdPrefix = toClassifierCwdPrefix(currentCwd, getMountedPaths);
 
-      const result = await classifyShellCommand(
-        {
+      // No classifier available — fail closed (require manual approval).
+      if (!smartApproval) return true;
+
+      // The package accepts an arbitrary host `classify`; if it throws, fail
+      // closed rather than letting the exception propagate out of the tool.
+      let result: SmartApprovalClassifyResult;
+      try {
+        result = await smartApproval.classify({
           command: classifierCommand,
           cwdPrefix,
           agentExplanation: input.explanation ?? '',
           shellTail,
-        },
-        smartApproval.modelProviderService,
-        agentInstanceId,
-        smartApproval.telemetryService,
-      );
+        });
+      } catch {
+        smartApproval.recordPendingApproval(
+          toolCallId,
+          'Smart-approval classifier failed. Approving manually to stay safe.',
+        );
+        return true;
+      }
 
       if (result.needsApproval)
         smartApproval.recordPendingApproval(toolCallId, result.explanation);
