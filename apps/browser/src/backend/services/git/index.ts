@@ -866,6 +866,13 @@ export class GitService extends DisposableService {
       );
     }
 
+    if (branch.kind !== 'local') {
+      return this.failure(
+        'branch-not-found',
+        `Branch ${branchName} is not a local branch.`,
+      );
+    }
+
     if (branch.current) return null;
 
     if (branch.checkedOut) {
