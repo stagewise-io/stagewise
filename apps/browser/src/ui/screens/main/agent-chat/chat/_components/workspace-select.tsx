@@ -5,6 +5,8 @@ import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
 import {
   Combobox,
   ComboboxInput,
+  ComboboxGroup,
+  ComboboxGroupLabel,
   ComboboxItem,
   ComboboxItemIndicator,
   ComboboxList,
@@ -1272,7 +1274,6 @@ export function applyMountedWorkspaceActionDefault(
   return {
     ...config,
     selectedAction: 'create-worktree',
-    ...(mount.git.branch ? { createWorktreeFrom: mount.git.branch } : {}),
   };
 }
 
@@ -2647,12 +2648,11 @@ function ActionBranchSelect({
               </div>
               <ComboboxList className="scrollbar-subtle max-h-48 min-w-0 overflow-y-auto">
                 {groupedFiltered.map(({ group, items: groupItems }, index) => (
-                  <div key={group ?? `ungrouped-${index}`}>
-                    {group && (
-                      <div className="px-2 py-1 text-subtle-foreground text-xs">
-                        {group}
-                      </div>
-                    )}
+                  <ComboboxGroup
+                    key={group ?? `ungrouped-${index}`}
+                    className="shrink-0"
+                  >
+                    {group && <ComboboxGroupLabel>{group}</ComboboxGroupLabel>}
                     {groupItems.map((item) => {
                       const label =
                         typeof item.label === 'string'
@@ -2672,18 +2672,18 @@ function ActionBranchSelect({
                           // default cursor signals "no-op". Other rows are
                           // actionable — keep the pointer cursor.
                           className={cn(
-                            'min-h-6 text-xs leading-4',
+                            'min-h-6 shrink-0 items-center text-xs leading-4',
                             isSelected ? 'cursor-default' : 'cursor-pointer',
                           )}
                         >
-                          <ComboboxItemIndicator />
-                          <span className="col-start-2 min-w-0 truncate">
+                          <ComboboxItemIndicator className="self-center" />
+                          <span className="col-start-2 min-w-0 truncate leading-4">
                             {label}
                           </span>
                         </ComboboxItem>
                       );
                     })}
-                  </div>
+                  </ComboboxGroup>
                 ))}
                 {filtered.length === 0 && (
                   <div className="px-2 py-1.5 text-muted-foreground text-xs">
