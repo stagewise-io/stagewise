@@ -489,6 +489,24 @@ describe('GitService', () => {
     });
   });
 
+  it('prevents switching to a remote branch ref', async () => {
+    const { service, mutationCalls } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+      'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+      remote: 'origin',
+    });
+
+    await expect(service.switchBranch('/repo', 'origin/main')).resolves.toEqual(
+      {
+        ok: false,
+        reason: 'branch-not-found',
+        message: 'Branch origin/main is not a local branch.',
+      },
+    );
+    expect(mutationCalls).not.toContain('checkout origin/main');
+  });
+
   it('prevents switching to a branch checked out in another worktree', async () => {
     const { service } = await createGitService({
       ...baseReadResponses,
