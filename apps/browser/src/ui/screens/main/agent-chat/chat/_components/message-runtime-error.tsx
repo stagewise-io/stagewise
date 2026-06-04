@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { cn } from '@ui/utils';
 import { IconTriangleWarning } from 'nucleo-micro-bold';
+import { IconLockKeyOutline18 } from 'nucleo-ui-outline-18';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import {
   RefreshCcwIcon,
@@ -301,6 +302,14 @@ function GenericError({
   const [helpExpanded, setHelpExpanded] = useState(false);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [hasCopied, setHasCopied] = useState(false);
+  const loginRetryStorageKey = `stagewise:login-retry-shown:${agentInstanceId}`;
+  const [showLoginRetry, setShowLoginRetry] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(loginRetryStorageKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [openAgent] = useOpenAgent();
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
 
@@ -310,7 +319,7 @@ function GenericError({
 
   const providerConfigs = useKartonState((s) => s.preferences?.providerConfigs);
 
-  const showSignInLink = useMemo(() => {
+  const stagewiseLoginRequired = useMemo(() => {
     if (!isAuthorizationError(error)) return false;
     if (!activeModelId || !providerConfigs) return false;
 
@@ -323,6 +332,61 @@ function GenericError({
     if (!provider) return false;
     return providerConfigs[provider]?.mode === 'stagewise';
   }, [error, activeModelId, providerConfigs]);
+
+  const openSettingsAndShowLoginRetry = (
+    section: 'account' | 'models-providers',
+  ) => {
+    setShowLoginRetry(true);
+    try {
+      window.sessionStorage.setItem(loginRetryStorageKey, 'true');
+    } catch {}
+    void openSettings({ section });
+  };
+
+  if (stagewiseLoginRequired) {
+    return (
+      <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-derived-strong p-2 text-sm">
+        <div className="flex flex-row items-center gap-1.5">
+          <IconLockKeyOutline18 className="size-3.5 shrink-0 text-warning-foreground" />
+          <span className="font-medium text-warning-foreground">
+            Not logged in
+          </span>
+        </div>
+
+        <div className="text-foreground">
+          You aren&apos;t signed in to stagewise, and you haven&apos;t
+          configured any other method for AI model access.
+        </div>
+
+        <div className="flex flex-row items-center justify-between gap-2 pt-1">
+          <div>
+            {showLoginRetry && canRetry && (
+              <Button variant="ghost" size="xs" onClick={onRetry}>
+                <RefreshCcwIcon className="size-3" />
+                Retry
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-row justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={() => openSettingsAndShowLoginRetry('models-providers')}
+            >
+              Configure other API for AI models
+            </Button>
+            <Button
+              variant="primary"
+              size="xs"
+              onClick={() => openSettingsAndShowLoginRetry('account')}
+            >
+              Log in to stagewise
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const copyError = () => {
     const errorText = `Error${error.code ? ` (Code: ${error.code})` : ''}: ${error.message}${error.stack ? `\n\nStack trace:\n${error.stack}` : ''}`;
@@ -360,24 +424,6 @@ function GenericError({
           </span>
         )}
       </div>
-
-      {showSignInLink && (
-        <div className="flex flex-col gap-2 rounded-md border border-derived bg-surface-1 p-2 text-xs">
-          <span className="text-muted-foreground">
-            This model uses the stagewise API. Sign in from Account settings to
-            continue.
-          </span>
-          <div className="flex justify-end">
-            <Button
-              variant="secondary"
-              size="xs"
-              onClick={() => void openSettings({ section: 'account' })}
-            >
-              Open Account settings
-            </Button>
-          </div>
-        </div>
-      )}
 
       <Collapsible open={helpExpanded} onOpenChange={setHelpExpanded}>
         <CollapsibleTrigger
