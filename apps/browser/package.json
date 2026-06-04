@@ -123,7 +123,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "@vueless/storybook-dark-mode": "^10.0.8",
     "ai": "6.0.177",
-    "better-auth": "^1.6.10",
+    "better-auth": "^1.6.11",
     "bowser": "^2.14.1",
     "bufferutil": "^4.1.0",
     "class-variance-authority": "^0.7.1",
