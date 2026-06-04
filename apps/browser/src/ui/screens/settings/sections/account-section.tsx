@@ -37,21 +37,31 @@ export function AccountSection() {
   return (
     <div className="h-full w-full">
       {/* Content */}
-      <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
-        <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-8">
-          {/* Header */}
-          <div>
-            <h1 className="font-semibold text-foreground text-xl">Account</h1>
-          </div>
-          {userAccount?.status === 'authenticated' ||
-          userAccount?.status === 'server_unreachable' ? (
+      <OverlayScrollbar
+        className="h-full"
+        contentClassName={cn(
+          'px-6 pt-24 pb-24',
+          userAccount?.status !== 'authenticated' &&
+            userAccount?.status !== 'server_unreachable' &&
+            'flex min-h-full items-center',
+        )}
+      >
+        {userAccount?.status === 'authenticated' ||
+        userAccount?.status === 'server_unreachable' ? (
+          <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-8">
+            {/* Header */}
+            <div>
+              <h1 className="font-semibold text-foreground text-xl">Account</h1>
+            </div>
             <AuthenticatedView
               email={userAccount.user?.email}
               subscription={userAccount.subscription}
               machineId={userAccount.machineId}
               onLogout={() => void logout()}
             />
-          ) : (
+          </div>
+        ) : (
+          <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-center">
             <SignInOptionsPanel
               title="Authenticate"
               description="Get access to the latest models with stagewise."
@@ -67,8 +77,8 @@ export function AccountSection() {
                 void openSettings({ section: 'models-providers' })
               }
             />
-          )}
-        </div>
+          </div>
+        )}
       </OverlayScrollbar>
     </div>
   );
