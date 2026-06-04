@@ -9,13 +9,19 @@ import {
   AgentManager,
   AgentStore,
   AgentTypeRegistry,
-  ChatAgent,
   CommandRegistry,
   WorkspaceMdAgent,
   createUniversalToolbox,
   createInitialAgentSystemState,
 } from '@stagewise/agent-core';
 import {
+  AGENTS_MD_DOMAIN_ID,
+  ENABLED_SKILLS_DOMAIN_ID,
+  FILE_DIFFS_DOMAIN_ID,
+  LOGS_DOMAIN_ID,
+  PLANS_DOMAIN_ID,
+  WORKSPACE_DOMAIN_ID,
+  WORKSPACE_MD_DOMAIN_ID,
   createAgentsMdDomainAdapter,
   createEnabledSkillsDomainAdapter,
   createFileDiffsDomainAdapter,
@@ -36,6 +42,16 @@ import type {
 import { createCliHostModels } from './cli-host-models.js';
 import { createCliHostPaths } from './cli-host-paths.js';
 import { createCliToolboxPort } from './cli-toolbox-port.js';
+import {
+  ShellService,
+  createShellSession,
+  executeShellCommand,
+} from '@stagewise/agent-shell';
+import {
+  SHELLS_DOMAIN_ID,
+  createShellsDomainAdapter,
+} from '@stagewise/agent-shell/env';
+import { CliChatAgent } from './cli-chat-agent.js';
 
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 
@@ -174,6 +190,15 @@ async function main() {
   });
   ensureRuntimeDirs(host);
 
+  // Shell runtime (shared with the browser via @stagewise/agent-shell).
+  // No stream sink (headless = no live preview) and no smart-approval —
+  // the CLI runs in `alwaysAllow`.
+  const shellService = await ShellService.create(
+    logger,
+    (agentInstanceId: string) =>
+      path.join(host.paths.agentsDir(), agentInstanceId, 'shells'),
+  );
+
   const store = new AgentStore(createInitialAgentSystemState());
   const workspaceMdRelativePath = host.workspaceMdRelativePath();
   const mountManager = new MountManager({
@@ -185,16 +210,40 @@ async function main() {
   });
 
   const toolboxPort = createCliToolboxPort({ mountManager, store });
-  const agentRuntimeToolbox: BaseAgentToolboxView = createUniversalToolbox({
-    host,
-    mountManager,
-  });
+  const universalToolbox = createUniversalToolbox({ host, mountManager });
+  // Extend the universal toolbox so the two shell tools resolve via
+  // `getTool`. Casts bridge the `ai` `Tool` shape divergence between the
+  // CLI compile site and the package's nested `ai` types.
+  const agentRuntimeToolbox: BaseAgentToolboxView = {
+    ...universalToolbox,
+    async getTool(name: string, id: string) {
+      // Hide the shell tools when no usable shell was detected (mirrors the
+      // browser's ToolboxService.getTool); ChatAgent.getTools filters nulls.
+      const shellAvailable = shellService.isAvailable();
+      if (name === 'createShellSession') {
+        if (!shellAvailable) return null;
+        return createShellSession(shellService, id, () =>
+          universalToolbox.getMountedPathsForAgent(id),
+        ) as unknown as Awaited<ReturnType<typeof universalToolbox.getTool>>;
+      }
+      if (name === 'executeShellCommand') {
+        if (!shellAvailable) return null;
+        return executeShellCommand(
+          shellService,
+          id,
+          () => 'alwaysAllow',
+          () => universalToolbox.getMountedPathsForAgent(id),
+        ) as unknown as Awaited<ReturnType<typeof universalToolbox.getTool>>;
+      }
+      return universalToolbox.getTool(name, id);
+    },
+  };
 
   const persistence = await AgentCorePersistence.create({ host, store });
 
   const registry = new CommandRegistry();
   const agentTypeRegistry = new AgentTypeRegistry();
-  agentTypeRegistry.register(AgentTypes.CHAT, ChatAgent);
+  agentTypeRegistry.register(AgentTypes.CHAT, CliChatAgent);
   agentTypeRegistry.register(AgentTypes.WORKSPACE_MD, WorkspaceMdAgent);
 
   const manager = new AgentManager({
@@ -234,6 +283,40 @@ async function main() {
   manager.registerEnvAdapter(createPlansDomainAdapter({ host, store }));
   manager.registerEnvAdapter(createLogsDomainAdapter({ host, store }));
   manager.registerEnvAdapter(createFileDiffsDomainAdapter({ store }));
+  manager.registerEnvAdapter(
+    createShellsDomainAdapter({
+      getSnapshot: (id) => shellService.getShellSnapshot(id),
+      getShellInfo: () => {
+        const info = shellService.getShellInfo();
+        return info
+          ? { platform: process.platform, type: info.type, path: info.path }
+          : null;
+      },
+    }),
+  );
+
+  // Opt the chat agent into the env domains registered above. Without a
+  // profile, `BaseAgent` resolves an empty allow-list and the model would
+  // receive no <workspace> mounts, no shell prompt section, and no
+  // <shell-sessions> state — which the shell tools depend on for the
+  // mount-prefix cwd. Listed explicitly, one per registered adapter.
+  host.defineAgentProfile(AgentTypes.CHAT, {
+    envDomainIds: [
+      WORKSPACE_DOMAIN_ID,
+      AGENTS_MD_DOMAIN_ID,
+      WORKSPACE_MD_DOMAIN_ID,
+      ENABLED_SKILLS_DOMAIN_ID,
+      PLANS_DOMAIN_ID,
+      LOGS_DOMAIN_ID,
+      FILE_DIFFS_DOMAIN_ID,
+      SHELLS_DOMAIN_ID,
+    ],
+  });
+  // WORKSPACE_MD child agent only needs the workspace snapshot to resolve
+  // mount prefixes (mirrors the browser host profile).
+  host.defineAgentProfile(AgentTypes.WORKSPACE_MD, {
+    envDomainIds: [WORKSPACE_DOMAIN_ID],
+  });
 
   const agent = await manager.createAgent(
     AgentTypes.CHAT,
@@ -259,8 +342,13 @@ async function main() {
     },
   };
 
-  await manager.sendUserMessage(instanceId, message);
-  await waitUntilIdle(store, instanceId, 600_000);
+  try {
+    await manager.sendUserMessage(instanceId, message);
+    await waitUntilIdle(store, instanceId, 600_000);
+  } finally {
+    // Always kill PTYs, even if the run threw or timed out.
+    await shellService.teardown();
+  }
 
   const finalState = store.get().agents.instances[instanceId]?.state;
   if (finalState?.error) {

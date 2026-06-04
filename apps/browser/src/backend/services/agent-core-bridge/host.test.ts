@@ -12,7 +12,7 @@ import { ACTIVE_APP_DOMAIN_ID } from '@/env-domains/active-app-domain-adapter';
 import { BROWSER_DOMAIN_ID } from '@/env-domains/browser-domain-adapter';
 import { LOG_INGEST_DOMAIN_ID } from '@/env-domains/log-ingest-domain-adapter';
 import { SANDBOX_DOMAIN_ID } from '@/env-domains/sandbox-domain-adapter';
-import { SHELLS_DOMAIN_ID } from '@/env-domains/shells-domain-adapter';
+import { SHELLS_DOMAIN_ID } from '@stagewise/agent-shell/env';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { Logger as BrowserLogger } from '@/services/logger';
 import type { TelemetryService, UIEventName } from '@/services/telemetry';

@@ -1304,7 +1304,7 @@ function toMsysPath(nativePath: string): string {
   if (process.platform !== 'win32') return nativePath;
   const match = nativePath.match(/^([A-Za-z]):[/\\](.*)/);
   if (!match) return nativePath;
-  const driveLetter = match[1].toLowerCase();
-  const rest = match[2].replace(/\\/g, '/');
+  const driveLetter = match[1]!.toLowerCase();
+  const rest = match[2]!.replace(/\\/g, '/');
   return `/${driveLetter}/${rest}`;
 }

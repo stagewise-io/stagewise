@@ -9,7 +9,15 @@ import { MountManagerService } from './services/mount-manager';
 import type { FilePickerService } from '@/services/file-picker';
 import type { UserExperienceService } from '@/services/experience';
 import { SandboxService } from '../sandbox';
-import { ShellService, type DetectedShell } from './services/shell';
+import {
+  ShellService,
+  type DetectedShell,
+  type SmartApprovalDeps,
+  executeShellCommand as executeShellCommandTool,
+  createShellSession as createShellSessionTool,
+} from '@stagewise/agent-shell';
+import { createKartonShellStreamSink } from './services/shell/karton-stream-sink';
+import { classifyShellCommand } from './tools/shell/smart-approval';
 import { TerminalService } from '@/services/terminal';
 import {
   FULL_PERMISSIONS,
@@ -29,7 +37,6 @@ import type { WindowLayoutService } from '@/services/window-layout';
 import type { AuthService } from '@/services/auth';
 import type { TelemetryService } from '@/services/telemetry';
 import type { ModelProviderService } from '@/agents/model-provider';
-import type { SmartApprovalDeps } from './tools/shell/execute-shell-command';
 import type { CredentialsService } from '@/services/credentials';
 import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
@@ -59,10 +66,6 @@ import {
 } from '@stagewise/agent-core';
 import type { BaseAgentToolboxView } from '@stagewise/agent-core/agents';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
-import {
-  executeShellCommand as executeShellCommandTool,
-  createShellSession as createShellSessionTool,
-} from './tools/shell/execute-shell-command';
 import { readConsoleLogs as readConsoleLogsTool } from './tools/browser/read-console-logs';
 import {
   askUserQuestions as askUserQuestionsTool,
@@ -623,24 +626,31 @@ export class ToolboxService
       case 'executeShellCommand': {
         if (!this.shellService?.isAvailable()) return null;
         const smartApproval: SmartApprovalDeps = {
-          // Use a thin forwarding shim so a late `setModelProviderService`
-          // call is still honored (closure captures `this`, not the
-          // possibly-null field at case-match time).
-          modelProviderService: {
-            getModelWithOptions: (modelId, traceId, props) => {
-              if (!this.modelProviderService) {
-                throw new Error(
-                  'ModelProviderService not yet initialized; smart-approval classification unavailable.',
-                );
-              }
-              return this.modelProviderService.getModelWithOptions(
-                modelId,
-                traceId,
-                props,
-              );
-            },
-          },
-          telemetryService: this.telemetryService,
+          // The classifier lives in the browser host (model provider +
+          // telemetry); the package only calls `classify`. Use a thin
+          // forwarding shim so a late `setModelProviderService` call is
+          // still honored (closure captures `this`, not the possibly-null
+          // field at case-match time).
+          classify: (input) =>
+            classifyShellCommand(
+              input,
+              {
+                getModelWithOptions: (modelId, traceId, props) => {
+                  if (!this.modelProviderService) {
+                    throw new Error(
+                      'ModelProviderService not yet initialized; smart-approval classification unavailable.',
+                    );
+                  }
+                  return this.modelProviderService.getModelWithOptions(
+                    modelId,
+                    traceId,
+                    props,
+                  );
+                },
+              },
+              agentInstanceId,
+              this.telemetryService,
+            ),
           recordPendingApproval: (toolCallId, explanation) => {
             // Legacy field name: this is smart-approval explanation metadata,
             // not the canonical approval-pending state. The canonical state
@@ -1400,7 +1410,8 @@ export class ToolboxService
     const resolvedEnv = await this.resolvedEnvPromise;
     this.shellService = await ShellService.create(
       this.logger,
-      this.uiKarton,
+      getAgentShellLogsDir,
+      createKartonShellStreamSink(this.uiKarton),
       this.detectedShell,
       resolvedEnv,
     );

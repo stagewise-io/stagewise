@@ -12,7 +12,7 @@ import {
   BASH_INTEGRATION,
   ZSH_INTEGRATION,
 } from './session-manager';
-import { detectShell } from './detect-shell';
+import { detectShell } from './shell-env';
 import { sanitizeEnv } from './sanitize-env';
 import {
   DEFAULT_EXITED_IDLE_MS,
