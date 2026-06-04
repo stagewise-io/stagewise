@@ -1,29 +1,93 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import type { Readable } from 'node:stream';
+import {
+  WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS,
+  variantForPlatform,
+} from '@shared/worktree-setup';
 import type { KartonService } from '@/services/karton';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 
-const WORKTREE_SETUP_SCRIPT_RELATIVE_PATH = path.join(
-  '.stagewise',
-  'worktree-setup.sh',
-);
 const WORKTREE_SETUP_TIMEOUT_MS = 20 * 60 * 1000;
 const OUTPUT_TAIL_MAX_LENGTH = 12_000;
 const OUTPUT_UPDATE_INTERVAL_MS = 150;
 
 const WORKTREE_SETUP_TIMEOUT_MESSAGE = 'Worktree setup timed out.';
-const WORKTREE_SETUP_WINDOWS_UNSUPPORTED_MESSAGE =
-  'Worktree setup scripts are not supported on Windows yet.';
 
 const EXPECTED_FAILURE_MESSAGES = new Set([
   WORKTREE_SETUP_TIMEOUT_MESSAGE,
-  WORKTREE_SETUP_WINDOWS_UNSUPPORTED_MESSAGE,
   'Worktree setup was interrupted.',
 ]);
+
+/**
+ * Merges `overrides` onto `base` with case-insensitive keys, so an override
+ * replaces any base entry whose name matches case-insensitively.
+ *
+ * Windows treats environment variable names case-insensitively, but a plain
+ * object spread does not: `process.env` may expose `Path` while the resolved
+ * shell environment exposes `PATH`, leaving both keys side by side. That stale
+ * `Path` would then win lookups (it is inserted first) and the spawned child
+ * would receive ambiguous duplicate variables. Collapsing to a single key per
+ * name, with the override taking precedence, avoids both problems.
+ */
+export function mergeEnv(
+  base: NodeJS.ProcessEnv,
+  overrides: Record<string, string>,
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = { ...base };
+  for (const [key, value] of Object.entries(overrides)) {
+    const lowerKey = key.toLowerCase();
+    for (const existingKey of Object.keys(result)) {
+      if (existingKey !== key && existingKey.toLowerCase() === lowerKey) {
+        delete result[existingKey];
+      }
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Reads the PATH value from an environment record. PATH casing is
+ * platform-dependent (Windows commonly exposes it as `Path`), so the lookup is
+ * case-insensitive.
+ */
+function readPathFromEnv(env: NodeJS.ProcessEnv): string {
+  for (const key of Object.keys(env)) {
+    if (key.toLowerCase() === 'path') {
+      return env[key] ?? '';
+    }
+  }
+  return '';
+}
+
+/**
+ * Resolves the PowerShell interpreter to invoke on Windows. Prefers `pwsh`
+ * (PowerShell 7+) when present on PATH, otherwise falls back to
+ * `powershell.exe` (Windows PowerShell 5.1, present on every Windows install).
+ *
+ * The PATH is taken from the resolved spawn environment rather than
+ * `process.env`, because Electron can start with a stripped `process.env` on
+ * Windows while the real user PATH (where `pwsh` lives) is recovered into the
+ * resolved environment that the child process actually receives.
+ */
+function defaultResolvePowerShellCommand(env: NodeJS.ProcessEnv): string {
+  const pathEnv = readPathFromEnv(env);
+  const dirs = pathEnv.split(path.delimiter).filter(Boolean);
+  for (const dir of dirs) {
+    if (
+      existsSync(path.join(dir, 'pwsh.exe')) ||
+      existsSync(path.join(dir, 'pwsh'))
+    ) {
+      return 'pwsh';
+    }
+  }
+  return 'powershell.exe';
+}
 
 type SpawnProcess = {
   stdout: Readable;
@@ -55,6 +119,7 @@ type WorktreeSetupRunnerDeps = {
   uiKarton: KartonService;
   resolvedEnvPromise: Promise<Record<string, string> | null>;
   spawnProcess?: SpawnFn;
+  resolvePowerShellCommand?: (env: NodeJS.ProcessEnv) => string;
   timeoutMs?: number;
   platform?: NodeJS.Platform;
 };
@@ -80,6 +145,7 @@ export class WorktreeSetupRunner {
   private readonly uiKarton: KartonService;
   private readonly resolvedEnvPromise: Promise<Record<string, string> | null>;
   private readonly spawnProcess: SpawnFn;
+  private readonly resolvePowerShellCommand: (env: NodeJS.ProcessEnv) => string;
   private readonly timeoutMs: number;
   private readonly platform: NodeJS.Platform;
   private readonly activeRuns = new Map<string, ActiveRun>();
@@ -91,6 +157,7 @@ export class WorktreeSetupRunner {
     resolvedEnvPromise,
     spawnProcess = (command, args, options) =>
       spawn(command, args, options) as SpawnProcess,
+    resolvePowerShellCommand = defaultResolvePowerShellCommand,
     timeoutMs = WORKTREE_SETUP_TIMEOUT_MS,
     platform = process.platform,
   }: WorktreeSetupRunnerDeps) {
@@ -99,6 +166,7 @@ export class WorktreeSetupRunner {
     this.uiKarton = uiKarton;
     this.resolvedEnvPromise = resolvedEnvPromise;
     this.spawnProcess = spawnProcess;
+    this.resolvePowerShellCommand = resolvePowerShellCommand;
     this.timeoutMs = timeoutMs;
     this.platform = platform;
   }
@@ -106,13 +174,15 @@ export class WorktreeSetupRunner {
   public async start(metadata: WorktreeSetupMetadata): Promise<void> {
     if (this.activeRuns.has(metadata.workspacePath)) return;
 
+    const variant = variantForPlatform(this.platform);
+    const relativeScriptPath = WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS[variant];
     const workspaceScriptPath = path.join(
       metadata.workspacePath,
-      WORKTREE_SETUP_SCRIPT_RELATIVE_PATH,
+      relativeScriptPath,
     );
     const mainWorktreeScriptPath = path.join(
       metadata.mainWorktreePath,
-      WORKTREE_SETUP_SCRIPT_RELATIVE_PATH,
+      relativeScriptPath,
     );
     const scriptPath = (await this.pathExists(workspaceScriptPath))
       ? workspaceScriptPath
@@ -203,11 +273,6 @@ export class WorktreeSetupRunner {
       });
     };
 
-    if (this.platform === 'win32') {
-      finish('failed', null, WORKTREE_SETUP_WINDOWS_UNSUPPORTED_MESSAGE);
-      return;
-    }
-
     let resolvedEnv: Record<string, string> | null;
     try {
       resolvedEnv = await this.resolvedEnvPromise;
@@ -224,16 +289,30 @@ export class WorktreeSetupRunner {
     }
     if (activeRun.settled) return;
 
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
+    const env: NodeJS.ProcessEnv = mergeEnv(process.env, {
       ...(resolvedEnv ?? {}),
       STAGEWISE_SOURCE_WORKTREE_PATH: metadata.sourceWorktreePath,
       STAGEWISE_TARGET_WORKTREE_PATH: metadata.workspacePath,
       STAGEWISE_MAIN_WORKTREE_PATH: metadata.mainWorktreePath,
-    };
+    });
+
+    const [command, commandArgs] =
+      variant === 'powershell'
+        ? ([
+            this.resolvePowerShellCommand(env),
+            [
+              '-NoProfile',
+              '-NonInteractive',
+              '-ExecutionPolicy',
+              'Bypass',
+              '-File',
+              scriptPath,
+            ],
+          ] as const)
+        : (['/bin/sh', [scriptPath]] as const);
 
     try {
-      activeRun.child = this.spawnProcess('/bin/sh', [scriptPath], {
+      activeRun.child = this.spawnProcess(command, [...commandArgs], {
         cwd: metadata.workspacePath,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],

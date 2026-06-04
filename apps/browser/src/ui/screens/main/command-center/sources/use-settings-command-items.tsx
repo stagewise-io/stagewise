@@ -6,7 +6,11 @@ import {
   IconNoteFillDuo18,
   IconSpace3dFillDuo18,
 } from 'nucleo-ui-fill-duo-18';
-import { IconKey2Outline18, IconServerOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconBranchOutOutline18,
+  IconKey2Outline18,
+  IconServerOutline18,
+} from 'nucleo-ui-outline-18';
 import type { SettingCommandItem } from '../command-center-model';
 import {
   commandCenterSettings,
@@ -25,6 +29,8 @@ function iconForSetting(setting: CommandCenterSettingDefinition) {
       return <IconServerOutline18 className={className} />;
     case 'context':
       return <IconNoteFillDuo18 className={className} />;
+    case 'worktrees':
+      return <IconBranchOutOutline18 className={className} />;
     case 'plugins':
       return <IconSpace3dFillDuo18 className={`${className} rotate-180`} />;
     case 'history':
