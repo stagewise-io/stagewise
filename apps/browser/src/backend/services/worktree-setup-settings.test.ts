@@ -133,16 +133,37 @@ describe('WorktreeSetupSettingsService', () => {
   it('rejects setup script saves for unknown repositories', async () => {
     const { service } = createService({ recentPaths: [] });
 
-    await expect(service.saveScript(repoPath, '#!/bin/sh')).resolves.toEqual({
+    await expect(
+      service.saveScript(repoPath, 'posix', '#!/bin/sh'),
+    ).resolves.toEqual({
       ok: false,
       message: 'Repository is no longer available.',
+    });
+  });
+
+  it('rejects setup script saves for unknown script variants', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.saveScript(
+        repoPath,
+        'batch' as unknown as Parameters<typeof service.saveScript>[1],
+        '@echo off',
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      message: 'Unknown script variant: batch.',
     });
   });
 
   it('saves setup scripts only under the repository setup script path', async () => {
     const { service } = createService();
 
-    const result = await service.saveScript(repoPath, '#!/bin/sh\necho ok\n');
+    const result = await service.saveScript(
+      repoPath,
+      'posix',
+      '#!/bin/sh\necho ok\n',
+    );
 
     expect(result.ok).toBe(true);
     await expect(
@@ -151,6 +172,31 @@ describe('WorktreeSetupSettingsService', () => {
         'utf8',
       ),
     ).resolves.toBe('#!/bin/sh\necho ok\n');
+  });
+
+  it('saves the PowerShell variant under the .ps1 path', async () => {
+    const { service } = createService();
+
+    const result = await service.saveScript(
+      repoPath,
+      'powershell',
+      "Write-Host 'ok'\n",
+    );
+
+    expect(result.ok).toBe(true);
+    await expect(
+      fs.readFile(
+        path.join(repoPath, '.stagewise', 'worktree-setup.ps1'),
+        'utf8',
+      ),
+    ).resolves.toBe("Write-Host 'ok'\n");
+    if (result.ok) {
+      expect(result.repository.scripts.powershell).toMatchObject({
+        variant: 'powershell',
+        exists: true,
+        content: "Write-Host 'ok'\n",
+      });
+    }
   });
 
   it('returns the saved script state when refresh after save cannot find the repository', async () => {
@@ -196,14 +242,17 @@ describe('WorktreeSetupSettingsService', () => {
     });
     const content = '#!/bin/sh\necho saved\n';
 
-    const result = await service.saveScript(repoPath, content);
+    const result = await service.saveScript(repoPath, 'posix', content);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.repository).toMatchObject({
         mainWorktreePath: repoPath,
-        scriptExists: true,
-        scriptContent: content,
+      });
+      expect(result.repository.scripts.posix).toMatchObject({
+        variant: 'posix',
+        exists: true,
+        content,
       });
     }
   });
@@ -397,7 +446,7 @@ describe('WorktreeSetupSettingsService', () => {
       expect(
         result.repositories.find(
           (repo) => repo.mainWorktreePath === unreadableRepo,
-        )?.scriptExists,
+        )?.scripts.posix.exists,
       ).toBe(false);
     } finally {
       readFileSpy.mockRestore();

@@ -18,6 +18,7 @@ import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
 import type { FileDiff } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
+import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
 import type {
   FilePickerRequest,
   GlobalConfig,
@@ -189,14 +190,19 @@ export type WorktreeSetupManagedWorktree = {
   disabledReason: string | null;
 };
 
+export type WorktreeSetupScriptFile = {
+  variant: WorktreeSetupScriptVariant;
+  path: string;
+  exists: boolean;
+  content: string;
+};
+
 export type WorktreeSetupRepositorySettings = {
   id: string;
   name: string;
   mainWorktreePath: string;
   repositoryId: string | null;
-  scriptPath: string;
-  scriptExists: boolean;
-  scriptContent: string;
+  scripts: Record<WorktreeSetupScriptVariant, WorktreeSetupScriptFile>;
   managedWorktrees: WorktreeSetupManagedWorktree[];
 };
 
@@ -1131,6 +1137,7 @@ export type KartonContract = {
       listWorktreeSetupRepositories: () => Promise<WorktreeSetupRepositoriesResult>;
       saveWorktreeSetupScript: (
         mainWorktreePath: string,
+        variant: WorktreeSetupScriptVariant,
         content: string,
       ) => Promise<SaveWorktreeSetupScriptResult>;
       deleteWorktreeSetupWorktree: (

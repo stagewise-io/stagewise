@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KartonService } from '@/services/karton';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
-import { WorktreeSetupRunner } from './worktree-setup-runner';
+import { mergeEnv, WorktreeSetupRunner } from './worktree-setup-runner';
 
 let tempDir: string;
 
@@ -62,6 +62,17 @@ async function writeSetupScript(worktreePath: string, content = 'exit 0') {
   return scriptPath;
 }
 
+async function writePowerShellScript(worktreePath: string, content = 'exit 0') {
+  const scriptPath = path.join(
+    worktreePath,
+    '.stagewise',
+    'worktree-setup.ps1',
+  );
+  await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+  await fs.writeFile(scriptPath, content);
+  return scriptPath;
+}
+
 function createProcess() {
   const child = new EventEmitter() as EventEmitter & {
     stdout: PassThrough;
@@ -90,6 +101,7 @@ type TestRunnerDeps = {
       stdio: ['ignore', 'pipe', 'pipe'];
     },
   ) => TestSpawnProcess;
+  resolvePowerShellCommand?: (env: NodeJS.ProcessEnv) => string;
   timeoutMs?: number;
   platform?: NodeJS.Platform;
 };
@@ -100,6 +112,26 @@ function createRunner(deps: TestRunnerDeps) {
     ...deps,
   });
 }
+
+describe('mergeEnv', () => {
+  it('lets overrides replace base entries that differ only in case', () => {
+    // Simulates Windows: process.env exposes a stale `Path`, the resolved
+    // shell environment exposes the real `PATH` (with pwsh on it).
+    const merged = mergeEnv(
+      { Path: 'C:\\stale', OTHER: 'keep' },
+      { PATH: 'C:\\resolved\\pwsh' },
+    );
+
+    expect(merged.Path).toBeUndefined();
+    expect(merged.PATH).toBe('C:\\resolved\\pwsh');
+    expect(merged.OTHER).toBe('keep');
+    // Only one PATH-like key survives, so the child receives no duplicates.
+    const pathKeys = Object.keys(merged).filter(
+      (key) => key.toLowerCase() === 'path',
+    );
+    expect(pathKeys).toEqual(['PATH']);
+  });
+});
 
 describe('WorktreeSetupRunner', () => {
   it('does not create setup state when the script is missing', async () => {
@@ -283,18 +315,180 @@ describe('WorktreeSetupRunner', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
-  it('does not spawn the setup script on Windows', async () => {
+  it('spawns the PowerShell variant on Windows', async () => {
     const mainWorktreePath = path.join(tempDir, 'main');
     const workspacePath = path.join(tempDir, 'worktree');
     await fs.mkdir(workspacePath, { recursive: true });
-    await writeSetupScript(workspacePath);
+    const scriptPath = await writePowerShellScript(workspacePath);
+    const child = createProcess();
     const { state, uiKarton } = createKarton();
-    const spawnProcess = vi.fn();
-    const captureException = vi.fn();
+    const spawnProcess = vi.fn(() => child);
     const runner = createRunner({
       logger: { warn: vi.fn() } as unknown as Logger,
       telemetryService: {
-        captureException,
+        captureException: vi.fn(),
+      } as unknown as TelemetryService,
+      uiKarton,
+      resolvedEnvPromise: Promise.resolve(null),
+      spawnProcess,
+      resolvePowerShellCommand: () => 'powershell.exe',
+      platform: 'win32',
+    });
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptPath,
+      ],
+      {
+        cwd: workspacePath,
+        env: expect.objectContaining({
+          STAGEWISE_TARGET_WORKTREE_PATH: workspacePath,
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toMatchObject({
+      scriptPath,
+      status: 'running',
+    });
+
+    child.emit('close', 0);
+    runner.teardown();
+  });
+
+  it('uses pwsh when the resolver returns it', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    const scriptPath = await writePowerShellScript(workspacePath);
+    const child = createProcess();
+    const { uiKarton } = createKarton();
+    const spawnProcess = vi.fn(() => child);
+    const runner = createRunner({
+      logger: { warn: vi.fn() } as unknown as Logger,
+      telemetryService: {
+        captureException: vi.fn(),
+      } as unknown as TelemetryService,
+      uiKarton,
+      resolvedEnvPromise: Promise.resolve(null),
+      spawnProcess,
+      resolvePowerShellCommand: () => 'pwsh',
+      platform: 'win32',
+    });
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'pwsh',
+      expect.arrayContaining(['-File', scriptPath]),
+      expect.objectContaining({ cwd: workspacePath }),
+    );
+
+    child.emit('close', 0);
+    runner.teardown();
+  });
+
+  it('resolves PowerShell using the resolved spawn environment PATH', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    await writePowerShellScript(workspacePath);
+    const child = createProcess();
+    const { uiKarton } = createKarton();
+    const spawnProcess = vi.fn(() => child);
+    const resolvedPath = path.join(tempDir, 'resolved-tools');
+    let resolverEnv: NodeJS.ProcessEnv | null = null;
+    const runner = createRunner({
+      logger: { warn: vi.fn() } as unknown as Logger,
+      telemetryService: {
+        captureException: vi.fn(),
+      } as unknown as TelemetryService,
+      uiKarton,
+      resolvedEnvPromise: Promise.resolve({ PATH: resolvedPath }),
+      spawnProcess,
+      resolvePowerShellCommand: (env) => {
+        resolverEnv = env;
+        return 'pwsh';
+      },
+      platform: 'win32',
+    });
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    // The resolver must see the PATH the child process actually receives, not
+    // the (possibly stripped) process.env PATH.
+    expect(resolverEnv).not.toBeNull();
+    expect((resolverEnv as unknown as NodeJS.ProcessEnv).PATH).toBe(
+      resolvedPath,
+    );
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'pwsh',
+      expect.anything(),
+      expect.objectContaining({
+        env: expect.objectContaining({ PATH: resolvedPath }),
+      }),
+    );
+
+    child.emit('close', 0);
+    runner.teardown();
+  });
+
+  it('falls back to the PowerShell script in the main worktree on Windows', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    const scriptPath = await writePowerShellScript(mainWorktreePath);
+    const child = createProcess();
+    const { state, uiKarton } = createKarton();
+    const spawnProcess = vi.fn(() => child);
+    const runner = createRunner({
+      logger: { warn: vi.fn() } as unknown as Logger,
+      telemetryService: {
+        captureException: vi.fn(),
+      } as unknown as TelemetryService,
+      uiKarton,
+      resolvedEnvPromise: Promise.resolve(null),
+      spawnProcess,
+      resolvePowerShellCommand: () => 'powershell.exe',
+      platform: 'win32',
+    });
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'powershell.exe',
+      expect.arrayContaining(['-File', scriptPath]),
+      expect.objectContaining({ cwd: workspacePath }),
+    );
+    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toMatchObject({
+      scriptPath,
+      status: 'running',
+    });
+
+    child.emit('close', 0);
+    runner.teardown();
+  });
+
+  it('does not run a POSIX-only script on Windows', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    // Only a .sh script exists; on Windows the runner looks for .ps1.
+    await writeSetupScript(workspacePath);
+    const { state, uiKarton } = createKarton();
+    const spawnProcess = vi.fn();
+    const runner = createRunner({
+      logger: { warn: vi.fn() } as unknown as Logger,
+      telemetryService: {
+        captureException: vi.fn(),
       } as unknown as TelemetryService,
       uiKarton,
       resolvedEnvPromise: Promise.resolve(null),
@@ -305,12 +499,7 @@ describe('WorktreeSetupRunner', () => {
     await runner.start(metadata(mainWorktreePath, workspacePath));
 
     expect(spawnProcess).not.toHaveBeenCalled();
-    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toMatchObject({
-      status: 'failed',
-      exitCode: null,
-      message: 'Worktree setup scripts are not supported on Windows yet.',
-    });
-    expect(captureException).not.toHaveBeenCalled();
+    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toBeUndefined();
   });
 
   it('marks setup failed if environment resolution times out', async () => {

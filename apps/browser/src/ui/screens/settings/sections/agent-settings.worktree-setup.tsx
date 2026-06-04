@@ -17,8 +17,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@stagewise/stage-ui/components/tabs';
 import { toast } from '@stagewise/stage-ui/components/toaster';
-import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { SettingsScrollTabs } from '../_components/settings-scroll-tabs';
@@ -28,6 +33,10 @@ import type {
   WorktreeSetupRepositorySettings,
 } from '@shared/karton-contracts/ui';
 import {
+  WORKTREE_SETUP_SCRIPT_FILENAMES,
+  type WorktreeSetupScriptVariant,
+} from '@shared/worktree-setup';
+import {
   IconBranchOutOutline18,
   IconCircleQuestionOutline18,
   IconTrashOutline18,
@@ -35,7 +44,8 @@ import {
 import { FileIcon } from '@ui/components/file-icon';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 
-const SETUP_SCRIPT_TEMPLATE = `#!/bin/sh
+const SETUP_SCRIPT_TEMPLATES: Record<WorktreeSetupScriptVariant, string> = {
+  posix: `#!/bin/sh
 set -e
 
 # Runs after stagewise creates and mounts a new Git worktree.
@@ -43,14 +53,43 @@ set -e
 
 # Example:
 # pnpm install
-`;
+`,
+  powershell: `$ErrorActionPreference = 'Stop'
+
+# Runs after stagewise creates and mounts a new Git worktree.
+# CWD is the new worktree.
+
+# Example:
+# pnpm install
+`,
+};
+
+const VARIANT_TAB_LABELS: Record<WorktreeSetupScriptVariant, string> = {
+  posix: 'Shell (.sh)',
+  powershell: 'PowerShell (.ps1)',
+};
+
+const EMPTY_SCRIPT_DRAFTS: Record<WorktreeSetupScriptVariant, string> = {
+  posix: '',
+  powershell: '',
+};
 
 function getInitialScriptDraft(
   repository: WorktreeSetupRepositorySettings,
+  variant: WorktreeSetupScriptVariant,
 ): string {
-  return repository.scriptExists
-    ? repository.scriptContent
-    : SETUP_SCRIPT_TEMPLATE;
+  const script = repository.scripts[variant];
+  return script.exists ? script.content : SETUP_SCRIPT_TEMPLATES[variant];
+}
+
+function buildScriptDrafts(
+  repository: WorktreeSetupRepositorySettings | null,
+): Record<WorktreeSetupScriptVariant, string> {
+  if (!repository) return { ...EMPTY_SCRIPT_DRAFTS };
+  return {
+    posix: getInitialScriptDraft(repository, 'posix'),
+    powershell: getInitialScriptDraft(repository, 'powershell'),
+  };
 }
 
 function formatRelativeTime(timestamp: number | null): string {
@@ -88,7 +127,14 @@ export function WorktreeSetupSection() {
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<
     string | null
   >(null);
-  const [scriptDraft, setScriptDraft] = useState('');
+  const platform = useKartonState((s) => s.appInfo.platform);
+  const [activeVariant, setActiveVariant] =
+    useState<WorktreeSetupScriptVariant>(
+      platform === 'win32' ? 'powershell' : 'posix',
+    );
+  const [scriptDrafts, setScriptDrafts] = useState<
+    Record<WorktreeSetupScriptVariant, string>
+  >({ ...EMPTY_SCRIPT_DRAFTS });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
@@ -104,9 +150,11 @@ export function WorktreeSetupSection() {
     [repositories, selectedRepositoryId],
   );
 
+  const scriptDraft = scriptDrafts[activeVariant];
+
   const dirty =
     selectedRepository !== null &&
-    scriptDraft !== getInitialScriptDraft(selectedRepository);
+    scriptDraft !== getInitialScriptDraft(selectedRepository, activeVariant);
 
   const refreshRepositories = useCallback(async () => {
     if (refreshInFlightRef.current) {
@@ -159,10 +207,15 @@ export function WorktreeSetupSection() {
     }
 
     previousSelectedRepositoryIdRef.current = selectedRepositoryId;
-    setScriptDraft(
-      selectedRepository ? getInitialScriptDraft(selectedRepository) : '',
-    );
+    setScriptDrafts(buildScriptDrafts(selectedRepository));
   }, [selectedRepository]);
+
+  const handleScriptDraftChange = useCallback(
+    (value: string) => {
+      setScriptDrafts((current) => ({ ...current, [activeVariant]: value }));
+    },
+    [activeVariant],
+  );
 
   const updateRepository = useCallback(
     (repository: WorktreeSetupRepositorySettings) => {
@@ -184,7 +237,8 @@ export function WorktreeSetupSection() {
     try {
       const result = await saveScript(
         selectedRepository.mainWorktreePath,
-        scriptDraft,
+        activeVariant,
+        scriptDrafts[activeVariant],
       );
       if (result.ok) {
         updateRepository(result.repository);
@@ -207,12 +261,21 @@ export function WorktreeSetupSection() {
     } finally {
       setSaving(false);
     }
-  }, [saveScript, scriptDraft, selectedRepository, updateRepository]);
+  }, [
+    saveScript,
+    activeVariant,
+    scriptDrafts,
+    selectedRepository,
+    updateRepository,
+  ]);
 
   const handleReset = useCallback(() => {
     if (!selectedRepository) return;
-    setScriptDraft(getInitialScriptDraft(selectedRepository));
-  }, [selectedRepository]);
+    setScriptDrafts((current) => ({
+      ...current,
+      [activeVariant]: getInitialScriptDraft(selectedRepository, activeVariant),
+    }));
+  }, [activeVariant, selectedRepository]);
 
   const handleConfirmDelete = useCallback(
     async (worktree: WorktreeSetupManagedWorktree) => {
@@ -270,11 +333,13 @@ export function WorktreeSetupSection() {
             {selectedRepository ? (
               <RepositoryDetails
                 repository={selectedRepository}
+                activeVariant={activeVariant}
+                onVariantChange={setActiveVariant}
                 scriptDraft={scriptDraft}
                 dirty={dirty}
                 saving={saving}
                 deletingPath={deletingPath}
-                onScriptDraftChange={setScriptDraft}
+                onScriptDraftChange={handleScriptDraftChange}
                 onReset={handleReset}
                 onSave={handleSave}
                 onConfirmDelete={handleConfirmDelete}
@@ -324,6 +389,8 @@ function RepositoryList({
 
 function RepositoryDetails({
   repository,
+  activeVariant,
+  onVariantChange,
   scriptDraft,
   dirty,
   saving,
@@ -334,6 +401,8 @@ function RepositoryDetails({
   onConfirmDelete,
 }: {
   repository: WorktreeSetupRepositorySettings;
+  activeVariant: WorktreeSetupScriptVariant;
+  onVariantChange: (variant: WorktreeSetupScriptVariant) => void;
   scriptDraft: string;
   dirty: boolean;
   saving: boolean;
@@ -343,6 +412,7 @@ function RepositoryDetails({
   onSave: () => void;
   onConfirmDelete: (worktree: WorktreeSetupManagedWorktree) => Promise<boolean>;
 }) {
+  const activeScript = repository.scripts[activeVariant];
   return (
     <div className="space-y-8">
       <section className="space-y-3">
@@ -354,10 +424,10 @@ function RepositoryDetails({
           <div className="flex items-center justify-between">
             <p className="text-muted-foreground text-xs">
               Runs for new worktrees when the checked-out branch contains this
-              file.
+              file. The variant for the worktree's platform is executed.
             </p>
             <FileContextMenu
-              relativePath={repository.scriptPath}
+              relativePath={activeScript.path}
               resolvePath={(p) => p}
             >
               <Tooltip>
@@ -370,20 +440,44 @@ function RepositoryDetails({
                     )}
                   >
                     <FileIcon
-                      filePath={repository.scriptPath}
+                      filePath={activeScript.path}
                       className="size-4 shrink-0"
                     />
-                    <span>worktree-setup.sh</span>
+                    <span className="shrink-0">
+                      {WORKTREE_SETUP_SCRIPT_FILENAMES[activeVariant]}
+                    </span>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{repository.scriptPath}</TooltipContent>
+                <TooltipContent>{activeScript.path}</TooltipContent>
               </Tooltip>
             </FileContextMenu>
           </div>
         </div>
+        <Tabs
+          value={activeVariant}
+          onValueChange={(value) =>
+            onVariantChange(value as WorktreeSetupScriptVariant)
+          }
+        >
+          <TabsList className="w-auto">
+            <TabsTrigger value="posix">{VARIANT_TAB_LABELS.posix}</TabsTrigger>
+            <TabsTrigger value="powershell">
+              {VARIANT_TAB_LABELS.powershell}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         <textarea
           value={scriptDraft}
           onChange={(event) => onScriptDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              (event.metaKey || event.ctrlKey) &&
+              event.key.toLowerCase() === 's'
+            ) {
+              event.preventDefault();
+              if (dirty && !saving) void onSave();
+            }
+          }}
           spellCheck={false}
           className="scrollbar-subtle min-h-72 w-full resize-y rounded-lg border border-derived bg-surface-1 p-3 font-mono text-foreground text-xs outline-none ring-0 transition-colors placeholder:text-subtle-foreground focus:border-derived-strong"
         />
@@ -444,6 +538,13 @@ function SetupVariablesPopover() {
             value="STAGEWISE_MAIN_WORKTREE_PATH"
           />
         </div>
+        <PopoverFooter>
+          <p className="text-muted-foreground text-xs">
+            In POSIX shell scripts, access these via{' '}
+            <code className="font-mono">$STAGEWISE_...</code>. In PowerShell,
+            use <code className="font-mono">$env:STAGEWISE_...</code>.
+          </p>
+        </PopoverFooter>
       </PopoverContent>
     </Popover>
   );

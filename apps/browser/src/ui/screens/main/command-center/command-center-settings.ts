@@ -11,6 +11,7 @@ export type CommandCenterSettingDefinition = Omit<
     | 'provider'
     | 'settings'
     | 'context'
+    | 'worktrees'
     | 'plugins'
     | 'browser'
     | 'history';
@@ -21,6 +22,7 @@ const ROUTE_MODELS_PROVIDERS: SettingsRoute = { section: 'models-providers' };
 const ROUTE_CUSTOM_PROVIDERS: SettingsRoute = { section: 'custom-providers' };
 const ROUTE_AGENT_GENERAL: SettingsRoute = { section: 'agent-general' };
 const ROUTE_SKILLS_CONTEXT: SettingsRoute = { section: 'skills-context' };
+const ROUTE_WORKTREE_SETUP: SettingsRoute = { section: 'worktree-setup' };
 const ROUTE_PLUGINS: SettingsRoute = { section: 'plugins' };
 const ROUTE_BROWSING: SettingsRoute = { section: 'browsing' };
 const ROUTE_HISTORY: SettingsRoute = { section: 'history' };
@@ -80,6 +82,15 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     url: '',
     settingsRoute: ROUTE_SKILLS_CONTEXT,
     iconName: 'context',
+  },
+  {
+    id: 'setting:worktree-setup',
+    title: 'Worktrees',
+    subtitle: 'Manage worktree setup scripts',
+    keywords: ['worktree', 'worktrees', 'setup', 'script', 'branch'],
+    url: '',
+    settingsRoute: ROUTE_WORKTREE_SETUP,
+    iconName: 'worktrees',
   },
   {
     id: 'setting:plugins',

@@ -9,10 +9,15 @@ import type {
   WorktreeSetupManagedWorktree,
   WorktreeSetupRepositoriesResult,
   WorktreeSetupRepositorySettings,
+  WorktreeSetupScriptFile,
   SaveWorktreeSetupScriptResult,
 } from '@shared/karton-contracts/ui';
+import {
+  WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS,
+  WORKTREE_SETUP_SCRIPT_VARIANTS,
+  type WorktreeSetupScriptVariant,
+} from '@shared/worktree-setup';
 
-const SETUP_SCRIPT_RELATIVE_PATH = path.join('.stagewise', 'worktree-setup.sh');
 const MANAGED_WORKTREE_INSPECTION_CONCURRENCY = 4;
 
 type ManagedWorktreeInspection = WorktreeSetupManagedWorktree & {
@@ -116,19 +121,25 @@ export class WorktreeSetupSettingsService {
 
   public async saveScript(
     mainWorktreePath: string,
+    variant: WorktreeSetupScriptVariant,
     content: string,
   ): Promise<SaveWorktreeSetupScriptResult> {
+    if (!WORKTREE_SETUP_SCRIPT_VARIANTS.includes(variant)) {
+      return { ok: false, message: `Unknown script variant: ${variant}.` };
+    }
+
     const repository =
       await this.findRepositoryByMainWorktreePath(mainWorktreePath);
     if (!repository) {
       return { ok: false, message: 'Repository is no longer available.' };
     }
 
+    const scriptPath = repository.scripts[variant].path;
     try {
-      await fs.mkdir(path.dirname(repository.scriptPath), { recursive: true });
-      await fs.writeFile(repository.scriptPath, content, 'utf8');
-      if (process.platform !== 'win32') {
-        await fs.chmod(repository.scriptPath, 0o755);
+      await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+      await fs.writeFile(scriptPath, content, 'utf8');
+      if (variant === 'posix' && process.platform !== 'win32') {
+        await fs.chmod(scriptPath, 0o755);
       }
       const refreshed = await this.findRepositoryByMainWorktreePath(
         repository.mainWorktreePath,
@@ -137,8 +148,15 @@ export class WorktreeSetupSettingsService {
         ok: true,
         repository: refreshed ?? {
           ...repository,
-          scriptExists: true,
-          scriptContent: content,
+          scripts: {
+            ...repository.scripts,
+            [variant]: {
+              variant,
+              path: scriptPath,
+              exists: true,
+              content,
+            },
+          },
         },
       };
     } catch (error) {
@@ -295,16 +313,32 @@ export class WorktreeSetupSettingsService {
     repositoryId: string | null,
     managedWorktrees: ManagedWorktreeInspection[],
   ): Promise<WorktreeSetupRepositorySettings> {
-    const scriptPath = path.join(mainWorktreePath, SETUP_SCRIPT_RELATIVE_PATH);
-    const scriptContent = await this.readScriptContent(scriptPath);
+    const scriptEntries = await Promise.all(
+      WORKTREE_SETUP_SCRIPT_VARIANTS.map(async (variant) => {
+        const scriptPath = path.join(
+          mainWorktreePath,
+          WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS[variant],
+        );
+        const scriptContent = await this.readScriptContent(scriptPath);
+        const file: WorktreeSetupScriptFile = {
+          variant,
+          path: scriptPath,
+          exists: scriptContent !== null,
+          content: scriptContent ?? '',
+        };
+        return [variant, file] as const;
+      }),
+    );
+    const scripts = Object.fromEntries(scriptEntries) as Record<
+      WorktreeSetupScriptVariant,
+      WorktreeSetupScriptFile
+    >;
     return {
       id: repositoryId ?? normalizePathForKey(mainWorktreePath),
       name: path.basename(mainWorktreePath),
       mainWorktreePath,
       repositoryId,
-      scriptPath,
-      scriptExists: scriptContent !== null,
-      scriptContent: scriptContent ?? '',
+      scripts,
       managedWorktrees: this.filterManagedWorktreesForRepository(
         mainWorktreePath,
         repositoryId,

@@ -33,6 +33,7 @@ import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { AutoUpdateService } from './services/auto-update';
 import { LocalPortsScannerService } from './services/local-ports-scanner';
 import { WorktreeSetupSettingsService } from './services/worktree-setup-settings';
+import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
 import { DevToolAPIService } from './services/dev-tool-api';
 import { OmniboxSuggestionsService } from './services/omnibox-suggestions';
 import { ensureRipgrepInstalled } from '@stagewise/agent-runtime-node';
@@ -950,8 +951,17 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   );
   uiKarton.registerServerProcedureHandler(
     'toolbox.saveWorktreeSetupScript',
-    async (_cid: string, mainWorktreePath: string, content: string) =>
-      worktreeSetupSettingsService.saveScript(mainWorktreePath, content),
+    async (
+      _cid: string,
+      mainWorktreePath: string,
+      variant: WorktreeSetupScriptVariant,
+      content: string,
+    ) =>
+      worktreeSetupSettingsService.saveScript(
+        mainWorktreePath,
+        variant,
+        content,
+      ),
   );
   uiKarton.registerServerProcedureHandler(
     'toolbox.deleteWorktreeSetupWorktree',
