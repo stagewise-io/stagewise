@@ -128,9 +128,7 @@ export function SignInOptionsPanel({
   const emailRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
   const socialRequestIdRef = useRef(0);
-  const socialLoadingTimeoutRef = useRef<ReturnType<
-    typeof window.setTimeout
-  > | null>(null);
+  const socialLoadingTimeoutRef = useRef<number | null>(null);
   const {
     containerRef: turnstileRef,
     token: turnstileToken,
@@ -191,9 +189,10 @@ export function SignInOptionsPanel({
     [clearSocialLoadingTimeout],
   );
 
-  useEffect(() => () => clearSocialLoadingTimeout(), [
-    clearSocialLoadingTimeout,
-  ]);
+  useEffect(
+    () => () => clearSocialLoadingTimeout(),
+    [clearSocialLoadingTimeout],
+  );
 
   const handleSocialSignIn = useCallback(
     async (provider: SocialAuthProvider) => {
