@@ -6,13 +6,12 @@ import { GithubMark } from '@ui/components/icons/github-mark';
 import { GoogleLogo } from '@ui/components/provider-logos/google';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { IconEnvelopeOutline18, IconKey2Outline18 } from 'nucleo-ui-outline-18';
-import { Loader2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
 export type SignInMethod = SocialAuthProvider | 'email';
 
-type AuthPhase = 'options' | 'email' | 'otp';
+type AuthPhase = 'options' | 'email' | 'otp' | 'social';
 type TrackingPrefix = 'onboarding-auth' | 'account-auth' | 'chat-auth';
 type TrackEvent = (
   eventName: string,
@@ -42,7 +41,16 @@ export type SignInOptionsPanelProps = {
 };
 
 const LAST_USED_SIGN_IN_METHOD_KEY = 'stagewise:last-used-sign-in-method';
-const SOCIAL_SIGN_IN_BUSY_MS = 5_000;
+function getSocialProviderLabel(provider: SocialAuthProvider | null) {
+  switch (provider) {
+    case 'google':
+      return 'Google';
+    case 'github':
+      return 'GitHub';
+    default:
+      return 'your provider';
+  }
+}
 
 function LastUsedBadge() {
   return (
@@ -124,11 +132,10 @@ export function SignInOptionsPanel({
   const [lastUsedMethod, setLastUsedMethod] = useState<SignInMethod | null>(
     null,
   );
-  const pendingSocialAuth = !!socialLoading;
   const emailRef = useRef<HTMLInputElement>(null);
   const otpRef = useRef<HTMLInputElement>(null);
   const socialRequestIdRef = useRef(0);
-  const socialLoadingTimeoutRef = useRef<number | null>(null);
+  const socialAuthMountedRef = useRef(true);
   const {
     containerRef: turnstileRef,
     token: turnstileToken,
@@ -174,26 +181,14 @@ export function SignInOptionsPanel({
     } catch {}
   }, []);
 
-  const clearSocialLoadingTimeout = useCallback(() => {
-    if (!socialLoadingTimeoutRef.current) return;
-    window.clearTimeout(socialLoadingTimeoutRef.current);
-    socialLoadingTimeoutRef.current = null;
+  useEffect(() => {
+    socialAuthMountedRef.current = true;
+
+    return () => {
+      socialAuthMountedRef.current = false;
+      socialRequestIdRef.current += 1;
+    };
   }, []);
-
-  const stopSocialLoading = useCallback(
-    (requestId: number) => {
-      if (socialRequestIdRef.current !== requestId) return;
-      clearSocialLoadingTimeout();
-      setSocialLoading(null);
-    },
-    [clearSocialLoadingTimeout],
-  );
-
-  useEffect(
-    () => () => clearSocialLoadingTimeout(),
-    [clearSocialLoadingTimeout],
-  );
-
   const handleSocialSignIn = useCallback(
     async (provider: SocialAuthProvider) => {
       if (loading) return;
@@ -201,26 +196,25 @@ export function SignInOptionsPanel({
       socialRequestIdRef.current = requestId;
       setError(null);
       setSocialLoading(provider);
-      clearSocialLoadingTimeout();
-      socialLoadingTimeoutRef.current = window.setTimeout(
-        () => stopSocialLoading(requestId),
-        SOCIAL_SIGN_IN_BUSY_MS,
-      );
+      setPhase('social');
       rememberSignInMethod(provider);
       void track(`${trackingPrefix}-social-requested`, { provider });
       try {
         const result = await signInSocial(provider);
-        if (socialRequestIdRef.current !== requestId) return;
         if (result?.error) {
+          if (socialRequestIdRef.current !== requestId) return;
           void track(`${trackingPrefix}-method-failed`, {
             auth_method: 'stagewise',
             provider,
             error_kind: 'backend-error',
           });
           clearRememberedSignInMethod();
+          setSocialLoading(null);
           setError(result.error);
           return;
         }
+        if (!socialAuthMountedRef.current) return;
+        setSocialLoading(null);
         void track(`${trackingPrefix}-social-verified`, { provider });
         onAuthenticated?.(provider);
       } catch {
@@ -231,19 +225,16 @@ export function SignInOptionsPanel({
           error_kind: 'network-error',
         });
         clearRememberedSignInMethod();
+        setSocialLoading(null);
         setError('Failed to complete social sign-in.');
-      } finally {
-        stopSocialLoading(requestId);
       }
     },
     [
       clearRememberedSignInMethod,
-      clearSocialLoadingTimeout,
       loading,
       onAuthenticated,
       rememberSignInMethod,
       signInSocial,
-      stopSocialLoading,
       track,
       trackingPrefix,
     ],
@@ -339,7 +330,9 @@ export function SignInOptionsPanel({
       ? 'Enter your email to receive a verification code.'
       : phase === 'otp'
         ? `We sent a code to ${email}. Enter it below.`
-        : description;
+        : phase === 'social'
+          ? `Please finish signing in with ${getSocialProviderLabel(socialLoading)} in your browser, then return to stagewise.`
+          : description;
 
   return (
     <div
@@ -387,45 +380,32 @@ export function SignInOptionsPanel({
               size="sm"
               className="relative w-full overflow-visible"
               onClick={() => void handleSocialSignIn('google')}
-              disabled={loading || !!socialLoading}
+              disabled={loading}
             >
               {lastUsedMethod === 'google' && <LastUsedBadge />}
-              {socialLoading === 'google' ? (
-                <Loader2Icon className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <GoogleLogo className="size-4" aria-hidden />
-              )}
-              {socialLoading === 'google'
-                ? 'Opening Google…'
-                : 'Continue with Google'}
+              <GoogleLogo className="size-4" aria-hidden />
+              Continue with Google
             </Button>
             <Button
               variant="secondary"
               size="sm"
               className="relative w-full overflow-visible"
               onClick={() => void handleSocialSignIn('github')}
-              disabled={loading || !!socialLoading}
+              disabled={loading}
             >
               {lastUsedMethod === 'github' && <LastUsedBadge />}
-              {socialLoading === 'github' ? (
-                <Loader2Icon className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <GithubMark className="size-4" aria-hidden="true" />
-              )}
-              {socialLoading === 'github'
-                ? 'Opening GitHub…'
-                : 'Continue with GitHub'}
+              <GithubMark className="size-4" aria-hidden="true" />
+              Continue with GitHub
             </Button>
             <Button
               variant="secondary"
               size="sm"
               className="relative w-full overflow-visible"
               onClick={() => {
-                if (pendingSocialAuth) return;
                 setPhase('email');
                 setError(null);
               }}
-              disabled={pendingSocialAuth}
+              disabled={loading}
             >
               {lastUsedMethod === 'email' && <LastUsedBadge />}
               <IconEnvelopeOutline18 className="size-4" />
@@ -441,11 +421,10 @@ export function SignInOptionsPanel({
               size="sm"
               className="w-full"
               onClick={() => {
-                if (pendingSocialAuth) return;
                 setError(null);
                 onUseApiKeys();
               }}
-              disabled={pendingSocialAuth}
+              disabled={loading}
             >
               <IconKey2Outline18 className="size-4" />
               Use your own API keys
@@ -455,11 +434,10 @@ export function SignInOptionsPanel({
               size="sm"
               className="w-full"
               onClick={() => {
-                if (pendingSocialAuth) return;
                 setError(null);
                 onUseSubscription();
               }}
-              disabled={pendingSocialAuth}
+              disabled={loading}
             >
               <CodingPlanLogoStack />
               Use existing subscription
@@ -469,7 +447,7 @@ export function SignInOptionsPanel({
       )}
 
       {phase === 'email' && (
-        <div className="app-no-drag grid w-full max-w-sm gap-3">
+        <div className="app-no-drag grid w-full max-w-sm gap-3 py-6">
           <Input
             ref={emailRef}
             placeholder="you@example.com"
@@ -481,7 +459,7 @@ export function SignInOptionsPanel({
             onKeyDown={(e) => {
               if (e.key === 'Enter') void handleSendOtp();
             }}
-            disabled={loading || !!socialLoading}
+            disabled={loading}
           />
           <Button
             variant="primary"
@@ -490,7 +468,6 @@ export function SignInOptionsPanel({
             onClick={() => void handleSendOtp()}
             disabled={
               loading ||
-              !!socialLoading ||
               !email.trim() ||
               (turnstileEnabled && !turnstileError && !turnstileToken)
             }
@@ -510,6 +487,23 @@ export function SignInOptionsPanel({
               resetTurnstile();
             }}
             disabled={loading}
+          >
+            Back to sign-in options
+          </Button>
+        </div>
+      )}
+
+      {phase === 'social' && (
+        <div className="app-no-drag grid w-full max-w-sm gap-3">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              socialRequestIdRef.current += 1;
+              setSocialLoading(null);
+              setPhase('options');
+              setError(null);
+            }}
           >
             Back to sign-in options
           </Button>

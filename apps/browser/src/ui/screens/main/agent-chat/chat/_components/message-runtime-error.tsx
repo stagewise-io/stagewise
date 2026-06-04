@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { cn } from '@ui/utils';
 import { IconTriangleWarning } from 'nucleo-micro-bold';
 import { IconLockKeyOutline18 } from 'nucleo-ui-outline-18';
-import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import {
   RefreshCcwIcon,
   CopyIcon,
@@ -142,56 +142,58 @@ function PlanLimitExceededError({
         return {
           heading: 'Usage limit reached',
           description: `You've used all your included credits.${resetSuffix}`,
-          ctaLabel: 'Get more credits',
-          ctaHref: `${consoleUrl}/billing/checkout-extra-credits`,
+          ctaLabel: 'Buy credits in console',
+          ctaHref: consoleUrl,
         };
       case 'pro':
         return {
           heading: 'Usage limit reached',
           description: `You've reached your Pro plan limit.${resetSuffix}`,
-          ctaLabel: 'Upgrade to Ultra',
-          ctaHref: `${consoleUrl}/billing/checkout`,
+          ctaLabel: 'Buy credits in console',
+          ctaHref: consoleUrl,
         };
       default:
         return {
           heading: 'Usage limit reached',
           description: `You've reached your free plan limit.${resetSuffix}`,
-          ctaLabel: 'Set up a subscription',
-          ctaHref: `${consoleUrl}/billing/checkout`,
+          ctaLabel: 'Buy credits in console',
+          ctaHref: consoleUrl,
         };
     }
   }, [plan, resetLabel]);
 
   return (
-    <div className="mt-6 flex w-full flex-col gap-2 rounded-lg border border-derived bg-surface-1 p-3 text-sm">
+    <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-derived-strong p-2 text-sm">
       <span className="font-medium text-foreground">{heading}</span>
 
-      <span className="text-muted-foreground text-xs">{description}</span>
+      <div className="text-foreground">{description}</div>
 
-      <div className="flex flex-row items-center justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={() => void openSettings({ section: 'models-providers' })}
-          className={buttonVariants({ variant: 'ghost', size: 'xs' })}
-        >
-          Configure API keys
-        </button>
-
-        {canRetry && (
-          <Button variant="primary" size="xs" onClick={onRetry}>
-            <RefreshCcwIcon className="size-3" />
-            Retry
+      <div className="flex flex-row items-center justify-between gap-2 pt-1">
+        <div>
+          {canRetry && (
+            <Button variant="ghost" size="xs" onClick={onRetry}>
+              <RefreshCcwIcon className="size-3" />
+              Retry
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-row justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void openSettings({ section: 'models-providers' })}
+          >
+            Configure other API keys
           </Button>
-        )}
-
-        <Button
-          variant={canRetry ? 'secondary' : 'primary'}
-          size="xs"
-          onClick={() => void openExternalUrl(ctaHref)}
-        >
-          {ctaLabel}
-          <ArrowUpRightIcon className="size-3" />
-        </Button>
+          <Button
+            variant="primary"
+            size="xs"
+            onClick={() => void openExternalUrl(ctaHref)}
+          >
+            {ctaLabel}
+            <ArrowUpRightIcon className="size-3" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -302,14 +304,6 @@ function GenericError({
   const [helpExpanded, setHelpExpanded] = useState(false);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [hasCopied, setHasCopied] = useState(false);
-  const loginRetryStorageKey = `stagewise:login-retry-shown:${agentInstanceId}`;
-  const [showLoginRetry, setShowLoginRetry] = useState(() => {
-    try {
-      return window.sessionStorage.getItem(loginRetryStorageKey) === 'true';
-    } catch {
-      return false;
-    }
-  });
   const [openAgent] = useOpenAgent();
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
 
@@ -333,24 +327,12 @@ function GenericError({
     return providerConfigs[provider]?.mode === 'stagewise';
   }, [error, activeModelId, providerConfigs]);
 
-  const openSettingsAndShowLoginRetry = (
-    section: 'account' | 'models-providers',
-  ) => {
-    setShowLoginRetry(true);
-    try {
-      window.sessionStorage.setItem(loginRetryStorageKey, 'true');
-    } catch {}
-    void openSettings({ section });
-  };
-
   if (stagewiseLoginRequired) {
     return (
       <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-derived-strong p-2 text-sm">
         <div className="flex flex-row items-center gap-1.5">
-          <IconLockKeyOutline18 className="size-3.5 shrink-0 text-warning-foreground" />
-          <span className="font-medium text-warning-foreground">
-            Not logged in
-          </span>
+          <IconLockKeyOutline18 className="size-3.5 shrink-0 text-foreground" />
+          <span className="font-medium text-foreground">Not logged in</span>
         </div>
 
         <div className="text-foreground">
@@ -360,7 +342,7 @@ function GenericError({
 
         <div className="flex flex-row items-center justify-between gap-2 pt-1">
           <div>
-            {showLoginRetry && canRetry && (
+            {canRetry && (
               <Button variant="ghost" size="xs" onClick={onRetry}>
                 <RefreshCcwIcon className="size-3" />
                 Retry
@@ -369,16 +351,16 @@ function GenericError({
           </div>
           <div className="flex flex-row justify-end gap-2">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="xs"
-              onClick={() => openSettingsAndShowLoginRetry('models-providers')}
+              onClick={() => void openSettings({ section: 'models-providers' })}
             >
-              Configure other API for AI models
+              Configure other API keys
             </Button>
             <Button
               variant="primary"
               size="xs"
-              onClick={() => openSettingsAndShowLoginRetry('account')}
+              onClick={() => void openSettings({ section: 'account' })}
             >
               Log in to stagewise
             </Button>
