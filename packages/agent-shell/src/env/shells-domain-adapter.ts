@@ -19,9 +19,9 @@ import {
   escXml,
   renderChangesXml,
 } from '@stagewise/agent-core/env';
-import type { ShellSnapshot } from '@shared/env-domain-schemas';
+import type { ShellSnapshot } from '../schemas';
 import { z } from 'zod';
-import { shellSnapshotSchema } from '@shared/env-domain-schemas';
+import { shellSnapshotSchema } from '../schemas';
 import ShellsDomainPromptSection from './shells-domain-adapter.prompt.md?raw';
 
 export const SHELLS_DOMAIN_SCHEMA_VERSION = 1;

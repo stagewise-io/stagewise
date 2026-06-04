@@ -1,0 +1,45 @@
+{
+  "name": "@stagewise/agent-shell",
+  "author": "stagewise GmbH",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "import": "./dist/schemas/index.js"
+    },
+    "./env": {
+      "types": "./dist/env/index.d.ts",
+      "import": "./dist/env/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@stagewise/agent-core": "workspace:*",
+    "@xterm/headless": "^6.0.0",
+    "ai": "6.0.177",
+    "node-pty": "^1.1.0",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@stagewise/typescript-config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "esbuild": "0.25.9",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

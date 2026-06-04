@@ -68,7 +68,7 @@ import { discoverSkills } from './agents/shared/prompts/utils/get-skills';
 import type { Skill } from './agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition, SkillDefinitionUI } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
-import { detectShell, resolveShellEnv } from './utils/shell-env';
+import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
 import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';

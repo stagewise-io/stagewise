@@ -3,15 +3,13 @@ import {
   executeShellCommand,
   type SmartApprovalDeps,
 } from './execute-shell-command';
-import type { ShellService } from '@/services/toolbox/services/shell';
-import type { TelemetryService } from '@/services/telemetry';
-import type { ModelProviderService } from '@/agents/model-provider';
+import type { ShellService } from '../engine';
 
 const createSmartApprovalDeps = (): SmartApprovalDeps => ({
-  modelProviderService: {
-    getModelWithOptions: vi.fn(),
-  } as unknown as Pick<ModelProviderService, 'getModelWithOptions'>,
-  telemetryService: {} as TelemetryService,
+  classify: vi.fn(async () => ({
+    needsApproval: false,
+    explanation: 'safe',
+  })),
   recordPendingApproval: vi.fn(),
 });
 
@@ -48,6 +46,7 @@ describe('executeShellCommand approval', () => {
     );
 
     expect(needsApproval).toBe(false);
+    expect(smartApproval.classify).not.toHaveBeenCalled();
     expect(smartApproval.recordPendingApproval).not.toHaveBeenCalled();
   });
 });

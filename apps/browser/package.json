@@ -23,7 +23,7 @@
     "clear-vite-cache": "tsx scripts/clear-vite-cache.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "pnpm -F @stagewise/agent-core build && concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
+    "typecheck": "pnpm -F @stagewise/agent-core build && pnpm -F @stagewise/agent-shell build && concurrently -n ui,backend,preload,storybook -c blue,green,yellow,magenta \"tsc -p tsconfig.ui.json --noEmit\" \"tsc -p tsconfig.backend.json --noEmit\" \"tsc -p tsconfig.web-content-preload.json --noEmit\" \"tsc -p tsconfig.storybook.json --noEmit\""
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "^0.0.27",
@@ -92,6 +92,7 @@
     "@smithy/shared-ini-file-loader": "^4.4.9",
     "@stagewise/agent-core": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
+    "@stagewise/agent-shell": "workspace:*",
     "@stagewise/api-client": "4.0.0",
     "@stagewise/karton": "workspace:*",
     "@stagewise/stage-ui": "workspace:*",

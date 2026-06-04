@@ -18,7 +18,7 @@ import { createSandboxDomainAdapter } from './sandbox-domain-adapter';
 import {
   createShellsDomainAdapter,
   type ShellInfoState,
-} from './shells-domain-adapter';
+} from '@stagewise/agent-shell/env';
 
 export {
   createBrowserHostEnvironmentSources,
@@ -60,7 +60,7 @@ export {
   type ShellsDomainAdapterDeps,
   type ShellsDomainState,
   type ShellInfoState,
-} from './shells-domain-adapter';
+} from '@stagewise/agent-shell/env';
 
 /**
  * Dependencies required to instantiate the five host {@link DomainAdapter}

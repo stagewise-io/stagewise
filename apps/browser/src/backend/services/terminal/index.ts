@@ -20,12 +20,12 @@ const HeadlessTerminal = xtermHeadless.Terminal as new (options: {
 }) => IHeadlessTerminal;
 import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
-import { OscParser } from '@/services/toolbox/services/shell/osc-parser';
-import type { DetectedShell } from '@/services/toolbox/services/shell/types';
 import {
+  OscParser,
   DEFAULT_TERMINAL_COLS,
   DEFAULT_TERMINAL_ROWS,
-} from '@/services/toolbox/services/shell/types';
+} from '@stagewise/agent-shell';
+import type { DetectedShell } from '@stagewise/agent-shell';
 import { getTerminalTabDefaults } from '@shared/karton-contracts/ui';
 
 /**

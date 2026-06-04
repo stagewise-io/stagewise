@@ -66,23 +66,17 @@ export type ActiveAppSnapshot = z.infer<typeof activeAppSnapshotSchema>;
 // Shells
 // ---------------------------------------------------------------------------
 
-export const shellSessionSnapshotSchema = z.object({
-  id: z.string(),
-  exited: z.boolean(),
-  exitCode: z.number().nullable(),
-  lineCount: z.number(),
-  logPath: z.string(),
-  tailContent: z.string().optional(),
-  lastLine: z.string().optional(),
-  cwd: z.string(),
-  createdAt: z.number(),
-});
-export type ShellSessionSnapshot = z.infer<typeof shellSessionSnapshotSchema>;
-
-export const shellSnapshotSchema = z.object({
-  sessions: z.array(shellSessionSnapshotSchema),
-});
-export type ShellSnapshot = z.infer<typeof shellSnapshotSchema>;
+// Shell snapshot schemas live in `@stagewise/agent-shell/schemas` (single
+// source of truth shared with the Node shell runtime). Re-exported here so
+// existing browser backend/UI imports continue to resolve unchanged.
+export {
+  shellSessionSnapshotSchema,
+  shellSnapshotSchema,
+} from '@stagewise/agent-shell/schemas';
+export type {
+  ShellSessionSnapshot,
+  ShellSnapshot,
+} from '@stagewise/agent-shell/schemas';
 
 // ---------------------------------------------------------------------------
 // Log ingest
