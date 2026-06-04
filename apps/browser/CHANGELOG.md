@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.6.0 (2026-06-04)
+
+### Features
+
+* add sidebar-foreground color for legible sidebar labels (262b49d)
+
+### Bug Fixes
+
+* align sidebar-styles (0abced2)
+
+### Other Changes
+
+* refactor context-skills settings (da2dcee)
+
 ## 1.5.0 (2026-06-03)
 
 ### Features
