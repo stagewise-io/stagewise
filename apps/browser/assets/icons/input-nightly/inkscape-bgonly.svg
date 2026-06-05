@@ -5,13 +5,13 @@
   viewBox="0 0 2048 2048"
   version="1.1"
   xmlns="http://www.w3.org/2000/svg">
-  <!-- Background fill derived from apps/browser/assets/icons/release/icon.icon/icon.json. -->
+  <!-- Background fill derived from apps/browser/assets/icons/nightly/icon.icon/icon.json. -->
   <defs>
     <clipPath id="app-icon-clip">
       <rect width="2048" height="2048" rx="460" ry="460"/>
     </clipPath>
   </defs>
   <g clip-path="url(#app-icon-clip)">
-    <rect width="2048" height="2048" fill="#f2f2f1"/>
+    <rect width="2048" height="2048" fill="#1e1e1d"/>
   </g>
 </svg>

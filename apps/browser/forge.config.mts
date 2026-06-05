@@ -23,7 +23,8 @@ const windowsSignConfig = getWindowsSignConfig();
  * Set via RELEASE_CHANNEL environment variable in CI workflows.
  *
  * - 'dev': Local development or CI builds on non-release commits
- * - 'prerelease': Alpha or beta releases (alphaNNN, betaNNN versions)
+ * - 'nightly': Nightly releases
+ * - 'prerelease': Legacy alpha or beta releases (alphaNNN, betaNNN versions)
  * - 'release': Production releases (stable versions without prerelease suffix)
  */
 
@@ -32,8 +33,8 @@ console.log(
   `[forge.config] Release channel: ${buildConstants.__APP_RELEASE_CHANNEL__}`,
 );
 const visualAssetChannel =
-  buildConstants.__APP_RELEASE_CHANNEL__ === 'nightly'
-    ? 'prerelease'
+  buildConstants.__APP_RELEASE_CHANNEL__ === 'prerelease'
+    ? 'nightly'
     : buildConstants.__APP_RELEASE_CHANNEL__;
 
 // DMG volume name (shown when mounted)

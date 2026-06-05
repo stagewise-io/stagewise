@@ -10,7 +10,7 @@
           "fill-specializations": [
             {
               "value": {
-                "solid": "srgb:0.14510,0.34902,0.99608,1.00000"
+                "solid": "srgb:0.19608,0.41176,1.00000,1.00000"
               }
             },
             {
@@ -63,7 +63,7 @@
       "layers": [
         {
           "fill": {
-            "solid": "srgb:0.14510,0.34902,0.99608,1.00000"
+            "solid": "srgb:0.19608,0.41176,1.00000,1.00000"
           },
           "glass": true,
           "image-name": "inkscape-starsonly.svg",
