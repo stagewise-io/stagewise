@@ -105,7 +105,11 @@ const readCliOption = (name: string) => {
   if (equalsArg) return equalsArg.slice(equalsPrefix.length);
 
   const optionIndex = process.argv.indexOf(`--${name}`);
-  if (optionIndex >= 0) return process.argv[optionIndex + 1];
+  if (optionIndex >= 0) {
+    const nextArg = process.argv[optionIndex + 1];
+    if (!nextArg || nextArg.startsWith('--')) return undefined;
+    return nextArg;
+  }
 
   return undefined;
 };

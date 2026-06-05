@@ -128,7 +128,7 @@ jobs:
           - os: macos-26
             arch: arm64
             artifact: stagewise-macos-arm64
-          - os: macos-13
+          - os: macos-26-intel
             arch: x64
             artifact: stagewise-macos-x64
           - os: ubuntu-latest

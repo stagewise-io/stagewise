@@ -181,7 +181,7 @@ jobs:
           - os: macos-26
             platform: darwin-arm64
             arch: arm64
-          - os: macos-13
+          - os: macos-26-intel
             platform: darwin-x64
             arch: x64
           - os: ubuntu-latest
