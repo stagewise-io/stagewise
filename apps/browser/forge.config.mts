@@ -407,7 +407,7 @@ const config: ForgeConfig = {
           x: 192,
           y: 200,
           type: 'file',
-          path: `./out/${buildConstants.__APP_RELEASE_CHANNEL__}/${buildConstants.__APP_BASE_NAME__}-darwin-arm64/${buildConstants.__APP_BASE_NAME__}.app`,
+          path: `./out/${buildConstants.__APP_RELEASE_CHANNEL__}/${buildConstants.__APP_BASE_NAME__}-darwin-${buildConstants.__APP_ARCH__}/${buildConstants.__APP_BASE_NAME__}.app`,
           name: `${buildConstants.__APP_NAME__}.app`,
         },
       ],

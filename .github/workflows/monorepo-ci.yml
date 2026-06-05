@@ -181,6 +181,9 @@ jobs:
           - os: macos-26
             platform: darwin-arm64
             arch: arm64
+          - os: macos-13
+            platform: darwin-x64
+            arch: x64
           - os: ubuntu-latest
             platform: linux-x64
             arch: x64
@@ -242,20 +245,22 @@ jobs:
       - name: Smoke Test
         shell: bash
         timeout-minutes: 2
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
 
-          if [ "${{ runner.os }}" == "macOS" ]; then
-            BINARY="apps/browser/out/dev/stagewise-dev-darwin-arm64/stagewise-dev.app/Contents/MacOS/stagewise-dev"
-          elif [ "${{ runner.os }}" == "Linux" ]; then
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            BINARY="apps/browser/out/dev/stagewise-dev-${PLATFORM}/stagewise-dev.app/Contents/MacOS/stagewise-dev"
+          elif [ "$RUNNER_OS" == "Linux" ]; then
             BINARY="apps/browser/out/dev/stagewise-dev-linux-x64/stagewise-dev"
-          elif [ "${{ runner.os }}" == "Windows" ]; then
+          elif [ "$RUNNER_OS" == "Windows" ]; then
             BINARY="apps/browser/out/dev/stagewise-dev-win32-x64/stagewise-dev.exe"
           fi
 
           echo "Launching smoke test: $BINARY --smoke-test"
 
-          if [ "${{ runner.os }}" == "Linux" ]; then
+          if [ "$RUNNER_OS" == "Linux" ]; then
             xvfb-run --auto-servernum "$BINARY" --no-sandbox --smoke-test
           else
             "$BINARY" --smoke-test
