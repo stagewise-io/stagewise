@@ -99,9 +99,23 @@ export const __APP_AUTHOR__ = (() => {
   return 'GENERIC_AUTHOR';
 })();
 
+const readCliOption = (name: string) => {
+  const equalsPrefix = `--${name}=`;
+  const equalsArg = process.argv.find((arg) => arg.startsWith(equalsPrefix));
+  if (equalsArg) return equalsArg.slice(equalsPrefix.length);
+
+  const optionIndex = process.argv.indexOf(`--${name}`);
+  if (optionIndex >= 0) return process.argv[optionIndex + 1];
+
+  return undefined;
+};
+
 export const __APP_PLATFORM__ =
-  process.env.npm_config_platform || process.platform;
-export const __APP_ARCH__ = process.env.npm_config_arch || process.arch;
+  process.env.npm_config_platform ||
+  readCliOption('platform') ||
+  process.platform;
+export const __APP_ARCH__ =
+  process.env.npm_config_arch || readCliOption('arch') || process.arch;
 
 export const __APP_COPYRIGHT__ = `Copyright © ${new Date().getFullYear()} ${__APP_AUTHOR__}`;
 
