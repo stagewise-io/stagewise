@@ -333,7 +333,8 @@ export class MountManager {
     }
     allowedChildren[this.workspaceMdDir]!.add(this.workspaceMdFile);
 
-    const watcher = watch(wsPath, {
+    const workspaceMdPath = path.join(wsPath, this.workspaceMdRelativePath);
+    const watcher = watch([wsPath, workspaceMdPath], {
       persistent: true,
       ignoreInitial: true,
       // depth 4 = .stagewise/skills/<skill-name>/SKILL.md
