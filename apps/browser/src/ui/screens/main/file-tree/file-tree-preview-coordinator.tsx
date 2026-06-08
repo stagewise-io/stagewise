@@ -5,6 +5,7 @@ import {
 } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useEffect, useRef } from 'react';
+import { useContentCollapsed } from '../_components/content-collapsed-context';
 
 const PREVIEW_DEBOUNCE_MS = 80;
 
@@ -22,6 +23,8 @@ export function FileTreePreviewCoordinator({
   onPreviewTargetClose,
 }: FileTreePreviewCoordinatorProps) {
   const [openAgent] = useOpenAgent();
+  const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
+    useContentCollapsed();
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
@@ -80,6 +83,8 @@ export function FileTreePreviewCoordinator({
       return;
     }
 
+    if (contentCollapsed) setContentCollapsed(false);
+
     if (targetPermanentTab) {
       if (
         activePreviewTab &&
@@ -130,12 +135,14 @@ export function FileTreePreviewCoordinator({
   }, [
     activePreviewTab,
     closeTab,
+    contentCollapsed,
     groupKey,
     openAgent,
     onPreviewTargetClose,
     openFileTab,
     previewTargetPath,
     revealInFolder,
+    setContentCollapsed,
     targetPermanentTab,
     workspaceKey,
   ]);

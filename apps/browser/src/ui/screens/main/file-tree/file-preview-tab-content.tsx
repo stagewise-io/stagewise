@@ -7,13 +7,13 @@ import {
 } from '@stagewise/stage-ui/components/popover';
 import { SearchableSelect } from '@stagewise/stage-ui/components/searchable-select';
 import { Select } from '@stagewise/stage-ui/components/select';
-import { Switch } from '@stagewise/stage-ui/components/switch';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { cn } from '@ui/utils';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import type { FilePreviewResult, TabState } from '@shared/karton-contracts/ui';
 import {
@@ -498,52 +498,52 @@ function FileTabToolbar({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between border-border border-b bg-background px-1">
-      <div className="flex items-center gap-1">
-        <ToolbarTooltip label="Save file">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Save file"
-            disabled={!actions?.isDirty || actions.isSaving}
-            onClick={() => actions?.save()}
-          >
-            {actions?.isSaving ? (
-              <Loader2Icon className="size-3 animate-spin" />
-            ) : (
-              <IconFloppyDiskOutline18 className="size-4" />
-            )}
-          </Button>
-        </ToolbarTooltip>
-        <div className="h-5 w-px bg-border-subtle" />
-        <ToolbarTooltip label="Undo">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Undo"
-            disabled={!actions?.canUndo}
-            onClick={() => actions?.undo()}
-          >
-            <IconUndoOutline18 className="size-4" />
-          </Button>
-        </ToolbarTooltip>
-        <ToolbarTooltip label="Redo">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Redo"
-            disabled={!actions?.canRedo}
-            onClick={() => actions?.redo()}
-          >
-            <IconRedoOutline18 className="size-4" />
-          </Button>
-        </ToolbarTooltip>
-      </div>
-      {right ? (
-        <div className="flex items-center divide-x divide-border-subtle">
-          {right}
+    <div className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1">
+      <div className="flex items-center">
+        <div className="flex items-center px-1">
+          <ToolbarTooltip label="Save file">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Save file"
+              disabled={!actions?.isDirty || actions.isSaving}
+              onClick={() => actions?.save()}
+            >
+              {actions?.isSaving ? (
+                <Loader2Icon className="size-3 animate-spin" />
+              ) : (
+                <IconFloppyDiskOutline18 className="size-4" />
+              )}
+            </Button>
+          </ToolbarTooltip>
         </div>
-      ) : null}
+        <div className="h-5 w-px bg-border-subtle" />
+        <div className="flex items-center px-1">
+          <ToolbarTooltip label="Undo">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Undo"
+              disabled={!actions?.canUndo}
+              onClick={() => actions?.undo()}
+            >
+              <IconUndoOutline18 className="size-4" />
+            </Button>
+          </ToolbarTooltip>
+          <ToolbarTooltip label="Redo">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Redo"
+              disabled={!actions?.canRedo}
+              onClick={() => actions?.redo()}
+            >
+              <IconRedoOutline18 className="size-4" />
+            </Button>
+          </ToolbarTooltip>
+        </div>
+      </div>
+      {right ? <div className="flex items-center gap-1">{right}</div> : null}
     </div>
   );
 }
@@ -919,6 +919,7 @@ function ImagePreview({
                 <PlusIcon className="size-4" />
               </Button>
             </div>
+            <div className="h-5 w-px bg-border-subtle" />
             <div className="flex items-center px-1">
               <Popover>
                 <PopoverTrigger>
@@ -1170,103 +1171,108 @@ function SvgPreview({
               </div>
             ) : null}
             {mode === 'preview' ? (
-              <div className="flex items-center px-1">
-                <Popover>
-                  <PopoverTrigger>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="Preview config"
-                    >
-                      <IconColorPaletteOutline18 className="size-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-80 gap-3 p-3">
-                    <div className="font-medium text-foreground text-xs">
-                      Colors
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                          <IconTextBgColorOutline18 className="size-3" />
-                          Background
-                        </span>
-                        <Select<SvgPreviewBackground>
-                          items={[
-                            { value: 'default', label: 'Default' },
-                            { value: 'light', label: 'Light' },
-                            { value: 'dark', label: 'Dark' },
-                            { value: 'checkerboard', label: 'Checkerboard' },
-                            { value: 'custom', label: 'Custom' },
-                          ]}
-                          value={background}
-                          onValueChange={(value) => setBackground(value)}
-                          size="sm"
-                        />
-                        {background === 'custom' ? (
-                          <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
-                            <span className="font-mono text-muted-foreground text-sm">
-                              #
-                            </span>
-                            <Input
-                              className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
-                              size="xs"
-                              type="text"
-                              maxLength={6}
-                              value={customBackground}
-                              onValueChange={(value) =>
-                                setCustomBackground(
-                                  String(value)
-                                    .replace(/[^0-9a-f]/gi, '')
-                                    .slice(0, 6),
-                                )
-                              }
-                              placeholder="ffffff"
-                            />
-                          </div>
-                        ) : null}
+              <>
+                <div className="h-5 w-px bg-border-subtle" />
+                <div className="flex items-center px-1">
+                  <Popover>
+                    <PopoverTrigger>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Preview config"
+                      >
+                        <IconColorPaletteOutline18 className="size-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-80 gap-3 p-3">
+                      <div className="font-medium text-foreground text-xs">
+                        Colors
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                          <IconTextColorOutline18 className="size-3" />
-                          Foreground
-                        </span>
-                        <Select<SvgCurrentColorMode>
-                          items={[
-                            { value: 'default', label: 'Default' },
-                            { value: 'custom', label: 'Custom' },
-                          ]}
-                          value={currentColorMode}
-                          onValueChange={(value) => setCurrentColorMode(value)}
-                          size="sm"
-                        />
-                        {currentColorMode === 'custom' ? (
-                          <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
-                            <span className="font-mono text-muted-foreground text-sm">
-                              #
-                            </span>
-                            <Input
-                              className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
-                              size="xs"
-                              type="text"
-                              maxLength={6}
-                              value={customCurrentColor}
-                              onValueChange={(value) =>
-                                setCustomCurrentColor(
-                                  String(value)
-                                    .replace(/[^0-9a-f]/gi, '')
-                                    .slice(0, 6),
-                                )
-                              }
-                              placeholder="8b5cf6"
-                            />
-                          </div>
-                        ) : null}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                            <IconTextBgColorOutline18 className="size-3" />
+                            Background
+                          </span>
+                          <Select<SvgPreviewBackground>
+                            items={[
+                              { value: 'default', label: 'Default' },
+                              { value: 'light', label: 'Light' },
+                              { value: 'dark', label: 'Dark' },
+                              { value: 'checkerboard', label: 'Checkerboard' },
+                              { value: 'custom', label: 'Custom' },
+                            ]}
+                            value={background}
+                            onValueChange={(value) => setBackground(value)}
+                            size="sm"
+                          />
+                          {background === 'custom' ? (
+                            <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
+                              <span className="font-mono text-muted-foreground text-sm">
+                                #
+                              </span>
+                              <Input
+                                className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
+                                size="xs"
+                                type="text"
+                                maxLength={6}
+                                value={customBackground}
+                                onValueChange={(value) =>
+                                  setCustomBackground(
+                                    String(value)
+                                      .replace(/[^0-9a-f]/gi, '')
+                                      .slice(0, 6),
+                                  )
+                                }
+                                placeholder="ffffff"
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                            <IconTextColorOutline18 className="size-3" />
+                            Foreground
+                          </span>
+                          <Select<SvgCurrentColorMode>
+                            items={[
+                              { value: 'default', label: 'Default' },
+                              { value: 'custom', label: 'Custom' },
+                            ]}
+                            value={currentColorMode}
+                            onValueChange={(value) =>
+                              setCurrentColorMode(value)
+                            }
+                            size="sm"
+                          />
+                          {currentColorMode === 'custom' ? (
+                            <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
+                              <span className="font-mono text-muted-foreground text-sm">
+                                #
+                              </span>
+                              <Input
+                                className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
+                                size="xs"
+                                type="text"
+                                maxLength={6}
+                                value={customCurrentColor}
+                                onValueChange={(value) =>
+                                  setCustomCurrentColor(
+                                    String(value)
+                                      .replace(/[^0-9a-f]/gi, '')
+                                      .slice(0, 6),
+                                  )
+                                }
+                                placeholder="8b5cf6"
+                              />
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </>
             ) : null}
             {mode === 'source' ? (
               <div className="flex items-center px-1">
@@ -1283,18 +1289,35 @@ function SvgPreview({
                 />
               </div>
             ) : null}
-            <div className="flex items-center gap-1.5 pr-1 pl-2">
-              <IconSquareCodeOutline18 className="size-4 text-subtle-foreground" />
-              <Switch
-                className="h-4 w-7 p-0.5"
-                size="xs"
-                checked={mode === 'preview'}
-                aria-label="Toggle SVG preview mode"
-                onCheckedChange={(checked: boolean) =>
-                  setMode(checked ? 'preview' : 'source')
-                }
-              />
-              <IconEye2Outline18 className="size-4 text-subtle-foreground" />
+            <div className="flex h-7 items-center gap-1 rounded-md bg-surface-1 p-0.5">
+              <button
+                type="button"
+                className={cn(
+                  'flex h-full items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                  mode === 'source' &&
+                    'bg-background text-foreground ring-1 ring-border-subtle',
+                )}
+                aria-label="Show SVG source"
+                aria-pressed={mode === 'source'}
+                onClick={() => setMode('source')}
+              >
+                <IconSquareCodeOutline18 className="size-3.5" />
+                {mode === 'source' ? <span>Code</span> : null}
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'flex h-full items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                  mode === 'preview' &&
+                    'bg-background text-foreground ring-1 ring-border-subtle',
+                )}
+                aria-label="Show SVG preview"
+                aria-pressed={mode === 'preview'}
+                onClick={() => setMode('preview')}
+              >
+                <IconEye2Outline18 className="size-3.5" />
+                {mode === 'preview' ? <span>Preview</span> : null}
+              </button>
             </div>
           </>
         }

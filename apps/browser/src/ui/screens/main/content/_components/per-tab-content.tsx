@@ -66,7 +66,7 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
     ) : (
       <div className="absolute inset-0 z-10 flex flex-col">
         {/* Control Bar */}
-        <div className="flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0 [&_button:focus-visible]:outline-offset-[-4px]">
+        <div className="flex h-9 w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0 [&_button:focus-visible]:outline-offset-[-4px]">
           <NavButtons tabId={tabId} tab={tab} />
           <Omnibox ref={omniboxRef} tabId={tabId} tab={tab} isActive />
           <ZoomBar tabId={tabId} />
