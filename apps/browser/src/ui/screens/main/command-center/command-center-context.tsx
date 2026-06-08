@@ -17,12 +17,15 @@ type CommandCenterContextValue = {
   mode: CommandCenterMode;
   selectFirstOnOpen: boolean;
   restoreFocusOnClose: boolean;
+  initialFileWorkspaceKeys: readonly string[];
   open: (options?: CommandCenterOpenOptions) => void;
   close: () => void;
   toggle: (options?: CommandCenterOpenOptions) => void;
   setQuery: (query: string) => void;
   setMode: (mode: CommandCenterMode) => void;
 };
+
+const EMPTY_WORKSPACE_KEYS: readonly string[] = [];
 
 const CommandCenterContext = createContext<CommandCenterContextValue | null>(
   null,
@@ -34,12 +37,17 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<CommandCenterMode>('global');
   const [selectFirstOnOpen, setSelectFirstOnOpen] = useState(true);
   const [restoreFocusOnClose, setRestoreFocusOnClose] = useState(false);
+  const [initialFileWorkspaceKeys, setInitialFileWorkspaceKeys] =
+    useState<readonly string[]>(EMPTY_WORKSPACE_KEYS);
 
   const open = useCallback((options?: CommandCenterOpenOptions) => {
     setQuery(options?.initialQuery ?? '');
     setMode(options?.initialMode ?? 'global');
     setSelectFirstOnOpen(options?.selectFirst ?? true);
     setRestoreFocusOnClose(options?.restoreFocusOnClose ?? false);
+    setInitialFileWorkspaceKeys(
+      options?.initialFileWorkspaceKeys ?? EMPTY_WORKSPACE_KEYS,
+    );
     setIsOpen(true);
   }, []);
 
@@ -49,6 +57,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     setMode('global');
     setSelectFirstOnOpen(true);
     setRestoreFocusOnClose(false);
+    setInitialFileWorkspaceKeys(EMPTY_WORKSPACE_KEYS);
   }, []);
 
   const toggle = useCallback(
@@ -66,6 +75,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
       mode,
       selectFirstOnOpen,
       restoreFocusOnClose,
+      initialFileWorkspaceKeys,
       open,
       close,
       toggle,
@@ -74,6 +84,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     }),
     [
       close,
+      initialFileWorkspaceKeys,
       isOpen,
       mode,
       open,

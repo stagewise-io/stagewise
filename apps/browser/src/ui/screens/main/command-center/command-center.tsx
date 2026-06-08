@@ -33,11 +33,13 @@ import { dispatchAgentDeleted } from '../_lib/agent-deleted-event';
 import { COMMAND_CENTER_FOCUS_REQUESTED_EVENT } from '../_lib/command-center-focus-event';
 import { buildGroupedRows } from './command-center-rows';
 import { useCommandCenterItems } from './sources/use-command-center-items';
+import { CommandCenterFileFilter } from './_components/command-center-file-filter';
 import { CommandCenterFooter } from './_components/command-center-footer';
 import { CommandCenterInput } from './_components/command-center-input';
 import { CommandCenterOverlay } from './_components/command-center-overlay';
 import { CommandCenterPanel } from './_components/command-center-panel';
 import { CommandCenterResults } from './_components/command-center-results';
+import type { FileSearchFilterState } from './sources/use-file-command-items';
 
 function stringArraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -62,6 +64,7 @@ export function CommandCenter() {
     mode,
     selectFirstOnOpen,
     restoreFocusOnClose,
+    initialFileWorkspaceKeys,
     close,
     setQuery,
     setMode,
@@ -77,20 +80,33 @@ export function CommandCenter() {
     add: addPendingRemoval,
     remove: removePendingRemoval,
   } = usePendingRemovals();
-  const { items, isLoading, rawAgentTitles, refreshAgentHistory } =
-    useCommandCenterItems({
-      query,
-      mode,
-      optimisticAgentTitles,
-      optimisticPinnedAgentIds,
-      pendingRemovalAgentIds,
+  const [fileSearchFilter, setFileSearchFilter] =
+    useState<FileSearchFilterState>({
+      selectedWorkspaceKeys: new Set(),
+      includeGitignored: false,
     });
+
+  const {
+    items,
+    isLoading,
+    workspaceOptions,
+    rawAgentTitles,
+    refreshAgentHistory,
+  } = useCommandCenterItems({
+    query,
+    mode,
+    optimisticAgentTitles,
+    optimisticPinnedAgentIds,
+    pendingRemovalAgentIds,
+    fileSearchFilter,
+  });
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const activeTab = useKartonState((s) =>
     activeTabId ? (s.contentTabs.tabs[activeTabId] ?? null) : null,
   );
   const [openAgent, setOpenAgent] = useOpenAgent();
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
@@ -196,6 +212,19 @@ export function CommandCenter() {
     focusInput();
   }, [focusInput, isOpen, mode, query, selectFirstOnOpen]);
 
+  // Initialize the file search filter when the command center opens, seeding
+  // the workspace selection from the open options (empty = all workspaces).
+  // Kept separate from the query/selection effect above so it does NOT
+  // recreate the filter object on every keystroke (which would retrigger the
+  // file search loop).
+  useEffect(() => {
+    if (!isOpen) return;
+    setFileSearchFilter({
+      selectedWorkspaceKeys: new Set(initialFileWorkspaceKeys),
+      includeGitignored: false,
+    });
+  }, [isOpen, initialFileWorkspaceKeys]);
+
   useEffect(() => {
     if (visibleItemIndexes.length === 0) {
       if (selectedIndex !== 0 && selectedIndex !== -1) setSelectedIndex(0);
@@ -254,7 +283,9 @@ export function CommandCenter() {
     (item: CommandCenterItem) => {
       if (item.disabled) return;
 
-      if (item.kind === 'agent') {
+      if (item.kind === 'file') {
+        void openFileTab(item.workspaceKey, item.relativePath);
+      } else if (item.kind === 'agent') {
         setOpenAgent(item.agentId);
         void setLastOpenAgentId(item.agentId).then(() =>
           resumeAgent(item.agentId),
@@ -280,6 +311,7 @@ export function CommandCenter() {
     },
     [
       createTab,
+      openFileTab,
       openSettings,
       dismissCommandCenter,
       resumeAgent,
@@ -709,6 +741,13 @@ export function CommandCenter() {
             onModeChange={setMode}
             onSelectionChange={updateInputSelectionState}
           />
+          {mode === 'files' && (
+            <CommandCenterFileFilter
+              workspaceOptions={workspaceOptions}
+              filterState={fileSearchFilter}
+              onFilterChange={setFileSearchFilter}
+            />
+          )}
           <CommandCenterResults
             items={items}
             mode={mode}

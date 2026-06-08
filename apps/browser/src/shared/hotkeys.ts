@@ -51,6 +51,7 @@ export enum HotkeyActions {
   OPEN_WORKSPACE_SELECT = 'open_workspace_select',
   OPEN_MODEL_SELECT = 'open_model_select',
   OPEN_COMMAND_CENTER = 'open_command_center',
+  OPEN_FILE_SEARCH = 'open_file_search',
   COMMAND_CENTER_RENAME_AGENT = 'command_center_rename_agent',
   COMMAND_CENTER_TOGGLE_AGENT_PIN = 'command_center_toggle_agent_pin',
   COMMAND_CENTER_COPY_TAB_URL = 'command_center_copy_tab_url',
@@ -166,6 +167,14 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.OPEN_COMMAND_CENTER]: {
     accelerator: 'Mod+K',
+    captureDominantly: false,
+  },
+  // Opens the command center directly in file-search mode. On macOS this
+  // shares Mod+P with COMMAND_CENTER_TOGGLE_AGENT_PIN, but that action only
+  // applies while the command center is already open (this global listener is
+  // suppressed in that case), so the two never collide.
+  [HotkeyActions.OPEN_FILE_SEARCH]: {
+    accelerator: 'Mod+P',
     captureDominantly: false,
   },
   [HotkeyActions.COMMAND_CENTER_RENAME_AGENT]: {

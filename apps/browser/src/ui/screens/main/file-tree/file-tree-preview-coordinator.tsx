@@ -31,6 +31,7 @@ export function FileTreePreviewCoordinator({
   const timerRef = useRef<number | null>(null);
   const latestTargetRef = useRef(previewTargetPath);
   const previousPreviewTargetRef = useRef<string | null>(previewTargetPath);
+  const pendingPreviewOpenAfterExpandRef = useRef(false);
   latestTargetRef.current = previewTargetPath;
 
   const activePreviewTab = useKartonState(
@@ -76,6 +77,8 @@ export function FileTreePreviewCoordinator({
 
     const previousPreviewTarget = previousPreviewTargetRef.current;
     const targetChanged = previousPreviewTarget !== previewTargetPath;
+    const forcePreviewOpen = pendingPreviewOpenAfterExpandRef.current;
+    pendingPreviewOpenAfterExpandRef.current = false;
     previousPreviewTargetRef.current = previewTargetPath;
 
     if (!workspaceKey || !previewTargetPath) {
@@ -83,7 +86,11 @@ export function FileTreePreviewCoordinator({
       return;
     }
 
-    if (contentCollapsed) setContentCollapsed(false);
+    if (contentCollapsed) {
+      pendingPreviewOpenAfterExpandRef.current = true;
+      setContentCollapsed(false);
+      return;
+    }
 
     if (targetPermanentTab) {
       if (
@@ -94,7 +101,7 @@ export function FileTreePreviewCoordinator({
         void closeTab(activePreviewTab.id);
       }
 
-      if (targetChanged) {
+      if (targetChanged || forcePreviewOpen) {
         void openFileTab(workspaceKey, previewTargetPath, openAgent, {
           preview: true,
           temporaryGroupKey: groupKey,
@@ -103,7 +110,7 @@ export function FileTreePreviewCoordinator({
       return;
     }
 
-    if (!activePreviewTab && !targetChanged) {
+    if (!activePreviewTab && !targetChanged && !forcePreviewOpen) {
       onPreviewTargetClose();
       return;
     }

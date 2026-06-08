@@ -47,6 +47,7 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
   const blobUrl = resolveAttachmentBlobUrl(attrs.id, openAgent);
 
   const renderer = getRenderer(mediaType);
+  const Badge = renderer.Badge;
   const openWorkspaceFile = useCallback(() => {
     if (!attrs.id.includes('/') || attrs.id.startsWith('att/')) return;
     const slashIndex = attrs.id.indexOf('/');
@@ -73,20 +74,43 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
     onDelete: () => ('deleteNode' in props ? props.deleteNode() : undefined),
   };
 
+  // In the editor (editable mode) the node view's root element MUST be the
+  // NodeViewWrapper that `Badge` renders internally — wrapping it in another
+  // element breaks TipTap's node-view contract ("Please use the
+  // NodeViewWrapper component for your node view."). Only the view-only
+  // renderer (chat history) uses a plain <span> root, so the click-to-open
+  // wrapper is safe there.
+  if (isEditable) {
+    return <Badge {...badgeProps} />;
+  }
+
+  const canOpenWorkspaceFile =
+    attrs.id.includes('/') && !attrs.id.startsWith('att/');
+
   return (
     <span
-      className="inline cursor-pointer"
-      role="button"
-      tabIndex={0}
-      onClick={openWorkspaceFile}
+      className={canOpenWorkspaceFile ? 'inline cursor-pointer' : 'inline'}
+      role={canOpenWorkspaceFile ? 'button' : undefined}
+      tabIndex={canOpenWorkspaceFile ? 0 : undefined}
+      onClick={(event) => {
+        if (!canOpenWorkspaceFile) return;
+        // Stop the click from bubbling to the parent user-message bubble,
+        // which would otherwise enter message-edit mode instead of opening
+        // the file preview.
+        event.preventDefault();
+        event.stopPropagation();
+        openWorkspaceFile();
+      }}
       onKeyDown={(event) => {
+        if (!canOpenWorkspaceFile) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
+          event.stopPropagation();
           openWorkspaceFile();
         }
       }}
     >
-      <renderer.Badge {...badgeProps} />
+      <Badge {...badgeProps} />
     </span>
   );
 }

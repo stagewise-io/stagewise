@@ -2,6 +2,7 @@ import posthog from 'posthog-js';
 import { StatusCard } from './footer-status-card';
 import type { SelectedElement } from '@shared/selected-elements';
 import { useMessageEditState } from '@ui/hooks/use-message-edit-state';
+import { MessageAttachmentsProvider } from '@ui/hooks/use-message-elements';
 import { useFileAttachments } from '@ui/hooks/use-file-attachments';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useDragDrop } from '@ui/hooks/use-drag-drop';
@@ -55,7 +56,11 @@ import type { AttachmentType } from '@ui/screens/main/agent-chat/chat/_component
 import type { MentionContext } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions';
 import type { FileMentionItem } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions/types';
 import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
-import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
+import {
+  attachmentToAttachmentAttributes,
+  selectedElementToAttachmentAttributes,
+} from '@ui/utils/attachment-conversions';
+import { normalizePath } from '@shared/path-utils';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
@@ -1366,10 +1371,91 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     [removeFileAttachment, removeSelectedElementProc],
   );
 
+  const handleWorkspaceFileDrop = useCallback(
+    (attachment: AttachmentMetadata) => {
+      const colonIndex = attachment.path.indexOf(':');
+      const slashIndex = attachment.path.indexOf('/');
+      const mountPrefix =
+        colonIndex > 0 ? attachment.path.slice(0, colonIndex) : null;
+      const absolutePath =
+        colonIndex > 0 ? attachment.path.slice(colonIndex + 1) : null;
+      const currentMounts = mountsRef.current;
+      const mount =
+        mountPrefix && absolutePath
+          ? currentMounts.find(
+              (item) =>
+                item.prefix === mountPrefix &&
+                normalizePath(absolutePath).startsWith(
+                  `${normalizePath(item.path)}/`,
+                ),
+            )
+          : null;
+      const normalizedAttachment =
+        mount && absolutePath
+          ? {
+              path: `${mount.prefix}/${normalizePath(absolutePath).slice(
+                normalizePath(mount.path).length + 1,
+              )}`,
+            }
+          : slashIndex > 0 && colonIndex === -1
+            ? attachment
+            : null;
+
+      // #region @stagewise-debug
+      fetch(
+        'http://127.0.0.1:51577/ingest/attachment-insert-debug?token=1b5c7bc1-5d65-439f-9da9-afa4c102a49f',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            level: 'info',
+            source: 'panelFooter.workspaceFileDrop',
+            data: {
+              attachment,
+              normalizedAttachment,
+              hasInputRef: Boolean(chatInputRef.current),
+            },
+          }),
+        },
+      ).catch(() => {});
+      // #endregion @stagewise-debug
+
+      if (!normalizedAttachment) return;
+
+      setFileAttachments((prev) => {
+        if (prev.some((item) => item.path === normalizedAttachment.path)) {
+          return prev;
+        }
+        return [...prev, normalizedAttachment];
+      });
+      chatInputRef.current?.insertAttachment(
+        attachmentToAttachmentAttributes(normalizedAttachment),
+      );
+    },
+    [setFileAttachments],
+  );
+
   // Drag and drop via shared hook
   const { isDragOver, handlers: dragHandlers } = useDragDrop({
     onFileDrop: addFileAttachment,
-    onDropComplete: () => chatInputRef.current?.focus(),
+    onWorkspaceFileDrop: handleWorkspaceFileDrop,
+    onDropComplete: () => {
+      // #region @stagewise-debug
+      fetch(
+        'http://127.0.0.1:51577/ingest/attachment-insert-debug?token=1b5c7bc1-5d65-439f-9da9-afa4c102a49f',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            level: 'info',
+            source: 'panelFooter.dropComplete',
+            data: { hasInputRef: Boolean(chatInputRef.current) },
+          }),
+        },
+      ).catch(() => {});
+      // #endregion @stagewise-debug
+      chatInputRef.current?.focus();
+    },
   });
 
   // Register main drop handler for forwarded events
@@ -1634,83 +1720,86 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   return (
     <footer className="z-20 flex shrink-0 flex-col items-stretch gap-1 px-1 pb-1">
-      <div
-        className={cn(
-          'relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-elevation-1 ring-1 ring-derived-strong transition-colors dark:bg-surface-1',
-          isDragOver && 'bg-hover-derived!',
-        )}
-        id="chat-input-container-box"
-        data-chat-active={chatInputActive}
-        onKeyDown={(e) => {
-          // Shift-Tab from chat input → jump to last question in status card form
-          if (
-            e.key === 'Tab' &&
-            e.shiftKey &&
-            !(e.target as HTMLElement).closest('[data-status-card]')
-          ) {
-            const card = e.currentTarget.querySelector('[data-status-card]');
-            const questions = card?.querySelectorAll('[data-question]');
-            const last = questions?.[questions.length - 1];
-            if (last) {
-              e.preventDefault();
-              const focusable =
-                last.querySelector<HTMLElement>('button[data-checked]') ??
-                last.querySelector<HTMLElement>(
-                  'input:not([tabindex="-1"]), button, [role="radio"], [role="checkbox"]',
-                );
-              focusable?.focus();
+      <MessageAttachmentsProvider elements={[]} attachments={fileAttachments}>
+        <div
+          className={cn(
+            'relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-elevation-1 ring-1 ring-derived-strong transition-colors dark:bg-surface-1',
+            isDragOver && 'bg-hover-derived!',
+          )}
+          id="chat-input-container-box"
+          data-chat-active={chatInputActive}
+          onKeyDown={(e) => {
+            // Shift-Tab from chat input → jump to last question in status card form
+            if (
+              e.key === 'Tab' &&
+              e.shiftKey &&
+              !(e.target as HTMLElement).closest('[data-status-card]')
+            ) {
+              const card = e.currentTarget.querySelector('[data-status-card]');
+              const questions = card?.querySelectorAll('[data-question]');
+              const last = questions?.[questions.length - 1];
+              if (last) {
+                e.preventDefault();
+                const focusable =
+                  last.querySelector<HTMLElement>('button[data-checked]') ??
+                  last.querySelector<HTMLElement>(
+                    'input:not([tabindex="-1"]), button, [role="radio"], [role="checkbox"]',
+                  );
+                focusable?.focus();
+              }
             }
-          }
-        }}
-        onDragEnter={dragHandlers.onDragEnter}
-        onDragLeave={dragHandlers.onDragLeave}
-        onDragOver={dragHandlers.onDragOver}
-        onDrop={dragHandlers.onDropBubble} // Reset drag state, let event bubble to ChatPanel
-      >
-        <ChatInput
-          key={openAgent}
-          ref={chatInputRef as RefObject<ChatInputHandle>}
-          value={localInputState}
-          onChange={updateChatInputState}
-          onSubmit={handleSubmit}
-          disabled={!enableInputField}
-          placeholder={
-            hasPendingQuestion ? 'Write a message instead' : undefined
-          }
-          attachmentCount={fileAttachments.length}
-          showModelSelect
-          onModelChange={handleModelChange}
-          showContextUsageRing={
-            !!usedTokens && (isVerboseMode || contextUsed > 80)
-          }
-          contextUsedPercentage={contextUsed}
-          contextUsedKb={usedTokens ? usedTokens / 1000 : 0}
-          contextMaxKb={maxTokens ? maxTokens / 1000 : 0}
-          hasQueuedMessages={(queuedMessages?.length ?? 0) > 0}
-          onFlushQueue={handleFlushQueue}
-          onFocus={onInputFocus}
-          onBlur={onInputBlur}
-          onEscape={handleEscape}
-          onPasteFiles={handlePasteFiles}
-          onAttachmentRemoved={handleAttachmentRemoved}
-          mentionContext={mentionContext}
-          slashCommands={slashCommands}
-        />
-        <ChatInputActions
-          isAgentWorking={isWorking}
-          hasPendingQuestion={hasPendingQuestion}
-          onStop={stableAbortAgent}
-          showElementSelectorButton={hasVisibleBrowsingTab}
-          elementSelectionActive={elementSelectionActive}
-          onToggleElementSelection={handleToggleElementSelection}
-          elementSelectorDisabled={hasOpenedInternalPage}
-          showImageUploadButton
-          onAddFileAttachment={handleAddFileAttachment}
-          canSendMessage={effectiveCanSendMessage}
-          onSubmit={handleSubmit}
-        />
-        <StatusCard />
-      </div>
+          }}
+          onDragEnter={dragHandlers.onDragEnter}
+          onDragLeave={dragHandlers.onDragLeave}
+          onDragOver={dragHandlers.onDragOver}
+          // Reset drag state, let event bubble to ChatPanel.
+          onDrop={dragHandlers.onDropBubble}
+        >
+          <ChatInput
+            key={openAgent}
+            ref={chatInputRef as RefObject<ChatInputHandle>}
+            value={localInputState}
+            onChange={updateChatInputState}
+            onSubmit={handleSubmit}
+            disabled={!enableInputField}
+            placeholder={
+              hasPendingQuestion ? 'Write a message instead' : undefined
+            }
+            attachmentCount={fileAttachments.length}
+            showModelSelect
+            onModelChange={handleModelChange}
+            showContextUsageRing={
+              !!usedTokens && (isVerboseMode || contextUsed > 80)
+            }
+            contextUsedPercentage={contextUsed}
+            contextUsedKb={usedTokens ? usedTokens / 1000 : 0}
+            contextMaxKb={maxTokens ? maxTokens / 1000 : 0}
+            hasQueuedMessages={(queuedMessages?.length ?? 0) > 0}
+            onFlushQueue={handleFlushQueue}
+            onFocus={onInputFocus}
+            onBlur={onInputBlur}
+            onEscape={handleEscape}
+            onPasteFiles={handlePasteFiles}
+            onAttachmentRemoved={handleAttachmentRemoved}
+            mentionContext={mentionContext}
+            slashCommands={slashCommands}
+          />
+          <ChatInputActions
+            isAgentWorking={isWorking}
+            hasPendingQuestion={hasPendingQuestion}
+            onStop={stableAbortAgent}
+            showElementSelectorButton={hasVisibleBrowsingTab}
+            elementSelectionActive={elementSelectionActive}
+            onToggleElementSelection={handleToggleElementSelection}
+            elementSelectorDisabled={hasOpenedInternalPage}
+            showImageUploadButton
+            onAddFileAttachment={handleAddFileAttachment}
+            canSendMessage={effectiveCanSendMessage}
+            onSubmit={handleSubmit}
+          />
+          <StatusCard />
+        </div>
+      </MessageAttachmentsProvider>
       {workspaceActionError && (
         <WorkspaceActionErrorMessage message={workspaceActionError} />
       )}

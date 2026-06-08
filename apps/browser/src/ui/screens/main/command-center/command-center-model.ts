@@ -2,16 +2,27 @@ import type { HotkeyActions } from '@shared/hotkeys';
 import type { ReactNode } from 'react';
 import type { SettingsRoute } from '@shared/settings-route';
 
-export type CommandCenterMode = 'global' | 'agents' | 'browser' | 'settings';
+export type CommandCenterMode =
+  | 'global'
+  | 'agents'
+  | 'browser'
+  | 'settings'
+  | 'files';
 
 export const COMMAND_CENTER_MODES: CommandCenterMode[] = [
   'global',
   'agents',
   'browser',
+  'files',
   'settings',
 ];
 
-export type CommandCenterItemKind = 'agent' | 'tab' | 'setting' | 'action';
+export type CommandCenterItemKind =
+  | 'agent'
+  | 'tab'
+  | 'setting'
+  | 'action'
+  | 'file';
 
 export type CommandCenterShortcut = {
   action?: HotkeyActions;
@@ -65,6 +76,15 @@ export type SettingCommandItem = CommandCenterItemBase & {
   settingsRoute?: SettingsRoute;
 };
 
+export type FileCommandItem = CommandCenterItemBase & {
+  kind: 'file';
+  mode: 'files';
+  relativePath: string;
+  mountPrefix: string;
+  workspaceKey: string;
+  fileName: string;
+};
+
 export type ActionCommandItem = CommandCenterItemBase & {
   kind: 'action';
 };
@@ -73,6 +93,7 @@ export type CommandCenterItem =
   | AgentCommandItem
   | TabCommandItem
   | SettingCommandItem
+  | FileCommandItem
   | ActionCommandItem;
 
 export type CommandCenterOpenOptions = {
@@ -80,6 +101,11 @@ export type CommandCenterOpenOptions = {
   initialMode?: CommandCenterMode;
   selectFirst?: boolean;
   restoreFocusOnClose?: boolean;
+  /**
+   * Workspace keys to preselect as the only search targets in "files" mode.
+   * An empty/omitted value means "search all workspaces".
+   */
+  initialFileWorkspaceKeys?: string[];
 };
 
 export type CommandCenterSourceResult<T extends CommandCenterItem> = {

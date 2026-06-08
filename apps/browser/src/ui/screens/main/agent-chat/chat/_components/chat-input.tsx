@@ -655,11 +655,21 @@ export const ChatInput = memo(function ChatInput({
       editor?.commands.blur();
     },
     insertAttachment: (attrs: AttachmentAttributes, position?: number) => {
-      if (editor) {
-        // Mark as internal change so valueEffect doesn't reset content
-        isInternalChangeRef.current = true;
-        editor.commands.insertAttachment(attrs, position);
-      }
+      if (!editor) return;
+      // Mark as internal change so valueEffect doesn't reset content
+      isInternalChangeRef.current = true;
+      editor.commands.insertAttachment(attrs, position);
+      // When the insert originates from a native drag/drop or other
+      // out-of-React event, TipTap's React node-view portals may not flush
+      // until a later transaction (which is why the badge previously only
+      // appeared after typing/refocusing). Force a follow-up no-op
+      // transaction + focus on the next frame so the node view paints
+      // immediately.
+      requestAnimationFrame(() => {
+        if (editor.isDestroyed) return;
+        editor.view.dispatch(editor.state.tr.setMeta('addToHistory', false));
+        editor.commands.focus();
+      });
     },
     getTextContent: () => {
       if (!editor) return '';

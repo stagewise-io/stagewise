@@ -44,5 +44,16 @@ export function CommandCenterHotkeys() {
     });
   }, HotkeyActions.OPEN_COMMAND_CENTER);
 
+  // Mod+P opens the command center directly in file-search mode. The shared
+  // useHotKeyListener suppresses this while the command center is already open
+  // (so it never clashes with the in-modal pin shortcut on macOS).
+  useHotKeyListener(() => {
+    if (isOpen) return;
+    open({
+      initialMode: 'files',
+      restoreFocusOnClose: shouldRestoreFocusOnClose,
+    });
+  }, HotkeyActions.OPEN_FILE_SEARCH);
+
   return null;
 }

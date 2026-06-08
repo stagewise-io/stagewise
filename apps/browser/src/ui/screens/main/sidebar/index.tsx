@@ -34,7 +34,7 @@ import { WorktreeCleanupBadge } from './worktree-cleanup-badge';
 // (`defaultSize={12}`) and then collapses via effect on the next frame,
 // producing a visible flash when the user last left the sidebar collapsed.
 const INITIAL_COLLAPSED = readInitialSidebarCollapsed();
-const DEFAULT_EXPANDED_SIZE = 6;
+const DEFAULT_EXPANDED_SIZE = 12;
 
 function getPlanLabel(plan: string | undefined): string {
   if (!plan) return 'Free';

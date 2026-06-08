@@ -1,21 +1,7 @@
-import { ContextMenu } from '@base-ui/react/context-menu';
-import { Menu as MenuBase } from '@base-ui/react/menu';
 import { FileIcon } from '@ui/components/file-icon';
 import { cn } from '@ui/utils';
 import type { FileTreeEntry } from '@shared/karton-contracts/ui';
-import { getCurrentPlatform } from '@shared/hotkeys';
-import { nativeFileManagerLabel } from '@shared/ide-url';
-import {
-  ChevronRightIcon,
-  ClipboardPasteIcon,
-  CopyIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  Loader2Icon,
-  PencilIcon,
-  ScissorsIcon,
-  Trash2Icon,
-} from 'lucide-react';
+import { ChevronRightIcon, FolderIcon, Loader2Icon } from 'lucide-react';
 import {
   memo,
   useEffect,
@@ -24,24 +10,6 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
-
-const menuItemClassName = cn(
-  'flex w-full cursor-default flex-row items-center justify-start gap-2',
-  'rounded-md px-2 py-1 text-foreground text-xs outline-none',
-  'transition-colors duration-150 ease-out',
-  'hover:bg-surface-1 data-highlighted:bg-surface-1',
-  'data-disabled:pointer-events-none data-disabled:opacity-45',
-);
-
-const actionModifierLabel = getCurrentPlatform() === 'mac' ? '⌘' : 'Ctrl';
-
-function MenuShortcut({ children }: { children: string }) {
-  return (
-    <span className="ml-auto pl-4 font-mono text-[0.625rem] text-muted-foreground">
-      {children}
-    </span>
-  );
-}
 
 type FileTreeNodeProps = {
   entry: FileTreeEntry;
@@ -52,27 +20,22 @@ type FileTreeNodeProps = {
   rowIndex: number;
   dragPath: string;
   dragPayload: string;
-  canPaste: boolean;
+  dragFilePaths: string[];
+  selected: boolean;
   cut: boolean;
   dropTarget: boolean;
-  canRename: boolean;
   renaming: boolean;
   onFocus: () => void;
   onToggle: () => void;
   onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
+  onSelectPointerDown: (event: MouseEvent<HTMLButtonElement>) => void;
   onOpen: () => void;
   onDragEnter: () => void;
   onDragLeave: () => void;
   onDragOver: (event: DragEvent<HTMLButtonElement>) => void;
   onDrop: (event: DragEvent<HTMLButtonElement>) => void;
-  onStartRename: () => void;
   onRenameSubmit: (name: string) => void;
   onRenameCancel: () => void;
-  onCopy: () => void;
-  onCut: () => void;
-  onPaste: () => void;
-  onDelete: () => void;
-  onReveal: () => void;
 };
 
 export const FileTreeNode = memo(function FileTreeNode({
@@ -84,30 +47,25 @@ export const FileTreeNode = memo(function FileTreeNode({
   rowIndex,
   dragPath,
   dragPayload,
-  canPaste,
+  dragFilePaths,
+  selected,
   cut,
   dropTarget,
-  canRename,
   renaming,
   onFocus,
   onSelect,
+  onSelectPointerDown,
   onOpen,
   onDragEnter,
   onDragLeave,
   onDragOver,
   onDrop,
-  onStartRename,
   onRenameSubmit,
   onRenameCancel,
-  onCopy,
-  onCut,
-  onPaste,
-  onDelete,
-  onReveal,
 }: FileTreeNodeProps) {
   const isDirectory = entry.kind === 'directory';
 
-  const content = renaming ? (
+  return renaming ? (
     <RenameRow
       entry={entry}
       depth={depth}
@@ -121,10 +79,14 @@ export const FileTreeNode = memo(function FileTreeNode({
     <button
       type="button"
       className={cn(
-        'flex h-6 w-full items-center gap-1 rounded px-1 text-left text-xs hover:bg-hover-derived focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset',
+        'flex h-6 w-full select-none items-center gap-1 rounded px-1 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset',
         entry.isIgnored
           ? 'text-muted-foreground opacity-45'
           : 'text-foreground',
+        // When the row is already selected, darken the selection background on
+        // hover (translucent overlay blends with the selected bg behind it)
+        // instead of replacing it with the neutral gray hover.
+        selected ? 'hover:bg-foreground/[0.06]' : 'hover:bg-hover-derived',
         cut && 'opacity-45',
         dropTarget && 'bg-primary-solid/15 ring-1 ring-primary-solid/50',
       )}
@@ -145,12 +107,28 @@ export const FileTreeNode = memo(function FileTreeNode({
           'application/x-stagewise-file-tree-move',
           dragPayload,
         );
-        event.dataTransfer.setData('text/plain', `[](path:${dragPath})`);
+        // Carry every selected file path so dropping a multi-selection into
+        // the chat input attaches all of them, not just the dragged file.
+        if (dragFilePaths.length > 0) {
+          event.dataTransfer.setData(
+            'application/x-stagewise-file-paths',
+            JSON.stringify(dragFilePaths),
+          );
+        }
+        event.dataTransfer.setData(
+          'text/plain',
+          dragFilePaths.length > 1
+            ? dragFilePaths.map((p) => `[](path:${p})`).join(' ')
+            : `[](path:${dragPath})`,
+        );
       }}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onPointerDown={(event) => {
+        if (event.pointerType === 'mouse') onSelectPointerDown(event);
+      }}
       onClick={(event) => {
         onSelect(event);
       }}
@@ -163,77 +141,6 @@ export const FileTreeNode = memo(function FileTreeNode({
       <TreeNodeIcon entry={entry} expanded={expanded} loading={loading} />
       <span className="min-w-0 truncate">{entry.name}</span>
     </button>
-  );
-
-  return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger render={<span />} className="contents">
-        {content}
-      </ContextMenu.Trigger>
-      <MenuBase.Portal>
-        <MenuBase.Positioner
-          className="z-50"
-          sideOffset={4}
-          align="start"
-          side="bottom"
-        >
-          <MenuBase.Popup
-            onClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
-            className={cn(
-              'flex min-w-40 origin-(--transform-origin) flex-col items-stretch gap-0.5',
-              'rounded-lg border border-border-subtle bg-background p-1',
-              'text-xs shadow-lg',
-              'transition-[transform,scale,opacity] duration-150 ease-out',
-              'data-ending-style:scale-90 data-starting-style:scale-90',
-              'data-ending-style:opacity-0 data-starting-style:opacity-0',
-            )}
-          >
-            <MenuBase.Item
-              className={menuItemClassName}
-              disabled={!canRename}
-              onClick={onStartRename}
-            >
-              <PencilIcon className="size-3.5 shrink-0" />
-              <span>Rename</span>
-              <MenuShortcut>F2</MenuShortcut>
-            </MenuBase.Item>
-            <MenuBase.Item className={menuItemClassName} onClick={onCopy}>
-              <CopyIcon className="size-3.5 shrink-0" />
-              <span>Copy</span>
-              <MenuShortcut>{`${actionModifierLabel}C`}</MenuShortcut>
-            </MenuBase.Item>
-            <MenuBase.Item className={menuItemClassName} onClick={onCut}>
-              <ScissorsIcon className="size-3.5 shrink-0" />
-              <span>Cut</span>
-              <MenuShortcut>{`${actionModifierLabel}X`}</MenuShortcut>
-            </MenuBase.Item>
-            <MenuBase.Item
-              className={menuItemClassName}
-              disabled={!canPaste}
-              onClick={onPaste}
-            >
-              <ClipboardPasteIcon className="size-3.5 shrink-0" />
-              <span>Paste</span>
-              <MenuShortcut>{`${actionModifierLabel}V`}</MenuShortcut>
-            </MenuBase.Item>
-            <MenuBase.Item
-              className={cn(menuItemClassName, 'text-error-foreground')}
-              onClick={onDelete}
-            >
-              <Trash2Icon className="size-3.5 shrink-0" />
-              <span>Delete</span>
-              <MenuShortcut>Del</MenuShortcut>
-            </MenuBase.Item>
-            <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
-            <MenuBase.Item className={menuItemClassName} onClick={onReveal}>
-              <FolderOpenIcon className="size-3.5 shrink-0" />
-              <span>Open in {nativeFileManagerLabel}</span>
-            </MenuBase.Item>
-          </MenuBase.Popup>
-        </MenuBase.Positioner>
-      </MenuBase.Portal>
-    </ContextMenu.Root>
   );
 });
 

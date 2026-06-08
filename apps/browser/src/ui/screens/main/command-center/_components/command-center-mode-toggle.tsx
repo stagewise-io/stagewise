@@ -1,5 +1,6 @@
 import {
   IconEarthSearchOutline18,
+  IconFolder5Outline18,
   IconGear3Outline18,
   IconMsgWritingOutline18,
 } from 'nucleo-ui-outline-18';
@@ -18,6 +19,7 @@ const modes: ModeDefinition[] = [
   { mode: 'global', label: 'All' },
   { mode: 'agents', label: 'Agents', Icon: IconMsgWritingOutline18 },
   { mode: 'browser', label: 'Browser', Icon: IconEarthSearchOutline18 },
+  { mode: 'files', label: 'Files', Icon: IconFolder5Outline18 },
   { mode: 'settings', label: 'Settings', Icon: IconGear3Outline18 },
 ];
 

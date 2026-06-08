@@ -41,17 +41,6 @@ export function UnsavedFileCloseDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="secondary" size="sm" onClick={onKeepOpen}>
-            Keep open
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onCancelWithoutSave}
-            disabled={isSaving}
-          >
-            Cancel without save
-          </Button>
           <Button
             variant="primary"
             size="sm"
@@ -64,7 +53,18 @@ export function UnsavedFileCloseDialog({
             {isSaving ? (
               <Loader2Icon className="mr-2 size-3 animate-spin" />
             ) : null}
-            Save and cancel
+            Save and close
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onCancelWithoutSave}
+            disabled={isSaving}
+          >
+            Close without save
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onKeepOpen}>
+            Abort
           </Button>
         </DialogFooter>
       </DialogContent>

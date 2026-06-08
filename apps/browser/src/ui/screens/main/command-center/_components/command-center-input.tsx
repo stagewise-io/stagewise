@@ -29,7 +29,9 @@ export const CommandCenterInput = forwardRef<
         onKeyUp={(event) => onSelectionChange(event.currentTarget)}
         onPointerUp={(event) => onSelectionChange(event.currentTarget)}
         onSelect={(event) => onSelectionChange(event.currentTarget)}
-        placeholder="Search agents, tabs, settings…"
+        placeholder={
+          mode === 'files' ? 'Search files…' : 'Search agents, tabs, settings…'
+        }
         className="min-w-0 flex-1 bg-transparent text-foreground text-sm outline-none placeholder:text-subtle-foreground"
       />
       <CommandCenterModeToggle mode={mode} onModeChange={onModeChange} />
