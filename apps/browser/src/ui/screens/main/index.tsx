@@ -286,10 +286,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
               !isMacOs && 'mt-px',
             )}
           >
-            <ResizablePanelGroup
-              direction="horizontal"
-              className="h-full divide-x divide-surface-1"
-            >
+            <ResizablePanelGroup direction="horizontal" className="h-full">
               <AgentChat
                 topRightActions={chatTopRightActions}
                 defaultSize={innerPanelLayout.chatSize}
@@ -298,7 +295,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
 
               {showContent && (
                 <>
-                  <ResizableHandle />
+                  <ResizableHandle className="w-0.5 bg-border" />
                   <MainSection
                     onCreateTab={handleCreateTab}
                     pendingOmniboxFocusRequest={pendingOmniboxFocusRequest}
@@ -320,7 +317,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
 
               {fileTreeVisible && (
                 <>
-                  <ResizableHandle />
+                  <ResizableHandle className="w-0.5 bg-border" />
                   <ResizablePanel
                     id="file-tree-panel"
                     order={3}
