@@ -12,8 +12,8 @@ import { WebContentsOverlayProvider } from '@ui/contexts';
 import { BasicAuthDialog } from './basic-auth-dialog';
 import { ColorSchemeWidget } from './control-buttons/color-scheme';
 import { ChromeDevToolsWidget } from './control-buttons/chrome-devtools';
-import { TabErrorBoundary } from './tab-error-boundary';
 import { PerTerminalContent } from '../../terminal-panel/_components/per-terminal-content';
+import { FilePreviewTabContent } from '../../file-tree/file-preview-tab-content';
 
 export interface PerTabContentRef {
   focusOmnibox: () => void;
@@ -57,52 +57,50 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
       [],
     );
 
-    return (
-      <TabErrorBoundary tabId={tabId}>
-        {tab?.type === 'terminal' ? (
-          <div className="absolute inset-0 z-10 flex flex-col">
-            <PerTerminalContent terminalId={tabId} isActive />
+    return tab?.type === 'file' ? (
+      <FilePreviewTabContent tab={tab} />
+    ) : tab?.type === 'terminal' ? (
+      <div className="absolute inset-0 z-10 flex flex-col">
+        <PerTerminalContent terminalId={tabId} isActive />
+      </div>
+    ) : (
+      <div className="absolute inset-0 z-10 flex flex-col">
+        {/* Control Bar */}
+        <div className="flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0 [&_button:focus-visible]:outline-offset-[-4px]">
+          <NavButtons tabId={tabId} tab={tab} />
+          <Omnibox ref={omniboxRef} tabId={tabId} tab={tab} isActive />
+          <ZoomBar tabId={tabId} />
+          <SearchBar tabId={tabId} ref={searchBarRef} />
+          {(tab?.permissionRequests?.length ?? 0) > 0 && (
+            <ResourceRequestsControlButton tabId={tabId} isActive />
+          )}
+          <div className="flex flex-row items-center gap-0.5">
+            {tab && <ColorSchemeWidget tab={tab} />}
+            {tab && <ChromeDevToolsWidget tab={tab} />}
           </div>
-        ) : (
-          <div className="absolute inset-0 z-10 flex flex-col">
-            {/* Control Bar */}
-            <div className="flex w-full shrink-0 items-stretch divide-x divide-surface-2 border-derived border-b bg-background px-1 py-0 [&_button:focus-visible]:outline-offset-[-4px]">
-              <NavButtons tabId={tabId} tab={tab} />
-              <Omnibox ref={omniboxRef} tabId={tabId} tab={tab} isActive />
-              <ZoomBar tabId={tabId} />
-              <SearchBar tabId={tabId} ref={searchBarRef} />
-              {(tab?.permissionRequests?.length ?? 0) > 0 && (
-                <ResourceRequestsControlButton tabId={tabId} isActive />
+        </div>
+        {/* Content area - wrapped with WebContentsOverlayProvider for overlay access */}
+        <WebContentsOverlayProvider>
+          <div className="flex size-full flex-col items-center justify-center overflow-hidden">
+            <div
+              ref={devAppPreviewContainerRef}
+              id={`dev-app-preview-container-${tabId}`}
+              className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+            >
+              {/* Unified web contents overlay for devtools and DOM selection */}
+              {!isInternalPage && <WebContentsOverlay />}
+              {/* DOM context selector - uses the unified overlay via hook */}
+              {!isInternalPage && <DOMContextSelector />}
+              {tab?.authenticationRequest && (
+                <BasicAuthDialog
+                  request={tab.authenticationRequest}
+                  container={devAppPreviewContainerRef}
+                />
               )}
-              <div className="flex flex-row items-center gap-0.5">
-                {tab && <ColorSchemeWidget tab={tab} />}
-                {tab && <ChromeDevToolsWidget tab={tab} />}
-              </div>
             </div>
-            {/* Content area - wrapped with WebContentsOverlayProvider for overlay access */}
-            <WebContentsOverlayProvider>
-              <div className="flex size-full flex-col items-center justify-center overflow-hidden">
-                <div
-                  ref={devAppPreviewContainerRef}
-                  id={`dev-app-preview-container-${tabId}`}
-                  className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
-                >
-                  {/* Unified web contents overlay for devtools and DOM selection */}
-                  {!isInternalPage && <WebContentsOverlay />}
-                  {/* DOM context selector - uses the unified overlay via hook */}
-                  {!isInternalPage && <DOMContextSelector />}
-                  {tab?.authenticationRequest && (
-                    <BasicAuthDialog
-                      request={tab.authenticationRequest}
-                      container={devAppPreviewContainerRef}
-                    />
-                  )}
-                </div>
-              </div>
-            </WebContentsOverlayProvider>
           </div>
-        )}
-      </TabErrorBoundary>
+        </WebContentsOverlayProvider>
+      </div>
     );
   },
 );

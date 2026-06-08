@@ -841,9 +841,9 @@ export class ToolboxService
     const isTabVisible = (tab: { agentInstanceId: string | null }) =>
       tab.agentInstanceId === null || tab.agentInstanceId === agentInstanceId;
 
-    // Terminal tabs are excluded from the browser snapshot
-    const isTerminalTab = (tab: { type?: 'browser' | 'terminal' }) =>
-      tab.type === 'terminal';
+    // Non-browser tabs are excluded from the browser snapshot.
+    const isBrowserTab = (tab: TabState) =>
+      tab.type === undefined || tab.type === 'browser';
 
     const activeTab =
       contentTabs.activeTabId && contentTabs.tabs[contentTabs.activeTabId]
@@ -864,7 +864,7 @@ export class ToolboxService
       })
       .map((id) => contentTabs.tabs[id] as TabState | undefined)
       .filter((tab): tab is TabState => Boolean(tab))
-      .filter((tab) => !isTerminalTab(tab))
+      .filter(isBrowserTab)
       .filter(isTabVisible);
 
     const allTabs = visibleTabs
@@ -885,7 +885,7 @@ export class ToolboxService
 
     // Only show active tab if it's visible to this agent
     const activeTabVisible =
-      activeTab && isTabVisible(activeTab) && !isTerminalTab(activeTab)
+      activeTab && isTabVisible(activeTab) && isBrowserTab(activeTab)
         ? activeTab
         : null;
 

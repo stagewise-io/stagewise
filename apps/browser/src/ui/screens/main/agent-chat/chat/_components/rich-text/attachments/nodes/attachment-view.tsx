@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { InlineNodeViewProps } from '../../shared/types';
 import {
   getRenderer,
@@ -7,6 +7,7 @@ import {
 import type { BadgeProps } from '@ui/components/attachment-renderers';
 import { useMessageAttachments } from '@ui/hooks/use-message-elements';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { inferMimeType } from '@shared/mime-utils';
 
 interface AttachmentAttrs {
@@ -18,6 +19,11 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
   const attrs = props.node.attrs as AttachmentAttrs;
   const isEditable = !('viewOnly' in props);
   const [openAgent] = useOpenAgent();
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const mounts = useKartonState((s) =>
+    openAgent ? (s.toolbox[openAgent]?.workspace.mounts ?? []) : [],
+  );
 
   const { attachments } = useMessageAttachments();
   const attachment = useMemo(
@@ -41,6 +47,19 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
   const blobUrl = resolveAttachmentBlobUrl(attrs.id, openAgent);
 
   const renderer = getRenderer(mediaType);
+  const openWorkspaceFile = useCallback(() => {
+    if (!attrs.id.includes('/') || attrs.id.startsWith('att/')) return;
+    const slashIndex = attrs.id.indexOf('/');
+    const prefix = attrs.id.slice(0, slashIndex);
+    const relativePath = attrs.id.slice(slashIndex + 1);
+    const mount = mounts.find((item) => item.prefix === prefix);
+    if (!mount) return;
+
+    const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+    void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
+      if (!tabId) void revealInFolder(workspaceKey, relativePath);
+    });
+  }, [attrs.id, mounts, openAgent, openFileTab, revealInFolder]);
 
   const badgeProps: BadgeProps = {
     attachmentId: attrs.id,
@@ -54,5 +73,20 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
     onDelete: () => ('deleteNode' in props ? props.deleteNode() : undefined),
   };
 
-  return <renderer.Badge {...badgeProps} />;
+  return (
+    <span
+      className="inline cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onClick={openWorkspaceFile}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openWorkspaceFile();
+        }
+      }}
+    >
+      <renderer.Badge {...badgeProps} />
+    </span>
+  );
 }

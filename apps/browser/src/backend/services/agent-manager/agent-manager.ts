@@ -43,6 +43,7 @@ const AGENT_RPC_COMMANDS = [
   'agents.setActiveModelId',
   'agents.setTitle',
   'agents.getAgentsHistoryList',
+  'agents.getAgentHistoryEntriesByIds',
   'agents.updateInputState',
   'agents.retryLastUserMessage',
   'agents.storeAttachment',

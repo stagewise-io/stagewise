@@ -1,7 +1,12 @@
 import { BaseWindow, app, ipcMain, nativeTheme, session } from 'electron';
 import type { WebContents } from 'electron';
 import path from 'node:path';
-import type { AppState, SelectedElement } from '@shared/karton-contracts/ui';
+import type {
+  AppState,
+  FileTabMetadata,
+  OpenFileTabOptions,
+  SelectedElement,
+} from '@shared/karton-contracts/ui';
 import { getHotkeyDefinitionForEvent } from '@shared/hotkeys';
 import { generateTabId, resetTabIdCounter } from './tab-id';
 import { getBrowserSessionId } from './browser-session';
@@ -27,6 +32,7 @@ import {
   type ConfigurablePermissionType,
   PermissionSetting,
   configurablePermissionTypes,
+  getFileTabDefaults,
   getTerminalTabDefaults,
 } from '@shared/karton-contracts/ui';
 import { THEME_COLORS } from '@/shared/theme-colors';
@@ -59,6 +65,15 @@ const windowStateSchema = z.object({
 
 type WindowState = z.infer<typeof windowStateSchema>;
 
+const fileTabMetadataSchema = z.object({
+  workspaceKey: z.string(),
+  relativePath: z.string(),
+  absolutePath: z.string(),
+  kind: z.enum(['text', 'image', 'svg', 'binary']),
+  mimeType: z.string(),
+  size: z.number(),
+});
+
 const tabEntrySchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('browser'),
@@ -70,6 +85,13 @@ const tabEntrySchema = z.discriminatedUnion('type', [
     id: z.string(),
     cwd: z.string(),
     title: z.string(),
+    agentInstanceId: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal('file'),
+    id: z.string(),
+    title: z.string(),
+    file: fileTabMetadataSchema,
     agentInstanceId: z.string().nullable(),
   }),
 ]);
@@ -770,6 +792,120 @@ export class WindowLayoutService extends DisposableService {
     return tabId;
   }
 
+  private getFilePreviewGroupKey(agentInstanceId?: string | null): string {
+    return `file-tree-preview:${agentInstanceId ?? 'global'}`;
+  }
+
+  private revealFileTabInTree(file: FileTabMetadata): void {
+    const normalized = file.relativePath.replace(/\\/g, '/');
+    const parts = normalized.split('/').filter(Boolean);
+    const expandedDirectories = parts
+      .slice(0, -1)
+      .map((_, index) => parts.slice(0, index + 1).join('/'));
+
+    this.uiKarton.setState((draft) => {
+      draft.fileTree.visible = true;
+      draft.fileTree.activeWorkspaceKey = file.workspaceKey;
+      const existing = new Set(
+        draft.fileTree.expandedDirectoriesByWorkspaceKey[file.workspaceKey] ??
+          [],
+      );
+      for (const directoryPath of expandedDirectories) {
+        existing.add(directoryPath);
+      }
+      draft.fileTree.expandedDirectoriesByWorkspaceKey[file.workspaceKey] =
+        Array.from(existing);
+    });
+  }
+
+  public async openFileTab(
+    file: FileTabMetadata,
+    agentInstanceId?: string | null,
+    options?: OpenFileTabOptions,
+  ): Promise<string | null> {
+    const existing = Object.entries(this.uiKarton.state.contentTabs.tabs).find(
+      ([, tab]) =>
+        tab.type === 'file' &&
+        tab.file?.workspaceKey === file.workspaceKey &&
+        tab.file.relativePath === file.relativePath &&
+        tab.agentInstanceId === (agentInstanceId ?? null),
+    );
+    if (existing) {
+      if (!options?.preview) this.promoteFileTab(existing[0]);
+      await this.handleSwitchTab(existing[0]);
+      this.revealFileTabInTree(file);
+      return existing[0];
+    }
+
+    const temporaryGroupKey =
+      options?.temporaryGroupKey ??
+      this.getFilePreviewGroupKey(agentInstanceId);
+    const reusablePreview = options?.preview
+      ? Object.entries(this.uiKarton.state.contentTabs.tabs).find(
+          ([, tab]) =>
+            tab.lifecycle.kind === 'temporary' &&
+            tab.lifecycle.groupKey === temporaryGroupKey &&
+            tab.agentInstanceId === (agentInstanceId ?? null),
+        )
+      : undefined;
+    const title = path.basename(file.relativePath) || 'File';
+
+    if (reusablePreview) {
+      const [id] = reusablePreview;
+      this.uiKarton.setState((draft) => {
+        const tab = draft.contentTabs.tabs[id];
+        if (!tab) return;
+        tab.title = title;
+        tab.url = `file-tree://${encodeURIComponent(file.workspaceKey)}/${encodeURIComponent(file.relativePath)}`;
+        tab.file = file;
+        tab.lifecycle = { kind: 'temporary', groupKey: temporaryGroupKey };
+        tab.lastFocusedAt = Date.now();
+      });
+      await this.handleSwitchTab(id);
+      this.revealFileTabInTree(file);
+      this.saveTabState();
+      return id;
+    }
+
+    const id = generateTabId();
+    this.uiKarton.setState((draft) => {
+      draft.contentTabs.tabs[id] = {
+        ...getFileTabDefaults(),
+        id,
+        title,
+        url: `file-tree://${encodeURIComponent(file.workspaceKey)}/${encodeURIComponent(file.relativePath)}`,
+        agentInstanceId: agentInstanceId ?? null,
+        file,
+        lifecycle: options?.preview
+          ? { kind: 'temporary', groupKey: temporaryGroupKey }
+          : { kind: 'permanent' },
+        createdAt: Date.now(),
+        lastFocusedAt: Date.now(),
+      };
+      this.addToTabOrder(draft.contentTabs, id, agentInstanceId ?? null);
+      if (agentInstanceId) {
+        draft.browser.lastActiveTabPerAgent[agentInstanceId] = id;
+      }
+    });
+    if (agentInstanceId) {
+      this.lastActiveTabPerAgent[agentInstanceId] = id;
+    }
+    await this.handleSwitchTab(id);
+    this.revealFileTabInTree(file);
+    this.saveTabState();
+    return id;
+  }
+
+  public promoteFileTab(tabId: string): void {
+    this.uiKarton.setState((draft) => {
+      const tab = draft.contentTabs.tabs[tabId];
+      if (tab?.type === 'file' && tab.file) {
+        tab.lifecycle = { kind: 'permanent' };
+      }
+    });
+    this.saveTabState();
+  }
+
   /**
    * Opens a URL in a new tab, or navigates the active tab if it's a new/default tab.
    * A tab is considered "new" if it's the only tab and is on the default URL (ui-main).
@@ -1417,6 +1553,7 @@ export class WindowLayoutService extends DisposableService {
       const newTabState = {
         id,
         cwd: '',
+        lifecycle: { kind: 'permanent' as const },
         ...tab.getState(),
       };
       const tabAgentInstanceId = newTabState.agentInstanceId ?? null;
@@ -1464,20 +1601,28 @@ export class WindowLayoutService extends DisposableService {
 
   private handleCloseTab = async (tabId: string) => {
     const tab = this.tabs[tabId];
-    const isTerminal =
-      !tab && this.uiKarton.state.contentTabs.tabs[tabId]?.type === 'terminal';
+    const stateOnlyTab = !tab
+      ? this.uiKarton.state.contentTabs.tabs[tabId]
+      : undefined;
+    const isStateOnlyTab =
+      stateOnlyTab?.type === 'terminal' || stateOnlyTab?.type === 'file';
 
-    if (isTerminal) {
-      // Delegate PTY teardown and buffer cleanup to TerminalService.
-      // WindowLayoutService owns active-tab selection — handle it here
-      // after the terminal tab has been removed from Karton state.
+    if (isStateOnlyTab) {
+      // Terminal tabs delegate PTY teardown and buffer cleanup to
+      // TerminalService. File tabs are backend-only Karton entries.
       const wasActive =
         this.activeTabId === tabId ||
         this.uiKarton.state.contentTabs.activeTabId === tabId;
-      // Snapshot the terminal's agent before onCloseTerminal removes it.
-      const kartonTab = this.uiKarton.state.contentTabs.tabs[tabId];
-      const closedAgentInstanceId = kartonTab?.agentInstanceId ?? null;
-      this.onCloseTerminal?.(tabId);
+      const closedAgentInstanceId = stateOnlyTab.agentInstanceId ?? null;
+      if (stateOnlyTab.type === 'terminal') {
+        this.onCloseTerminal?.(tabId);
+      } else {
+        this.uiKarton.setState((draft) => {
+          delete draft.contentTabs.tabs[tabId];
+          this.removeFromTabOrders(draft.contentTabs, tabId);
+        });
+      }
+      this.purgeLastActiveRefs(tabId);
       if (wasActive) {
         const remainingIds = this.getTabOrderForAgent(
           this.uiKarton.state.contentTabs,
@@ -1497,7 +1642,6 @@ export class WindowLayoutService extends DisposableService {
           });
           this.saveTabState();
         }
-        this.purgeLastActiveRefs(tabId);
       } else {
         this.saveTabState();
       }
@@ -1592,18 +1736,18 @@ export class WindowLayoutService extends DisposableService {
   };
 
   private handleSwitchTab = async (tabId: string, skipSetState = false) => {
-    // Terminal tabs are managed by TerminalService, not by Electron views.
-    // They have no BrowsingTabController — just update activeTabId in
-    // state.  Short-circuiting on this.activeTabId === tabId is now safe
-    // because TerminalService no longer sets activeTabId directly; all
-    // tab activations (creation, user click, PTY-exit fallback) route
-    // through this method, keeping this.activeTabId authoritative.
-    const isTerminal =
-      this.uiKarton.state.contentTabs.tabs[tabId]?.type === 'terminal';
-    if (!this.tabs[tabId] && !isTerminal) return;
+    // Terminal and file tabs are managed by Karton state, not Electron
+    // BrowsingTabController views. They have no WebContentsView.
+    const contentTab = this.uiKarton.state.contentTabs.tabs[tabId];
+    const isStateOnlyTab =
+      contentTab?.type === 'terminal' || contentTab?.type === 'file';
+    if (!this.tabs[tabId] && !isStateOnlyTab) return;
     if (this.activeTabId === tabId) return;
 
-    if (isTerminal) {
+    if (isStateOnlyTab) {
+      if (contentTab?.type === 'file' && contentTab.file) {
+        this.revealFileTabInTree(contentTab.file);
+      }
       const previousTabId = this.activeTabId;
       // Hide previous browser tab if any
       if (previousTabId && this.tabs[previousTabId]) {
@@ -2165,7 +2309,21 @@ export class WindowLayoutService extends DisposableService {
 
     const restoredIds = new Map<(typeof configs)[number], string>();
     for (const cfg of configs) {
-      if (cfg.type === 'terminal') {
+      if (cfg.type === 'file') {
+        this.uiKarton.setState((draft) => {
+          draft.contentTabs.tabs[cfg.id] ??= {
+            ...getFileTabDefaults(),
+            id: cfg.id,
+            title: cfg.title,
+            file: cfg.file,
+            url: `file-tree://${encodeURIComponent(cfg.file.workspaceKey)}/${encodeURIComponent(cfg.file.relativePath)}`,
+            agentInstanceId: cfg.agentInstanceId,
+            createdAt: Date.now(),
+            lastFocusedAt: Date.now(),
+          };
+        });
+        restoredIds.set(cfg, cfg.id);
+      } else if (cfg.type === 'terminal') {
         this.uiKarton.setState((draft) => {
           draft.contentTabs.tabs[cfg.id] ??= {
             ...getTerminalTabDefaults(),
@@ -2738,6 +2896,15 @@ export class WindowLayoutService extends DisposableService {
       const state: PersistedTabState = {
         tabs: allIds.map((id) => {
           const terminalTab = contentTabsTabs[id];
+          if (terminalTab?.type === 'file' && terminalTab.file) {
+            return {
+              type: 'file' as const,
+              id: terminalTab.id,
+              title: terminalTab.title,
+              file: terminalTab.file,
+              agentInstanceId: terminalTab.agentInstanceId,
+            };
+          }
           if (terminalTab?.type === 'terminal') {
             return {
               type: 'terminal' as const,
@@ -2815,7 +2982,21 @@ export class WindowLayoutService extends DisposableService {
     // reuse their persisted IDs so TerminalService can respawn their PTYs.
     const restoredIds = new Map<(typeof visibleTabs)[number], string>();
     for (const savedTab of visibleTabs) {
-      if (savedTab.type === 'terminal') {
+      if (savedTab.type === 'file') {
+        this.uiKarton.setState((draft) => {
+          draft.contentTabs.tabs[savedTab.id] ??= {
+            ...getFileTabDefaults(),
+            id: savedTab.id,
+            title: savedTab.title,
+            file: savedTab.file,
+            url: `file-tree://${encodeURIComponent(savedTab.file.workspaceKey)}/${encodeURIComponent(savedTab.file.relativePath)}`,
+            agentInstanceId: savedTab.agentInstanceId,
+            createdAt: Date.now(),
+            lastFocusedAt: Date.now(),
+          };
+        });
+        restoredIds.set(savedTab, savedTab.id);
+      } else if (savedTab.type === 'terminal') {
         this.uiKarton.setState((draft) => {
           draft.contentTabs.tabs[savedTab.id] ??= {
             ...getTerminalTabDefaults(),

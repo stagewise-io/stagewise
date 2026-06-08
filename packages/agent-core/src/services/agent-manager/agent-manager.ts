@@ -673,6 +673,16 @@ export class AgentManager extends DisposableService {
       },
     );
     this.wrapAgentRpc(
+      'agents.getAgentHistoryEntriesByIds',
+      async (ids: string[]) => {
+        const entries =
+          await this.persistenceDb.getAgentHistoryEntriesByIds(ids);
+        return this.enrichHistoryEntries
+          ? await this.enrichHistoryEntries(entries)
+          : entries;
+      },
+    );
+    this.wrapAgentRpc(
       'agents.updateInputState',
       async (instanceId: string, inputState: string) => {
         await this.updateInputState(instanceId, inputState);

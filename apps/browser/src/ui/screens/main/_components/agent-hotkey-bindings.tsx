@@ -2,10 +2,15 @@ import { HotkeyActions } from '@shared/hotkeys';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useContentCollapsed } from './content-collapsed-context';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useCommandCenter } from '../command-center';
+import {
+  getFileTabUnsavedEditEntry,
+  type FileTabUnsavedEditEntry,
+} from '../file-tree/file-tab-unsaved-edits';
+import { UnsavedFileCloseDialog } from '../content/_components/unsaved-file-close-dialog';
 
 /**
  * Agent-scoped hotkeys — always mounted. Handles tab management attached
@@ -24,6 +29,8 @@ export function AgentHotkeyBindings({
     useContentCollapsed();
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const agentHotkeysEnabled = !isCommandCenterOpen;
+  const [pendingUnsavedClose, setPendingUnsavedClose] =
+    useState<FileTabUnsavedEditEntry | null>(null);
 
   useHotKeyListener(
     () => {
@@ -69,12 +76,32 @@ export function AgentHotkeyBindings({
     agentHotkeysEnabled,
   );
 
+  const closeTabWithUnsavedCheck = useCallback(
+    (tabId: string) => {
+      const unsavedEntry = getFileTabUnsavedEditEntry(tabId);
+      if (unsavedEntry) {
+        setPendingUnsavedClose(unsavedEntry);
+        return;
+      }
+      closeTab(tabId);
+      removeTabUiState(tabId);
+    },
+    [closeTab, removeTabUiState],
+  );
+
+  const closePendingUnsavedTab = useCallback(() => {
+    if (!pendingUnsavedClose) return;
+    const tabId = pendingUnsavedClose.tabId;
+    closeTab(tabId);
+    removeTabUiState(tabId);
+    setPendingUnsavedClose(null);
+  }, [closeTab, pendingUnsavedClose, removeTabUiState]);
+
   // Mod+W: close active tab
   useHotKeyListener(
     () => {
       if (!activeTabId) return;
-      closeTab(activeTabId);
-      removeTabUiState(activeTabId);
+      closeTabWithUnsavedCheck(activeTabId);
     },
     HotkeyActions.CLOSE_TAB,
     agentHotkeysEnabled,
@@ -247,5 +274,19 @@ export function AgentHotkeyBindings({
   // because it depends on local chat-input state. It guards on content
   // panel visibility + active browser tab internally.
 
-  return null;
+  return (
+    <UnsavedFileCloseDialog
+      entry={pendingUnsavedClose}
+      onKeepOpen={() => setPendingUnsavedClose(null)}
+      onCancelWithoutSave={() => {
+        pendingUnsavedClose?.discard();
+        closePendingUnsavedTab();
+      }}
+      onSaveAndClose={async () => {
+        if (!pendingUnsavedClose) return;
+        const saved = await pendingUnsavedClose.save();
+        if (saved) closePendingUnsavedTab();
+      }}
+    />
+  );
 }
