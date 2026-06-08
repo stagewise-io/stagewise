@@ -3,7 +3,7 @@ import {
   ResizablePanel,
   type ImperativePanelHandle,
 } from '@stagewise/stage-ui/components/resizable';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useSidebarCollapsed } from '../_components/sidebar-collapsed-context';
 import { SidebarTitlebarRow } from '../_components/sidebar-titlebar-row';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -13,7 +13,17 @@ import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { useTrack } from '@ui/hooks/use-track';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 
-export function AgentChat() {
+type AgentChatProps = {
+  topRightActions?: ReactNode;
+  defaultSize?: number;
+  minSize?: number;
+};
+
+export function AgentChat({
+  topRightActions,
+  defaultSize = 35,
+  minSize = 20,
+}: AgentChatProps) {
   const panelRef = useRef<ImperativePanelHandle>(null);
   const previousSizeRef = useRef<number | null>(null);
   const { collapsed } = useSidebarCollapsed();
@@ -102,14 +112,19 @@ export function AgentChat() {
       ref={panelRef}
       id="sidebar-panel"
       order={1}
-      defaultSize={35}
-      minSize={20}
+      defaultSize={defaultSize}
+      minSize={minSize}
       maxSize={80}
       onResize={(size) => {
         if (size > 0) previousSizeRef.current = size;
       }}
       className="@container group overflow-visible! relative z-10 flex h-full flex-col items-stretch justify-between bg-background"
     >
+      {topRightActions && (
+        <div className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5">
+          {topRightActions}
+        </div>
+      )}
       {collapsed && (
         <SidebarTitlebarRow
           absolute

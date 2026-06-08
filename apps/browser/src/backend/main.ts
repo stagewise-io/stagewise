@@ -8,6 +8,7 @@ import { AgentManagerService } from './services/agent-manager';
 import { enrichHistoryEntryWorkspaces } from './services/agent-manager/history-workspace-enrichment';
 import { UserExperienceService } from './services/experience';
 import { FilePickerService } from './services/file-picker';
+import { FileTreeService } from './services/file-tree';
 import { AppMenuService } from './services/app-menu';
 import { URIHandlerService } from './services/uri-handler';
 import { IdentifierService } from './services/identifier';
@@ -200,6 +201,21 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
   );
   const uiKarton = windowLayoutService.uiKarton;
+  const fileTreeService = await FileTreeService.create(logger, uiKarton);
+  fileTreeService.setOpenFileTabHandler(
+    async (metadata, agentInstanceId, options) => {
+      const tabId = await windowLayoutService.openFileTab(
+        metadata,
+        agentInstanceId,
+        options,
+      );
+      fileTreeService.revealInFileTree(
+        metadata.workspaceKey,
+        metadata.relativePath,
+      );
+      return tabId;
+    },
+  );
 
   const detectedShell = detectShell();
   const resolvedEnvPromise = detectedShell
@@ -775,6 +791,109 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // Wire permission-exceptions clear handler (used by clearBrowsingData)
   pagesService.setClearPermissionExceptionsHandler(() =>
     preferencesService.clearAllPermissionExceptionsForAllTypes(),
+  );
+
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.listDirectory',
+    async (_cid, input) => fileTreeService.listDirectory(input),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.getFilePreview',
+    async (_cid, workspaceKey: string, relativePath: string) =>
+      fileTreeService.getFilePreview(workspaceKey, relativePath),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.saveFile',
+    async (_cid, workspaceKey: string, relativePath: string, text: string) =>
+      fileTreeService.saveFile(workspaceKey, relativePath, text),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.openFileTab',
+    async (
+      _cid,
+      workspaceKey: string,
+      relativePath: string,
+      agentInstanceId?: string | null,
+      options?: { preview?: boolean; temporaryGroupKey?: string },
+    ) =>
+      fileTreeService.openFileTab(
+        workspaceKey,
+        relativePath,
+        agentInstanceId,
+        options,
+      ),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.promoteFileTab',
+    async (_cid, tabId: string) => windowLayoutService.promoteFileTab(tabId),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.renameEntry',
+    async (_cid, workspaceKey: string, relativePath: string, newName: string) =>
+      fileTreeService.renameEntry(workspaceKey, relativePath, newName),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.pasteEntry',
+    async (
+      _cid,
+      sourceWorkspaceKey: string,
+      sourceRelativePath: string,
+      targetWorkspaceKey: string,
+      targetDirectoryPath: string,
+      operation: 'copy' | 'cut',
+      preferredName?: string,
+    ) =>
+      fileTreeService.pasteEntry(
+        sourceWorkspaceKey,
+        sourceRelativePath,
+        targetWorkspaceKey,
+        targetDirectoryPath,
+        operation,
+        preferredName,
+      ),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.deleteEntry',
+    async (_cid, workspaceKey: string, relativePath: string) =>
+      fileTreeService.deleteEntry(workspaceKey, relativePath),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.revealInFolder',
+    async (_cid, workspaceKey: string, relativePath: string) =>
+      fileTreeService.revealInFolder(workspaceKey, relativePath),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.openExternally',
+    async (_cid, workspaceKey: string, relativePath: string) =>
+      fileTreeService.openExternally(workspaceKey, relativePath),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.revealInFileTree',
+    async (_cid, workspaceKey: string, relativePath: string) =>
+      fileTreeService.revealInFileTree(workspaceKey, relativePath),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.setVisible',
+    async (_cid, visible: boolean) => fileTreeService.setVisible(visible),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.setActiveWorkspace',
+    async (_cid, workspaceKey: string | null) =>
+      fileTreeService.setActiveWorkspace(workspaceKey),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.setDirectoryExpanded',
+    async (
+      _cid,
+      workspaceKey: string,
+      directoryPath: string,
+      expanded: boolean,
+    ) =>
+      fileTreeService.setDirectoryExpanded(
+        workspaceKey,
+        directoryPath,
+        expanded,
+      ),
   );
 
   // --- Wire main UI settings RPC procedures ---

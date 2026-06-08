@@ -118,6 +118,11 @@ export enum HotkeyActions {
   ZOOM_IN = 'zoom_in',
   ZOOM_OUT = 'zoom_out',
   ZOOM_RESET = 'zoom_reset',
+
+  // File editing
+  SAVE_FILE = 'save_file',
+  UNDO_FILE_EDIT = 'undo_file_edit',
+  REDO_FILE_EDIT = 'redo_file_edit',
 }
 
 /**
@@ -390,6 +395,19 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.ZOOM_RESET]: {
     accelerator: 'Mod+0',
+    captureDominantly: true,
+  },
+  [HotkeyActions.SAVE_FILE]: {
+    accelerator: 'Mod+S',
+    captureDominantly: true,
+  },
+  [HotkeyActions.UNDO_FILE_EDIT]: {
+    accelerator: 'Mod+Z',
+    captureDominantly: true,
+  },
+  [HotkeyActions.REDO_FILE_EDIT]: {
+    accelerator: 'Mod+Shift+Z',
+    aliases: ['Mod+Y'],
     captureDominantly: true,
   },
 };

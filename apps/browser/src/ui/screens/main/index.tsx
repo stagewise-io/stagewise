@@ -33,10 +33,38 @@ import {
   CommandCenterHotkeys,
   CommandCenterProvider,
 } from './command-center';
+import { FileTreeSidebar } from './file-tree/file-tree-sidebar';
+import { FileTreeToggleButton } from './file-tree/file-tree-toggle-button';
 
 // Reuse the same autoSaveId as the settings screen so the root panel layout
 // (sidebar width, content width) persists when switching between screens.
 const rootLayoutStorageKey = 'stagewise-panel-layout-root';
+const contentPanelSizeKey = 'stagewise-content-panel-size';
+const fileTreePanelSizeKey = 'stagewise-file-tree-panel-size';
+const CHAT_PANEL_MIN_SIZE = 20;
+
+function readPanelSize(key: string, fallback: number): number {
+  try {
+    const stored = localStorage.getItem(key);
+    if (!stored) return fallback;
+    const parsed = Number.parseFloat(stored);
+    return Number.isFinite(parsed) && parsed >= 5 ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function persistPanelSize(key: string, size: number) {
+  try {
+    localStorage.setItem(key, String(size));
+  } catch {
+    // ignore
+  }
+}
+
+function ActionDivider() {
+  return <div className="mx-px h-5 w-px bg-border-subtle" />;
+}
 
 export function DefaultLayout({ show }: { show: boolean }) {
   return (
@@ -61,6 +89,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const fileTreeVisible = useKartonState((s) => s.fileTree.visible);
   const { setTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
   const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
@@ -78,6 +107,24 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const createTerminal = useKartonProcedure((p) => p.browser.createTerminal);
   // content panel visible when there are visible tabs AND it's not collapsed
   const showContent = hasVisibleTabs && !contentCollapsed;
+
+  const fileTreeSizeRef = useRef(readPanelSize(fileTreePanelSizeKey, 22));
+  const contentSizeRef = useRef(readPanelSize(contentPanelSizeKey, 70));
+
+  const innerPanelLayout = useMemo(() => {
+    const fileTreeSize = fileTreeVisible ? fileTreeSizeRef.current : 0;
+    const desiredContentSize = showContent ? contentSizeRef.current : 0;
+    const fixedPanelSize = fileTreeSize + desiredContentSize;
+    const chatSize = Math.max(CHAT_PANEL_MIN_SIZE, 100 - fixedPanelSize);
+    const scale =
+      chatSize + fixedPanelSize > 100 ? 100 / (chatSize + fixedPanelSize) : 1;
+
+    return {
+      chatSize: chatSize * scale,
+      contentSize: desiredContentSize * scale,
+      fileTreeSize: fileTreeSize * scale,
+    };
+  }, [fileTreeVisible, showContent]);
 
   const pendingOmniboxFocusRequestIdRef = useRef(0);
   const pendingOmniboxFocusExpiryRef = useRef<ReturnType<
@@ -157,6 +204,37 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
     return createTerminal(undefined, openAgent);
   }, [createTerminal, openAgent, contentCollapsed, setContentCollapsed]);
 
+  const contentPanelTopRightActions =
+    showContent && !fileTreeVisible ? (
+      <>
+        <ContentToggleButton />
+        <ActionDivider />
+        <FileTreeToggleButton />
+      </>
+    ) : null;
+
+  const chatTopRightActions = !showContent ? (
+    <>
+      {hasVisibleTabs ? (
+        <ContentToggleButton />
+      ) : (
+        <NewTabButtons
+          onCreateBrowserTab={handleCreateTab}
+          onCreateTerminalTab={handleOpenTerminal}
+        />
+      )}
+      {!fileTreeVisible && (
+        <>
+          <ActionDivider />
+          <FileTreeToggleButton />
+        </>
+      )}
+    </>
+  ) : null;
+
+  const openedContentTopRightActions =
+    showContent && fileTreeVisible ? <ContentToggleButton /> : null;
+
   const markStagewiseUiFocused = useCallback(() => {
     if (!activeTabId) return;
     setTabUiState(activeTabId, { focusedPanel: 'stagewise-ui' });
@@ -208,22 +286,15 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
               !isMacOs && 'mt-px',
             )}
           >
-            {/* Top-right action button: content toggle when tabs visible, globe when none */}
-            <div className="app-no-drag absolute top-1 right-2 z-20">
-              {hasVisibleTabs ? (
-                <ContentToggleButton />
-              ) : (
-                <NewTabButtons
-                  onCreateBrowserTab={handleCreateTab}
-                  onCreateTerminalTab={handleOpenTerminal}
-                />
-              )}
-            </div>
             <ResizablePanelGroup
               direction="horizontal"
               className="h-full divide-x divide-surface-1"
             >
-              <AgentChat />
+              <AgentChat
+                topRightActions={chatTopRightActions}
+                defaultSize={innerPanelLayout.chatSize}
+                minSize={CHAT_PANEL_MIN_SIZE}
+              />
 
               {showContent && (
                 <>
@@ -234,7 +305,40 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
                     onPendingOmniboxFocusHandled={
                       handlePendingOmniboxFocusHandled
                     }
+                    topRightActions={
+                      contentPanelTopRightActions ??
+                      openedContentTopRightActions
+                    }
+                    defaultSize={innerPanelLayout.contentSize}
+                    onPanelResize={(size) => {
+                      contentSizeRef.current = size;
+                      persistPanelSize(contentPanelSizeKey, size);
+                    }}
                   />
+                </>
+              )}
+
+              {fileTreeVisible && (
+                <>
+                  <ResizableHandle />
+                  <ResizablePanel
+                    id="file-tree-panel"
+                    order={3}
+                    defaultSize={innerPanelLayout.fileTreeSize}
+                    minSize={15}
+                    maxSize={45}
+                    onResize={(size) => {
+                      if (size > 0) {
+                        fileTreeSizeRef.current = size;
+                        persistPanelSize(fileTreePanelSizeKey, size);
+                      }
+                    }}
+                    className="relative min-w-0 overflow-hidden bg-background"
+                  >
+                    <div className="size-full overflow-hidden">
+                      <FileTreeSidebar />
+                    </div>
+                  </ResizablePanel>
                 </>
               )}
             </ResizablePanelGroup>

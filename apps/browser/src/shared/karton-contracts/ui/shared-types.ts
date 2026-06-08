@@ -415,12 +415,15 @@ export const userPreferencesSchema = z.object({
       uiZoomPercentage: z.number().min(70).max(130).default(100),
       /** Global terminal zoom percentage applied to all terminal tabs (50-150) */
       terminalZoomPercentage: z.number().min(50).max(150).default(100),
+      /** Global file code editor zoom percentage applied to all file tabs (50-200) */
+      fileCodeZoomPercentage: z.number().min(50).max(200).default(100),
     })
     .default({
       newTabPage: { type: 'home' },
       startupPage: { type: 'home' },
       uiZoomPercentage: 100,
       terminalZoomPercentage: 100,
+      fileCodeZoomPercentage: 100,
     }),
   /** Website permission settings (defaults and host-specific overrides) */
   permissions: z.lazy(() => permissionsPreferencesSchema),
@@ -557,6 +560,7 @@ export const defaultUserPreferences: UserPreferences = {
     startupPage: { type: 'home' },
     uiZoomPercentage: 100,
     terminalZoomPercentage: 100,
+    fileCodeZoomPercentage: 100,
   },
   permissions: defaultPermissionsForUserPrefs,
   devToolbar: defaultDevToolbarForUserPrefs,

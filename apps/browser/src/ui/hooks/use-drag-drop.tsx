@@ -44,7 +44,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     const types = Array.from(e.dataTransfer.types);
 
     // Accept Files (from file system) OR text/uri-list (from web pages - images/links)
-    if (types.includes('Files') || types.includes('text/uri-list'))
+    if (
+      types.includes('Files') ||
+      types.includes('text/uri-list') ||
+      types.includes('application/x-stagewise-file-path')
+    )
       setIsDragOver(true);
   }, []);
 
@@ -67,6 +71,26 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       e.stopPropagation();
       dragCounterRef.current = 0;
       setIsDragOver(false);
+
+      const draggedWorkspacePath = e.dataTransfer.getData(
+        'application/x-stagewise-file-path',
+      );
+      if (draggedWorkspacePath) {
+        const file = new File(
+          [''],
+          draggedWorkspacePath.split('/').pop() ?? 'file',
+          {
+            type: 'application/x-stagewise-workspace-file',
+          },
+        );
+        Object.defineProperty(file, 'path', {
+          value: draggedWorkspacePath,
+          configurable: true,
+        });
+        onFileDrop(file);
+        onDropComplete?.();
+        return;
+      }
 
       const files = Array.from(e.dataTransfer.files);
 

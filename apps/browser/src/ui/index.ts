@@ -29,6 +29,7 @@ import { createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import posthog from 'posthog-js';
 import '@ui/app.css';
+import '@ui/monaco-workers';
 import { App } from '@ui/app';
 import { initThemeColorSync } from '@ui/utils/theme-color-sync';
 import { containsResizeObserverLoopError } from '@ui/utils/resize-observer';

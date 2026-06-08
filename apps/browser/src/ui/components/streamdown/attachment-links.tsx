@@ -14,7 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { useKartonState } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { IdePickerPopover } from '@ui/components/ide-picker-popover';
@@ -327,8 +327,14 @@ const WorkspaceFileClickWrapper = ({
   const [openAgent] = useOpenAgent();
   const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
   const ideName = IDE_SELECTION_ITEMS[openInIdeChoice];
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
   const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
     useFileIDEHref();
+  const historicalMounts = useMountedPaths();
+  const liveMounts = useKartonState((s) =>
+    openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? null) : null,
+  );
   const wsName = useWorkspaceName(filePath);
 
   const strippedPath = stripMountPrefix(filePath);
@@ -370,9 +376,41 @@ const WorkspaceFileClickWrapper = ({
   ]);
 
   const handleClick = useCallback(() => {
-    if (needsIdePicker) return;
-    if (processedHref) window.open(processedHref, '_blank');
-  }, [needsIdePicker, processedHref]);
+    if (isFolder) {
+      if (needsIdePicker) return;
+      if (processedHref) window.open(processedHref, '_blank');
+      return;
+    }
+
+    const slashIndex = filePath.indexOf('/');
+    if (slashIndex <= 0) return;
+
+    const workspacePrefix = filePath.slice(0, slashIndex);
+    const relativePath = filePath.slice(slashIndex + 1);
+    const mount =
+      liveMounts?.find((item) => item.prefix === workspacePrefix) ??
+      historicalMounts?.find((item) => item.prefix === workspacePrefix);
+    if (!mount) {
+      if (needsIdePicker) return;
+      if (processedHref) window.open(processedHref, '_blank');
+      return;
+    }
+
+    const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+    void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
+      if (!tabId) void revealInFolder(workspaceKey, relativePath);
+    });
+  }, [
+    filePath,
+    isFolder,
+    historicalMounts,
+    liveMounts,
+    needsIdePicker,
+    openAgent,
+    openFileTab,
+    processedHref,
+    revealInFolder,
+  ]);
 
   const wrapped = (
     <Tooltip>
@@ -395,7 +433,7 @@ const WorkspaceFileClickWrapper = ({
             {displayPathWithLine}
           </div>
           <div className="text-muted-foreground text-xs">
-            Click to open in {ideName}
+            Click to open in file view
           </div>
         </div>
       </TooltipContent>

@@ -51,7 +51,8 @@ export function ChatPanel() {
     // Accept Files (from file system) OR text/uri-list (from web pages - images/links)
     if (
       e.dataTransfer.types.includes('Files') ||
-      e.dataTransfer.types.includes('text/uri-list')
+      e.dataTransfer.types.includes('text/uri-list') ||
+      e.dataTransfer.types.includes('application/x-stagewise-file-path')
     ) {
       setIsDragOver(true);
     }

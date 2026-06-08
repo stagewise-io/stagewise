@@ -351,8 +351,8 @@ export type { UpdateChannel } from './shared-types';
  */
 export type ChatSummary = {
   id: string;
-  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs. */
-  type?: 'browser' | 'terminal';
+  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs, 'file' for workspace file previews. */
+  type?: 'browser' | 'terminal' | 'file';
   title: string;
   createdAt: Date;
   updatedAt: Date;
@@ -559,10 +559,79 @@ export interface AuthenticationRequest {
 // Tab State
 // ============================================================================
 
+export type FileTreeWorkspaceKey = string;
+
+export type FileTreeNodeKind = 'directory' | 'file' | 'symlink';
+
+export type FileTreeEntry = {
+  name: string;
+  relativePath: string;
+  kind: FileTreeNodeKind;
+  size: number | null;
+  mtimeMs: number | null;
+  mimeType: string | null;
+  isIgnored: boolean;
+  hasChildren?: boolean;
+};
+
+export type FileTreeListDirectoryInput = {
+  workspaceKey: FileTreeWorkspaceKey;
+  directoryPath: string;
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type FileTreeListDirectoryResult = {
+  workspaceKey: FileTreeWorkspaceKey;
+  directoryPath: string;
+  entries: FileTreeEntry[];
+  nextCursor: string | null;
+  revision: number;
+};
+
+export type FilePreviewKind = 'text' | 'image' | 'svg' | 'binary';
+
+export type FilePreviewResult = {
+  workspaceKey: FileTreeWorkspaceKey;
+  relativePath: string;
+  kind: FilePreviewKind;
+  mimeType: string;
+  size: number;
+  text?: string;
+  base64?: string;
+  truncated?: boolean;
+};
+
+export type FileTabMetadata = {
+  workspaceKey: FileTreeWorkspaceKey;
+  relativePath: string;
+  absolutePath: string;
+  kind: FilePreviewKind;
+  mimeType: string;
+  size: number;
+};
+
+export type TabLifecycle =
+  | { kind: 'permanent' }
+  | { kind: 'temporary'; groupKey: string };
+
+export type OpenFileTabOptions = {
+  preview?: boolean;
+  temporaryGroupKey?: string;
+};
+
+export type FileTreeClipboardOperation = 'copy' | 'cut';
+
+export type FileTreeOperationResult = {
+  success: boolean;
+  error?: string;
+  relativePath?: string;
+};
+
 export type TabState = {
   id: string;
-  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs. */
-  type?: 'browser' | 'terminal';
+  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs, 'file' for workspace file previews. */
+  type?: 'browser' | 'terminal' | 'file';
   title: string;
   url: string;
   faviconUrls: string[];
@@ -598,6 +667,7 @@ export type TabState = {
   isSearchBarActive: boolean; // Whether the search bar UI is active for this tab
   zoomPercentage: number; // Page zoom level as percentage (100 = default)
   lastFocusedAt: number; // Timestamp (Date.now()) of when this tab was last focused
+  lifecycle: TabLifecycle;
   consoleLogCount: number; // Total number of console logs captured since page load
   consoleErrorCount: number; // Number of error-level console logs
   /** Pending permission requests for this tab */
@@ -609,6 +679,8 @@ export type TabState = {
   /** Terminal-specific fields (present when type === 'terminal') */
   cwd: string;
   terminalRunningProcess?: string | null;
+  /** File-preview-specific fields (present when type === 'file') */
+  file?: FileTabMetadata;
   createdAt?: number;
   exited?: boolean;
   exitCode?: number | null;
@@ -642,8 +714,40 @@ export function getTerminalTabDefaults(): Omit<
     permissionRequests: [] as TabState['permissionRequests'],
     isContentFullscreen: false,
     authenticationRequest: null,
+    lifecycle: { kind: 'permanent' },
     exited: false,
     exitCode: null,
+  };
+}
+
+export function getFileTabDefaults(): Omit<
+  TabState,
+  'id' | 'title' | 'lastFocusedAt' | 'file'
+> {
+  return {
+    type: 'file' as const,
+    url: '',
+    cwd: '',
+    faviconUrls: [],
+    agentInstanceId: null as string | null,
+    isLoading: false,
+    isResponsive: true,
+    isPlayingAudio: false,
+    isMuted: false,
+    colorScheme: 'system' as TabState['colorScheme'],
+    error: null,
+    navigationHistory: { canGoBack: false, canGoForward: false },
+    devTools: { open: false, chromeOpen: false },
+    screenshot: null,
+    search: null,
+    isSearchBarActive: false,
+    zoomPercentage: 100,
+    consoleLogCount: 0,
+    consoleErrorCount: 0,
+    permissionRequests: [] as TabState['permissionRequests'],
+    isContentFullscreen: false,
+    authenticationRequest: null,
+    lifecycle: { kind: 'permanent' },
   };
 }
 
@@ -896,6 +1000,14 @@ export type AppState = {
       string,
       { baseOffset: number; endOffset: number }
     >;
+  };
+
+  fileTree: {
+    visible: boolean;
+    activeWorkspaceKey: string | null;
+    expandedDirectoriesByWorkspaceKey: Record<string, string[]>;
+    workspaceRevisions: Record<string, number>;
+    directoryRevisions: Record<string, Record<string, number>>;
   };
 
   // Unified content tabs (browser + terminal + future tab types)
@@ -1561,6 +1673,63 @@ export type KartonContract = {
       /** Return the list of credential type IDs that have stored data */
       getConfiguredIds: () => Promise<string[]>;
     };
+    fileTree: {
+      listDirectory: (
+        input: FileTreeListDirectoryInput,
+      ) => Promise<FileTreeListDirectoryResult>;
+      getFilePreview: (
+        workspaceKey: string,
+        relativePath: string,
+      ) => Promise<FilePreviewResult | null>;
+      saveFile: (
+        workspaceKey: string,
+        relativePath: string,
+        text: string,
+      ) => Promise<FilePreviewResult | null>;
+      openFileTab: (
+        workspaceKey: string,
+        relativePath: string,
+        agentInstanceId?: string | null,
+        options?: OpenFileTabOptions,
+      ) => Promise<string | null>;
+      promoteFileTab: (tabId: string) => Promise<void>;
+      renameEntry: (
+        workspaceKey: string,
+        relativePath: string,
+        newName: string,
+      ) => Promise<FileTreeOperationResult>;
+      pasteEntry: (
+        sourceWorkspaceKey: string,
+        sourceRelativePath: string,
+        targetWorkspaceKey: string,
+        targetDirectoryPath: string,
+        operation: FileTreeClipboardOperation,
+        preferredName?: string,
+      ) => Promise<FileTreeOperationResult>;
+      deleteEntry: (
+        workspaceKey: string,
+        relativePath: string,
+      ) => Promise<FileTreeOperationResult>;
+      revealInFolder: (
+        workspaceKey: string,
+        relativePath: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      openExternally: (
+        workspaceKey: string,
+        relativePath: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      revealInFileTree: (
+        workspaceKey: string,
+        relativePath: string,
+      ) => Promise<void>;
+      setVisible: (visible: boolean) => Promise<void>;
+      setActiveWorkspace: (workspaceKey: string | null) => Promise<void>;
+      setDirectoryExpanded: (
+        workspaceKey: string,
+        directoryPath: string,
+        expanded: boolean,
+      ) => Promise<void>;
+    };
     downloads: {
       /** Mark all current downloads as seen (updates lastSeenAt timestamp) */
       markSeen: () => Promise<void>;
@@ -1766,6 +1935,13 @@ export const defaultState: KartonContract['state'] = {
   terminals: {
     outputBuffers: {},
     outputBufferOffsets: {},
+  },
+  fileTree: {
+    visible: false,
+    activeWorkspaceKey: null,
+    expandedDirectoriesByWorkspaceKey: {},
+    workspaceRevisions: {},
+    directoryRevisions: {},
   },
   contentTabs: {
     tabs: {},

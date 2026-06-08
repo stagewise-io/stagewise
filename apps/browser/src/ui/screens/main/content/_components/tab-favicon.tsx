@@ -7,6 +7,7 @@ import {
 import { Logo } from '@ui/components/ui/logo';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2Icon } from 'lucide-react';
+import { FileIcon } from '@ui/components/file-icon';
 
 export function TabFavicon({ tabState }: { tabState: TabState }) {
   const isAppPreview = useMemo(
@@ -46,6 +47,8 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
         <div className="flex size-4 items-center justify-center p-[1px]">
           <Logo color="current" className="size-full text-primary-solid" />
         </div>
+      ) : tabState?.type === 'file' && tabState.file ? (
+        <FileIcon filePath={tabState.file.relativePath} className="size-4" />
       ) : tabState?.isLoading ? (
         <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
       ) : shouldShowFallback ? (

@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type ReactNode,
 } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -29,6 +30,8 @@ import {
 import { TabFavicon } from './_components/tab-favicon';
 import { WithTabPreviewCard } from './_components/with-tab-preview-card';
 import { WithTerminalTabPreviewCard } from './_components/with-terminal-tab-preview-card';
+import { TabErrorBoundary } from './_components/tab-error-boundary';
+import { UnsavedFileCloseDialog } from './_components/unsaved-file-close-dialog';
 import {
   SortableTabs,
   SortableTabsList,
@@ -49,6 +52,10 @@ import {
 import { NewTabButtons } from '../_components/new-tab-buttons';
 import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 import { HotkeyActions } from '@shared/hotkeys';
+import {
+  getFileTabUnsavedEditEntry,
+  type FileTabUnsavedEditEntry,
+} from '../file-tree/file-tab-unsaved-edits';
 
 // ---------------------------------------------------------------------------
 // Local sub-component: audio mute toggle shown as an `actions` slot on tabs
@@ -159,31 +166,13 @@ function TabPinIcon({
 // MainSection
 // ---------------------------------------------------------------------------
 
-const CONTENT_SIZE_KEY = 'stagewise-content-panel-size';
-
-function readContentSize(): number {
-  try {
-    const stored = localStorage.getItem(CONTENT_SIZE_KEY);
-    if (!stored) return 70;
-    const parsed = Number.parseFloat(stored);
-    return Number.isFinite(parsed) && parsed >= 20 ? parsed : 70;
-  } catch {
-    return 70;
-  }
-}
-
-function persistContentSize(size: number) {
-  try {
-    localStorage.setItem(CONTENT_SIZE_KEY, String(size));
-  } catch {
-    // ignore
-  }
-}
-
 export function MainSection({
   onCreateTab,
   pendingOmniboxFocusRequest,
   onPendingOmniboxFocusHandled,
+  topRightActions,
+  defaultSize = 70,
+  onPanelResize,
 }: {
   onCreateTab: () => void;
   pendingOmniboxFocusRequest: {
@@ -192,6 +181,9 @@ export function MainSection({
     targetTabId: string;
   } | null;
   onPendingOmniboxFocusHandled: (requestId: number) => void;
+  topRightActions?: ReactNode;
+  defaultSize?: number;
+  onPanelResize?: (size: number) => void;
 }) {
   const panelRef = useRef<ImperativePanelHandle>(null);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
@@ -208,32 +200,8 @@ export function MainSection({
 
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
-
-  // Persisted panel size survives mount/unmount (conditional rendering).
-  const storedSizeRef = useRef(readContentSize());
-  // Block onResize→persist during mount-time layout and programmatic restore.
-  // Starts true: onResize fires BEFORE useEffect, and the panel group's
-  // auto-layout size must not leak into localStorage.
-  const isRestoringRef = useRef(true);
-
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-    const saved = storedSizeRef.current;
-    const rafId = requestAnimationFrame(() => {
-      panel.resize(saved);
-      const tid = setTimeout(() => {
-        isRestoringRef.current = false;
-      }, 150);
-      // If the effect unmounts during this RAF, cancel the timeout.
-      timeoutId = tid;
-    });
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    return () => {
-      cancelAnimationFrame(rafId);
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
-    };
-  }, []);
+  const [pendingUnsavedClose, setPendingUnsavedClose] =
+    useState<FileTabUnsavedEditEntry | null>(null);
 
   // ---------------------------------------------------------------------------
   // Per-agent last-active-tab tracking + auto-switch on agent change
@@ -482,6 +450,27 @@ export function MainSection({
     [openAgent, replaceReorderedSlots, tabs],
   );
 
+  const closeTabWithUnsavedCheck = useCallback(
+    (id: string) => {
+      const unsavedEntry = getFileTabUnsavedEditEntry(id);
+      if (unsavedEntry) {
+        setPendingUnsavedClose(unsavedEntry);
+        return;
+      }
+      void closeTab(id);
+      removeTabUiState(id);
+    },
+    [closeTab, removeTabUiState],
+  );
+
+  const closePendingUnsavedTab = useCallback(() => {
+    if (!pendingUnsavedClose) return;
+    const tabId = pendingUnsavedClose.tabId;
+    void closeTab(tabId);
+    removeTabUiState(tabId);
+    setPendingUnsavedClose(null);
+  }, [closeTab, pendingUnsavedClose, removeTabUiState]);
+
   // ---------------------------------------------------------------------------
   // Build SortableTabItem[] from optimistic order + Karton tab state
   // ---------------------------------------------------------------------------
@@ -492,27 +481,30 @@ export function MainSection({
         if (!tab) return null;
         return {
           id,
-          label: tab.title,
+          label:
+            tab.type === 'file' && tab.lifecycle.kind === 'temporary' ? (
+              <span className="italic">{tab.title}</span>
+            ) : (
+              tab.title
+            ),
           icon: <TabPinIcon tab={tab} openAgent={openAgent} />,
-          onClose: () => {
-            void closeTab(id);
-            removeTabUiState(id);
-          },
+          onClose: () => closeTabWithUnsavedCheck(id),
           closeShortcut: (
             <HotkeyCombo action={HotkeyActions.CLOSE_TAB} size="xs" />
           ),
           onAuxClick: (e: React.MouseEvent) => {
             if (e.button !== 1) return;
             e.preventDefault();
-            void closeTab(id);
-            removeTabUiState(id);
+            closeTabWithUnsavedCheck(id);
           },
           actions:
             tab.type !== 'terminal' && (tab.isPlayingAudio || tab.isMuted) ? (
               <AudioMuteButton tab={tab} />
             ) : undefined,
           wrapTrigger: (inner: ReactElement) =>
-            tab.type === 'terminal' ? (
+            tab.type === 'file' ? (
+              inner
+            ) : tab.type === 'terminal' ? (
               <WithTerminalTabPreviewCard
                 tabState={tab}
                 activeTabId={activeTabId}
@@ -667,16 +659,18 @@ export function MainSection({
       ref={panelRef}
       id="opened-content-panel"
       order={2}
-      defaultSize={storedSizeRef.current}
+      defaultSize={defaultSize}
       minSize={20}
       onResize={(size) => {
-        if (size > 0 && !isRestoringRef.current) {
-          storedSizeRef.current = size;
-          persistContentSize(size);
-        }
+        if (size > 0) onPanelResize?.(size);
       }}
-      className="@container overflow-visible! flex h-full flex-1 flex-col items-start justify-between"
+      className="@container overflow-visible! relative flex h-full flex-1 flex-col items-start justify-between"
     >
+      {topRightActions && (
+        <div className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5">
+          {topRightActions}
+        </div>
+      )}
       <BrowserTabHotkeys
         onFocusUrlBar={handleFocusUrlBar}
         onFocusSearchBar={handleFocusSearchBar}
@@ -735,17 +729,34 @@ export function MainSection({
                 content UI are mounted exclusively for the effective active tab. */}
             {effectiveActiveTabId &&
               visibleTabIds.includes(effectiveActiveTabId) && (
-                <PerTabContent
+                <TabErrorBoundary
                   key={effectiveActiveTabId}
-                  ref={(ref) => {
-                    tabContentRefs.current[effectiveActiveTabId] = ref;
-                  }}
                   tabId={effectiveActiveTabId}
-                />
+                >
+                  <PerTabContent
+                    ref={(ref) => {
+                      tabContentRefs.current[effectiveActiveTabId] = ref;
+                    }}
+                    tabId={effectiveActiveTabId}
+                  />
+                </TabErrorBoundary>
               )}
           </div>
         </div>
       </div>
+      <UnsavedFileCloseDialog
+        entry={pendingUnsavedClose}
+        onKeepOpen={() => setPendingUnsavedClose(null)}
+        onCancelWithoutSave={() => {
+          pendingUnsavedClose?.discard();
+          closePendingUnsavedTab();
+        }}
+        onSaveAndClose={async () => {
+          if (!pendingUnsavedClose) return;
+          const saved = await pendingUnsavedClose.save();
+          if (saved) closePendingUnsavedTab();
+        }}
+      />
     </ResizablePanel>
   );
 }

@@ -43,9 +43,12 @@ export function BrowserTabHotkeys({
     activeTabId ? s.contentTabs.tabs[activeTabId]?.zoomPercentage : 100,
   );
 
-  // Browser-specific hotkeys are no-ops for terminal tabs.
-  const isTerminalTab = useKartonState((s) =>
-    activeTabId ? s.contentTabs.tabs[activeTabId]?.type === 'terminal' : false,
+  // Browser-specific hotkeys are no-ops for state-only tabs.
+  const isStateOnlyTab = useKartonState((s) =>
+    activeTabId
+      ? s.contentTabs.tabs[activeTabId]?.type === 'terminal' ||
+        s.contentTabs.tabs[activeTabId]?.type === 'file'
+      : false,
   );
 
   useEffect(() => {
@@ -55,7 +58,7 @@ export function BrowserTabHotkeys({
   // Browser tab-content zoom. Terminal zoom is handled locally in
   // PerTerminalContent so it can mark/require terminal focus explicitly.
   useHotKeyListener(() => {
-    if (isTerminalTab) return false;
+    if (isStateOnlyTab) return false;
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId || !currentZoomPercentage) return;
     if (currentZoomPercentage >= 500) return;
@@ -63,7 +66,7 @@ export function BrowserTabHotkeys({
   }, HotkeyActions.ZOOM_IN);
 
   useHotKeyListener(() => {
-    if (isTerminalTab) return false;
+    if (isStateOnlyTab) return false;
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId || !currentZoomPercentage) return;
     if (currentZoomPercentage <= 50) return;
@@ -71,7 +74,7 @@ export function BrowserTabHotkeys({
   }, HotkeyActions.ZOOM_OUT);
 
   useHotKeyListener(() => {
-    if (isTerminalTab) return false;
+    if (isStateOnlyTab) return false;
     if (focusedPanel !== 'tab-content') return false;
     if (!activeTabId) return;
     setZoomPercentage(100, activeTabId);
@@ -79,7 +82,7 @@ export function BrowserTabHotkeys({
 
   // URL bar: always focus the omnibox.
   useHotKeyListener(async () => {
-    if (isTerminalTab) return;
+    if (isStateOnlyTab) return;
     const targetTabId = activeTabId;
     try {
       await togglePanelKeyboardFocus('stagewise-ui');
@@ -92,42 +95,42 @@ export function BrowserTabHotkeys({
 
   // Search bar
   useHotKeyListener(() => {
-    if (isTerminalTab) return;
+    if (isStateOnlyTab) return;
     togglePanelKeyboardFocus('stagewise-ui');
     onFocusSearchBar();
   }, HotkeyActions.FIND_IN_PAGE);
 
   // History navigation
   useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
+    if (!activeTabId || isStateOnlyTab) return;
     goBack(activeTabId);
   }, HotkeyActions.HISTORY_BACK);
 
   useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
+    if (!activeTabId || isStateOnlyTab) return;
     goForward(activeTabId);
   }, HotkeyActions.HISTORY_FORWARD);
 
   // Page reload
   useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
+    if (!activeTabId || isStateOnlyTab) return;
     reload(activeTabId);
   }, HotkeyActions.RELOAD);
 
   useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
+    if (!activeTabId || isStateOnlyTab) return;
     reload(activeTabId);
   }, HotkeyActions.HARD_RELOAD);
 
   // Chrome DevTools
   useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
+    if (!activeTabId || isStateOnlyTab) return;
     toggleChromeDevTools(activeTabId);
   }, HotkeyActions.DEV_TOOLS);
 
   // Color scheme
   useHotKeyListener(() => {
-    if (!activeTabId || isTerminalTab) return;
+    if (!activeTabId || isStateOnlyTab) return;
     cycleColorScheme(activeTabId);
   }, HotkeyActions.CYCLE_COLOR_SCHEME);
 
