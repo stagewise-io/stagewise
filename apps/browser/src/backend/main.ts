@@ -895,6 +895,15 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         expanded,
       ),
   );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.searchFiles',
+    async (
+      _cid,
+      query: string,
+      workspaceKeys: string[],
+      includeGitignored: boolean,
+    ) => fileTreeService.searchFiles(query, workspaceKeys, includeGitignored),
+  );
 
   // --- Wire main UI settings RPC procedures ---
 

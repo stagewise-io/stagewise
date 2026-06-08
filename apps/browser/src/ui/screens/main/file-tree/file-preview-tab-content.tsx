@@ -23,7 +23,6 @@ import {
   useRef,
   useState,
   type ReactElement,
-  type RefObject,
 } from 'react';
 import { IconDatabaseFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import { Loader2Icon, MinusIcon, PlusIcon } from 'lucide-react';
@@ -42,6 +41,10 @@ import MonacoEditor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import {
+  clearFileTabUnsavedEditEntry,
+  setFileTabUnsavedEditEntry,
+} from './file-tab-unsaved-edits';
 
 const MONACO_THEME_NAME = 'stagewise-file-preview';
 
@@ -357,38 +360,40 @@ function configureMonacoTheme(monaco: MonacoApi) {
   });
 }
 
+// Re-apply the Monaco theme whenever the OS color scheme flips. The theme is
+// derived from CSS variables that switch via `prefers-color-scheme`, but Monaco
+// caches the resolved theme, so without this it stays stale until the editor
+// remounts. Registered once globally; the `change` event only fires on an
+// actual scheme change, so this adds no steady-state cost.
+let monacoThemeSyncRegistered = false;
+function registerMonacoThemeSync(monaco: MonacoApi) {
+  if (monacoThemeSyncRegistered) return;
+  monacoThemeSyncRegistered = true;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  media.addEventListener('change', () => {
+    configureMonacoTheme(monaco);
+    monaco.editor.setTheme(MONACO_THEME_NAME);
+  });
+}
+
 function createEditorActionState(editor: MonacoEditorInstance | null) {
   const model = editor?.getModel();
-  if (!editor || !model) {
+  if (!model) {
     return {
       canUndo: false,
       canRedo: false,
     };
   }
 
-  const alternativeVersionId = model.getAlternativeVersionId();
-  editor.trigger('file-preview-state', 'undo', undefined);
-  const afterUndoVersionId = model.getAlternativeVersionId();
-  const canUndo = afterUndoVersionId !== alternativeVersionId;
-  if (canUndo) {
-    editor.trigger('file-preview-state', 'redo', undefined);
-  }
-
-  editor.trigger('file-preview-state', 'redo', undefined);
-  const afterRedoVersionId = model.getAlternativeVersionId();
-  const canRedo = afterRedoVersionId !== alternativeVersionId;
-  if (canRedo) {
-    editor.trigger('file-preview-state', 'undo', undefined);
-  }
-
   return {
-    canUndo,
-    canRedo,
+    canUndo: model.canUndo(),
+    canRedo: model.canRedo(),
   };
 }
 
 function useEditorActions(
-  editorRef: RefObject<MonacoEditorInstance | null>,
+  tabId: string,
+  editor: MonacoEditorInstance | null,
   preview: FilePreviewResult,
   text: string,
 ) {
@@ -400,11 +405,12 @@ function useEditorActions(
   const savedTextRef = useRef(preview.text ?? '');
 
   const refreshActionState = useCallback(() => {
-    const state = createEditorActionState(editorRef.current);
+    const state = createEditorActionState(editor);
+    const currentText = editor?.getValue() ?? text;
     setCanUndo(state.canUndo);
     setCanRedo(state.canRedo);
-    setIsDirty(text !== savedTextRef.current);
-  }, [editorRef, text]);
+    setIsDirty(currentText !== savedTextRef.current);
+  }, [editor, text]);
 
   useEffect(() => {
     savedTextRef.current = preview.text ?? '';
@@ -412,46 +418,83 @@ function useEditorActions(
     refreshActionState();
   }, [preview.relativePath, preview.text, refreshActionState, text]);
 
-  const save = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor || isSaving) return;
+  useEffect(() => {
+    return () => clearFileTabUnsavedEditEntry(tabId);
+  }, [tabId]);
+
+  const save = useCallback(async () => {
+    if (!editor || isSaving) return false;
 
     const nextText = editor.getValue();
     setIsSaving(true);
-    void saveFile(preview.workspaceKey, preview.relativePath, nextText)
-      .then((result) => {
-        savedTextRef.current = nextText;
-        setIsDirty(false);
-        if (result) {
-          const cacheKey = getPreviewCacheKey(
-            result.workspaceKey,
-            result.relativePath,
-          );
-          previewCache.set(cacheKey, { preview: result, error: null });
-          textDraftCache.set(cacheKey, nextText);
-        }
-      })
-      .finally(() => {
-        setIsSaving(false);
-        refreshActionState();
-      });
-  }, [editorRef, isSaving, preview, refreshActionState, saveFile]);
+    try {
+      const result = await saveFile(
+        preview.workspaceKey,
+        preview.relativePath,
+        nextText,
+      );
+      savedTextRef.current = nextText;
+      setIsDirty(false);
+      clearFileTabUnsavedEditEntry(tabId);
+      if (result) {
+        const cacheKey = getPreviewCacheKey(
+          result.workspaceKey,
+          result.relativePath,
+        );
+        previewCache.set(cacheKey, { preview: result, error: null });
+        textDraftCache.set(cacheKey, nextText);
+      }
+      return true;
+    } finally {
+      setIsSaving(false);
+      refreshActionState();
+    }
+  }, [editor, isSaving, preview, refreshActionState, saveFile, tabId]);
 
   const undo = useCallback(() => {
-    editorRef.current?.trigger('file-preview-toolbar', 'undo', undefined);
-    refreshActionState();
-  }, [editorRef, refreshActionState]);
+    const model = editor?.getModel();
+    if (!model?.canUndo()) return false;
+    void model.undo();
+    window.setTimeout(refreshActionState, 0);
+  }, [editor, preview, refreshActionState, save, tabId]);
 
   const redo = useCallback(() => {
-    editorRef.current?.trigger('file-preview-toolbar', 'redo', undefined);
-    refreshActionState();
-  }, [editorRef, refreshActionState]);
+    const model = editor?.getModel();
+    if (!model?.canRedo()) return false;
+    void model.redo();
+    window.setTimeout(refreshActionState, 0);
+  }, [editor, preview, refreshActionState, save, tabId]);
+
+  useHotKeyListener(save, HotkeyActions.SAVE_FILE);
+  useHotKeyListener(undo, HotkeyActions.UNDO_FILE_EDIT);
+  useHotKeyListener(redo, HotkeyActions.REDO_FILE_EDIT);
 
   useEffect(() => {
-    const editor = editorRef.current;
     if (!editor) return;
 
+    refreshActionState();
+
     const contentDisposable = editor.onDidChangeModelContent(() => {
+      const nextText = editor.getValue();
+      const isNextDirty = nextText !== savedTextRef.current;
+      setIsDirty(isNextDirty);
+      if (isNextDirty) {
+        setFileTabUnsavedEditEntry({
+          tabId,
+          title: preview.relativePath.split('/').pop() || preview.relativePath,
+          workspaceKey: preview.workspaceKey,
+          relativePath: preview.relativePath,
+          save,
+          discard: () => {
+            textDraftCache.delete(
+              getPreviewCacheKey(preview.workspaceKey, preview.relativePath),
+            );
+            clearFileTabUnsavedEditEntry(tabId);
+          },
+        });
+      } else {
+        clearFileTabUnsavedEditEntry(tabId);
+      }
       window.setTimeout(refreshActionState, 0);
     });
     const cursorDisposable = editor.onDidChangeCursorSelection(() => {
@@ -462,7 +505,7 @@ function useEditorActions(
       contentDisposable.dispose();
       cursorDisposable.dispose();
     };
-  }, [editorRef, refreshActionState]);
+  }, [editor, refreshActionState]);
 
   return {
     save,
@@ -624,16 +667,39 @@ function TextEditorPreview({
   const [language, setLanguage] = useState<SourceLanguage>(() =>
     languageFromPath(preview.relativePath),
   );
-  const editorRef = useRef<MonacoEditorInstance | null>(null);
-  const actions = useEditorActions(editorRef, preview, text);
+  const [editor, setEditor] = useState<MonacoEditorInstance | null>(null);
+  const [cursorPosition, setCursorPosition] = useState({
+    lineNumber: 1,
+    column: 1,
+  });
+  const actions = useEditorActions(tabId, editor, preview, text);
 
   useEffect(() => {
     setText(textDraftCache.get(cacheKey) ?? preview.text ?? '');
   }, [cacheKey, preview.text]);
 
+  useEffect(() => {
+    if (!editor) return;
+    const position = editor.getPosition();
+    if (position) {
+      setCursorPosition({
+        lineNumber: position.lineNumber,
+        column: position.column,
+      });
+    }
+    const disposable = editor.onDidChangeCursorPosition((event) => {
+      setCursorPosition({
+        lineNumber: event.position.lineNumber,
+        column: event.position.column,
+      });
+    });
+    return () => disposable.dispose();
+  }, [editor]);
+
   const handleMount = useCallback(
     (editor: MonacoEditorInstance, monaco: MonacoApi) => {
-      editorRef.current = editor;
+      setEditor(editor);
+      registerMonacoThemeSync(monaco);
       editor.onDidFocusEditorWidget(markFocused);
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Equal, () => {
         markFocused();
@@ -661,28 +727,15 @@ function TextEditorPreview({
   );
 
   useEffect(() => {
-    editorRef.current?.updateOptions({
+    editor?.updateOptions({
       fontSize,
       lineHeight: fontSize * 1.5,
     });
-  }, [fontSize]);
+  }, [editor, fontSize]);
 
   return (
     <div className="flex size-full flex-col bg-background">
-      <FileTabToolbar
-        actions={actions}
-        right={
-          <SearchableSelect
-            items={SOURCE_LANGUAGE_ITEMS}
-            value={language}
-            onValueChange={(value) => setLanguage(value as SourceLanguage)}
-            size="xs"
-            triggerVariant="ghost"
-            triggerClassName="h-6 rounded-none"
-            side="bottom"
-          />
-        }
-      />
+      <FileTabToolbar actions={actions} />
       <div
         className="min-h-0 flex-1"
         onFocusCapture={markFocused}
@@ -704,6 +757,10 @@ function TextEditorPreview({
             wordWrap: 'on',
             automaticLayout: true,
             renderLineHighlight: 'line',
+            scrollbar: {
+              verticalScrollbarSize: 6,
+              horizontalScrollbarSize: 6,
+            },
             fontFamily:
               "'Roboto Mono', Menlo, Monaco, stagewise-builtin-roboto-mono, 'Noto Sans Mono', ui-monospace, 'SF Mono', 'Segoe UI Mono', 'Ubuntu Mono', 'Noto Mono', 'Liberation Mono', 'Inter Mono', Consolas, monospace",
             fontSize,
@@ -711,6 +768,41 @@ function TextEditorPreview({
           }}
         />
       </div>
+      <FileEditorStatusBar
+        lineNumber={cursorPosition.lineNumber}
+        column={cursorPosition.column}
+        language={language}
+        onLanguageChange={setLanguage}
+      />
+    </div>
+  );
+}
+
+function FileEditorStatusBar({
+  lineNumber,
+  column,
+  language,
+  onLanguageChange,
+}: {
+  lineNumber: number;
+  column: number;
+  language: SourceLanguage;
+  onLanguageChange: (language: SourceLanguage) => void;
+}) {
+  return (
+    <div className="flex h-6 shrink-0 items-center justify-between border-border-subtle border-t bg-background pr-0.5 pl-2 text-muted-foreground text-xs">
+      <span className="font-mono tabular-nums">
+        Ln {lineNumber}, Col {column}
+      </span>
+      <SearchableSelect
+        items={SOURCE_LANGUAGE_ITEMS}
+        value={language}
+        onValueChange={(value) => onLanguageChange(value as SourceLanguage)}
+        size="xs"
+        triggerVariant="ghost"
+        triggerClassName="h-5 rounded-none px-1.5"
+        side="top"
+      />
     </div>
   );
 }
@@ -1045,8 +1137,8 @@ function SvgPreview({
   const [currentColorMode, setCurrentColorMode] =
     useState<SvgCurrentColorMode>('default');
   const [customCurrentColor, setCustomCurrentColor] = useState('8b5cf6');
-  const editorRef = useRef<MonacoEditorInstance | null>(null);
-  const actions = useEditorActions(editorRef, preview, text);
+  const [editor, setEditor] = useState<MonacoEditorInstance | null>(null);
+  const actions = useEditorActions(tabId, editor, preview, text);
   const previewBackgroundClassName = getPreviewBackgroundClassName(background);
   const normalizedCustomBackground = normalizeHexColor(
     customBackground,
@@ -1075,7 +1167,8 @@ function SvgPreview({
 
   const handleMount = useCallback(
     (editor: MonacoEditorInstance, monaco: MonacoApi) => {
-      editorRef.current = editor;
+      setEditor(editor);
+      registerMonacoThemeSync(monaco);
       editor.onDidFocusEditorWidget(markSourceFocused);
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Equal, () => {
         markSourceFocused();
@@ -1103,11 +1196,11 @@ function SvgPreview({
   );
 
   useEffect(() => {
-    editorRef.current?.updateOptions({
+    editor?.updateOptions({
       fontSize: sourceFontSize,
       lineHeight: sourceFontSize * 1.5,
     });
-  }, [sourceFontSize]);
+  }, [editor, sourceFontSize]);
 
   const {
     zoom,

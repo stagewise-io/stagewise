@@ -108,7 +108,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   // content panel visible when there are visible tabs AND it's not collapsed
   const showContent = hasVisibleTabs && !contentCollapsed;
 
-  const fileTreeSizeRef = useRef(readPanelSize(fileTreePanelSizeKey, 22));
+  const fileTreeSizeRef = useRef(readPanelSize(fileTreePanelSizeKey, 12));
   const contentSizeRef = useRef(readPanelSize(contentPanelSizeKey, 70));
 
   const innerPanelLayout = useMemo(() => {
@@ -330,7 +330,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
                         persistPanelSize(fileTreePanelSizeKey, size);
                       }
                     }}
-                    className="relative min-w-0 overflow-hidden bg-background"
+                    className="relative min-w-[96px] overflow-hidden bg-background"
                   >
                     <div className="size-full overflow-hidden">
                       <FileTreeSidebar />

@@ -84,23 +84,17 @@ function RowsStory({ storyRows }: { storyRows: FileTreeRow[] }) {
             rowIndex={index}
             dragPath={row.id}
             dragPayload=""
+            dragFilePaths={[]}
             onFocus={() => undefined}
             onToggle={() => undefined}
             onSelect={() => undefined}
+            onSelectPointerDown={() => undefined}
             onOpen={() => undefined}
-            canPaste={false}
             cut={false}
             dropTarget={false}
-            canRename
             renaming={false}
-            onStartRename={() => undefined}
             onRenameSubmit={() => undefined}
             onRenameCancel={() => undefined}
-            onCopy={() => undefined}
-            onCut={() => undefined}
-            onPaste={() => undefined}
-            onDelete={() => undefined}
-            onReveal={() => undefined}
             onMoveDrop={() => undefined}
             onDragTargetChange={() => undefined}
             onLoadMore={() => undefined}

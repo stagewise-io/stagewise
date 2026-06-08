@@ -127,11 +127,14 @@ export function buildGroupedRows(
   if (mode === 'global') return buildGlobalRows(items);
   if (mode === 'agents') return buildAgentRows(items);
 
+  const label =
+    mode === 'browser' ? 'Browser' : mode === 'files' ? 'Files' : 'Settings';
+
   return [
     {
       type: 'header',
       key: `header:${mode}`,
-      label: mode === 'browser' ? 'Browser' : 'Settings',
+      label,
     },
     ...items.map((item, itemIndex) => ({
       type: 'item' as const,

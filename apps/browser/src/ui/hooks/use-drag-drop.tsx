@@ -1,9 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { extractImageUrlFromDragData, imageUrlToFile } from '@ui/utils';
+import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
 
 export interface UseDragDropOptions {
   /** Callback when a file is dropped */
   onFileDrop: (file: File) => void;
+  /** Callback when a workspace file is dropped by mount-prefixed path */
+  onWorkspaceFileDrop?: (attachment: AttachmentMetadata) => void;
   /** Optional callback after drop completes (e.g., to focus input) */
   onDropComplete?: () => void;
 }
@@ -32,7 +35,7 @@ export interface UseDragDropReturn {
  * - Accepts Files and text/uri-list data transfer types
  */
 export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
-  const { onFileDrop, onDropComplete } = options;
+  const { onFileDrop, onWorkspaceFileDrop, onDropComplete } = options;
 
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
@@ -42,12 +45,12 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
     e.stopPropagation();
     dragCounterRef.current++;
     const types = Array.from(e.dataTransfer.types);
-
     // Accept Files (from file system) OR text/uri-list (from web pages - images/links)
     if (
       types.includes('Files') ||
       types.includes('text/uri-list') ||
-      types.includes('application/x-stagewise-file-path')
+      types.includes('application/x-stagewise-file-path') ||
+      types.includes('application/x-stagewise-file-paths')
     )
       setIsDragOver(true);
   }, []);
@@ -72,22 +75,29 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       dragCounterRef.current = 0;
       setIsDragOver(false);
 
+      // Multi-file drop from the file tree (selected set). Falls back to the
+      // single-path payload for a single dragged file.
+      const draggedWorkspacePaths = e.dataTransfer.getData(
+        'application/x-stagewise-file-paths',
+      );
+      if (draggedWorkspacePaths) {
+        try {
+          const paths = JSON.parse(draggedWorkspacePaths) as string[];
+          if (Array.isArray(paths) && paths.length > 0) {
+            for (const path of paths) onWorkspaceFileDrop?.({ path });
+            onDropComplete?.();
+            return;
+          }
+        } catch {
+          // Fall through to single-path handling.
+        }
+      }
+
       const draggedWorkspacePath = e.dataTransfer.getData(
         'application/x-stagewise-file-path',
       );
       if (draggedWorkspacePath) {
-        const file = new File(
-          [''],
-          draggedWorkspacePath.split('/').pop() ?? 'file',
-          {
-            type: 'application/x-stagewise-workspace-file',
-          },
-        );
-        Object.defineProperty(file, 'path', {
-          value: draggedWorkspacePath,
-          configurable: true,
-        });
-        onFileDrop(file);
+        onWorkspaceFileDrop?.({ path: draggedWorkspacePath });
         onDropComplete?.();
         return;
       }
@@ -115,7 +125,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
 
       onDropComplete?.();
     },
-    [onFileDrop, onDropComplete],
+    [onFileDrop, onWorkspaceFileDrop, onDropComplete],
   );
 
   // Reset drag state on drop but let event bubble (for centralized drop handling)

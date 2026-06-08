@@ -622,6 +622,14 @@ export type OpenFileTabOptions = {
 
 export type FileTreeClipboardOperation = 'copy' | 'cut';
 
+export type FileSearchResult = {
+  workspaceKey: string;
+  mountPrefix: string;
+  relativePath: string;
+  fileName: string;
+  isDirectory?: boolean;
+};
+
 export type FileTreeOperationResult = {
   success: boolean;
   error?: string;
@@ -1729,6 +1737,11 @@ export type KartonContract = {
         directoryPath: string,
         expanded: boolean,
       ) => Promise<void>;
+      searchFiles: (
+        query: string,
+        workspaceKeys: string[],
+        includeGitignored: boolean,
+      ) => Promise<FileSearchResult[]>;
     };
     downloads: {
       /** Mark all current downloads as seen (updates lastSeenAt timestamp) */

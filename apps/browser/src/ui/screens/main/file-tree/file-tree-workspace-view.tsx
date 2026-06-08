@@ -1,5 +1,6 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import { toast } from '@stagewise/stage-ui/components/toaster';
+import { cn } from '@ui/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
@@ -14,10 +15,21 @@ import {
   type MouseEvent,
 } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { Loader2Icon } from 'lucide-react';
+import {
+  ClipboardPasteIcon,
+  CopyIcon,
+  FolderOpenIcon,
+  Loader2Icon,
+  PencilIcon,
+  ScissorsIcon,
+  Trash2Icon,
+} from 'lucide-react';
+import { ContextMenu } from '@base-ui/react/context-menu';
+import { Menu as MenuBase } from '@base-ui/react/menu';
 import { FileTreeNode } from './file-tree-node';
 import type { FileTreeClipboardOperation } from '@shared/karton-contracts/ui';
 import { getCurrentPlatform } from '@shared/hotkeys';
+import { nativeFileManagerLabel } from '@shared/ide-url';
 import {
   getEffectiveFileTreeActionPaths,
   selectAllFileTreeEntries,
@@ -58,6 +70,26 @@ type FileTreeDragPayload = {
 };
 
 const FILE_TREE_MOVE_MIME = 'application/x-stagewise-file-tree-move';
+const EMPTY_DRAG_FILE_PATHS: string[] = [];
+
+const contextMenuItemClassName = cn(
+  'flex w-full cursor-default flex-row items-center justify-start gap-2',
+  'rounded-md px-2 py-1 text-foreground text-xs outline-none',
+  'transition-colors duration-150 ease-out',
+  'hover:bg-surface-1 data-highlighted:bg-surface-1',
+  'data-disabled:pointer-events-none data-disabled:opacity-45',
+);
+
+const contextMenuModifierLabel =
+  getCurrentPlatform() === 'mac' ? '\u2318' : 'Ctrl';
+
+function ContextMenuShortcut({ children }: { children: string }) {
+  return (
+    <span className="ml-auto pl-4 font-mono text-[0.625rem] text-muted-foreground">
+      {children}
+    </span>
+  );
+}
 
 function getFileName(relativePath: string): string {
   return relativePath.split('/').pop() ?? relativePath;
@@ -145,6 +177,9 @@ export function FileTreeWorkspaceView({
     null,
   );
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [contextTargetPath, setContextTargetPath] = useState<string | null>(
+    null,
+  );
   const [clipboardItem, setClipboardItem] =
     useState<FileTreeClipboardItem | null>(null);
   const [dragOverDirectoryPath, setDragOverDirectoryPath] = useState<
@@ -598,6 +633,23 @@ export function FileTreeWorkspaceView({
     ],
   );
 
+  // Collapse an active multi-selection as soon as the user presses (mouse
+  // down) on a row without a group-selection modifier and outside the current
+  // selection. Pressing inside the selection is preserved so a group can still
+  // be dragged; range/toggle (shift / cmd|ctrl) are left to the click handler.
+  const handleSelectPointerDown = useCallback(
+    (relativePath: string, event: MouseEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      if (event.shiftKey || isSelectionModifierPressed(event)) return;
+      if (selectedEntryPaths.length === 0) return;
+      if (selectedEntryPaths.includes(relativePath)) return;
+      setSelectedEntryPaths([]);
+      setSelectionAnchorPath(relativePath);
+      setFocusedEntryPath(relativePath);
+    },
+    [selectedEntryPaths],
+  );
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       const modifierPressed = event.ctrlKey || event.metaKey;
@@ -774,115 +826,229 @@ export function FileTreeWorkspaceView({
     };
   }, []);
 
+  const handleTreeContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const element = (
+        event.target as HTMLElement | null
+      )?.closest<HTMLElement>('[data-file-tree-entry-path]');
+      const path = element?.dataset.fileTreeEntryPath ?? null;
+      setContextTargetPath(path);
+      if (path) setFocusedEntryPath(path);
+    },
+    [],
+  );
+
   if (!workspaceKey) {
     return (
-      <div className="px-3 py-6 text-center text-muted-foreground text-xs">
+      <div className="flex size-full items-center justify-center px-3 text-center text-muted-foreground text-xs">
         No mounted workspaces.
       </div>
     );
   }
 
+  const contextEntry = contextTargetPath
+    ? (entryByRelativePath.get(contextTargetPath)?.entry ?? null)
+    : null;
+  const contextIsDirectory = contextEntry?.kind === 'directory';
+  const contextCanRename =
+    contextTargetPath != null && getActionPaths(contextTargetPath).length === 1;
+  const contextPasteDirectory = !contextTargetPath
+    ? ''
+    : contextIsDirectory
+      ? contextTargetPath
+      : getParentDirectory(contextTargetPath);
+
   return (
-    <div
-      ref={treeRef}
-      className="size-full"
-      onKeyDown={handleKeyDown}
-      onDragOver={(event) => {
-        if (!event.dataTransfer.types.includes(FILE_TREE_MOVE_MIME)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        setDragOverDirectoryPath('');
-      }}
-      onDrop={(event) => handleMoveDrop('', event)}
-      role="tree"
-    >
-      <Virtuoso
-        ref={virtuosoRef}
-        className="size-full py-0.5"
-        data={rows}
-        computeItemKey={(_, row) => row.id}
-        itemContent={(index, row) => (
-          <FileTreeRowView
-            row={row}
-            selected={
-              row.type === 'entry' &&
-              (selectedEntryPathSet.has(row.entry.relativePath) ||
-                (selectedEntryPaths.length === 0 &&
-                  row.entry.relativePath === shownRelativePath))
-            }
-            focused={index === focusedRowIndex}
-            rowIndex={index}
-            dragPath={
-              row.type === 'entry'
-                ? `${workspaceKey}/${row.entry.relativePath}`
-                : ''
-            }
-            dragPayload={
-              row.type === 'entry'
-                ? JSON.stringify({
-                    workspaceKey,
-                    relativePaths: getActionPaths(
-                      row.entry.relativePath,
-                    ).filter(
-                      (relativePath) =>
-                        entryByRelativePath.get(relativePath)?.entry.kind !==
-                        'directory',
-                    ),
-                  } satisfies FileTreeDragPayload)
-                : ''
-            }
-            onFocus={() => {
-              if (
-                row.type === 'entry' &&
-                focusedEntryPath !== row.entry.relativePath
-              ) {
-                setFocusedEntryPath(row.entry.relativePath);
-              }
+    <ContextMenu.Root>
+      <ContextMenu.Trigger
+        render={
+          <div
+            ref={treeRef}
+            className="size-full"
+            onKeyDown={handleKeyDown}
+            onContextMenuCapture={handleTreeContextMenu}
+            onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes(FILE_TREE_MOVE_MIME))
+                return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              setDragOverDirectoryPath('');
             }}
-            onToggle={handleToggle}
-            onSelect={(event) => {
-              if (row.type === 'entry')
-                handleSelect(row.entry.relativePath, event);
-            }}
-            canPaste={row.type === 'entry' && clipboardItem !== null}
-            cut={
-              row.type === 'entry' &&
-              clipboardItem?.operation === 'cut' &&
-              clipboardItem.relativePaths.includes(row.entry.relativePath)
-            }
-            dropTarget={
-              row.type === 'entry' &&
-              dragOverDirectoryPath ===
-                (row.entry.kind === 'directory'
-                  ? row.entry.relativePath
-                  : getParentDirectory(row.entry.relativePath))
-            }
-            canRename={
-              row.type === 'entry' &&
-              getActionPaths(row.entry.relativePath).length === 1
-            }
-            renaming={
-              row.type === 'entry' && row.entry.relativePath === renamingPath
-            }
-            onStartRename={(relativePath) => {
-              setFocusedEntryPath(relativePath);
-              setRenamingPath(relativePath);
-            }}
-            onRenameSubmit={handleRenameSubmit}
-            onRenameCancel={() => setRenamingPath(null)}
-            onCopy={handleCopy}
-            onCut={handleCut}
-            onPaste={handlePaste}
-            onDelete={handleDelete}
-            onReveal={handleReveal}
-            onOpen={handleOpen}
-            onMoveDrop={handleMoveDrop}
-            onDragTargetChange={setDragOverDirectoryPath}
-            onLoadMore={loadMore}
+            onDrop={(event) => handleMoveDrop('', event)}
+            role="tree"
           />
-        )}
-      />
-    </div>
+        }
+      >
+        <Virtuoso
+          ref={virtuosoRef}
+          className="size-full py-0.5"
+          data={rows}
+          computeItemKey={(_, row) => row.id}
+          itemContent={(index, row) => (
+            <FileTreeRowView
+              row={row}
+              selected={
+                row.type === 'entry' &&
+                (selectedEntryPathSet.has(row.entry.relativePath) ||
+                  (selectedEntryPaths.length === 0 &&
+                    row.entry.relativePath === shownRelativePath))
+              }
+              focused={index === focusedRowIndex}
+              rowIndex={index}
+              dragPath={
+                row.type === 'entry'
+                  ? `${workspaceKey}/${row.entry.relativePath}`
+                  : ''
+              }
+              dragPayload={
+                row.type === 'entry'
+                  ? JSON.stringify({
+                      workspaceKey,
+                      relativePaths: getActionPaths(
+                        row.entry.relativePath,
+                      ).filter(
+                        (relativePath) =>
+                          entryByRelativePath.get(relativePath)?.entry.kind !==
+                          'directory',
+                      ),
+                    } satisfies FileTreeDragPayload)
+                  : ''
+              }
+              dragFilePaths={
+                row.type === 'entry'
+                  ? getActionPaths(row.entry.relativePath)
+                      .filter(
+                        (relativePath) =>
+                          entryByRelativePath.get(relativePath)?.entry.kind !==
+                          'directory',
+                      )
+                      .map((relativePath) => `${workspaceKey}/${relativePath}`)
+                  : EMPTY_DRAG_FILE_PATHS
+              }
+              onFocus={() => {
+                if (
+                  row.type === 'entry' &&
+                  focusedEntryPath !== row.entry.relativePath
+                ) {
+                  setFocusedEntryPath(row.entry.relativePath);
+                }
+              }}
+              onToggle={handleToggle}
+              onSelect={(event) => {
+                if (row.type === 'entry')
+                  handleSelect(row.entry.relativePath, event);
+              }}
+              onSelectPointerDown={(event) => {
+                if (row.type === 'entry')
+                  handleSelectPointerDown(row.entry.relativePath, event);
+              }}
+              cut={
+                row.type === 'entry' &&
+                clipboardItem?.operation === 'cut' &&
+                clipboardItem.relativePaths.includes(row.entry.relativePath)
+              }
+              dropTarget={
+                row.type === 'entry' &&
+                dragOverDirectoryPath ===
+                  (row.entry.kind === 'directory'
+                    ? row.entry.relativePath
+                    : getParentDirectory(row.entry.relativePath))
+              }
+              renaming={
+                row.type === 'entry' && row.entry.relativePath === renamingPath
+              }
+              onRenameSubmit={handleRenameSubmit}
+              onRenameCancel={() => setRenamingPath(null)}
+              onOpen={handleOpen}
+              onMoveDrop={handleMoveDrop}
+              onDragTargetChange={setDragOverDirectoryPath}
+              onLoadMore={loadMore}
+            />
+          )}
+        />
+      </ContextMenu.Trigger>
+      <MenuBase.Portal>
+        <MenuBase.Positioner className="z-50" sideOffset={4} align="start">
+          <MenuBase.Popup
+            className={cn(
+              'flex min-w-40 origin-(--transform-origin) flex-col items-stretch gap-0.5',
+              'rounded-lg border border-border-subtle bg-background p-1',
+              'text-xs shadow-lg',
+              'transition-[transform,scale,opacity] duration-150 ease-out',
+              'data-ending-style:scale-90 data-starting-style:scale-90',
+              'data-ending-style:opacity-0 data-starting-style:opacity-0',
+            )}
+          >
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={!contextCanRename}
+              onClick={() => {
+                if (!contextTargetPath) return;
+                setFocusedEntryPath(contextTargetPath);
+                setRenamingPath(contextTargetPath);
+              }}
+            >
+              <PencilIcon className="size-3.5 shrink-0" />
+              <span>Rename</span>
+              <ContextMenuShortcut>F2</ContextMenuShortcut>
+            </MenuBase.Item>
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={!contextTargetPath}
+              onClick={() => {
+                if (contextTargetPath) handleCopy(contextTargetPath);
+              }}
+            >
+              <CopyIcon className="size-3.5 shrink-0" />
+              <span>Copy</span>
+              <ContextMenuShortcut>{`${contextMenuModifierLabel}C`}</ContextMenuShortcut>
+            </MenuBase.Item>
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={!contextTargetPath}
+              onClick={() => {
+                if (contextTargetPath) handleCut(contextTargetPath);
+              }}
+            >
+              <ScissorsIcon className="size-3.5 shrink-0" />
+              <span>Cut</span>
+              <ContextMenuShortcut>{`${contextMenuModifierLabel}X`}</ContextMenuShortcut>
+            </MenuBase.Item>
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={clipboardItem === null}
+              onClick={() => handlePaste(contextPasteDirectory)}
+            >
+              <ClipboardPasteIcon className="size-3.5 shrink-0" />
+              <span>Paste</span>
+              <ContextMenuShortcut>{`${contextMenuModifierLabel}V`}</ContextMenuShortcut>
+            </MenuBase.Item>
+            <MenuBase.Item
+              className={cn(contextMenuItemClassName, 'text-error-foreground')}
+              disabled={!contextTargetPath}
+              onClick={() => {
+                if (contextTargetPath) handleDelete(contextTargetPath);
+              }}
+            >
+              <Trash2Icon className="size-3.5 shrink-0" />
+              <span>Delete</span>
+              <ContextMenuShortcut>Del</ContextMenuShortcut>
+            </MenuBase.Item>
+            <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={!contextTargetPath}
+              onClick={() => {
+                if (contextTargetPath) handleReveal(contextTargetPath);
+              }}
+            >
+              <FolderOpenIcon className="size-3.5 shrink-0" />
+              <span>Open in {nativeFileManagerLabel}</span>
+            </MenuBase.Item>
+          </MenuBase.Popup>
+        </MenuBase.Positioner>
+      </MenuBase.Portal>
+    </ContextMenu.Root>
   );
 }
 
@@ -893,23 +1059,17 @@ type FileTreeRowViewProps = {
   rowIndex: number;
   dragPath: string;
   dragPayload: string;
-  canPaste: boolean;
+  dragFilePaths: string[];
   cut: boolean;
   dropTarget: boolean;
-  canRename: boolean;
   renaming: boolean;
   onFocus: () => void;
   onToggle: (directoryPath: string, expanded: boolean) => void;
   onSelect: (event: MouseEvent<HTMLButtonElement>) => void;
+  onSelectPointerDown: (event: MouseEvent<HTMLButtonElement>) => void;
   onOpen: (relativePath: string) => void;
-  onStartRename: (relativePath: string) => void;
   onRenameSubmit: (relativePath: string, name: string) => void;
   onRenameCancel: () => void;
-  onCopy: (relativePath: string) => void;
-  onCut: (relativePath: string) => void;
-  onPaste: (targetDirectoryPath: string) => void;
-  onDelete: (relativePath: string) => void;
-  onReveal: (relativePath: string) => void;
   onMoveDrop: (
     targetDirectoryPath: string,
     event: DragEvent<HTMLElement>,
@@ -925,23 +1085,17 @@ export const FileTreeRowView = memo(function FileTreeRowView({
   rowIndex,
   dragPath,
   dragPayload,
-  canPaste,
+  dragFilePaths,
   cut,
   dropTarget,
-  canRename,
   renaming,
   onFocus,
   onToggle,
   onSelect,
+  onSelectPointerDown,
   onOpen,
-  onStartRename,
   onRenameSubmit,
   onRenameCancel,
-  onCopy,
-  onCut,
-  onPaste,
-  onDelete,
-  onReveal,
   onMoveDrop,
   onDragTargetChange,
   onLoadMore,
@@ -969,8 +1123,6 @@ export const FileTreeRowView = memo(function FileTreeRowView({
     );
   }
 
-  const isMultiSelected = selected && canRename === false;
-
   if (row.type === 'load-more') {
     return (
       <Button
@@ -988,11 +1140,7 @@ export const FileTreeRowView = memo(function FileTreeRowView({
   return (
     <div
       className={
-        selected
-          ? isMultiSelected
-            ? 'mx-1 mb-px rounded bg-primary-solid/15'
-            : 'mx-1 mb-px rounded bg-active-derived'
-          : 'mx-1 mb-px'
+        selected ? 'mx-1 mb-px rounded bg-active-derived' : 'mx-1 mb-px'
       }
     >
       <FileTreeNode
@@ -1004,14 +1152,15 @@ export const FileTreeRowView = memo(function FileTreeRowView({
         rowIndex={rowIndex}
         dragPath={dragPath}
         dragPayload={dragPayload}
-        canPaste={canPaste}
+        dragFilePaths={dragFilePaths}
+        selected={selected}
         cut={cut}
         dropTarget={dropTarget}
-        canRename={canRename}
         renaming={renaming}
         onFocus={onFocus}
         onToggle={() => onToggle(row.entry.relativePath, !row.expanded)}
         onSelect={onSelect}
+        onSelectPointerDown={onSelectPointerDown}
         onOpen={() => onOpen(row.entry.relativePath)}
         onDragEnter={() =>
           onDragTargetChange(
@@ -1040,20 +1189,8 @@ export const FileTreeRowView = memo(function FileTreeRowView({
             event,
           )
         }
-        onStartRename={() => onStartRename(row.entry.relativePath)}
         onRenameSubmit={(name) => onRenameSubmit(row.entry.relativePath, name)}
         onRenameCancel={onRenameCancel}
-        onCopy={() => onCopy(row.entry.relativePath)}
-        onCut={() => onCut(row.entry.relativePath)}
-        onPaste={() =>
-          onPaste(
-            row.entry.kind === 'directory'
-              ? row.entry.relativePath
-              : getParentDirectory(row.entry.relativePath),
-          )
-        }
-        onDelete={() => onDelete(row.entry.relativePath)}
-        onReveal={() => onReveal(row.entry.relativePath)}
       />
     </div>
   );

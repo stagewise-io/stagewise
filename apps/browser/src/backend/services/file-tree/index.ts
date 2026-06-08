@@ -9,6 +9,7 @@ import type {
   AppState,
   FilePreviewKind,
   FilePreviewResult,
+  FileSearchResult,
   FileTreeEntry,
   FileTreeListDirectoryInput,
   FileTreeListDirectoryResult,
@@ -124,6 +125,8 @@ export class FileTreeService extends DisposableService {
   private readonly directoryCache = new Map<string, DirectoryCacheEntry>();
   private readonly ignoreCache = new Map<string, Promise<Ignore>>();
   private readonly watchers = new Map<string, FSWatcher>();
+  // Absolute directory paths currently watched (depth 0) per workspace key.
+  private readonly watchedDirs = new Map<string, Set<string>>();
   private readonly pendingRevisionTimers = new Map<
     string,
     ReturnType<typeof setTimeout>
@@ -497,6 +500,93 @@ export class FileTreeService extends DisposableService {
     });
   }
 
+  async searchFiles(
+    query: string,
+    workspaceKeys: string[],
+    includeGitignored: boolean,
+  ): Promise<FileSearchResult[]> {
+    const lowerQuery = query.toLowerCase();
+    const results: FileSearchResult[] = [];
+    const seen = new Set<string>();
+
+    for (const workspaceKey of workspaceKeys) {
+      const mount = this.resolveWorkspace(workspaceKey);
+      if (!mount) continue;
+
+      let ig: Ignore | null = null;
+      if (!includeGitignored) {
+        ig = await this.getIgnore({
+          key: workspaceKey,
+          mount,
+          root: mount.path,
+          rootReal: mount.path,
+        });
+      }
+
+      const walkDir = async (dirRelativePath: string) => {
+        const absoluteDir = dirRelativePath
+          ? path.join(mount.path, dirRelativePath)
+          : mount.path;
+
+        let entries: string[];
+        try {
+          entries = await fs.readdir(absoluteDir);
+        } catch {
+          return;
+        }
+
+        for (const name of entries) {
+          if (name === '.git' || name === 'node_modules') continue;
+
+          const relPath = dirRelativePath ? `${dirRelativePath}/${name}` : name;
+          const absPath = path.join(absoluteDir, name);
+
+          let stat: ReturnType<typeof fs.stat> extends Promise<infer T>
+            ? T
+            : never;
+          try {
+            stat = await fs.stat(absPath);
+          } catch {
+            continue;
+          }
+
+          if (stat.isSymbolicLink()) {
+            try {
+              const real = await fs.realpath(absPath);
+              const realStat = await fs.stat(real);
+              if (!realStat.isFile()) continue;
+            } catch {
+              continue;
+            }
+          }
+
+          if (!stat.isFile()) continue;
+
+          if (ig?.ignores(relPath)) continue;
+          if (this.isDefaultIgnoredPath(relPath)) continue;
+
+          if (name.toLowerCase().includes(lowerQuery)) {
+            const mountPrefix = mount.prefix;
+            const uniqueKey = `${workspaceKey}:${relPath}`;
+            if (!seen.has(uniqueKey)) {
+              seen.add(uniqueKey);
+              results.push({
+                workspaceKey,
+                mountPrefix,
+                relativePath: relPath,
+                fileName: name,
+              });
+            }
+          }
+        }
+      };
+
+      await walkDir('');
+    }
+
+    return results;
+  }
+
   setActiveWorkspace(workspaceKey: string | null): void {
     this.uiKarton.setState((draft) => {
       draft.fileTree.activeWorkspaceKey = workspaceKey;
@@ -529,40 +619,89 @@ export class FileTreeService extends DisposableService {
     this.syncWatchers();
   };
 
+  /**
+   * Compute the set of directories whose contents are currently displayed for
+   * a workspace — the tree root plus every expanded directory. Only these
+   * directories need filesystem watching, since the tree loads directory
+   * contents lazily and only renders root + expanded paths.
+   */
+  private getWatchedDirsForMount(
+    workspaceKey: string,
+    mount: WorkspaceMount,
+  ): Set<string> {
+    const result = new Set<string>([normalizePath(mount.path)]);
+    const expanded =
+      this.uiKarton.state.fileTree.expandedDirectoriesByWorkspaceKey[
+        workspaceKey
+      ] ?? [];
+    for (const relativePath of expanded) {
+      if (!relativePath || this.isDefaultIgnoredPath(relativePath)) continue;
+      result.add(normalizePath(path.join(mount.path, relativePath)));
+    }
+    return result;
+  }
+
   private syncWatchers(): void {
     const mounts = this.getWatchedMounts();
     const desired = new Map(
       mounts.map((mount) => [this.getWorkspaceKey(mount), mount]),
     );
-    const signature = [...desired.entries()]
-      .map(([key, mount]) => `${key}:${mount.path}`)
+
+    // Signature includes the mounts AND the directories that must be watched
+    // for each (root + expanded dirs), so expand/collapse re-syncs watchers
+    // while unrelated state changes are cheap no-ops.
+    const desiredDirsByKey = new Map<string, Set<string>>();
+    for (const [key, mount] of desired) {
+      desiredDirsByKey.set(key, this.getWatchedDirsForMount(key, mount));
+    }
+    const signature = [...desiredDirsByKey.entries()]
+      .map(([key, dirs]) => `${key}:${[...dirs].sort().join(',')}`)
       .sort()
       .join('\n');
 
     if (signature === this.watchedMountsSignature) return;
     this.watchedMountsSignature = signature;
 
+    // Close watchers for mounts no longer watched.
     for (const [key, watcher] of this.watchers) {
       if (desired.has(key)) continue;
       void watcher.close();
       this.watchers.delete(key);
+      this.watchedDirs.delete(key);
     }
 
-    for (const [key, mount] of desired) {
-      if (this.watchers.has(key)) continue;
-      const watcher = chokidar.watch(mount.path, {
-        ignoreInitial: true,
-        ignored: (candidate) => this.isDefaultIgnoredPath(candidate),
-        depth: 20,
-      });
-      watcher.on('all', (_event, changedPath) => {
-        if (this.isDefaultIgnoredPath(changedPath)) return;
-        this.scheduleRevisionBump(key, changedPath);
-      });
-      watcher.on('error', (error) => {
-        this.logger.warn('[FileTreeService] watcher error', { key, error });
-      });
-      this.watchers.set(key, watcher);
+    for (const [key, desiredDirs] of desiredDirsByKey) {
+      let watcher = this.watchers.get(key);
+      if (!watcher) {
+        // Shallow (depth: 0) watch — only the immediate children of each
+        // watched directory. This avoids the expensive deep recursive scan
+        // of the whole workspace that previously blocked the main process.
+        watcher = chokidar.watch([...desiredDirs], {
+          ignoreInitial: true,
+          ignored: (candidate) => this.isDefaultIgnoredPath(candidate),
+          depth: 0,
+        });
+        watcher.on('all', (_event, changedPath) => {
+          if (this.isDefaultIgnoredPath(changedPath)) return;
+          this.scheduleRevisionBump(key, changedPath);
+        });
+        watcher.on('error', (error) => {
+          this.logger.warn('[FileTreeService] watcher error', { key, error });
+        });
+        this.watchers.set(key, watcher);
+        this.watchedDirs.set(key, new Set(desiredDirs));
+        continue;
+      }
+
+      // Watcher already exists — incrementally add/remove watched directories.
+      const current = this.watchedDirs.get(key) ?? new Set<string>();
+      for (const dir of desiredDirs) {
+        if (!current.has(dir)) watcher.add(dir);
+      }
+      for (const dir of current) {
+        if (!desiredDirs.has(dir)) watcher.unwatch(dir);
+      }
+      this.watchedDirs.set(key, new Set(desiredDirs));
     }
   }
 
