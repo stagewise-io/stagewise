@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.6.0 (2026-06-08)
+
+### Features
+
+* add intel mac builds (0c96120)
+* open previews in browser tabs (9f1fa15)
+* prefer remote base for worktrees (db32c3b)
+* add sidebar-foreground color for legible sidebar labels (262b49d)
+
+### Bug Fixes
+
+* use intel mac runner (cd0448f)
+* fix dev origin for hosted API, improve signup UI, update error links (79741ab)
+* refine auth error actions (954cca2)
+* improve worktree branch picker (abded0e)
+* prevent remote branch checkout (da10524)
+* align sidebar-styles (0abced2)
+
+### Other Changes
+
+* refactor context-skills settings (da2dcee)
+
 ## 1.5.0 (2026-06-03)
 
 ### Features
