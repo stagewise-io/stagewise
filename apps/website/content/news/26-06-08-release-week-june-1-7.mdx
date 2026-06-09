@@ -8,15 +8,15 @@ date: 2026-06-08
 
 ## What Shipped Last Week
 
-Last week focused on making stagewise better at running several agents across several workspaces without losing track of what belongs where.
+Last week focused on making stagewise agents run more reliably when you're on the go, and on making worktrees a first-class part of the workflow.
 
-The sidebar can now group agents by workspace. Worktrees are easier to enter and clean up. New worktrees can run setup scripts automatically. We also added MiniMax M3, improved recovery after network loss, and gave active agents better ways to keep the machine awake while work is running.
+The sidebar can now group agents by workspace. Worktrees are easier to manage and clean up. New worktrees can run setup scripts automatically. We also added support for MiniMax's latest model, M3.
 
 ### Group agents by workspace
 
 The agent sidebar now has a **Group by Workspace** option.
 
-Instead of one long list, agents can be split by the workspace they were using. For Git repositories, stagewise also separates agents by worktree, so parallel work stays easier to scan.
+Instead of one long list, agents can be split by the workspace they use. For Git repositories, stagewise also separates agents by worktree, so parallel work stays easier to scan.
 
 ![The stagewise agent sidebar grouped by workspace, with pinned agents, repository workspaces, and worktree sections.](/news/release-week-june-1-7-workspace-grouping.png)
 
@@ -32,7 +32,7 @@ stagewise can now run setup scripts for managed worktrees.
 
 This is for the repetitive work that usually happens after creating a fresh worktree: installing what is needed, preparing local state, or making sure dev apps can be shown without manual setup.
 
-The goal is simple: when an agent starts in a new worktree, that workspace should be ready to use. Less “open a terminal and fix the environment first,” more “start the task.”
+The goal is simple: when an agent starts in a new worktree, that workspace should be ready to use. With this new feature, you can just start with the work instead of opening a terminal and fixing the environment first.
 
 ### MiniMax M3 is now available
 
@@ -46,21 +46,19 @@ MiniMax M3 is a frontier multimodal coding model with a long context window. It 
 
 Agents can now keep the system awake while they are active.
 
-That is a small change with a big practical effect: long-running tasks are less likely to stall because the machine went to sleep halfway through a build, test run, or multi-step edit.
+That is a small change with a big practical effect: long-running tasks are less likely to stall because the machine went to sleep halfway through a build, test run, or multi-step edit. This means you can finally leave your machine running and grab a coffee at the same time, confident that the agents keep working on their tasks.
 
 ### Better recovery after network loss
 
-Agents now automatically recover after losing network connectivity.
-
-Network drops still happen. The important part is that a temporary disconnect should not force you to restart the whole agent flow. stagewise now handles that recovery more gracefully.
+Agents now automatically resume their work after network connectivity returns. We added this because agents should keep going when you're on the go or moving from one place to another.
 
 ### Force awake mode for stricter macOS sleep behavior
 
-Some macOS Apple Silicon devices are more aggressive about suspending in battery mode. For those machines, we added a manual **force awake** option.
+Apple Silicon-based macOS devices are more aggressive about suspending on battery power. For those machines, we added a manual **force awake** option.
 
 ![The new coffee mug force-awake button in the bottom of the stagewise sidebar.](/news/release-week-june-1-7-force-awake.png)
 
-You can enable it with the new coffee-mug button at the bottom of the sidebar. It is intentionally manual because it affects battery behavior. Use it when you need agents to keep working while the device would otherwise suspend.
+You can enable it with the new coffee-mug button at the bottom of the sidebar. It is intentionally manual because it can significantly affect battery usage while the machine is closed. But if you need your agents to keep working when you're on the go, this gives you that control without giving up the advantages of locally running agents.
 
 ## What the Week Adds Up To
 
