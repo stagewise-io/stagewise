@@ -43,7 +43,11 @@ import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
-import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
+import type {
+  AgentHistoryEntry,
+  ExternalCliAgentAvailability,
+  ExternalCliAgentKind,
+} from '@shared/karton-contracts/ui/agent';
 import {
   activeAgentCardsEqual,
   buildWorkspaceAgentGroups,
@@ -78,6 +82,14 @@ import type {
 } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@stagewise/stage-ui/components/dialog';
 import {
   Tooltip,
   TooltipContent,
@@ -685,6 +697,13 @@ export function AgentsList() {
   const [openAgent, setOpenAgent] = useOpenAgent();
   const { previewAgentId } = useAgentSwitcher();
   const createAgent = useKartonProcedure((p) => p.agents.create);
+  const createExternalCliAgent = useKartonProcedure(
+    (p) => p.agents.createExternalCliAgent,
+  );
+  const getExternalCliAgentAvailability = useKartonProcedure(
+    (p) => p.agents.getExternalCliAgentAvailability,
+  );
+  const pickFiles = useKartonProcedure((p) => p.filePicker.createRequest);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const setLastOpenAgentId = useKartonProcedure(
     (p) => p.browser.setLastOpenAgentId,
@@ -774,17 +793,37 @@ export function AgentsList() {
   // Optimistic creation: show a skeleton card immediately while the backend
   // creates the agent. Cleared once the new agent appears in the real list.
   const [pendingCreate, setPendingCreate] = useState(false);
+  const [externalAvailability, setExternalAvailability] =
+    useState<ExternalCliAgentAvailability | null>(null);
+  const [selectedExternalKind, setSelectedExternalKind] =
+    useState<ExternalCliAgentKind | null>(null);
+  const [selectedExternalWorkspace, setSelectedExternalWorkspace] =
+    useState<string>('');
+  const [externalCreateError, setExternalCreateError] = useState<string | null>(
+    null,
+  );
+  const [externalCreatePending, setExternalCreatePending] = useState(false);
   const agentCountAtCreateRef = useRef(0);
 
   const agents = useKartonState(
     useComparingSelector(
       (s): ActiveAgentCardData[] =>
         Object.entries(s.agents.instances)
-          .filter(([_, agent]) => agent.type === AgentTypes.CHAT)
+          .filter(
+            ([_, agent]) =>
+              agent.type === AgentTypes.CHAT ||
+              agent.type === AgentTypes.CLAUDE ||
+              agent.type === AgentTypes.CODEX,
+          )
           .map(([id, agent]) => {
             const history = agent.state.history;
             const lastMsg = history[history.length - 1]!;
-            const hasPendingQuestion = !!s.toolbox[id]?.pendingUserQuestion;
+            const isExternal =
+              agent.type === AgentTypes.CLAUDE ||
+              agent.type === AgentTypes.CODEX;
+            const hasPendingQuestion =
+              !!s.toolbox[id]?.pendingUserQuestion ||
+              (isExternal && agent.externalCli?.status === 'waiting');
             // Detect any open tool-approval requests in the last assistant message.
             const hasPendingToolApproval = (() => {
               const h = agent.state.history;
@@ -799,15 +838,23 @@ export function AgentsList() {
               return false;
             })();
             const isWorking = agent.state.isWorking;
-            const rawActivity = hasPendingQuestion
-              ? { text: 'Waiting for response...', isUserInput: false }
-              : deriveActivityText(
-                  history as {
-                    role: string;
-                    parts: { type: string; text?: string }[];
-                  }[],
-                  agent.state.inputState,
-                );
+            const rawActivity = isExternal
+              ? {
+                  text:
+                    agent.externalCli?.status === 'exited'
+                      ? 'Exited'
+                      : `${agent.externalCli?.kind === 'codex' ? 'Codex' : 'Claude'} terminal`,
+                  isUserInput: false,
+                }
+              : hasPendingQuestion
+                ? { text: 'Waiting for response...', isUserInput: false }
+                : deriveActivityText(
+                    history as {
+                      role: string;
+                      parts: { type: string; text?: string }[];
+                    }[],
+                    agent.state.inputState,
+                  );
             // When the agent is actively working but we only have a
             // user-input fallback, show "Working…" instead.
             const activity =
@@ -817,7 +864,7 @@ export function AgentsList() {
             return {
               id,
               title: agent.state.title,
-              isWorking: agent.state.isWorking,
+              isWorking: isExternal ? false : agent.state.isWorking,
               isWaitingForUser: hasPendingQuestion || hasPendingToolApproval,
               activityText: activity.text,
               activityIsUserInput: activity.isUserInput,
@@ -827,12 +874,17 @@ export function AgentsList() {
               unread: !!agent.state.unread,
               lastMessageAt: lastMsg?.metadata?.createdAt
                 ? new Date(lastMsg.metadata.createdAt).getTime()
-                : 0,
+                : isExternal
+                  ? appStartTimeRef.current
+                  : 0,
               createdAt: agent.state.history[0]?.metadata?.createdAt
                 ? new Date(agent.state.history[0].metadata.createdAt).getTime()
-                : 0,
+                : isExternal
+                  ? appStartTimeRef.current
+                  : 0,
               messageCount: history.length,
               mountedWorkspaces: s.toolbox[id]?.workspace?.mounts ?? [],
+              type: agent.type,
             };
           }),
       activeAgentCardsEqual,
@@ -856,6 +908,19 @@ export function AgentsList() {
     pendingCreate && agents.length <= agentCountAtCreateRef.current;
 
   const track = useTrack();
+
+  const refreshExternalAvailability = useCallback(() => {
+    void getExternalCliAgentAvailability()
+      .then(setExternalAvailability)
+      .catch((error) => {
+        console.error('Failed to load external agent availability:', error);
+        setExternalAvailability(null);
+      });
+  }, [getExternalCliAgentAvailability]);
+
+  useEffect(() => {
+    refreshExternalAvailability();
+  }, [refreshExternalAvailability]);
 
   const handleCreateAgent = useCallback(() => {
     void track('chat-new-agent-clicked', { source: 'sidebar-active-agents' });
@@ -888,6 +953,46 @@ export function AgentsList() {
       void setLastOpenAgentId(id);
     });
   }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent, track]);
+
+  const handleOpenExternalDialog = useCallback((kind: ExternalCliAgentKind) => {
+    setSelectedExternalKind(kind);
+    setSelectedExternalWorkspace(currentMountPathsRef.current[0] ?? '');
+    setExternalCreateError(null);
+  }, []);
+
+  const handleSelectExternalWorkspace = useCallback(() => {
+    void pickFiles({ type: 'directory', multiple: false }).then((paths) => {
+      if (paths[0]) setSelectedExternalWorkspace(paths[0]);
+    });
+  }, [pickFiles]);
+
+  const handleCreateExternalAgent = useCallback(() => {
+    if (!selectedExternalKind || !selectedExternalWorkspace) return;
+    setExternalCreatePending(true);
+    setExternalCreateError(null);
+    void createExternalCliAgent(selectedExternalKind, {
+      workspacePath: selectedExternalWorkspace,
+    })
+      .then((id) => {
+        setOpenAgent(id);
+        void setLastOpenAgentId(id);
+        setSelectedExternalKind(null);
+        setExternalCreatePending(false);
+        window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+      })
+      .catch((error) => {
+        setExternalCreateError(
+          error instanceof Error ? error.message : 'Failed to create agent',
+        );
+        setExternalCreatePending(false);
+      });
+  }, [
+    createExternalCliAgent,
+    selectedExternalKind,
+    selectedExternalWorkspace,
+    setLastOpenAgentId,
+    setOpenAgent,
+  ]);
 
   const pendingScrollToCreatedAgentRef = useRef<string | null>(null);
 
@@ -1061,7 +1166,14 @@ export function AgentsList() {
   );
 
   const isAgentWorking = useCallback(
-    (id: string) => agents.some((agent) => agent.id === id && agent.isWorking),
+    (id: string) =>
+      agents.some(
+        (agent) =>
+          agent.id === id &&
+          agent.isWorking &&
+          agent.type !== AgentTypes.CLAUDE &&
+          agent.type !== AgentTypes.CODEX,
+      ),
     [agents],
   );
 
@@ -2332,23 +2444,139 @@ export function AgentsList() {
 
   return (
     <div className="flex h-full flex-col group-data-[collapsed=true]:hidden">
+      <Dialog
+        open={selectedExternalKind !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedExternalKind(null);
+        }}
+      >
+        <DialogContent>
+          <DialogClose />
+          <DialogHeader>
+            <DialogTitle>
+              Create new {selectedExternalKind === 'codex' ? 'Codex' : 'Claude'}{' '}
+              Agent
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <div className="font-medium text-foreground text-sm">
+                Working directory
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate rounded-md bg-foreground/5 px-2 py-1.5 text-left text-sm hover:bg-foreground/8"
+                  onClick={handleSelectExternalWorkspace}
+                >
+                  {selectedExternalWorkspace || 'Select a folder…'}
+                </button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSelectExternalWorkspace}
+                >
+                  Browse
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {currentMountPathsRef.current.slice(0, 5).map((path) => (
+                  <button
+                    key={path}
+                    type="button"
+                    className="block w-full truncate rounded px-2 py-1 text-left text-muted-foreground text-xs hover:bg-foreground/5 hover:text-foreground"
+                    onClick={() => setSelectedExternalWorkspace(path)}
+                  >
+                    {path}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {externalCreateError && (
+              <p className="text-error-foreground text-sm">
+                {externalCreateError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="primary"
+              disabled={!selectedExternalWorkspace || externalCreatePending}
+              onClick={handleCreateExternalAgent}
+            >
+              {externalCreatePending ? 'Creating…' : 'Create'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setSelectedExternalKind(null)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Header: New Agent button + Search */}
       <div className="shrink-0 pt-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="group/new-agent w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
-          onClick={handleCreateAgent}
-        >
-          <IconPenPlusOutline18 className="size-4" />
-          New Agent
-          <HotkeyCombo
-            action={HotkeyActions.NEW_CHAT}
-            className="ml-auto opacity-0 transition-opacity group-hover/new-agent:opacity-100"
-            size="xs"
-            variant="chrome"
-          />
-        </Button>
+        <div className="flex w-full items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="group/new-agent flex-1 justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
+            onClick={handleCreateAgent}
+          >
+            <IconPenPlusOutline18 className="size-4" />
+            New Agent
+            <HotkeyCombo
+              action={HotkeyActions.NEW_CHAT}
+              className="ml-auto opacity-0 transition-opacity group-hover/new-agent:opacity-100"
+              size="xs"
+              variant="chrome"
+            />
+          </Button>
+          <Menu>
+            <MenuTrigger>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Choose agent type"
+                onClick={refreshExternalAvailability}
+              >
+                <IconChevronDownOutline18 className="size-4" />
+              </Button>
+            </MenuTrigger>
+            <MenuContent side="bottom" align="end" sideOffset={2} size="sm">
+              <MenuItem size="sm" onClick={handleCreateAgent}>
+                stagewise Agent
+              </MenuItem>
+              {(['claude', 'codex'] as const).map((kind) => {
+                const item = externalAvailability?.[kind];
+                const available = !!item?.available;
+                const label = kind === 'claude' ? 'Claude' : 'Codex';
+                return (
+                  <MenuItem
+                    key={kind}
+                    size="sm"
+                    disabled={!available}
+                    className={cn(
+                      !available &&
+                        'text-subtle-foreground opacity-60 hover:bg-transparent data-highlighted:bg-transparent',
+                    )}
+                    onClick={() => available && handleOpenExternalDialog(kind)}
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span>{label}</span>
+                      {!available && (
+                        <span className="text-subtle-foreground text-xs">
+                          Not found on PATH
+                        </span>
+                      )}
+                    </span>
+                  </MenuItem>
+                );
+              })}
+            </MenuContent>
+          </Menu>
+        </div>
         <div className="mt-2 flex items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1.5">
           <IconMagnifierOutline18 className="size-3.5 shrink-0 text-sidebar-foreground" />
           <input

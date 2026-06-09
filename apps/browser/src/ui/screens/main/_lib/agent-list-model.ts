@@ -1,6 +1,7 @@
 import type {
   AgentHistoryEntry,
   AgentHistoryWorkspaceEntry,
+  AgentTypes,
 } from '@shared/karton-contracts/ui/agent';
 import type {
   MountEntry,
@@ -27,6 +28,7 @@ export type ActiveAgentCardData = {
   messageCount: number;
   unread: boolean;
   mountedWorkspaces: AgentWorkspaceEntry[];
+  type?: AgentTypes;
 };
 
 /** Unified entry for the merged active + history list. */
@@ -79,6 +81,7 @@ export function activeAgentCardsEqual(
     if (
       ai.id !== bi.id ||
       ai.title !== bi.title ||
+      ai.type !== bi.type ||
       ai.isWorking !== bi.isWorking ||
       ai.isWaitingForUser !== bi.isWaitingForUser ||
       ai.activityText !== bi.activityText ||
@@ -140,6 +143,7 @@ export function mergeAgentEntries({
       createdAt: new Date(e.createdAt).getTime(),
       messageCount: e.messageCount,
       mountedWorkspaces: e.mountedWorkspaces ?? [],
+      type: e.type,
       isLive: false,
     }));
 
@@ -165,6 +169,7 @@ export function mergeAgentEntries({
           a.mountedWorkspaces.length > 0
             ? a.mountedWorkspaces
             : (h?.mountedWorkspaces ?? []),
+        type: a.type,
         isLive: true,
         lastMessageAt:
           a.lastMessageAt > 0

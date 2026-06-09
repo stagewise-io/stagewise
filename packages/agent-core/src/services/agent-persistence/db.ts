@@ -179,6 +179,7 @@ export class AgentPersistenceDB {
     const results = await this._db
       .select({
         id: schema.agentInstances.id,
+        type: schema.agentInstances.type,
         title: schema.agentInstances.title,
         createdAt: schema.agentInstances.createdAt,
         lastMessageAt: schema.agentInstances.lastMessageAt,
@@ -237,6 +238,7 @@ export class AgentPersistenceDB {
     const results = await this._db
       .select({
         id: schema.agentInstances.id,
+        type: schema.agentInstances.type,
         title: schema.agentInstances.title,
         createdAt: schema.agentInstances.createdAt,
         lastMessageAt: schema.agentInstances.lastMessageAt,

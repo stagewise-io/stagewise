@@ -544,6 +544,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // `ModelProviderService` depends on `preferencesService`, which is
   // constructed after the toolbox itself.
   toolboxService.setModelProviderService(modelProviderService);
+  toolboxService.setAgentPersistenceDb(persistence.agentDb);
 
   const assetCacheService = await AssetCacheService.create(
     () => authService.accessToken,

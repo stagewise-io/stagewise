@@ -3,9 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enrichHistoryEntryWorkspaces } from './history-workspace-enrichment';
-import type {
-  AgentHistoryEntry,
-  AgentHistoryWorkspaceEntry,
+import {
+  AgentTypes,
+  type AgentHistoryEntry,
+  type AgentHistoryWorkspaceEntry,
 } from '@shared/karton-contracts/ui/agent';
 
 function makeEntry(
@@ -14,6 +15,7 @@ function makeEntry(
 ): AgentHistoryEntry {
   return {
     id,
+    type: AgentTypes.CHAT,
     title: `Agent ${id}`,
     createdAt: new Date(0),
     lastMessageAt: new Date(0),

@@ -21,6 +21,11 @@ import {
   type WorkspaceAgentSettings,
   type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  CreateExternalCliAgentInput,
+  ExternalCliAgentAvailability,
+  ExternalCliAgentKind,
+} from '@shared/karton-contracts/ui/agent';
 import type { Attachment } from '@shared/karton-contracts/ui/agent/metadata';
 import type { KartonService } from '@/services/karton';
 import { DisposableService } from '@/services/disposable';
@@ -34,11 +39,13 @@ import type { CredentialsService } from '@/services/credentials';
 import type { PreferencesService } from '@/services/preferences';
 import type { GitService } from '@/services/git';
 import type { HostAgentStateMutations } from '@/services/agent-core-bridge/state/agent-instances';
+import { getExternalCliAgentAvailability as discoverExternalCliAgentAvailability } from '@/services/agent-manager/executable-discovery';
 import { resolveNewAgentWorkspaceMountPath } from '@/services/agent-manager/workspace-mount-normalization';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import type { AttachmentsService } from '@stagewise/agent-core/attachments';
+import type { AgentPersistenceDB } from '@stagewise/agent-core/agent-persistence';
 import { getBrowserHostPaths } from '@/services/agent-core-bridge/host-paths';
 import {
   getDataRoot,
@@ -52,6 +59,7 @@ import { getLintingDiagnostics as getLintingDiagnosticsTool } from './tools/file
 import { listLibraryDocs as listLibraryDocsTool } from './tools/research/list-library-docs';
 import { searchInLibraryDocs as searchInLibraryDocsTool } from './tools/research/search-in-library-docs';
 import {
+  AgentTypes,
   makeUniversalTools,
   type AgentManagerToolboxPort,
   type AgentStore,
@@ -73,6 +81,7 @@ import {
 } from './tools/user-interaction/ask-user-questions';
 import type { Tool } from 'ai';
 import type { MountedClientRuntimes } from './utils';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { QuestionAnswerValue } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { TabState } from '@shared/karton-contracts/ui';
@@ -142,6 +151,7 @@ export class ToolboxService
   private readonly agentStore: AgentStore;
   private readonly hostAgentStateMutations: HostAgentStateMutations;
   private readonly attachments: AttachmentsService;
+  private agentPersistenceDb: AgentPersistenceDB | null = null;
 
   private sandboxService: SandboxService | null = null;
   private shellService: ShellService | null = null;
@@ -357,6 +367,10 @@ export class ToolboxService
     this.modelProviderService = service;
   }
 
+  public setAgentPersistenceDb(db: AgentPersistenceDB): void {
+    this.agentPersistenceDb = db;
+  }
+
   public setNotificationEventHandler(
     handler: (
       event: 'done' | 'question' | 'error',
@@ -364,6 +378,13 @@ export class ToolboxService
     ) => void | Promise<void>,
   ): void {
     this.notificationEventHandler = handler;
+    this.terminalService?.setNotificationEventHandler((event, agentId) => {
+      void Promise.resolve(handler(event, agentId)).catch((error) => {
+        this.logger.debug(
+          `[ToolboxService] Terminal notification event failed: ${(error as Error).message}`,
+        );
+      });
+    });
   }
 
   public setWorkspaceLastUsedAtResolver(
@@ -832,6 +853,126 @@ export class ToolboxService
 
   public killShellSession(sessionId: string): void {
     this.shellService?.killSession(sessionId);
+  }
+
+  public getExternalCliAgentAvailability(): Promise<ExternalCliAgentAvailability> {
+    return discoverExternalCliAgentAvailability(this.resolvedEnvPromise);
+  }
+
+  public async createExternalCliAgent(
+    kind: ExternalCliAgentKind,
+    input: CreateExternalCliAgentInput,
+    executablePath: string,
+    instanceId?: string,
+  ): Promise<string> {
+    const agentInstanceId = instanceId ?? randomUUID();
+    const now = new Date();
+    const type = kind === 'claude' ? AgentTypes.CLAUDE : AgentTypes.CODEX;
+    const title =
+      input.title?.trim() || (kind === 'claude' ? 'Claude' : 'Codex');
+    const workspacePath = input.workspacePath;
+    const instanceConfig = {
+      kind,
+      executablePath,
+      workspacePath,
+      requestedWorkspacePath: input.workspacePath,
+      workspaceAction: input.workspaceAction,
+      terminalId: null,
+    };
+
+    this.agentStore.update((draft) => {
+      draft.agents.instances[agentInstanceId] = {
+        type,
+        canSelectModel: false,
+        requiredModelCapabilities: {},
+        allowUserInput: false,
+        parentAgentInstanceId: null,
+        state: {
+          title,
+          isWorking: false,
+          history: [],
+          queuedMessages: [],
+          activeModelId: 'claude-sonnet-4.6',
+          toolApprovalMode: DEFAULT_TOOL_APPROVAL_MODE,
+          pendingApprovals: {},
+          inputState: '',
+          usedTokens: 0,
+        },
+        externalCli: {
+          kind,
+          executablePath,
+          workspacePath,
+          terminalId: null,
+          status: 'running',
+        },
+      };
+    });
+
+    try {
+      await this.handleMountWorkspace(agentInstanceId, workspacePath);
+      const terminalId = this.createAgentTerminal({
+        agentInstanceId,
+        cwd: workspacePath,
+        command: executablePath,
+      });
+      if (!terminalId) throw new Error(`Failed to start ${kind} terminal`);
+
+      const mountedWorkspaces =
+        this.getWorkspaceSnapshotForPersistence(agentInstanceId);
+      await this.agentPersistenceDb?.storeAgentInstance(
+        {
+          id: agentInstanceId,
+          type,
+          title,
+          instanceConfig,
+          createdAt: now,
+          lastMessageAt: now,
+          activeModelId: 'claude-sonnet-4.6',
+          toolApprovalMode: DEFAULT_TOOL_APPROVAL_MODE,
+          queuedMessages: [],
+          inputState: '',
+          usedTokens: 0,
+          mountedWorkspaces,
+        },
+        [],
+      );
+
+      this.telemetryService.capture('agent-created', {
+        agent_type: type,
+        agent_instance_id: agentInstanceId,
+        model_id: 'external-cli',
+      });
+
+      return agentInstanceId;
+    } catch (error) {
+      this.closeAgentTerminal(agentInstanceId);
+      this.agentStore.update((draft) => {
+        delete draft.agents.instances[agentInstanceId];
+        delete draft.toolbox[agentInstanceId];
+      });
+      throw error;
+    }
+  }
+
+  public isExternalCliAgentRunning(agentInstanceId: string): boolean {
+    const terminalId =
+      this.uiKarton.state.agents.instances[agentInstanceId]?.externalCli
+        ?.terminalId;
+    if (!terminalId) return false;
+    return this.terminalService?.hasTerminal(terminalId) ?? false;
+  }
+
+  public createAgentTerminal(args: {
+    agentInstanceId: string;
+    cwd: string;
+    command: string;
+    args?: string[];
+  }): string | null {
+    return this.terminalService?.createAgentTerminal(args) ?? null;
+  }
+
+  public closeAgentTerminal(agentInstanceId: string): void {
+    this.terminalService?.closeAgentTerminal(agentInstanceId);
   }
 
   public getBrowserSnapshot(agentInstanceId: string): BrowserSnapshot {
@@ -1422,6 +1563,17 @@ export class ToolboxService
         this.detectedShell,
         terminalEnv,
       );
+      if (this.notificationEventHandler) {
+        this.terminalService.setNotificationEventHandler((event, agentId) => {
+          void Promise.resolve(
+            this.notificationEventHandler?.(event, agentId),
+          ).catch((error) => {
+            this.logger.debug(
+              `[ToolboxService] Terminal notification event failed: ${(error as Error).message}`,
+            );
+          });
+        });
+      }
       this.terminalService.initialize();
       // Restore PTYs for terminal tabs persisted in loadTabState.
       this.terminalService.restoreFromState();

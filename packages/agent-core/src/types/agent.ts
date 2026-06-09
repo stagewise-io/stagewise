@@ -9,7 +9,67 @@ import type { UniversalTools } from './tools';
 export enum AgentTypes {
   CHAT = 'chat',
   WORKSPACE_MD = 'project-md',
+  CLAUDE = 'claude',
+  CODEX = 'codex',
 }
+
+export type ExternalCliAgentKind = 'claude' | 'codex';
+
+export type ExternalCliAgentAvailability = Record<
+  ExternalCliAgentKind,
+  {
+    available: boolean;
+    executablePath: string | null;
+  }
+>;
+
+export type WorkspaceActionPayloadLike = {
+  action: string;
+  createWorktree?: {
+    name: string;
+    baseRef?: string;
+  };
+  switchWorktree?: {
+    path: string;
+  };
+  createBranch?: {
+    name: string;
+    baseRef?: string;
+  };
+  switchBranch?: {
+    name: string;
+  };
+};
+
+export type ExternalCliAgentStatus =
+  | 'running'
+  | 'waiting'
+  | 'exited'
+  | 'unavailable';
+
+export type ExternalCliAgentInstanceConfig = {
+  kind: ExternalCliAgentKind;
+  executablePath: string;
+  workspacePath: string;
+  requestedWorkspacePath: string;
+  workspaceAction?: WorkspaceActionPayloadLike;
+  terminalId?: string | null;
+};
+
+export type ExternalCliAgentRuntimeState = {
+  kind: ExternalCliAgentKind;
+  executablePath: string;
+  workspacePath: string;
+  terminalId: string | null;
+  status: ExternalCliAgentStatus;
+  unavailableReason?: string;
+};
+
+export type CreateExternalCliAgentInput = {
+  workspacePath: string;
+  workspaceAction?: WorkspaceActionPayloadLike;
+  title?: string;
+};
 
 export type AgentMessage<
   TTools extends UITools = UniversalTools,
@@ -121,6 +181,7 @@ export type AgentHistoryWorkspaceEntry = {
 
 export type AgentHistoryEntry = {
   id: string;
+  type: AgentTypes;
   title: string;
   createdAt: Date;
   lastMessageAt: Date;

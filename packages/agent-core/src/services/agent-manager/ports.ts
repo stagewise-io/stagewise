@@ -1,3 +1,8 @@
+import type {
+  CreateExternalCliAgentInput,
+  ExternalCliAgentAvailability,
+  ExternalCliAgentKind,
+} from '../../types/agent';
 import type { MountPermission } from '../../types/metadata';
 
 /**
@@ -26,6 +31,14 @@ export interface AgentManagerToolboxPort {
   acceptAllPendingEditsForAgent(agentInstanceId: string): Promise<void>;
   getEditedFilePathsForAgent(agentInstanceId: string): Promise<string[]>;
   getShellSnapshot?(agentInstanceId: string): unknown;
+  getExternalCliAgentAvailability?(): Promise<ExternalCliAgentAvailability>;
+  createExternalCliAgent?(
+    kind: ExternalCliAgentKind,
+    input: CreateExternalCliAgentInput,
+    executablePath: string,
+    instanceId?: string,
+  ): Promise<string>;
+  isExternalCliAgentRunning?(agentInstanceId: string): boolean;
   /**
    * Optional host hook called from the `agents.create` handler to
    * normalize a user-supplied workspace path before mounting. Hosts
@@ -38,4 +51,11 @@ export interface AgentManagerToolboxPort {
    * via the `preserveWorkspacePaths` argument on `agents.create`.
    */
   resolveNewAgentMountPath?(workspacePath: string): Promise<string>;
+  createAgentTerminal?(args: {
+    agentInstanceId: string;
+    cwd: string;
+    command: string;
+    args?: string[];
+  }): string | null;
+  closeAgentTerminal?(agentInstanceId: string): void;
 }
