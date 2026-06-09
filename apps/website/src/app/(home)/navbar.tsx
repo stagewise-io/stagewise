@@ -110,6 +110,7 @@ export function Navbar() {
           {/* Desktop nav links (centered absolutely) */}
           <div className="pointer-events-none absolute inset-x-0 hidden items-center justify-center sm:flex">
             <div className="pointer-events-auto flex items-center">
+              <NavbarButton href="/pricing">Pricing</NavbarButton>
               <NavbarButton href="https://docs.stagewise.io">Docs</NavbarButton>
               <NavbarButton href="/news">News</NavbarButton>
               <NavbarButton href="/mission">Mission</NavbarButton>
@@ -146,6 +147,7 @@ export function Navbar() {
             id="mobile-navigation-menu"
             className="flex flex-col items-start gap-1 border-border border-t pb-3 sm:hidden"
           >
+            <NavbarButton href="/pricing">Pricing</NavbarButton>
             <NavbarButton href="https://docs.stagewise.io">Docs</NavbarButton>
             <NavbarButton href="/news">News</NavbarButton>
             <NavbarButton href="/mission">Mission</NavbarButton>
