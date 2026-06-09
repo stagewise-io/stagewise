@@ -1,0 +1,69 @@
+---
+title: "Release Week: June 1–7"
+author: stagewise team
+type: releases
+description: "Last week added workspace-based agent grouping, one-click worktree entry points, worktree setup scripts, MiniMax M3 support, active-agent keep-awake behavior, and better recovery after network loss."
+date: 2026-06-08
+---
+
+## What Shipped Last Week
+
+Last week focused on making stagewise better at running several agents across several workspaces without losing track of what belongs where.
+
+The sidebar can now group agents by workspace. Worktrees are easier to enter and clean up. New worktrees can run setup scripts automatically. We also added MiniMax M3, improved recovery after network loss, and gave active agents better ways to keep the machine awake while work is running.
+
+### Group agents by workspace
+
+The agent sidebar now has a **Group by Workspace** option.
+
+Instead of one long list, agents can be split by the workspace they were using. For Git repositories, stagewise also separates agents by worktree, so parallel work stays easier to scan.
+
+![The stagewise agent sidebar grouped by workspace, with pinned agents, repository workspaces, and worktree sections.](/news/release-week-june-1-7-workspace-grouping.png)
+
+This matters once you have more than a few agents running. A refactor in one worktree, a docs task in another, and a quick fix in the main checkout should not all look like the same pile of chats.
+
+The new grouping also adds better worktree actions. You can create an agent in an existing worktree or a new worktree with one click. When deleting a worktree from the sidebar, stagewise can also clean up the agents that were using that workspace.
+
+### Worktree setup scripts
+
+stagewise can now run setup scripts for managed worktrees.
+
+![Worktree settings in stagewise showing a setup script editor for new worktrees.](/news/release-week-june-1-7-worktree-setup-scripts.png)
+
+This is for the repetitive work that usually happens after creating a fresh worktree: installing what is needed, preparing local state, or making sure dev apps can be shown without manual setup.
+
+The goal is simple: when an agent starts in a new worktree, that workspace should be ready to use. Less “open a terminal and fix the environment first,” more “start the task.”
+
+### MiniMax M3 is now available
+
+We added support for **MiniMax M3** in the model picker.
+
+![MiniMax M3 selected in the stagewise model picker, with model details shown beside the list.](/news/release-week-june-1-7-minimax-m3.png)
+
+MiniMax M3 is a frontier multimodal coding model with a long context window. It is now available alongside the other supported models for agentic coding work in stagewise.
+
+### Active agents can keep the system awake
+
+Agents can now keep the system awake while they are active.
+
+That is a small change with a big practical effect: long-running tasks are less likely to stall because the machine went to sleep halfway through a build, test run, or multi-step edit.
+
+### Better recovery after network loss
+
+Agents now automatically recover after losing network connectivity.
+
+Network drops still happen. The important part is that a temporary disconnect should not force you to restart the whole agent flow. stagewise now handles that recovery more gracefully.
+
+### Force awake mode for stricter macOS sleep behavior
+
+Some macOS Apple Silicon devices are more aggressive about suspending in battery mode. For those machines, we added a manual **force awake** option.
+
+![The new coffee mug force-awake button in the bottom of the stagewise sidebar.](/news/release-week-june-1-7-force-awake.png)
+
+You can enable it with the new coffee-mug button at the bottom of the sidebar. It is intentionally manual because it affects battery behavior. Use it when you need agents to keep working while the device would otherwise suspend.
+
+## What the Week Adds Up To
+
+This week made stagewise more reliable for parallel agent work.
+
+Workspace grouping gives the sidebar more structure. Worktree setup scripts make fresh worktrees less brittle. Keep-awake behavior and network recovery reduce the two most annoying ways long-running agent work can get interrupted.
