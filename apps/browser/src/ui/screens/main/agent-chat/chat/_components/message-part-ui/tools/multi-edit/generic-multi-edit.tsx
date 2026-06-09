@@ -8,15 +8,15 @@ import {
   IconChevronExpandYOutline18,
   IconChevronReduceYOutline18,
   IconLoader6Outline18,
+  IconArrowUpRightOutline18,
 } from 'nucleo-ui-outline-18';
-import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
-import { IdePickerPopover } from '@ui/components/ide-picker-popover';
+import { cn, stripMountPrefix } from '@ui/utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
+import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useDiffLines } from '@ui/hooks/use-diff-lines';
 import { useMemo, useState } from 'react';
-import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import { useKartonState } from '@ui/hooks/use-karton';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import {
   Tooltip,
   TooltipContent,
@@ -24,7 +24,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { ToolPartUI } from '../shared/tool-part-ui';
-import { IdeLogo } from '@ui/components/ide-logo';
+
 import {
   StreamingCodeBlock,
   getLanguageFromPath,
@@ -36,8 +36,12 @@ export const GenericMultiEditToolPart = ({
   part: Extract<AgentToolUIPart, { type: 'tool-multiEdit' }>;
 }) => {
   const [expanded, setExpanded] = useState(true);
-  const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
-    useFileIDEHref();
+  const [openAgent] = useOpenAgent();
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const mounts = useKartonState((s) =>
+    openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
+  );
   const outputWithDiff = part.output as
     | WithDiff<typeof part.output>
     | undefined;
@@ -81,7 +85,7 @@ export const GenericMultiEditToolPart = ({
     return stripMountPrefix(part.input.path);
   }, [part.input?.path]);
 
-  const firstLineNumberEdited = useMemo(() => {
+  const _firstLineNumberEdited = useMemo(() => {
     let startLine = 1;
     for (const line of diff ?? []) {
       if (line.added || line.removed) return startLine;
@@ -99,9 +103,7 @@ export const GenericMultiEditToolPart = ({
 
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
 
-  const openInIdeSelection = useKartonState(
-    (s) => s.globalConfig.openFilesInIde,
-  );
+  const noopResolve = () => null;
 
   const trigger = useMemo(() => {
     if (state === 'error')
@@ -116,7 +118,7 @@ export const GenericMultiEditToolPart = ({
         <LoadingHeader
           relativePath={path ?? undefined}
           fullPath={part.input?.path ?? undefined}
-          resolvePath={resolvePath}
+          resolvePath={noopResolve}
         />
       );
     else
@@ -124,7 +126,7 @@ export const GenericMultiEditToolPart = ({
         <SuccessHeader
           relativePath={path ?? undefined}
           fullPath={part.input?.path ?? undefined}
-          resolvePath={resolvePath}
+          resolvePath={noopResolve}
           newLineCount={newLineCount}
           deletedLineCount={deletedLineCount}
         />
@@ -137,7 +139,6 @@ export const GenericMultiEditToolPart = ({
     newLineCount,
     deletedLineCount,
     part.errorText,
-    resolvePath,
   ]);
 
   const content = useMemo(() => {
@@ -209,62 +210,32 @@ export const GenericMultiEditToolPart = ({
                 {collapsedDiffView ? 'Expand code diff' : 'Collapse code diff'}
               </TooltipContent>
             </Tooltip>
-            {(() => {
-              const relPath = part.input?.path ?? '';
-              const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
-              const anchor = (
-                <a
-                  href={
-                    needsIdePicker
-                      ? '#'
-                      : getFileIDEHref(relPath, firstLineNumberEdited)
-                  }
-                  target={needsIdePicker ? undefined : '_blank'}
-                  rel="noopener noreferrer"
-                  onClick={
-                    needsIdePicker ? (e) => e.preventDefault() : undefined
-                  }
-                  className={cn(
-                    buttonVariants({ size: 'xs', variant: 'ghost' }),
-                    'shrink-0',
-                  )}
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="shrink-0 cursor-pointer"
+                  onClick={() => {
+                    const relPath = part.input?.path ?? '';
+                    const slashIndex = relPath.indexOf('/');
+                    if (slashIndex <= 0) return;
+                    const prefix = relPath.slice(0, slashIndex);
+                    const rel = relPath.slice(slashIndex + 1);
+                    const mount = mounts.find((m) => m.prefix === prefix);
+                    if (!mount) return;
+                    const wkKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+                    void openFileTab(wkKey, rel, openAgent).then((tabId) => {
+                      if (!tabId) void revealInFolder(wkKey, rel);
+                    });
+                  }}
                 >
-                  <div className="flex flex-row items-center justify-center gap-1">
-                    <IdeLogo
-                      ide={openInIdeSelection}
-                      className="size-3 shrink-0"
-                    />
-                    <span className="text-xs">Open file</span>
-                  </div>
-                </a>
-              );
-              if (needsIdePicker) {
-                return (
-                  <IdePickerPopover
-                    onSelect={(ide) =>
-                      pickIdeAndOpen(ide, relPath, firstLineNumberEdited)
-                    }
-                  >
-                    {anchor}
-                  </IdePickerPopover>
-                );
-              }
-              return (
-                <Tooltip>
-                  <TooltipTrigger>{anchor}</TooltipTrigger>
-                  <TooltipContent>
-                    <div className="flex max-w-96 flex-col gap-1">
-                      <div className="break-all font-mono text-xs">
-                        {stripMountPrefix(relPath)}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Click to open in {ideName}
-                      </div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })()}
+                  <IconArrowUpRightOutline18 className="size-3 shrink-0" />
+                  Open file
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Click to see full file</TooltipContent>
+            </Tooltip>
           </div>
         ) : undefined
       }

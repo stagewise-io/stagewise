@@ -32,6 +32,7 @@ import {
   IconChevronRightOutline18,
   IconCodeBranchOutline18,
   IconCopyOutline18,
+  IconArrowUpRightOutline18,
   IconFolder5Outline18,
   IconFolderOpenOutline18,
   IconPenDrawSparkleOutline18,
@@ -56,17 +57,11 @@ import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
-import { IdeLogo } from '@ui/components/ide-logo';
-import {
-  getIDEFileUrl,
-  IDE_SELECTION_ITEMS,
-  nativeFileManagerLabel,
-} from '@ui/utils';
+import { nativeFileManagerLabel } from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';
 import { getBaseName } from '@shared/path-utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import { getWorkspaceDisplayInfo } from '@ui/utils/workspace-display';
-import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import {
   type MountEntry,
   type MountedWorkspaceGitStatusSummary,
@@ -245,10 +240,6 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
       void preferencesUpdate(patches);
     },
     [mount.path, preferences, preferencesUpdate],
-  );
-
-  const openInIdeSelection = useKartonState(
-    (s: KartonState) => s.globalConfig.openFilesInIde,
   );
 
   const resolveAbsolute = useCallback((p: string) => p, []);
@@ -528,7 +519,6 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                     }
                     maskStyle={maskStyle}
                     onViewportRef={setScrollViewport}
-                    openInIdeSelection={openInIdeSelection}
                   />
                 ) : sidePanelContent.type === 'contextFiles' ? (
                   <ContextFilesSidePanel
@@ -538,7 +528,6 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                     onToggleAgentsMd={handleToggleAgentsMd}
                     isGeneratingWorkspaceMd={isGeneratingWorkspaceMd}
                     onGenerateWorkspaceMd={handleGenerateWorkspaceMd}
-                    openInIdeSelection={openInIdeSelection}
                   />
                 ) : sidePanelContent.type === 'setupRun' && setupRun ? (
                   <SetupRunSidePanel setupRun={setupRun} />
@@ -562,7 +551,6 @@ function MdSidePanelContent({
   sidePanelContent,
   maskStyle,
   onViewportRef,
-  openInIdeSelection,
   isIncludedInAgentContext,
 }: {
   sidePanelContent: Extract<
@@ -571,16 +559,13 @@ function MdSidePanelContent({
   >;
   maskStyle: React.CSSProperties;
   onViewportRef: (el: HTMLElement | null) => void;
-  openInIdeSelection: OpenFilesInIde;
   isIncludedInAgentContext: boolean;
 }) {
-  const absPath =
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const filePath =
     sidePanelContent.type === 'workspaceMd'
-      ? `${sidePanelContent.workspacePath}/.stagewise/WORKSPACE.md`
-      : `${sidePanelContent.workspacePath}/AGENTS.md`;
-
-  const ideHref = getIDEFileUrl(absPath, openInIdeSelection);
-  const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
+      ? '.stagewise/WORKSPACE.md'
+      : 'AGENTS.md';
 
   return (
     <>
@@ -608,7 +593,7 @@ function MdSidePanelContent({
             {
               ...maskStyle,
               '--os-scrollbar-inset-top': '8px',
-              '--os-scrollbar-inset-bottom': ideHref ? '24px' : '0px',
+              '--os-scrollbar-inset-bottom': '24px',
             } as React.CSSProperties
           }
           options={{ overflow: { x: 'hidden', y: 'scroll' } }}
@@ -618,17 +603,16 @@ function MdSidePanelContent({
             {sidePanelContent.content}
           </pre>
         </OverlayScrollbar>
-        {ideHref && (
-          <a
-            href={ideHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="absolute right-0 bottom-0 flex h-6 items-center gap-1 rounded-tl-lg border-derived border-t border-l bg-background px-2 py-1 text-muted-foreground text-xs hover:bg-muted hover:text-foreground dark:bg-surface-1"
-          >
-            <IdeLogo ide={openInIdeSelection} className="size-3" />
-            <span>Open in {ideName}</span>
-          </a>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            void openFileTab(sidePanelContent.workspacePath, filePath);
+          }}
+          className="absolute right-0 bottom-0 flex h-6 items-center gap-1 rounded-tl-lg border-derived border-t border-l bg-background px-2 py-1 text-muted-foreground text-xs hover:bg-muted hover:text-foreground dark:bg-surface-1"
+        >
+          <IconArrowUpRightOutline18 className="size-3" />
+          <span>Open in file view</span>
+        </button>
       </div>
     </>
   );
@@ -648,7 +632,6 @@ function ContextFilesSidePanel({
   onToggleAgentsMd,
   isGeneratingWorkspaceMd,
   onGenerateWorkspaceMd,
-  openInIdeSelection,
 }: {
   mount: MountEntry;
   name: string;
@@ -656,7 +639,6 @@ function ContextFilesSidePanel({
   onToggleAgentsMd: (checked: boolean) => void;
   isGeneratingWorkspaceMd: boolean;
   onGenerateWorkspaceMd: () => void;
-  openInIdeSelection: OpenFilesInIde;
 }) {
   const agentsMdDisabled = mount.agentsMdContent === null;
   const [hoveredContextFile, setHoveredContextFile] = useState<Extract<
@@ -841,7 +823,6 @@ function ContextFilesSidePanel({
               }
               maskStyle={maskStyle}
               onViewportRef={setScrollViewport}
-              openInIdeSelection={openInIdeSelection}
             />
           </div>
         )}

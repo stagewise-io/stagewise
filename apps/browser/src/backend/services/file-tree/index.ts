@@ -9,6 +9,7 @@ import type {
   AppState,
   FilePreviewKind,
   FilePreviewResult,
+  FileStatResult,
   FileSearchResult,
   FileTreeEntry,
   FileTreeListDirectoryInput,
@@ -18,6 +19,7 @@ import type {
   FileTreeClipboardOperation,
   FileTreeOperationResult,
 } from '@shared/karton-contracts/ui';
+import { FILE_SAVE_CONFLICT_CODE } from '@shared/karton-contracts/ui';
 import { inferMimeType } from '@shared/mime-utils';
 import { getBaseName, normalizePath } from '@shared/path-utils';
 import { DisposableService } from '../disposable';
@@ -29,6 +31,10 @@ const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const REVISION_DEBOUNCE_MS = 1000;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 const HIDDEN_LISTING_NAMES = new Set(['.git']);
 
@@ -97,6 +103,45 @@ type WorkspaceMount = {
   path: string;
 };
 
+/**
+ * Workspace-key prefixes that point at non-editable, agent-internal storage
+ * (attachment blobs, bundled plugins, agent app scratch space). Files opened
+ * from these mounts are surfaced read-only: the editor disables saving and
+ * hides write affordances.
+ */
+const READONLY_WORKSPACE_PREFIXES = new Set(['att', 'plugins', 'apps']);
+
+/**
+ * Reconstruct a {@link WorkspaceMount} directly from a workspace key.
+ *
+ * A workspace key has the shape `${prefix}:${absolutePath}`, so the underlying
+ * storage location is fully recoverable from the key alone. This lets file
+ * persistence/editing work even when the originating workspace is no longer
+ * mounted (after an unmount, an app restart, or deletion of the linked agent)
+ * and lets attachment (`att/`) blobs be addressed without a live mount.
+ */
+function parseWorkspaceKey(workspaceKey: string): WorkspaceMount | null {
+  const separatorIndex = workspaceKey.indexOf(':');
+  if (separatorIndex <= 0) return null;
+  const prefix = workspaceKey.slice(0, separatorIndex);
+  const mountPath = workspaceKey.slice(separatorIndex + 1);
+  if (!prefix || !mountPath) return null;
+  return { prefix, path: mountPath };
+}
+
+/** True when the workspace key targets a read-only, agent-internal mount. */
+function isReadOnlyWorkspaceKey(workspaceKey: string): boolean {
+  const mount = parseWorkspaceKey(workspaceKey);
+  return mount ? READONLY_WORKSPACE_PREFIXES.has(mount.prefix) : false;
+}
+
+/**
+ * Resolves the absolute attachment-blob directory for a given agent. Injected
+ * by the backend so the file-tree service can open `att/` blobs as tabs
+ * without importing host-path utilities directly.
+ */
+export type AttachmentDirResolver = (agentId: string) => string | null;
+
 type ResolvedWorkspace = {
   key: string;
   mount: WorkspaceMount;
@@ -134,6 +179,7 @@ export class FileTreeService extends DisposableService {
   private readonly pendingRevisionDirectories = new Map<string, Set<string>>();
   private watchedMountsSignature = '';
   private openFileTabHandler: OpenFileTabHandler | null = null;
+  private attachmentDirResolver: AttachmentDirResolver | null = null;
 
   private constructor(
     private readonly logger: Logger,
@@ -154,6 +200,10 @@ export class FileTreeService extends DisposableService {
 
   setOpenFileTabHandler(handler: OpenFileTabHandler): void {
     this.openFileTabHandler = handler;
+  }
+
+  setAttachmentDirResolver(resolver: AttachmentDirResolver): void {
+    this.attachmentDirResolver = resolver;
   }
 
   getWorkspaceKey(mount: WorkspaceMount): string {
@@ -220,6 +270,8 @@ export class FileTreeService extends DisposableService {
       kind,
       mimeType,
       size: stat.size,
+      mtimeMs: stat.mtimeMs,
+      readOnly: isReadOnlyWorkspaceKey(validated.key),
     };
 
     if (kind === 'text' || kind === 'svg') {
@@ -247,12 +299,44 @@ export class FileTreeService extends DisposableService {
     return base;
   }
 
+  /**
+   * Cheap revalidation primitive: returns the file's current mtime/size
+   * without reading its contents, or null when it no longer exists. Used by
+   * the UI to detect external edits before deciding whether to reload.
+   */
+  async getFileStat(
+    workspaceKey: string,
+    relativePath: string,
+  ): Promise<FileStatResult | null> {
+    try {
+      const validated = await this.validatePath(workspaceKey, relativePath);
+      const stat = await fs.stat(validated.absolutePath);
+      if (!stat.isFile()) return null;
+      return { mtimeMs: stat.mtimeMs, size: stat.size };
+    } catch {
+      // Missing file / unreadable path → treat as "no longer available".
+      return null;
+    }
+  }
+
   async saveFile(
     workspaceKey: string,
     relativePath: string,
     text: string,
+    expectedMtimeMs?: number | null,
   ): Promise<FilePreviewResult | null> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This file is read-only and cannot be saved');
+    }
     const validated = await this.validatePath(workspaceKey, relativePath);
+    // Conflict guard: refuse to clobber an external modification unless the
+    // caller explicitly forces the write (expectedMtimeMs omitted/null).
+    if (expectedMtimeMs != null) {
+      const current = await fs.stat(validated.absolutePath).catch(() => null);
+      if (current && current.mtimeMs !== expectedMtimeMs) {
+        throw new Error(FILE_SAVE_CONFLICT_CODE);
+      }
+    }
     await fs.writeFile(validated.absolutePath, text, 'utf8');
     this.invalidateDirectoryCacheForPath(validated.key, validated.absolutePath);
     return this.getFilePreview(workspaceKey, relativePath);
@@ -276,8 +360,53 @@ export class FileTreeService extends DisposableService {
         kind: preview.kind,
         mimeType: preview.mimeType,
         size: preview.size,
+        readOnly: preview.readOnly,
       },
       agentInstanceId,
+      options,
+    );
+  }
+
+  /**
+   * Open an agent attachment blob (stored under the per-agent `att/`
+   * directory) as a read-only file tab. Resolves the blob directory via the
+   * injected {@link AttachmentDirResolver}, then reuses the regular file-tab
+   * pipeline so the tab survives restarts and resolves through the
+   * key-reconstruction fallback even when no workspace is mounted.
+   */
+  async openAttachmentTab(
+    agentId: string,
+    attachmentId: string,
+    displayName?: string,
+    agentInstanceId?: string | null,
+    options?: OpenFileTabOptions,
+  ): Promise<string | null> {
+    if (!this.openFileTabHandler) return null;
+    if (!this.attachmentDirResolver) {
+      this.logger.warn(
+        '[FileTree] Cannot open attachment tab: no attachment dir resolver',
+      );
+      return null;
+    }
+    const blobDir = this.attachmentDirResolver(agentId);
+    if (!blobDir) return null;
+    const workspaceKey = `att:${normalizePath(blobDir)}`;
+    const preview = await this.getFilePreview(workspaceKey, attachmentId);
+    if (!preview) return null;
+    const validated = await this.validatePath(workspaceKey, attachmentId);
+    const title = displayName?.trim() || undefined;
+    return this.openFileTabHandler(
+      {
+        workspaceKey: validated.key,
+        relativePath: validated.relativePath,
+        absolutePath: validated.absolutePath,
+        kind: preview.kind,
+        mimeType: preview.mimeType,
+        size: preview.size,
+        displayName: title,
+        readOnly: true,
+      },
+      agentInstanceId ?? null,
       options,
     );
   }
@@ -500,16 +629,27 @@ export class FileTreeService extends DisposableService {
     });
   }
 
-  async searchFiles(
-    query: string,
+  /**
+   * Walk the selected workspaces collecting matching entries. `match` decides
+   * whether an entry is collected; results carry `mtimeMs` for recency
+   * sorting. Shared by file search and the "recently changed" listing.
+   */
+  private async collectWorkspaceEntries(
     workspaceKeys: string[],
     includeGitignored: boolean,
-  ): Promise<FileSearchResult[]> {
-    const lowerQuery = query.toLowerCase();
-    const results: FileSearchResult[] = [];
+    options: {
+      maxResults: number;
+      maxDepth: number;
+      includeDirectories: boolean;
+      match: (name: string, isDir: boolean) => boolean;
+    },
+  ): Promise<Array<FileSearchResult & { mtimeMs: number }>> {
+    const { maxResults, maxDepth, includeDirectories, match } = options;
+    const results: Array<FileSearchResult & { mtimeMs: number }> = [];
     const seen = new Set<string>();
 
     for (const workspaceKey of workspaceKeys) {
+      if (results.length >= maxResults) break;
       const mount = this.resolveWorkspace(workspaceKey);
       if (!mount) continue;
 
@@ -523,68 +663,140 @@ export class FileTreeService extends DisposableService {
         });
       }
 
-      const walkDir = async (dirRelativePath: string) => {
+      const walkDir = async (dirRelativePath: string, depth: number) => {
+        if (results.length >= maxResults || depth > maxDepth) return;
         const absoluteDir = dirRelativePath
           ? path.join(mount.path, dirRelativePath)
           : mount.path;
 
-        let entries: string[];
+        let entries: Array<{
+          name: string;
+          isDir: boolean;
+          isFile: boolean;
+          mtimeMs: number;
+        }>;
         try {
-          entries = await fs.readdir(absoluteDir);
+          const dirents = await fs.readdir(absoluteDir, {
+            withFileTypes: true,
+          });
+          entries = await Promise.all(
+            dirents.map(async (dirent) => {
+              let isDir = dirent.isDirectory();
+              let isFile = dirent.isFile();
+              let mtimeMs = 0;
+              try {
+                const stat = await fs.stat(path.join(absoluteDir, dirent.name));
+                isDir = stat.isDirectory();
+                isFile = stat.isFile();
+                mtimeMs = stat.mtimeMs;
+              } catch {
+                isDir = false;
+                isFile = false;
+              }
+              return { name: dirent.name, isDir, isFile, mtimeMs };
+            }),
+          );
         } catch {
           return;
         }
 
-        for (const name of entries) {
+        for (const { name, isDir, isFile, mtimeMs } of entries) {
+          if (results.length >= maxResults) return;
           if (name === '.git' || name === 'node_modules') continue;
+          if (!isDir && !isFile) continue;
 
           const relPath = dirRelativePath ? `${dirRelativePath}/${name}` : name;
-          const absPath = path.join(absoluteDir, name);
-
-          let stat: ReturnType<typeof fs.stat> extends Promise<infer T>
-            ? T
-            : never;
-          try {
-            stat = await fs.stat(absPath);
-          } catch {
+          // The default-ignore set (dist, build, .next, coverage, …) overlaps
+          // heavily with what git ignores, so only apply it when the caller
+          // is NOT explicitly including gitignored files. `.git`/`node_modules`
+          // stay excluded unconditionally (handled above) for sanity/perf.
+          if (!includeGitignored && this.isDefaultIgnoredPath(relPath))
             continue;
-          }
+          if (ig?.ignores(isDir ? `${relPath}/` : relPath)) continue;
 
-          if (stat.isSymbolicLink()) {
-            try {
-              const real = await fs.realpath(absPath);
-              const realStat = await fs.stat(real);
-              if (!realStat.isFile()) continue;
-            } catch {
-              continue;
-            }
-          }
-
-          if (!stat.isFile()) continue;
-
-          if (ig?.ignores(relPath)) continue;
-          if (this.isDefaultIgnoredPath(relPath)) continue;
-
-          if (name.toLowerCase().includes(lowerQuery)) {
-            const mountPrefix = mount.prefix;
+          const collectible =
+            (isFile || includeDirectories) && match(name, isDir);
+          if (collectible) {
             const uniqueKey = `${workspaceKey}:${relPath}`;
             if (!seen.has(uniqueKey)) {
               seen.add(uniqueKey);
               results.push({
                 workspaceKey,
-                mountPrefix,
+                mountPrefix: mount.prefix,
                 relativePath: relPath,
                 fileName: name,
+                isDirectory: isDir,
+                mtimeMs,
               });
             }
           }
+
+          if (isDir) await walkDir(relPath, depth + 1);
         }
       };
 
-      await walkDir('');
+      await walkDir('', 0);
     }
 
     return results;
+  }
+
+  async searchFiles(
+    query: string,
+    workspaceKeys: string[],
+    includeGitignored: boolean,
+  ): Promise<FileSearchResult[]> {
+    const lowerQuery = query.toLowerCase();
+    const collected = await this.collectWorkspaceEntries(
+      workspaceKeys,
+      includeGitignored,
+      {
+        maxResults: 400,
+        maxDepth: 12,
+        includeDirectories: true,
+        match: (name) => name.toLowerCase().includes(lowerQuery),
+      },
+    );
+
+    // Rank by name-match quality first, then recency. Exact > prefix >
+    // word-boundary > substring; ties broken by most-recently-modified.
+    const score = (name: string): number => {
+      const lower = name.toLowerCase();
+      if (lower === lowerQuery) return 4;
+      if (lower.startsWith(lowerQuery)) return 3;
+      if (new RegExp(`\\b${escapeRegExp(lowerQuery)}`).test(lower)) return 2;
+      return 1;
+    };
+
+    return collected
+      .sort((a, b) => {
+        const scoreDiff = score(b.fileName) - score(a.fileName);
+        if (scoreDiff !== 0) return scoreDiff;
+        return b.mtimeMs - a.mtimeMs;
+      })
+      .slice(0, 200);
+  }
+
+  async listRecentFiles(
+    workspaceKeys: string[],
+    includeGitignored: boolean,
+    limit: number,
+  ): Promise<FileSearchResult[]> {
+    const collected = await this.collectWorkspaceEntries(
+      workspaceKeys,
+      includeGitignored,
+      {
+        // Files only for the "recently changed" listing.
+        maxResults: 5000,
+        maxDepth: 12,
+        includeDirectories: false,
+        match: () => true,
+      },
+    );
+
+    return collected
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .slice(0, Math.max(0, limit));
   }
 
   setActiveWorkspace(workspaceKey: string | null): void {
@@ -629,14 +841,48 @@ export class FileTreeService extends DisposableService {
     workspaceKey: string,
     mount: WorkspaceMount,
   ): Set<string> {
-    const result = new Set<string>([normalizePath(mount.path)]);
-    const expanded =
-      this.uiKarton.state.fileTree.expandedDirectoriesByWorkspaceKey[
-        workspaceKey
-      ] ?? [];
-    for (const relativePath of expanded) {
-      if (!relativePath || this.isDefaultIgnoredPath(relativePath)) continue;
-      result.add(normalizePath(path.join(mount.path, relativePath)));
+    const state = this.uiKarton.state;
+    const result = new Set<string>();
+
+    // Always watch directories backing open file tabs for this mount, so an
+    // external edit to an open file is detected even when the tree panel is
+    // collapsed.
+    for (const tab of this.getOpenFileTabs()) {
+      if (tab.workspaceKey !== workspaceKey) continue;
+      result.add(normalizePath(path.dirname(tab.absolutePath)));
+    }
+
+    // Tree-driven directories (root + expanded) are only watched when the
+    // panel is visible.
+    if (state.fileTree.visible) {
+      result.add(normalizePath(mount.path));
+      const expanded =
+        state.fileTree.expandedDirectoriesByWorkspaceKey[workspaceKey] ?? [];
+      for (const relativePath of expanded) {
+        if (!relativePath || this.isDefaultIgnoredPath(relativePath)) continue;
+        result.add(normalizePath(path.join(mount.path, relativePath)));
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Editable file tabs currently open. Read-only blobs (attachments) are
+   * excluded — they never change on disk and don't need live watching.
+   */
+  private getOpenFileTabs(): Array<{
+    workspaceKey: string;
+    absolutePath: string;
+  }> {
+    const tabs = this.uiKarton.state.contentTabs?.tabs ?? {};
+    const result: Array<{ workspaceKey: string; absolutePath: string }> = [];
+    for (const tab of Object.values(tabs)) {
+      const file = tab?.file;
+      if (!file || file.readOnly) continue;
+      result.push({
+        workspaceKey: file.workspaceKey,
+        absolutePath: file.absolutePath,
+      });
     }
     return result;
   }
@@ -812,15 +1058,25 @@ export class FileTreeService extends DisposableService {
 
   private getWatchedMounts(): WorkspaceMount[] {
     const state = this.uiKarton.state;
-    if (!state.fileTree.visible) return [];
 
     const mountsByKey = new Map<string, WorkspaceMount>();
-    const allMounts = this.getMounts();
     const addMount = (mount: WorkspaceMount | null | undefined) => {
       if (!mount) return;
       mountsByKey.set(this.getWorkspaceKey(mount), mount);
     };
 
+    // Always watch mounts backing open file tabs (even when the tree panel is
+    // hidden), reconstructing the mount from the key so it works for files
+    // whose workspace is no longer mounted.
+    for (const tab of this.getOpenFileTabs()) {
+      addMount(parseWorkspaceKey(tab.workspaceKey));
+    }
+
+    // The remaining tree-driven watching only applies when the panel is
+    // visible.
+    if (!state.fileTree.visible) return [...mountsByKey.values()];
+
+    const allMounts = this.getMounts();
     const activeAgentId = state.browser?.lastOpenAgentId ?? null;
     if (activeAgentId) {
       for (const mount of state.toolbox[activeAgentId]?.workspace?.mounts ??
@@ -853,11 +1109,15 @@ export class FileTreeService extends DisposableService {
   }
 
   private resolveWorkspace(workspaceKey: string): WorkspaceMount | null {
-    return (
-      this.getMounts().find(
-        (mount) => this.getWorkspaceKey(mount) === workspaceKey,
-      ) ?? null
+    const liveMount = this.getMounts().find(
+      (mount) => this.getWorkspaceKey(mount) === workspaceKey,
     );
+    if (liveMount) return liveMount;
+    // Fallback: reconstruct the mount straight from the key. The key embeds
+    // the absolute path, so reading/saving keeps working even when the
+    // workspace is no longer mounted (unmount, restart, deleted agent) and
+    // for agent-internal `att/` blobs that are never mounted as workspaces.
+    return parseWorkspaceKey(workspaceKey);
   }
 
   private validateEntryName(name: string): string {

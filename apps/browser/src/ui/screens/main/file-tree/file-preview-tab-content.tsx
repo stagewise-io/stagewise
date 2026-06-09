@@ -15,7 +15,12 @@ import {
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
-import type { FilePreviewResult, TabState } from '@shared/karton-contracts/ui';
+import type {
+  FilePreviewResult,
+  FileStatResult,
+  TabState,
+} from '@shared/karton-contracts/ui';
+import { FILE_SAVE_CONFLICT_CODE } from '@shared/karton-contracts/ui';
 import {
   useCallback,
   useEffect,
@@ -25,22 +30,35 @@ import {
   type ReactElement,
 } from 'react';
 import { IconDatabaseFillDuo18 } from 'nucleo-ui-fill-duo-18';
-import { Loader2Icon, MinusIcon, PlusIcon } from 'lucide-react';
+import {
+  Loader2Icon,
+  MinusIcon,
+  PlusIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
 import {
   IconFloppyDiskOutline18,
+  IconLockKeyOutline18,
   IconArrowsToCenterOutline18,
   IconColorPaletteOutline18,
   IconEye2Outline18,
+  IconOpenExternalOutline18,
   IconRedoOutline18,
   IconSquareCodeOutline18,
   IconTextBgColorOutline18,
   IconTextColorOutline18,
   IconUndoOutline18,
 } from 'nucleo-ui-outline-18';
+import { Menu as MenuBase } from '@base-ui/react/menu';
 import MonacoEditor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { FileIcon } from '@ui/components/file-icon';
+import { IdeLogo } from '@ui/components/ide-logo';
+import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@shared/ide-url';
+import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import {
   clearFileTabUnsavedEditEntry,
   setFileTabUnsavedEditEntry,
@@ -62,12 +80,24 @@ type CachedPreview = {
 
 type EditorActions = {
   save: () => void;
+  /** Overwrite the on-disk file, ignoring a detected external modification. */
+  forceSave: () => void;
+  /** Discard local edits and load the latest on-disk content. */
+  reload: () => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
   isDirty: boolean;
   isSaving: boolean;
+  /** When true, the file is read-only (e.g. attachment blob) — no saving. */
+  readOnly: boolean;
+  /**
+   * True when the on-disk file changed while the user has unsaved local
+   * edits. The UI surfaces a conflict warning with reload/overwrite options
+   * instead of silently losing or overwriting either side.
+   */
+  externalChange: boolean;
 };
 
 type ImagePreviewBackground = SvgPreviewBackground;
@@ -96,7 +126,9 @@ function normalizeHexColor(value: string, fallback: string) {
 type SourceLanguage =
   | 'plaintext'
   | 'typescript'
+  | 'typescriptreact'
   | 'javascript'
+  | 'javascriptreact'
   | 'json'
   | 'css'
   | 'scss'
@@ -112,27 +144,77 @@ type SourceLanguage =
   | 'ruby'
   | 'sql';
 
+/** File extension representative of each language, for seti-icons lookup. */
+const LANGUAGE_EXT: Record<SourceLanguage, string> = {
+  plaintext: '.txt',
+  typescript: '.ts',
+  typescriptreact: '.tsx',
+  javascript: '.js',
+  javascriptreact: '.jsx',
+  json: '.json',
+  css: '.css',
+  scss: '.scss',
+  html: '.html',
+  markdown: '.md',
+  xml: '.svg',
+  yaml: '.yml',
+  python: '.py',
+  go: '.go',
+  rust: '.rs',
+  java: '.java',
+  php: '.php',
+  ruby: '.rb',
+  sql: '.sql',
+};
+
+function iconForLanguage(language: SourceLanguage): React.ReactNode {
+  return <FileIcon filePath={`file${LANGUAGE_EXT[language]}`} />;
+}
+
 const SOURCE_LANGUAGE_ITEMS: Array<{
   value: SourceLanguage;
   label: string;
+  icon: React.ReactNode;
 }> = [
-  { value: 'plaintext', label: 'Plain text' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'json', label: 'JSON' },
-  { value: 'css', label: 'CSS' },
-  { value: 'scss', label: 'SCSS' },
-  { value: 'html', label: 'HTML' },
-  { value: 'markdown', label: 'Markdown' },
-  { value: 'xml', label: 'XML / SVG' },
-  { value: 'yaml', label: 'YAML' },
-  { value: 'python', label: 'Python' },
-  { value: 'go', label: 'Go' },
-  { value: 'rust', label: 'Rust' },
-  { value: 'java', label: 'Java' },
-  { value: 'php', label: 'PHP' },
-  { value: 'ruby', label: 'Ruby' },
-  { value: 'sql', label: 'SQL' },
+  {
+    value: 'plaintext',
+    label: 'Plain text',
+    icon: iconForLanguage('plaintext'),
+  },
+  {
+    value: 'typescript',
+    label: 'TypeScript',
+    icon: iconForLanguage('typescript'),
+  },
+  {
+    value: 'typescriptreact',
+    label: 'TypeScript (JSX)',
+    icon: iconForLanguage('typescriptreact'),
+  },
+  {
+    value: 'javascript',
+    label: 'JavaScript',
+    icon: iconForLanguage('javascript'),
+  },
+  {
+    value: 'javascriptreact',
+    label: 'JavaScript (JSX)',
+    icon: iconForLanguage('javascriptreact'),
+  },
+  { value: 'json', label: 'JSON', icon: iconForLanguage('json') },
+  { value: 'css', label: 'CSS', icon: iconForLanguage('css') },
+  { value: 'scss', label: 'SCSS', icon: iconForLanguage('scss') },
+  { value: 'html', label: 'HTML', icon: iconForLanguage('html') },
+  { value: 'markdown', label: 'Markdown', icon: iconForLanguage('markdown') },
+  { value: 'xml', label: 'XML / SVG', icon: iconForLanguage('xml') },
+  { value: 'yaml', label: 'YAML', icon: iconForLanguage('yaml') },
+  { value: 'python', label: 'Python', icon: iconForLanguage('python') },
+  { value: 'go', label: 'Go', icon: iconForLanguage('go') },
+  { value: 'rust', label: 'Rust', icon: iconForLanguage('rust') },
+  { value: 'java', label: 'Java', icon: iconForLanguage('java') },
+  { value: 'php', label: 'PHP', icon: iconForLanguage('php') },
+  { value: 'ruby', label: 'Ruby', icon: iconForLanguage('ruby') },
+  { value: 'sql', label: 'SQL', icon: iconForLanguage('sql') },
 ];
 
 const previewCache = new Map<string, CachedPreview>();
@@ -146,12 +228,14 @@ function languageFromPath(path: string): SourceLanguage {
   const ext = path.split('.').pop()?.toLowerCase();
   switch (ext) {
     case 'ts':
-    case 'tsx':
       return 'typescript';
+    case 'tsx':
+      return 'typescriptreact';
     case 'js':
-    case 'jsx':
     case 'mjs':
       return 'javascript';
+    case 'jsx':
+      return 'javascriptreact';
     case 'json':
       return 'json';
     case 'css':
@@ -396,13 +480,27 @@ function useEditorActions(
   editor: MonacoEditorInstance | null,
   preview: FilePreviewResult,
   text: string,
+  setText: (value: string) => void,
 ) {
   const saveFile = useKartonProcedure((p) => p.fileTree.saveFile);
+  const getFilePreview = useKartonProcedure((p) => p.fileTree.getFilePreview);
+  const readOnly = preview.readOnly ?? false;
+  const cacheKey = getPreviewCacheKey(
+    preview.workspaceKey,
+    preview.relativePath,
+  );
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [externalChange, setExternalChange] = useState(false);
+
+  // The on-disk content + mtime the editor is currently based on. These form
+  // the baseline for dirty detection, live external-edit adoption, and the
+  // save-time conflict guard.
   const savedTextRef = useRef(preview.text ?? '');
+  const baselineMtimeRef = useRef<number | undefined>(preview.mtimeMs);
+  const lastDiskTextRef = useRef(preview.text ?? '');
 
   const refreshActionState = useCallback(() => {
     const state = createEditorActionState(editor);
@@ -412,60 +510,151 @@ function useEditorActions(
     setIsDirty(currentText !== savedTextRef.current);
   }, [editor, text]);
 
+  // React to fresh on-disk content arriving from the parent's revalidation
+  // (driven by the file-tree watcher bumping the backing directory's
+  // revision). With no local edits we adopt the new content live; with
+  // unsaved edits we keep them and raise a conflict so the user is warned.
   useEffect(() => {
-    savedTextRef.current = preview.text ?? '';
-    setIsDirty(text !== savedTextRef.current);
-    refreshActionState();
-  }, [preview.relativePath, preview.text, refreshActionState, text]);
+    if (readOnly) return;
+    const diskText = preview.text ?? '';
+    if (diskText === lastDiskTextRef.current) {
+      // Content unchanged (e.g. a metadata-only touch) — just refresh the
+      // mtime baseline so the next save isn't flagged as a false conflict.
+      baselineMtimeRef.current = preview.mtimeMs;
+      return;
+    }
+    lastDiskTextRef.current = diskText;
+    const editorText = editor?.getValue() ?? savedTextRef.current;
+    const userHasEdits = editorText !== savedTextRef.current;
+    if (userHasEdits) {
+      setExternalChange(true);
+      return;
+    }
+    savedTextRef.current = diskText;
+    baselineMtimeRef.current = preview.mtimeMs;
+    setExternalChange(false);
+    setIsDirty(false);
+    textDraftCache.set(cacheKey, diskText);
+    setText(diskText);
+    clearFileTabUnsavedEditEntry(tabId);
+  }, [
+    preview.text,
+    preview.mtimeMs,
+    readOnly,
+    editor,
+    cacheKey,
+    tabId,
+    setText,
+  ]);
 
   useEffect(() => {
     return () => clearFileTabUnsavedEditEntry(tabId);
   }, [tabId]);
 
-  const save = useCallback(async () => {
-    if (!editor || isSaving) return false;
+  const save = useCallback(
+    async (force = false): Promise<boolean> => {
+      if (readOnly || !editor || isSaving) return false;
 
-    const nextText = editor.getValue();
-    setIsSaving(true);
-    try {
-      const result = await saveFile(
-        preview.workspaceKey,
-        preview.relativePath,
-        nextText,
-      );
-      savedTextRef.current = nextText;
-      setIsDirty(false);
-      clearFileTabUnsavedEditEntry(tabId);
-      if (result) {
-        const cacheKey = getPreviewCacheKey(
-          result.workspaceKey,
-          result.relativePath,
+      const nextText = editor.getValue();
+      setIsSaving(true);
+      try {
+        const result = await saveFile(
+          preview.workspaceKey,
+          preview.relativePath,
+          nextText,
+          force ? null : baselineMtimeRef.current,
         );
-        previewCache.set(cacheKey, { preview: result, error: null });
-        textDraftCache.set(cacheKey, nextText);
+        savedTextRef.current = nextText;
+        lastDiskTextRef.current = nextText;
+        baselineMtimeRef.current = result?.mtimeMs;
+        setIsDirty(false);
+        setExternalChange(false);
+        clearFileTabUnsavedEditEntry(tabId);
+        if (result) {
+          const key = getPreviewCacheKey(
+            result.workspaceKey,
+            result.relativePath,
+          );
+          previewCache.set(key, { preview: result, error: null });
+          textDraftCache.set(key, nextText);
+        }
+        return true;
+      } catch (err) {
+        // The backend rejected the save because the file was modified
+        // externally. Surface the conflict instead of throwing so the user
+        // can reload or explicitly overwrite.
+        if (
+          err instanceof Error &&
+          err.message.includes(FILE_SAVE_CONFLICT_CODE)
+        ) {
+          setExternalChange(true);
+          return false;
+        }
+        throw err;
+      } finally {
+        setIsSaving(false);
+        refreshActionState();
       }
-      return true;
-    } finally {
-      setIsSaving(false);
-      refreshActionState();
-    }
-  }, [editor, isSaving, preview, refreshActionState, saveFile, tabId]);
+    },
+    [editor, isSaving, preview, readOnly, refreshActionState, saveFile, tabId],
+  );
+
+  const handleSave = useCallback(() => {
+    // While an external-change conflict is surfaced, the regular save is
+    // blocked — the user must explicitly Reload or Overwrite from the banner.
+    if (externalChange) return;
+    void save(false);
+  }, [save, externalChange]);
+
+  const forceSave = useCallback(() => {
+    void save(true);
+  }, [save]);
+
+  // Discard local edits and load the latest on-disk content.
+  const reload = useCallback(async () => {
+    const result = await getFilePreview(
+      preview.workspaceKey,
+      preview.relativePath,
+    );
+    if (!result) return;
+    const diskText = result.text ?? '';
+    savedTextRef.current = diskText;
+    lastDiskTextRef.current = diskText;
+    baselineMtimeRef.current = result.mtimeMs;
+    const key = getPreviewCacheKey(result.workspaceKey, result.relativePath);
+    previewCache.set(key, { preview: result, error: null });
+    textDraftCache.set(key, diskText);
+    setText(diskText);
+    setExternalChange(false);
+    setIsDirty(false);
+    clearFileTabUnsavedEditEntry(tabId);
+  }, [
+    getFilePreview,
+    preview.workspaceKey,
+    preview.relativePath,
+    setText,
+    tabId,
+  ]);
+
+  const handleReload = useCallback(() => {
+    void reload();
+  }, [reload]);
 
   const undo = useCallback(() => {
     const model = editor?.getModel();
     if (!model?.canUndo()) return false;
     void model.undo();
     window.setTimeout(refreshActionState, 0);
-  }, [editor, preview, refreshActionState, save, tabId]);
+  }, [editor, refreshActionState]);
 
   const redo = useCallback(() => {
     const model = editor?.getModel();
     if (!model?.canRedo()) return false;
     void model.redo();
     window.setTimeout(refreshActionState, 0);
-  }, [editor, preview, refreshActionState, save, tabId]);
+  }, [editor, refreshActionState]);
 
-  useHotKeyListener(save, HotkeyActions.SAVE_FILE);
+  useHotKeyListener(handleSave, HotkeyActions.SAVE_FILE);
   useHotKeyListener(undo, HotkeyActions.UNDO_FILE_EDIT);
   useHotKeyListener(redo, HotkeyActions.REDO_FILE_EDIT);
 
@@ -478,13 +667,15 @@ function useEditorActions(
       const nextText = editor.getValue();
       const isNextDirty = nextText !== savedTextRef.current;
       setIsDirty(isNextDirty);
-      if (isNextDirty) {
+      // Read-only files (e.g. attachment blobs) can never be saved, so don't
+      // surface an unsaved-edit prompt for them.
+      if (isNextDirty && !readOnly) {
         setFileTabUnsavedEditEntry({
           tabId,
           title: preview.relativePath.split('/').pop() || preview.relativePath,
           workspaceKey: preview.workspaceKey,
           relativePath: preview.relativePath,
-          save,
+          save: () => save(false),
           discard: () => {
             textDraftCache.delete(
               getPreviewCacheKey(preview.workspaceKey, preview.relativePath),
@@ -505,51 +696,189 @@ function useEditorActions(
       contentDisposable.dispose();
       cursorDisposable.dispose();
     };
-  }, [editor, refreshActionState]);
+  }, [
+    editor,
+    readOnly,
+    refreshActionState,
+    save,
+    tabId,
+    preview.relativePath,
+    preview.workspaceKey,
+  ]);
 
   return {
-    save,
+    save: handleSave,
+    forceSave,
+    reload: handleReload,
     undo,
     redo,
     canUndo,
     canRedo,
     isDirty,
     isSaving,
+    readOnly,
+    externalChange,
   } satisfies EditorActions;
 }
 
 function ToolbarTooltip({
   label,
+  shortcut,
   children,
 }: {
   label: string;
+  shortcut?: HotkeyActions;
   children: ReactElement;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger>{children}</TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent>
+        <span className="flex items-center gap-1.5">
+          <span>{label}</span>
+          {shortcut && <HotkeyCombo action={shortcut} size="xs" />}
+        </span>
+      </TooltipContent>
     </Tooltip>
+  );
+}
+
+// Derive the on-disk absolute path from a preview's workspace key
+// (`<prefix>:<absoluteWorkspacePath>`) and its workspace-relative path.
+function getPreviewAbsolutePath(
+  preview: FilePreviewResult,
+): string | undefined {
+  const colonIndex = preview.workspaceKey.indexOf(':');
+  if (colonIndex < 0) return undefined;
+  const workspacePath = preview.workspaceKey.slice(colonIndex + 1);
+  if (!workspacePath) return undefined;
+  return `${workspacePath}/${preview.relativePath}`;
+}
+
+function OpenExternalMenu({ absolutePath }: { absolutePath: string }) {
+  const ides: OpenFilesInIde[] = [
+    'cursor',
+    'vscode',
+    'zed',
+    'kiro',
+    'windsurf',
+    'trae',
+  ];
+
+  const open = (ide: OpenFilesInIde) => {
+    window.open(getIDEFileUrl(absolutePath, ide), '_blank');
+  };
+
+  return (
+    <MenuBase.Root>
+      <Tooltip>
+        <TooltipTrigger>
+          <MenuBase.Trigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Open externally"
+              >
+                <IconOpenExternalOutline18 className="size-4" />
+              </Button>
+            }
+          />
+        </TooltipTrigger>
+        <TooltipContent>Open externally</TooltipContent>
+      </Tooltip>
+      <MenuBase.Portal>
+        <MenuBase.Positioner className="z-50" sideOffset={4} align="end">
+          <MenuBase.Popup
+            className={cn(
+              'flex min-w-44 origin-(--transform-origin) flex-col items-stretch gap-0.5',
+              'rounded-lg border border-border-subtle bg-background p-1',
+              'text-xs shadow-lg',
+              'transition-[transform,scale,opacity] duration-150 ease-out',
+              'data-ending-style:scale-90 data-starting-style:scale-90',
+              'data-ending-style:opacity-0 data-starting-style:opacity-0',
+            )}
+          >
+            {ides.map((ide) => (
+              <MenuBase.Item
+                key={ide}
+                className={cn(
+                  'flex w-full cursor-default flex-row items-center justify-start gap-2',
+                  'rounded-md px-2 py-1 text-foreground text-xs outline-none',
+                  'transition-colors duration-150 ease-out',
+                  'hover:bg-surface-1 data-highlighted:bg-surface-1',
+                )}
+                onClick={() => open(ide)}
+              >
+                <IdeLogo ide={ide} className="size-3.5 shrink-0" />
+                <span>Open in {IDE_SELECTION_ITEMS[ide]}</span>
+              </MenuBase.Item>
+            ))}
+            <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
+            <MenuBase.Item
+              className={cn(
+                'flex w-full cursor-default flex-row items-center justify-start gap-2',
+                'rounded-md px-2 py-1 text-foreground text-xs outline-none',
+                'transition-colors duration-150 ease-out',
+                'hover:bg-surface-1 data-highlighted:bg-surface-1',
+              )}
+              onClick={() => open('other')}
+            >
+              <IdeLogo ide="other" className="size-3.5 shrink-0" />
+              <span>Reveal in {IDE_SELECTION_ITEMS.other}</span>
+            </MenuBase.Item>
+          </MenuBase.Popup>
+        </MenuBase.Positioner>
+      </MenuBase.Portal>
+    </MenuBase.Root>
   );
 }
 
 function FileTabToolbar({
   actions,
   right,
+  openExternalPath,
 }: {
   actions: EditorActions | null;
   right?: React.ReactNode;
+  openExternalPath?: string;
 }) {
+  // Read-only files (attachment blobs, bundled plugins, agent app scratch)
+  // cannot be edited, so collapse the save/undo/redo controls to a single
+  // read-only indicator.
+  if (actions?.readOnly) {
+    return (
+      <div className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1">
+        <div className="flex items-center gap-1.5 px-2 text-muted-foreground text-xs">
+          <IconLockKeyOutline18 className="size-4" />
+          <span>Read-only</span>
+        </div>
+        <div className="flex items-center">
+          {openExternalPath && (
+            <div className="flex items-center px-1">
+              <OpenExternalMenu absolutePath={openExternalPath} />
+            </div>
+          )}
+          {right ? (
+            <div className="flex items-center gap-1">{right}</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1">
       <div className="flex items-center">
         <div className="flex items-center px-1">
-          <ToolbarTooltip label="Save file">
+          <ToolbarTooltip label="Save file" shortcut={HotkeyActions.SAVE_FILE}>
             <Button
               variant="ghost"
               size="icon-xs"
               aria-label="Save file"
-              disabled={!actions?.isDirty || actions.isSaving}
+              disabled={
+                !actions?.isDirty || actions.isSaving || actions.externalChange
+              }
               onClick={() => actions?.save()}
             >
               {actions?.isSaving ? (
@@ -562,7 +891,7 @@ function FileTabToolbar({
         </div>
         <div className="h-5 w-px bg-border-subtle" />
         <div className="flex items-center px-1">
-          <ToolbarTooltip label="Undo">
+          <ToolbarTooltip label="Undo" shortcut={HotkeyActions.UNDO_FILE_EDIT}>
             <Button
               variant="ghost"
               size="icon-xs"
@@ -573,7 +902,7 @@ function FileTabToolbar({
               <IconUndoOutline18 className="size-4" />
             </Button>
           </ToolbarTooltip>
-          <ToolbarTooltip label="Redo">
+          <ToolbarTooltip label="Redo" shortcut={HotkeyActions.REDO_FILE_EDIT}>
             <Button
               variant="ghost"
               size="icon-xs"
@@ -585,8 +914,52 @@ function FileTabToolbar({
             </Button>
           </ToolbarTooltip>
         </div>
+        {openExternalPath && (
+          <>
+            <div className="h-5 w-px bg-border-subtle" />
+            <div className="flex items-center px-1">
+              <OpenExternalMenu absolutePath={openExternalPath} />
+            </div>
+          </>
+        )}
       </div>
       {right ? <div className="flex items-center gap-1">{right}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Warning shown when a file was modified on disk while the user has unsaved
+ * local edits. Saving is blocked until the user reloads (discarding local
+ * edits) or explicitly overwrites the external changes.
+ */
+function ExternalChangeBanner({ actions }: { actions: EditorActions }) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-2 border-border border-b bg-warning-solid/10 px-3 py-1.5 text-warning-foreground text-xs">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <TriangleAlertIcon className="size-3.5 shrink-0" />
+        <span className="truncate">
+          This file changed on disk since you started editing.
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          variant="secondary"
+          size="xs"
+          onClick={() => actions.reload()}
+          disabled={actions.isSaving}
+        >
+          Reload
+        </Button>
+        <Button
+          variant="warning"
+          size="xs"
+          onClick={() => actions.forceSave()}
+          disabled={actions.isSaving}
+        >
+          Overwrite
+        </Button>
+      </div>
     </div>
   );
 }
@@ -672,11 +1045,7 @@ function TextEditorPreview({
     lineNumber: 1,
     column: 1,
   });
-  const actions = useEditorActions(tabId, editor, preview, text);
-
-  useEffect(() => {
-    setText(textDraftCache.get(cacheKey) ?? preview.text ?? '');
-  }, [cacheKey, preview.text]);
+  const actions = useEditorActions(tabId, editor, preview, text, setText);
 
   useEffect(() => {
     if (!editor) return;
@@ -735,7 +1104,13 @@ function TextEditorPreview({
 
   return (
     <div className="flex size-full flex-col bg-background">
-      <FileTabToolbar actions={actions} />
+      <FileTabToolbar
+        actions={actions}
+        openExternalPath={getPreviewAbsolutePath(preview)}
+      />
+      {actions.externalChange ? (
+        <ExternalChangeBanner actions={actions} />
+      ) : null}
       <div
         className="min-h-0 flex-1"
         onFocusCapture={markFocused}
@@ -751,7 +1126,7 @@ function TextEditorPreview({
           onMount={handleMount}
           onChange={handleChange}
           options={{
-            readOnly: false,
+            readOnly: preview.readOnly ?? false,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             wordWrap: 'on',
@@ -970,6 +1345,7 @@ function ImagePreview({
     <div className="flex size-full flex-col bg-background">
       <FileTabToolbar
         actions={null}
+        openExternalPath={getPreviewAbsolutePath(preview)}
         right={
           <>
             {isPanned ? (
@@ -1138,7 +1514,7 @@ function SvgPreview({
     useState<SvgCurrentColorMode>('default');
   const [customCurrentColor, setCustomCurrentColor] = useState('8b5cf6');
   const [editor, setEditor] = useState<MonacoEditorInstance | null>(null);
-  const actions = useEditorActions(tabId, editor, preview, text);
+  const actions = useEditorActions(tabId, editor, preview, text, setText);
   const previewBackgroundClassName = getPreviewBackgroundClassName(background);
   const normalizedCustomBackground = normalizeHexColor(
     customBackground,
@@ -1160,10 +1536,6 @@ function SvgPreview({
     () => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`,
     [text],
   );
-
-  useEffect(() => {
-    setText(textDraftCache.get(cacheKey) ?? preview.text ?? '');
-  }, [cacheKey, preview.text]);
 
   const handleMount = useCallback(
     (editor: MonacoEditorInstance, monaco: MonacoApi) => {
@@ -1220,6 +1592,7 @@ function SvgPreview({
     <div className="flex size-full flex-col bg-background">
       <FileTabToolbar
         actions={actions}
+        openExternalPath={getPreviewAbsolutePath(preview)}
         right={
           <>
             {mode === 'preview' && isPanned ? (
@@ -1415,6 +1788,9 @@ function SvgPreview({
           </>
         }
       />
+      {actions.externalChange ? (
+        <ExternalChangeBanner actions={actions} />
+      ) : null}
       <div className="min-h-0 flex-1">
         {mode === 'preview' ? (
           <button
@@ -1466,7 +1842,7 @@ function SvgPreview({
               onMount={handleMount}
               onChange={handleChange}
               options={{
-                readOnly: false,
+                readOnly: preview.readOnly ?? false,
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
@@ -1501,20 +1877,122 @@ function BinaryPreview() {
   );
 }
 
+// A file backing a tab may no longer exist on disk — e.g. the workspace was
+// unmounted and the file was deleted externally, or an agent (and its
+// attachment blobs) was removed. Detect that case so the tab can show a
+// friendly "file removed" notice instead of a raw filesystem error string.
+function isMissingFileError(error: string | null): boolean {
+  if (!error) return false;
+  const normalized = error.toLowerCase();
+  return (
+    normalized.includes('enoent') ||
+    normalized.includes('no such file') ||
+    normalized.includes('not a file') ||
+    normalized.includes('escapes workspace root')
+  );
+}
+
+function MissingFileNotice() {
+  return (
+    <div className="flex size-full flex-col bg-background">
+      <FileTabToolbar actions={null} />
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+        <div className="flex max-w-sm flex-col items-center gap-3 text-center text-muted-foreground">
+          <IconDatabaseFillDuo18 className="size-12" />
+          <span className="font-medium text-foreground text-sm">
+            This file is no longer available
+          </span>
+          <span className="text-xs">
+            It may have been deleted, moved, or removed together with the agent
+            it belonged to. The contents can no longer be loaded.
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
   const getFilePreview = useKartonProcedure((p) => p.fileTree.getFilePreview);
+  const getFileStat = useKartonProcedure((p) => p.fileTree.getFileStat);
   const workspaceKey = tab.file?.workspaceKey;
   const relativePath = tab.file?.relativePath;
   const cacheKey =
     workspaceKey && relativePath
       ? getPreviewCacheKey(workspaceKey, relativePath)
       : null;
+
+  // The file-tree watcher bumps the revision of the directory backing each
+  // open file tab whenever its contents change on disk. Subscribing to that
+  // single number lets us revalidate only the affected file in response to an
+  // external edit, instead of polling every open tab.
+  const directoryRevision = useKartonState((s) => {
+    if (!workspaceKey || !relativePath) return 0;
+    const slash = relativePath.lastIndexOf('/');
+    const directoryPath = slash === -1 ? '' : relativePath.slice(0, slash);
+    return (
+      s.fileTree.directoryRevisions?.[workspaceKey]?.[directoryPath] ??
+      s.fileTree.workspaceRevisions?.[workspaceKey] ??
+      0
+    );
+  });
+
   const cached = cacheKey ? previewCache.get(cacheKey) : undefined;
   const [preview, setPreview] = useState<FilePreviewResult | null>(
     cached?.preview ?? null,
   );
   const [error, setError] = useState<string | null>(cached?.error ?? null);
   const [isLoading, setIsLoading] = useState(!cached);
+
+  // Cheap revalidation: stat the file and only re-read its full contents when
+  // the mtime/size actually changed. Used for both re-open staleness (run on
+  // mount) and live external-edit detection (run on directory-revision bumps).
+  // Read-only blobs (attachments) never change, so they are skipped entirely.
+  const revalidate = useCallback(async () => {
+    if (!workspaceKey || !relativePath || !cacheKey) return;
+    const current = previewCache.get(cacheKey);
+    // Nothing loaded yet — the initial-load effect owns the first fetch.
+    if (!current?.preview) return;
+    if (current.preview.readOnly) return;
+
+    let stat: FileStatResult | null = null;
+    try {
+      stat = await getFileStat(workspaceKey, relativePath);
+    } catch {
+      return; // Transient failure — keep showing the current content.
+    }
+    if (!stat) {
+      const missing = 'ENOENT: file no longer exists';
+      previewCache.set(cacheKey, { preview: null, error: missing });
+      setPreview(null);
+      setError(missing);
+      return;
+    }
+    const latest = previewCache.get(cacheKey)?.preview;
+    if (
+      latest &&
+      latest.mtimeMs === stat.mtimeMs &&
+      latest.size === stat.size
+    ) {
+      return; // Unchanged on disk — nothing to do.
+    }
+
+    let result: FilePreviewResult | null;
+    try {
+      result = await getFilePreview(workspaceKey, relativePath);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load file';
+      previewCache.set(cacheKey, { preview: null, error: message });
+      setPreview(null);
+      setError(message);
+      return;
+    }
+    const nextError = result ? null : 'File preview unavailable';
+    previewCache.set(cacheKey, { preview: result, error: nextError });
+    setPreview(result);
+    setError(nextError);
+  }, [workspaceKey, relativePath, cacheKey, getFileStat, getFilePreview]);
 
   useEffect(() => {
     if (!workspaceKey || !relativePath || !cacheKey) return;
@@ -1567,6 +2045,14 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
     };
   }, [workspaceKey, relativePath, cacheKey, getFilePreview]);
 
+  // Revalidate when the tab (re)mounts and whenever the backing directory
+  // changes on disk. On mount this ensures a re-opened tab shows the latest
+  // content rather than a stale cached copy; on revision bumps it picks up
+  // external edits in real time without polling.
+  useEffect(() => {
+    void revalidate();
+  }, [revalidate, directoryRevision]);
+
   if (!tab.file) {
     return (
       <div className="flex size-full items-center justify-center bg-background text-muted-foreground text-sm">
@@ -1588,6 +2074,8 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
               </div>
             </div>
           </div>
+        ) : isMissingFileError(error) ? (
+          <MissingFileNotice />
         ) : error || !preview ? (
           <div className="flex size-full flex-col bg-background">
             <FileTabToolbar actions={null} />

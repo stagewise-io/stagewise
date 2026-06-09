@@ -8,9 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { getTruncatedFileUrl } from '@ui/utils';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
-import { IdePickerPopover } from '@ui/components/ide-picker-popover';
+import { stripMountPrefix } from '@ui/utils';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useMessageAttachments } from '@ui/hooks/use-message-elements';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -24,8 +22,10 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { IdeLogo } from '@ui/components/ide-logo';
-import { IconOpenExternalOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconArrowUpRightOutline18,
+  IconOpenExternalOutline18,
+} from 'nucleo-ui-outline-18';
 import type { ElementAttachmentAttrs } from '../types';
 import type { InlineNodeViewProps } from '../../shared/types';
 import { truncateLabel, InlineBadge, InlineBadgeWrapper } from '../../shared';
@@ -134,16 +134,18 @@ function ElementPreviewContent({
   effectiveTagName?: string;
   blobData: SwDomBlobData | null;
 }) {
-  const openInIdeSelection = useKartonState(
-    (s) => s.globalConfig.openFilesInIde,
-  );
   const tabs = useKartonState((s) => s.contentTabs.tabs);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const scrollToElement = useKartonProcedure((p) => p.browser.scrollToElement);
   const checkElementExists = useKartonProcedure(
     (p) => p.browser.checkElementExists,
   );
-  const { getFileIDEHref, needsIdePicker, pickIdeAndOpen } = useFileIDEHref();
+  const [openAgent] = useOpenAgent();
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const mounts = useKartonState((s) =>
+    openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
+  );
   const [elementExistenceChecked, setElementExistenceChecked] = useState(false);
   const [elementExists, setElementExists] = useState<boolean | null>(null);
 
@@ -467,28 +469,27 @@ function ElementPreviewContent({
             <div className="flex w-full flex-col items-stretch gap-2">
               {effectiveCodeMetadata.slice(0, 10).map((metadata) => {
                 const anchor = (
-                  <a
-                    href={
-                      needsIdePicker
-                        ? '#'
-                        : getFileIDEHref(
-                            metadata.relativePath,
-                            metadata.startLine,
-                          )
-                    }
-                    target={needsIdePicker ? undefined : '_blank'}
-                    rel="noopener noreferrer"
-                    onClick={
-                      needsIdePicker ? (e) => e.preventDefault() : undefined
-                    }
-                    className="flex shrink basis-4/5 gap-1 break-all text-foreground text-sm hover:text-primary"
+                  <button
+                    type="button"
+                    className="flex shrink basis-4/5 cursor-pointer gap-1 break-all text-foreground text-sm hover:text-primary"
+                    onClick={() => {
+                      const relPath = metadata.relativePath;
+                      const slashIdx = relPath.indexOf('/');
+                      if (slashIdx <= 0) return;
+                      const prefix = relPath.slice(0, slashIdx);
+                      const rel = relPath.slice(slashIdx + 1);
+                      const mount = mounts.find((m) => m.prefix === prefix);
+                      if (!mount) return;
+                      const wkKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+                      void openFileTab(wkKey, rel, openAgent).then((tabId) => {
+                        if (!tabId) void revealInFolder(wkKey, rel);
+                      });
+                    }}
                   >
-                    <IdeLogo
-                      ide={openInIdeSelection}
-                      className="size-3 shrink-0"
-                    />
-                    {getTruncatedFileUrl(metadata.relativePath)}
-                  </a>
+                    <IconArrowUpRightOutline18 className="size-3 shrink-0" />
+                    {stripMountPrefix(metadata.relativePath) ||
+                      metadata.relativePath}
+                  </button>
                 );
 
                 return (
@@ -496,24 +497,10 @@ function ElementPreviewContent({
                     key={`${metadata.relativePath}|${metadata.startLine}`}
                     className="flex flex-col items-stretch"
                   >
-                    {needsIdePicker ? (
-                      <IdePickerPopover
-                        onSelect={(ide) =>
-                          pickIdeAndOpen(
-                            ide,
-                            metadata.relativePath,
-                            metadata.startLine,
-                          )
-                        }
-                      >
-                        {anchor}
-                      </IdePickerPopover>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger>{anchor}</TooltipTrigger>
-                        <TooltipContent>{metadata.relation}</TooltipContent>
-                      </Tooltip>
-                    )}
+                    <Tooltip>
+                      <TooltipTrigger>{anchor}</TooltipTrigger>
+                      <TooltipContent>{metadata.relation}</TooltipContent>
+                    </Tooltip>
                   </div>
                 );
               })}

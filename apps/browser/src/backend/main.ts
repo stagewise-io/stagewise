@@ -209,12 +209,22 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         agentInstanceId,
         options,
       );
-      fileTreeService.revealInFileTree(
-        metadata.workspaceKey,
-        metadata.relativePath,
-      );
+      // Read-only, agent-internal files (e.g. `att/` attachment blobs) are
+      // not part of any listed workspace tree, so revealing them would only
+      // force the panel open on a non-existent workspace. Skip the reveal.
+      if (!metadata.readOnly) {
+        fileTreeService.revealInFileTree(
+          metadata.workspaceKey,
+          metadata.relativePath,
+        );
+      }
       return tabId;
     },
+  );
+  // Let the file-tree service resolve a given agent's attachment blob
+  // directory so it can open `att/` blobs as read-only tabs.
+  fileTreeService.setAttachmentDirResolver((agentId) =>
+    attachments.agentBlobDir(agentId),
   );
 
   const detectedShell = detectShell();
@@ -803,9 +813,25 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       fileTreeService.getFilePreview(workspaceKey, relativePath),
   );
   uiKarton.registerServerProcedureHandler(
+    'fileTree.getFileStat',
+    async (_cid, workspaceKey: string, relativePath: string) =>
+      fileTreeService.getFileStat(workspaceKey, relativePath),
+  );
+  uiKarton.registerServerProcedureHandler(
     'fileTree.saveFile',
-    async (_cid, workspaceKey: string, relativePath: string, text: string) =>
-      fileTreeService.saveFile(workspaceKey, relativePath, text),
+    async (
+      _cid,
+      workspaceKey: string,
+      relativePath: string,
+      text: string,
+      expectedMtimeMs?: number | null,
+    ) =>
+      fileTreeService.saveFile(
+        workspaceKey,
+        relativePath,
+        text,
+        expectedMtimeMs,
+      ),
   );
   uiKarton.registerServerProcedureHandler(
     'fileTree.openFileTab',
@@ -819,6 +845,24 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       fileTreeService.openFileTab(
         workspaceKey,
         relativePath,
+        agentInstanceId,
+        options,
+      ),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.openAttachmentTab',
+    async (
+      _cid,
+      agentId: string,
+      attachmentId: string,
+      displayName?: string,
+      agentInstanceId?: string | null,
+      options?: { preview?: boolean; temporaryGroupKey?: string },
+    ) =>
+      fileTreeService.openAttachmentTab(
+        agentId,
+        attachmentId,
+        displayName,
         agentInstanceId,
         options,
       ),
@@ -903,6 +947,16 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       workspaceKeys: string[],
       includeGitignored: boolean,
     ) => fileTreeService.searchFiles(query, workspaceKeys, includeGitignored),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.listRecentFiles',
+    async (
+      _cid,
+      workspaceKeys: string[],
+      includeGitignored: boolean,
+      limit: number,
+    ) =>
+      fileTreeService.listRecentFiles(workspaceKeys, includeGitignored, limit),
   );
 
   // --- Wire main UI settings RPC procedures ---

@@ -16,7 +16,6 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { cn, stripMountPrefix } from '@ui/utils';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 
 export const DeleteFileToolPart = ({
@@ -25,7 +24,6 @@ export const DeleteFileToolPart = ({
   part: Extract<AgentToolUIPart, { type: 'tool-delete' }>;
 }) => {
   const [expanded, setExpanded] = useState(true);
-  const { resolvePath } = useFileIDEHref();
 
   const outputWithDiff = part.output as
     | WithDiff<Record<string, never>>
@@ -68,26 +66,16 @@ export const DeleteFileToolPart = ({
         <LoadingHeader
           relativePath={path ?? undefined}
           fullPath={part.input?.path ?? undefined}
-          resolvePath={resolvePath}
         />
       );
     return (
       <SuccessHeader
         relativePath={path ?? undefined}
         fullPath={part.input?.path ?? undefined}
-        resolvePath={resolvePath}
         isDirectory={isDirectory}
       />
     );
-  }, [
-    state,
-    streaming,
-    path,
-    part.input?.path,
-    part.errorText,
-    resolvePath,
-    isDirectory,
-  ]);
+  }, [state, streaming, path, part.input?.path, part.errorText, isDirectory]);
 
   return (
     <ToolPartUI
@@ -133,12 +121,10 @@ const ErrorHeader = ({
 const SuccessHeader = ({
   relativePath,
   fullPath,
-  resolvePath,
   isDirectory,
 }: {
   relativePath?: string;
   fullPath?: string;
-  resolvePath: (path: string) => string | null;
   isDirectory?: boolean;
 }) => {
   const fileName = relativePath ? getBaseName(relativePath) : relativePath;
@@ -146,10 +132,7 @@ const SuccessHeader = ({
   return (
     <div className="pointer-events-none flex flex-row items-center justify-start gap-1">
       <div className="pointer-events-auto flex flex-row items-center justify-start gap-1 text-muted-foreground">
-        <FileContextMenu
-          relativePath={fullPath ?? relativePath ?? ''}
-          resolvePath={resolvePath}
-        >
+        <FileContextMenu relativePath={fullPath ?? relativePath ?? ''}>
           <Tooltip>
             <TooltipTrigger>
               <div className="flex flex-row items-center justify-start gap-1">
@@ -185,11 +168,9 @@ const SuccessHeader = ({
 const LoadingHeader = ({
   relativePath,
   fullPath,
-  resolvePath,
 }: {
   relativePath?: string;
   fullPath?: string;
-  resolvePath: (path: string) => string | null;
 }) => {
   const fileName = relativePath ? getBaseName(relativePath) : relativePath;
 
@@ -197,10 +178,7 @@ const LoadingHeader = ({
     <div className="flex flex-row items-center justify-start gap-1">
       <IconLoader6Outline18 className="size-3 shrink-0 animate-spin text-primary" />
       {relativePath !== null ? (
-        <FileContextMenu
-          relativePath={fullPath ?? relativePath ?? ''}
-          resolvePath={resolvePath}
-        >
+        <FileContextMenu relativePath={fullPath ?? relativePath ?? ''}>
           <Tooltip>
             <TooltipTrigger>
               <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">

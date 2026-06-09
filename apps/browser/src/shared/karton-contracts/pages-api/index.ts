@@ -106,8 +106,6 @@ export const defaultState: PagesApiState = {
   pendingAppMessagesByAgentInstanceId: {},
   globalConfig: {
     telemetryLevel: 'full',
-    openFilesInIde: 'other',
-    hasSetIde: false,
     notificationSoundsEnabled: true,
     notificationSoundLoudness: 'subtle',
     notificationSoundPack: 'bubble-pops',

@@ -86,9 +86,24 @@ export function CommandCenter() {
       includeGitignored: false,
     });
 
+  // `includeGitignored` is a global, persisted toggle (survives restarts), so
+  // it lives in preferences rather than the transient per-open filter state.
+  const includeGitignoredPref = useKartonState(
+    (s) => s.preferences.general.fileSearchIncludeGitignored ?? false,
+  );
+
+  const effectiveFileSearchFilter = useMemo<FileSearchFilterState>(
+    () => ({
+      selectedWorkspaceKeys: fileSearchFilter.selectedWorkspaceKeys,
+      includeGitignored: includeGitignoredPref,
+    }),
+    [fileSearchFilter.selectedWorkspaceKeys, includeGitignoredPref],
+  );
+
   const {
     items,
     isLoading,
+    fileIsRecent,
     workspaceOptions,
     rawAgentTitles,
     refreshAgentHistory,
@@ -98,7 +113,7 @@ export function CommandCenter() {
     optimisticAgentTitles,
     optimisticPinnedAgentIds,
     pendingRemovalAgentIds,
-    fileSearchFilter,
+    fileSearchFilter: effectiveFileSearchFilter,
   });
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const activeTab = useKartonState((s) =>
@@ -107,11 +122,38 @@ export function CommandCenter() {
   const [openAgent, setOpenAgent] = useOpenAgent();
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const setFileTreeVisible = useKartonProcedure((p) => p.fileTree.setVisible);
+  const setFileTreeActiveWorkspace = useKartonProcedure(
+    (p) => p.fileTree.setActiveWorkspace,
+  );
+  const setDirectoryExpanded = useKartonProcedure(
+    (p) => p.fileTree.setDirectoryExpanded,
+  );
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
   const setLastOpenAgentId = useKartonProcedure(
     (p) => p.browser.setLastOpenAgentId,
+  );
+
+  const handleFileFilterChange = useCallback(
+    (next: FileSearchFilterState) => {
+      if (next.includeGitignored !== includeGitignoredPref) {
+        void updatePreferences([
+          {
+            op: 'replace',
+            path: ['general', 'fileSearchIncludeGitignored'],
+            value: next.includeGitignored,
+          } satisfies Patch,
+        ]);
+      }
+      setFileSearchFilter((current) =>
+        current.selectedWorkspaceKeys === next.selectedWorkspaceKeys
+          ? current
+          : { ...current, selectedWorkspaceKeys: next.selectedWorkspaceKeys },
+      );
+    },
+    [includeGitignoredPref, updatePreferences],
   );
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
@@ -140,7 +182,22 @@ export function CommandCenter() {
   } | null>(null);
   const [renamingAgentId, setRenamingAgentId] = useState<string | null>(null);
   const [hasInputSelection, setHasInputSelection] = useState(false);
-  const rows = useMemo(() => buildGroupedRows(items, mode), [items, mode]);
+  const filesSectionLabel = fileIsRecent ? 'Last changed' : 'Files';
+  // The gitignored toggle is only meaningful when a currently-searched
+  // workspace is a git repository / worktree.
+  const canToggleGitignored = useMemo(() => {
+    const isAll = effectiveFileSearchFilter.selectedWorkspaceKeys.size === 0;
+    return workspaceOptions.some(
+      (workspace) =>
+        (isAll ||
+          effectiveFileSearchFilter.selectedWorkspaceKeys.has(workspace.key)) &&
+        workspace.isGit,
+    );
+  }, [workspaceOptions, effectiveFileSearchFilter.selectedWorkspaceKeys]);
+  const rows = useMemo(
+    () => buildGroupedRows(items, mode, { filesLabel: filesSectionLabel }),
+    [items, mode, filesSectionLabel],
+  );
   const visibleItemIndexes = useMemo(
     () => rows.filter((row) => row.type === 'item').map((row) => row.itemIndex),
     [rows],
@@ -284,7 +341,20 @@ export function CommandCenter() {
       if (item.disabled) return;
 
       if (item.kind === 'file') {
-        void openFileTab(item.workspaceKey, item.relativePath);
+        if (item.isDirectory) {
+          // Reveal the folder in the file tree: show the panel, focus the
+          // owning workspace, and expand the directory plus every ancestor
+          // so it is scrolled into view.
+          void setFileTreeVisible(true);
+          void setFileTreeActiveWorkspace(item.workspaceKey);
+          const segments = item.relativePath.split('/').filter(Boolean);
+          for (let i = 0; i < segments.length; i++) {
+            const dirPath = segments.slice(0, i + 1).join('/');
+            void setDirectoryExpanded(item.workspaceKey, dirPath, true);
+          }
+        } else {
+          void openFileTab(item.workspaceKey, item.relativePath);
+        }
       } else if (item.kind === 'agent') {
         setOpenAgent(item.agentId);
         void setLastOpenAgentId(item.agentId).then(() =>
@@ -318,6 +388,9 @@ export function CommandCenter() {
       setLastOpenAgentId,
       setOpenAgent,
       switchTab,
+      setFileTreeVisible,
+      setFileTreeActiveWorkspace,
+      setDirectoryExpanded,
     ],
   );
 
@@ -663,6 +736,27 @@ export function CommandCenter() {
         return;
       }
 
+      if (
+        mode === 'files' &&
+        canToggleGitignored &&
+        isEventMatch(
+          event.nativeEvent,
+          hotkeyDefinitions[HotkeyActions.COMMAND_CENTER_TOGGLE_GITIGNORED],
+          platform,
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        void updatePreferences([
+          {
+            op: 'replace',
+            path: ['general', 'fileSearchIncludeGitignored'],
+            value: !includeGitignoredPref,
+          } satisfies Patch,
+        ]);
+        return;
+      }
+
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -720,6 +814,10 @@ export function CommandCenter() {
       selectedTab,
       togglePinnedAgent,
       togglePinnedTab,
+      mode,
+      canToggleGitignored,
+      includeGitignoredPref,
+      updatePreferences,
     ],
   );
 
@@ -744,13 +842,14 @@ export function CommandCenter() {
           {mode === 'files' && (
             <CommandCenterFileFilter
               workspaceOptions={workspaceOptions}
-              filterState={fileSearchFilter}
-              onFilterChange={setFileSearchFilter}
+              filterState={effectiveFileSearchFilter}
+              onFilterChange={handleFileFilterChange}
             />
           )}
           <CommandCenterResults
             items={items}
             mode={mode}
+            filesLabel={filesSectionLabel}
             selectedIndex={selectedIndex}
             isLoading={isLoading}
             renamingAgentId={renamingAgentId}
@@ -761,12 +860,15 @@ export function CommandCenter() {
             onHoverIndex={handleHoverIndex}
           />
           <CommandCenterFooter
+            mode={mode}
             deleteConfirmation={deleteConfirmationAgent}
             isRenamingAgent={renamingAgentId !== null}
             selectedAgent={selectedAgent}
             canCopySelectedTabUrl={canCopySelectedTabUrl}
             canToggleSelectedTabPin={selectedPinnableTab !== null}
             selectedTab={selectedTab}
+            canToggleGitignored={canToggleGitignored}
+            includeGitignored={includeGitignoredPref}
           />
         </CommandCenterPanel>
       </div>

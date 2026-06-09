@@ -19,7 +19,6 @@ import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { getWorkspaceMountsFromMessage } from '@shared/env-metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import {
   type StatusCardSection,
   type FormattedFileDiff,
@@ -98,7 +97,7 @@ export function StatusCard() {
     (p) => p.toolbox.acceptHunks,
   );
   const createTab = useKartonProcedure((p) => p.browser.createTab);
-  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+  const _openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
@@ -271,22 +270,14 @@ export function StatusCard() {
     prevAgentStatesRef.current = next;
   }, [workspaceMdAgents, workspaceMounts]);
 
-  const { getFileIDEHref, needsIdePicker } = useFileIDEHref();
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
 
   const handleShowFile = useCallback(
-    (workspacePath?: string) => {
-      const filePath = workspacePath
-        ? `${workspacePath}/.stagewise/WORKSPACE.md`
-        : '.stagewise/WORKSPACE.md';
-      if (needsIdePicker) {
-        // Fall back to settings when no IDE has been configured yet
-        void openSettings({ section: 'skills-context' });
-        return;
-      }
-      const href = getFileIDEHref(filePath);
-      if (href && href !== '#') window.open(href, '_blank');
+    (workspaceKey?: string) => {
+      if (!workspaceKey) return;
+      void openFileTab(workspaceKey, '.stagewise/WORKSPACE.md');
     },
-    [needsIdePicker, getFileIDEHref, openSettings],
+    [openFileTab],
   );
 
   // Procedure to remove a queued message

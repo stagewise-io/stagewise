@@ -591,15 +591,40 @@ export type FileTreeListDirectoryResult = {
 
 export type FilePreviewKind = 'text' | 'image' | 'svg' | 'binary';
 
+/**
+ * Sentinel error message thrown by `fileTree.saveFile` when the on-disk file
+ * was modified externally since it was loaded. The UI matches on this to show
+ * a conflict warning instead of silently overwriting the external change.
+ */
+export const FILE_SAVE_CONFLICT_CODE = 'FILE_SAVE_CONFLICT';
+
+/** Lightweight on-disk file identity used to detect external modifications. */
+export type FileStatResult = {
+  mtimeMs: number;
+  size: number;
+};
+
 export type FilePreviewResult = {
   workspaceKey: FileTreeWorkspaceKey;
   relativePath: string;
   kind: FilePreviewKind;
   mimeType: string;
   size: number;
+  /**
+   * Last-modified time (ms) of the file when this preview was produced. Used
+   * as a cheap version token to detect external edits (for re-open
+   * revalidation, live reload, and save-conflict detection).
+   */
+  mtimeMs: number;
   text?: string;
   base64?: string;
   truncated?: boolean;
+  /**
+   * When true, the file lives in a read-only location (e.g. an `att/`
+   * attachment blob, `plugins/`, or `apps/`) and must not be edited or
+   * saved. The editor opens in read-only mode and hides save controls.
+   */
+  readOnly?: boolean;
 };
 
 export type FileTabMetadata = {
@@ -609,6 +634,14 @@ export type FileTabMetadata = {
   kind: FilePreviewKind;
   mimeType: string;
   size: number;
+  /**
+   * Optional human-readable title for the tab. Used for attachment tabs
+   * where the on-disk filename is an opaque blob key but the original
+   * file name should be shown to the user.
+   */
+  displayName?: string;
+  /** When true, the tab content is read-only (e.g. attachment blobs). */
+  readOnly?: boolean;
 };
 
 export type TabLifecycle =
@@ -628,6 +661,8 @@ export type FileSearchResult = {
   relativePath: string;
   fileName: string;
   isDirectory?: boolean;
+  /** Last-modified time (epoch ms) used for recency sorting. */
+  mtimeMs?: number;
 };
 
 export type FileTreeOperationResult = {
@@ -1689,14 +1724,41 @@ export type KartonContract = {
         workspaceKey: string,
         relativePath: string,
       ) => Promise<FilePreviewResult | null>;
+      /**
+       * Cheap stat used to revalidate an already-loaded file without reading
+       * its contents. Returns null when the file no longer exists.
+       */
+      getFileStat: (
+        workspaceKey: string,
+        relativePath: string,
+      ) => Promise<FileStatResult | null>;
+      /**
+       * Persist `text` to disk. When `expectedMtimeMs` is provided and the
+       * on-disk modification time no longer matches it, the save is rejected
+       * with {@link FILE_SAVE_CONFLICT_CODE} instead of overwriting the
+       * external change. Pass `null`/omit to force-write (overwrite).
+       */
       saveFile: (
         workspaceKey: string,
         relativePath: string,
         text: string,
+        expectedMtimeMs?: number | null,
       ) => Promise<FilePreviewResult | null>;
       openFileTab: (
         workspaceKey: string,
         relativePath: string,
+        agentInstanceId?: string | null,
+        options?: OpenFileTabOptions,
+      ) => Promise<string | null>;
+      /**
+       * Open an agent attachment blob (stored under `att/`) as a read-only
+       * file tab. The backend resolves the per-agent blob directory, so the
+       * renderer only needs the agent id and attachment (blob) id.
+       */
+      openAttachmentTab: (
+        agentId: string,
+        attachmentId: string,
+        displayName?: string,
         agentInstanceId?: string | null,
         options?: OpenFileTabOptions,
       ) => Promise<string | null>;
@@ -1741,6 +1803,11 @@ export type KartonContract = {
         query: string,
         workspaceKeys: string[],
         includeGitignored: boolean,
+      ) => Promise<FileSearchResult[]>;
+      listRecentFiles: (
+        workspaceKeys: string[],
+        includeGitignored: boolean,
+        limit: number,
       ) => Promise<FileSearchResult[]>;
     };
     downloads: {
@@ -1921,8 +1988,6 @@ export const defaultState: KartonContract['state'] = {
   },
   globalConfig: {
     telemetryLevel: 'full',
-    openFilesInIde: 'other',
-    hasSetIde: false,
     notificationSoundsEnabled: true,
     notificationSoundLoudness: 'subtle',
     notificationSoundPack: 'bubble-pops',

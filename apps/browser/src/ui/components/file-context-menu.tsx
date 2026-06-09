@@ -2,9 +2,8 @@ import type { ReactNode } from 'react';
 import { ContextMenu } from '@base-ui/react/context-menu';
 import { Menu as MenuBase } from '@base-ui/react/menu';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { useKartonState } from '@ui/hooks/use-karton';
-import { IdeLogo } from '@ui/components/ide-logo';
-import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@shared/ide-url';
+import { nativeFileManagerLabel } from '@shared/ide-url';
+import { IconArrowUpRightOutline18 } from 'nucleo-ui-outline-18';
 
 const itemClassName = cn(
   'flex w-full cursor-default flex-row items-center justify-start gap-2',
@@ -16,31 +15,19 @@ const itemClassName = cn(
 export function FileContextMenu({
   relativePath,
   resolvePath,
-  lineNumber,
+  onOpenFile,
   children,
 }: {
   relativePath: string;
-  resolvePath: (path: string) => string | null;
-  lineNumber?: number;
+  resolvePath?: (path: string) => string | null;
+  onOpenFile?: () => void;
   children: ReactNode;
 }) {
-  const globalConfig = useKartonState((s) => s.globalConfig);
-
-  const ide = globalConfig.openFilesInIde;
-  const hasIde = globalConfig.hasSetIde && ide !== 'other';
-  const ideName = IDE_SELECTION_ITEMS[ide];
-  const fileManagerName = IDE_SELECTION_ITEMS.other;
-
   const openInFileManager = () => {
+    if (!resolvePath) return;
     const abs = resolvePath(relativePath);
     if (!abs) return;
-    window.open(getIDEFileUrl(abs, 'other', lineNumber), '_blank');
-  };
-
-  const openInIde = () => {
-    const abs = resolvePath(relativePath);
-    if (!abs) return;
-    window.open(getIDEFileUrl(abs, ide, lineNumber), '_blank');
+    window.open(`stagewise://reveal-file/${encodeURIComponent(abs)}`, '_blank');
   };
 
   return (
@@ -67,19 +54,19 @@ export function FileContextMenu({
               'data-ending-style:opacity-0 data-starting-style:opacity-0',
             )}
           >
+            {onOpenFile && (
+              <MenuBase.Item className={itemClassName} onClick={onOpenFile}>
+                <IconArrowUpRightOutline18 className="size-3.5 shrink-0" />
+                <span>Open in file view</span>
+              </MenuBase.Item>
+            )}
             <MenuBase.Item
               className={itemClassName}
               onClick={openInFileManager}
             >
-              <IdeLogo ide="other" className="size-3.5 shrink-0" />
-              <span>Reveal in {fileManagerName}</span>
+              <IconArrowUpRightOutline18 className="size-3.5 shrink-0" />
+              <span>Reveal in {nativeFileManagerLabel}</span>
             </MenuBase.Item>
-            {hasIde && (
-              <MenuBase.Item className={itemClassName} onClick={openInIde}>
-                <IdeLogo ide={ide} className="size-3.5 shrink-0" />
-                <span>Open in {ideName}</span>
-              </MenuBase.Item>
-            )}
           </MenuBase.Popup>
         </MenuBase.Positioner>
       </MenuBase.Portal>

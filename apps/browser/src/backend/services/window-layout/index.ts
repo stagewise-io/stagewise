@@ -72,6 +72,8 @@ const fileTabMetadataSchema = z.object({
   kind: z.enum(['text', 'image', 'svg', 'binary']),
   mimeType: z.string(),
   size: z.number(),
+  displayName: z.string().optional(),
+  readOnly: z.boolean().optional(),
 });
 
 const tabEntrySchema = z.discriminatedUnion('type', [
@@ -797,6 +799,10 @@ export class WindowLayoutService extends DisposableService {
   }
 
   private revealFileTabInTree(file: FileTabMetadata): void {
+    // Read-only, agent-internal files (e.g. `att/` attachment blobs) are not
+    // part of any listed workspace tree; revealing them would force the panel
+    // open on a non-existent workspace.
+    if (file.readOnly) return;
     const normalized = file.relativePath.replace(/\\/g, '/');
     const parts = normalized.split('/').filter(Boolean);
     const expandedDirectories = parts
@@ -848,7 +854,8 @@ export class WindowLayoutService extends DisposableService {
             tab.agentInstanceId === (agentInstanceId ?? null),
         )
       : undefined;
-    const title = path.basename(file.relativePath) || 'File';
+    const title =
+      file.displayName?.trim() || path.basename(file.relativePath) || 'File';
 
     if (reusablePreview) {
       const [id] = reusablePreview;

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { useKartonState } from '@ui/hooks/use-karton';
 import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -48,9 +48,6 @@ export function useFileIDEHref() {
       (historicalMounts?.length ? historicalMounts : null) ?? liveMounts ?? [],
     [historicalMounts, liveMounts],
   );
-  const globalConfig = useKartonState((s) => s.globalConfig);
-  const setGlobalConfig = useKartonProcedure((s) => s.config.set);
-
   const resolvePath = useCallback(
     (relativePath: string) => resolveAbsolutePath(relativePath, mounts),
     [mounts],
@@ -64,8 +61,8 @@ export function useFileIDEHref() {
   return {
     ...useFileIDEHrefBase({
       resolvePath,
-      globalConfig,
-      setGlobalConfig,
+      ideConfig: { openFilesInIde: 'other' as const },
+      setIdeConfig: async () => {},
     }),
     toRelativePath,
   };

@@ -56,6 +56,7 @@ export enum HotkeyActions {
   COMMAND_CENTER_TOGGLE_AGENT_PIN = 'command_center_toggle_agent_pin',
   COMMAND_CENTER_COPY_TAB_URL = 'command_center_copy_tab_url',
   COMMAND_CENTER_DELETE_AGENT = 'command_center_delete_agent',
+  COMMAND_CENTER_TOGGLE_GITIGNORED = 'command_center_toggle_gitignored',
   NEW_CHAT = 'new_chat',
   IMPLEMENT_CREATED_PLAN = 'implement_created_plan',
   STOP_AGENT = 'stop_agent',
@@ -193,6 +194,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.COMMAND_CENTER_DELETE_AGENT]: {
     accelerator: 'Ctrl+Shift+D',
     mac: 'Mod+D',
+    captureDominantly: false,
+  },
+  [HotkeyActions.COMMAND_CENTER_TOGGLE_GITIGNORED]: {
+    accelerator: 'Mod+G',
     captureDominantly: false,
   },
   [HotkeyActions.NEW_CHAT]: {

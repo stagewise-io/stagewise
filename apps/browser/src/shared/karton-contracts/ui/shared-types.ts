@@ -235,8 +235,6 @@ export type OpenFilesInIde = z.infer<typeof openFilesInIdeSchema>;
 export const globalConfigSchema = z
   .object({
     telemetryLevel: z.enum(['off', 'anonymous', 'full']).default('anonymous'),
-    openFilesInIde: openFilesInIdeSchema.default('other'),
-    hasSetIde: z.boolean().default(false),
     notificationSoundsEnabled: z.boolean().default(true),
     notificationSoundLoudness: z
       .enum(['off', 'subtle', 'default'])
@@ -417,6 +415,8 @@ export const userPreferencesSchema = z.object({
       terminalZoomPercentage: z.number().min(50).max(150).default(100),
       /** Global file code editor zoom percentage applied to all file tabs (50-200) */
       fileCodeZoomPercentage: z.number().min(50).max(200).default(100),
+      /** Whether file search includes gitignored files (global toggle) */
+      fileSearchIncludeGitignored: z.boolean().default(false),
     })
     .default({
       newTabPage: { type: 'home' },
@@ -424,6 +424,7 @@ export const userPreferencesSchema = z.object({
       uiZoomPercentage: 100,
       terminalZoomPercentage: 100,
       fileCodeZoomPercentage: 100,
+      fileSearchIncludeGitignored: false,
     }),
   /** Website permission settings (defaults and host-specific overrides) */
   permissions: z.lazy(() => permissionsPreferencesSchema),
@@ -561,6 +562,7 @@ export const defaultUserPreferences: UserPreferences = {
     uiZoomPercentage: 100,
     terminalZoomPercentage: 100,
     fileCodeZoomPercentage: 100,
+    fileSearchIncludeGitignored: false,
   },
   permissions: defaultPermissionsForUserPrefs,
   devToolbar: defaultDevToolbarForUserPrefs,

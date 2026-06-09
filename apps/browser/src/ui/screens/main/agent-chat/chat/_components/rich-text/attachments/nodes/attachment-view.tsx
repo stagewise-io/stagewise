@@ -20,6 +20,9 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
   const isEditable = !('viewOnly' in props);
   const [openAgent] = useOpenAgent();
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const openAttachmentTab = useKartonProcedure(
+    (p) => p.fileTree.openAttachmentTab,
+  );
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
   const mounts = useKartonState((s) =>
     openAgent ? (s.toolbox[openAgent]?.workspace.mounts ?? []) : [],
@@ -48,19 +51,41 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
 
   const renderer = getRenderer(mediaType);
   const Badge = renderer.Badge;
-  const openWorkspaceFile = useCallback(() => {
-    if (!attrs.id.includes('/') || attrs.id.startsWith('att/')) return;
+  const openFile = useCallback(() => {
+    // Agent attachment blobs (`att/<blobKey>`) open as read-only tabs. The
+    // backend resolves the per-agent blob directory, so only the agent id
+    // and blob id are needed here.
+    if (attrs.id.startsWith('att/')) {
+      if (!openAgent) return;
+      const attachmentId = attrs.id.slice('att/'.length);
+      if (!attachmentId) return;
+      void openAttachmentTab(openAgent, attachmentId, displayName, openAgent);
+      return;
+    }
+    if (!attrs.id.includes('/')) return;
     const slashIndex = attrs.id.indexOf('/');
     const prefix = attrs.id.slice(0, slashIndex);
     const relativePath = attrs.id.slice(slashIndex + 1);
     const mount = mounts.find((item) => item.prefix === prefix);
-    if (!mount) return;
-
-    const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+    // Even when the originating workspace is no longer mounted, the backend
+    // can reconstruct the location from the workspace key, so fall back to a
+    // key derived from the attachment path's prefix.
+    const workspaceKey = mount
+      ? `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`
+      : null;
+    if (!workspaceKey) return;
     void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
       if (!tabId) void revealInFolder(workspaceKey, relativePath);
     });
-  }, [attrs.id, mounts, openAgent, openFileTab, revealInFolder]);
+  }, [
+    attrs.id,
+    displayName,
+    mounts,
+    openAgent,
+    openAttachmentTab,
+    openFileTab,
+    revealInFolder,
+  ]);
 
   const badgeProps: BadgeProps = {
     attachmentId: attrs.id,
@@ -84,29 +109,30 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
     return <Badge {...badgeProps} />;
   }
 
-  const canOpenWorkspaceFile =
-    attrs.id.includes('/') && !attrs.id.startsWith('att/');
+  const canOpenFile =
+    (attrs.id.startsWith('att/') && attrs.id.length > 'att/'.length) ||
+    (attrs.id.includes('/') && !attrs.id.startsWith('att/'));
 
   return (
     <span
-      className={canOpenWorkspaceFile ? 'inline cursor-pointer' : 'inline'}
-      role={canOpenWorkspaceFile ? 'button' : undefined}
-      tabIndex={canOpenWorkspaceFile ? 0 : undefined}
+      className={canOpenFile ? 'inline cursor-pointer' : 'inline'}
+      role={canOpenFile ? 'button' : undefined}
+      tabIndex={canOpenFile ? 0 : undefined}
       onClick={(event) => {
-        if (!canOpenWorkspaceFile) return;
+        if (!canOpenFile) return;
         // Stop the click from bubbling to the parent user-message bubble,
         // which would otherwise enter message-edit mode instead of opening
         // the file preview.
         event.preventDefault();
         event.stopPropagation();
-        openWorkspaceFile();
+        openFile();
       }}
       onKeyDown={(event) => {
-        if (!canOpenWorkspaceFile) return;
+        if (!canOpenFile) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           event.stopPropagation();
-          openWorkspaceFile();
+          openFile();
         }
       }}
     >

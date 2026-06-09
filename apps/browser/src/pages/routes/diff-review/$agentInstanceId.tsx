@@ -39,13 +39,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
-import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useFileIDEHref } from '@pages/hooks/use-file-ide-href';
-import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
-import { IdeLogo } from '@ui/components/ide-logo';
-import { cn, IDE_SELECTION_ITEMS } from '@ui/utils';
+import { cn, stripMountPrefix } from '@ui/utils';
+import { IconArrowUpRightOutline18 } from 'nucleo-ui-outline-18';
 
 export const Route = createFileRoute('/diff-review/$agentInstanceId')({
   component: Page,
@@ -68,15 +66,12 @@ const FileDiffItem: FC<{
   const [isOpen, setIsOpen] = useState(true);
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
   const { added, removed } = getLineStats(edit);
-  const {
-    getFileIDEHref,
-    needsIdePicker,
-    pickIdeAndOpen,
-    resolvePath,
-    toRelativePath,
-  } = useFileIDEHref();
-  const openInIdeSelection = useKartonState(
-    (s) => s.globalConfig.openFilesInIde,
+  const workspaceMounts = useKartonState((s) => s.workspaceMounts);
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const toRelativePath = useCallback(
+    (absPath: string) => stripMountPrefix(absPath),
+    [],
   );
 
   return (
@@ -100,7 +95,7 @@ const FileDiffItem: FC<{
               filePath={edit.fileName}
               className="-ml-1 size-4 shrink-0"
             />
-            <FileContextMenu relativePath={edit.path} resolvePath={resolvePath}>
+            <FileContextMenu relativePath={edit.path}>
               <Tooltip>
                 <TooltipTrigger>
                   <span className="min-w-0 truncate font-normal text-foreground text-xs hover:text-foreground group-hover:text-hover-derived">
@@ -226,56 +221,45 @@ const FileDiffItem: FC<{
               <div />
             )}
             {!edit.isExternal && <div />}
-            {(() => {
-              const relPath = edit.path;
-              const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
-              const anchor = (
-                <a
-                  href={needsIdePicker ? '#' : getFileIDEHref(relPath)}
-                  target={needsIdePicker ? undefined : '_blank'}
-                  rel="noopener noreferrer"
-                  onClick={
-                    needsIdePicker ? (e) => e.preventDefault() : undefined
-                  }
-                  className={cn(
-                    buttonVariants({ size: 'xs', variant: 'ghost' }),
-                    'shrink-0',
-                  )}
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="shrink-0 cursor-pointer"
+                  onClick={() => {
+                    const relPath = edit.path;
+                    const slashIdx = relPath.indexOf('/');
+                    if (slashIdx <= 0) return;
+                    const prefix = relPath.slice(0, slashIdx);
+                    const rel = relPath.slice(slashIdx + 1);
+                    const mount = workspaceMounts.find(
+                      (m) => m.prefix === prefix,
+                    );
+                    if (!mount) return;
+                    const wkKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+                    void openFileTab(wkKey, rel).then((tabId) => {
+                      if (!tabId) void revealInFolder(wkKey, rel);
+                    });
+                  }}
                 >
                   <div className="flex flex-row items-center justify-center gap-1">
-                    <IdeLogo
-                      ide={openInIdeSelection}
-                      className="size-3 shrink-0"
-                    />
+                    <IconArrowUpRightOutline18 className="size-3 shrink-0" />
                     <span className="text-xs">Open file</span>
                   </div>
-                </a>
-              );
-              if (needsIdePicker) {
-                return (
-                  <IdePickerPopover
-                    onSelect={(ide) => pickIdeAndOpen(ide, relPath)}
-                  >
-                    {anchor}
-                  </IdePickerPopover>
-                );
-              }
-              return (
-                <Tooltip>
-                  <TooltipTrigger>{anchor}</TooltipTrigger>
-                  <TooltipContent>
-                    <div className="flex max-w-96 flex-col gap-1">
-                      <div className="break-all font-mono text-xs">
-                        {toRelativePath(relPath) ?? relPath}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Click to open in {ideName}
-                      </div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })()}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="flex max-w-96 flex-col gap-1">
+                  <div className="break-all font-mono text-xs">
+                    {toRelativePath(edit.path) ?? edit.path}
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    Click to see full file
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </CollapsibleContent>
       </Collapsible>

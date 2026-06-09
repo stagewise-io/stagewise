@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useKartonState, useKartonProcedure } from '@pages/hooks/use-karton';
+import { useKartonState } from '@pages/hooks/use-karton';
 import { stripMountPrefix } from '@ui/utils';
 import { normalizePath } from '@shared/path-utils';
 import type { WorkspaceMountInfo } from '@shared/karton-contracts/pages-api';
@@ -34,8 +34,6 @@ function absoluteToRelative(
 
 export function useFileIDEHref() {
   const workspaceMounts = useKartonState((s) => s.workspaceMounts);
-  const globalConfig = useKartonState((s) => s.globalConfig);
-  const setGlobalConfig = useKartonProcedure((s) => s.setGlobalConfig);
 
   const resolvePath = useCallback(
     (relativePath: string) =>
@@ -51,8 +49,8 @@ export function useFileIDEHref() {
   return {
     ...useFileIDEHrefBase({
       resolvePath,
-      globalConfig,
-      setGlobalConfig,
+      ideConfig: { openFilesInIde: 'other' as const },
+      setIdeConfig: async () => {},
     }),
     toRelativePath,
   };
