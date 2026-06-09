@@ -1,9 +1,13 @@
 {
   "name": "@stagewise/agent-shell",
   "author": "stagewise GmbH",
-  "version": "0.0.0",
+  "version": "0.0.1-cloud-runner.0",
   "license": "MIT",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "restricted",
+    "tag": "cloud-runner"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,6 +25,12 @@
       "import": "./dist/env/index.js"
     }
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts.map"
+  ],
   "scripts": {
     "build": "node build.js",
     "dev": "node build.js",
@@ -29,7 +39,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@stagewise/agent-core": "workspace:*",
+    "@stagewise/agent-core": "0.0.1-cloud-runner.0",
     "@xterm/headless": "^6.0.0",
     "ai": "6.0.177",
     "node-pty": "^1.1.0",

@@ -1,9 +1,13 @@
 {
   "name": "@stagewise/agent-core",
   "author": "stagewise GmbH",
-  "version": "0.0.0",
+  "version": "0.0.1-cloud-runner.0",
   "license": "MIT",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "restricted",
+    "tag": "cloud-runner"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -133,6 +137,12 @@
       "import": "./dist/agents/index.js"
     }
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts.map"
+  ],
   "scripts": {
     "build": "node build.js",
     "dev": "node build.js",
@@ -145,7 +155,6 @@
     "@ai-sdk/google": "3.0.71",
     "@ai-sdk/openai": "3.0.63",
     "@libsql/client": "^0.15.15",
-    "@stagewise/agent-runtime-node": "workspace:*",
     "@vscode/tree-sitter-wasm": "^0.3.0",
     "ai": "6.0.177",
     "chokidar": "^4.0.3",
@@ -165,6 +174,7 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
+    "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/typescript-config": "workspace:*",
     "@types/node": "^22.10.2",
     "@types/xml": "^1.0.11",

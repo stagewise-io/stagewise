@@ -49,6 +49,55 @@ import {
 import type { AgentFileEdit } from '../diff-history';
 import type { UniversalToolboxDeps } from './types';
 import { findWorkspaceRootForPath, resolveToolPath } from './path-resolution';
+
+type RuntimeGlobResult = {
+  success: boolean;
+  error?: string;
+  message?: string;
+  relativePaths?: string[];
+  totalMatches?: number;
+};
+
+type RuntimeGrepMatch = {
+  relativePath: string;
+  line: number;
+  preview?: string;
+  match?: string;
+};
+
+type RuntimeGrepResult = {
+  success: boolean;
+  error?: string;
+  message?: string;
+  matches?: RuntimeGrepMatch[];
+  filesSearched?: number;
+  totalMatches?: number;
+};
+
+type FileSearchRuntime = {
+  fileSystem: {
+    glob: (
+      pattern: string,
+      options: {
+        respectGitignore: boolean;
+        maxResults: number;
+      },
+    ) => Promise<RuntimeGlobResult>;
+    grep: (
+      query: string,
+      options: {
+        recursive: boolean;
+        caseSensitive?: boolean;
+        filePattern?: string;
+        excludePatterns?: string[];
+        respectGitignore: boolean;
+        maxMatches: number;
+      },
+    ) => Promise<RuntimeGrepResult>;
+  };
+};
+
+type RuntimeCache = { get: (mountRoot: string) => FileSearchRuntime };
 import {
   buildAgentFileEditContent,
   capToolOutput,
@@ -732,10 +781,8 @@ export async function copyToolExecute(
  * reuse the same runtime (and its memoized gitignore tree). Created lazily
  * the first time a tool call touches a given mount.
  */
-function makeRuntimeCache(rgBinaryBasePath: string | undefined): {
-  get: (mountRoot: string) => ClientRuntimeNode;
-} {
-  const cache = new Map<string, ClientRuntimeNode>();
+function makeRuntimeCache(rgBinaryBasePath: string | undefined): RuntimeCache {
+  const cache = new Map<string, FileSearchRuntime>();
   return {
     get(mountRoot: string) {
       const cached = cache.get(mountRoot);
@@ -753,7 +800,7 @@ function makeRuntimeCache(rgBinaryBasePath: string | undefined): {
 export async function globToolExecute(
   params: GlobToolInput,
   deps: UniversalToolboxDeps,
-  runtimeCache?: { get: (mountRoot: string) => ClientRuntimeNode },
+  runtimeCache?: RuntimeCache,
 ) {
   const resolved = resolveToolPath(deps, `${params.mount_prefix}/`, 'read');
   const cache = runtimeCache ?? makeRuntimeCache(deps.rgBinaryBasePath);
@@ -790,7 +837,7 @@ export async function globToolExecute(
 export async function grepSearchToolExecute(
   params: GrepSearchToolInput,
   deps: UniversalToolboxDeps,
-  runtimeCache?: { get: (mountRoot: string) => ClientRuntimeNode },
+  runtimeCache?: RuntimeCache,
 ) {
   const resolved = resolveToolPath(deps, `${params.mount_prefix}/`, 'read');
   const cache = runtimeCache ?? makeRuntimeCache(deps.rgBinaryBasePath);
