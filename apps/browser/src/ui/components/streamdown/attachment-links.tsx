@@ -7,17 +7,16 @@ import {
   type ReactNode,
 } from 'react';
 
-import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
-import { getFolderIDEUrl } from '@shared/ide-url';
+import { cn, stripMountPrefix } from '@ui/utils';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
+
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { IdePickerPopover } from '@ui/components/ide-picker-popover';
+
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 
@@ -325,12 +324,8 @@ const WorkspaceFileClickWrapper = ({
   children: ReactNode;
 }) => {
   const [openAgent] = useOpenAgent();
-  const openInIdeChoice = useKartonState((s) => s.globalConfig.openFilesInIde);
-  const ideName = IDE_SELECTION_ITEMS[openInIdeChoice];
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
-  const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
-    useFileIDEHref();
   const historicalMounts = useMountedPaths();
   const liveMounts = useKartonState((s) =>
     openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? null) : null,
@@ -341,46 +336,12 @@ const WorkspaceFileClickWrapper = ({
   const displayPathWithLine = lineNumber
     ? `${strippedPath}:${lineNumber}`
     : strippedPath;
-  const pathWithLine = lineNumber ? `${filePath}:${lineNumber}` : filePath;
-
-  const parsedLineNumber = lineNumber
-    ? Number.parseInt(lineNumber, 10)
-    : undefined;
 
   const isFolder =
     filePath.endsWith('/') || !filePath.includes('/') /* workspace root */;
 
-  const processedHref = useMemo(() => {
-    if (!openAgent) return '';
-
-    if (isFolder) {
-      const absPath = resolvePath(filePath);
-      if (!absPath) return '#';
-      return getFolderIDEUrl(absPath, openInIdeChoice);
-    }
-
-    let href = getFileIDEHref(pathWithLine);
-    href = href.replaceAll(
-      encodeURIComponent('{{CONVERSATION_ID}}'),
-      openAgent,
-    );
-    return href;
-  }, [
-    pathWithLine,
-    getFileIDEHref,
-    openAgent,
-    isFolder,
-    resolvePath,
-    filePath,
-    openInIdeChoice,
-  ]);
-
   const handleClick = useCallback(() => {
-    if (isFolder) {
-      if (needsIdePicker) return;
-      if (processedHref) window.open(processedHref, '_blank');
-      return;
-    }
+    if (isFolder) return;
 
     const slashIndex = filePath.indexOf('/');
     if (slashIndex <= 0) return;
@@ -390,11 +351,7 @@ const WorkspaceFileClickWrapper = ({
     const mount =
       liveMounts?.find((item) => item.prefix === workspacePrefix) ??
       historicalMounts?.find((item) => item.prefix === workspacePrefix);
-    if (!mount) {
-      if (needsIdePicker) return;
-      if (processedHref) window.open(processedHref, '_blank');
-      return;
-    }
+    if (!mount) return;
 
     const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
     void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
@@ -405,10 +362,8 @@ const WorkspaceFileClickWrapper = ({
     isFolder,
     historicalMounts,
     liveMounts,
-    needsIdePicker,
     openAgent,
     openFileTab,
-    processedHref,
     revealInFolder,
   ]);
 
@@ -420,7 +375,7 @@ const WorkspaceFileClickWrapper = ({
             className={cn('inline cursor-pointer', incomplete && 'opacity-70')}
             onClick={handleClick}
             role="link"
-            aria-label={`Open ${displayPathWithLine} in ${ideName}`}
+            aria-label={`Open ${displayPathWithLine}`}
           >
             {children}
           </span>
@@ -440,39 +395,60 @@ const WorkspaceFileClickWrapper = ({
     </Tooltip>
   );
 
-  if (needsIdePicker) {
-    return (
-      <FileContextMenu
-        relativePath={filePath}
-        resolvePath={resolvePath}
-        lineNumber={parsedLineNumber}
-      >
-        <IdePickerPopover
-          onSelect={(ide) => {
-            if (isFolder) {
-              const absPath = resolvePath(filePath);
-              if (absPath) {
-                window.open(getFolderIDEUrl(absPath, ide), '_blank');
-              }
-            } else {
-              pickIdeAndOpen(ide, pathWithLine, parsedLineNumber);
-            }
-          }}
-        >
-          {wrapped}
-        </IdePickerPopover>
-      </FileContextMenu>
-    );
-  }
+  return <FileContextMenu relativePath={filePath}>{wrapped}</FileContextMenu>;
+};
+
+// ─── Attachment file wrapper (open att/ blob as read-only tab) ───────────────
+
+/**
+ * Wraps an attachment (`att/<blobKey>`) badge with click-to-open behaviour.
+ * Attachment blobs open as read-only tabs; the backend resolves the per-agent
+ * blob directory, so only the agent id and blob id are required here.
+ */
+const AttachmentFileClickWrapper = ({
+  attachmentId,
+  displayName,
+  children,
+}: {
+  attachmentId: string;
+  displayName?: string;
+  children: ReactNode;
+}) => {
+  const [openAgent] = useOpenAgent();
+  const openAttachmentTab = useKartonProcedure(
+    (p) => p.fileTree.openAttachmentTab,
+  );
+
+  const handleClick = useCallback(() => {
+    if (!openAgent || !attachmentId) return;
+    void openAttachmentTab(openAgent, attachmentId, displayName, openAgent);
+  }, [openAgent, openAttachmentTab, attachmentId, displayName]);
 
   return (
-    <FileContextMenu
-      relativePath={filePath}
-      resolvePath={resolvePath}
-      lineNumber={parsedLineNumber}
-    >
-      {wrapped}
-    </FileContextMenu>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className="inline cursor-pointer"
+            onClick={handleClick}
+            role="link"
+            aria-label={`Open ${displayName ?? attachmentId}`}
+          >
+            {children}
+          </span>
+        }
+      />
+      <TooltipContent>
+        <div className="flex max-w-96 flex-col gap-1">
+          <div className="break-all font-mono text-xs">
+            {displayName ?? attachmentId}
+          </div>
+          <div className="text-muted-foreground text-xs">
+            Click to open (read-only)
+          </div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -552,7 +528,14 @@ const PathFileRendererLink = ({
         </WorkspaceFileClickWrapper>
       );
     }
-    return badge;
+    return (
+      <AttachmentFileClickWrapper
+        attachmentId={id}
+        displayName={displayFileName}
+      >
+        {badge}
+      </AttachmentFileClickWrapper>
+    );
   }
 
   const rendererProps: RendererProps = {
@@ -584,7 +567,11 @@ const PathFileRendererLink = ({
     );
   }
 
-  return content;
+  return (
+    <AttachmentFileClickWrapper attachmentId={id} displayName={displayFileName}>
+      {content}
+    </AttachmentFileClickWrapper>
+  );
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import { CommandCenterRow } from './command-center-row';
 export function CommandCenterResults({
   items,
   mode,
+  filesLabel,
   selectedIndex,
   isLoading,
   renamingAgentId,
@@ -22,6 +23,7 @@ export function CommandCenterResults({
 }: {
   items: CommandCenterItem[];
   mode: CommandCenterMode;
+  filesLabel?: string;
   selectedIndex: number;
   isLoading?: boolean;
   renamingAgentId: string | null;
@@ -32,7 +34,10 @@ export function CommandCenterResults({
   onHoverIndex: (index: number) => void;
 }) {
   const itemRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
-  const rows = useMemo(() => buildGroupedRows(items, mode), [items, mode]);
+  const rows = useMemo(
+    () => buildGroupedRows(items, mode, { filesLabel }),
+    [items, mode, filesLabel],
+  );
 
   useEffect(() => {
     itemRefs.current.get(selectedIndex)?.scrollIntoView({ block: 'nearest' });

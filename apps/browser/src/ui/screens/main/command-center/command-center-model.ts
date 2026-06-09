@@ -83,6 +83,7 @@ export type FileCommandItem = CommandCenterItemBase & {
   mountPrefix: string;
   workspaceKey: string;
   fileName: string;
+  isDirectory: boolean;
 };
 
 export type ActionCommandItem = CommandCenterItemBase & {

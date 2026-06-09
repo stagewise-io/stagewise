@@ -1,7 +1,11 @@
 import { HotkeyActions } from '@shared/hotkeys';
 import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
-import type { AgentCommandItem, TabCommandItem } from '../command-center-model';
+import type {
+  AgentCommandItem,
+  CommandCenterMode,
+  TabCommandItem,
+} from '../command-center-model';
 
 export type CommandCenterDeleteConfirmation = {
   agentId: string;
@@ -9,19 +13,25 @@ export type CommandCenterDeleteConfirmation = {
 };
 
 export function CommandCenterFooter({
+  mode,
   deleteConfirmation,
   isRenamingAgent,
   selectedAgent,
   canCopySelectedTabUrl,
   canToggleSelectedTabPin,
   selectedTab,
+  canToggleGitignored,
+  includeGitignored,
 }: {
+  mode: CommandCenterMode;
   deleteConfirmation: CommandCenterDeleteConfirmation | null;
   isRenamingAgent: boolean;
   selectedAgent: AgentCommandItem | null;
   canCopySelectedTabUrl: boolean;
   canToggleSelectedTabPin: boolean;
   selectedTab: TabCommandItem | null;
+  canToggleGitignored: boolean;
+  includeGitignored: boolean;
 }) {
   if (isRenamingAgent) {
     return (
@@ -80,6 +90,23 @@ export function CommandCenterFooter({
             />
           </CommandCenterFooterAction>
         )}
+      </div>
+    );
+  }
+
+  if (mode === 'files' && canToggleGitignored) {
+    return (
+      <div className="flex h-9 items-center justify-end gap-3 border-border-subtle border-t px-3 text-muted-foreground text-xs">
+        <CommandCenterFooterAction
+          label={
+            includeGitignored ? 'Exclude gitignored' : 'Include gitignored'
+          }
+        >
+          <HotkeyCombo
+            action={HotkeyActions.COMMAND_CENTER_TOGGLE_GITIGNORED}
+            size="xs"
+          />
+        </CommandCenterFooterAction>
       </div>
     );
   }

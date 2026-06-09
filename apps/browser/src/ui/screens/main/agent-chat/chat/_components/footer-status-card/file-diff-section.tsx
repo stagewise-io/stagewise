@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { getBaseName, getParentPath, normalizePath } from '@shared/path-utils';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
+import { stripMountPrefix } from '@ui/utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import type { MountEntry } from '@shared/karton-contracts/ui';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
@@ -133,15 +133,14 @@ export function FileDiffFileItem({
   onOpenDiffReview: (fileId: string) => void;
 }) {
   const { added, removed } = getLineStats(fileDiff);
-  const { resolvePath, toRelativePath } = useFileIDEHref();
-  const displayPath = toRelativePath(fileDiff.path) ?? fileDiff.path;
+  const displayPath = stripMountPrefix(fileDiff.path) ?? fileDiff.path;
   const relativeDir = useMemo(
     () => getRelativeDir(fileDiff.path, resolvedMounts),
     [fileDiff.path, resolvedMounts],
   );
 
   return (
-    <FileContextMenu relativePath={fileDiff.path} resolvePath={resolvePath}>
+    <FileContextMenu relativePath={fileDiff.path}>
       <Tooltip>
         <TooltipTrigger>
           <button

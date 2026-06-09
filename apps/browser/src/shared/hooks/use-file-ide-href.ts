@@ -1,43 +1,35 @@
 import { useCallback } from 'react';
 import { getIDEFileUrl } from '@shared/ide-url';
-import type {
-  OpenFilesInIde,
-  GlobalConfig,
-} from '@shared/karton-contracts/ui/shared-types';
+import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 
-type IdeConfigPatch = Pick<GlobalConfig, 'openFilesInIde' | 'hasSetIde'>;
+type IdeConfig = {
+  openFilesInIde: OpenFilesInIde;
+};
 
 export type UseFileIDEHrefOptions = {
   resolvePath: (relativePath: string) => string | null;
-  globalConfig: GlobalConfig;
-  setGlobalConfig: (config: IdeConfigPatch) => Promise<void>;
+  ideConfig: IdeConfig;
+  setIdeConfig: (config: IdeConfig) => Promise<void>;
 };
 
 export function useFileIDEHref({
   resolvePath,
-  globalConfig,
-  setGlobalConfig,
+  ideConfig,
+  setIdeConfig,
 }: UseFileIDEHrefOptions) {
-  const needsIdePicker = !globalConfig.hasSetIde;
-
   const getFileIDEHref = useCallback(
     (relativePath: string, lineNumber?: number) => {
       const absolutePath = resolvePath(relativePath);
       if (!absolutePath) return '#';
-      return getIDEFileUrl(
-        absolutePath,
-        globalConfig.openFilesInIde,
-        lineNumber,
-      );
+      return getIDEFileUrl(absolutePath, ideConfig.openFilesInIde, lineNumber);
     },
-    [resolvePath, globalConfig.openFilesInIde],
+    [resolvePath, ideConfig.openFilesInIde],
   );
 
   const pickIdeAndOpen = useCallback(
     async (ide: OpenFilesInIde, relativePath: string, lineNumber?: number) => {
-      await setGlobalConfig({
+      await setIdeConfig({
         openFilesInIde: ide,
-        hasSetIde: true,
       });
 
       const absolutePath = resolvePath(relativePath);
@@ -45,12 +37,11 @@ export function useFileIDEHref({
       const url = getIDEFileUrl(absolutePath, ide, lineNumber);
       window.open(url, '_blank');
     },
-    [setGlobalConfig, resolvePath],
+    [setIdeConfig, resolvePath],
   );
 
   return {
     getFileIDEHref,
-    needsIdePicker,
     pickIdeAndOpen,
     resolvePath,
   };

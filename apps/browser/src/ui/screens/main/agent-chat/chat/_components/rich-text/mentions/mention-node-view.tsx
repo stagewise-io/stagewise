@@ -1,7 +1,6 @@
 import type { InlineNodeViewProps } from '../shared/types';
 import type { MentionAttrs } from './types';
 import { FileContextMenu } from '@ui/components/file-context-menu';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
 import { TabMentionBadge } from './tab-mention-badge';
 import { FileReferenceBadge } from '@ui/components/file-reference-badge';
 
@@ -10,8 +9,6 @@ export function MentionNodeView(props: InlineNodeViewProps) {
   const isEditable = !('viewOnly' in props);
   const isFile = attrs.providerType === 'file';
   const isTab = attrs.providerType === 'tab';
-  const { resolvePath } = useFileIDEHref();
-
   if (isTab) {
     const tabMeta = attrs.meta?.providerType === 'tab' ? attrs.meta : null;
     return (
@@ -43,11 +40,7 @@ export function MentionNodeView(props: InlineNodeViewProps) {
 
   // View-only file badges get the context menu for IDE-opening.
   if (isFile && !isEditable) {
-    return (
-      <FileContextMenu relativePath={attrs.id} resolvePath={resolvePath}>
-        {badge}
-      </FileContextMenu>
-    );
+    return <FileContextMenu relativePath={attrs.id}>{badge}</FileContextMenu>;
   }
 
   return badge;

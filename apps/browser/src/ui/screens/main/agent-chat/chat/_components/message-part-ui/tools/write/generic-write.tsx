@@ -12,20 +12,19 @@ import {
   IconChevronExpandYOutline18,
   IconChevronReduceYOutline18,
   IconLoader6Outline18,
+  IconArrowUpRightOutline18,
 } from 'nucleo-ui-outline-18';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
-import { useFileIDEHref } from '@ui/hooks/use-file-ide-href';
-import { IdePickerPopover } from '@ui/components/ide-picker-popover';
 import { FileContextMenu } from '@ui/components/file-context-menu';
+import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { DiffPreview } from '../shared/diff-preview';
-import { cn, IDE_SELECTION_ITEMS, stripMountPrefix } from '@ui/utils';
+import { cn, stripMountPrefix } from '@ui/utils';
 import { useMemo, useState, memo } from 'react';
 import { ToolPartUI } from '../shared/tool-part-ui';
 import { useDiffLines } from '@ui/hooks/use-diff-lines';
-import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import { Button } from '@stagewise/stage-ui/components/button';
 
-import { useKartonState } from '@ui/hooks/use-karton';
-import { IdeLogo } from '@ui/components/ide-logo';
+import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import {
   StreamingCodeBlock,
   getLanguageFromPath,
@@ -35,8 +34,12 @@ export const GenericWriteToolPart = memo(
   function GenericWriteToolPart({ part }: { part: WritePart }) {
     const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
     const [expanded, setExpanded] = useState(true);
-    const { getFileIDEHref, needsIdePicker, pickIdeAndOpen, resolvePath } =
-      useFileIDEHref();
+    const [openAgent] = useOpenAgent();
+    const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+    const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+    const mounts = useKartonState((s) =>
+      openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
+    );
     const outputWithDiff = part.output as
       | WithDiff<typeof part.output>
       | undefined;
@@ -61,10 +64,6 @@ export const GenericWriteToolPart = memo(
       [diff],
     );
 
-    const openInIdeSelection = useKartonState(
-      (s) => s.globalConfig.openFilesInIde,
-    );
-
     const streaming = useMemo(() => {
       return (
         part.state === 'input-streaming' || part.state === 'input-available'
@@ -86,6 +85,8 @@ export const GenericWriteToolPart = memo(
       return state === 'error' ? false : expanded;
     }, [state, expanded]);
 
+    const noopResolve = () => null;
+
     const trigger = useMemo(() => {
       if (state === 'error')
         return (
@@ -99,7 +100,7 @@ export const GenericWriteToolPart = memo(
           <LoadingHeader
             relativePath={path ?? undefined}
             fullPath={part.input?.path ?? undefined}
-            resolvePath={resolvePath}
+            resolvePath={noopResolve}
           />
         );
       else
@@ -107,7 +108,7 @@ export const GenericWriteToolPart = memo(
           <SuccessHeader
             relativePath={path ?? undefined}
             fullPath={part.input?.path ?? undefined}
-            resolvePath={resolvePath}
+            resolvePath={noopResolve}
             newLineCount={newLineCount}
             deletedLineCount={deletedLineCount}
             fileWasCreated={outputWithDiff?._diff?.before === null}
@@ -122,7 +123,6 @@ export const GenericWriteToolPart = memo(
       newLineCount,
       deletedLineCount,
       outputWithDiff?._diff?.before,
-      resolvePath,
     ]);
 
     const content = useMemo(() => {
@@ -180,56 +180,32 @@ export const GenericWriteToolPart = memo(
                 {codeDiffCollapsed ? 'Expand code diff' : 'Collapse code diff'}
               </TooltipContent>
             </Tooltip>
-            {(() => {
-              const relPath = part.input?.path ?? '';
-              const ideName = IDE_SELECTION_ITEMS[openInIdeSelection];
-              const anchor = (
-                <a
-                  href={needsIdePicker ? '#' : getFileIDEHref(relPath)}
-                  target={needsIdePicker ? undefined : '_blank'}
-                  rel="noopener noreferrer"
-                  onClick={
-                    needsIdePicker ? (e) => e.preventDefault() : undefined
-                  }
-                  className={cn(
-                    buttonVariants({ size: 'xs', variant: 'ghost' }),
-                    'shrink-0',
-                  )}
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="shrink-0 cursor-pointer"
+                  onClick={() => {
+                    const relPath = part.input?.path ?? '';
+                    const slashIndex = relPath.indexOf('/');
+                    if (slashIndex <= 0) return;
+                    const prefix = relPath.slice(0, slashIndex);
+                    const rel = relPath.slice(slashIndex + 1);
+                    const mount = mounts.find((m) => m.prefix === prefix);
+                    if (!mount) return;
+                    const wkKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+                    void openFileTab(wkKey, rel, openAgent).then((tabId) => {
+                      if (!tabId) void revealInFolder(wkKey, rel);
+                    });
+                  }}
                 >
-                  <div className="flex flex-row items-center justify-center gap-1">
-                    <IdeLogo
-                      ide={openInIdeSelection}
-                      className="size-3 shrink-0"
-                    />
-                    <span className="text-xs">Open file</span>
-                  </div>
-                </a>
-              );
-              if (needsIdePicker) {
-                return (
-                  <IdePickerPopover
-                    onSelect={(ide) => pickIdeAndOpen(ide, relPath)}
-                  >
-                    {anchor}
-                  </IdePickerPopover>
-                );
-              }
-              return (
-                <Tooltip>
-                  <TooltipTrigger>{anchor}</TooltipTrigger>
-                  <TooltipContent>
-                    <div className="flex max-w-96 flex-col gap-1">
-                      <div className="break-all font-mono text-xs">
-                        {stripMountPrefix(relPath)}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        Click to open in {ideName}
-                      </div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })()}
+                  <IconArrowUpRightOutline18 className="size-3 shrink-0" />
+                  Open file
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Click to see full file</TooltipContent>
+            </Tooltip>
           </div>
         );
       else return undefined;
@@ -238,10 +214,10 @@ export const GenericWriteToolPart = memo(
       diff,
       codeDiffCollapsed,
       part.input?.path,
-      openInIdeSelection,
-      needsIdePicker,
-      getFileIDEHref,
-      pickIdeAndOpen,
+      openFileTab,
+      openAgent,
+      mounts,
+      revealInFolder,
     ]);
 
     return (

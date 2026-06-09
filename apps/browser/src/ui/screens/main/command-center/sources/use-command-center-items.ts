@@ -39,13 +39,24 @@ export function useCommandCenterItems({
   });
   const tabs = useTabCommandItems(query);
   const settings = useSettingsCommandItems(query);
+  // File search runs in both "files" mode and the "all" (global) mode. In
+  // global mode we always search across every connected workspace (empty
+  // filter), ignoring the per-workspace selection that only applies to the
+  // dedicated files mode.
+  const fileSearchActive = mode === 'files' || mode === 'global';
   const {
     items: fileItems,
     isLoading: fileIsLoading,
+    isRecent: fileIsRecent,
     workspaceOptions,
   } = useFileSearchCommandItems(
-    mode === 'files' ? query : '',
-    fileSearchFilter ?? EMPTY_FILE_FILTER,
+    fileSearchActive ? query : '',
+    mode === 'files'
+      ? (fileSearchFilter ?? EMPTY_FILE_FILTER)
+      : EMPTY_FILE_FILTER,
+    // Only the dedicated files mode shows recently-changed files on an empty
+    // query; the global view stays empty until the user types.
+    mode === 'files',
   );
 
   const items = useMemo<CommandCenterItem[]>(() => {
@@ -54,14 +65,20 @@ export function useCommandCenterItems({
     if (mode === 'files') return fileItems;
     if (mode === 'settings') return settings.items;
 
-    return [...agents.items, ...tabs.items, ...settings.items]
+    const ranked = [...agents.items, ...tabs.items, ...settings.items]
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, GLOBAL_LIMIT);
+    // Append file results after the ranked list so they always surface in the
+    // "all" view rather than being cut by the global limit.
+    return [...ranked, ...fileItems];
   }, [agents.items, fileItems, mode, settings.items, tabs.items]);
 
   return {
     items,
-    isLoading: mode === 'files' ? fileIsLoading : agents.isLoading,
+    isLoading: fileSearchActive
+      ? fileIsLoading || (mode === 'global' && agents.isLoading)
+      : agents.isLoading,
+    fileIsRecent,
     workspaceOptions,
     rawAgentTitles: agents.rawAgentTitles,
     refreshAgentHistory: agents.refreshHistoryList,

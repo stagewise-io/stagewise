@@ -80,6 +80,11 @@ function buildGlobalRows(items: CommandCenterItem[]): CommandCenterRenderRow[] {
   );
   pushSection(
     rows,
+    'Files',
+    indexedItems.filter(({ item }) => item.kind === 'file'),
+  );
+  pushSection(
+    rows,
     'Settings',
     indexedItems.filter(({ item }) => item.kind === 'setting'),
   );
@@ -123,12 +128,17 @@ function buildAgentRows(items: CommandCenterItem[]): CommandCenterRenderRow[] {
 export function buildGroupedRows(
   items: CommandCenterItem[],
   mode: CommandCenterMode,
+  options?: { filesLabel?: string },
 ): CommandCenterRenderRow[] {
   if (mode === 'global') return buildGlobalRows(items);
   if (mode === 'agents') return buildAgentRows(items);
 
   const label =
-    mode === 'browser' ? 'Browser' : mode === 'files' ? 'Files' : 'Settings';
+    mode === 'browser'
+      ? 'Browser'
+      : mode === 'files'
+        ? (options?.filesLabel ?? 'Files')
+        : 'Settings';
 
   return [
     {

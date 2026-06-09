@@ -194,6 +194,7 @@ export function MainSection({
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const reorderTabs = useKartonProcedure((p) => p.browser.reorderTabs);
+  const promoteFileTab = useKartonProcedure((p) => p.fileTree.promoteFileTab);
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
@@ -497,6 +498,13 @@ export function MainSection({
             e.preventDefault();
             closeTabWithUnsavedCheck(id);
           },
+          onDoubleClick: () => {
+            // Double-clicking a temporary (preview) file tab promotes it to a
+            // permanent tab, matching the file-tree double-click behavior.
+            if (tab.type === 'file' && tab.lifecycle.kind === 'temporary') {
+              void promoteFileTab(id);
+            }
+          },
           actions:
             tab.type !== 'terminal' && (tab.isPlayingAudio || tab.isMuted) ? (
               <AudioMuteButton tab={tab} />
@@ -519,7 +527,15 @@ export function MainSection({
         };
       })
       .filter((item): item is SortableTabItem => item !== null);
-  }, [visibleTabIds, tabs, activeTabId, openAgent, closeTab, removeTabUiState]);
+  }, [
+    visibleTabIds,
+    tabs,
+    activeTabId,
+    openAgent,
+    closeTab,
+    removeTabUiState,
+    promoteFileTab,
+  ]);
 
   // Split into global and agent groups for separate sortable lists
   const globalTabItems = useMemo(

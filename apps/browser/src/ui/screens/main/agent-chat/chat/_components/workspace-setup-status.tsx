@@ -9,14 +9,9 @@ import {
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import { FileIcon } from '@ui/components/file-icon';
-import { useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import { getIDEFileUrl } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
-import type {
-  AppState,
-  WorkspaceGitSetupRun,
-} from '@shared/karton-contracts/ui';
+import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
 import { IconTriangleWarningOutline18 } from 'nucleo-ui-outline-18';
 import { Loader2Icon } from 'lucide-react';
 
@@ -113,18 +108,13 @@ export function SetupRunSidePanel({
         ? 'Worktree setup failed'
         : 'Worktree setup done';
   const hasOutput = setupRun.stdoutTail || setupRun.stderrTail;
-  const globalConfig = useKartonState((s: AppState) => s.globalConfig);
   const scriptName = getBaseName(setupRun.scriptPath) || setupRun.scriptPath;
-  const resolveScriptPath = useCallback(
-    (filePath: string) => (filePath === setupRun.scriptPath ? filePath : null),
-    [setupRun.scriptPath],
-  );
   const handleOpenScript = useCallback(() => {
     window.open(
-      getIDEFileUrl(setupRun.scriptPath, globalConfig.openFilesInIde),
+      `stagewise://reveal-file/${encodeURIComponent(setupRun.scriptPath)}`,
       '_blank',
     );
-  }, [globalConfig.openFilesInIde, setupRun.scriptPath]);
+  }, [setupRun.scriptPath]);
 
   return (
     <>
@@ -149,10 +139,7 @@ export function SetupRunSidePanel({
           <span className="pt-0.5 text-subtle-foreground leading-none">
             Script
           </span>
-          <FileContextMenu
-            relativePath={setupRun.scriptPath}
-            resolvePath={resolveScriptPath}
-          >
+          <FileContextMenu relativePath={setupRun.scriptPath}>
             <Tooltip>
               <TooltipTrigger>
                 <Button

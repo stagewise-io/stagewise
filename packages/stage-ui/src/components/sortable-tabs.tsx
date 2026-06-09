@@ -116,6 +116,10 @@ export interface SortableTabItem {
    */
   onAuxClick?: (e: React.MouseEvent) => void;
   /**
+   * Double-click handler on the outer tab wrapper. Bar variant only.
+   */
+  onDoubleClick?: (e: React.MouseEvent) => void;
+  /**
    * Extra React content rendered as a flex sibling between the label
    * trigger area and the close button. Bar variant only. Renders outside
    * `Tabs.Tab` so nested interactive elements (buttons) are valid DOM.
@@ -208,6 +212,7 @@ function BarTriggerContent({
   const el = (
     <div
       onAuxClick={item.onAuxClick}
+      onDoubleClick={item.onDoubleClick}
       className={cn(
         'group relative flex h-7 flex-row items-stretch rounded-md transition-colors duration-150 ease-out',
         isActive ? 'bg-surface-1' : 'bg-transparent hover:bg-surface-1',

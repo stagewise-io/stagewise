@@ -1,77 +1,11 @@
 import { Button } from '@stagewise/stage-ui/components/button';
-import { SearchableSelect } from '@stagewise/stage-ui/components/searchable-select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { toast } from '@stagewise/stage-ui/components/toaster';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { IdeLogo } from '@ui/components/ide-logo';
-import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
-import { IDE_SELECTION_ITEMS } from '@ui/utils';
 import { PlayIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
-
-// =============================================================================
-// IDE Selection Setting Component
-// =============================================================================
-
-const IDE_OPTIONS: { value: OpenFilesInIde; label: string }[] = [
-  { value: 'cursor', label: 'Cursor' },
-  { value: 'zed', label: 'Zed' },
-  { value: 'vscode', label: 'VS Code' },
-  { value: 'kiro', label: 'Kiro' },
-  { value: 'windsurf', label: 'Windsurf' },
-  { value: 'trae', label: 'Trae' },
-  { value: 'other', label: IDE_SELECTION_ITEMS.other },
-];
-
-function IdeSelectionSetting() {
-  const globalConfig = useKartonState((s) => s.globalConfig);
-  const setGlobalConfig = useKartonProcedure((p) => p.config.set);
-
-  const currentIde = globalConfig.openFilesInIde;
-
-  const handleIdeChange = async (value: string) => {
-    await setGlobalConfig({
-      openFilesInIde: value as OpenFilesInIde,
-      hasSetIde: true,
-    });
-  };
-
-  const selectItems = IDE_OPTIONS.map((option) => ({
-    value: option.value,
-    label: option.label,
-    triggerLabel: (
-      <div className="flex items-center gap-2">
-        <IdeLogo ide={option.value} className="size-4" />
-        {option.label}
-      </div>
-    ),
-    icon: <IdeLogo ide={option.value} className="size-4" />,
-    searchText: option.label,
-  }));
-
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <h3 className="font-medium text-base text-foreground">Open files in</h3>
-        <p className="text-muted-foreground text-sm">
-          Choose which file manager to use when opening files in the agent chat.
-        </p>
-      </div>
-
-      <SearchableSelect
-        value={currentIde}
-        onValueChange={(value) => handleIdeChange(value as OpenFilesInIde)}
-        items={selectItems}
-        triggerVariant="secondary"
-        size="xs"
-        triggerClassName="w-auto min-w-0 px-2 py-3"
-        side="bottom"
-      />
-    </div>
-  );
-}
 
 // =============================================================================
 // Power Save Blocker Setting Component
@@ -367,7 +301,6 @@ export function GeneralSettingsSection() {
             <h1 className="font-semibold text-foreground text-xl">General</h1>
           </div>
           <section className="space-y-6">
-            <IdeSelectionSetting />
             <PowerSaveBlockerSetting />
           </section>
 

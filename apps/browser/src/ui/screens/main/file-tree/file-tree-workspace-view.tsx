@@ -881,7 +881,7 @@ export function FileTreeWorkspaceView({
       >
         <Virtuoso
           ref={virtuosoRef}
-          className="size-full py-0.5"
+          className="scrollbar-subtle size-full py-0.5"
           data={rows}
           computeItemKey={(_, row) => row.id}
           itemContent={(index, row) => (

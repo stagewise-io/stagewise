@@ -1,5 +1,10 @@
 import { FileIcon } from '@ui/components/file-icon';
 import { cn } from '@ui/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 import type { FileTreeEntry } from '@shared/karton-contracts/ui';
 import { ChevronRightIcon, FolderIcon, Loader2Icon } from 'lucide-react';
 import {
@@ -64,18 +69,25 @@ export const FileTreeNode = memo(function FileTreeNode({
   onRenameCancel,
 }: FileTreeNodeProps) {
   const isDirectory = entry.kind === 'directory';
+  const folderPath = entry.relativePath.includes('/')
+    ? entry.relativePath.slice(0, entry.relativePath.lastIndexOf('/'))
+    : '';
 
-  return renaming ? (
-    <RenameRow
-      entry={entry}
-      depth={depth}
-      expanded={expanded}
-      loading={loading}
-      rowIndex={rowIndex}
-      onSubmit={onRenameSubmit}
-      onCancel={onRenameCancel}
-    />
-  ) : (
+  if (renaming) {
+    return (
+      <RenameRow
+        entry={entry}
+        depth={depth}
+        expanded={expanded}
+        loading={loading}
+        rowIndex={rowIndex}
+        onSubmit={onRenameSubmit}
+        onCancel={onRenameCancel}
+      />
+    );
+  }
+
+  const button = (
     <button
       type="button"
       className={cn(
@@ -135,12 +147,28 @@ export const FileTreeNode = memo(function FileTreeNode({
       onDoubleClick={() => {
         if (!isDirectory) onOpen();
       }}
-      title={entry.relativePath}
       onFocus={onFocus}
     >
       <TreeNodeIcon entry={entry} expanded={expanded} loading={loading} />
       <span className="min-w-0 truncate">{entry.name}</span>
     </button>
+  );
+
+  // Only files get the rich name/path tooltip; directories keep no tooltip.
+  if (isDirectory) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipContent side="right" align="start">
+        <div className="flex flex-col">
+          <span className="font-medium">{entry.name}</span>
+          {folderPath && (
+            <span className="text-muted-foreground">{folderPath}</span>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 });
 
