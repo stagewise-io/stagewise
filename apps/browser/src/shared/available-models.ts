@@ -127,6 +127,47 @@ export const availableModels = [
   // Anthropic Models
   {
     officialProvider: 'anthropic',
+    modelId: 'claude-fable-5',
+    modelDisplayName: 'Fable 5',
+    modelDescription:
+      "Anthropic's next-generation frontier model for complex reasoning, long-horizon coding, and agentic workflows.",
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
+    headers: anthropicHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      anthropic: {
+        thinking: { type: 'adaptive' },
+        effort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 10.0,
+      outputPerMillion: 50.0,
+      relativeMultiplier: 10.0,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: ANTHROPIC_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'anthropic',
     modelId: 'claude-opus-4.8',
     modelDisplayName: 'Opus 4.8',
     modelDescription:

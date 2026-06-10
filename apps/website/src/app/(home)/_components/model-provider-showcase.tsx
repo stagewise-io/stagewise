@@ -48,6 +48,7 @@ const PROVIDERS: ProviderInfo[] = [
     description:
       'Best-in-class instruction following and long-context reasoning.',
     models: [
+      { name: 'Fable 5', tier: 'frontier' },
       { name: 'Opus 4.8', tier: 'frontier' },
       { name: 'Opus 4.7', tier: 'frontier' },
       { name: 'Opus 4.6', tier: 'frontier' },
