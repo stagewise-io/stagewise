@@ -2906,7 +2906,8 @@ export class WindowLayoutService extends DisposableService {
         return true;
       });
       const activeId = this.uiKarton.state.contentTabs.activeTabId;
-      const activeIndex = activeId ? allIds.indexOf(activeId) : -1;
+      let activeIndex = activeId ? allIds.indexOf(activeId) : -1;
+      if (activeIndex === -1 && allIds.length > 0) activeIndex = 0;
       const state: PersistedTabState = {
         tabs: allIds.map((id) => {
           const terminalTab = contentTabsTabs[id];
