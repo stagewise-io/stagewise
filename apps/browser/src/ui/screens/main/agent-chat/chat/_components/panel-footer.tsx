@@ -302,6 +302,16 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
 
+  const hasVisibleBrowsingTab = useKartonState((s) => {
+    const tabId = s.contentTabs.activeTabId;
+    if (!tabId) return false;
+    const tab = s.contentTabs.tabs[tabId];
+    if (!tab) return false;
+    return (
+      tab.type !== 'terminal' && !tab.url?.startsWith('stagewise://internal/')
+    );
+  });
+
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
     return selectionModeActive;
@@ -1669,7 +1679,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
           isAgentWorking={isWorking}
           hasPendingQuestion={hasPendingQuestion}
           onStop={stableAbortAgent}
-          showElementSelectorButton
+          showElementSelectorButton={hasVisibleBrowsingTab}
           elementSelectionActive={elementSelectionActive}
           onToggleElementSelection={handleToggleElementSelection}
           elementSelectorDisabled={hasOpenedInternalPage}
