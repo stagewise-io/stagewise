@@ -2434,7 +2434,9 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
     const colonIdx = workspaceKey.indexOf(':');
     if (colonIdx <= 0) return '';
     const mountPrefix = workspaceKey.slice(0, colonIdx);
-    return `workspace://${mountPrefix}/${encodeURIComponent(relativePath)}`;
+    const workspaceRoot = workspaceKey.slice(colonIdx + 1);
+    const params = new URLSearchParams({ root: workspaceRoot });
+    return `workspace://${mountPrefix}/${encodeURIComponent(relativePath)}?${params}`;
   }, [workspaceKey, relativePath, tab.agentInstanceId]);
 
   // The file-tree watcher bumps the revision of the directory backing each

@@ -224,16 +224,18 @@ export class PagesService extends DisposableService {
         const relativePath = decodeURIComponent(
           url.pathname.replace(/^\//, ''),
         );
+        const requestedRoot = url.searchParams.get('root');
 
         if (!mountPrefix || !relativePath)
           return new Response('Invalid workspace URL', { status: 400 });
 
-        const workspaceRoot = this.findMountPath(mountPrefix);
+        const workspaceRoot = this.findMountPath(mountPrefix, requestedRoot);
         if (!workspaceRoot)
           return new Response('Mount not found', { status: 404 });
 
-        const absolutePath = path.resolve(workspaceRoot, relativePath);
-        if (!absolutePath.startsWith(workspaceRoot + path.sep))
+        const resolvedWorkspaceRoot = path.resolve(workspaceRoot);
+        const absolutePath = path.resolve(resolvedWorkspaceRoot, relativePath);
+        if (!absolutePath.startsWith(resolvedWorkspaceRoot + path.sep))
           return new Response('Path traversal denied', { status: 400 });
 
         const mime = inferMimeType(relativePath);
@@ -669,9 +671,20 @@ export class PagesService extends DisposableService {
 
   // ── Port & lifecycle ──
 
-  private findMountPath(prefix: string): string | null {
-    for (const mount of this.kartonServer.state.workspaceMounts)
-      if (mount.prefix === prefix) return mount.path;
+  private findMountPath(
+    prefix: string,
+    root: string | null = null,
+  ): string | null {
+    const resolvedRoot = root ? path.resolve(root) : null;
+
+    for (const mount of this.kartonServer.state.workspaceMounts) {
+      if (
+        mount.prefix === prefix &&
+        (!resolvedRoot || path.resolve(mount.path) === resolvedRoot)
+      ) {
+        return mount.path;
+      }
+    }
     return null;
   }
 

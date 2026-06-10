@@ -318,7 +318,9 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       try {
         const url = new URL(request.url);
         const agentId = url.hostname;
-        const attachmentId = url.pathname.replace(/^\//, '');
+        const attachmentId = decodeURIComponent(
+          url.pathname.replace(/^\//, ''),
+        );
 
         if (!agentId || !attachmentId) {
           return new Response('Invalid attachment URL', { status: 400 });
@@ -363,16 +365,18 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         const relativePath = decodeURIComponent(
           url.pathname.replace(/^\//, ''),
         );
+        const requestedRoot = url.searchParams.get('root');
 
         if (!mountPrefix || !relativePath)
           return new Response('Invalid workspace URL', { status: 400 });
 
-        const workspaceRoot = this.findMountPath(mountPrefix);
+        const workspaceRoot = this.findMountPath(mountPrefix, requestedRoot);
         if (!workspaceRoot)
           return new Response('Mount not found', { status: 404 });
 
-        const absolutePath = path.resolve(workspaceRoot, relativePath);
-        if (!absolutePath.startsWith(workspaceRoot + path.sep))
+        const resolvedWorkspaceRoot = path.resolve(workspaceRoot);
+        const absolutePath = path.resolve(resolvedWorkspaceRoot, relativePath);
+        if (!absolutePath.startsWith(resolvedWorkspaceRoot + path.sep))
           return new Response('Path traversal denied', { status: 400 });
 
         const mime = inferMimeType(relativePath);
@@ -405,14 +409,30 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
   }
 
   /**
-   * Find the absolute workspace path for a mount prefix by scanning
-   * all agents' toolbox mounts in Karton state.
+   * Find the absolute workspace path for a mount prefix by scanning global
+   * workspace mounts and all agents' toolbox mounts in Karton state.
+   *
+   * When a root is provided, require an exact mounted root match so
+   * workspace:// URLs can resolve duplicate prefixes unambiguously without
+   * granting access to arbitrary filesystem paths.
    */
-  private findMountPath(prefix: string): string | null {
+  private findMountPath(
+    prefix: string,
+    root: string | null = null,
+  ): string | null {
+    const resolvedRoot = root ? path.resolve(root) : null;
+    const matches = (mount: { prefix: string; path: string }) =>
+      mount.prefix === prefix &&
+      (!resolvedRoot || path.resolve(mount.path) === resolvedRoot);
+
+    for (const mount of this.uiKarton.state.workspaceMounts) {
+      if (matches(mount)) return mount.path;
+    }
+
     for (const agentId in this.uiKarton.state.toolbox) {
       const mounts = this.uiKarton.state.toolbox[agentId]?.workspace?.mounts;
       if (!mounts) continue;
-      for (const m of mounts) if (m.prefix === prefix) return m.path;
+      for (const mount of mounts) if (matches(mount)) return mount.path;
     }
     return null;
   }

@@ -654,7 +654,7 @@ export class FileTreeService extends DisposableService {
         throw new Error('Path escapes workspace root');
       }
 
-      await fs.writeFile(absolutePath, content, 'utf-8');
+      await fs.writeFile(realPath, content, 'utf-8');
 
       const mountKey = this.getWorkspaceKey(mount);
       // Clear the delete notice on any tabs tracking this file.
