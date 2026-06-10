@@ -22,7 +22,7 @@ import type {
 } from '@shared/karton-contracts/ui';
 import { FILE_SAVE_CONFLICT_CODE } from '@shared/karton-contracts/ui';
 import { inferMimeType } from '@shared/mime-utils';
-import { getBaseName, normalizePath } from '@shared/path-utils';
+import { normalizePath } from '@shared/path-utils';
 import { getRipgrepPath } from '@stagewise/agent-runtime-node';
 import { DisposableService } from '../disposable';
 import { getRipgrepBasePath } from '@/utils/paths';
@@ -713,20 +713,6 @@ export class FileTreeService extends DisposableService {
       const validated = await this.validatePath(workspaceKey, relativePath);
       shell.showItemInFolder(validated.realPath);
       return { success: true };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: message };
-    }
-  }
-
-  async openExternally(
-    workspaceKey: string,
-    relativePath: string,
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const validated = await this.validatePath(workspaceKey, relativePath);
-      const error = await shell.openPath(validated.realPath);
-      return error ? { success: false, error } : { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: message };
@@ -1896,8 +1882,4 @@ export class FileTreeService extends DisposableService {
     this.directoryCache.clear();
     this.ignoreCache.clear();
   }
-}
-
-export function getFileTreeTabTitle(relativePath: string): string {
-  return getBaseName(relativePath) || 'File';
 }

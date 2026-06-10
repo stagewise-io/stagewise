@@ -912,16 +912,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       fileTreeService.revealInFolder(workspaceKey, relativePath),
   );
   uiKarton.registerServerProcedureHandler(
-    'fileTree.openExternally',
-    async (_cid, workspaceKey: string, relativePath: string) =>
-      fileTreeService.openExternally(workspaceKey, relativePath),
-  );
-  uiKarton.registerServerProcedureHandler(
-    'fileTree.revealInFileTree',
-    async (_cid, workspaceKey: string, relativePath: string) =>
-      fileTreeService.revealInFileTree(workspaceKey, relativePath),
-  );
-  uiKarton.registerServerProcedureHandler(
     'fileTree.setVisible',
     async (_cid, visible: boolean) => fileTreeService.setVisible(visible),
   );
