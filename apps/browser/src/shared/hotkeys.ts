@@ -125,6 +125,15 @@ export enum HotkeyActions {
   SAVE_FILE = 'save_file',
   UNDO_FILE_EDIT = 'undo_file_edit',
   REDO_FILE_EDIT = 'redo_file_edit',
+
+  // SVG preview
+  TOGGLE_SVG_CODE_MODE = 'toggle_svg_code_mode',
+  CENTER_IMAGE = 'center_image',
+  CYCLE_SVG_BG = 'cycle_svg_bg',
+  CYCLE_SVG_FG = 'cycle_svg_fg',
+
+  // Markdown preview
+  TOGGLE_MARKDOWN_PREVIEW = 'toggle_markdown_preview',
 }
 
 /**
@@ -422,6 +431,26 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.REDO_FILE_EDIT]: {
     accelerator: 'Mod+Shift+Z',
     aliases: ['Mod+Y'],
+    captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_SVG_CODE_MODE]: {
+    accelerator: 'Mod+Shift+V',
+    captureDominantly: true,
+  },
+  [HotkeyActions.CENTER_IMAGE]: {
+    accelerator: 'Mod+Shift+C',
+    captureDominantly: true,
+  },
+  [HotkeyActions.CYCLE_SVG_BG]: {
+    accelerator: 'Mod+Shift+B',
+    captureDominantly: true,
+  },
+  [HotkeyActions.CYCLE_SVG_FG]: {
+    accelerator: 'Mod+Shift+F',
+    captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_MARKDOWN_PREVIEW]: {
+    accelerator: 'Mod+Shift+V',
     captureDominantly: true,
   },
 };

@@ -2337,14 +2337,16 @@ export function AgentsList() {
         <Button
           variant="ghost"
           size="sm"
-          className="group/new-agent w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
+          className="group/new-agent relative w-full justify-start pl-1.5 text-start font-medium hover:bg-foreground/8"
           onClick={handleCreateAgent}
         >
-          <IconPenPlusOutline18 className="size-4" />
-          New Agent
+          <IconPenPlusOutline18 className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-left transition-[mask-image] duration-200 group-hover/new-agent:[mask-image:linear-gradient(to_right,black_calc(100%-56px),transparent_100%)]">
+            New Agent
+          </span>
           <HotkeyCombo
             action={HotkeyActions.NEW_CHAT}
-            className="ml-auto opacity-0 transition-opacity group-hover/new-agent:opacity-100"
+            className="absolute top-1/2 right-1.5 -translate-y-1/2 opacity-0 transition-opacity group-hover/new-agent:opacity-100"
             size="xs"
             variant="chrome"
           />

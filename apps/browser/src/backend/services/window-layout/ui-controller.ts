@@ -713,6 +713,15 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.clearFileNotice',
+      async (_callingClientId: string, tabId: string) => {
+        this.uiKarton.setState((draft) => {
+          const tab = draft.contentTabs.tabs[tabId];
+          if (tab) tab.fileNotice = undefined;
+        });
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.closeTab',
       async (_callingClientId: string, tabId: string) => {
         this.emit('closeTab', tabId);

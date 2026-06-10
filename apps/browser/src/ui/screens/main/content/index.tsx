@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -54,6 +55,9 @@ import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 import { HotkeyActions } from '@shared/hotkeys';
 import {
   getFileTabUnsavedEditEntry,
+  hasFileTabUnsavedEditEntry,
+  subscribeUnsavedEdits,
+  getUnsavedEditsVersion,
   type FileTabUnsavedEditEntry,
 } from '../file-tree/file-tab-unsaved-edits';
 
@@ -473,6 +477,10 @@ export function MainSection({
   }, [closeTab, pendingUnsavedClose, removeTabUiState]);
 
   // ---------------------------------------------------------------------------
+  // Subscribe to unsaved-edits changes so the tab bar re-renders when
+  // dirty state changes (no Karton field for this yet).
+  useSyncExternalStore(subscribeUnsavedEdits, getUnsavedEditsVersion);
+
   // Build SortableTabItem[] from optimistic order + Karton tab state
   // ---------------------------------------------------------------------------
   const tabItems = useMemo<SortableTabItem[]>(() => {
@@ -498,6 +506,8 @@ export function MainSection({
             e.preventDefault();
             closeTabWithUnsavedCheck(id);
           },
+          dirty:
+            tab.type === 'file' ? hasFileTabUnsavedEditEntry(id) : undefined,
           onDoubleClick: () => {
             // Double-clicking a temporary (preview) file tab promotes it to a
             // permanent tab, matching the file-tree double-click behavior.

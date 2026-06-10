@@ -6,7 +6,6 @@ import ignore, { type Ignore } from 'ignore';
 import type { Logger } from '../logger';
 import type { KartonService } from '../karton';
 import type {
-  AppState,
   FilePreviewKind,
   FilePreviewResult,
   FileStatResult,
@@ -515,6 +514,9 @@ export class FileTreeService extends DisposableService {
 
       if (operation === 'cut') {
         if (path.dirname(source.realPath) === targetDirectory.realPath) {
+          this.bumpDirectoryRevisionsNow(targetDirectory.key, [
+            targetDirectory.relativePath,
+          ]);
           return { success: true, relativePath: source.relativePath };
         }
         if (await this.pathExists(destinationPath)) {
@@ -564,6 +566,37 @@ export class FileTreeService extends DisposableService {
       );
       this.bumpDirectoryRevisionsNow(validated.key, [parentPath]);
       return { success: true, relativePath: parentPath };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }
+
+  async recreateDeletedFile(
+    workspaceKey: string,
+    relativePath: string,
+    content: string,
+  ): Promise<FileTreeOperationResult> {
+    try {
+      const validated = await this.validatePath(workspaceKey, relativePath);
+      await fs.writeFile(validated.absolutePath, content, 'utf-8');
+      // Clear the delete notice on any tabs tracking this file.
+      this.uiKarton.setState((draft) => {
+        for (const tab of Object.values(draft.contentTabs.tabs)) {
+          if (
+            tab.fileNotice?.kind === 'deleted' &&
+            tab.file?.workspaceKey === validated.key &&
+            tab.file.relativePath === validated.relativePath
+          ) {
+            tab.fileNotice = undefined;
+          }
+        }
+      });
+      const parentPath = this.normalizeRelative(
+        path.dirname(validated.relativePath),
+      );
+      this.bumpDirectoryRevisionsNow(validated.key, [parentPath]);
+      return { success: true, relativePath: validated.relativePath };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: message };
@@ -1218,6 +1251,7 @@ export class FileTreeService extends DisposableService {
         if (root) file.absolutePath = path.resolve(root, nextRelativePath);
         tab.title = path.basename(nextRelativePath) || 'File';
         tab.url = `file-tree://${encodeURIComponent(workspaceKey)}/${encodeURIComponent(nextRelativePath)}`;
+        tab.fileNotice = { kind: 'moved', fromRelativePath: normalizedFrom };
       }
     });
   }
@@ -1228,7 +1262,7 @@ export class FileTreeService extends DisposableService {
   ): void {
     const normalized = this.normalizeRelative(relativePath);
     this.uiKarton.setState((draft) => {
-      for (const [tabId, tab] of Object.entries(draft.contentTabs.tabs)) {
+      for (const [, tab] of Object.entries(draft.contentTabs.tabs)) {
         const file = tab.file;
         if (!file || file.workspaceKey !== workspaceKey) continue;
         if (
@@ -1237,45 +1271,11 @@ export class FileTreeService extends DisposableService {
         ) {
           continue;
         }
-        delete draft.contentTabs.tabs[tabId];
-        this.cleanupContentTabOrders(draft.contentTabs, tabId);
-        if (draft.contentTabs.activeTabId === tabId) {
-          draft.contentTabs.activeTabId = this.getFallbackContentTabId(
-            draft.contentTabs,
-          );
-        }
+        // Instead of closing, mark with a delete notice so the user can
+        // choose to close or re-create the file.
+        tab.fileNotice = { kind: 'deleted' };
       }
     });
-  }
-
-  private cleanupContentTabOrders(
-    contentTabs: AppState['contentTabs'],
-    removedTabId: string,
-  ): void {
-    contentTabs.globalOrder = contentTabs.globalOrder.filter(
-      (id) => id !== removedTabId,
-    );
-    for (const agentId of Object.keys(contentTabs.agentOrders)) {
-      contentTabs.agentOrders[agentId] = contentTabs.agentOrders[
-        agentId
-      ]!.filter((id) => id !== removedTabId);
-      if (contentTabs.agentOrders[agentId]!.length === 0) {
-        delete contentTabs.agentOrders[agentId];
-      }
-    }
-  }
-
-  private getFallbackContentTabId(
-    contentTabs: AppState['contentTabs'],
-  ): string | null {
-    return (
-      contentTabs.globalOrder.find((id) => contentTabs.tabs[id]) ??
-      Object.values(contentTabs.agentOrders)
-        .flat()
-        .find((id) => contentTabs.tabs[id]) ??
-      Object.keys(contentTabs.tabs)[0] ??
-      null
-    );
   }
 
   private bumpDirectoryRevisionsNow(

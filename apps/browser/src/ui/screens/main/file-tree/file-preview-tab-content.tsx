@@ -35,6 +35,7 @@ import {
   MinusIcon,
   PlusIcon,
   TriangleAlertIcon,
+  XIcon,
 } from 'lucide-react';
 import {
   IconFloppyDiskOutline18,
@@ -57,12 +58,17 @@ import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { FileIcon } from '@ui/components/file-icon';
 import { IdeLogo } from '@ui/components/ide-logo';
-import { getIDEFileUrl, IDE_SELECTION_ITEMS } from '@shared/ide-url';
+import {
+  getIDEFileUrl,
+  IDE_SELECTION_ITEMS,
+  nativeFileManagerLabel,
+} from '@shared/ide-url';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import {
   clearFileTabUnsavedEditEntry,
   setFileTabUnsavedEditEntry,
 } from './file-tab-unsaved-edits';
+import { Streamdown } from '@ui/components/streamdown';
 
 const MONACO_THEME_NAME = 'stagewise-file-preview';
 
@@ -274,6 +280,11 @@ function languageFromPath(path: string): SourceLanguage {
   }
 }
 
+function isMarkdownPath(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase();
+  return ext === 'md' || ext === 'mdx';
+}
+
 function toHexChannel(value: number): string {
   return Math.max(0, Math.min(255, Math.round(value)))
     .toString(16)
@@ -366,6 +377,7 @@ function resolveCssColor(cssVariable: string, fallback = '#ffffff'): string {
 }
 
 function configureMonacoTheme(monaco: MonacoApi) {
+  configureMonacoTypeScript(monaco);
   const color = (name: string, fallback?: string) =>
     resolveCssColor(name, fallback);
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -458,6 +470,104 @@ function registerMonacoThemeSync(monaco: MonacoApi) {
     configureMonacoTheme(monaco);
     monaco.editor.setTheme(MONACO_THEME_NAME);
   });
+}
+
+// Monaco's built-in TypeScript worker runs an embedded language service that
+// has no access to the project's tsconfig.json, node_modules, or path aliases.
+// This causes spurious errors (red squigglies) on valid code. The real LSP
+// runs on the backend (LspService); the frontend editor is a viewer, not an
+// IDE, so we disable Monaco's inline diagnostics entirely.
+let monacoTSDiagnosticsDisabled = false;
+function configureMonacoTypeScript(monaco: MonacoApi) {
+  if (monacoTSDiagnosticsDisabled) return;
+  monacoTSDiagnosticsDisabled = true;
+  const noValidation = { noSemanticValidation: true, noSyntaxValidation: true };
+  // monaco.languages.typescript is deprecated at the type level in Monaco
+  // 0.55 (the declarations are stubbed), but the runtime API still exists.
+  // We use a cast because importing from 'monaco-editor' directly would
+  // bundle it eagerly instead of loading it dynamically via the wrapper.
+  const ts = monaco.languages.typescript as unknown as {
+    typescriptDefaults: {
+      setDiagnosticsOptions(opts: Record<string, boolean>): void;
+    };
+    javascriptDefaults: {
+      setDiagnosticsOptions(opts: Record<string, boolean>): void;
+    };
+  };
+  ts.typescriptDefaults.setDiagnosticsOptions(noValidation);
+  ts.javascriptDefaults.setDiagnosticsOptions(noValidation);
+}
+
+// Shared Monaco editor options used by both TextEditorPreview and SvgPreview
+// source mode. fontSize, lineHeight, and readOnly are applied per-instance.
+const MONACO_SOURCE_FONT_FAMILY =
+  "'Roboto Mono', Menlo, Monaco, stagewise-builtin-roboto-mono, 'Noto Sans Mono', ui-monospace, 'SF Mono', 'Segoe UI Mono', 'Ubuntu Mono', 'Noto Mono', 'Liberation Mono', 'Inter Mono', Consolas, monospace";
+
+const MONACO_SHARED_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions =
+  {
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    wordWrap: 'on',
+    automaticLayout: true,
+    renderLineHighlight: 'line',
+    scrollbar: {
+      verticalScrollbarSize: 6,
+      horizontalScrollbarSize: 6,
+    },
+    fontFamily: MONACO_SOURCE_FONT_FAMILY,
+  };
+
+/** Register Ctrl+/Ctrl-/Ctrl+0 zoom commands on a Monaco editor instance. */
+function registerMonacoZoomCommands(
+  editor: MonacoEditorInstance,
+  monaco: MonacoApi,
+  markFocused: () => void,
+  updateZoom: (next: number) => void,
+  zoomPercentageRef: React.MutableRefObject<number>,
+) {
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Equal, () => {
+    markFocused();
+    updateZoom(zoomPercentageRef.current + 10);
+  });
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Minus, () => {
+    markFocused();
+    updateZoom(zoomPercentageRef.current - 10);
+  });
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit0, () => {
+    markFocused();
+    updateZoom(100);
+  });
+}
+
+/** Track the Monaco editor cursor position for the status bar. */
+function useSourceCursorPosition(editor: MonacoEditorInstance | null): {
+  lineNumber: number;
+  column: number;
+} {
+  const [cursorPosition, setCursorPosition] = useState({
+    lineNumber: 1,
+    column: 1,
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+    const position = editor.getPosition();
+    if (position) {
+      setCursorPosition({
+        lineNumber: position.lineNumber,
+        column: position.column,
+      });
+    }
+    const disposable = editor.onDidChangeCursorPosition((event) => {
+      setCursorPosition({
+        lineNumber: event.position.lineNumber,
+        column: event.position.column,
+      });
+    });
+    return () => disposable.dispose();
+  }, [editor]);
+
+  return cursorPosition;
 }
 
 function createEditorActionState(editor: MonacoEditorInstance | null) {
@@ -658,6 +768,13 @@ function useEditorActions(
   useHotKeyListener(undo, HotkeyActions.UNDO_FILE_EDIT);
   useHotKeyListener(redo, HotkeyActions.REDO_FILE_EDIT);
 
+  // Keep dirty state in sync with the text value regardless of editor
+  // mount state. When the editor is unmounted (e.g. SVG preview mode),
+  // onDidChangeModelContent doesn't fire, so we rely on this effect.
+  useEffect(() => {
+    refreshActionState();
+  }, [text, refreshActionState]);
+
   useEffect(() => {
     if (!editor) return;
 
@@ -838,17 +955,23 @@ function FileTabToolbar({
   actions,
   right,
   openExternalPath,
+  onInteract,
 }: {
   actions: EditorActions | null;
   right?: React.ReactNode;
   openExternalPath?: string;
+  onInteract?: () => void;
 }) {
   // Read-only files (attachment blobs, bundled plugins, agent app scratch)
   // cannot be edited, so collapse the save/undo/redo controls to a single
   // read-only indicator.
   if (actions?.readOnly) {
     return (
-      <div className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1">
+      <div
+        className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1"
+        onClickCapture={onInteract}
+        onFocusCapture={onInteract}
+      >
         <div className="flex items-center gap-1.5 px-2 text-muted-foreground text-xs">
           <IconLockKeyOutline18 className="size-4" />
           <span>Read-only</span>
@@ -868,7 +991,11 @@ function FileTabToolbar({
   }
 
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1">
+    <div
+      className="flex h-9 shrink-0 items-center justify-between border-border-subtle border-b bg-background px-1"
+      onClickCapture={onInteract}
+      onFocusCapture={onInteract}
+    >
       <div className="flex items-center">
         <div className="flex items-center px-1">
           <ToolbarTooltip label="Save file" shortcut={HotkeyActions.SAVE_FILE}>
@@ -944,7 +1071,7 @@ function ExternalChangeBanner({ actions }: { actions: EditorActions }) {
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button
-          variant="secondary"
+          variant="ghost"
           size="xs"
           onClick={() => actions.reload()}
           disabled={actions.isSaving}
@@ -964,7 +1091,85 @@ function ExternalChangeBanner({ actions }: { actions: EditorActions }) {
   );
 }
 
-function useFileCodeZoom(tabId: string) {
+/**
+ * Banner shown when a file was moved (via drag-and-drop or cut-paste) while
+ * open in a tab. The tab path was automatically updated; future edits go to
+ * the new location. Dismissible.
+ */
+function FileMoveBanner({
+  fromPath,
+  toPath,
+  onDismiss,
+}: {
+  fromPath: string;
+  toPath: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-2 border-border border-b bg-info-solid/10 px-3 py-1.5 text-info-foreground text-xs">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <TriangleAlertIcon className="size-3.5 shrink-0" />
+        <span className="truncate">
+          File moved from {fromPath} to {toPath}. Future edits will apply to the
+          new location.
+        </span>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon-2xs"
+        className="shrink-0"
+        onClick={onDismiss}
+      >
+        <XIcon className="size-3" />
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Banner shown when a file open in a tab was deleted. The user can close the
+ * tab or re-create the file with the current editor content.
+ */
+function FileDeletedBanner({
+  onClose,
+  onRecreate,
+  isRecreating,
+}: {
+  onClose: () => void;
+  onRecreate: () => void;
+  isRecreating: boolean;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-2 border-border border-b bg-error-solid/10 px-3 py-1.5 text-error-foreground text-xs">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <TriangleAlertIcon className="size-3.5 shrink-0" />
+        <span className="truncate">
+          This file was deleted outside of stagewise.
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={onRecreate}
+          disabled={isRecreating}
+        >
+          {isRecreating ? 'Recreating…' : 'Re-create and save'}
+        </Button>
+        <Button
+          variant="destructive"
+          size="xs"
+          onClick={onClose}
+          disabled={isRecreating}
+        >
+          Close
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function useFileCodeZoom(tabId: string, enabled = true) {
   const storedZoomPercentage = useKartonState(
     (s) => s.preferences.general.fileCodeZoomPercentage,
   );
@@ -1008,9 +1213,9 @@ function useFileCodeZoom(tabId: string) {
     setTabUiState(tabId, { focusedPanel: 'tab-content' });
   }, [setTabUiState, tabId]);
 
-  useHotKeyListener(zoomIn, HotkeyActions.ZOOM_IN);
-  useHotKeyListener(zoomOut, HotkeyActions.ZOOM_OUT);
-  useHotKeyListener(zoomReset, HotkeyActions.ZOOM_RESET);
+  useHotKeyListener(zoomIn, HotkeyActions.ZOOM_IN, enabled);
+  useHotKeyListener(zoomOut, HotkeyActions.ZOOM_OUT, enabled);
+  useHotKeyListener(zoomReset, HotkeyActions.ZOOM_RESET, enabled);
 
   return {
     fontSize: (12 * zoomPercentage) / 100,
@@ -1041,47 +1246,21 @@ function TextEditorPreview({
     languageFromPath(preview.relativePath),
   );
   const [editor, setEditor] = useState<MonacoEditorInstance | null>(null);
-  const [cursorPosition, setCursorPosition] = useState({
-    lineNumber: 1,
-    column: 1,
-  });
+  const cursorPosition = useSourceCursorPosition(editor);
   const actions = useEditorActions(tabId, editor, preview, text, setText);
-
-  useEffect(() => {
-    if (!editor) return;
-    const position = editor.getPosition();
-    if (position) {
-      setCursorPosition({
-        lineNumber: position.lineNumber,
-        column: position.column,
-      });
-    }
-    const disposable = editor.onDidChangeCursorPosition((event) => {
-      setCursorPosition({
-        lineNumber: event.position.lineNumber,
-        column: event.position.column,
-      });
-    });
-    return () => disposable.dispose();
-  }, [editor]);
 
   const handleMount = useCallback(
     (editor: MonacoEditorInstance, monaco: MonacoApi) => {
       setEditor(editor);
       registerMonacoThemeSync(monaco);
       editor.onDidFocusEditorWidget(markFocused);
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Equal, () => {
-        markFocused();
-        updateZoom(zoomPercentageRef.current + 10);
-      });
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Minus, () => {
-        markFocused();
-        updateZoom(zoomPercentageRef.current - 10);
-      });
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit0, () => {
-        markFocused();
-        updateZoom(100);
-      });
+      registerMonacoZoomCommands(
+        editor,
+        monaco,
+        markFocused,
+        updateZoom,
+        zoomPercentageRef,
+      );
     },
     [markFocused, updateZoom, zoomPercentageRef],
   );
@@ -1107,6 +1286,7 @@ function TextEditorPreview({
       <FileTabToolbar
         actions={actions}
         openExternalPath={getPreviewAbsolutePath(preview)}
+        onInteract={markFocused}
       />
       {actions.externalChange ? (
         <ExternalChangeBanner actions={actions} />
@@ -1126,18 +1306,8 @@ function TextEditorPreview({
           onMount={handleMount}
           onChange={handleChange}
           options={{
+            ...MONACO_SHARED_OPTIONS,
             readOnly: preview.readOnly ?? false,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            automaticLayout: true,
-            renderLineHighlight: 'line',
-            scrollbar: {
-              verticalScrollbarSize: 6,
-              horizontalScrollbarSize: 6,
-            },
-            fontFamily:
-              "'Roboto Mono', Menlo, Monaco, stagewise-builtin-roboto-mono, 'Noto Sans Mono', ui-monospace, 'SF Mono', 'Segoe UI Mono', 'Ubuntu Mono', 'Noto Mono', 'Liberation Mono', 'Inter Mono', Consolas, monospace",
             fontSize,
             lineHeight: fontSize * 1.5,
           }}
@@ -1202,7 +1372,7 @@ function getCheckerboardStyle(background: SvgPreviewBackground) {
     : undefined;
 }
 
-function useImagePanAndZoom(tabId: string) {
+function useImagePanAndZoom(tabId: string, enabled = true) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const { tabUiState, setTabUiState } = useTabUIState();
@@ -1238,9 +1408,9 @@ function useImagePanAndZoom(tabId: string) {
     setZoom(1);
   }, [isTabContentFocused]);
 
-  useHotKeyListener(handleZoomIn, HotkeyActions.ZOOM_IN);
-  useHotKeyListener(handleZoomOut, HotkeyActions.ZOOM_OUT);
-  useHotKeyListener(handleZoomReset, HotkeyActions.ZOOM_RESET);
+  useHotKeyListener(handleZoomIn, HotkeyActions.ZOOM_IN, enabled);
+  useHotKeyListener(handleZoomOut, HotkeyActions.ZOOM_OUT, enabled);
+  useHotKeyListener(handleZoomReset, HotkeyActions.ZOOM_RESET, enabled);
 
   const handleWheel = useCallback((event: React.WheelEvent) => {
     if (!event.ctrlKey && !event.metaKey) return;
@@ -1341,6 +1511,7 @@ function ImagePreview({
     '#ffffff',
   );
   const dataUrl = `data:${preview.mimeType};base64,${preview.base64}`;
+  const [imageError, setImageError] = useState(false);
   return (
     <div className="flex size-full flex-col bg-background">
       <FileTabToolbar
@@ -1469,16 +1640,27 @@ function ImagePreview({
             : getCheckerboardStyle(background)
         }
       >
-        <img
-          src={dataUrl}
-          alt={preview.relativePath}
-          className="pointer-events-none max-h-none max-w-none object-contain"
-          draggable={false}
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: 'center',
-          }}
-        />
+        {imageError ? (
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <TriangleAlertIcon className="size-8" />
+            <span className="text-sm">Unable to render this image.</span>
+            <span className="text-xs">
+              The file may be corrupt or in an unsupported format.
+            </span>
+          </div>
+        ) : (
+          <img
+            src={dataUrl}
+            alt={preview.relativePath}
+            className="pointer-events-none max-h-none max-w-none object-contain"
+            draggable={false}
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: 'center',
+            }}
+            onError={() => setImageError(true)}
+          />
+        )}
       </div>
     </div>
   );
@@ -1504,16 +1686,49 @@ function SvgPreview({
     markFocused: markSourceFocused,
     updateZoom: updateSourceZoom,
     zoomPercentageRef: sourceZoomPercentageRef,
-  } = useFileCodeZoom(tabId);
+  } = useFileCodeZoom(tabId, mode === 'source');
   const [sourceLanguage, setSourceLanguage] = useState<SourceLanguage>(() =>
     languageFromPath(preview.relativePath),
   );
   const [background, setBackground] = useState<SvgPreviewBackground>('default');
-  const [customBackground, setCustomBackground] = useState('ffffff');
+  const storedCustomBg = useKartonState(
+    (s) => s.preferences.general.svgCustomBackground,
+  );
+  const storedCustomFg = useKartonState(
+    (s) => s.preferences.general.svgCustomForeground,
+  );
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const customBackground = storedCustomBg ?? 'ffffff';
+  const customCurrentColor = storedCustomFg ?? '8b5cf6';
+  const setCustomBackground = useCallback(
+    (value: string) => {
+      void updatePreferences([
+        {
+          op: storedCustomBg === undefined ? 'add' : 'replace',
+          path: ['general', 'svgCustomBackground'],
+          value,
+        },
+      ]);
+    },
+    [storedCustomBg, updatePreferences],
+  );
+  const setCustomCurrentColor = useCallback(
+    (value: string) => {
+      void updatePreferences([
+        {
+          op: storedCustomFg === undefined ? 'add' : 'replace',
+          path: ['general', 'svgCustomForeground'],
+          value,
+        },
+      ]);
+    },
+    [storedCustomFg, updatePreferences],
+  );
   const [currentColorMode, setCurrentColorMode] =
     useState<SvgCurrentColorMode>('default');
-  const [customCurrentColor, setCustomCurrentColor] = useState('8b5cf6');
+  const [imageError, setImageError] = useState(false);
   const [editor, setEditor] = useState<MonacoEditorInstance | null>(null);
+  const cursorPosition = useSourceCursorPosition(editor);
   const actions = useEditorActions(tabId, editor, preview, text, setText);
   const previewBackgroundClassName = getPreviewBackgroundClassName(background);
   const normalizedCustomBackground = normalizeHexColor(
@@ -1524,36 +1739,60 @@ function SvgPreview({
     customCurrentColor,
     '#8b5cf6',
   );
-  const previewCurrentColor =
-    currentColorMode === 'custom'
-      ? normalizedCustomCurrentColor
-      : background === 'dark'
-        ? 'var(--color-base-50)'
-        : background === 'light'
-          ? 'var(--color-base-900)'
-          : 'var(--color-foreground)';
-  const dataUrl = useMemo(
-    () => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`,
-    [text],
-  );
+  // When loaded via <img>, the SVG lives in an isolated document context.
+  // currentColor resolves to the color property of the SVG element itself — it
+  // does NOT inherit from the parent HTML <img>. We inject a :root { color }
+  // rule into the SVG source so currentColor resolves correctly.
+  const dataUrl = useMemo(() => {
+    // CSS variables (var(--color-…)) do not resolve inside an <img>-loaded
+    // SVG's isolated document, so we resolve them to hex via the HTML DOM.
+    const color =
+      currentColorMode === 'custom'
+        ? normalizedCustomCurrentColor
+        : resolveCssColor(
+            background === 'dark'
+              ? '--color-base-50'
+              : background === 'light'
+                ? '--color-base-900'
+                : '--color-foreground',
+          );
+    const injected = text.replace(
+      /<svg([^>]*)>/,
+      `<svg$1><style>:root{color:${color}}</style>`,
+    );
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(injected)}`;
+  }, [text, currentColorMode, normalizedCustomCurrentColor, background]);
+
+  // Reset image error when the SVG data URL changes.
+  useEffect(() => {
+    setImageError(false);
+  }, [dataUrl]);
+
+  // Cmd/Ctrl+Shift+V toggles code/preview mode when the tab is focused.
+  const { tabUiState } = useTabUIState();
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const tabUiStateRef = useRef(tabUiState);
+  tabUiStateRef.current = tabUiState;
+  const toggleCodeMode = useCallback(() => {
+    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
+      return false;
+    setMode(modeRef.current === 'source' ? 'preview' : 'source');
+  }, [tabId]);
+  useHotKeyListener(toggleCodeMode, HotkeyActions.TOGGLE_SVG_CODE_MODE);
 
   const handleMount = useCallback(
     (editor: MonacoEditorInstance, monaco: MonacoApi) => {
       setEditor(editor);
       registerMonacoThemeSync(monaco);
       editor.onDidFocusEditorWidget(markSourceFocused);
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Equal, () => {
-        markSourceFocused();
-        updateSourceZoom(sourceZoomPercentageRef.current + 10);
-      });
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Minus, () => {
-        markSourceFocused();
-        updateSourceZoom(sourceZoomPercentageRef.current - 10);
-      });
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Digit0, () => {
-        markSourceFocused();
-        updateSourceZoom(100);
-      });
+      registerMonacoZoomCommands(
+        editor,
+        monaco,
+        markSourceFocused,
+        updateSourceZoom,
+        sourceZoomPercentageRef,
+      );
     },
     [markSourceFocused, sourceZoomPercentageRef, updateSourceZoom],
   );
@@ -1586,204 +1825,275 @@ function SvgPreview({
     handlePointerMove,
     clearPanCapture,
     markFocused,
-  } = useImagePanAndZoom(tabId);
+  } = useImagePanAndZoom(tabId, mode === 'preview');
+
+  // Hotkeys scoped to this SVG tab when it has focus.
+  const bgRef = useRef(background);
+  bgRef.current = background;
+  const fgRef = useRef(currentColorMode);
+  fgRef.current = currentColorMode;
+
+  const handleCenterImage = useCallback(() => {
+    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
+      return false;
+    if (modeRef.current !== 'preview') return false;
+    setPan({ x: 0, y: 0 });
+  }, [tabId, setPan]);
+  useHotKeyListener(handleCenterImage, HotkeyActions.CENTER_IMAGE);
+
+  const handleCycleBg = useCallback(() => {
+    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
+      return false;
+    const options: SvgPreviewBackground[] = [
+      'default',
+      'light',
+      'dark',
+      'checkerboard',
+      'custom',
+    ];
+    const idx = options.indexOf(bgRef.current);
+    setBackground(options[(idx + 1) % options.length]!);
+  }, [tabId]);
+  useHotKeyListener(handleCycleBg, HotkeyActions.CYCLE_SVG_BG);
+
+  const handleCycleFg = useCallback(() => {
+    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
+      return false;
+    const options: SvgCurrentColorMode[] = ['default', 'custom'];
+    const idx = options.indexOf(fgRef.current);
+    setCurrentColorMode(options[(idx + 1) % options.length]!);
+  }, [tabId]);
+  useHotKeyListener(handleCycleFg, HotkeyActions.CYCLE_SVG_FG);
 
   return (
     <div className="flex size-full flex-col bg-background">
       <FileTabToolbar
         actions={actions}
         openExternalPath={getPreviewAbsolutePath(preview)}
+        onInteract={markSourceFocused}
         right={
           <>
             {mode === 'preview' && isPanned ? (
               <div className="flex items-center pr-2 pl-1">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Center image"
-                  onClick={() => setPan({ x: 0, y: 0 })}
+                <ToolbarTooltip
+                  label="Center image"
+                  shortcut={HotkeyActions.CENTER_IMAGE}
                 >
-                  <IconArrowsToCenterOutline18 className="size-4" />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Center image"
+                    onClick={() => setPan({ x: 0, y: 0 })}
+                  >
+                    <IconArrowsToCenterOutline18 className="size-4" />
+                  </Button>
+                </ToolbarTooltip>
               </div>
             ) : null}
             {mode === 'preview' ? (
               <div className="flex items-center gap-0.5 px-1">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Zoom out"
-                  disabled={zoom <= 0.01}
-                  onClick={() => zoomBy(-0.25)}
+                <ToolbarTooltip
+                  label="Zoom out"
+                  shortcut={HotkeyActions.ZOOM_OUT}
                 >
-                  <MinusIcon className="size-4" />
-                </Button>
-                <button
-                  type="button"
-                  className="min-w-10 text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
-                  onClick={() => setZoom(1)}
-                  aria-label="Reset zoom"
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Zoom out"
+                    disabled={zoom <= 0.01}
+                    onClick={() => zoomBy(-0.25)}
+                  >
+                    <MinusIcon className="size-4" />
+                  </Button>
+                </ToolbarTooltip>
+                <ToolbarTooltip
+                  label="Reset zoom"
+                  shortcut={HotkeyActions.ZOOM_RESET}
                 >
-                  {Math.round(zoom * 100)}%
-                </button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Zoom in"
-                  onClick={() => zoomBy(0.25)}
+                  <button
+                    type="button"
+                    className="min-w-10 cursor-pointer text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
+                    onClick={() => setZoom(1)}
+                    aria-label="Reset zoom"
+                  >
+                    {Math.round(zoom * 100)}%
+                  </button>
+                </ToolbarTooltip>
+                <ToolbarTooltip
+                  label="Zoom in"
+                  shortcut={HotkeyActions.ZOOM_IN}
                 >
-                  <PlusIcon className="size-4" />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Zoom in"
+                    onClick={() => zoomBy(0.25)}
+                  >
+                    <PlusIcon className="size-4" />
+                  </Button>
+                </ToolbarTooltip>
               </div>
             ) : null}
             {mode === 'preview' ? (
               <>
                 <div className="h-5 w-px bg-border-subtle" />
                 <div className="flex items-center px-1">
-                  <Popover>
-                    <PopoverTrigger>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label="Preview config"
-                      >
-                        <IconColorPaletteOutline18 className="size-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-80 gap-3 p-3">
-                      <div className="font-medium text-foreground text-xs">
-                        Colors
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                            <IconTextBgColorOutline18 className="size-3" />
-                            Background
-                          </span>
-                          <Select<SvgPreviewBackground>
-                            items={[
-                              { value: 'default', label: 'Default' },
-                              { value: 'light', label: 'Light' },
-                              { value: 'dark', label: 'Dark' },
-                              { value: 'checkerboard', label: 'Checkerboard' },
-                              { value: 'custom', label: 'Custom' },
-                            ]}
-                            value={background}
-                            onValueChange={(value) => setBackground(value)}
-                            size="sm"
-                          />
-                          {background === 'custom' ? (
-                            <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
-                              <span className="font-mono text-muted-foreground text-sm">
-                                #
-                              </span>
-                              <Input
-                                className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
-                                size="xs"
-                                type="text"
-                                maxLength={6}
-                                value={customBackground}
-                                onValueChange={(value) =>
-                                  setCustomBackground(
-                                    String(value)
-                                      .replace(/[^0-9a-f]/gi, '')
-                                      .slice(0, 6),
-                                  )
-                                }
-                                placeholder="ffffff"
-                              />
-                            </div>
-                          ) : null}
+                  <ToolbarTooltip label="Preview config">
+                    <Popover>
+                      <PopoverTrigger>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Preview config"
+                        >
+                          <IconColorPaletteOutline18 className="size-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-80 gap-3 p-3">
+                        <div className="font-medium text-foreground text-xs">
+                          Colors
                         </div>
-                        <div className="flex flex-col gap-1.5">
-                          <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                            <IconTextColorOutline18 className="size-3" />
-                            Foreground
-                          </span>
-                          <Select<SvgCurrentColorMode>
-                            items={[
-                              { value: 'default', label: 'Default' },
-                              { value: 'custom', label: 'Custom' },
-                            ]}
-                            value={currentColorMode}
-                            onValueChange={(value) =>
-                              setCurrentColorMode(value)
-                            }
-                            size="sm"
-                          />
-                          {currentColorMode === 'custom' ? (
-                            <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
-                              <span className="font-mono text-muted-foreground text-sm">
-                                #
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="flex items-center justify-between gap-1 text-muted-foreground text-xs">
+                              <span className="flex items-center gap-1">
+                                <IconTextBgColorOutline18 className="size-3" />
+                                Background
                               </span>
-                              <Input
-                                className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
+                              <HotkeyCombo
+                                action={HotkeyActions.CYCLE_SVG_BG}
                                 size="xs"
-                                type="text"
-                                maxLength={6}
-                                value={customCurrentColor}
-                                onValueChange={(value) =>
-                                  setCustomCurrentColor(
-                                    String(value)
-                                      .replace(/[^0-9a-f]/gi, '')
-                                      .slice(0, 6),
-                                  )
-                                }
-                                placeholder="8b5cf6"
                               />
-                            </div>
-                          ) : null}
+                            </span>
+                            <Select<SvgPreviewBackground>
+                              items={[
+                                { value: 'default', label: 'Default' },
+                                { value: 'light', label: 'Light' },
+                                { value: 'dark', label: 'Dark' },
+                                {
+                                  value: 'checkerboard',
+                                  label: 'Checkerboard',
+                                },
+                                { value: 'custom', label: 'Custom' },
+                              ]}
+                              value={background}
+                              onValueChange={(value) => setBackground(value)}
+                              size="sm"
+                            />
+                            {background === 'custom' ? (
+                              <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
+                                <span className="font-mono text-muted-foreground text-sm">
+                                  #
+                                </span>
+                                <Input
+                                  className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
+                                  size="xs"
+                                  type="text"
+                                  maxLength={6}
+                                  value={customBackground}
+                                  onValueChange={(value) =>
+                                    setCustomBackground(
+                                      String(value)
+                                        .replace(/[^0-9a-f]/gi, '')
+                                        .slice(0, 6),
+                                    )
+                                  }
+                                  placeholder="ffffff"
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <span className="flex items-center justify-between gap-1 text-muted-foreground text-xs">
+                              <span className="flex items-center gap-1">
+                                <IconTextColorOutline18 className="size-3" />
+                                Foreground
+                              </span>
+                              <HotkeyCombo
+                                action={HotkeyActions.CYCLE_SVG_FG}
+                                size="xs"
+                              />
+                            </span>
+                            <Select<SvgCurrentColorMode>
+                              items={[
+                                { value: 'default', label: 'Default' },
+                                { value: 'custom', label: 'Custom' },
+                              ]}
+                              value={currentColorMode}
+                              onValueChange={(value) =>
+                                setCurrentColorMode(value)
+                              }
+                              size="sm"
+                            />
+                            {currentColorMode === 'custom' ? (
+                              <div className="flex items-center rounded-md border border-surface-2 bg-surface-1 px-2">
+                                <span className="font-mono text-muted-foreground text-sm">
+                                  #
+                                </span>
+                                <Input
+                                  className="border-0 bg-transparent px-1 font-mono focus:border-transparent"
+                                  size="xs"
+                                  type="text"
+                                  maxLength={6}
+                                  value={customCurrentColor}
+                                  onValueChange={(value) =>
+                                    setCustomCurrentColor(
+                                      String(value)
+                                        .replace(/[^0-9a-f]/gi, '')
+                                        .slice(0, 6),
+                                    )
+                                  }
+                                  placeholder="8b5cf6"
+                                />
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                      </PopoverContent>
+                    </Popover>
+                  </ToolbarTooltip>
                 </div>
               </>
             ) : null}
-            {mode === 'source' ? (
-              <div className="flex items-center px-1">
-                <SearchableSelect
-                  items={SOURCE_LANGUAGE_ITEMS}
-                  value={sourceLanguage}
-                  onValueChange={(value) =>
-                    setSourceLanguage(value as SourceLanguage)
-                  }
-                  size="xs"
-                  triggerVariant="ghost"
-                  triggerClassName="h-6 rounded-none"
-                  side="bottom"
-                />
-              </div>
-            ) : null}
             <div className="flex h-7 items-center gap-1 rounded-md bg-surface-1 p-0.5">
-              <button
-                type="button"
-                className={cn(
-                  'flex h-full items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
-                  mode === 'source' &&
-                    'bg-background text-foreground ring-1 ring-border-subtle',
-                )}
-                aria-label="Show SVG source"
-                aria-pressed={mode === 'source'}
-                onClick={() => setMode('source')}
+              <ToolbarTooltip
+                label="Show SVG source"
+                shortcut={HotkeyActions.TOGGLE_SVG_CODE_MODE}
               >
-                <IconSquareCodeOutline18 className="size-3.5" />
-                {mode === 'source' ? <span>Code</span> : null}
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'flex h-full items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
-                  mode === 'preview' &&
-                    'bg-background text-foreground ring-1 ring-border-subtle',
-                )}
-                aria-label="Show SVG preview"
-                aria-pressed={mode === 'preview'}
-                onClick={() => setMode('preview')}
+                <button
+                  type="button"
+                  className={cn(
+                    'flex h-full cursor-pointer items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                    mode === 'source' &&
+                      'bg-background text-foreground ring-1 ring-border-subtle',
+                  )}
+                  aria-label="Show SVG source"
+                  aria-pressed={mode === 'source'}
+                  onClick={() => setMode('source')}
+                >
+                  <IconSquareCodeOutline18 className="size-3.5" />
+                  {mode === 'source' ? <span>Code</span> : null}
+                </button>
+              </ToolbarTooltip>
+              <ToolbarTooltip
+                label="Show SVG preview"
+                shortcut={HotkeyActions.TOGGLE_SVG_CODE_MODE}
               >
-                <IconEye2Outline18 className="size-3.5" />
-                {mode === 'preview' ? <span>Preview</span> : null}
-              </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'flex h-full cursor-pointer items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                    mode === 'preview' &&
+                      'bg-background text-foreground ring-1 ring-border-subtle',
+                  )}
+                  aria-label="Show SVG preview"
+                  aria-pressed={mode === 'preview'}
+                  onClick={() => setMode('preview')}
+                >
+                  <IconEye2Outline18 className="size-3.5" />
+                  {mode === 'preview' ? <span>Preview</span> : null}
+                </button>
+              </ToolbarTooltip>
             </div>
           </>
         }
@@ -1812,17 +2122,27 @@ function SvgPreview({
                 : getCheckerboardStyle(background)
             }
           >
-            <img
-              src={dataUrl}
-              alt={preview.relativePath}
-              className="pointer-events-none max-h-none max-w-none object-contain"
-              draggable={false}
-              style={{
-                color: previewCurrentColor,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: 'center',
-              }}
-            />
+            {imageError ? (
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <TriangleAlertIcon className="size-8" />
+                <span className="text-sm">Unable to render this SVG.</span>
+                <span className="text-xs">
+                  The file may be malformed or contain unsupported content.
+                </span>
+              </div>
+            ) : (
+              <img
+                src={dataUrl}
+                alt={preview.relativePath}
+                className="pointer-events-none max-h-none max-w-none object-contain"
+                draggable={false}
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: 'center',
+                }}
+                onError={() => setImageError(true)}
+              />
+            )}
           </button>
         ) : (
           <div
@@ -1842,14 +2162,8 @@ function SvgPreview({
               onMount={handleMount}
               onChange={handleChange}
               options={{
+                ...MONACO_SHARED_OPTIONS,
                 readOnly: preview.readOnly ?? false,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                wordWrap: 'on',
-                automaticLayout: true,
-                renderLineHighlight: 'line',
-                fontFamily:
-                  "'Roboto Mono', Menlo, Monaco, stagewise-builtin-roboto-mono, 'Noto Sans Mono', ui-monospace, 'SF Mono', 'Segoe UI Mono', 'Ubuntu Mono', 'Noto Mono', 'Liberation Mono', 'Inter Mono', Consolas, monospace",
                 fontSize: sourceFontSize,
                 lineHeight: sourceFontSize * 1.5,
               }}
@@ -1857,20 +2171,207 @@ function SvgPreview({
           </div>
         )}
       </div>
+      {mode === 'source' ? (
+        <FileEditorStatusBar
+          lineNumber={cursorPosition.lineNumber}
+          column={cursorPosition.column}
+          language={sourceLanguage}
+          onLanguageChange={setSourceLanguage}
+        />
+      ) : null}
     </div>
   );
 }
 
-function BinaryPreview() {
+function MarkdownPreview({
+  preview,
+  tabId,
+}: {
+  preview: FilePreviewResult;
+  tabId: string;
+}) {
+  const cacheKey = getPreviewCacheKey(
+    preview.workspaceKey,
+    preview.relativePath,
+  );
+  const [mode, setMode] = useState<'preview' | 'source'>('preview');
+  const [text, setText] = useState(
+    () => textDraftCache.get(cacheKey) ?? preview.text ?? '',
+  );
+  const { fontSize, markFocused, updateZoom, zoomPercentageRef } =
+    useFileCodeZoom(tabId, mode === 'source');
+  const [sourceLanguage, setSourceLanguage] = useState<SourceLanguage>(() =>
+    languageFromPath(preview.relativePath),
+  );
+  const [editor, setEditor] = useState<MonacoEditorInstance | null>(null);
+  const cursorPosition = useSourceCursorPosition(editor);
+  const actions = useEditorActions(tabId, editor, preview, text, setText);
+
+  // Cmd/Ctrl+Shift+V toggles code/preview mode when the tab is focused.
+  const { tabUiState } = useTabUIState();
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const tabUiStateRef = useRef(tabUiState);
+  tabUiStateRef.current = tabUiState;
+  const toggleCodeMode = useCallback(() => {
+    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
+      return false;
+    setMode(modeRef.current === 'source' ? 'preview' : 'source');
+  }, [tabId]);
+  useHotKeyListener(toggleCodeMode, HotkeyActions.TOGGLE_MARKDOWN_PREVIEW);
+
+  const handleMount = useCallback(
+    (editor: MonacoEditorInstance, monaco: MonacoApi) => {
+      setEditor(editor);
+      registerMonacoThemeSync(monaco);
+      editor.onDidFocusEditorWidget(markFocused);
+      registerMonacoZoomCommands(
+        editor,
+        monaco,
+        markFocused,
+        updateZoom,
+        zoomPercentageRef,
+      );
+    },
+    [markFocused, zoomPercentageRef, updateZoom],
+  );
+
+  const handleChange = useCallback(
+    (value: string | undefined) => {
+      const nextText = value ?? '';
+      textDraftCache.set(cacheKey, nextText);
+      setText(nextText);
+    },
+    [cacheKey],
+  );
+
+  useEffect(() => {
+    editor?.updateOptions({
+      fontSize,
+      lineHeight: fontSize * 1.5,
+    });
+  }, [editor, fontSize]);
+
+  return (
+    <div className="flex size-full flex-col bg-background">
+      <FileTabToolbar
+        actions={actions}
+        openExternalPath={getPreviewAbsolutePath(preview)}
+        onInteract={markFocused}
+        right={
+          <div className="flex h-7 items-center gap-1 rounded-md bg-surface-1 p-0.5">
+            <ToolbarTooltip
+              label="Show markdown source"
+              shortcut={HotkeyActions.TOGGLE_MARKDOWN_PREVIEW}
+            >
+              <button
+                type="button"
+                className={cn(
+                  'flex h-full cursor-pointer items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                  mode === 'source' &&
+                    'bg-background text-foreground ring-1 ring-border-subtle',
+                )}
+                aria-label="Show markdown source"
+                aria-pressed={mode === 'source'}
+                onClick={() => setMode('source')}
+              >
+                <IconSquareCodeOutline18 className="size-3.5" />
+                {mode === 'source' ? <span>Code</span> : null}
+              </button>
+            </ToolbarTooltip>
+            <ToolbarTooltip
+              label="Show markdown preview"
+              shortcut={HotkeyActions.TOGGLE_MARKDOWN_PREVIEW}
+            >
+              <button
+                type="button"
+                className={cn(
+                  'flex h-full cursor-pointer items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                  mode === 'preview' &&
+                    'bg-background text-foreground ring-1 ring-border-subtle',
+                )}
+                aria-label="Show markdown preview"
+                aria-pressed={mode === 'preview'}
+                onClick={() => setMode('preview')}
+              >
+                <IconEye2Outline18 className="size-3.5" />
+                {mode === 'preview' ? <span>Preview</span> : null}
+              </button>
+            </ToolbarTooltip>
+          </div>
+        }
+      />
+      {actions.externalChange ? (
+        <ExternalChangeBanner actions={actions} />
+      ) : null}
+      <div className="min-h-0 flex-1">
+        {mode === 'preview' ? (
+          <div className="[&_[data-streamdown=image-wrapper]]:!items-start scrollbar-subtle size-full overflow-auto p-6 text-foreground [&_[data-streamdown=image-wrapper]>div:first-child]:hidden">
+            <Streamdown isAnimating={false}>{text}</Streamdown>
+          </div>
+        ) : (
+          <div
+            className="size-full"
+            onFocusCapture={markFocused}
+            onPointerDownCapture={markFocused}
+          >
+            <MonacoEditor
+              height="100%"
+              language={
+                sourceLanguage === 'plaintext' ? undefined : sourceLanguage
+              }
+              path={`${preview.workspaceKey}/${preview.relativePath}`}
+              value={text}
+              theme={MONACO_THEME_NAME}
+              beforeMount={configureMonacoTheme}
+              onMount={handleMount}
+              onChange={handleChange}
+              options={{
+                ...MONACO_SHARED_OPTIONS,
+                readOnly: preview.readOnly ?? false,
+                fontSize,
+                lineHeight: fontSize * 1.5,
+              }}
+            />
+          </div>
+        )}
+      </div>
+      {mode === 'source' ? (
+        <FileEditorStatusBar
+          lineNumber={cursorPosition.lineNumber}
+          column={cursorPosition.column}
+          language={sourceLanguage}
+          onLanguageChange={setSourceLanguage}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function BinaryPreview({
+  workspaceKey,
+  relativePath,
+  revealInFolder,
+}: {
+  workspaceKey: string;
+  relativePath: string;
+  revealInFolder: (workspaceKey: string, relativePath: string) => void;
+}) {
   return (
     <div className="flex size-full flex-col bg-background">
       <FileTabToolbar actions={null} />
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <IconDatabaseFillDuo18 className="size-12" />
-          <span className="font-normal text-muted-foreground text-xs">
-            Binary file
+        <div className="flex flex-col items-center gap-6 text-muted-foreground">
+          <span className="font-normal text-muted-foreground text-sm">
+            Can't display this file inside stagewise
           </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => revealInFolder(workspaceKey, relativePath)}
+          >
+            Reveal in {nativeFileManagerLabel}
+          </Button>
         </div>
       </div>
     </div>
@@ -1915,6 +2416,13 @@ function MissingFileNotice() {
 export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
   const getFilePreview = useKartonProcedure((p) => p.fileTree.getFilePreview);
   const getFileStat = useKartonProcedure((p) => p.fileTree.getFileStat);
+  const clearFileNotice = useKartonProcedure((p) => p.browser.clearFileNotice);
+  const closeTab = useKartonProcedure((p) => p.browser.closeTab);
+  const recreateDeletedFile = useKartonProcedure(
+    (p) => p.fileTree.recreateDeletedFile,
+  );
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const [isRecreating, setIsRecreating] = useState(false);
   const workspaceKey = tab.file?.workspaceKey;
   const relativePath = tab.file?.relativePath;
   const cacheKey =
@@ -2049,9 +2557,12 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
   // changes on disk. On mount this ensures a re-opened tab shows the latest
   // content rather than a stale cached copy; on revision bumps it picks up
   // external edits in real time without polling.
+  // Skip when the file has a delete notice — the file no longer exists and
+  // we're preserving the cached content for re-create.
   useEffect(() => {
+    if (tab.fileNotice?.kind === 'deleted') return;
     void revalidate();
-  }, [revalidate, directoryRevision]);
+  }, [revalidate, directoryRevision, tab.fileNotice]);
 
   if (!tab.file) {
     return (
@@ -2061,8 +2572,83 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
     );
   }
 
+  // Handlers for file-notice banners.
+  const handleDismissMoveNotice = useCallback(() => {
+    void clearFileNotice(tab.id);
+  }, [clearFileNotice, tab.id]);
+
+  const handleCloseDeletedTab = useCallback(() => {
+    void clearFileNotice(tab.id);
+    void closeTab(tab.id);
+  }, [clearFileNotice, closeTab, tab.id]);
+
+  const handleRecreateDeleted = useCallback(async () => {
+    if (!workspaceKey || !relativePath) return;
+    setIsRecreating(true);
+    try {
+      const content =
+        textDraftCache.get(getPreviewCacheKey(workspaceKey, relativePath)) ??
+        preview?.text ??
+        '';
+      await recreateDeletedFile(workspaceKey, relativePath, content);
+      // Recreate succeeded — the notice is cleared by the backend.
+      // Re-trigger loading to fetch the freshly-created file.
+      setIsRecreating(false);
+      void revalidate();
+    } catch {
+      setIsRecreating(false);
+    }
+  }, [workspaceKey, relativePath, preview, recreateDeletedFile, revalidate]);
+
+  const fileNotice = tab.fileNotice;
+
+  // File was deleted — keep showing cached content with the delete banner.
+  // Don't show the MissingFileNotice; the user can still see/edit and
+  // choose to re-create.
+  if (fileNotice?.kind === 'deleted') {
+    const cachedPreview = cacheKey
+      ? (previewCache.get(cacheKey)?.preview ?? preview)
+      : preview;
+    return (
+      <div className="absolute inset-0 z-10 flex flex-col bg-background">
+        <FileDeletedBanner
+          onClose={handleCloseDeletedTab}
+          onRecreate={handleRecreateDeleted}
+          isRecreating={isRecreating}
+        />
+        <div className="min-h-0 flex-1">
+          {cachedPreview ? (
+            cachedPreview.kind === 'image' ? (
+              <ImagePreview preview={cachedPreview} tabId={tab.id} />
+            ) : cachedPreview.kind === 'svg' ? (
+              <SvgPreview preview={cachedPreview} tabId={tab.id} />
+            ) : isMarkdownPath(cachedPreview.relativePath) ? (
+              <MarkdownPreview preview={cachedPreview} tabId={tab.id} />
+            ) : (
+              <TextEditorPreview preview={cachedPreview} tabId={tab.id} />
+            )
+          ) : (
+            <div className="flex size-full flex-col bg-background">
+              <FileTabToolbar actions={null} />
+              <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-xs">
+                No cached content available.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-background">
+      {fileNotice?.kind === 'moved' && tab.file && (
+        <FileMoveBanner
+          fromPath={fileNotice.fromRelativePath}
+          toPath={tab.file.relativePath}
+          onDismiss={handleDismissMoveNotice}
+        />
+      )}
       <div className="min-h-0 flex-1">
         {isLoading ? (
           <div className="flex size-full flex-col bg-background">
@@ -2093,7 +2679,11 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
               {preview.kind === 'text' || preview.kind === 'svg' ? (
                 <TextEditorPreview preview={preview} tabId={tab.id} />
               ) : (
-                <BinaryPreview />
+                <BinaryPreview
+                  workspaceKey={workspaceKey!}
+                  relativePath={relativePath!}
+                  revealInFolder={revealInFolder}
+                />
               )}
             </div>
           </div>
@@ -2101,10 +2691,16 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
           <ImagePreview preview={preview} tabId={tab.id} />
         ) : preview.kind === 'svg' ? (
           <SvgPreview preview={preview} tabId={tab.id} />
+        ) : preview.kind === 'text' && isMarkdownPath(preview.relativePath) ? (
+          <MarkdownPreview preview={preview} tabId={tab.id} />
         ) : preview.kind === 'text' ? (
           <TextEditorPreview preview={preview} tabId={tab.id} />
         ) : (
-          <BinaryPreview />
+          <BinaryPreview
+            workspaceKey={workspaceKey!}
+            relativePath={relativePath!}
+            revealInFolder={revealInFolder}
+          />
         )}
       </div>
     </div>

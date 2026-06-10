@@ -417,6 +417,10 @@ export const userPreferencesSchema = z.object({
       fileCodeZoomPercentage: z.number().min(50).max(200).default(100),
       /** Whether file search includes gitignored files (global toggle) */
       fileSearchIncludeGitignored: z.boolean().default(false),
+      /** Custom hex background color for SVG previews (without #) */
+      svgCustomBackground: z.string().default('ffffff'),
+      /** Custom hex foreground color for SVG previews (without #) */
+      svgCustomForeground: z.string().default('8b5cf6'),
     })
     .default({
       newTabPage: { type: 'home' },
@@ -425,6 +429,8 @@ export const userPreferencesSchema = z.object({
       terminalZoomPercentage: 100,
       fileCodeZoomPercentage: 100,
       fileSearchIncludeGitignored: false,
+      svgCustomBackground: 'ffffff',
+      svgCustomForeground: '8b5cf6',
     }),
   /** Website permission settings (defaults and host-specific overrides) */
   permissions: z.lazy(() => permissionsPreferencesSchema),
@@ -563,6 +569,8 @@ export const defaultUserPreferences: UserPreferences = {
     terminalZoomPercentage: 100,
     fileCodeZoomPercentage: 100,
     fileSearchIncludeGitignored: false,
+    svgCustomBackground: 'ffffff',
+    svgCustomForeground: '8b5cf6',
   },
   permissions: defaultPermissionsForUserPrefs,
   devToolbar: defaultDevToolbarForUserPrefs,

@@ -1,6 +1,7 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -32,6 +33,7 @@ export function UnsavedFileCloseDialog({
       onOpenChange={(open) => !open && onKeepOpen()}
     >
       <DialogContent>
+        <DialogClose />
         <DialogHeader>
           <DialogTitle>Unsaved file edits</DialogTitle>
           <DialogDescription>
@@ -62,9 +64,6 @@ export function UnsavedFileCloseDialog({
             disabled={isSaving}
           >
             Close without save
-          </Button>
-          <Button variant="secondary" size="sm" onClick={onKeepOpen}>
-            Abort
           </Button>
         </DialogFooter>
       </DialogContent>

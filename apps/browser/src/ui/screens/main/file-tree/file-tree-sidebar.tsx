@@ -91,7 +91,7 @@ export function FileTreeSidebar() {
                 key={workspace.key}
                 type="button"
                 className={cn(
-                  'group relative flex h-7 min-w-12 max-w-44 shrink cursor-pointer select-none flex-row items-center rounded-md bg-transparent px-2 py-0.5 text-xs transition-colors duration-150 ease-out hover:bg-surface-1',
+                  'app-no-drag group relative flex h-7 min-w-12 max-w-44 shrink cursor-pointer select-none flex-row items-center rounded-md bg-transparent px-2 py-0.5 text-xs transition-colors duration-150 ease-out hover:bg-surface-1',
                   active && 'bg-surface-1',
                 )}
                 title={workspace.path}
