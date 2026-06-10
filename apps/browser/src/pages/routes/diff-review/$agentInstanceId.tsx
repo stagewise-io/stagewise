@@ -65,27 +65,16 @@ const FileDiffItem: FC<{
   const [isOpen, setIsOpen] = useState(true);
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
   const { added, removed } = getLineStats(edit);
-  const workspaceMounts = useKartonState((s) => s.workspaceMounts);
   const toRelativePath = useCallback(
     (absPath: string) => stripMountPrefix(absPath),
     [],
   );
   const handleOpenInTab = useCallback(() => {
-    for (const mount of workspaceMounts) {
-      const normalizedMount = mount.path.replace(/\\/g, '/');
-      const normalizedPath = edit.path.replace(/\\/g, '/');
-      if (
-        normalizedPath === normalizedMount ||
-        normalizedPath.startsWith(`${normalizedMount}/`)
-      ) {
-        window.open(
-          `stagewise://reveal-file/${encodeURIComponent(edit.path)}`,
-          '_blank',
-        );
-        return;
-      }
-    }
-  }, [edit.path, workspaceMounts]);
+    window.open(
+      `stagewise://reveal-file/${encodeURIComponent(edit.path)}`,
+      '_blank',
+    );
+  }, [edit.path]);
 
   return (
     <div
