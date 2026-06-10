@@ -209,6 +209,7 @@ export const GenericWriteToolPart = memo(
       openFileTab,
       openAgent,
       mounts,
+      globalMounts,
       revealInFolder,
     ]);
 
