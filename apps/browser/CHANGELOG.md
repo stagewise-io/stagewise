@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 (2026-06-10)
+
+### Features
+
+* add windows-support for worktree-setups (6533536)
+
 ## 1.6.0 (2026-06-08)
 
 ### Features
