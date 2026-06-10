@@ -1,5 +1,6 @@
 import { WebContentsView, shell, session, app, net } from 'electron';
 import { domCodeToElectronKeyCode } from '../../utils/dom-code-to-electron-key-code';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import contextMenu from 'electron-context-menu';
 import type { Logger } from '../logger';
@@ -379,8 +380,19 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         if (!absolutePath.startsWith(resolvedWorkspaceRoot + path.sep))
           return new Response('Path traversal denied', { status: 400 });
 
+        const realWorkspaceRoot = await fs.realpath(resolvedWorkspaceRoot);
+        const realFilePath = await fs.realpath(absolutePath);
+        const relativeFromRoot = path.relative(realWorkspaceRoot, realFilePath);
+        if (
+          relativeFromRoot === '..' ||
+          relativeFromRoot.startsWith(`..${path.sep}`) ||
+          path.isAbsolute(relativeFromRoot)
+        ) {
+          return new Response('Path traversal denied', { status: 400 });
+        }
+
         const mime = inferMimeType(relativePath);
-        const fileUrl = pathToFileURL(absolutePath).href;
+        const fileUrl = pathToFileURL(realFilePath).href;
         const fileResponse = await net.fetch(fileUrl);
 
         return new Response(fileResponse.body, {

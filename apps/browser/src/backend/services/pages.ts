@@ -1,5 +1,6 @@
 import { net, session, shell } from 'electron';
 import type { Logger } from './logger';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
@@ -238,8 +239,19 @@ export class PagesService extends DisposableService {
         if (!absolutePath.startsWith(resolvedWorkspaceRoot + path.sep))
           return new Response('Path traversal denied', { status: 400 });
 
+        const realWorkspaceRoot = await fs.realpath(resolvedWorkspaceRoot);
+        const realFilePath = await fs.realpath(absolutePath);
+        const relativeFromRoot = path.relative(realWorkspaceRoot, realFilePath);
+        if (
+          relativeFromRoot === '..' ||
+          relativeFromRoot.startsWith(`..${path.sep}`) ||
+          path.isAbsolute(relativeFromRoot)
+        ) {
+          return new Response('Path traversal denied', { status: 400 });
+        }
+
         const mime = inferMimeType(relativePath);
-        const fileUrl = pathToFileURL(absolutePath).href;
+        const fileUrl = pathToFileURL(realFilePath).href;
         const fileResponse = await net.fetch(fileUrl);
 
         return new Response(fileResponse.body, {

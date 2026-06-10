@@ -121,7 +121,13 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
       className={canOpenFile ? 'inline cursor-pointer' : 'inline'}
       role={canOpenFile ? 'button' : undefined}
       tabIndex={canOpenFile ? 0 : undefined}
-      onClick={(event) => {
+      onMouseDownCapture={(event) => {
+        if (!canOpenFile) return;
+        // Prevent the parent user-message bubble from starting edit/focus
+        // handling before the click opens the file tab.
+        event.stopPropagation();
+      }}
+      onClickCapture={(event) => {
         if (!canOpenFile) return;
         // Stop the click from bubbling to the parent user-message bubble,
         // which would otherwise enter message-edit mode instead of opening

@@ -1,12 +1,21 @@
+import { useCallback } from 'react';
 import type { InlineNodeViewProps } from '../shared/types';
 import type { MentionAttrs } from './types';
 import { FileContextMenu } from '@ui/components/file-context-menu';
 import { TabMentionBadge } from './tab-mention-badge';
 import { FileReferenceBadge } from '@ui/components/file-reference-badge';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useOpenAgent } from '@ui/hooks/use-open-chat';
 
 export function MentionNodeView(props: InlineNodeViewProps) {
   const attrs = props.node.attrs as MentionAttrs;
   const isEditable = !('viewOnly' in props);
+  const [openAgent] = useOpenAgent();
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const mounts = useKartonState((s) =>
+    openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
+  );
   const isFile = attrs.providerType === 'file';
   const isTab = attrs.providerType === 'tab';
   if (isTab) {
@@ -38,9 +47,45 @@ export function MentionNodeView(props: InlineNodeViewProps) {
     />
   );
 
-  // View-only file badges get the context menu for IDE-opening.
+  const openFile = useCallback(() => {
+    if (!isFile || !attrs.id.includes('/')) return;
+    const slashIndex = attrs.id.indexOf('/');
+    if (slashIndex <= 0) return;
+    const prefix = attrs.id.slice(0, slashIndex);
+    const relativePath = attrs.id.slice(slashIndex + 1);
+    const mount = mounts.find((item) => item.prefix === prefix);
+    if (!mount) return;
+    const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+    void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
+      if (!tabId) void revealInFolder(workspaceKey, relativePath);
+    });
+  }, [attrs.id, isFile, mounts, openAgent, openFileTab, revealInFolder]);
+
+  // View-only file badges get click-to-open plus the context menu.
   if (isFile && !isEditable) {
-    return <FileContextMenu relativePath={attrs.id}>{badge}</FileContextMenu>;
+    return (
+      <FileContextMenu relativePath={attrs.id} onOpenFile={openFile}>
+        <span
+          className="inline cursor-pointer"
+          role="link"
+          tabIndex={0}
+          onMouseDownCapture={(event) => event.stopPropagation()}
+          onClickCapture={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openFile();
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            event.stopPropagation();
+            openFile();
+          }}
+        >
+          {badge}
+        </span>
+      </FileContextMenu>
+    );
   }
 
   return badge;
