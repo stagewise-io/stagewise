@@ -57,6 +57,13 @@ export function CommandCenterFileFilter({
     [filterState, onFilterChange],
   );
 
+  const setSearchInContent = useCallback(
+    (checked: boolean) => {
+      onFilterChange({ ...filterState, searchInContent: checked });
+    },
+    [filterState, onFilterChange],
+  );
+
   // Nothing to search → no bar.
   if (workspaceOptions.length === 0) return null;
 
@@ -104,21 +111,36 @@ export function CommandCenterFileFilter({
           })}
         </div>
       )}
-      {searchedIsGit && (
+      <div className="flex shrink-0 items-center gap-3">
         <button
           type="button"
-          onClick={() => setGitignored(!filterState.includeGitignored)}
-          className="flex shrink-0 cursor-pointer items-center gap-1.5 text-subtle-foreground text-xs"
+          onClick={() => setSearchInContent(!filterState.searchInContent)}
+          className="flex cursor-pointer items-center gap-1.5 text-subtle-foreground text-xs"
         >
           <Checkbox
             size="xs"
-            checked={filterState.includeGitignored}
-            onCheckedChange={(checked) => setGitignored(checked === true)}
+            checked={filterState.searchInContent}
+            onCheckedChange={(checked) => setSearchInContent(checked === true)}
             tabIndex={-1}
           />
-          <span>Include gitignored</span>
+          <span>Search in content</span>
         </button>
-      )}
+        {searchedIsGit && (
+          <button
+            type="button"
+            onClick={() => setGitignored(!filterState.includeGitignored)}
+            className="flex cursor-pointer items-center gap-1.5 text-subtle-foreground text-xs"
+          >
+            <Checkbox
+              size="xs"
+              checked={filterState.includeGitignored}
+              onCheckedChange={(checked) => setGitignored(checked === true)}
+              tabIndex={-1}
+            />
+            <span>Include gitignored</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

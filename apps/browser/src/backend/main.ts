@@ -951,7 +951,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       query: string,
       workspaceKeys: string[],
       includeGitignored: boolean,
-    ) => fileTreeService.searchFiles(query, workspaceKeys, includeGitignored),
+      searchInContent?: boolean,
+    ) =>
+      fileTreeService.searchFiles(
+        query,
+        workspaceKeys,
+        includeGitignored,
+        searchInContent,
+      ),
   );
   uiKarton.registerServerProcedureHandler(
     'fileTree.listRecentFiles',

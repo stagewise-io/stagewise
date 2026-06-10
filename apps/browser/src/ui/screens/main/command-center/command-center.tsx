@@ -65,6 +65,7 @@ export function CommandCenter() {
     selectFirstOnOpen,
     restoreFocusOnClose,
     initialFileWorkspaceKeys,
+    initialSearchInContent,
     close,
     setQuery,
     setMode,
@@ -84,6 +85,7 @@ export function CommandCenter() {
     useState<FileSearchFilterState>({
       selectedWorkspaceKeys: new Set(),
       includeGitignored: false,
+      searchInContent: false,
     });
 
   // `includeGitignored` is a global, persisted toggle (survives restarts), so
@@ -96,8 +98,13 @@ export function CommandCenter() {
     () => ({
       selectedWorkspaceKeys: fileSearchFilter.selectedWorkspaceKeys,
       includeGitignored: includeGitignoredPref,
+      searchInContent: fileSearchFilter.searchInContent,
     }),
-    [fileSearchFilter.selectedWorkspaceKeys, includeGitignoredPref],
+    [
+      fileSearchFilter.selectedWorkspaceKeys,
+      fileSearchFilter.searchInContent,
+      includeGitignoredPref,
+    ],
   );
 
   const {
@@ -148,9 +155,14 @@ export function CommandCenter() {
         ]);
       }
       setFileSearchFilter((current) =>
-        current.selectedWorkspaceKeys === next.selectedWorkspaceKeys
+        current.selectedWorkspaceKeys === next.selectedWorkspaceKeys &&
+        current.searchInContent === next.searchInContent
           ? current
-          : { ...current, selectedWorkspaceKeys: next.selectedWorkspaceKeys },
+          : {
+              ...current,
+              selectedWorkspaceKeys: next.selectedWorkspaceKeys,
+              searchInContent: next.searchInContent,
+            },
       );
     },
     [includeGitignoredPref, updatePreferences],
@@ -279,8 +291,9 @@ export function CommandCenter() {
     setFileSearchFilter({
       selectedWorkspaceKeys: new Set(initialFileWorkspaceKeys),
       includeGitignored: false,
+      searchInContent: initialSearchInContent,
     });
-  }, [isOpen, initialFileWorkspaceKeys]);
+  }, [isOpen, initialFileWorkspaceKeys, initialSearchInContent]);
 
   useEffect(() => {
     if (visibleItemIndexes.length === 0) {
@@ -757,6 +770,25 @@ export function CommandCenter() {
         return;
       }
 
+      if (
+        mode === 'files' &&
+        isEventMatch(
+          event.nativeEvent,
+          hotkeyDefinitions[
+            HotkeyActions.COMMAND_CENTER_TOGGLE_SEARCH_IN_CONTENT
+          ],
+          platform,
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        setFileSearchFilter((current) => ({
+          ...current,
+          searchInContent: !current.searchInContent,
+        }));
+        return;
+      }
+
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -869,6 +901,7 @@ export function CommandCenter() {
             selectedTab={selectedTab}
             canToggleGitignored={canToggleGitignored}
             includeGitignored={includeGitignoredPref}
+            searchInContent={effectiveFileSearchFilter.searchInContent}
           />
         </CommandCenterPanel>
       </div>

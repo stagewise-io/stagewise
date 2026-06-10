@@ -18,6 +18,7 @@ type CommandCenterContextValue = {
   selectFirstOnOpen: boolean;
   restoreFocusOnClose: boolean;
   initialFileWorkspaceKeys: readonly string[];
+  initialSearchInContent: boolean;
   open: (options?: CommandCenterOpenOptions) => void;
   close: () => void;
   toggle: (options?: CommandCenterOpenOptions) => void;
@@ -39,6 +40,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
   const [restoreFocusOnClose, setRestoreFocusOnClose] = useState(false);
   const [initialFileWorkspaceKeys, setInitialFileWorkspaceKeys] =
     useState<readonly string[]>(EMPTY_WORKSPACE_KEYS);
+  const [initialSearchInContent, setInitialSearchInContent] = useState(false);
 
   const open = useCallback((options?: CommandCenterOpenOptions) => {
     setQuery(options?.initialQuery ?? '');
@@ -48,6 +50,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     setInitialFileWorkspaceKeys(
       options?.initialFileWorkspaceKeys ?? EMPTY_WORKSPACE_KEYS,
     );
+    setInitialSearchInContent(options?.initialSearchInContent ?? false);
     setIsOpen(true);
   }, []);
 
@@ -58,6 +61,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     setSelectFirstOnOpen(true);
     setRestoreFocusOnClose(false);
     setInitialFileWorkspaceKeys(EMPTY_WORKSPACE_KEYS);
+    setInitialSearchInContent(false);
   }, []);
 
   const toggle = useCallback(
@@ -76,6 +80,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
       selectFirstOnOpen,
       restoreFocusOnClose,
       initialFileWorkspaceKeys,
+      initialSearchInContent,
       open,
       close,
       toggle,
@@ -85,6 +90,7 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     [
       close,
       initialFileWorkspaceKeys,
+      initialSearchInContent,
       isOpen,
       mode,
       open,

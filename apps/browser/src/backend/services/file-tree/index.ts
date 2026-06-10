@@ -1,6 +1,8 @@
 import { shell } from 'electron';
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, promises as fs } from 'node:fs';
+import { createInterface } from 'node:readline';
 import chokidar, { type FSWatcher } from 'chokidar';
 import ignore, { type Ignore } from 'ignore';
 import type { Logger } from '../logger';
@@ -21,12 +23,17 @@ import type {
 import { FILE_SAVE_CONFLICT_CODE } from '@shared/karton-contracts/ui';
 import { inferMimeType } from '@shared/mime-utils';
 import { getBaseName, normalizePath } from '@shared/path-utils';
+import { getRipgrepPath } from '@stagewise/agent-runtime-node';
 import { DisposableService } from '../disposable';
+import { getRipgrepBasePath } from '@/utils/paths';
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 const MAX_CACHE_ENTRIES = 200;
 const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+const CONTENT_SEARCH_RESULT_LIMIT = 5000;
+const CONTENT_SEARCH_CONCURRENCY = 8;
+const MAX_RIPGREP_JSON_LINE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const REVISION_DEBOUNCE_MS = 1000;
@@ -157,6 +164,35 @@ type ValidatedPath = ResolvedWorkspace & {
 type DirectoryCacheEntry = {
   revision: number;
   entries: FileTreeEntry[];
+};
+
+type ContentSearchResult = FileSearchResult & {
+  isDirectory: false;
+  mtimeMs: number;
+  absolutePath: string;
+  contentMatchCount: number;
+  contentMatches: NonNullable<FileSearchResult['contentMatches']>;
+};
+
+type RipgrepContentMatch = {
+  count: number;
+  snippets: NonNullable<FileSearchResult['contentMatches']>;
+};
+
+type RipgrepJsonMatch = {
+  type: 'match';
+  data: {
+    path: { text: string };
+    lines: { text: string };
+    line_number: number;
+    submatches: Array<{ match: { text: string } }>;
+  };
+};
+
+type RipgrepProcessResult = {
+  matches: Map<string, RipgrepContentMatch>;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
 };
 
 export type OpenFileTabHandler = (
@@ -676,9 +712,13 @@ export class FileTreeService extends DisposableService {
       includeDirectories: boolean;
       match: (name: string, isDir: boolean) => boolean;
     },
-  ): Promise<Array<FileSearchResult & { mtimeMs: number }>> {
+  ): Promise<
+    Array<FileSearchResult & { mtimeMs: number; absolutePath: string }>
+  > {
     const { maxResults, maxDepth, includeDirectories, match } = options;
-    const results: Array<FileSearchResult & { mtimeMs: number }> = [];
+    const results: Array<
+      FileSearchResult & { mtimeMs: number; absolutePath: string }
+    > = [];
     const seen = new Set<string>();
 
     for (const workspaceKey of workspaceKeys) {
@@ -760,6 +800,7 @@ export class FileTreeService extends DisposableService {
                 fileName: name,
                 isDirectory: isDir,
                 mtimeMs,
+                absolutePath: path.join(absoluteDir, name),
               });
             }
           }
@@ -778,8 +819,10 @@ export class FileTreeService extends DisposableService {
     query: string,
     workspaceKeys: string[],
     includeGitignored: boolean,
+    searchInContent = false,
   ): Promise<FileSearchResult[]> {
     const lowerQuery = query.toLowerCase();
+    const boundaryPattern = new RegExp(`\\b${escapeRegExp(lowerQuery)}`);
     const collected = await this.collectWorkspaceEntries(
       workspaceKeys,
       includeGitignored,
@@ -797,17 +840,321 @@ export class FileTreeService extends DisposableService {
       const lower = name.toLowerCase();
       if (lower === lowerQuery) return 4;
       if (lower.startsWith(lowerQuery)) return 3;
-      if (new RegExp(`\\b${escapeRegExp(lowerQuery)}`).test(lower)) return 2;
-      return 1;
+      if (boundaryPattern.test(lower)) return 2;
+      if (lower.includes(lowerQuery)) return 1;
+      return 0;
     };
 
-    return collected
+    if (!searchInContent) {
+      return collected
+        .sort((a, b) => {
+          const scoreDiff = score(b.fileName) - score(a.fileName);
+          if (scoreDiff !== 0) return scoreDiff;
+          return b.mtimeMs - a.mtimeMs;
+        })
+        .slice(0, 200)
+        .map(({ absolutePath: _absolutePath, ...result }) => result);
+    }
+
+    const byKey = new Map<
+      string,
+      FileSearchResult & {
+        mtimeMs: number;
+        absolutePath: string;
+        nameScore: number;
+        category: number;
+        contentMatchCount: number;
+      }
+    >();
+
+    const addOrUpdate = (
+      result: FileSearchResult & {
+        mtimeMs: number;
+        absolutePath: string;
+        contentMatchCount?: number;
+      },
+    ) => {
+      const key = `${result.workspaceKey}:${result.relativePath}`;
+      const nameScore = score(result.fileName);
+      const contentMatchCount = result.contentMatchCount ?? 0;
+      const exactNameMatch = nameScore === 4;
+      const category = exactNameMatch ? 3 : contentMatchCount > 0 ? 2 : 1;
+      const existing = byKey.get(key);
+      byKey.set(key, {
+        ...existing,
+        ...result,
+        nameScore,
+        category,
+        contentMatchCount,
+        contentMatches:
+          category === 2 && nameScore === 0 ? result.contentMatches : undefined,
+      });
+    };
+
+    for (const result of collected) addOrUpdate(result);
+    for (const result of await this.searchContentWithRipgrep(
+      query,
+      workspaceKeys,
+      includeGitignored,
+    )) {
+      addOrUpdate(result);
+    }
+
+    const searched = [...byKey.values()];
+
+    return searched
+      .filter(
+        ({ nameScore, contentMatchCount }) =>
+          nameScore > 0 || contentMatchCount > 0,
+      )
       .sort((a, b) => {
-        const scoreDiff = score(b.fileName) - score(a.fileName);
-        if (scoreDiff !== 0) return scoreDiff;
+        if (b.category !== a.category) return b.category - a.category;
+        if (a.category === 2 && b.contentMatchCount !== a.contentMatchCount) {
+          return b.contentMatchCount - a.contentMatchCount;
+        }
+        if (b.nameScore !== a.nameScore) return b.nameScore - a.nameScore;
         return b.mtimeMs - a.mtimeMs;
       })
-      .slice(0, 200);
+      .slice(0, 200)
+      .map(
+        ({
+          absolutePath: _absolutePath,
+          nameScore: _nameScore,
+          category: _category,
+          ...result
+        }) => result,
+      );
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (item: T) => Promise<R>,
+  ): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(concurrency, items.length);
+
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (nextIndex < items.length) {
+          const index = nextIndex;
+          nextIndex += 1;
+          results[index] = await mapper(items[index]!);
+        }
+      }),
+    );
+
+    return results;
+  }
+
+  private async searchContentWithRipgrep(
+    query: string,
+    workspaceKeys: string[],
+    includeGitignored: boolean,
+  ): Promise<ContentSearchResult[]> {
+    const rgPath = getRipgrepPath(getRipgrepBasePath());
+    if (!existsSync(rgPath)) return [];
+
+    const results: ContentSearchResult[] = [];
+
+    for (const workspaceKey of workspaceKeys) {
+      const mount = this.resolveWorkspace(workspaceKey);
+      if (!mount) continue;
+
+      const matches = await this.findContentMatchesWithRipgrep(
+        rgPath,
+        mount.path,
+        query,
+        includeGitignored,
+      );
+      if (matches.size === 0) continue;
+
+      const entries = [...matches.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, CONTENT_SEARCH_RESULT_LIMIT);
+
+      const workspaceResults = await this.mapWithConcurrency(
+        entries,
+        CONTENT_SEARCH_CONCURRENCY,
+        async ([relativePath, match]) => {
+          const absolutePath = path.join(mount.path, relativePath);
+          try {
+            const stat = await fs.stat(absolutePath);
+            if (!stat.isFile()) return null;
+            return {
+              workspaceKey,
+              mountPrefix: mount.prefix,
+              relativePath,
+              fileName: path.basename(relativePath),
+              isDirectory: false,
+              mtimeMs: stat.mtimeMs,
+              absolutePath,
+              contentMatchCount: match.count,
+              contentMatches: match.snippets,
+            };
+          } catch {
+            return null;
+          }
+        },
+      );
+
+      results.push(
+        ...workspaceResults.filter(
+          (result): result is ContentSearchResult => result !== null,
+        ),
+      );
+    }
+
+    return results;
+  }
+
+  private async findContentMatchesWithRipgrep(
+    rgPath: string,
+    workspacePath: string,
+    query: string,
+    includeGitignored: boolean,
+  ): Promise<Map<string, RipgrepContentMatch>> {
+    const args = this.buildContentSearchRipgrepArgs(query, includeGitignored);
+    const child = spawn(rgPath, args, {
+      cwd: workspacePath,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    });
+    if (!child.stdout) return new Map();
+
+    try {
+      const { matches, exitCode, signal } = await this.readRipgrepMatches(
+        child,
+        query,
+        includeGitignored,
+      );
+
+      // ripgrep returns 1 for a successful search with zero matches.
+      if (exitCode !== 0 && exitCode !== 1) {
+        this.logger.debug('[FileTreeService] ripgrep content search failed', {
+          exitCode,
+          signal,
+          workspacePath,
+        });
+      }
+
+      return matches;
+    } catch (error) {
+      this.logger.debug('[FileTreeService] ripgrep content search failed', {
+        error,
+        workspacePath,
+      });
+      return new Map();
+    }
+  }
+
+  private readRipgrepMatches(
+    child: ReturnType<typeof spawn>,
+    query: string,
+    includeGitignored: boolean,
+  ): Promise<RipgrepProcessResult> {
+    const results = new Map<string, RipgrepContentMatch>();
+    const lowerQuery = query.toLowerCase();
+
+    return new Promise((resolve, reject) => {
+      child.on('error', reject);
+
+      const rl = createInterface({
+        input: child.stdout!,
+        crlfDelay: Number.POSITIVE_INFINITY,
+      });
+
+      rl.on('line', (line) => {
+        if (line.length > MAX_RIPGREP_JSON_LINE_BYTES) return;
+
+        let message: RipgrepJsonMatch | { type?: string };
+        try {
+          message = JSON.parse(line) as RipgrepJsonMatch | { type?: string };
+        } catch {
+          return;
+        }
+
+        if (message.type !== 'match') return;
+
+        const match = message as RipgrepJsonMatch;
+        const relativePath = normalizePath(match.data.path.text).replace(
+          /^\.\//,
+          '',
+        );
+        if (!relativePath) return;
+        if (!includeGitignored && this.isDefaultIgnoredPath(relativePath))
+          return;
+
+        const current = results.get(relativePath) ?? {
+          count: 0,
+          snippets: [],
+        };
+        current.count += Math.max(1, match.data.submatches.length);
+
+        if (current.snippets.length < 3) {
+          current.snippets.push({
+            lineNumber: match.data.line_number,
+            line: this.createContentMatchSnippet(
+              match.data.lines.text,
+              lowerQuery,
+            ),
+          });
+        }
+        results.set(relativePath, current);
+      });
+
+      rl.on('error', reject);
+      child.on('close', (exitCode, signal) =>
+        resolve({ matches: results, exitCode, signal }),
+      );
+    });
+  }
+
+  private buildContentSearchRipgrepArgs(
+    query: string,
+    includeGitignored: boolean,
+  ): string[] {
+    const args = [
+      '--json',
+      '--no-config',
+      '--no-ignore-global',
+      '--hidden',
+      '--fixed-strings',
+      '--ignore-case',
+      '--max-filesize',
+      `${MAX_TEXT_BYTES}`,
+      '-e',
+      query,
+    ];
+
+    const excludedNames = includeGitignored
+      ? ['.git', 'node_modules']
+      : [...WATCH_IGNORED_NAMES];
+    for (const name of excludedNames) {
+      args.push('--glob', `!${name}/**`);
+    }
+
+    if (includeGitignored) args.push('--no-ignore');
+    args.push('.');
+    return args;
+  }
+
+  private createContentMatchSnippet(line: string, lowerQuery: string): string {
+    const trimmed = line.trim();
+    const matchIndex = trimmed.toLowerCase().indexOf(lowerQuery);
+    const maxLength = 160;
+    if (matchIndex === -1 || trimmed.length <= maxLength) return trimmed;
+
+    const contextLength = Math.floor((maxLength - lowerQuery.length) / 2);
+    const start = Math.max(0, matchIndex - contextLength);
+    const end = Math.min(
+      trimmed.length,
+      matchIndex + lowerQuery.length + contextLength,
+    );
+    return `${start > 0 ? '…' : ''}${trimmed.slice(start, end)}${
+      end < trimmed.length ? '…' : ''
+    }`;
   }
 
   async listRecentFiles(
@@ -829,7 +1176,8 @@ export class FileTreeService extends DisposableService {
 
     return collected
       .sort((a, b) => b.mtimeMs - a.mtimeMs)
-      .slice(0, Math.max(0, limit));
+      .slice(0, Math.max(0, limit))
+      .map(({ absolutePath: _absolutePath, ...result }) => result);
   }
 
   setActiveWorkspace(workspaceKey: string | null): void {

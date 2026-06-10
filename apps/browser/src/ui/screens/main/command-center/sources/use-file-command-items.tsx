@@ -21,6 +21,7 @@ const RECENT_FILE_LIMIT = 8;
 export type FileSearchFilterState = {
   selectedWorkspaceKeys: Set<string>;
   includeGitignored: boolean;
+  searchInContent: boolean;
 };
 
 export type FileSearchWorkspaceOption = {
@@ -115,6 +116,7 @@ export function useFileSearchCommandItems(
 
   const trimmedQuery = query.trim();
   const includeGitignored = filterState.includeGitignored;
+  const searchInContent = filterState.searchInContent;
 
   const [resultItems, setResultItems] = useState<FileCommandItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -140,6 +142,7 @@ export function useFileSearchCommandItems(
       relativePath: string;
       fileName: string;
       isDirectory?: boolean;
+      contentMatches?: { lineNumber: number; line: string }[];
     }): FileCommandItem => {
       const isDirectory = result.isDirectory ?? false;
       const workspaceName =
@@ -156,6 +159,11 @@ export function useFileSearchCommandItems(
         workspaceKey: result.workspaceKey,
         fileName: result.fileName,
         isDirectory,
+        contentMatches: result.contentMatches,
+        contentMatchQuery:
+          result.contentMatches && result.contentMatches.length > 0
+            ? trimmedQuery
+            : undefined,
         icon: isDirectory ? (
           <FolderResultIcon />
         ) : (
@@ -190,6 +198,7 @@ export function useFileSearchCommandItems(
                 trimmedQuery,
                 workspaceKeys,
                 includeGitignored,
+                searchInContent,
               );
           if (requestId !== requestIdRef.current) return;
           setResultItems(results.map(toFileItem));
@@ -202,7 +211,13 @@ export function useFileSearchCommandItems(
     }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [trimmedQuery, searchKey, includeGitignored, enableRecent]);
+  }, [
+    trimmedQuery,
+    searchKey,
+    includeGitignored,
+    searchInContent,
+    enableRecent,
+  ]);
 
   return { items: resultItems, isLoading, isRecent, workspaceOptions };
 }
