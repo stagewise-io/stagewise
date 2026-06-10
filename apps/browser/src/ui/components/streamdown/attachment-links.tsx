@@ -17,7 +17,6 @@ import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 
-import { FileContextMenu } from '@ui/components/file-context-menu';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 
 import { TabMentionBadge } from '@ui/screens/main/agent-chat/chat/_components/rich-text/mentions/tab-mention-badge';
@@ -395,7 +394,7 @@ const WorkspaceFileClickWrapper = ({
     </Tooltip>
   );
 
-  return <FileContextMenu relativePath={filePath}>{wrapped}</FileContextMenu>;
+  return wrapped;
 };
 
 // ─── Attachment file wrapper (open att/ blob as read-only tab) ───────────────

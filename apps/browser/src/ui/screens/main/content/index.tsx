@@ -545,8 +545,7 @@ export function MainSection({
     tabs,
     activeTabId,
     openAgent,
-    closeTab,
-    removeTabUiState,
+    closeTabWithUnsavedCheck,
     promoteFileTab,
   ]);
 

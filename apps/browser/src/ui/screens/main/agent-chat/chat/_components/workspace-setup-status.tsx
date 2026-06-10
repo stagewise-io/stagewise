@@ -7,7 +7,6 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { FileContextMenu } from '@ui/components/file-context-menu';
 import { FileIcon } from '@ui/components/file-icon';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { getBaseName } from '@shared/path-utils';
@@ -139,25 +138,23 @@ export function SetupRunSidePanel({
           <span className="pt-0.5 text-subtle-foreground leading-none">
             Script
           </span>
-          <FileContextMenu relativePath={setupRun.scriptPath}>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="h-auto min-w-0 items-center justify-start gap-1 px-0 py-0 text-muted-foreground"
-                  onClick={handleOpenScript}
-                >
-                  <FileIcon filePath={scriptName} className="size-4" />
-                  <span className="truncate font-mono leading-none">
-                    {scriptName}
-                  </span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{setupRun.scriptPath}</TooltipContent>
-            </Tooltip>
-          </FileContextMenu>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="h-auto min-w-0 items-center justify-start gap-1 px-0 py-0 text-muted-foreground"
+                onClick={handleOpenScript}
+              >
+                <FileIcon filePath={scriptName} className="size-4" />
+                <span className="truncate font-mono leading-none">
+                  {scriptName}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{setupRun.scriptPath}</TooltipContent>
+          </Tooltip>
           {setupRun.exitCode !== null && (
             <>
               <span className="text-subtle-foreground leading-none">Exit</span>

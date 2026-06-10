@@ -1475,21 +1475,13 @@ function useImagePanAndZoom(tabId: string, enabled = true) {
 
 function ImagePreview({
   preview,
+  blobUrl,
   tabId,
 }: {
   preview: FilePreviewResult;
+  blobUrl: string;
   tabId: string;
 }) {
-  if (!preview.base64) {
-    return (
-      <div className="flex size-full flex-col bg-background">
-        <FileTabToolbar actions={null} />
-        <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-sm">
-          Image is too large to preview.
-        </div>
-      </div>
-    );
-  }
   const [background, setBackground] =
     useState<ImagePreviewBackground>('default');
   const [customBackground, setCustomBackground] = useState('ffffff');
@@ -1510,7 +1502,6 @@ function ImagePreview({
     customBackground,
     '#ffffff',
   );
-  const dataUrl = `data:${preview.mimeType};base64,${preview.base64}`;
   const [imageError, setImageError] = useState(false);
   return (
     <div className="flex size-full flex-col bg-background">
@@ -1650,7 +1641,7 @@ function ImagePreview({
           </div>
         ) : (
           <img
-            src={dataUrl}
+            src={blobUrl}
             alt={preview.relativePath}
             className="pointer-events-none max-h-none max-w-none object-contain"
             draggable={false}
@@ -2430,6 +2421,22 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
       ? getPreviewCacheKey(workspaceKey, relativePath)
       : null;
 
+  // Construct a direct file://-equivalent URL that the registered custom
+  // protocols (workspace://, attachment://) can resolve without reading the
+  // file into memory or base64-encoding it.
+  const blobUrl = useMemo(() => {
+    if (!workspaceKey || !relativePath) return '';
+    if (workspaceKey.startsWith('att:')) {
+      return tab.agentInstanceId
+        ? `attachment://${tab.agentInstanceId}/${encodeURIComponent(relativePath)}`
+        : '';
+    }
+    const colonIdx = workspaceKey.indexOf(':');
+    if (colonIdx <= 0) return '';
+    const mountPrefix = workspaceKey.slice(0, colonIdx);
+    return `workspace://${mountPrefix}/${encodeURIComponent(relativePath)}`;
+  }, [workspaceKey, relativePath, tab.agentInstanceId]);
+
   // The file-tree watcher bumps the revision of the directory backing each
   // open file tab whenever its contents change on disk. Subscribing to that
   // single number lets us revalidate only the affected file in response to an
@@ -2619,7 +2626,11 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
         <div className="min-h-0 flex-1">
           {cachedPreview ? (
             cachedPreview.kind === 'image' ? (
-              <ImagePreview preview={cachedPreview} tabId={tab.id} />
+              <ImagePreview
+                preview={cachedPreview}
+                blobUrl={blobUrl}
+                tabId={tab.id}
+              />
             ) : cachedPreview.kind === 'svg' ? (
               <SvgPreview preview={cachedPreview} tabId={tab.id} />
             ) : isMarkdownPath(cachedPreview.relativePath) ? (
@@ -2671,24 +2682,25 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
           </div>
         ) : preview.truncated ? (
           <div className="flex size-full flex-col">
-            <FileTabToolbar actions={null} />
-            <div className="shrink-0 border-border border-b px-3 py-1 text-warning-foreground text-xs">
-              Preview truncated
-            </div>
-            <div className="min-h-0 flex-1">
-              {preview.kind === 'text' || preview.kind === 'svg' ? (
-                <TextEditorPreview preview={preview} tabId={tab.id} />
-              ) : (
-                <BinaryPreview
-                  workspaceKey={workspaceKey!}
-                  relativePath={relativePath!}
-                  revealInFolder={revealInFolder}
-                />
-              )}
-            </div>
+            {preview.kind === 'text' || preview.kind === 'svg' ? (
+              <>
+                <div className="shrink-0 border-border border-b px-3 py-1 text-warning-foreground text-xs">
+                  Preview truncated
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TextEditorPreview preview={preview} tabId={tab.id} />
+                </div>
+              </>
+            ) : (
+              <BinaryPreview
+                workspaceKey={workspaceKey!}
+                relativePath={relativePath!}
+                revealInFolder={revealInFolder}
+              />
+            )}
           </div>
         ) : preview.kind === 'image' ? (
-          <ImagePreview preview={preview} tabId={tab.id} />
+          <ImagePreview preview={preview} blobUrl={blobUrl} tabId={tab.id} />
         ) : preview.kind === 'svg' ? (
           <SvgPreview preview={preview} tabId={tab.id} />
         ) : preview.kind === 'text' && isMarkdownPath(preview.relativePath) ? (

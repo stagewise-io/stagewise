@@ -78,7 +78,7 @@ export const AskUserQuestionsToolPart = ({
   // ── Error state (agent stopped while questions were pending) ──
   if (part.state === 'output-error') {
     return (
-      <div className="flex h-6 w-full items-center gap-1 font-medium text-muted-foreground">
+      <div className="flex h-6 w-full select-none items-center gap-1 font-medium text-muted-foreground">
         <IconHelpChatOutline18 className="size-3 shrink-0 text-muted-foreground" />
         <span className="truncate text-xs">
           Questions cancelled (agent stopped)
@@ -96,7 +96,7 @@ export const AskUserQuestionsToolPart = ({
     const Icon = isStreaming ? IconPenWriting3Outline18 : IconHelpChatOutline18;
 
     return (
-      <div className="flex h-6 w-full items-center gap-1 font-medium text-muted-foreground">
+      <div className="flex h-6 w-full select-none items-center gap-1 font-medium text-muted-foreground">
         <Icon
           className={
             isStreaming
@@ -141,7 +141,7 @@ export const AskUserQuestionsToolPart = ({
 
     return (
       <>
-        <div className="flex h-6 w-full items-center gap-1 font-medium text-muted-foreground">
+        <div className="flex h-6 w-full select-none items-center gap-1 font-medium text-muted-foreground">
           {icon}
           <span className="truncate text-xs">{triggerText}</span>
         </div>
@@ -170,7 +170,7 @@ export const AskUserQuestionsToolPart = ({
 
   // Fallback: no output yet (shouldn't normally happen)
   return (
-    <div className="flex h-6 w-full items-center gap-1 font-medium text-muted-foreground">
+    <div className="flex h-6 w-full select-none items-center gap-1 font-medium text-muted-foreground">
       <IconHelpChatOutline18 className="size-3 shrink-0 text-muted-foreground" />
       <span className="truncate text-xs">
         {input?.title ?? 'User questions'}

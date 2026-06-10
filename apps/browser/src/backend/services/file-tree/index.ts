@@ -34,8 +34,6 @@ const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 const CONTENT_SEARCH_RESULT_LIMIT = 5000;
 const CONTENT_SEARCH_CONCURRENCY = 8;
 const MAX_RIPGREP_JSON_LINE_BYTES = 10 * 1024 * 1024;
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-
 const REVISION_DEBOUNCE_MS = 1000;
 
 function escapeRegExp(value: string): string {
@@ -325,11 +323,7 @@ export class FileTreeService extends DisposableService {
       }
     }
 
-    if (kind === 'image') {
-      if (stat.size > MAX_IMAGE_BYTES) return { ...base, truncated: true };
-      const buffer = await fs.readFile(validated.absolutePath);
-      return { ...base, base64: buffer.toString('base64') };
-    }
+    if (kind === 'image') return base;
 
     return base;
   }
@@ -451,6 +445,9 @@ export class FileTreeService extends DisposableService {
     relativePath: string,
     newName: string,
   ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This file is read-only and cannot be renamed');
+    }
     try {
       const source = await this.validatePath(workspaceKey, relativePath);
       const safeName = this.validateEntryName(newName);
@@ -499,6 +496,12 @@ export class FileTreeService extends DisposableService {
     operation: FileTreeClipboardOperation,
     preferredName?: string,
   ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(targetWorkspaceKey)) {
+      throw new Error('This location is read-only and cannot be pasted into');
+    }
+    if (operation === 'cut' && isReadOnlyWorkspaceKey(sourceWorkspaceKey)) {
+      throw new Error('This file is read-only and cannot be moved');
+    }
     try {
       const source = await this.validatePath(
         sourceWorkspaceKey,
@@ -593,6 +596,9 @@ export class FileTreeService extends DisposableService {
     workspaceKey: string,
     relativePath: string,
   ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This file is read-only and cannot be deleted');
+    }
     try {
       const validated = await this.validatePath(workspaceKey, relativePath);
       await fs.rm(validated.absolutePath, { recursive: true, force: false });
@@ -613,26 +619,61 @@ export class FileTreeService extends DisposableService {
     relativePath: string,
     content: string,
   ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This file is read-only and cannot be recreated');
+    }
     try {
-      const validated = await this.validatePath(workspaceKey, relativePath);
-      await fs.writeFile(validated.absolutePath, content, 'utf-8');
+      const mount = this.resolveWorkspace(workspaceKey);
+      if (!mount) throw new Error('Workspace not mounted');
+      const normalizedRelative = this.normalizeRelative(relativePath);
+      if (path.isAbsolute(normalizedRelative)) {
+        throw new Error('Absolute paths are not allowed');
+      }
+
+      const root = path.resolve(mount.path);
+      const absolutePath = path.resolve(root, normalizedRelative || '.');
+      const rootReal = await fs.realpath(root);
+
+      // Resolve the parent directory via realpath so we can validate
+      // the target path without requiring the file itself to exist.
+      const parentDir = path.dirname(absolutePath);
+      let realParent: string;
+      try {
+        realParent = await fs.realpath(parentDir);
+      } catch {
+        throw new Error('Parent directory does not exist');
+      }
+
+      const realPath = path.join(realParent, path.basename(absolutePath));
+      const relativeFromRoot = path.relative(rootReal, realPath);
+      if (
+        relativeFromRoot === '..' ||
+        relativeFromRoot.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativeFromRoot)
+      ) {
+        throw new Error('Path escapes workspace root');
+      }
+
+      await fs.writeFile(absolutePath, content, 'utf-8');
+
+      const mountKey = this.getWorkspaceKey(mount);
       // Clear the delete notice on any tabs tracking this file.
       this.uiKarton.setState((draft) => {
         for (const tab of Object.values(draft.contentTabs.tabs)) {
           if (
             tab.fileNotice?.kind === 'deleted' &&
-            tab.file?.workspaceKey === validated.key &&
-            tab.file.relativePath === validated.relativePath
+            tab.file?.workspaceKey === mountKey &&
+            tab.file.relativePath === normalizedRelative
           ) {
             tab.fileNotice = undefined;
           }
         }
       });
       const parentPath = this.normalizeRelative(
-        path.dirname(validated.relativePath),
+        path.dirname(normalizedRelative),
       );
-      this.bumpDirectoryRevisionsNow(validated.key, [parentPath]);
-      return { success: true, relativePath: validated.relativePath };
+      this.bumpDirectoryRevisionsNow(mountKey, [parentPath]);
+      return { success: true, relativePath: normalizedRelative };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: message };
@@ -1357,14 +1398,21 @@ export class FileTreeService extends DisposableService {
       // Clear delete notices for any tabs whose file was re-created.
       this.uiKarton.setState((draft) => {
         if (watcherEvent === 'add' && changedPath) {
-          const normalizedCreated = this.normalizeRelative(changedPath);
-          for (const tab of Object.values(draft.contentTabs.tabs)) {
-            if (
-              tab.fileNotice?.kind === 'deleted' &&
-              tab.file?.workspaceKey === workspaceKey &&
-              tab.file.relativePath === normalizedCreated
-            ) {
-              tab.fileNotice = undefined;
+          // changedPath from chokidar is absolute; convert to workspace-
+          // relative so it can be compared against tab.file.relativePath.
+          const mount = this.resolveWorkspace(workspaceKey);
+          const relativeCreated = mount
+            ? normalizePath(path.relative(mount.path, changedPath))
+            : null;
+          if (relativeCreated && !relativeCreated.startsWith('..')) {
+            for (const tab of Object.values(draft.contentTabs.tabs)) {
+              if (
+                tab.fileNotice?.kind === 'deleted' &&
+                tab.file?.workspaceKey === workspaceKey &&
+                tab.file.relativePath === relativeCreated
+              ) {
+                tab.fileNotice = undefined;
+              }
             }
           }
         }

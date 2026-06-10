@@ -48,11 +48,13 @@ export function ChatPanel() {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current++;
-    // Accept Files (from file system) OR text/uri-list (from web pages - images/links)
+    // Accept Files (from file system), text/uri-list (from web pages - images/links),
+    // or workspace file/folder entries dragged from the file tree.
     if (
       e.dataTransfer.types.includes('Files') ||
       e.dataTransfer.types.includes('text/uri-list') ||
-      e.dataTransfer.types.includes('application/x-stagewise-file-path')
+      e.dataTransfer.types.includes('application/x-stagewise-file-path') ||
+      e.dataTransfer.types.includes('application/x-stagewise-file-paths')
     ) {
       setIsDragOver(true);
     }

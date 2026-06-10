@@ -1,5 +1,8 @@
 import posthog from 'posthog-js';
-import { selectedElementToAttachmentAttributes } from '@ui/utils/attachment-conversions';
+import {
+  attachmentToAttachmentAttributes,
+  selectedElementToAttachmentAttributes,
+} from '@ui/utils/attachment-conversions';
 import {
   markdownToTipTapContent,
   enrichTipTapContent,
@@ -7,6 +10,7 @@ import {
 import { cn, collectUserMessageMetadata } from '@ui/utils';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
+import { normalizePath } from '@shared/path-utils';
 
 import {
   useMemo,
@@ -359,10 +363,64 @@ export const MessageUser = memo(
       setElementSelectionActive(!elementSelectionActive);
     }, [elementSelectionActive, setElementSelectionActive]);
 
+    // Resolve workspace mount paths from Karton state for drag-drop handling.
+    const editDragMounts = useKartonState((s) =>
+      openAgent
+        ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
+        : EMPTY_MOUNTS,
+    );
+    const editDragMountsRef = useRef(editDragMounts);
+    editDragMountsRef.current = editDragMounts;
+
+    const handleEditedWorkspaceFileDrop = useCallback(
+      (attachment: AttachmentMetadata) => {
+        const colonIndex = attachment.path.indexOf(':');
+        const slashIndex = attachment.path.indexOf('/');
+        const mountPrefix =
+          colonIndex > 0 ? attachment.path.slice(0, colonIndex) : null;
+        const absolutePath =
+          colonIndex > 0 ? attachment.path.slice(colonIndex + 1) : null;
+        const currentMounts = editDragMountsRef.current;
+        const mount =
+          mountPrefix && absolutePath
+            ? currentMounts.find(
+                (item) =>
+                  item.prefix === mountPrefix &&
+                  normalizePath(absolutePath).startsWith(
+                    `${normalizePath(item.path)}/`,
+                  ),
+              )
+            : null;
+        const normalizedAttachment =
+          mount && absolutePath
+            ? {
+                path: `${mount.prefix}/${normalizePath(absolutePath).slice(
+                  normalizePath(mount.path).length + 1,
+                )}`,
+              }
+            : slashIndex > 0 && colonIndex === -1
+              ? attachment
+              : null;
+
+        if (!normalizedAttachment) return;
+
+        setEditedFileAttachments((prev) => {
+          if (prev.some((item) => item.path === normalizedAttachment.path))
+            return prev;
+          return [...prev, normalizedAttachment];
+        });
+        chatInputRef.current?.insertAttachment(
+          attachmentToAttachmentAttributes(normalizedAttachment),
+        );
+      },
+      [setEditedFileAttachments],
+    );
+
     // Drag and drop via shared hook
     const { isDragOver: isEditDragOver, handlers: editDragHandlers } =
       useDragDrop({
         onFileDrop: addFileAttachment,
+        onWorkspaceFileDrop: handleEditedWorkspaceFileDrop,
         onDropComplete: () => chatInputRef.current?.focus(),
       });
 

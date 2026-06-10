@@ -105,11 +105,10 @@ export const FileTreeNode = memo(function FileTreeNode({
       data-file-tree-entry-path={entry.relativePath}
       data-file-tree-row-index={rowIndex}
       tabIndex={focused ? 0 : -1}
-      draggable={!isDirectory}
+      draggable
       style={{ paddingLeft: 4 + depth * 14 }}
       onContextMenu={onFocus}
       onDragStart={(event) => {
-        if (isDirectory) return;
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData(
           'application/x-stagewise-file-path',

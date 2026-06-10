@@ -80,11 +80,11 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       const draggedWorkspacePaths = e.dataTransfer.getData(
         'application/x-stagewise-file-paths',
       );
-      if (draggedWorkspacePaths) {
+      if (draggedWorkspacePaths && onWorkspaceFileDrop) {
         try {
           const paths = JSON.parse(draggedWorkspacePaths) as string[];
           if (Array.isArray(paths) && paths.length > 0) {
-            for (const path of paths) onWorkspaceFileDrop?.({ path });
+            for (const path of paths) onWorkspaceFileDrop({ path });
             onDropComplete?.();
             return;
           }
@@ -96,8 +96,8 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDropReturn {
       const draggedWorkspacePath = e.dataTransfer.getData(
         'application/x-stagewise-file-path',
       );
-      if (draggedWorkspacePath) {
-        onWorkspaceFileDrop?.({ path: draggedWorkspacePath });
+      if (draggedWorkspacePath && onWorkspaceFileDrop) {
+        onWorkspaceFileDrop({ path: draggedWorkspacePath });
         onDropComplete?.();
         return;
       }
