@@ -13,8 +13,8 @@ import {
   ArrowUpIcon,
   SquareIcon,
   SquareDashedMousePointerIcon,
-  ImageUpIcon,
 } from 'lucide-react';
+import { IconPaperclip2Outline18 } from 'nucleo-ui-outline-18';
 import {
   useCallback,
   useMemo,
@@ -935,7 +935,6 @@ export const ChatInputActions = memo(function ChatInputActions({
             type="file"
             multiple
             className="hidden"
-            accept="image/png, image/jpeg, image/gif, image/webp, application/pdf, text/plain"
             id="chat-file-attachment-input-file"
           />
           <Tooltip>
@@ -943,7 +942,7 @@ export const ChatInputActions = memo(function ChatInputActions({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Upload image"
+                aria-label="Attach file"
                 className="mb-1 shrink-0"
                 onClick={() => {
                   const input = document.getElementById(
@@ -960,10 +959,10 @@ export const ChatInputActions = memo(function ChatInputActions({
                   };
                 }}
               >
-                <ImageUpIcon className="size-4" />
+                <IconPaperclip2Outline18 className="size-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Upload image</TooltipContent>
+            <TooltipContent>Attach file</TooltipContent>
           </Tooltip>
         </>
       )}

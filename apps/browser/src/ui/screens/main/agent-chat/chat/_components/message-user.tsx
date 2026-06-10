@@ -501,6 +501,14 @@ export const MessageUser = memo(
       return activeTab?.url?.startsWith('stagewise://internal/') ?? false;
     }, [activeTab?.url]);
 
+    const hasVisibleBrowsingTab = useMemo(() => {
+      if (!activeTab) return false;
+      return (
+        activeTab.type !== 'terminal' &&
+        !activeTab.url?.startsWith('stagewise://internal/')
+      );
+    }, [activeTab]);
+
     const mentionMounts = useKartonState((s) =>
       openAgent
         ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
@@ -688,7 +696,7 @@ export const MessageUser = memo(
                     <div className="relative flex shrink-0 flex-col items-center justify-end gap-1">
                       <ChatInputActions
                         isAgentWorking={false}
-                        showElementSelectorButton
+                        showElementSelectorButton={hasVisibleBrowsingTab}
                         elementSelectionActive={elementSelectionActive}
                         onToggleElementSelection={handleToggleElementSelection}
                         elementSelectorDisabled={hasOpenedInternalPage}
