@@ -902,6 +902,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       fileTreeService.deleteEntry(workspaceKey, relativePath),
   );
   uiKarton.registerServerProcedureHandler(
+    'fileTree.recreateDeletedFile',
+    async (_cid, workspaceKey: string, relativePath: string, content: string) =>
+      fileTreeService.recreateDeletedFile(workspaceKey, relativePath, content),
+  );
+  uiKarton.registerServerProcedureHandler(
     'fileTree.revealInFolder',
     async (_cid, workspaceKey: string, relativePath: string) =>
       fileTreeService.revealInFolder(workspaceKey, relativePath),

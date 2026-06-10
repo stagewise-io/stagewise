@@ -627,6 +627,10 @@ export type FilePreviewResult = {
   readOnly?: boolean;
 };
 
+export type FileTabNotice =
+  | { kind: 'moved'; fromRelativePath: string }
+  | { kind: 'deleted' };
+
 export type FileTabMetadata = {
   workspaceKey: FileTreeWorkspaceKey;
   relativePath: string;
@@ -724,6 +728,8 @@ export type TabState = {
   terminalRunningProcess?: string | null;
   /** File-preview-specific fields (present when type === 'file') */
   file?: FileTabMetadata;
+  /** Transient notice banner for file tabs (move / delete). */
+  fileNotice?: FileTabNotice;
   createdAt?: number;
   exited?: boolean;
   exitCode?: number | null;
@@ -1488,6 +1494,7 @@ export type KartonContract = {
         agentInstanceId?: string | null,
       ) => Promise<string | undefined>;
       closeTab: (tabId: string) => Promise<void>;
+      clearFileNotice: (tabId: string) => Promise<void>;
       switchTab: (tabId: string) => Promise<void>;
       reorderTabs: (tabIds: string[]) => Promise<void>;
       layout: {
@@ -1794,6 +1801,11 @@ export type KartonContract = {
       ) => Promise<void>;
       setVisible: (visible: boolean) => Promise<void>;
       setActiveWorkspace: (workspaceKey: string | null) => Promise<void>;
+      recreateDeletedFile: (
+        workspaceKey: string,
+        relativePath: string,
+        content: string,
+      ) => Promise<FileTreeOperationResult>;
       setDirectoryExpanded: (
         workspaceKey: string,
         directoryPath: string,

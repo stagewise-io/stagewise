@@ -133,6 +133,11 @@ export interface SortableTabItem {
    * Use case: `WithTabPreviewCard` hover-preview in the browser app.
    */
   wrapTrigger?: (inner: ReactElement) => ReactElement;
+  /**
+   * When true, a dot indicator is shown next to the label (hidden on hover).
+   * Bar variant only. Use case: unsaved file edits marker.
+   */
+  dirty?: boolean;
 }
 
 export type SortableTabVariant = 'pill' | 'bar';
@@ -202,7 +207,7 @@ function BarTriggerContent({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={item.onClose}
       className={cn(
-        'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100',
+        'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
       )}
     >
       <XIcon className="size-3" />
@@ -238,6 +243,16 @@ function BarTriggerContent({
         >
           {item.label}
         </span>
+        {item.dirty && (
+          <div
+            aria-hidden="true"
+            className={cn(
+              '-mr-1 ml-0.5 size-1.5 shrink-0 rounded-full',
+              isActive ? 'bg-foreground' : 'bg-muted-foreground',
+              'group-hover:opacity-0',
+            )}
+          />
+        )}
       </TabsBase.Tab>
 
       {/* Extra actions (e.g. audio mute toggle) — sibling to Tabs.Tab */}

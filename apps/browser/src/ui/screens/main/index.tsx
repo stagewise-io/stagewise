@@ -265,7 +265,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
       >
         {/* Single global drag zone for macOS titlebar — sits behind everything */}
         {isMacOs && !isFullScreen && (
-          <div className="app-drag absolute top-0 left-0 -z-10 h-8 w-full" />
+          <div className="app-drag absolute top-0 left-0 -z-10 h-10 w-full" />
         )}
         <ResizablePanelGroup
           direction="horizontal"

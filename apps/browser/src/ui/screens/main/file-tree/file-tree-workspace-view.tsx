@@ -1,6 +1,7 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import { toast } from '@stagewise/stage-ui/components/toaster';
 import { cn } from '@ui/utils';
+import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
@@ -16,6 +17,7 @@ import {
 } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import {
+  ClipboardIcon,
   ClipboardPasteIcon,
   CopyIcon,
   FolderOpenIcon,
@@ -29,6 +31,7 @@ import { Menu as MenuBase } from '@base-ui/react/menu';
 import { FileTreeNode } from './file-tree-node';
 import type { FileTreeClipboardOperation } from '@shared/karton-contracts/ui';
 import { getCurrentPlatform } from '@shared/hotkeys';
+import { normalizePath } from '@shared/path-utils';
 import { nativeFileManagerLabel } from '@shared/ide-url';
 import {
   getEffectiveFileTreeActionPaths,
@@ -73,22 +76,18 @@ const FILE_TREE_MOVE_MIME = 'application/x-stagewise-file-tree-move';
 const EMPTY_DRAG_FILE_PATHS: string[] = [];
 
 const contextMenuItemClassName = cn(
-  'flex w-full cursor-default flex-row items-center justify-start gap-2',
+  'flex w-full cursor-default flex-row items-center gap-2',
   'rounded-md px-2 py-1 text-foreground text-xs outline-none',
   'transition-colors duration-150 ease-out',
   'hover:bg-surface-1 data-highlighted:bg-surface-1',
   'data-disabled:pointer-events-none data-disabled:opacity-45',
 );
 
-const contextMenuModifierLabel =
-  getCurrentPlatform() === 'mac' ? '\u2318' : 'Ctrl';
+const isMac = getCurrentPlatform() === 'mac';
 
-function ContextMenuShortcut({ children }: { children: string }) {
-  return (
-    <span className="ml-auto pl-4 font-mono text-[0.625rem] text-muted-foreground">
-      {children}
-    </span>
-  );
+function contextMenuShortcut(key: string): string {
+  if (isMac) return `\u2318${key}`;
+  return `Ctrl+${key}`;
 }
 
 function getFileName(relativePath: string): string {
@@ -140,7 +139,9 @@ export function FileTreeWorkspaceView({
   const renameEntry = useKartonProcedure((p) => p.fileTree.renameEntry);
   const pasteEntry = useKartonProcedure((p) => p.fileTree.pasteEntry);
   const deleteEntry = useKartonProcedure((p) => p.fileTree.deleteEntry);
+  const copyText = useKartonProcedure((p) => p.browser.copyText);
   const [openAgent] = useOpenAgent();
+  const workspaceMounts = useKartonState((s) => s.workspaceMounts);
   const selectedRelativePath = useKartonState((s) => {
     const activeTabId = s.contentTabs.activeTabId;
     if (!activeTabId || !workspaceKey) return null;
@@ -468,6 +469,7 @@ export function FileTreeWorkspaceView({
           return;
         }
         if (clipboardItem.operation === 'cut') setClipboardItem(null);
+        void setDirectoryExpanded(workspaceKey, targetDirectoryPath, true);
         const lastResult = results.at(-1);
         if (lastResult?.relativePath)
           setFocusedEntryPath(lastResult.relativePath);
@@ -475,7 +477,7 @@ export function FileTreeWorkspaceView({
         setSelectionAnchorPath(null);
       });
     },
-    [clipboardItem, pasteEntry, workspaceKey],
+    [clipboardItem, pasteEntry, setDirectoryExpanded, workspaceKey],
   );
 
   const handleMoveDrop = useCallback(
@@ -510,12 +512,13 @@ export function FileTreeWorkspaceView({
           return;
         }
         setClipboardItem(null);
+        void setDirectoryExpanded(workspaceKey, targetDirectoryPath, true);
         const lastResult = results.at(-1);
         if (lastResult?.relativePath)
           setFocusedEntryPath(lastResult.relativePath);
       });
     },
-    [pasteEntry, workspaceKey],
+    [pasteEntry, setDirectoryExpanded, workspaceKey],
   );
 
   const handleDelete = useCallback(
@@ -570,6 +573,28 @@ export function FileTreeWorkspaceView({
       void revealInFolder(workspaceKey, relativePath);
     },
     [revealInFolder, workspaceKey],
+  );
+
+  const resolveAbsolutePath = useCallback(
+    (relativePath: string): string | null => {
+      if (!workspaceKey) return null;
+      const mount = workspaceMounts.find(
+        (m) => `${m.prefix}:${normalizePath(m.path)}` === workspaceKey,
+      );
+      if (!mount) return null;
+      const root = normalizePath(mount.path);
+      return `${root}/${relativePath}`;
+    },
+    [workspaceKey, workspaceMounts],
+  );
+
+  const handleCopyPath = useCallback(
+    (relativePath: string) => {
+      const absPath = resolveAbsolutePath(relativePath);
+      if (!absPath) return;
+      void copyText(absPath);
+    },
+    [copyText, resolveAbsolutePath],
   );
 
   const handleSelect = useCallback(
@@ -949,10 +974,8 @@ export function FileTreeWorkspaceView({
               }
               dropTarget={
                 row.type === 'entry' &&
-                dragOverDirectoryPath ===
-                  (row.entry.kind === 'directory'
-                    ? row.entry.relativePath
-                    : getParentDirectory(row.entry.relativePath))
+                row.entry.kind === 'directory' &&
+                dragOverDirectoryPath === row.entry.relativePath
               }
               renaming={
                 row.type === 'entry' && row.entry.relativePath === renamingPath
@@ -989,8 +1012,13 @@ export function FileTreeWorkspaceView({
               }}
             >
               <PencilIcon className="size-3.5 shrink-0" />
-              <span>Rename</span>
-              <ContextMenuShortcut>F2</ContextMenuShortcut>
+              <span className="min-w-0 flex-1 truncate">Rename</span>
+              <ShortcutCombo
+                value="F2"
+                size="xs"
+                variant="subtle"
+                className="shrink-0"
+              />
             </MenuBase.Item>
             <MenuBase.Item
               className={contextMenuItemClassName}
@@ -1000,8 +1028,13 @@ export function FileTreeWorkspaceView({
               }}
             >
               <CopyIcon className="size-3.5 shrink-0" />
-              <span>Copy</span>
-              <ContextMenuShortcut>{`${contextMenuModifierLabel}C`}</ContextMenuShortcut>
+              <span className="min-w-0 flex-1 truncate">Copy</span>
+              <ShortcutCombo
+                value={contextMenuShortcut('C')}
+                size="xs"
+                variant="subtle"
+                className="shrink-0"
+              />
             </MenuBase.Item>
             <MenuBase.Item
               className={contextMenuItemClassName}
@@ -1011,8 +1044,13 @@ export function FileTreeWorkspaceView({
               }}
             >
               <ScissorsIcon className="size-3.5 shrink-0" />
-              <span>Cut</span>
-              <ContextMenuShortcut>{`${contextMenuModifierLabel}X`}</ContextMenuShortcut>
+              <span className="min-w-0 flex-1 truncate">Cut</span>
+              <ShortcutCombo
+                value={contextMenuShortcut('X')}
+                size="xs"
+                variant="subtle"
+                className="shrink-0"
+              />
             </MenuBase.Item>
             <MenuBase.Item
               className={contextMenuItemClassName}
@@ -1020,8 +1058,13 @@ export function FileTreeWorkspaceView({
               onClick={() => handlePaste(contextPasteDirectory)}
             >
               <ClipboardPasteIcon className="size-3.5 shrink-0" />
-              <span>Paste</span>
-              <ContextMenuShortcut>{`${contextMenuModifierLabel}V`}</ContextMenuShortcut>
+              <span className="min-w-0 flex-1 truncate">Paste</span>
+              <ShortcutCombo
+                value={contextMenuShortcut('V')}
+                size="xs"
+                variant="subtle"
+                className="shrink-0"
+              />
             </MenuBase.Item>
             <MenuBase.Item
               className={cn(contextMenuItemClassName, 'text-error-foreground')}
@@ -1031,8 +1074,24 @@ export function FileTreeWorkspaceView({
               }}
             >
               <Trash2Icon className="size-3.5 shrink-0" />
-              <span>Delete</span>
-              <ContextMenuShortcut>Del</ContextMenuShortcut>
+              <span className="min-w-0 flex-1 truncate">Delete</span>
+              <ShortcutCombo
+                value="Delete"
+                size="xs"
+                variant="subtle"
+                className="shrink-0"
+              />
+            </MenuBase.Item>
+            <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={!contextTargetPath}
+              onClick={() => {
+                if (contextTargetPath) handleCopyPath(contextTargetPath);
+              }}
+            >
+              <ClipboardIcon className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Copy path</span>
             </MenuBase.Item>
             <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
             <MenuBase.Item
@@ -1043,7 +1102,9 @@ export function FileTreeWorkspaceView({
               }}
             >
               <FolderOpenIcon className="size-3.5 shrink-0" />
-              <span>Open in {nativeFileManagerLabel}</span>
+              <span className="min-w-0 flex-1 truncate">
+                Open in {nativeFileManagerLabel}
+              </span>
             </MenuBase.Item>
           </MenuBase.Popup>
         </MenuBase.Positioner>

@@ -110,7 +110,7 @@ export const FileTreeNode = memo(function FileTreeNode({
       onContextMenu={onFocus}
       onDragStart={(event) => {
         if (isDirectory) return;
-        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData(
           'application/x-stagewise-file-path',
           dragPath,
