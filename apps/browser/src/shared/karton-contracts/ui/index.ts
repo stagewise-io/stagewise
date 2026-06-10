@@ -1800,14 +1800,6 @@ export type KartonContract = {
         workspaceKey: string,
         relativePath: string,
       ) => Promise<{ success: boolean; error?: string }>;
-      openExternally: (
-        workspaceKey: string,
-        relativePath: string,
-      ) => Promise<{ success: boolean; error?: string }>;
-      revealInFileTree: (
-        workspaceKey: string,
-        relativePath: string,
-      ) => Promise<void>;
       setVisible: (visible: boolean) => Promise<void>;
       setActiveWorkspace: (workspaceKey: string | null) => Promise<void>;
       recreateDeletedFile: (
