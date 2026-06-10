@@ -300,8 +300,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     (s) => s.browsing.contextSelectionMode,
   );
 
-  const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
-
   const activeTabData = useKartonState((s) => {
     const tabId = s.contentTabs.activeTabId;
     if (!tabId) return null;
@@ -1225,13 +1223,13 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   );
 
   // Cmd+I: toggle context element selection. Always focuses chat input,
-  // never unfocuses. Only works when a browser tab is visible.
+  // never unfocuses. Only works when a browsing tab is visible.
   useHotKeyListener(
     useCallback(async () => {
-      if (!activeTabId) return;
+      if (!hasVisibleBrowsingTab) return;
       if (elementSelectionActive) {
         stopContextSelector();
-      } else if (!activeTabUrl?.startsWith('stagewise://internal/')) {
+      } else {
         startContextSelector();
       }
       if (!chatInputActive) {
@@ -1239,8 +1237,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         await togglePanelKeyboardFocus('stagewise-ui');
       }
     }, [
-      activeTabId,
-      activeTabUrl,
+      hasVisibleBrowsingTab,
       elementSelectionActive,
       chatInputActive,
       startContextSelector,
