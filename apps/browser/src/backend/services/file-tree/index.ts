@@ -960,9 +960,9 @@ export class FileTreeService extends DisposableService {
           ignored: (candidate) => this.isDefaultIgnoredPath(candidate),
           depth: 0,
         });
-        watcher.on('all', (_event, changedPath) => {
+        watcher.on('all', (event, changedPath) => {
           if (this.isDefaultIgnoredPath(changedPath)) return;
-          this.scheduleRevisionBump(key, changedPath);
+          this.scheduleRevisionBump(key, changedPath, event);
         });
         watcher.on('error', (error) => {
           this.logger.warn('[FileTreeService] watcher error', { key, error });
@@ -987,6 +987,7 @@ export class FileTreeService extends DisposableService {
   private scheduleRevisionBump(
     workspaceKey: string,
     changedPath?: string,
+    watcherEvent?: string,
   ): void {
     const affectedDirectory = changedPath
       ? this.invalidateDirectoryCacheForPath(workspaceKey, changedPath)
@@ -1005,7 +1006,20 @@ export class FileTreeService extends DisposableService {
       const affectedDirectories =
         this.pendingRevisionDirectories.get(workspaceKey);
       this.pendingRevisionDirectories.delete(workspaceKey);
+      // Clear delete notices for any tabs whose file was re-created.
       this.uiKarton.setState((draft) => {
+        if (watcherEvent === 'add' && changedPath) {
+          const normalizedCreated = this.normalizeRelative(changedPath);
+          for (const tab of Object.values(draft.contentTabs.tabs)) {
+            if (
+              tab.fileNotice?.kind === 'deleted' &&
+              tab.file?.workspaceKey === workspaceKey &&
+              tab.file.relativePath === normalizedCreated
+            ) {
+              tab.fileNotice = undefined;
+            }
+          }
+        }
         if (affectedDirectories?.size) {
           draft.fileTree.directoryRevisions ??= {};
           draft.fileTree.directoryRevisions[workspaceKey] ??= {};
