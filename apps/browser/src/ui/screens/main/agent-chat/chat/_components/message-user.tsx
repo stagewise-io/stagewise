@@ -503,11 +503,29 @@ export const MessageUser = memo(
 
     const hasVisibleBrowsingTab = useMemo(() => {
       if (!activeTab) return false;
+      const ownedByOtherAgent =
+        activeTab.agentInstanceId != null &&
+        activeTab.agentInstanceId !== openAgent;
       return (
         activeTab.type !== 'terminal' &&
-        !activeTab.url?.startsWith('stagewise://internal/')
+        !activeTab.url?.startsWith('stagewise://internal/') &&
+        !ownedByOtherAgent
       );
-    }, [activeTab]);
+    }, [activeTab, openAgent]);
+
+    // Deactivate element selection when the browsing tab disappears
+    const prevHasVisibleBrowsingTabRef = useRef(hasVisibleBrowsingTab);
+    useEffect(() => {
+      const prev = prevHasVisibleBrowsingTabRef.current;
+      prevHasVisibleBrowsingTabRef.current = hasVisibleBrowsingTab;
+      if (prev && !hasVisibleBrowsingTab && elementSelectionActive) {
+        setElementSelectionActive(false);
+      }
+    }, [
+      hasVisibleBrowsingTab,
+      elementSelectionActive,
+      setElementSelectionActive,
+    ]);
 
     const mentionMounts = useKartonState((s) =>
       openAgent

@@ -302,15 +302,23 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
 
-  const hasVisibleBrowsingTab = useKartonState((s) => {
+  const activeTabData = useKartonState((s) => {
     const tabId = s.contentTabs.activeTabId;
-    if (!tabId) return false;
-    const tab = s.contentTabs.tabs[tabId];
-    if (!tab) return false;
-    return (
-      tab.type !== 'terminal' && !tab.url?.startsWith('stagewise://internal/')
-    );
+    if (!tabId) return null;
+    return s.contentTabs.tabs[tabId] ?? null;
   });
+
+  const hasVisibleBrowsingTab = useMemo(() => {
+    if (!activeTabData) return false;
+    const ownedByOtherAgent =
+      activeTabData.agentInstanceId != null &&
+      activeTabData.agentInstanceId !== openAgent;
+    return (
+      activeTabData.type !== 'terminal' &&
+      !activeTabData.url?.startsWith('stagewise://internal/') &&
+      !ownedByOtherAgent
+    );
+  }, [activeTabData, openAgent]);
 
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;
@@ -466,6 +474,19 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const stopContextSelector = useCallback(() => {
     setContextSelectionActive(false);
   }, [setContextSelectionActive]);
+
+  // Deactivate element selection when the browsing tab disappears
+  // (e.g. user switches to terminal or internal page). Without this,
+  // selectionModeActive stays true while the toggle button is hidden,
+  // leaving no way to exit selection mode from the chat input.
+  const prevHasVisibleBrowsingTabRef = useRef(hasVisibleBrowsingTab);
+  useEffect(() => {
+    const prev = prevHasVisibleBrowsingTabRef.current;
+    prevHasVisibleBrowsingTabRef.current = hasVisibleBrowsingTab;
+    if (prev && !hasVisibleBrowsingTab && selectionModeActive) {
+      stopContextSelector();
+    }
+  }, [hasVisibleBrowsingTab, selectionModeActive, stopContextSelector]);
 
   // Pending early-abort revert: deferred until isWorking becomes false
   // so the stream is fully done and won't re-add the assistant message.
