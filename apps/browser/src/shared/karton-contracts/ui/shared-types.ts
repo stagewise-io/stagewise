@@ -418,9 +418,15 @@ export const userPreferencesSchema = z.object({
       /** Whether file search includes gitignored files (global toggle) */
       fileSearchIncludeGitignored: z.boolean().default(false),
       /** Custom hex background color for SVG previews (without #) */
-      svgCustomBackground: z.string().default('ffffff'),
+      svgCustomBackground: z
+        .string()
+        .regex(/^[0-9A-Fa-f]{6}$/, 'must be a 6-digit hex without #')
+        .default('ffffff'),
       /** Custom hex foreground color for SVG previews (without #) */
-      svgCustomForeground: z.string().default('8b5cf6'),
+      svgCustomForeground: z
+        .string()
+        .regex(/^[0-9A-Fa-f]{6}$/, 'must be a 6-digit hex without #')
+        .default('8b5cf6'),
     })
     .default({
       newTabPage: { type: 'home' },

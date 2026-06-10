@@ -41,7 +41,6 @@ import {
 } from '@stagewise/stage-ui/components/collapsible';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { FileContextMenu } from '@ui/components/file-context-menu';
 import { cn, stripMountPrefix } from '@ui/utils';
 import { IconArrowUpRightOutline18 } from 'nucleo-ui-outline-18';
 
@@ -67,12 +66,26 @@ const FileDiffItem: FC<{
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
   const { added, removed } = getLineStats(edit);
   const workspaceMounts = useKartonState((s) => s.workspaceMounts);
-  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
-  const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
   const toRelativePath = useCallback(
     (absPath: string) => stripMountPrefix(absPath),
     [],
   );
+  const handleOpenInTab = useCallback(() => {
+    for (const mount of workspaceMounts) {
+      const normalizedMount = mount.path.replace(/\\/g, '/');
+      const normalizedPath = edit.path.replace(/\\/g, '/');
+      if (
+        normalizedPath === normalizedMount ||
+        normalizedPath.startsWith(`${normalizedMount}/`)
+      ) {
+        window.open(
+          `stagewise://reveal-file/${encodeURIComponent(edit.path)}`,
+          '_blank',
+        );
+        return;
+      }
+    }
+  }, [edit.path, workspaceMounts]);
 
   return (
     <div
@@ -95,20 +108,25 @@ const FileDiffItem: FC<{
               filePath={edit.fileName}
               className="-ml-1 size-4 shrink-0"
             />
-            <FileContextMenu relativePath={edit.path}>
-              <Tooltip>
-                <TooltipTrigger>
-                  <span className="min-w-0 truncate font-normal text-foreground text-xs hover:text-foreground group-hover:text-hover-derived">
-                    {edit.fileName}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="max-w-md">
-                    {toRelativePath(edit.path) ?? edit.path}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </FileContextMenu>
+            <Tooltip>
+              <TooltipTrigger>
+                <button
+                  type="button"
+                  className="min-w-0 cursor-pointer truncate font-normal text-foreground text-xs hover:text-foreground group-hover:text-hover-derived"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenInTab();
+                  }}
+                >
+                  {edit.fileName}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="max-w-md">
+                  {toRelativePath(edit.path) ?? edit.path}
+                </div>
+              </TooltipContent>
+            </Tooltip>
             {edit.isExternal && edit.changeType === 'created' && (
               <span className="shrink-0 text-success-foreground text-xs">
                 (new)
@@ -228,19 +246,10 @@ const FileDiffItem: FC<{
                   size="xs"
                   className="shrink-0 cursor-pointer"
                   onClick={() => {
-                    const relPath = edit.path;
-                    const slashIdx = relPath.indexOf('/');
-                    if (slashIdx <= 0) return;
-                    const prefix = relPath.slice(0, slashIdx);
-                    const rel = relPath.slice(slashIdx + 1);
-                    const mount = workspaceMounts.find(
-                      (m) => m.prefix === prefix,
+                    window.open(
+                      `stagewise://reveal-file/${encodeURIComponent(edit.path)}`,
+                      '_blank',
                     );
-                    if (!mount) return;
-                    const wkKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
-                    void openFileTab(wkKey, rel).then((tabId) => {
-                      if (!tabId) void revealInFolder(wkKey, rel);
-                    });
                   }}
                 >
                   <div className="flex flex-row items-center justify-center gap-1">

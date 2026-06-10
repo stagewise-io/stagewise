@@ -222,7 +222,7 @@ export const ExecuteSandboxJsToolPart = ({
                 open={scriptExpanded}
                 onOpenChange={setScriptExpanded}
               >
-                <CollapsibleTrigger size="condensed" className="">
+                <CollapsibleTrigger size="condensed" className="select-none">
                   <IconChevronDownOutline18
                     className={cn(
                       'size-3 transition-transform duration-150',
@@ -245,7 +245,7 @@ export const ExecuteSandboxJsToolPart = ({
                 open={resultExpanded}
                 onOpenChange={setResultExpanded}
               >
-                <CollapsibleTrigger size="condensed" className="">
+                <CollapsibleTrigger size="condensed" className="select-none">
                   <IconChevronDownOutline18
                     className={cn(
                       'size-3 transition-transform duration-150',
@@ -318,7 +318,7 @@ export const ExecuteSandboxJsToolPart = ({
                   open={scriptExpanded}
                   onOpenChange={setScriptExpanded}
                 >
-                  <CollapsibleTrigger size="condensed" className="">
+                  <CollapsibleTrigger size="condensed" className="select-none">
                     <IconChevronDownOutline18
                       className={cn(
                         'size-3 transition-transform duration-150',
@@ -341,7 +341,7 @@ export const ExecuteSandboxJsToolPart = ({
                   open={resultExpanded}
                   onOpenChange={setResultExpanded}
                 >
-                  <CollapsibleTrigger size="condensed" className="">
+                  <CollapsibleTrigger size="condensed" className="select-none">
                     <IconChevronDownOutline18
                       className={cn(
                         'size-3 transition-transform duration-150',

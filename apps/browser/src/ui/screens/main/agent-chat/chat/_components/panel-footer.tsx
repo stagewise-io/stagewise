@@ -1401,25 +1401,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             ? attachment
             : null;
 
-      // #region @stagewise-debug
-      fetch(
-        'http://127.0.0.1:51577/ingest/attachment-insert-debug?token=1b5c7bc1-5d65-439f-9da9-afa4c102a49f',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            level: 'info',
-            source: 'panelFooter.workspaceFileDrop',
-            data: {
-              attachment,
-              normalizedAttachment,
-              hasInputRef: Boolean(chatInputRef.current),
-            },
-          }),
-        },
-      ).catch(() => {});
-      // #endregion @stagewise-debug
-
       if (!normalizedAttachment) return;
 
       setFileAttachments((prev) => {
@@ -1440,20 +1421,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     onFileDrop: addFileAttachment,
     onWorkspaceFileDrop: handleWorkspaceFileDrop,
     onDropComplete: () => {
-      // #region @stagewise-debug
-      fetch(
-        'http://127.0.0.1:51577/ingest/attachment-insert-debug?token=1b5c7bc1-5d65-439f-9da9-afa4c102a49f',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            level: 'info',
-            source: 'panelFooter.dropComplete',
-            data: { hasInputRef: Boolean(chatInputRef.current) },
-          }),
-        },
-      ).catch(() => {});
-      // #endregion @stagewise-debug
       chatInputRef.current?.focus();
     },
   });

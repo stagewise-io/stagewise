@@ -426,7 +426,7 @@ export function StatusCard() {
             return copy;
           });
         },
-        onShowFile: () => handleShowFile(mountPath),
+        onShowFile: () => handleShowFile(`${mountPrefix}:${mountPath}`),
         onGenerate: () => {
           if (!openAgentId) return;
           setErrorsByPath((m) => {

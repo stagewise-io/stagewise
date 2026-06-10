@@ -2897,7 +2897,14 @@ export class WindowLayoutService extends DisposableService {
       // key order. Object order is no longer part of tab semantics.
       const contentTabs = this.uiKarton.state.contentTabs;
       const contentTabsTabs = contentTabs.tabs;
-      const allIds = this.getAllOrderedTabIds(contentTabs);
+      const allIds = this.getAllOrderedTabIds(contentTabs).filter((id) => {
+        const tab = contentTabsTabs[id];
+        // Never persist temporary/preview file tabs — they are ephemeral by
+        // design and should not survive a restart.
+        if (tab?.type === 'file' && tab.lifecycle?.kind !== 'permanent')
+          return false;
+        return true;
+      });
       const activeId = this.uiKarton.state.contentTabs.activeTabId;
       const activeIndex = activeId ? allIds.indexOf(activeId) : -1;
       const state: PersistedTabState = {

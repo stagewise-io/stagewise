@@ -11,7 +11,6 @@ import {
   IconArrowUpRightOutline18,
 } from 'nucleo-ui-outline-18';
 import { cn, stripMountPrefix } from '@ui/utils';
-import { FileContextMenu } from '@ui/components/file-context-menu';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useDiffLines } from '@ui/hooks/use-diff-lines';
 import { useMemo, useState } from 'react';
@@ -42,6 +41,10 @@ export const GenericMultiEditToolPart = ({
   const mounts = useKartonState((s) =>
     openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
   );
+  // Fall back to the global mount registry so "Open file" links still work
+  // when the workspace was remounted after the tool ran, or after an agent
+  // disconnect/reconnect cycle.
+  const globalMounts = useKartonState((s) => s.workspaceMounts);
   const outputWithDiff = part.output as
     | WithDiff<typeof part.output>
     | undefined;
@@ -103,8 +106,6 @@ export const GenericMultiEditToolPart = ({
 
   const [collapsedDiffView, setCollapsedDiffView] = useState(true);
 
-  const noopResolve = () => null;
-
   const trigger = useMemo(() => {
     if (state === 'error')
       return (
@@ -114,19 +115,11 @@ export const GenericMultiEditToolPart = ({
         />
       );
     else if (streaming)
-      return (
-        <LoadingHeader
-          relativePath={path ?? undefined}
-          fullPath={part.input?.path ?? undefined}
-          resolvePath={noopResolve}
-        />
-      );
+      return <LoadingHeader relativePath={path ?? undefined} />;
     else
       return (
         <SuccessHeader
           relativePath={path ?? undefined}
-          fullPath={part.input?.path ?? undefined}
-          resolvePath={noopResolve}
           newLineCount={newLineCount}
           deletedLineCount={deletedLineCount}
         />
@@ -222,7 +215,9 @@ export const GenericMultiEditToolPart = ({
                     if (slashIndex <= 0) return;
                     const prefix = relPath.slice(0, slashIndex);
                     const rel = relPath.slice(slashIndex + 1);
-                    const mount = mounts.find((m) => m.prefix === prefix);
+                    const mount =
+                      mounts.find((m) => m.prefix === prefix) ??
+                      globalMounts.find((m) => m.prefix === prefix);
                     if (!mount) return;
                     const wkKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
                     void openFileTab(wkKey, rel, openAgent).then((tabId) => {
@@ -276,14 +271,10 @@ const ErrorHeader = ({
 
 const SuccessHeader = ({
   relativePath,
-  fullPath,
-  resolvePath,
   newLineCount,
   deletedLineCount,
 }: {
   relativePath?: string;
-  fullPath?: string;
-  resolvePath: (path: string) => string | null;
   newLineCount: number;
   deletedLineCount: number;
 }) => {
@@ -296,24 +287,19 @@ const SuccessHeader = ({
           filePath={relativePath ?? ''}
           className="-ml-1 size-4 shrink-0"
         />
-        <FileContextMenu
-          relativePath={fullPath ?? relativePath ?? ''}
-          resolvePath={resolvePath}
-        >
-          <Tooltip>
-            <TooltipTrigger>
-              <span className="min-w-0 truncate text-xs" dir="rtl">
-                <span
-                  className="items-center gap-0.5 text-foreground text-xs group-hover/trigger:text-hover-derived"
-                  dir="ltr"
-                >
-                  {fileName}
-                </span>
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="min-w-0 truncate text-xs" dir="rtl">
+              <span
+                className="items-center gap-0.5 text-foreground text-xs group-hover/trigger:text-hover-derived"
+                dir="ltr"
+              >
+                {fileName}
               </span>
-            </TooltipTrigger>
-            <TooltipContent>{relativePath ?? ''}</TooltipContent>
-          </Tooltip>
-        </FileContextMenu>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{relativePath ?? ''}</TooltipContent>
+        </Tooltip>
       </div>
       {newLineCount > 0 && (
         <span className="shrink-0 text-success-foreground text-xs group-hover/trigger:text-hover-derived">
@@ -329,36 +315,23 @@ const SuccessHeader = ({
   );
 };
 
-const LoadingHeader = ({
-  relativePath,
-  fullPath,
-  resolvePath,
-}: {
-  relativePath?: string;
-  fullPath?: string;
-  resolvePath: (path: string) => string | null;
-}) => {
+const LoadingHeader = ({ relativePath }: { relativePath?: string }) => {
   const fileName = relativePath ? getBaseName(relativePath) : relativePath;
 
   return (
     <div className="flex flex-row items-center justify-start gap-1">
       <IconLoader6Outline18 className="size-3 shrink-0 animate-spin text-primary-foreground" />
       {relativePath !== null ? (
-        <FileContextMenu
-          relativePath={fullPath ?? relativePath ?? ''}
-          resolvePath={resolvePath}
-        >
-          <Tooltip>
-            <TooltipTrigger>
-              <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
-                <span dir="ltr" className="shimmer-text-primary">
-                  {fileName}
-                </span>
+        <Tooltip>
+          <TooltipTrigger>
+            <span className="min-w-0 flex-1 truncate text-xs" dir="rtl">
+              <span dir="ltr" className="shimmer-text-primary">
+                {fileName}
               </span>
-            </TooltipTrigger>
-            <TooltipContent>{relativePath ?? ''}</TooltipContent>
-          </Tooltip>
-        </FileContextMenu>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{relativePath ?? ''}</TooltipContent>
+        </Tooltip>
       ) : (
         <Skeleton className="h-3 w-16" variant="text" />
       )}

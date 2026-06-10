@@ -929,25 +929,15 @@ export function FileTreeWorkspaceView({
                 row.type === 'entry'
                   ? JSON.stringify({
                       workspaceKey,
-                      relativePaths: getActionPaths(
-                        row.entry.relativePath,
-                      ).filter(
-                        (relativePath) =>
-                          entryByRelativePath.get(relativePath)?.entry.kind !==
-                          'directory',
-                      ),
+                      relativePaths: getActionPaths(row.entry.relativePath),
                     } satisfies FileTreeDragPayload)
                   : ''
               }
               dragFilePaths={
                 row.type === 'entry'
-                  ? getActionPaths(row.entry.relativePath)
-                      .filter(
-                        (relativePath) =>
-                          entryByRelativePath.get(relativePath)?.entry.kind !==
-                          'directory',
-                      )
-                      .map((relativePath) => `${workspaceKey}/${relativePath}`)
+                  ? getActionPaths(row.entry.relativePath).map(
+                      (relativePath) => `${workspaceKey}/${relativePath}`,
+                    )
                   : EMPTY_DRAG_FILE_PATHS
               }
               onFocus={() => {

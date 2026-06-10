@@ -30,10 +30,10 @@ export function UnsavedFileCloseDialog({
   return (
     <Dialog
       open={entry !== null}
-      onOpenChange={(open) => !open && onKeepOpen()}
+      onOpenChange={(open) => !open && !isSaving && onKeepOpen()}
     >
       <DialogContent>
-        <DialogClose />
+        {!isSaving && <DialogClose />}
         <DialogHeader>
           <DialogTitle>Unsaved file edits</DialogTitle>
           <DialogDescription>

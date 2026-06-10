@@ -60,13 +60,15 @@ export function FileContextMenu({
                 <span>Open in file view</span>
               </MenuBase.Item>
             )}
-            <MenuBase.Item
-              className={itemClassName}
-              onClick={openInFileManager}
-            >
-              <IconArrowUpRightOutline18 className="size-3.5 shrink-0" />
-              <span>Reveal in {nativeFileManagerLabel}</span>
-            </MenuBase.Item>
+            {resolvePath && (
+              <MenuBase.Item
+                className={itemClassName}
+                onClick={openInFileManager}
+              >
+                <IconArrowUpRightOutline18 className="size-3.5 shrink-0" />
+                <span>Reveal in {nativeFileManagerLabel}</span>
+              </MenuBase.Item>
+            )}
           </MenuBase.Popup>
         </MenuBase.Positioner>
       </MenuBase.Portal>

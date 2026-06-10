@@ -122,7 +122,7 @@ const ToolPartUIWithContent = ({
         <CollapsibleTrigger
           size="condensed"
           className={cn(
-            `group/trigger gap-1 px-0 font-normal text-muted-foreground`,
+            `group/trigger select-none gap-1 px-0 font-normal text-muted-foreground`,
             'cursor-pointer',
             showBorder &&
               'h-6 rounded-t-lg rounded-b-none border-b bg-background px-2.5 dark:bg-surface-1',
@@ -181,7 +181,7 @@ const ToolPartUIWithContent = ({
             <div
               className={cn(
                 // Base: shared typography + container chrome
-                'flex flex-row items-center justify-start gap-1 rounded-b-lg bg-background px-2 py-1 text-muted-foreground dark:bg-surface-1',
+                'flex select-none flex-row items-center justify-start gap-1 rounded-b-lg bg-background px-2 py-1 text-muted-foreground dark:bg-surface-1',
                 // Default (absolute) mode: pin to bottom and add separator
                 !contentFooterStatic &&
                   'absolute right-0 bottom-0 left-0 h-6 border-border/30 border-t dark:border-border/70',

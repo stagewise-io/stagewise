@@ -11,7 +11,6 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { getBaseName, getParentPath, normalizePath } from '@shared/path-utils';
 import { stripMountPrefix } from '@ui/utils';
-import { FileContextMenu } from '@ui/components/file-context-menu';
 import type { MountEntry } from '@shared/karton-contracts/ui';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
 import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
@@ -138,68 +137,62 @@ export function FileDiffFileItem({
     () => getRelativeDir(fileDiff.path, resolvedMounts),
     [fileDiff.path, resolvedMounts],
   );
-
   return (
-    <FileContextMenu relativePath={fileDiff.path}>
-      <Tooltip>
-        <TooltipTrigger>
-          <button
-            type="button"
-            className="flex w-full cursor-pointer flex-row items-center justify-start gap-1 rounded px-1 py-0.5 pr-2 text-foreground hover:bg-surface-1 hover:text-hover-derived"
-            onClick={() => onOpenDiffReview(fileDiff.fileId)}
-          >
-            <FileIcon
-              filePath={fileDiff.fileName}
-              className="size-5 shrink-0"
-            />
-            <span className="shrink-0 text-xs leading-none">
-              {fileDiff.fileName}
+    <Tooltip>
+      <TooltipTrigger>
+        <button
+          type="button"
+          className="flex w-full cursor-pointer flex-row items-center justify-start gap-1 rounded px-1 py-0.5 pr-2 text-foreground hover:bg-surface-1 hover:text-hover-derived"
+          onClick={() => onOpenDiffReview(fileDiff.fileId)}
+        >
+          <FileIcon filePath={fileDiff.fileName} className="size-5 shrink-0" />
+          <span className="shrink-0 text-xs leading-none">
+            {fileDiff.fileName}
+          </span>
+          {relativeDir && (
+            <span
+              className="min-w-0 shrink truncate text-subtle-foreground text-xs leading-none"
+              dir="rtl"
+            >
+              <span dir="ltr">{relativeDir}</span>
             </span>
-            {relativeDir && (
-              <span
-                className="min-w-0 shrink truncate text-subtle-foreground text-xs leading-none"
-                dir="rtl"
-              >
-                <span dir="ltr">{relativeDir}</span>
-              </span>
-            )}
-            {fileDiff.isExternal ? (
-              <>
-                {fileDiff.changeType === 'created' && (
-                  <span className="ml-auto shrink-0 text-[10px] text-success-foreground leading-none">
-                    (new)
-                  </span>
-                )}
-                {fileDiff.changeType === 'deleted' && (
-                  <span className="ml-auto shrink-0 text-[10px] text-error-foreground leading-none">
-                    (deleted)
-                  </span>
-                )}
-                {fileDiff.changeType === 'modified' && (
-                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground leading-none">
-                    (binary)
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="ml-auto flex shrink-0 flex-row items-center gap-0.5 pl-2">
-                {added > 0 && (
-                  <span className="text-[10px] text-success-foreground leading-none hover:text-hover-derived">
-                    +{added}
-                  </span>
-                )}
-                {removed > 0 && (
-                  <span className="text-[10px] text-error-foreground leading-none hover:text-hover-derived">
-                    -{removed}
-                  </span>
-                )}
-              </span>
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{displayPath}</TooltipContent>
-      </Tooltip>
-    </FileContextMenu>
+          )}
+          {fileDiff.isExternal ? (
+            <>
+              {fileDiff.changeType === 'created' && (
+                <span className="ml-auto shrink-0 text-[10px] text-success-foreground leading-none">
+                  (new)
+                </span>
+              )}
+              {fileDiff.changeType === 'deleted' && (
+                <span className="ml-auto shrink-0 text-[10px] text-error-foreground leading-none">
+                  (deleted)
+                </span>
+              )}
+              {fileDiff.changeType === 'modified' && (
+                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground leading-none">
+                  (binary)
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="ml-auto flex shrink-0 flex-row items-center gap-0.5 pl-2">
+              {added > 0 && (
+                <span className="text-[10px] text-success-foreground leading-none hover:text-hover-derived">
+                  +{added}
+                </span>
+              )}
+              {removed > 0 && (
+                <span className="text-[10px] text-error-foreground leading-none hover:text-hover-derived">
+                  -{removed}
+                </span>
+              )}
+            </span>
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{displayPath}</TooltipContent>
+    </Tooltip>
   );
 }
 

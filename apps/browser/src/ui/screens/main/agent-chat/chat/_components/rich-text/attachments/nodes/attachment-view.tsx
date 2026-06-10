@@ -25,7 +25,7 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
   );
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
   const mounts = useKartonState((s) =>
-    openAgent ? (s.toolbox[openAgent]?.workspace.mounts ?? []) : [],
+    openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
   );
 
   const { attachments } = useMessageAttachments();
@@ -67,16 +67,19 @@ export function AttachmentRegistryNodeView(props: InlineNodeViewProps) {
     const prefix = attrs.id.slice(0, slashIndex);
     const relativePath = attrs.id.slice(slashIndex + 1);
     const mount = mounts.find((item) => item.prefix === prefix);
-    // Even when the originating workspace is no longer mounted, the backend
-    // can reconstruct the location from the workspace key, so fall back to a
-    // key derived from the attachment path's prefix.
-    const workspaceKey = mount
-      ? `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`
-      : null;
-    if (!workspaceKey) return;
-    void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
-      if (!tabId) void revealInFolder(workspaceKey, relativePath);
-    });
+    // The workspace key embeds the mount's absolute path (prefix:path). When
+    // the workspace is no longer mounted, we have no way to recover that
+    // absolute path from the attachment alone (it stores only prefix/relativePath),
+    // so opening is only possible while the workspace is still mounted.
+    if (!mount) return;
+    const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
+    void openFileTab(workspaceKey, relativePath, openAgent)
+      .then((tabId) => {
+        if (!tabId) void revealInFolder(workspaceKey, relativePath);
+      })
+      .catch(() => {
+        void revealInFolder(workspaceKey, relativePath);
+      });
   }, [
     attrs.id,
     displayName,

@@ -33,7 +33,7 @@ export const ToolPartUINotCollapsible = memo(
         return (
           <div
             className={cn(
-              'flex cursor-default flex-row items-center justify-start gap-1 text-muted-foreground text-xs hover:text-foreground',
+              'flex cursor-default select-none flex-row items-center justify-start gap-1 text-muted-foreground text-xs hover:text-foreground',
             )}
           >
             {icon && <div className="size-3 shrink-0">{icon}</div>}
@@ -51,7 +51,7 @@ export const ToolPartUINotCollapsible = memo(
         return (
           <div
             className={cn(
-              'flex min-w-0 cursor-default flex-row items-center justify-start gap-1 text-muted-foreground text-xs hover:text-foreground',
+              'flex min-w-0 cursor-default select-none flex-row items-center justify-start gap-1 text-muted-foreground text-xs hover:text-foreground',
             )}
           >
             {icon && (
@@ -72,7 +72,7 @@ export const ToolPartUINotCollapsible = memo(
 
       if (part.state === 'output-error') {
         return (
-          <div className="flex max-w-full cursor-default flex-row items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
+          <div className="flex max-w-full cursor-default select-none flex-row items-center gap-1 text-muted-foreground text-xs hover:text-foreground">
             <XIcon className="size-3 shrink-0" />
             <Tooltip>
               <TooltipTrigger>
