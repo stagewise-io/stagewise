@@ -60,6 +60,7 @@ import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomel
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import { availableModels } from '@shared/available-models';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
 import type { Content } from '@tiptap/core';
@@ -185,6 +186,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   const [openAgent] = useOpenAgent();
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
+  const { collapsed: contentCollapsed } = useContentCollapsed();
 
   const isWorking = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.isWorking || false : false,
@@ -308,6 +310,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   const hasVisibleBrowsingTab = useMemo(() => {
     if (!activeTabData) return false;
+    if (contentCollapsed) return false;
     const ownedByOtherAgent =
       activeTabData.agentInstanceId != null &&
       activeTabData.agentInstanceId !== openAgent;
@@ -316,7 +319,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       !activeTabData.url?.startsWith('stagewise://internal/') &&
       !ownedByOtherAgent
     );
-  }, [activeTabData, openAgent]);
+  }, [activeTabData, openAgent, contentCollapsed]);
 
   const elementSelectionActive = useMemo(() => {
     if (activeEditMessageId) return false;

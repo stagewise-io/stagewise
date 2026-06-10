@@ -42,6 +42,7 @@ import {
   type ChatEditUserMessageRequestedEvent,
 } from '../_lib/chat-edit-user-message-event';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from 'nucleo-micro-bold';
 import { MessageUserPlanAction } from './message-user-plan-action';
@@ -65,6 +66,7 @@ export const MessageUser = memo(
     const chatInputRef = useRef<ChatInputHandle>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [openAgent] = useOpenAgent();
+    const { collapsed: contentCollapsed } = useContentCollapsed();
 
     // File attachments via shared hook
     const {
@@ -503,6 +505,7 @@ export const MessageUser = memo(
 
     const hasVisibleBrowsingTab = useMemo(() => {
       if (!activeTab) return false;
+      if (contentCollapsed) return false;
       const ownedByOtherAgent =
         activeTab.agentInstanceId != null &&
         activeTab.agentInstanceId !== openAgent;
@@ -511,7 +514,7 @@ export const MessageUser = memo(
         !activeTab.url?.startsWith('stagewise://internal/') &&
         !ownedByOtherAgent
       );
-    }, [activeTab, openAgent]);
+    }, [activeTab, openAgent, contentCollapsed]);
 
     // Deactivate element selection when the browsing tab disappears
     const prevHasVisibleBrowsingTabRef = useRef(hasVisibleBrowsingTab);
