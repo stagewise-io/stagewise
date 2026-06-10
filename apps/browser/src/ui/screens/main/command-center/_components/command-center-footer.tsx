@@ -22,6 +22,7 @@ export function CommandCenterFooter({
   selectedTab,
   canToggleGitignored,
   includeGitignored,
+  searchInContent,
 }: {
   mode: CommandCenterMode;
   deleteConfirmation: CommandCenterDeleteConfirmation | null;
@@ -32,6 +33,7 @@ export function CommandCenterFooter({
   selectedTab: TabCommandItem | null;
   canToggleGitignored: boolean;
   includeGitignored: boolean;
+  searchInContent: boolean;
 }) {
   if (isRenamingAgent) {
     return (
@@ -94,19 +96,31 @@ export function CommandCenterFooter({
     );
   }
 
-  if (mode === 'files' && canToggleGitignored) {
+  if (mode === 'files') {
     return (
       <div className="flex h-9 items-center justify-end gap-3 border-border-subtle border-t px-3 text-muted-foreground text-xs">
         <CommandCenterFooterAction
           label={
-            includeGitignored ? 'Exclude gitignored' : 'Include gitignored'
+            searchInContent ? 'Search filenames only' : 'Search in content'
           }
         >
           <HotkeyCombo
-            action={HotkeyActions.COMMAND_CENTER_TOGGLE_GITIGNORED}
+            action={HotkeyActions.COMMAND_CENTER_TOGGLE_SEARCH_IN_CONTENT}
             size="xs"
           />
         </CommandCenterFooterAction>
+        {canToggleGitignored && (
+          <CommandCenterFooterAction
+            label={
+              includeGitignored ? 'Exclude gitignored' : 'Include gitignored'
+            }
+          >
+            <HotkeyCombo
+              action={HotkeyActions.COMMAND_CENTER_TOGGLE_GITIGNORED}
+              size="xs"
+            />
+          </CommandCenterFooterAction>
+        )}
       </div>
     );
   }

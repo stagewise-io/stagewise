@@ -76,6 +76,11 @@ export type SettingCommandItem = CommandCenterItemBase & {
   settingsRoute?: SettingsRoute;
 };
 
+export type FileContentMatch = {
+  lineNumber: number;
+  line: string;
+};
+
 export type FileCommandItem = CommandCenterItemBase & {
   kind: 'file';
   mode: 'files';
@@ -84,6 +89,8 @@ export type FileCommandItem = CommandCenterItemBase & {
   workspaceKey: string;
   fileName: string;
   isDirectory: boolean;
+  contentMatches?: FileContentMatch[];
+  contentMatchQuery?: string;
 };
 
 export type ActionCommandItem = CommandCenterItemBase & {
@@ -107,6 +114,7 @@ export type CommandCenterOpenOptions = {
    * An empty/omitted value means "search all workspaces".
    */
   initialFileWorkspaceKeys?: string[];
+  initialSearchInContent?: boolean;
 };
 
 export type CommandCenterSourceResult<T extends CommandCenterItem> = {

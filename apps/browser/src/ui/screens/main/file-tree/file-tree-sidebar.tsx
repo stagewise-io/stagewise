@@ -1,4 +1,9 @@
 import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 import { cn } from '@ui/utils';
 import {
   useComparingSelector,
@@ -6,8 +11,14 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { SearchIcon, XIcon } from 'lucide-react';
+import { XIcon } from 'lucide-react';
+import {
+  IconFileSearchOutline18,
+  IconFolderSearchOutline18,
+} from 'nucleo-ui-outline-18';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { HotkeyActions } from '@shared/hotkeys';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { useCommandCenter } from '../command-center';
 import { FileTreePreviewCoordinator } from './file-tree-preview-coordinator';
 import { FileTreeWorkspaceView } from './file-tree-workspace-view';
@@ -73,13 +84,26 @@ export function FileTreeSidebar() {
     setPreviewTargetPath(null);
   }, []);
 
+  const openFileSearch = useCallback(
+    (searchInContent: boolean) => {
+      openCommandCenter({
+        initialMode: 'files',
+        initialSearchInContent: searchInContent,
+        initialFileWorkspaceKeys: selectedWorkspaceKey
+          ? [selectedWorkspaceKey]
+          : undefined,
+      });
+    },
+    [openCommandCenter, selectedWorkspaceKey],
+  );
+
   const previewGroupKey = `file-tree-preview:${openAgent ?? 'global'}`;
 
   return (
     <aside className="flex h-full w-full flex-col bg-background">
       <div
         className={cn(
-          'flex shrink-0 flex-row items-stretch gap-1 bg-background p-1.5 pr-1',
+          'flex shrink-0 flex-row items-stretch gap-1 bg-background p-1.5 pr-2.5',
           workspaces.length > 0 && 'border-derived-strong border-b',
         )}
       >
@@ -107,35 +131,73 @@ export function FileTreeSidebar() {
             );
           })}
         </div>
-        <Button
-          className="size-7 shrink-0"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Hide file tree"
-          onClick={() => setVisible(false)}
-        >
-          <XIcon className="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              className="size-7 shrink-0"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Hide file tree"
+              onClick={() => setVisible(false)}
+            >
+              <XIcon className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span className="flex items-center gap-1.5">
+              <span>Hide file tree</span>
+              <HotkeyCombo action={HotkeyActions.TOGGLE_FILE_TREE} size="xs" />
+            </span>
+          </TooltipContent>
+        </Tooltip>
       </div>
       {workspaces.length > 0 && (
-        <div className="flex h-9 shrink-0 items-center justify-end border-derived-strong border-b bg-background px-1.5">
+        <div className="flex h-9 shrink-0 items-center justify-end gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2">
           {/* Files/Git mode switcher hidden until Git Diff view is functional. */}
-          <Button
-            className="size-7 shrink-0"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Search files"
-            onClick={() =>
-              openCommandCenter({
-                initialMode: 'files',
-                initialFileWorkspaceKeys: selectedWorkspaceKey
-                  ? [selectedWorkspaceKey]
-                  : undefined,
-              })
-            }
-          >
-            <SearchIcon className="size-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                className="size-7 shrink-0"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Search in content"
+                onClick={() => openFileSearch(true)}
+              >
+                <IconFileSearchOutline18 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Search in content</span>
+                <HotkeyCombo
+                  action={HotkeyActions.OPEN_CONTENT_FILE_SEARCH}
+                  size="xs"
+                />
+              </span>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                className="size-7 shrink-0"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Search files"
+                onClick={() => openFileSearch(false)}
+              >
+                <IconFolderSearchOutline18 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Search for files</span>
+                <HotkeyCombo
+                  action={HotkeyActions.OPEN_FILE_SEARCH}
+                  size="xs"
+                />
+              </span>
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
       <FileTreePreviewCoordinator

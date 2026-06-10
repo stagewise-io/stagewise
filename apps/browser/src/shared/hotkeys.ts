@@ -52,11 +52,13 @@ export enum HotkeyActions {
   OPEN_MODEL_SELECT = 'open_model_select',
   OPEN_COMMAND_CENTER = 'open_command_center',
   OPEN_FILE_SEARCH = 'open_file_search',
+  OPEN_CONTENT_FILE_SEARCH = 'open_content_file_search',
   COMMAND_CENTER_RENAME_AGENT = 'command_center_rename_agent',
   COMMAND_CENTER_TOGGLE_AGENT_PIN = 'command_center_toggle_agent_pin',
   COMMAND_CENTER_COPY_TAB_URL = 'command_center_copy_tab_url',
   COMMAND_CENTER_DELETE_AGENT = 'command_center_delete_agent',
   COMMAND_CENTER_TOGGLE_GITIGNORED = 'command_center_toggle_gitignored',
+  COMMAND_CENTER_TOGGLE_SEARCH_IN_CONTENT = 'command_center_toggle_search_in_content',
   NEW_CHAT = 'new_chat',
   IMPLEMENT_CREATED_PLAN = 'implement_created_plan',
   STOP_AGENT = 'stop_agent',
@@ -68,6 +70,8 @@ export enum HotkeyActions {
   CLOSE_TAB = 'close_tab',
   NEXT_TAB = 'next_tab',
   PREV_TAB = 'prev_tab',
+
+  TOGGLE_TAB_PIN = 'toggle_tab_pin',
 
   // Content panel tab switching (per-agent, Mod+Alt based)
   FOCUS_TAB_1 = 'focus_tab_1',
@@ -125,6 +129,9 @@ export enum HotkeyActions {
   SAVE_FILE = 'save_file',
   UNDO_FILE_EDIT = 'undo_file_edit',
   REDO_FILE_EDIT = 'redo_file_edit',
+
+  // File tree
+  TOGGLE_FILE_TREE = 'toggle_file_tree',
 
   // SVG preview
   TOGGLE_SVG_CODE_MODE = 'toggle_svg_code_mode',
@@ -187,6 +194,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+P',
     captureDominantly: false,
   },
+  [HotkeyActions.OPEN_CONTENT_FILE_SEARCH]: {
+    accelerator: 'Mod+Shift+F',
+    captureDominantly: false,
+  },
   [HotkeyActions.COMMAND_CENTER_RENAME_AGENT]: {
     accelerator: 'Mod+E',
     captureDominantly: false,
@@ -207,6 +218,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.COMMAND_CENTER_TOGGLE_GITIGNORED]: {
     accelerator: 'Mod+G',
+    captureDominantly: false,
+  },
+  [HotkeyActions.COMMAND_CENTER_TOGGLE_SEARCH_IN_CONTENT]: {
+    accelerator: 'Mod+F',
     captureDominantly: false,
   },
   [HotkeyActions.NEW_CHAT]: {
@@ -336,6 +351,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+Alt+9',
     captureDominantly: true,
   },
+  [HotkeyActions.TOGGLE_TAB_PIN]: {
+    accelerator: 'Mod+Alt+P',
+    captureDominantly: true,
+  },
   [HotkeyActions.TOGGLE_CONTENT_PANEL]: {
     accelerator: 'Mod+Alt+B',
     captureDominantly: true,
@@ -433,20 +452,24 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     aliases: ['Mod+Y'],
     captureDominantly: true,
   },
+  [HotkeyActions.TOGGLE_FILE_TREE]: {
+    accelerator: 'Mod+Shift+B',
+    captureDominantly: true,
+  },
   [HotkeyActions.TOGGLE_SVG_CODE_MODE]: {
     accelerator: 'Mod+Shift+V',
     captureDominantly: true,
   },
   [HotkeyActions.CENTER_IMAGE]: {
-    accelerator: 'Mod+Shift+C',
+    accelerator: 'Mod+Alt+C',
     captureDominantly: true,
   },
   [HotkeyActions.CYCLE_SVG_BG]: {
-    accelerator: 'Mod+Shift+B',
+    accelerator: 'Mod+Alt+G',
     captureDominantly: true,
   },
   [HotkeyActions.CYCLE_SVG_FG]: {
-    accelerator: 'Mod+Shift+F',
+    accelerator: 'Mod+Alt+F',
     captureDominantly: true,
   },
   [HotkeyActions.TOGGLE_MARKDOWN_PREVIEW]: {

@@ -14,6 +14,7 @@ const GLOBAL_LIMIT = 30;
 const EMPTY_FILE_FILTER: FileFilterState = {
   selectedWorkspaceKeys: new Set<string>(),
   includeGitignored: false,
+  searchInContent: false,
 };
 
 export function useCommandCenterItems({

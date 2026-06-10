@@ -159,7 +159,10 @@ function TabPinIcon({
           }
         />
         <TooltipContent side="bottom">
-          {isAttachedToCurrentAgent ? 'Pin globally' : 'Unpin'}
+          <span className="flex items-center gap-1.5">
+            <span>{isAttachedToCurrentAgent ? 'Pin globally' : 'Unpin'}</span>
+            <HotkeyCombo action={HotkeyActions.TOGGLE_TAB_PIN} size="xs" />
+          </span>
         </TooltipContent>
       </Tooltip>
     </div>

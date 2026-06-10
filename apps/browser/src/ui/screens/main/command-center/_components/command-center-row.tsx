@@ -1,10 +1,11 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, type ReactNode } from 'react';
 import { IconPinTackFill18 } from 'nucleo-ui-fill-18';
 import { useInlineTitleEdit } from '../../_lib/use-inline-title-edit';
 import { cn } from '@ui/utils';
 import type {
   AgentCommandItem,
   CommandCenterItem,
+  FileContentMatch,
 } from '../command-center-model';
 
 function compactTimeAgo(timestamp: number): string {
@@ -104,10 +105,17 @@ export function CommandCenterRow({
             </span>
           )}
         </span>
-        {item.subtitle && (
-          <span className="block truncate font-normal text-subtle-foreground text-xs">
-            {item.subtitle}
-          </span>
+        {item.kind === 'file' && item.contentMatches?.length ? (
+          <CommandCenterFileContentMatches
+            matches={item.contentMatches}
+            query={item.contentMatchQuery ?? ''}
+          />
+        ) : (
+          item.subtitle && (
+            <span className="block truncate font-normal text-subtle-foreground text-xs">
+              {item.subtitle}
+            </span>
+          )
         )}
       </span>
       {((item.kind === 'agent' && item.isPinned) ||
@@ -121,6 +129,64 @@ export function CommandCenterRow({
       )}
     </div>
   );
+}
+
+function CommandCenterFileContentMatches({
+  matches,
+  query,
+}: {
+  matches: FileContentMatch[];
+  query: string;
+}) {
+  return (
+    <span className="block space-y-0.5 font-normal text-subtle-foreground text-xs">
+      {matches.map((match) => (
+        <span key={match.lineNumber} className="block truncate">
+          <span className="text-muted-foreground tabular-nums">
+            {match.lineNumber}:
+          </span>{' '}
+          <HighlightedContentLine line={match.line} query={query} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function HighlightedContentLine({
+  line,
+  query,
+}: {
+  line: string;
+  query: string;
+}) {
+  const normalizedQuery = query.toLowerCase();
+  if (!normalizedQuery) return <>{line.trim()}</>;
+
+  const normalizedLine = line.toLowerCase();
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let matchIndex = normalizedLine.indexOf(normalizedQuery);
+
+  while (matchIndex !== -1) {
+    if (matchIndex > cursor) {
+      parts.push(line.slice(cursor, matchIndex));
+    }
+    const end = matchIndex + query.length;
+    parts.push(
+      <mark
+        key={`${matchIndex}-${end}`}
+        className="rounded-sm bg-primary-solid/20 px-0.5 text-primary-foreground"
+      >
+        {line.slice(matchIndex, end)}
+      </mark>,
+    );
+    cursor = end;
+    matchIndex = normalizedLine.indexOf(normalizedQuery, cursor);
+  }
+
+  if (cursor < line.length) parts.push(line.slice(cursor));
+
+  return <>{parts.length > 0 ? parts : line.trim()}</>;
 }
 
 function CommandCenterAgentTitle({

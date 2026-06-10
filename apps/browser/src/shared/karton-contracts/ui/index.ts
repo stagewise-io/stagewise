@@ -659,6 +659,11 @@ export type OpenFileTabOptions = {
 
 export type FileTreeClipboardOperation = 'copy' | 'cut';
 
+export type FileSearchContentMatch = {
+  lineNumber: number;
+  line: string;
+};
+
 export type FileSearchResult = {
   workspaceKey: string;
   mountPrefix: string;
@@ -667,6 +672,10 @@ export type FileSearchResult = {
   isDirectory?: boolean;
   /** Last-modified time (epoch ms) used for recency sorting. */
   mtimeMs?: number;
+  /** Total number of query occurrences found in the file content. */
+  contentMatchCount?: number;
+  /** Up to three matching content lines for preview/highlighting. */
+  contentMatches?: FileSearchContentMatch[];
 };
 
 export type FileTreeOperationResult = {
@@ -1815,6 +1824,7 @@ export type KartonContract = {
         query: string,
         workspaceKeys: string[],
         includeGitignored: boolean,
+        searchInContent?: boolean,
       ) => Promise<FileSearchResult[]>;
       listRecentFiles: (
         workspaceKeys: string[],

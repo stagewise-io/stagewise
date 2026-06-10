@@ -47,6 +47,11 @@ export function AgentHotkeyBindings({
   const agentOrders = useKartonState((s) => s.contentTabs.agentOrders);
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
+  const setTabAgentInstance = useKartonProcedure(
+    (p) => p.browser.setTabAgentInstance,
+  );
+  const fileTreeVisible = useKartonState((s) => s.fileTree.visible);
+  const setFileTreeVisible = useKartonProcedure((p) => p.fileTree.setVisible);
   const { tabUiState, requestTerminalFocus, removeTabUiState } =
     useTabUIState();
 
@@ -267,6 +272,29 @@ export function AgentHotkeyBindings({
   useHotKeyListener(
     () => switchToTabByIndex(8),
     HotkeyActions.FOCUS_TAB_9,
+    agentHotkeysEnabled,
+  );
+
+  // Mod+Alt+P: toggle current tab pin state (global ↔ per-agent)
+  useHotKeyListener(
+    () => {
+      if (!activeTabId || !openAgent) return;
+      const activeTab = tabs[activeTabId];
+      if (!activeTab) return;
+      const newValue =
+        activeTab.agentInstanceId === openAgent ? null : openAgent;
+      setTabAgentInstance(activeTabId, newValue);
+    },
+    HotkeyActions.TOGGLE_TAB_PIN,
+    agentHotkeysEnabled && !contentCollapsed && !!activeTabId,
+  );
+
+  // Mod+Shift+B: toggle file tree panel
+  useHotKeyListener(
+    () => {
+      setFileTreeVisible(!fileTreeVisible);
+    },
+    HotkeyActions.TOGGLE_FILE_TREE,
     agentHotkeysEnabled,
   );
 
