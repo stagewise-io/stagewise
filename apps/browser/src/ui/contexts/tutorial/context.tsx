@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -58,6 +59,24 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     useState<TutorialDefinition | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
+  // Queue of tutorials waiting to be shown (deferred when another is active)
+  const pendingQueueRef = useRef<TutorialDefinition[]>([]);
+
+  // Consume the next queued tutorial if one is waiting
+  const dequeueNext = useCallback(() => {
+    const queue = pendingQueueRef.current;
+    while (queue.length > 0) {
+      const next = queue.shift()!;
+      if (sessionDismissedTutorialIds.has(next.id)) continue;
+      const lastSeen = tutorialState[next.id] ?? -1;
+      if (lastSeen >= next.steps.length - 1) continue;
+      setActiveTutorialId(next.id);
+      setActiveTutorialDef(next);
+      setCurrentStepIndex(lastSeen + 1);
+      return;
+    }
+  }, [tutorialState]);
+
   // Bring stagewise UI to foreground when a tutorial becomes active
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
@@ -70,18 +89,22 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
 
   const registerTutorial = useCallback(
     (def: TutorialDefinition) => {
-      // Don't register if another tutorial is already active or this tutorial
-      // was explicitly dismissed during the current renderer session.
-      if (
-        activeTutorialId !== null ||
-        sessionDismissedTutorialIds.has(def.id)
-      ) {
-        return;
-      }
+      if (sessionDismissedTutorialIds.has(def.id)) return;
 
       const lastSeenIndex = tutorialState[def.id] ?? -1;
       // Tutorial already fully seen — don't show
       if (lastSeenIndex >= def.steps.length - 1) return;
+
+      // If another tutorial is currently active, queue this one for later.
+      // This prevents transient tutorials (like workspace-selection-options)
+      // from being permanently lost when they register during an active tutorial.
+      if (activeTutorialId !== null) {
+        // Avoid queueing the same tutorial multiple times
+        if (!pendingQueueRef.current.some((d) => d.id === def.id)) {
+          pendingQueueRef.current.push(def);
+        }
+        return;
+      }
 
       // Start at the first unseen step
       const startIndex = lastSeenIndex + 1;
@@ -123,11 +146,12 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
       setActiveTutorialId(null);
       setActiveTutorialDef(null);
       setCurrentStepIndex(0);
+      dequeueNext();
       return;
     }
     setCurrentStepIndex(nextIndex);
     persistStep(activeTutorialDef.id, nextIndex);
-  }, [activeTutorialDef, currentStepIndex, persistStep]);
+  }, [activeTutorialDef, currentStepIndex, persistStep, dequeueNext]);
 
   const goBack = useCallback(() => {
     if (currentStepIndex > 0) {
