@@ -780,14 +780,25 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
         this.emit('layoutUpdate', bounds);
       },
     );
+    // Primary RPC path: browser.layout.movePanelToForeground
+    // Also register the legacy alias browser.movePanelToForeground (without
+    // the `layout` intermediate namespace) as a defensive fallback — some
+    // production client builds may reference the older flat path under the
+    // `browser` namespace, which would otherwise produce an unregistered-
+    // procedure error.
+    const handleMovePanelToForeground = async (
+      _callingClientId: string,
+      panel: 'stagewise-ui' | 'tab-content',
+    ) => {
+      this.emit('movePanelToForeground', panel);
+    };
     this.uiKarton.registerServerProcedureHandler(
       'browser.layout.movePanelToForeground',
-      async (
-        _callingClientId: string,
-        panel: 'stagewise-ui' | 'tab-content',
-      ) => {
-        this.emit('movePanelToForeground', panel);
-      },
+      handleMovePanelToForeground,
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.movePanelToForeground',
+      handleMovePanelToForeground,
     );
     this.uiKarton.registerServerProcedureHandler(
       'browser.layout.togglePanelKeyboardFocus',
@@ -1206,6 +1217,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler(
       'browser.layout.movePanelToForeground',
     );
+    this.uiKarton.removeServerProcedureHandler('browser.movePanelToForeground');
     this.uiKarton.removeServerProcedureHandler(
       'browser.layout.togglePanelKeyboardFocus',
     );
