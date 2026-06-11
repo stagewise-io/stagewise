@@ -16,6 +16,7 @@ import { useDiffLines } from '@ui/hooks/use-diff-lines';
 import { useMemo, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import {
   Tooltip,
   TooltipContent,
@@ -39,7 +40,9 @@ export const GenericMultiEditToolPart = ({
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
   const mounts = useKartonState((s) =>
-    openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
+    openAgent
+      ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
+      : EMPTY_MOUNTS,
   );
   // Fall back to the global mount registry so "Open file" links still work
   // when the workspace was remounted after the tool ran, or after an agent

@@ -6,6 +6,8 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useKartonState } from '@ui/hooks/use-karton';
 import type { ShellSessionSnapshot } from '@shared/karton-contracts/ui/agent/metadata';
 
+const EMPTY_SESSIONS: ShellSessionSnapshot[] = [];
+
 interface ShellSessionBadgeProps {
   sessionId: string;
   viewOnly?: boolean;
@@ -19,7 +21,7 @@ export function ShellSessionBadge({
 
   const session = useKartonState((s): ShellSessionSnapshot | null => {
     if (!openAgentId) return null;
-    const sessions = s.toolbox[openAgentId]?.shells?.sessions ?? [];
+    const sessions = s.toolbox[openAgentId]?.shells?.sessions ?? EMPTY_SESSIONS;
     return sessions.find((sess) => sess.id === sessionId) ?? null;
   });
 
