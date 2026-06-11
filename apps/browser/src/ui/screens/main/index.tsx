@@ -26,6 +26,7 @@ import {
 } from './_components/content-collapsed-context';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { ContentToggleButton } from './_components/content-toggle-button';
+import { Tutorial } from '@ui/components/tutorial';
 import { GlobalHotkeyBindings } from './_components/global-hotkey-bindings';
 import { AgentHotkeyBindings } from './_components/agent-hotkey-bindings';
 import {
@@ -91,6 +92,17 @@ export function DefaultLayout({ show }: { show: boolean }) {
         </SidebarCollapsedProvider>
       </ChatDraftProvider>
     </OpenAgentProvider>
+  );
+}
+
+import { TUTORIALS } from '@ui/tutorial-steps';
+
+function GeneralUiExperienceTutorial() {
+  return (
+    <Tutorial
+      tutorialId="general-ui-experience"
+      steps={TUTORIALS['general-ui-experience']}
+    />
   );
 }
 
@@ -267,6 +279,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
       )}
       {show && <CommandCenterHotkeys />}
       {show && <CommandCenter />}
+      {show && <GeneralUiExperienceTutorial />}
       <div
         className={cn(
           'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',

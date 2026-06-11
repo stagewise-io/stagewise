@@ -56,6 +56,8 @@ import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
+import { Tutorial } from '@ui/components/tutorial';
+import { useTutorial } from '@ui/contexts/tutorial';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { nativeFileManagerLabel } from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';
@@ -1649,6 +1651,7 @@ function WorkspaceActionPickerContent({
       <ActionRow
         active={config.selectedAction === 'create-worktree'}
         onSelect={() => onCommit('create-worktree')}
+        tutorialId="action-create-worktree"
       >
         <span className="shrink-0 text-xs">Create worktree</span>
         <NameChip
@@ -1674,6 +1677,7 @@ function WorkspaceActionPickerContent({
       <ActionRow
         active={config.selectedAction === 'switch-worktree'}
         onSelect={() => onCommit('switch-worktree')}
+        tutorialId="action-switch-worktree"
       >
         <span className="shrink-0 text-xs">Use existing worktree</span>
         <ActionBranchSelect
@@ -1692,6 +1696,7 @@ function WorkspaceActionPickerContent({
       <ActionRow
         active={config.selectedAction === 'create-branch'}
         onSelect={() => onCommit('create-branch')}
+        tutorialId="action-create-branch"
       >
         <span className="shrink-0 text-xs">Create branch</span>
         <NameChip
@@ -1717,6 +1722,7 @@ function WorkspaceActionPickerContent({
       <ActionRow
         active={config.selectedAction === 'switch-branch'}
         onSelect={() => onCommit('switch-branch')}
+        tutorialId="action-switch-branch"
       >
         <span className="shrink-0 text-xs">Use existing branch</span>
         <ActionBranchSelect
@@ -1746,12 +1752,14 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   onUnmount,
   config: controlledConfig,
   onConfigChange,
+  onOpenChange,
   agentInstanceId,
 }: {
   mount: MountEntry;
   onUnmount: (prefix: string) => void;
   config?: WorkspaceActionConfig;
   onConfigChange?: (mount: MountEntry, config: WorkspaceActionConfig) => void;
+  onOpenChange?: (mountPrefix: string, open: boolean) => void;
   agentInstanceId: string;
 }) {
   const track = useTrack();
@@ -1791,6 +1799,8 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     useState<WorkspaceGitWorktreesResult | null>(null);
   const [gitDataLoaded, setGitDataLoaded] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
+  const openChangeTimeoutRef = useRef<number | null>(null);
+  const { activeTutorial } = useTutorial();
 
   const sourceBranchItems = useMemo(
     () => getBranchSelectItemsFromGit(branchesResult, gitRef, 'source'),
@@ -1927,13 +1937,41 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
-      setOpen(next);
-      if (next && !gitDataLoaded) {
-        void refreshGitData();
+      if (openChangeTimeoutRef.current !== null) {
+        window.clearTimeout(openChangeTimeoutRef.current);
+        openChangeTimeoutRef.current = null;
       }
+
+      if (!next && activeTutorial?.id === 'workspace-selection-options') {
+        return;
+      }
+
+      setOpen(next);
+
+      if (next) {
+        openChangeTimeoutRef.current = window.setTimeout(() => {
+          onOpenChange?.(mount.prefix, true);
+          openChangeTimeoutRef.current = null;
+        }, 150);
+
+        if (!gitDataLoaded) {
+          void refreshGitData();
+        }
+        return;
+      }
+
+      onOpenChange?.(mount.prefix, false);
     },
-    [gitDataLoaded, refreshGitData],
+    [activeTutorial, gitDataLoaded, mount.prefix, onOpenChange, refreshGitData],
   );
+
+  useEffect(() => {
+    return () => {
+      if (openChangeTimeoutRef.current !== null) {
+        window.clearTimeout(openChangeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const persistWorkspaceGitActionPreference = useCallback(
     (next: WorkspaceAction, partial: Partial<WorkspaceActionConfig>) => {
@@ -2188,7 +2226,10 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <FileContextMenu relativePath={mount.path} resolvePath={resolveAbsolute}>
-        <div className="group/workspace flex max-w-96 cursor-default items-center justify-start gap-1.5 text-muted-foreground text-xs">
+        <div
+          data-tutorial={mount.git ? 'workspace-badge' : undefined}
+          className="group/workspace flex max-w-96 cursor-default items-center justify-start gap-1.5 text-muted-foreground text-xs"
+        >
           <Tooltip>
             <TooltipTrigger>
               <span
@@ -2236,6 +2277,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             <Button
               variant="ghost"
               size="xs"
+              data-tutorial="workspace-action-trigger"
               className={cn(
                 'group/action flex min-w-0 justify-start gap-1.5 px-0',
                 'text-muted-foreground hover:text-muted-foreground',
@@ -2334,10 +2376,12 @@ function ActionRow({
   active,
   onSelect,
   children,
+  tutorialId,
 }: {
   active: boolean;
   onSelect: () => void;
   children: React.ReactNode;
+  tutorialId?: string;
 }) {
   return (
     <div
@@ -2345,6 +2389,7 @@ function ActionRow({
       aria-checked={active}
       tabIndex={0}
       data-action-row=""
+      data-tutorial={tutorialId}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -3550,6 +3595,8 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   onWorkspaceActionConfigChange,
 }: WorkspaceSelectProps) {
   const [openAgent] = useOpenAgent();
+  const [openWorkspaceActionPrefixes, setOpenWorkspaceActionPrefixes] =
+    useState<Set<string>>(() => new Set());
 
   const recentlyOpenedWorkspaces = useKartonState(
     (s: KartonState) =>
@@ -3808,6 +3855,11 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   const handleUnmount = useCallback(
     (prefix: string) => {
       if (openAgent) {
+        setOpenWorkspaceActionPrefixes((prev) => {
+          const next = new Set(prev);
+          next.delete(prefix);
+          return next;
+        });
         void unmountWorkspace(openAgent, prefix);
         onWorkspaceChange?.();
       }
@@ -3815,37 +3867,83 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
     [openAgent, unmountWorkspace, onWorkspaceChange],
   );
 
+  const handleWorkspaceActionOpenChange = useCallback(
+    (mountPrefix: string, open: boolean) => {
+      setOpenWorkspaceActionPrefixes((prev) => {
+        const next = new Set(prev);
+        if (open) next.add(mountPrefix);
+        else next.delete(mountPrefix);
+        return next;
+      });
+    },
+    [],
+  );
+
   if (!openAgent) return null;
 
   return (
-    <div className="scrollbar-none flex min-w-0 shrink-0 items-center gap-7 overflow-x-auto px-1 py-0.5">
-      {/* Connected workspaces */}
-      {allMounts.map((mount: MountEntry) => {
-        const useActionSelect = chatIsEmpty && !!mount.git;
-        return useActionSelect ? (
-          <WorkspaceActionSelect
-            key={mount.prefix}
-            mount={mount}
-            onUnmount={handleUnmount}
-            config={workspaceActionConfigs?.get(mount.prefix)}
-            onConfigChange={onWorkspaceActionConfigChange}
-            agentInstanceId={openAgent}
-          />
-        ) : (
-          <WorkspaceBadge
-            key={mount.prefix}
-            mount={mount}
-            onUnmount={handleUnmount}
-            agentInstanceId={openAgent}
-          />
-        );
-      })}
+    <>
+      {allMounts.length > 0 && (
+        <WorkspaceSelectionTutorial
+          enabled={chatIsEmpty && allMounts.some((mount) => !!mount.git)}
+          showOptionSteps={openWorkspaceActionPrefixes.size > 0}
+        />
+      )}
+      <div className="scrollbar-none flex min-w-0 shrink-0 items-center gap-7 overflow-x-auto px-1 py-0.5">
+        {/* Connected workspaces */}
+        {allMounts.map((mount: MountEntry) => {
+          const useActionSelect = chatIsEmpty && !!mount.git;
+          return useActionSelect ? (
+            <WorkspaceActionSelect
+              key={mount.prefix}
+              mount={mount}
+              onUnmount={handleUnmount}
+              config={workspaceActionConfigs?.get(mount.prefix)}
+              onConfigChange={onWorkspaceActionConfigChange}
+              onOpenChange={handleWorkspaceActionOpenChange}
+              agentInstanceId={openAgent}
+            />
+          ) : (
+            <WorkspaceBadge
+              key={mount.prefix}
+              mount={mount}
+              onUnmount={handleUnmount}
+              agentInstanceId={openAgent}
+            />
+          );
+        })}
 
-      <ConnectWorkspaceSelect
-        hasMounts={hasMounts}
-        recentPaths={recentPaths}
-        onMount={handleMount}
-      />
-    </div>
+        <ConnectWorkspaceSelect
+          hasMounts={hasMounts}
+          recentPaths={recentPaths}
+          onMount={handleMount}
+        />
+      </div>
+    </>
   );
 });
+
+import { TUTORIALS } from '@ui/tutorial-steps';
+
+function WorkspaceSelectionTutorial({
+  enabled,
+  showOptionSteps,
+}: {
+  enabled: boolean;
+  showOptionSteps: boolean;
+}) {
+  return (
+    <>
+      <Tutorial
+        tutorialId="workspace-selection"
+        steps={TUTORIALS['workspace-selection']}
+        enabled={enabled}
+      />
+      <Tutorial
+        tutorialId="workspace-selection-options"
+        steps={TUTORIALS['workspace-selection-options']}
+        enabled={enabled && showOptionSteps}
+      />
+    </>
+  );
+}

@@ -27,6 +27,8 @@ import {
   getFileTreeWorkspaceMountsForAgent,
   getFileTreeWorkspaceName,
 } from './file-tree-utils';
+import { Tutorial } from '@ui/components/tutorial';
+import { TUTORIALS } from '@ui/tutorial-steps';
 
 export function FileTreeSidebar() {
   const [openAgent] = useOpenAgent();
@@ -100,14 +102,20 @@ export function FileTreeSidebar() {
   const previewGroupKey = `file-tree-preview:${openAgent ?? 'global'}`;
 
   return (
-    <aside className="flex h-full w-full flex-col bg-background">
+    <aside
+      data-tutorial="file-tree-panel"
+      className="flex h-full w-full flex-col bg-background"
+    >
       <div
         className={cn(
           'flex shrink-0 flex-row items-stretch gap-1 bg-background p-1.5 pr-2.5',
           workspaces.length > 0 && 'border-derived-strong border-b',
         )}
       >
-        <div className="flex min-w-0 flex-1 flex-row items-stretch gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          data-tutorial="file-tree-workspace-tabs"
+          className="flex min-w-0 flex-1 flex-row items-stretch gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {workspaces.map((workspace) => {
             const active = workspace.key === selectedWorkspaceKey;
             return (
@@ -152,7 +160,13 @@ export function FileTreeSidebar() {
         </Tooltip>
       </div>
       {workspaces.length > 0 && (
-        <div className="flex h-9 shrink-0 items-center justify-end gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2">
+        <Tutorial tutorialId="file-tree" steps={TUTORIALS['file-tree']} />
+      )}
+      {workspaces.length > 0 && (
+        <div
+          data-tutorial="file-tree-search-bar"
+          className="flex h-9 shrink-0 items-center justify-end gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2"
+        >
           {/* Files/Git mode switcher hidden until Git Diff view is functional. */}
           <Tooltip>
             <TooltipTrigger>

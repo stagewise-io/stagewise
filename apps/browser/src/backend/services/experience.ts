@@ -12,6 +12,7 @@ import path from 'node:path';
 import {
   recentlyOpenedWorkspacesArraySchema,
   onboardingStateSchema,
+  tutorialStateSchema,
   type StoredExperienceData,
   type RecentlyOpenedWorkspace,
 } from '@shared/karton-contracts/ui';
@@ -149,6 +150,15 @@ export class UserExperienceService extends DisposableService {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'userExperience.tutorial.setStep',
+      async (
+        _callingClientId: string,
+        { tutorialId, stepIndex }: { tutorialId: string; stepIndex: number },
+      ) => {
+        await this.setTutorialStep(tutorialId, stepIndex);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'userExperience.setHasSeenOnboardingFlow',
       async (
         _callingClientId: string,
@@ -176,6 +186,9 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.removeServerProcedureHandler(
       'userExperience.setHasSeenOnboardingFlow',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.tutorial.setStep',
     );
     this.logger.debug('[UserExperienceService] Teardown complete');
   }
@@ -397,6 +410,22 @@ export class UserExperienceService extends DisposableService {
     });
   }
 
+  /**
+   * Read the tutorial state from persisted data.
+   */
+  private async readTutorialState(): Promise<Record<string, number>> {
+    return readPersistedData('tutorial-state', tutorialStateSchema, {});
+  }
+
+  /**
+   * Write the tutorial state to persisted data.
+   */
+  private async writeTutorialState(
+    state: Record<string, number>,
+  ): Promise<void> {
+    await writePersistedData('tutorial-state', tutorialStateSchema, state);
+  }
+
   public async saveRecentlyOpenedWorkspace({
     path: workspacePath,
     name,
@@ -437,13 +466,17 @@ export class UserExperienceService extends DisposableService {
    * This combines data from recently-opened-workspaces.json and onboarding-state.json.
    */
   public async getStoredExperienceData(): Promise<StoredExperienceData> {
-    const [recentlyOpenedWorkspaces, hasSeenOnboardingFlow] = await Promise.all(
-      [this.getRecentlyOpenedWorkspaces(), this.readOnboardingState()],
-    );
+    const [recentlyOpenedWorkspaces, hasSeenOnboardingFlow, tutorialState] =
+      await Promise.all([
+        this.getRecentlyOpenedWorkspaces(),
+        this.readOnboardingState(),
+        this.readTutorialState(),
+      ]);
     return {
       recentlyOpenedWorkspaces,
       hasSeenOnboardingFlow,
       lastViewedChats: {},
+      tutorialState,
     };
   }
 
@@ -473,6 +506,27 @@ export class UserExperienceService extends DisposableService {
         `[UserExperienceService] Failed to save hasSeenOnboardingFlow. Error: ${error}`,
       );
       this.report(error as Error, 'saveOnboardingState');
+    }
+  }
+
+  public async setTutorialStep(tutorialId: string, stepIndex: number) {
+    try {
+      const currentState = await this.readTutorialState();
+      currentState[tutorialId] = stepIndex;
+      await this.writeTutorialState(currentState);
+      // Update UI state with combined data
+      const storedData = await this.getStoredExperienceData();
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.storedExperienceData = storedData;
+      });
+      this.logger.debug(
+        `[UserExperienceService] Set tutorial ${tutorialId} step to: ${stepIndex}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to save tutorial step. Error: ${error}`,
+      );
+      this.report(error as Error, 'saveTutorialStep');
     }
   }
 

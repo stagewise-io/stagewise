@@ -11,3 +11,9 @@ export {
   type AccessHandle,
   type Registration,
 } from './web-contents-overlay';
+
+export {
+  TutorialProvider,
+  useTutorial,
+} from './tutorial';
+export type { TutorialStep, TutorialDefinition } from './tutorial';

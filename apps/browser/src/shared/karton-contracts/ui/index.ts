@@ -383,12 +383,18 @@ export const downloadsStateSchema = z.object({
 
 export type DownloadsState = z.infer<typeof downloadsStateSchema>;
 
+/** Schema for tutorial state persisted data */
+export const tutorialStateSchema = z.record(z.string(), z.number());
+
+export type TutorialState = z.infer<typeof tutorialStateSchema>;
+
 export const lastViewedChatsSchema = z.record(z.string(), z.number());
 
 export const storedExperienceDataSchema = z.object({
   recentlyOpenedWorkspaces: recentlyOpenedWorkspacesArraySchema,
   hasSeenOnboardingFlow: z.boolean().nullable(),
   lastViewedChats: lastViewedChatsSchema,
+  tutorialState: tutorialStateSchema,
 });
 
 export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;
@@ -1447,6 +1453,12 @@ export type KartonContract = {
             },
       ) => Promise<void>;
       clearPendingOnboardingSuggestion: () => Promise<void>;
+      tutorial: {
+        setStep: (input: {
+          tutorialId: string;
+          stepIndex: number;
+        }) => Promise<void>;
+      };
     };
     filePicker: {
       createRequest: (request: FilePickerRequest) => Promise<string[]>;
@@ -2023,6 +2035,7 @@ export const defaultState: KartonContract['state'] = {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: null,
       lastViewedChats: {},
+      tutorialState: {},
     },
     pendingOnboardingSuggestion: null,
     devAppPreview: {

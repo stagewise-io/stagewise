@@ -6,6 +6,7 @@ import {
 } from '@ui/hooks/use-karton';
 import { Logo } from '@ui/components/ui/logo';
 import { WebContentsBoundsSyncer } from '@ui/components/web-contents-bounds-syncer';
+import { TutorialOverlay } from '@ui/components/tutorial/tutorial-overlay';
 
 // Lazy-load the heavy screen trees. Both `DefaultLayout` and `OnboardingWizard`
 // only render *after* the karton connection is established, yet importing them
@@ -78,6 +79,7 @@ export function ScreenRouter() {
           <OnboardingWizard />
         </Suspense>
       )}
+      <TutorialOverlay />
     </div>
   );
 }
