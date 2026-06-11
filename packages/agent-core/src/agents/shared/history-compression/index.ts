@@ -45,7 +45,7 @@ export {
  * tried in order when the previous one fails or times out.
  */
 const HISTORY_COMPRESSION_MODELS = [
-  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-flash-lite',
   'gpt-5.4-nano',
   'claude-haiku-4.5',
 ] as const;
@@ -53,8 +53,26 @@ const HISTORY_COMPRESSION_MODELS = [
 /** Maximum time (ms) allowed for a single history compression attempt. */
 const HISTORY_COMPRESSION_TIMEOUT_MS = 30_000;
 
+/**
+ * Grace period after aborting a timed-out compression request.
+ *
+ * If the provider/SDK does not settle the original request within this
+ * window, stop the cascade instead of starting overlapping fallback
+ * requests that can continue billing in the background.
+ */
+const HISTORY_COMPRESSION_ABORT_GRACE_MS = 2_000;
+
 /** Minimum acceptable compression length; shorter results trigger a fallback. */
 const COMPRESSION_MIN_LENGTH = 30;
+
+class HistoryCompressionUnsettledTimeoutError extends Error {
+  constructor(modelId: string) {
+    super(
+      `History compression request for ${modelId} timed out and did not settle after abort`,
+    );
+    this.name = 'HistoryCompressionUnsettledTimeoutError';
+  }
+}
 
 /**
  * Attempts a single compression call against the given model.
@@ -77,13 +95,11 @@ const tryCompressWithModel = async (
   );
 
   const abortController = new AbortController();
-  const timeout = setTimeout(
-    () => abortController.abort(),
-    HISTORY_COMPRESSION_TIMEOUT_MS,
-  );
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let abortGraceTimeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    const compactionResult = await generateText({
+    const generationPromise = generateText({
       model: modelWithOptions.model,
       providerOptions: modelWithOptions.providerOptions,
       headers: modelWithOptions.headers,
@@ -105,6 +121,36 @@ const tryCompressWithModel = async (
       maxOutputTokens: 20000,
     }).then((result) => result.text.trim());
 
+    const timeoutResult = Symbol('history-compression-timeout');
+    const timeoutPromise = new Promise<typeof timeoutResult>((resolve) => {
+      timeout = setTimeout(() => {
+        abortController.abort();
+        resolve(timeoutResult);
+      }, HISTORY_COMPRESSION_TIMEOUT_MS);
+    });
+
+    const racedResult = await Promise.race([generationPromise, timeoutPromise]);
+
+    const compactionResult =
+      racedResult === timeoutResult
+        ? await Promise.race([
+            generationPromise.then(
+              (result) => ({ status: 'fulfilled' as const, result }),
+              (error) => ({ status: 'rejected' as const, error }),
+            ),
+            new Promise<{ status: 'pending' }>((resolve) => {
+              abortGraceTimeout = setTimeout(
+                () => resolve({ status: 'pending' }),
+                HISTORY_COMPRESSION_ABORT_GRACE_MS,
+              );
+            }),
+          ]).then((settled) => {
+            if (settled.status === 'fulfilled') return settled.result;
+            if (settled.status === 'rejected') throw settled.error;
+            throw new HistoryCompressionUnsettledTimeoutError(modelId);
+          })
+        : racedResult;
+
     if (compactionResult.length < COMPRESSION_MIN_LENGTH) {
       throw new Error(
         `Compression too short (${compactionResult.length} chars)`,
@@ -113,7 +159,8 @@ const tryCompressWithModel = async (
 
     return compactionResult;
   } finally {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
+    if (abortGraceTimeout) clearTimeout(abortGraceTimeout);
   }
 };
 
@@ -146,6 +193,9 @@ export const generateSimpleCompressedHistory = async (
       );
     } catch (e) {
       lastError = e as Error;
+      if (lastError instanceof HistoryCompressionUnsettledTimeoutError) {
+        throw lastError;
+      }
       // Continue to the next fallback model
     }
   }
@@ -168,6 +218,9 @@ export const generateSimpleCompressedHistory = async (
       );
     } catch (e) {
       lastError = e as Error;
+      if (lastError instanceof HistoryCompressionUnsettledTimeoutError) {
+        throw lastError;
+      }
     }
   }
 
