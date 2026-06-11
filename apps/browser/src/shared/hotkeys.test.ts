@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   isEventMatch,
   getDisplayString,
+  hotkeyDefinitions,
+  HotkeyActions,
   type HotkeyDefinition,
 } from './hotkeys';
 
@@ -175,6 +177,25 @@ describe('isEventMatch', () => {
       const def: HotkeyDefinition = { accelerator: 'Mod+0' };
       const ev = createKeyboardEvent({ code: 'Digit0', ctrlKey: true });
       expect(isEventMatch(ev, def, 'windows')).toBe(true);
+    });
+  });
+
+  describe('terminal toggle shortcuts', () => {
+    const def = hotkeyDefinitions[HotkeyActions.FOCUS_OR_TOGGLE_TERMINAL];
+
+    it('matches Ctrl+Backquote on Mac', () => {
+      const ev = createKeyboardEvent({ code: 'Backquote', ctrlKey: true });
+      expect(isEventMatch(ev, def, 'mac')).toBe(true);
+    });
+
+    it('matches Cmd+J on Mac', () => {
+      const ev = createKeyboardEvent({ code: 'KeyJ', metaKey: true });
+      expect(isEventMatch(ev, def, 'mac')).toBe(true);
+    });
+
+    it('does NOT match Ctrl+J on Windows', () => {
+      const ev = createKeyboardEvent({ code: 'KeyJ', ctrlKey: true });
+      expect(isEventMatch(ev, def, 'windows')).toBe(false);
     });
   });
 

@@ -248,6 +248,7 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.FOCUS_OR_TOGGLE_TERMINAL]: {
     accelerator: 'Ctrl+Backquote',
+    macAliases: ['Mod+J'],
     captureDominantly: true,
   },
   [HotkeyActions.CLOSE_TAB]: {
