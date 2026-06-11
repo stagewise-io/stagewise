@@ -8,6 +8,18 @@ import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
 
+function findLastMountByPrefix<T extends { prefix: string }>(
+  mounts: readonly T[] | null,
+  prefix: string,
+): T | undefined {
+  if (!mounts) return undefined;
+  for (let index = mounts.length - 1; index >= 0; index--) {
+    const mount = mounts[index];
+    if (mount?.prefix === prefix) return mount;
+  }
+  return undefined;
+}
+
 export function MentionNodeView(props: InlineNodeViewProps) {
   const attrs = props.node.attrs as MentionAttrs;
   const isEditable = !('viewOnly' in props);
@@ -57,7 +69,7 @@ export function MentionNodeView(props: InlineNodeViewProps) {
     const relativePath = attrs.id.slice(slashIndex + 1);
     const mount =
       mounts.find((item) => item.prefix === prefix) ??
-      historicalMounts?.find((item) => item.prefix === prefix);
+      findLastMountByPrefix(historicalMounts, prefix);
     if (!mount) return;
     const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
     void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {

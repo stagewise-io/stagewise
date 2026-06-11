@@ -2,6 +2,20 @@ import { mkdtemp, mkdir, realpath, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  vi.stubGlobal('__APP_BASE_NAME__', 'stagewise-test');
+  vi.stubGlobal('__APP_NAME__', 'stagewise-test');
+  vi.stubGlobal('__APP_BUNDLE_ID__', 'io.stagewise.test');
+  vi.stubGlobal('__APP_VERSION__', '0.0.0-test');
+  vi.stubGlobal('__APP_PLATFORM__', 'darwin');
+  vi.stubGlobal('__APP_RELEASE_CHANNEL__', 'test');
+  vi.stubGlobal('__APP_AUTHOR__', 'stagewise');
+  vi.stubGlobal('__APP_COPYRIGHT__', 'stagewise');
+  vi.stubGlobal('__APP_HOMEPAGE__', 'https://stagewise.io');
+  vi.stubGlobal('__APP_ARCH__', 'arm64');
+});
+
 import type { Logger } from '../logger';
 import type { KartonService } from '../karton';
 import type { AppState } from '@shared/karton-contracts/ui';
