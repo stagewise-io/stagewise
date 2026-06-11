@@ -2,17 +2,17 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
-  title: 'Our Mission · stagewise',
+  title: 'Company · stagewise',
   description:
     "We're building the software engineering environment of the future.",
   openGraph: {
-    title: 'Our Mission · stagewise',
+    title: 'Company · stagewise',
     description:
       "We're building the software engineering environment of the future.",
     type: 'website',
   },
   twitter: {
-    title: 'Our Mission · stagewise',
+    title: 'Company · stagewise',
     description:
       "We're building the software engineering environment of the future.",
     creator: '@stagewise_io',
