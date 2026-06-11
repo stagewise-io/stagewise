@@ -8,6 +8,7 @@ import {
   TITLEBAR_ICON_OPTICAL_OFFSET,
 } from '@shared/titlebar';
 import { SidebarTitlebarRow } from '../main/_components/sidebar-titlebar-row';
+import { SidebarAuthFooter } from '../main/_components/sidebar-auth-footer';
 import {
   SETTINGS_NAV_GROUPS,
   getSettingsSectionLabel,
@@ -49,11 +50,11 @@ export function SettingsSidebar() {
         </div>
       </SidebarTitlebarRow>
       <div
-        className="flex h-full flex-col items-stretch p-2"
+        className="flex h-full min-h-0 flex-col items-stretch p-2"
         style={{ paddingTop: (TITLEBAR_HEIGHT + 8) * counterScale }}
       >
         {/* Navigation groups */}
-        <nav className="flex flex-1 flex-col gap-px pt-2 pr-1.5 pb-3.5 pl-0.5">
+        <nav className="scrollbar-subtle flex min-h-0 flex-1 flex-col gap-px overflow-y-auto pt-2 pr-1.5 pb-3.5 pl-0.5">
           {SETTINGS_NAV_GROUPS.map((group, gi) => (
             <div key={gi} className="flex flex-col gap-px pt-4 first:pt-0">
               {group.label && (
@@ -85,6 +86,8 @@ export function SettingsSidebar() {
             </div>
           ))}
         </nav>
+
+        <SidebarAuthFooter />
       </div>
     </div>
   );

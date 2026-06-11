@@ -37,6 +37,9 @@ function getVisibleAgentIds() {
 export function GlobalHotkeyBindings() {
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const globalHotkeysEnabled = !isCommandCenterOpen;
+  const appScreenMode = useKartonState((s) => s.appScreen.mode);
+  const settingsOpen = appScreenMode === 'settings';
+  const mainHotkeysEnabled = globalHotkeysEnabled && !settingsOpen;
 
   // -- Agent switching --------------------------------------------------
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
@@ -91,7 +94,7 @@ export function GlobalHotkeyBindings() {
   // because we need to track the held Control key for commit-on-release
   // of the Ctrl+Tab cycling mode.
   useEffect(() => {
-    if (!globalHotkeysEnabled) return;
+    if (!mainHotkeysEnabled) return;
 
     const nextDef = hotkeyDefinitions[HotkeyActions.NEXT_AGENT];
     const prevDef = hotkeyDefinitions[HotkeyActions.PREV_AGENT];
@@ -117,7 +120,7 @@ export function GlobalHotkeyBindings() {
     window.addEventListener('keydown', handleCycleKeyDown, true);
     return () =>
       window.removeEventListener('keydown', handleCycleKeyDown, true);
-  }, [globalHotkeysEnabled, handleAgentCycle, platform, switchAgentImmediate]);
+  }, [handleAgentCycle, mainHotkeysEnabled, platform, switchAgentImmediate]);
 
   const commitCycle = useCallback(() => {
     hasActiveCycleRef.current = false;
@@ -131,7 +134,7 @@ export function GlobalHotkeyBindings() {
   }, [cancelAgentCycle]);
 
   useEffect(() => {
-    if (!globalHotkeysEnabled) {
+    if (!mainHotkeysEnabled) {
       if (hasActiveCycleRef.current || isCyclingAgentsRef.current) {
         cancelCycle();
       }
@@ -164,7 +167,7 @@ export function GlobalHotkeyBindings() {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [cancelCycle, commitCycle, globalHotkeysEnabled]);
+  }, [cancelCycle, commitCycle, mainHotkeysEnabled]);
 
   const focusAgentByIndex = useCallback(
     (index: number) => {
@@ -180,63 +183,79 @@ export function GlobalHotkeyBindings() {
   useHotKeyListener(
     () => focusAgentByIndex(0),
     HotkeyActions.FOCUS_AGENT_1,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(1),
     HotkeyActions.FOCUS_AGENT_2,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(2),
     HotkeyActions.FOCUS_AGENT_3,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(3),
     HotkeyActions.FOCUS_AGENT_4,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(4),
     HotkeyActions.FOCUS_AGENT_5,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(5),
     HotkeyActions.FOCUS_AGENT_6,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(6),
     HotkeyActions.FOCUS_AGENT_7,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(7),
     HotkeyActions.FOCUS_AGENT_8,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
   useHotKeyListener(
     () => focusAgentByIndex(8),
     HotkeyActions.FOCUS_AGENT_LAST,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
 
-  // -- Settings (Mod+,) --------------------------------------------------
+  // -- Settings ----------------------------------------------------------
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+  const closeSettings = useKartonProcedure((p) => p.appScreen.closeSettings);
   useHotKeyListener(
-    () => void openSettings(),
+    () => {
+      if (!settingsOpen) void openSettings();
+    },
     HotkeyActions.OPEN_SETTINGS,
     globalHotkeysEnabled,
   );
+  useEffect(() => {
+    if (!globalHotkeysEnabled || !settingsOpen) return;
+
+    const handleSettingsEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+
+      event.preventDefault();
+      void closeSettings();
+    };
+
+    window.addEventListener('keydown', handleSettingsEscape);
+    return () => window.removeEventListener('keydown', handleSettingsEscape);
+  }, [closeSettings, globalHotkeysEnabled, settingsOpen]);
 
   // -- Sidebar toggle (Mod+B) -------------------------------------------
   const { toggle: toggleSidebar } = useSidebarCollapsed();
   useHotKeyListener(
     () => toggleSidebar(),
     HotkeyActions.TOGGLE_SIDEBAR,
-    globalHotkeysEnabled,
+    mainHotkeysEnabled,
   );
 
   // -- UI zoom (Mod+=, Mod+-, Mod+0) ------------------------------------

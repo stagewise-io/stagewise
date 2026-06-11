@@ -10,6 +10,7 @@ type Bounds = { x: number; y: number; width: number; height: number };
 
 export const WebContentsBoundsSyncer = () => {
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
+  const appScreenMode = useKartonState((s) => s.appScreen.mode);
   const connected = useKartonConnected();
   const updateLayout = useKartonProcedure((p) => p.browser.layout.update);
   const movePanelToForeground = useKartonProcedure(
@@ -28,7 +29,12 @@ export const WebContentsBoundsSyncer = () => {
     // the backend never received them — keeping the tab invisible.
     // Re-running when `connected` becomes true ensures a fresh send.
     if (!connected) return;
-    if (!activeTabId) return;
+
+    if (appScreenMode !== 'main' || !activeTabId) {
+      updateLayout.fire(null);
+      void movePanelToForeground('stagewise-ui');
+      return;
+    }
 
     const containerId = `dev-app-preview-container-${activeTabId}`;
 
@@ -263,7 +269,7 @@ export const WebContentsBoundsSyncer = () => {
         sendBoundsUpdateRef.current = null;
       }
     };
-  }, [activeTabId, connected]);
+  }, [activeTabId, appScreenMode, connected]);
 
   useLayoutEffect(() => {
     uiZoomPercentageRef.current = uiZoomPercentage;

@@ -4,7 +4,6 @@ import {
   useKartonReconnectState,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import { SettingsScreen } from './settings';
 import { Logo } from '@ui/components/ui/logo';
 import { WebContentsBoundsSyncer } from '@ui/components/web-contents-bounds-syncer';
 
@@ -65,23 +64,15 @@ export function ScreenRouter() {
   const hasSeenOnboarding = useKartonState(
     (s) => s.userExperience.storedExperienceData.hasSeenOnboardingFlow,
   );
-  const appScreenMode = useKartonState((s) => s.appScreen.mode);
-
   return (
     <div className="fixed inset-0">
       {!connected || hasSeenOnboarding === null ? (
         <LoadingScreen reconnectState={reconnectState} />
       ) : hasSeenOnboarding ? (
-        appScreenMode === 'settings' ? (
-          <SettingsScreen />
-        ) : (
-          <Suspense
-            fallback={<LoadingScreen reconnectState={reconnectState} />}
-          >
-            <DefaultLayout show />
-            <WebContentsBoundsSyncer />
-          </Suspense>
-        )
+        <Suspense fallback={<LoadingScreen reconnectState={reconnectState} />}>
+          <DefaultLayout show />
+          <WebContentsBoundsSyncer />
+        </Suspense>
       ) : (
         <Suspense fallback={<LoadingScreen reconnectState={reconnectState} />}>
           <OnboardingWizard />
