@@ -24,6 +24,7 @@ import { useDiffLines } from '@ui/hooks/use-diff-lines';
 import { Button } from '@stagewise/stage-ui/components/button';
 
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import {
   StreamingCodeBlock,
   getLanguageFromPath,
@@ -37,7 +38,9 @@ export const GenericWriteToolPart = memo(
     const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
     const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
     const mounts = useKartonState((s) =>
-      openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
+      openAgent
+        ? (s.toolbox[openAgent]?.workspace?.mounts ?? EMPTY_MOUNTS)
+        : EMPTY_MOUNTS,
     );
     const globalMounts = useKartonState((s) => s.workspaceMounts);
     const outputWithDiff = part.output as
