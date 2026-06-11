@@ -525,7 +525,12 @@ export class UserExperienceService extends DisposableService {
 
     try {
       const currentState = await this.readTutorialState();
-      currentState[tutorialId] = stepIndex;
+      // Only move forward — never regress. An older fire-and-forget
+      // save can still arrive *after* a newer one, even with the lock.
+      currentState[tutorialId] = Math.max(
+        currentState[tutorialId] ?? stepIndex,
+        stepIndex,
+      );
       await this.writeTutorialState(currentState);
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();

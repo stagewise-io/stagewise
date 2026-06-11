@@ -64,6 +64,10 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
   // Queue of tutorials waiting to be shown (deferred when another is active)
   const pendingQueueRef = useRef<TutorialDefinition[]>([]);
 
+  // Preserved step index when a tutorial is hidden but not dismissed.
+  // Re-registration should resume from here rather than from lastSeen + 1.
+  const hiddenStepIndicesRef = useRef<Map<string, number>>(new Map());
+
   // Consume the next queued tutorial if one is waiting
   const dequeueNext = useCallback(() => {
     const queue = pendingQueueRef.current;
@@ -108,8 +112,11 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
         return;
       }
 
-      // Start at the first unseen step
-      const startIndex = lastSeenIndex + 1;
+      // Start at the first unseen step, or resume from where the
+      // tutorial was hidden if it was hidden but not dismissed.
+      const hiddenStep = hiddenStepIndicesRef.current.get(def.id);
+      hiddenStepIndicesRef.current.delete(def.id);
+      const startIndex = hiddenStep ?? lastSeenIndex + 1;
       setActiveTutorialId(def.id);
       setActiveTutorialDef(def);
       setCurrentStepIndex(startIndex);
@@ -201,10 +208,13 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
   ]);
 
   const hideTutorial = useCallback(() => {
+    if (activeTutorialId && activeTutorialDef) {
+      hiddenStepIndicesRef.current.set(activeTutorialId, currentStepIndex);
+    }
     setActiveTutorialId(null);
     setActiveTutorialDef(null);
     setCurrentStepIndex(0);
-  }, []);
+  }, [activeTutorialId, activeTutorialDef, currentStepIndex]);
 
   const currentStep = useMemo(() => {
     if (!activeTutorialDef) return null;

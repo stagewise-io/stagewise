@@ -262,7 +262,17 @@ export function TutorialOverlay() {
 
     // Watch for DOM changes so we detect when the target element appears
     // dynamically (e.g. inside a popover that just opened).
-    const observer = new MutationObserver(() => recalc());
+    // Throttled via requestAnimationFrame to avoid expensive recalculations
+    // during high-frequency DOM mutations (e.g. chat streaming).
+    let rafId: number | null = null;
+    const observer = new MutationObserver(() => {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          recalc();
+        });
+      }
+    });
     observer.observe(document.body, {
       childList: true,
       subtree: true,
@@ -271,6 +281,7 @@ export function TutorialOverlay() {
     return () => {
       window.removeEventListener('resize', onResizeOrScroll);
       window.removeEventListener('scroll', onResizeOrScroll, { capture: true });
+      if (rafId !== null) cancelAnimationFrame(rafId);
       observer.disconnect();
     };
   }, [recalc]);
@@ -290,10 +301,16 @@ export function TutorialOverlay() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         dismissTutorial();
       } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
         goNext();
       } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
         goBack();
       }
     };
