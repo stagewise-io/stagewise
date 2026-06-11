@@ -53,7 +53,7 @@ import {
 import { NewTabButtons } from '../_components/new-tab-buttons';
 import { Tutorial } from '@ui/components/tutorial';
 import { useTutorial } from '@ui/contexts/tutorial';
-import { TUTORIALS } from '@ui/tutorial-steps';
+import type { TutorialId } from '@ui/tutorial-steps';
 import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 import { HotkeyActions } from '@shared/hotkeys';
 import {
@@ -495,7 +495,8 @@ export function MainSection({
     [effectiveActiveTabId, visibleTabIds],
   );
 
-  const shouldForceTabTutorialActions = activeTutorial?.id === 'content-tabs';
+  const shouldForceTabTutorialActions =
+    activeTutorial?.id === ('content-tabs' satisfies TutorialId);
 
   const tabItems = useMemo<SortableTabItem[]>(() => {
     return visibleTabIds
@@ -715,9 +716,7 @@ export function MainSection({
           {topRightActions}
         </div>
       )}
-      {visibleTabIds.length > 0 && (
-        <Tutorial tutorialId="content-tabs" steps={TUTORIALS['content-tabs']} />
-      )}
+      {visibleTabIds.length > 0 && <Tutorial tutorialId="content-tabs" />}
       <BrowserTabHotkeys
         onFocusUrlBar={handleFocusUrlBar}
         onFocusSearchBar={handleFocusSearchBar}

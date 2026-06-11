@@ -513,41 +513,40 @@ export class UserExperienceService extends DisposableService {
   }
 
   public async setTutorialStep(tutorialId: string, stepIndex: number) {
-    // Serialize writes to prevent concurrent read-modify-write races.
-    // The UI sends these fire-and-forget, so two rapid saves can otherwise
-    // read the same stale state and overwrite each other's progress.
-    const prev = this.tutorialStepLock;
-    let release: () => void;
-    this.tutorialStepLock = new Promise<void>((resolve) => {
-      release = resolve;
+    // Serialize writes by chaining onto the previous one. The UI sends
+    // these fire-and-forget, so two rapid saves can otherwise read the
+    // same stale state and drop each other's updates. Errors are handled
+    // inside the chained task, so the chain itself never rejects.
+    const run = this.tutorialStepLock.then(async () => {
+      try {
+        const currentState = await this.readTutorialState();
+        // Only move forward — never regress. An older fire-and-forget
+        // save can still arrive *after* a newer one, even when serialized.
+        currentState[tutorialId] = Math.max(
+          currentState[tutorialId] ?? stepIndex,
+          stepIndex,
+        );
+        await this.writeTutorialState(currentState);
+        // Patch only the tutorial slice — rebuilding the whole
+        // storedExperienceData object would hand new references to
+        // unrelated consumers (e.g. recently opened workspaces) and
+        // re-render them on every step advance.
+        this.uiKarton.setState((draft) => {
+          draft.userExperience.storedExperienceData.tutorialState =
+            currentState;
+        });
+        this.logger.debug(
+          `[UserExperienceService] Set tutorial ${tutorialId} step to: ${stepIndex}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `[UserExperienceService] Failed to save tutorial step. Error: ${error}`,
+        );
+        this.report(error as Error, 'saveTutorialStep');
+      }
     });
-    await prev;
-
-    try {
-      const currentState = await this.readTutorialState();
-      // Only move forward — never regress. An older fire-and-forget
-      // save can still arrive *after* a newer one, even with the lock.
-      currentState[tutorialId] = Math.max(
-        currentState[tutorialId] ?? stepIndex,
-        stepIndex,
-      );
-      await this.writeTutorialState(currentState);
-      // Update UI state with combined data
-      const storedData = await this.getStoredExperienceData();
-      this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
-      });
-      this.logger.debug(
-        `[UserExperienceService] Set tutorial ${tutorialId} step to: ${stepIndex}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[UserExperienceService] Failed to save tutorial step. Error: ${error}`,
-      );
-      this.report(error as Error, 'saveTutorialStep');
-    } finally {
-      release!();
-    }
+    this.tutorialStepLock = run;
+    await run;
   }
 
   private async pruneRecentlyOpenedWorkspaces({

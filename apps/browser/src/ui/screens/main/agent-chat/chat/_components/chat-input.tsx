@@ -31,7 +31,6 @@ import {
 import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { Tutorial } from '@ui/components/tutorial';
-import { TUTORIALS } from '@ui/tutorial-steps';
 import {
   configureAttachmentExtensions,
   ALL_ATTACHMENT_NODE_NAMES,
@@ -905,10 +904,7 @@ export const ChatInputActions = memo(function ChatInputActions({
       {/* Element selector and image upload - always shown (can add context to queued messages) */}
       {showElementSelectorButton && (
         <>
-          <Tutorial
-            tutorialId="browser-element-selector"
-            steps={TUTORIALS['browser-element-selector']}
-          />
+          <Tutorial tutorialId="browser-element-selector" />
           <Tooltip>
             <TooltipTrigger>
               <Button

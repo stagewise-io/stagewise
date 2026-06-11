@@ -1694,6 +1694,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             isDragOver && 'bg-hover-derived!',
           )}
           id="chat-input-container-box"
+          data-tutorial="chat-input"
           data-chat-active={chatInputActive}
           onKeyDown={(e) => {
             // Shift-Tab from chat input → jump to last question in status card form

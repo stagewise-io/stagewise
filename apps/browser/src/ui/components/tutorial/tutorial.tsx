@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { useTutorial } from '@ui/contexts/tutorial';
-import type { TutorialStep } from '@ui/contexts/tutorial';
+import {
+  TUTORIALS,
+  TUTORIAL_PRIORITY,
+  type TutorialId,
+} from '@ui/tutorial-steps';
 
 interface TutorialProps {
-  /** Unique identifier for this tutorial */
-  tutorialId: string;
-  /** Ordered list of steps */
-  steps: TutorialStep[];
+  /** Which tutorial to trigger — steps and version come from `TUTORIALS` */
+  tutorialId: TutorialId;
   /** Whether this tutorial is currently eligible to run */
   enabled?: boolean;
 }
@@ -18,7 +20,7 @@ interface TutorialProps {
  *
  * Renders nothing — it's purely a trigger.
  */
-export function Tutorial({ tutorialId, steps, enabled = true }: TutorialProps) {
+export function Tutorial({ tutorialId, enabled = true }: TutorialProps) {
   const { activeTutorial, hideTutorial, registerTutorial, unregisterTutorial } =
     useTutorial();
 
@@ -33,8 +35,14 @@ export function Tutorial({ tutorialId, steps, enabled = true }: TutorialProps) {
 
   useEffect(() => {
     if (!enabled) return;
-    registerRef.current({ id: tutorialId, steps });
-  }, [enabled, tutorialId, steps]);
+    const content = TUTORIALS[tutorialId];
+    registerRef.current({
+      id: tutorialId,
+      version: content.version,
+      steps: content.steps,
+      priority: TUTORIAL_PRIORITY.indexOf(tutorialId),
+    });
+  }, [enabled, tutorialId]);
 
   useEffect(() => {
     if (!enabled && activeTutorial?.id === tutorialId) {

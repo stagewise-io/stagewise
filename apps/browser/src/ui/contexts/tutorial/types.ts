@@ -10,6 +10,17 @@ export interface TutorialStep {
 export interface TutorialDefinition {
   /** Unique identifier for this tutorial (e.g. "command-center") */
   id: string;
+  /**
+   * Content version. Persisted progress is keyed by id + version, so bump
+   * this whenever steps are reordered, inserted, or removed — otherwise
+   * users with stale step indices would resume at the wrong step.
+   */
+  version: number;
   /** Ordered list of steps */
-  steps: TutorialStep[];
+  steps: readonly TutorialStep[];
+  /**
+   * Display priority when multiple tutorials are queued.
+   * Lower values are shown first. Defaults to lowest priority.
+   */
+  priority?: number;
 }
