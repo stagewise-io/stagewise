@@ -19,7 +19,8 @@ interface TutorialProps {
  * Renders nothing — it's purely a trigger.
  */
 export function Tutorial({ tutorialId, steps, enabled = true }: TutorialProps) {
-  const { activeTutorial, hideTutorial, registerTutorial } = useTutorial();
+  const { activeTutorial, hideTutorial, registerTutorial, unregisterTutorial } =
+    useTutorial();
 
   useEffect(() => {
     if (!enabled) return;
@@ -31,6 +32,17 @@ export function Tutorial({ tutorialId, steps, enabled = true }: TutorialProps) {
       hideTutorial();
     }
   }, [enabled, activeTutorial, tutorialId, hideTutorial]);
+
+  // Unregister when this tutorial's source unmounts — prevents queued
+  // tutorials from starting after their trigger UI is gone.
+  useEffect(() => {
+    return () => unregisterTutorial(tutorialId);
+  }, [tutorialId, unregisterTutorial]);
+
+  // Also unregister when enabled becomes false (clean up queue entry)
+  useEffect(() => {
+    if (!enabled) unregisterTutorial(tutorialId);
+  }, [enabled, tutorialId, unregisterTutorial]);
 
   return null;
 }
