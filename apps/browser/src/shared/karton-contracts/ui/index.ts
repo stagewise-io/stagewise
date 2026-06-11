@@ -1506,6 +1506,14 @@ export type KartonContract = {
       clearFileNotice: (tabId: string) => Promise<void>;
       switchTab: (tabId: string) => Promise<void>;
       reorderTabs: (tabIds: string[]) => Promise<void>;
+      /**
+       * Legacy alias for `browser.layout.movePanelToForeground`. Some
+       * production client builds reference the flat `browser.` path
+       * without the `layout` intermediate namespace.
+       */
+      movePanelToForeground: (
+        panel: 'stagewise-ui' | 'tab-content',
+      ) => Promise<void>;
       layout: {
         // This is called when the webcontents view is resized or moved or whatever. It's used to notify the main window about the new bounds that the webcontents view should have.
         update: (
