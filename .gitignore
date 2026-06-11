@@ -48,3 +48,4 @@ storybook-static
 
 .stagewise/*
 !.stagewise/worktree-setup.sh
+!.stagewise/worktree-setup.ps1
