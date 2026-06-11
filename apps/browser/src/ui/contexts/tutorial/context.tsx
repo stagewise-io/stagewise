@@ -34,6 +34,8 @@ interface TutorialContextValue {
   hideTutorial: () => void;
   /** Register a tutorial as available to show */
   registerTutorial: (def: TutorialDefinition) => void;
+  /** Unregister a tutorial — removes it from the queue and hides if active */
+  unregisterTutorial: (tutorialId: string) => void;
 }
 
 const TutorialContext = createContext<TutorialContextValue | null>(null);
@@ -115,6 +117,23 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     [activeTutorialId, tutorialState],
   );
 
+  const unregisterTutorial = useCallback(
+    (tutorialId: string) => {
+      // Hide if currently active
+      if (activeTutorialId === tutorialId) {
+        setActiveTutorialId(null);
+        setActiveTutorialDef(null);
+        setCurrentStepIndex(0);
+        dequeueNext();
+      }
+      // Remove from pending queue
+      const queue = pendingQueueRef.current;
+      const idx = queue.findIndex((d) => d.id === tutorialId);
+      if (idx !== -1) queue.splice(idx, 1);
+    },
+    [activeTutorialId, dequeueNext],
+  );
+
   const persistStep = useCallback(
     (tutorialId: string, stepIndex: number) => {
       const lastSeenIndex = tutorialState[tutorialId] ?? -1;
@@ -172,7 +191,14 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     setActiveTutorialId(null);
     setActiveTutorialDef(null);
     setCurrentStepIndex(0);
-  }, [activeTutorialDef, currentStepIndex, tutorialState, setTutorialStep]);
+    dequeueNext();
+  }, [
+    activeTutorialDef,
+    currentStepIndex,
+    tutorialState,
+    setTutorialStep,
+    dequeueNext,
+  ]);
 
   const hideTutorial = useCallback(() => {
     setActiveTutorialId(null);
@@ -199,6 +225,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
       dismissTutorial,
       hideTutorial,
       registerTutorial,
+      unregisterTutorial,
     }),
     [
       activeTutorialDef,
@@ -211,6 +238,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
       dismissTutorial,
       hideTutorial,
       registerTutorial,
+      unregisterTutorial,
     ],
   );
 
