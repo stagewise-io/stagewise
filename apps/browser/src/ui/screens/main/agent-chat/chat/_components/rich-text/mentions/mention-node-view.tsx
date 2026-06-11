@@ -6,6 +6,7 @@ import { TabMentionBadge } from './tab-mention-badge';
 import { FileReferenceBadge } from '@ui/components/file-reference-badge';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useMountedPaths } from '@ui/hooks/use-mounted-paths';
 
 export function MentionNodeView(props: InlineNodeViewProps) {
   const attrs = props.node.attrs as MentionAttrs;
@@ -13,6 +14,7 @@ export function MentionNodeView(props: InlineNodeViewProps) {
   const [openAgent] = useOpenAgent();
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);
+  const historicalMounts = useMountedPaths();
   const mounts = useKartonState((s) =>
     openAgent ? (s.toolbox[openAgent]?.workspace?.mounts ?? []) : [],
   );
@@ -53,13 +55,23 @@ export function MentionNodeView(props: InlineNodeViewProps) {
     if (slashIndex <= 0) return;
     const prefix = attrs.id.slice(0, slashIndex);
     const relativePath = attrs.id.slice(slashIndex + 1);
-    const mount = mounts.find((item) => item.prefix === prefix);
+    const mount =
+      mounts.find((item) => item.prefix === prefix) ??
+      historicalMounts?.find((item) => item.prefix === prefix);
     if (!mount) return;
     const workspaceKey = `${mount.prefix}:${mount.path.replace(/\\/g, '/')}`;
     void openFileTab(workspaceKey, relativePath, openAgent).then((tabId) => {
       if (!tabId) void revealInFolder(workspaceKey, relativePath);
     });
-  }, [attrs.id, isFile, mounts, openAgent, openFileTab, revealInFolder]);
+  }, [
+    attrs.id,
+    isFile,
+    mounts,
+    historicalMounts,
+    openAgent,
+    openFileTab,
+    revealInFolder,
+  ]);
 
   // View-only file badges get click-to-open plus the context menu.
   if (isFile && !isEditable) {
