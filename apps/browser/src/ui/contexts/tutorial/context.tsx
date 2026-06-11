@@ -85,7 +85,14 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
   // Re-registration should resume from here rather than from lastSeen + 1.
   const hiddenStepIndicesRef = useRef<Map<string, number>>(new Map());
 
+  // Mirrors activeTutorialId synchronously. Registration must not read the
+  // state value: all <Tutorial> effects of one commit flush before any
+  // re-render, so they would all see the stale pre-update id and overwrite
+  // each other's activation instead of queueing.
+  const activeTutorialIdRef = useRef<string | null>(null);
+
   const clearActive = useCallback(() => {
+    activeTutorialIdRef.current = null;
     setActiveTutorialId(null);
     setActiveTutorialDef(null);
     setCurrentStepIndex(0);
@@ -95,6 +102,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     (def: TutorialDefinition) => {
       const hiddenStep = hiddenStepIndicesRef.current.get(def.id);
       hiddenStepIndicesRef.current.delete(def.id);
+      activeTutorialIdRef.current = def.id;
       setActiveTutorialId(def.id);
       setActiveTutorialDef(def);
       setCurrentStepIndex(
@@ -126,25 +134,40 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     }
   }, [activeTutorialId, movePanelToForeground]);
 
+  // Defers activation to a microtask so all registrations from the same
+  // commit land in the queue first — the highest-priority one then wins,
+  // regardless of component mount/effect order.
+  const activationScheduledRef = useRef(false);
+  const dequeueNextRef = useRef(dequeueNext);
+  dequeueNextRef.current = dequeueNext;
+  const scheduleActivation = useCallback(() => {
+    if (activationScheduledRef.current) return;
+    activationScheduledRef.current = true;
+    queueMicrotask(() => {
+      activationScheduledRef.current = false;
+      if (activeTutorialIdRef.current !== null) return;
+      dequeueNextRef.current();
+    });
+  }, []);
+
   const registerTutorial = useCallback(
     (def: TutorialDefinition) => {
       if (sessionDismissedTutorialIds.has(def.id)) return;
       if (isTutorialCompleted(def, tutorialState)) return;
+      // Already showing — don't queue a second run of the same tutorial.
+      if (activeTutorialIdRef.current === def.id) return;
 
-      // If another tutorial is currently active, queue this one for later.
-      // This prevents transient tutorials (like workspace-selection-options)
-      // from being permanently lost when they register during an active tutorial.
-      if (activeTutorialId !== null) {
-        pendingQueueRef.current = insertQueuedTutorial(
-          pendingQueueRef.current,
-          def,
-        );
-        return;
-      }
-
-      activate(def);
+      // Always queue (sorted by priority, deduplicated), then activate the
+      // best candidate asynchronously. Queueing while another tutorial is
+      // active also prevents transient tutorials (like
+      // workspace-selection-options) from being permanently lost.
+      pendingQueueRef.current = insertQueuedTutorial(
+        pendingQueueRef.current,
+        def,
+      );
+      scheduleActivation();
     },
-    [activeTutorialId, tutorialState, activate],
+    [tutorialState, scheduleActivation],
   );
 
   const unregisterTutorial = useCallback(
