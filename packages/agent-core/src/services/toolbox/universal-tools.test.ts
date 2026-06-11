@@ -44,6 +44,7 @@ function makeHostPaths(root: string): HostPaths {
     userDataDir: () => path.join(root, 'user-data'),
     plansDir: () => path.join(root, 'plans'),
     logsDir: () => path.join(root, 'logs'),
+    memoryDir: () => path.join(root, 'memory'),
     pluginsDir: () => path.join(root, 'plugins'),
     builtinSkillsDir: () => path.join(root, 'plugins'),
     ripgrepBaseDir: () => path.join(root, 'rg'),
@@ -105,6 +106,37 @@ describe('universal toolbox', () => {
     ).resolves.toEqual({
       message: 'File opened and loaded into context.',
     });
+  });
+
+  it('reads from the memory mount', async () => {
+    mkdirSync(path.join(root, 'memory'), { recursive: true });
+    writeFileSync(path.join(root, 'memory', 'index.md'), '# Memory\n');
+    await expect(
+      readToolExecute({ path: 'memory/index.md' }, deps),
+    ).resolves.toEqual({
+      message: 'File opened and loaded into context.',
+    });
+  });
+
+  it('rejects writes, edits, and deletes in the memory mount', async () => {
+    mkdirSync(path.join(root, 'memory'), { recursive: true });
+    writeFileSync(path.join(root, 'memory', 'index.md'), '# Memory\n');
+
+    await expect(
+      writeToolExecute({ path: 'memory/new.md', content: 'nope' }, deps),
+    ).rejects.toThrow(/read-only/);
+    await expect(
+      multiEditToolExecute(
+        {
+          path: 'memory/index.md',
+          edits: [{ old_string: 'Memory', new_string: 'Edited' }],
+        },
+        deps,
+      ),
+    ).rejects.toThrow(/read-only/);
+    await expect(
+      deleteToolExecute({ path: 'memory/index.md' }, deps),
+    ).rejects.toThrow(/read-only/);
   });
 
   it('creates directories and rejects read-only mounts', async () => {
@@ -372,6 +404,26 @@ describe('universal toolbox', () => {
     const paths = getRegisteredEditPaths();
     expect(paths).not.toContain(path.join(workspace, 'a.txt'));
     expect(paths).toContain(path.join(workspace, 'b.txt'));
+  });
+
+  it('move rejects read-only sources', async () => {
+    writeFileSync(path.join(root, 'readonly', 'a.txt'), 'hello');
+
+    await expect(
+      copyToolExecute(
+        {
+          input_path: 'readonly/a.txt',
+          output_path: 'wtest/a.txt',
+          move: true,
+        },
+        deps,
+        { toolCallId: 'tc-move-readonly' },
+      ),
+    ).rejects.toThrow('Mount readonly is read-only or does not allow delete');
+
+    expect(readFileSync(path.join(root, 'readonly', 'a.txt'), 'utf-8')).toBe(
+      'hello',
+    );
   });
 
   it('delete (directory): registers an edit for every child file', async () => {

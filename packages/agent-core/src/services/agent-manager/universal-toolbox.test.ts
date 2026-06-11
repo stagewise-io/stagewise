@@ -71,6 +71,7 @@ function makeHost(): AgentHost {
     userDataDir: noopPath,
     plansDir: noopPath,
     logsDir: noopPath,
+    memoryDir: noopPath,
     pluginsDir: noopPath,
     builtinSkillsDir: noopPath,
     ripgrepBaseDir: noopPath,

@@ -26,14 +26,15 @@
 export {
   readFile,
   writeFile,
+  appendFile,
   stat,
   readdir,
   mkdir,
   rename,
   unlink,
+  rm,
   copyFile,
   access,
-  rm,
   open,
   realpath,
 } from 'node:fs/promises';

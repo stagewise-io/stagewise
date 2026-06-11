@@ -20,6 +20,7 @@ function makeHost(): AgentHost {
     agentAppsDir: (id: string) => `/host/apps/${id}`,
     plansDir: p('plans'),
     logsDir: p('logs'),
+    memoryDir: p('memory'),
     // Unused fields:
     dataDir: p('data'),
     tempDir: p('tmp'),
@@ -73,13 +74,26 @@ describe('createWorkspaceDomainAdapter', () => {
     const full = adapter.renderState(null, curr);
     expect(full).toContain('<symlinks>');
     expect(full).toContain('| wA | /abs/A | ');
-    // System prefixes (att, shells, plugins, apps, plans, logs)
+    // System prefixes (att, shells, plugins, apps, plans, logs, memory)
     expect(full).toContain('| att |');
     expect(full).toContain('| shells |');
     expect(full).toContain('| plugins |');
     expect(full).toContain('| apps |');
     expect(full).toContain('| plans |');
     expect(full).toContain('| logs |');
+    expect(full).toContain('| memory | /host/memory |  | read, list |');
+  });
+
+  it('does not emit workspace-mounted for built-in memory in the full render ordering', () => {
+    const adapter = createWorkspaceDomainAdapter({
+      host: makeHost(),
+      mountManager: makeMountManager([
+        { prefix: 'wA', path: '/abs/A', permissions: ['read'] },
+      ]),
+    });
+    const curr = adapter.getState('a1') as never;
+    const full = adapter.renderState(null, curr);
+    expect(full.indexOf('| wA |')).toBeLessThan(full.indexOf('| memory |'));
   });
 
   it('emits workspace-mounted on the diff render', () => {

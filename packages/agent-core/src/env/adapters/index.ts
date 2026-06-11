@@ -1,7 +1,7 @@
 /**
  * Core-owned {@link DomainAdapter} factories. Each builds an adapter
  * for one package-owned environment domain (`workspace`, `fileDiffs`,
- * `agentsMd`, `workspaceMd`, `enabledSkills`, `plans`, `logs`). Hosts
+ * `agentsMd`, `workspaceMd`, `enabledSkills`, `memory`, `plans`, `logs`). Hosts
  * register their own adapters (e.g. `browser`, `shells`, `sandbox`)
  * directly on the {@link DomainAdapterRegistry}.
  *
@@ -36,6 +36,11 @@ export {
   createLogsDomainAdapter,
   type LogsDomainAdapterDeps,
 } from './logs';
+export {
+  MEMORY_DOMAIN_ID,
+  createMemoryDomainAdapter,
+  type MemoryDomainAdapterDeps,
+} from './memory';
 export {
   PLANS_DOMAIN_ID,
   createPlansDomainAdapter,

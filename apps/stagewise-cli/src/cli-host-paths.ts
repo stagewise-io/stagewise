@@ -35,6 +35,7 @@ export function createCliHostPaths(sessionRoot: string): HostPaths {
     userDataDir: () => path.join(stagewise, 'user'),
     plansDir: () => path.join(stagewise, 'user', 'plans'),
     logsDir: () => path.join(stagewise, 'user', 'logs'),
+    memoryDir: () => path.join(stagewise, 'user', 'memory'),
 
     pluginsDir: () => path.join(sessionRoot, 'bundled', 'plugins'),
     builtinSkillsDir: () => path.join(sessionRoot, 'bundled', 'builtin-skills'),

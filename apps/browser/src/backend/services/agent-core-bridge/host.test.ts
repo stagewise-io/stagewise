@@ -4,6 +4,7 @@ import {
   AGENTS_MD_DOMAIN_ID,
   ENABLED_SKILLS_DOMAIN_ID,
   FILE_DIFFS_DOMAIN_ID,
+  MEMORY_DOMAIN_ID,
   PLANS_DOMAIN_ID,
   WORKSPACE_DOMAIN_ID,
 } from '@stagewise/agent-core/env/adapters';
@@ -43,6 +44,7 @@ vi.mock('@/utils/paths', () => ({
   getUserDataDir: () => '/tmp/data/user-data',
   getPlansDir: () => '/tmp/data/user-data/plans',
   getLogsDir: () => '/tmp/data/user-data/logs',
+  getMemoryDir: () => '/tmp/data/user-data/memory',
   getPluginsPath: () => '/tmp/plugins',
   getBuiltinSkillsPath: () => '/tmp/skills',
   getRipgrepBasePath: () => '/tmp/data/bin',
@@ -97,6 +99,7 @@ describe('createBrowserHostPaths', () => {
     expect(paths.userDataDir()).toBe('/tmp/data/user-data');
     expect(paths.plansDir()).toBe('/tmp/data/user-data/plans');
     expect(paths.logsDir()).toBe('/tmp/data/user-data/logs');
+    expect(paths.memoryDir()).toBe('/tmp/data/user-data/memory');
     expect(paths.pluginsDir()).toBe('/tmp/plugins');
     expect(paths.builtinSkillsDir()).toBe('/tmp/skills');
     expect(paths.ripgrepBaseDir()).toBe('/tmp/data/bin');
@@ -320,6 +323,7 @@ describe('createBrowserAgentHost', () => {
         WORKSPACE_DOMAIN_ID,
         AGENTS_MD_DOMAIN_ID,
         ENABLED_SKILLS_DOMAIN_ID,
+        MEMORY_DOMAIN_ID,
         PLANS_DOMAIN_ID,
         FILE_DIFFS_DOMAIN_ID,
       ]),

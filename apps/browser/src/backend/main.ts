@@ -84,6 +84,7 @@ import {
   createEnabledSkillsDomainAdapter,
   createFileDiffsDomainAdapter,
   createLogsDomainAdapter,
+  createMemoryDomainAdapter,
   createPlansDomainAdapter,
   createWorkspaceDomainAdapter,
   createWorkspaceMdDomainAdapter,
@@ -721,6 +722,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       },
     }),
   );
+  agentManagerService.registerEnvAdapter(createMemoryDomainAdapter());
   agentManagerService.registerEnvAdapter(
     createPlansDomainAdapter({
       host: agentCoreHost,

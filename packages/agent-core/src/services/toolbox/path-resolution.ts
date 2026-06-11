@@ -67,6 +67,11 @@ function getStaticMounts(deps: UniversalToolboxDeps): StaticMount[] {
       permissions: FULL_PERMISSIONS,
     },
     {
+      prefix: 'memory',
+      absolutePath: deps.hostPaths.memoryDir(),
+      permissions: READ_ONLY_PERMISSIONS,
+    },
+    {
       prefix: 'apps',
       absolutePath: deps.hostPaths.agentAppsDir(deps.agentInstanceId),
       permissions: FULL_PERMISSIONS,

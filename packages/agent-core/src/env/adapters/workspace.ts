@@ -4,7 +4,7 @@
  * Owns the workspace-mount manifest. Reads workspace mounts from the
  * `MountManager` and decorates them with the always-available system
  * mounts (`att/`, `shells/`, `plugins/`, global-skills, `apps/`,
- * `plans/`, `logs/`) sourced from `AgentHost`. The full-state render
+ * `plans/`, `logs/`, `memory/`) sourced from `AgentHost`. The full-state render
  * is the canonical `<symlinks>` table embedded in every system prompt;
  * the diff render reports mounted/unmounted/permission-change events.
  */
@@ -26,7 +26,7 @@ export interface WorkspaceDomainAdapterDeps {
   renderOrder?: number;
 }
 
-const SYSTEM_PREFIXES = new Set(['att', 'plugins', 'apps', 'shells']);
+const SYSTEM_PREFIXES = new Set(['att', 'plugins', 'apps', 'shells', 'memory']);
 
 function isSystemMount(prefix: string): boolean {
   return SYSTEM_PREFIXES.has(prefix) || prefix.startsWith('globalskills-');
@@ -72,6 +72,7 @@ function buildWorkspaceState(
     },
     { prefix: 'plans', path: host.paths.plansDir(), permissions: full },
     { prefix: 'logs', path: host.paths.logsDir(), permissions: full },
+    { prefix: 'memory', path: host.paths.memoryDir(), permissions: ro },
   ];
 
   return { mounts };
