@@ -1942,7 +1942,11 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         openChangeTimeoutRef.current = null;
       }
 
-      if (!next && activeTutorial?.id === 'workspace-selection-options') {
+      if (
+        !next &&
+        activeTutorial?.id ===
+          ('workspace-selection-options' satisfies TutorialId)
+      ) {
         return;
       }
 
@@ -3387,6 +3391,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
             variant="ghost"
             size="xs"
             aria-label="Connect workspace"
+            data-tutorial="connect-workspace"
             className="h-6 shrink-0 px-0 text-muted-foreground hover:text-foreground"
           >
             <IconFolder5Outline18 className="size-3 shrink-0" />
@@ -3396,6 +3401,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
           <Button
             variant="ghost"
             size="xs"
+            data-tutorial="connect-workspace"
             className="h-6 shrink-0 px-0 text-muted-foreground hover:text-foreground"
           >
             <IconFolder5Outline18 className="size-3 shrink-0" />
@@ -3923,7 +3929,7 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   );
 });
 
-import { TUTORIALS } from '@ui/tutorial-steps';
+import type { TutorialId } from '@ui/tutorial-steps';
 
 function WorkspaceSelectionTutorial({
   enabled,
@@ -3934,14 +3940,9 @@ function WorkspaceSelectionTutorial({
 }) {
   return (
     <>
-      <Tutorial
-        tutorialId="workspace-selection"
-        steps={TUTORIALS['workspace-selection']}
-        enabled={enabled}
-      />
+      <Tutorial tutorialId="workspace-selection" enabled={enabled} />
       <Tutorial
         tutorialId="workspace-selection-options"
-        steps={TUTORIALS['workspace-selection-options']}
         enabled={enabled && showOptionSteps}
       />
     </>

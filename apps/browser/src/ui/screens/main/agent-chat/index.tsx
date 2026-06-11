@@ -122,7 +122,7 @@ export function AgentChat({
     >
       {topRightActions && (
         <div
-          id="new-tab-buttons"
+          data-tutorial="new-tab-buttons"
           className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5 rounded-xl"
         >
           {topRightActions}

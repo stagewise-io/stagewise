@@ -10,7 +10,16 @@ import {
 } from 'react';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import type { TutorialDefinition, TutorialStep } from './types';
+import {
+  getTutorialStorageKey,
+  getTutorialStartIndex,
+  insertQueuedTutorial,
+  isTutorialCompleted,
+  takeNextEligibleTutorial,
+} from './tutorial-logic';
 
+// Tutorials explicitly dismissed or completed in this app session.
+// Module-level so a provider remount doesn't resurface them.
 const sessionDismissedTutorialIds = new Set<string>();
 
 interface TutorialContextValue {
@@ -28,7 +37,14 @@ interface TutorialContextValue {
   goNext: () => void;
   /** Go to the previous step */
   goBack: () => void;
-  /** Dismiss the current tutorial (saves progress) */
+  /**
+   * Skip the current step without persisting progress. Used when a step's
+   * target element cannot be found, so the user never gets steps marked as
+   * seen that were never shown. Skipping past the last step hides the
+   * tutorial (it stays eligible for a future session).
+   */
+  skipCurrentStep: () => void;
+  /** Dismiss the current tutorial permanently (persists completion) */
   dismissTutorial: () => void;
   /** Hide the current tutorial without changing persisted progress */
   hideTutorial: () => void;
@@ -61,29 +77,46 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     useState<TutorialDefinition | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  // Queue of tutorials waiting to be shown (deferred when another is active)
+  // Tutorials waiting to be shown (deferred while another is active),
+  // kept sorted by priority.
   const pendingQueueRef = useRef<TutorialDefinition[]>([]);
 
   // Preserved step index when a tutorial is hidden but not dismissed.
   // Re-registration should resume from here rather than from lastSeen + 1.
   const hiddenStepIndicesRef = useRef<Map<string, number>>(new Map());
 
-  // Consume the next queued tutorial if one is waiting
-  const dequeueNext = useCallback(() => {
-    const queue = pendingQueueRef.current;
-    while (queue.length > 0) {
-      const next = queue.shift()!;
-      if (sessionDismissedTutorialIds.has(next.id)) continue;
-      const lastSeen = tutorialState[next.id] ?? -1;
-      if (lastSeen >= next.steps.length - 1) continue;
-      setActiveTutorialId(next.id);
-      setActiveTutorialDef(next);
-      setCurrentStepIndex(lastSeen + 1);
-      return;
-    }
-  }, [tutorialState]);
+  const clearActive = useCallback(() => {
+    setActiveTutorialId(null);
+    setActiveTutorialDef(null);
+    setCurrentStepIndex(0);
+  }, []);
 
-  // Bring stagewise UI to foreground when a tutorial becomes active
+  const activate = useCallback(
+    (def: TutorialDefinition) => {
+      const hiddenStep = hiddenStepIndicesRef.current.get(def.id);
+      hiddenStepIndicesRef.current.delete(def.id);
+      setActiveTutorialId(def.id);
+      setActiveTutorialDef(def);
+      setCurrentStepIndex(
+        getTutorialStartIndex(def, tutorialState, hiddenStep),
+      );
+    },
+    [tutorialState],
+  );
+
+  // Consume the next queued tutorial if one is still eligible
+  const dequeueNext = useCallback(() => {
+    const { next, remaining } = takeNextEligibleTutorial(
+      pendingQueueRef.current,
+      tutorialState,
+      sessionDismissedTutorialIds,
+    );
+    pendingQueueRef.current = remaining;
+    if (next) activate(next);
+  }, [tutorialState, activate]);
+
+  // Bring stagewise UI to foreground when a tutorial becomes active —
+  // the overlay lives in the UI layer and must render above web content.
   const movePanelToForeground = useKartonProcedure(
     (p) => p.browser.layout.movePanelToForeground,
   );
@@ -96,57 +129,48 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
   const registerTutorial = useCallback(
     (def: TutorialDefinition) => {
       if (sessionDismissedTutorialIds.has(def.id)) return;
-
-      const lastSeenIndex = tutorialState[def.id] ?? -1;
-      // Tutorial already fully seen — don't show
-      if (lastSeenIndex >= def.steps.length - 1) return;
+      if (isTutorialCompleted(def, tutorialState)) return;
 
       // If another tutorial is currently active, queue this one for later.
       // This prevents transient tutorials (like workspace-selection-options)
       // from being permanently lost when they register during an active tutorial.
       if (activeTutorialId !== null) {
-        // Avoid queueing the same tutorial multiple times
-        if (!pendingQueueRef.current.some((d) => d.id === def.id)) {
-          pendingQueueRef.current.push(def);
-        }
+        pendingQueueRef.current = insertQueuedTutorial(
+          pendingQueueRef.current,
+          def,
+        );
         return;
       }
 
-      // Start at the first unseen step, or resume from where the
-      // tutorial was hidden if it was hidden but not dismissed.
-      const hiddenStep = hiddenStepIndicesRef.current.get(def.id);
-      hiddenStepIndicesRef.current.delete(def.id);
-      const startIndex = hiddenStep ?? lastSeenIndex + 1;
-      setActiveTutorialId(def.id);
-      setActiveTutorialDef(def);
-      setCurrentStepIndex(startIndex);
+      activate(def);
     },
-    [activeTutorialId, tutorialState],
+    [activeTutorialId, tutorialState, activate],
   );
 
   const unregisterTutorial = useCallback(
     (tutorialId: string) => {
       // Hide if currently active
       if (activeTutorialId === tutorialId) {
-        setActiveTutorialId(null);
-        setActiveTutorialDef(null);
-        setCurrentStepIndex(0);
+        clearActive();
         dequeueNext();
       }
       // Remove from pending queue
-      const queue = pendingQueueRef.current;
-      const idx = queue.findIndex((d) => d.id === tutorialId);
-      if (idx !== -1) queue.splice(idx, 1);
+      pendingQueueRef.current = pendingQueueRef.current.filter(
+        (d) => d.id !== tutorialId,
+      );
     },
-    [activeTutorialId, dequeueNext],
+    [activeTutorialId, clearActive, dequeueNext],
   );
 
   const persistStep = useCallback(
-    (tutorialId: string, stepIndex: number) => {
-      const lastSeenIndex = tutorialState[tutorialId] ?? -1;
+    (def: TutorialDefinition, stepIndex: number) => {
+      const storageKey = getTutorialStorageKey(def);
+      const lastSeenIndex = tutorialState[storageKey] ?? -1;
       // Only persist if we're advancing (don't persist going backward)
       if (stepIndex > lastSeenIndex) {
-        void setTutorialStep({ tutorialId, stepIndex });
+        // The persistence key is id + version so stale progress is
+        // discarded when tutorial content changes.
+        void setTutorialStep({ tutorialId: storageKey, stepIndex });
       }
     },
     [tutorialState, setTutorialStep],
@@ -157,7 +181,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
       if (!activeTutorialDef) return;
       if (index < 0 || index >= activeTutorialDef.steps.length) return;
       setCurrentStepIndex(index);
-      persistStep(activeTutorialDef.id, index);
+      persistStep(activeTutorialDef, index);
     },
     [activeTutorialDef, persistStep],
   );
@@ -166,18 +190,23 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     if (!activeTutorialDef) return;
     const nextIndex = currentStepIndex + 1;
     if (nextIndex >= activeTutorialDef.steps.length) {
-      // On the last step, hitting "next" dismisses with max index saved
-      persistStep(activeTutorialDef.id, activeTutorialDef.steps.length - 1);
+      // Completed the last step — persist full completion and chain to the
+      // next queued tutorial (natural completion keeps the flow going).
+      persistStep(activeTutorialDef, activeTutorialDef.steps.length - 1);
       sessionDismissedTutorialIds.add(activeTutorialDef.id);
-      setActiveTutorialId(null);
-      setActiveTutorialDef(null);
-      setCurrentStepIndex(0);
+      clearActive();
       dequeueNext();
       return;
     }
     setCurrentStepIndex(nextIndex);
-    persistStep(activeTutorialDef.id, nextIndex);
-  }, [activeTutorialDef, currentStepIndex, persistStep, dequeueNext]);
+    persistStep(activeTutorialDef, nextIndex);
+  }, [
+    activeTutorialDef,
+    currentStepIndex,
+    persistStep,
+    clearActive,
+    dequeueNext,
+  ]);
 
   const goBack = useCallback(() => {
     if (currentStepIndex > 0) {
@@ -185,36 +214,39 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     }
   }, [currentStepIndex]);
 
+  const skipCurrentStep = useCallback(() => {
+    if (!activeTutorialDef) return;
+    const nextIndex = currentStepIndex + 1;
+    if (nextIndex < activeTutorialDef.steps.length) {
+      // Advance without persisting — the user never saw this step.
+      setCurrentStepIndex(nextIndex);
+      return;
+    }
+    // Nothing left to show — hide without persisting completion so the
+    // tutorial can show again in a future session.
+    hiddenStepIndicesRef.current.set(activeTutorialDef.id, currentStepIndex);
+    clearActive();
+    dequeueNext();
+  }, [activeTutorialDef, currentStepIndex, clearActive, dequeueNext]);
+
   const dismissTutorial = useCallback(() => {
     if (!activeTutorialDef) return;
-    // Save the max of current index or last persisted
-    const lastSeenIndex = tutorialState[activeTutorialDef.id] ?? -1;
-    const saveIndex = Math.max(currentStepIndex, lastSeenIndex);
-    void setTutorialStep({
-      tutorialId: activeTutorialDef.id,
-      stepIndex: saveIndex,
-    });
+    // Explicit dismissal (X / Escape) is permanent: persist full completion
+    // so the tutorial doesn't reappear on the next app start.
+    persistStep(activeTutorialDef, activeTutorialDef.steps.length - 1);
     sessionDismissedTutorialIds.add(activeTutorialDef.id);
-    setActiveTutorialId(null);
-    setActiveTutorialDef(null);
-    setCurrentStepIndex(0);
-    dequeueNext();
-  }, [
-    activeTutorialDef,
-    currentStepIndex,
-    tutorialState,
-    setTutorialStep,
-    dequeueNext,
-  ]);
+    // Don't chain into more popovers right after the user opted out —
+    // queued tutorials stay eligible and can register again later.
+    pendingQueueRef.current = [];
+    clearActive();
+  }, [activeTutorialDef, persistStep, clearActive]);
 
   const hideTutorial = useCallback(() => {
     if (activeTutorialId && activeTutorialDef) {
       hiddenStepIndicesRef.current.set(activeTutorialId, currentStepIndex);
     }
-    setActiveTutorialId(null);
-    setActiveTutorialDef(null);
-    setCurrentStepIndex(0);
-  }, [activeTutorialId, activeTutorialDef, currentStepIndex]);
+    clearActive();
+  }, [activeTutorialId, activeTutorialDef, currentStepIndex, clearActive]);
 
   const currentStep = useMemo(() => {
     if (!activeTutorialDef) return null;
@@ -232,6 +264,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
       goToStep,
       goNext,
       goBack,
+      skipCurrentStep,
       dismissTutorial,
       hideTutorial,
       registerTutorial,
@@ -245,6 +278,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
       goToStep,
       goNext,
       goBack,
+      skipCurrentStep,
       dismissTutorial,
       hideTutorial,
       registerTutorial,

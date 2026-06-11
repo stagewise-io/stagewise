@@ -9,8 +9,23 @@ import {
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { IconXmarkFill18 } from 'nucleo-ui-fill-18';
 import { useTutorial } from '@ui/contexts/tutorial';
 import { cn } from '@ui/utils';
+
+// How long to wait for a step's target element before skipping the step.
+// Guards against stale selectors locking the UI behind the click shield.
+const MISSING_TARGET_SKIP_MS = 3000;
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT')
+  );
+}
 
 interface CutoutRect {
   left: number;
@@ -28,6 +43,16 @@ function clamp(value: number, min: number): number {
  * Compute the cutout rectangle from a target DOM element.
  * Expands by 3px on all sides beyond the element's bounding rect.
  */
+function cutoutRectsEqual(a: CutoutRect, b: CutoutRect): boolean {
+  return (
+    a.left === b.left &&
+    a.top === b.top &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.borderRadius === b.borderRadius
+  );
+}
+
 function getCutoutRect(el: HTMLElement): CutoutRect | null {
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return null;
@@ -195,12 +220,14 @@ export function TutorialOverlay() {
     totalSteps,
     goNext,
     goBack,
+    skipCurrentStep,
     dismissTutorial,
   } = useTutorial();
 
   const popoverRef = useRef<HTMLDivElement>(null);
   const [cutoutRect, setCutoutRect] = useState<CutoutRect | null>(null);
   const [popoverPos, setPopoverPos] = useState<PopoverPosition | null>(null);
+  const [targetMissing, setTargetMissing] = useState(false);
 
   const recalc = useCallback(() => {
     if (!currentStep) {
@@ -212,41 +239,38 @@ export function TutorialOverlay() {
     const targetEl = document.querySelector<HTMLElement>(
       currentStep.targetSelector,
     );
-    if (!targetEl) {
-      const popoverEl = popoverRef.current;
-      const pw = popoverEl?.offsetWidth ?? 320;
-      const ph = popoverEl?.offsetHeight ?? 200;
-      setCutoutRect(null);
-      setPopoverPos({
-        left: Math.max((window.innerWidth - pw) / 2, 12),
-        top: Math.max((window.innerHeight - ph) / 2, 12),
-        origin: 'center',
-      });
-      return;
-    }
-
-    const rect = getCutoutRect(targetEl);
+    const rect = targetEl ? getCutoutRect(targetEl) : null;
     if (!rect) {
-      const popoverEl = popoverRef.current;
-      const pw = popoverEl?.offsetWidth ?? 320;
-      const ph = popoverEl?.offsetHeight ?? 200;
+      // Don't render a shield/popover for a missing target — that would
+      // lock the whole UI. The skip timer below advances past the step.
       setCutoutRect(null);
-      setPopoverPos({
-        left: Math.max((window.innerWidth - pw) / 2, 12),
-        top: Math.max((window.innerHeight - ph) / 2, 12),
-        origin: 'center',
-      });
+      setPopoverPos(null);
+      setTargetMissing(true);
       return;
     }
+    setTargetMissing(false);
 
-    setCutoutRect(rect);
+    // Guard against no-op updates: recalc runs on every body mutation
+    // (e.g. chat streaming), and fresh object identities would re-render
+    // the overlay continuously.
+    setCutoutRect((prev) =>
+      prev && cutoutRectsEqual(prev, rect) ? prev : rect,
+    );
 
     // Compute popover position after layout settles
     // Use the popover element's measured size if available, else estimate
     const popoverEl = popoverRef.current;
     const pw = popoverEl?.offsetWidth ?? 320;
     const ph = popoverEl?.offsetHeight ?? 200;
-    setPopoverPos(getPopoverPosition(rect, pw, ph));
+    const pos = getPopoverPosition(rect, pw, ph);
+    setPopoverPos((prev) =>
+      prev &&
+      prev.left === pos.left &&
+      prev.top === pos.top &&
+      prev.origin === pos.origin
+        ? prev
+        : pos,
+    );
   }, [currentStep]);
 
   // Recalculate on step change, resize, scroll, and DOM mutations
@@ -290,10 +314,39 @@ export function TutorialOverlay() {
   useEffect(() => {
     if (!cutoutRect || !popoverRef.current) return;
     const el = popoverRef.current;
-    const pw = el.offsetWidth;
-    const ph = el.offsetHeight;
-    setPopoverPos(getPopoverPosition(cutoutRect, pw, ph));
+    const pos = getPopoverPosition(cutoutRect, el.offsetWidth, el.offsetHeight);
+    setPopoverPos((prev) =>
+      prev &&
+      prev.left === pos.left &&
+      prev.top === pos.top &&
+      prev.origin === pos.origin
+        ? prev
+        : pos,
+    );
   }, [cutoutRect]);
+
+  // Auto-skip steps whose target element never appears. Without this, a
+  // stale selector would block the UI behind the click shield forever.
+  useEffect(() => {
+    if (!activeTutorial || !targetMissing) return;
+    const timeout = window.setTimeout(
+      () => skipCurrentStep(),
+      MISSING_TARGET_SKIP_MS,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [activeTutorial, targetMissing, currentStepIndex, skipCurrentStep]);
+
+  // Move focus into the popover once per step so keyboard interaction
+  // targets the tutorial instead of whatever was focused before (e.g. the
+  // chat input — otherwise arrow keys would be swallowed while typing).
+  const lastFocusKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeTutorial || !popoverPos || !popoverRef.current) return;
+    const key = `${activeTutorial.id}:${currentStepIndex}`;
+    if (lastFocusKeyRef.current === key) return;
+    lastFocusKeyRef.current = key;
+    popoverRef.current.focus({ preventScroll: true });
+  }, [activeTutorial, currentStepIndex, popoverPos]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -304,7 +357,36 @@ export function TutorialOverlay() {
         e.preventDefault();
         e.stopPropagation();
         dismissTutorial();
-      } else if (e.key === 'ArrowRight') {
+        return;
+      }
+      if (e.key === 'Tab') {
+        // Trap focus inside the popover — the click shield blocks pointer
+        // events, but Tab would otherwise reach the obscured UI behind it.
+        const popover = popoverRef.current;
+        if (!popover) return;
+        const focusables = popover.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href]',
+        );
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (!first || !last) return;
+        const active = document.activeElement;
+        if (!popover.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      // Don't hijack arrow keys while the user is typing in an editable
+      // element (cursor movement must keep working).
+      if (isEditableTarget(e.target)) return;
+      if (e.key === 'ArrowRight') {
         e.preventDefault();
         e.stopPropagation();
         goNext();
@@ -323,7 +405,9 @@ export function TutorialOverlay() {
   const isSingleStepTutorial = totalSteps <= 1;
 
   const content = useMemo(() => {
-    if (!activeTutorial || !currentStep) return null;
+    // While the target is missing, render nothing — no shield, no popover.
+    // The auto-skip timer advances past the step if it never appears.
+    if (!activeTutorial || !currentStep || !cutoutRect) return null;
 
     return (
       <div className="pointer-events-none fixed inset-0 z-[9999]">
@@ -331,32 +415,29 @@ export function TutorialOverlay() {
         <div className="pointer-events-auto absolute inset-0 bg-transparent" />
 
         {/* Cutout element */}
-        {cutoutRect && (
-          <div
-            className="pointer-events-none absolute"
-            style={{
-              left: cutoutRect.left,
-              top: cutoutRect.top,
-              width: cutoutRect.width,
-              height: cutoutRect.height,
-              borderRadius: cutoutRect.borderRadius,
-              boxShadow:
-                '0 0 0 2px var(--color-primary-solid), 0 0 10px 4px oklch(from var(--color-primary-solid) l c h / 0.4), 0 0 0 9999px rgb(0 0 0 / 0.5)',
-            }}
-          />
-        )}
-
-        {/* Fallback overlay when no target element */}
-        {!cutoutRect && (
-          <div className="pointer-events-none absolute inset-0 bg-black/50" />
-        )}
+        <div
+          className="pointer-events-none absolute"
+          style={{
+            left: cutoutRect.left,
+            top: cutoutRect.top,
+            width: cutoutRect.width,
+            height: cutoutRect.height,
+            borderRadius: cutoutRect.borderRadius,
+            boxShadow:
+              '0 0 0 2px var(--color-primary-solid), 0 0 10px 4px oklch(from var(--color-primary-solid) l c h / 0.4), 0 0 0 9999px rgb(0 0 0 / 0.5)',
+          }}
+        />
 
         {/* Popover */}
         {popoverPos && (
           <div
             ref={popoverRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={currentStep.title}
+            tabIndex={-1}
             className={cn(
-              'pointer-events-auto absolute w-80 rounded-xl bg-background p-2.5',
+              'pointer-events-auto absolute w-80 rounded-xl bg-background p-2.5 outline-none',
               'border border-derived shadow-elevation-2',
             )}
             style={{
@@ -365,31 +446,15 @@ export function TutorialOverlay() {
             }}
           >
             {!isSingleStepTutorial && (
-              <>
-                {/* Close Button */}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={dismissTutorial}
-                  aria-label="Close tutorial"
-                  className="absolute top-2 right-2 z-10"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                </Button>
-              </>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={dismissTutorial}
+                aria-label="Close tutorial"
+                className="absolute top-2 right-2 z-10"
+              >
+                <IconXmarkFill18 className="size-4" />
+              </Button>
             )}
 
             {/* Title */}

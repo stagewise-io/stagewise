@@ -28,7 +28,6 @@ import {
   getFileTreeWorkspaceName,
 } from './file-tree-utils';
 import { Tutorial } from '@ui/components/tutorial';
-import { TUTORIALS } from '@ui/tutorial-steps';
 
 export function FileTreeSidebar() {
   const [openAgent] = useOpenAgent();
@@ -159,9 +158,7 @@ export function FileTreeSidebar() {
           </TooltipContent>
         </Tooltip>
       </div>
-      {workspaces.length > 0 && (
-        <Tutorial tutorialId="file-tree" steps={TUTORIALS['file-tree']} />
-      )}
+      {workspaces.length > 0 && <Tutorial tutorialId="file-tree" />}
       {workspaces.length > 0 && (
         <div
           data-tutorial="file-tree-search-bar"

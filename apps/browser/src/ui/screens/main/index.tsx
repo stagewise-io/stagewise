@@ -95,17 +95,6 @@ export function DefaultLayout({ show }: { show: boolean }) {
   );
 }
 
-import { TUTORIALS } from '@ui/tutorial-steps';
-
-function GeneralUiExperienceTutorial() {
-  return (
-    <Tutorial
-      tutorialId="general-ui-experience"
-      steps={TUTORIALS['general-ui-experience']}
-    />
-  );
-}
-
 function DefaultLayoutInner({ show }: { show: boolean }) {
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
@@ -279,7 +268,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
       )}
       {show && <CommandCenterHotkeys />}
       {show && <CommandCenter />}
-      {show && <GeneralUiExperienceTutorial />}
+      {show && <Tutorial tutorialId="general-ui-experience" />}
       <div
         className={cn(
           'root pointer-events-auto relative inset-0 flex size-full flex-row items-stretch justify-between transition-[opacity,filter] delay-150 duration-300 ease-out',
