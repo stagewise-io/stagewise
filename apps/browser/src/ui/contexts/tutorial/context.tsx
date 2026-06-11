@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import posthog from 'posthog-js';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import type { TutorialDefinition, TutorialStep } from './types';
 import {
@@ -212,7 +213,15 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
   const goNext = useCallback(() => {
     if (!activeTutorialDef) return;
     const nextIndex = currentStepIndex + 1;
-    if (nextIndex >= activeTutorialDef.steps.length) {
+    const finished = nextIndex >= activeTutorialDef.steps.length;
+    posthog.capture('tutorial_clicked_next', {
+      tutorial_id: activeTutorialDef.id,
+      tutorial_name: activeTutorialDef.id,
+      step_index: currentStepIndex,
+      total_steps: activeTutorialDef.steps.length,
+      finished_tutorial: finished,
+    });
+    if (finished) {
       // Completed the last step — persist full completion and chain to the
       // next queued tutorial (natural completion keeps the flow going).
       persistStep(activeTutorialDef, activeTutorialDef.steps.length - 1);
@@ -232,10 +241,16 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
   ]);
 
   const goBack = useCallback(() => {
-    if (currentStepIndex > 0) {
+    if (currentStepIndex > 0 && activeTutorialDef) {
+      posthog.capture('tutorial_clicked_back', {
+        tutorial_id: activeTutorialDef.id,
+        tutorial_name: activeTutorialDef.id,
+        step_index: currentStepIndex,
+        total_steps: activeTutorialDef.steps.length,
+      });
       setCurrentStepIndex((i) => i - 1);
     }
-  }, [currentStepIndex]);
+  }, [currentStepIndex, activeTutorialDef]);
 
   const skipCurrentStep = useCallback(() => {
     if (!activeTutorialDef) return;
@@ -254,6 +269,12 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
 
   const dismissTutorial = useCallback(() => {
     if (!activeTutorialDef) return;
+    posthog.capture('tutorial_dismissed', {
+      tutorial_id: activeTutorialDef.id,
+      tutorial_name: activeTutorialDef.id,
+      step_index: currentStepIndex,
+      total_steps: activeTutorialDef.steps.length,
+    });
     // Explicit dismissal (X / Escape) is permanent: persist full completion
     // so the tutorial doesn't reappear on the next app start.
     persistStep(activeTutorialDef, activeTutorialDef.steps.length - 1);
@@ -262,7 +283,7 @@ export function TutorialProvider({ children }: { children?: ReactNode }) {
     // queued tutorials stay eligible and can register again later.
     pendingQueueRef.current = [];
     clearActive();
-  }, [activeTutorialDef, persistStep, clearActive]);
+  }, [activeTutorialDef, currentStepIndex, persistStep, clearActive]);
 
   const hideTutorial = useCallback(() => {
     if (activeTutorialId && activeTutorialDef) {
