@@ -24,6 +24,7 @@ import { FILE_SAVE_CONFLICT_CODE } from '@shared/karton-contracts/ui';
 import { inferMimeType } from '@shared/mime-utils';
 import { normalizePath } from '@shared/path-utils';
 import { getRipgrepPath } from '@stagewise/agent-runtime-node';
+import { rankPathFuzzyCandidates } from '@stagewise/agent-core/mount-manager';
 import { DisposableService } from '../disposable';
 import { getRipgrepBasePath } from '@/utils/paths';
 
@@ -35,10 +36,6 @@ const CONTENT_SEARCH_RESULT_LIMIT = 5000;
 const CONTENT_SEARCH_CONCURRENCY = 8;
 const MAX_RIPGREP_JSON_LINE_BYTES = 10 * 1024 * 1024;
 const REVISION_DEBOUNCE_MS = 1000;
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 const HIDDEN_LISTING_NAMES = new Set(['.git']);
 
@@ -737,7 +734,7 @@ export class FileTreeService extends DisposableService {
       maxResults: number;
       maxDepth: number;
       includeDirectories: boolean;
-      match: (name: string, isDir: boolean) => boolean;
+      match: (name: string, isDir: boolean, relativePath: string) => boolean;
     },
   ): Promise<
     Array<FileSearchResult & { mtimeMs: number; absolutePath: string }>
@@ -815,7 +812,7 @@ export class FileTreeService extends DisposableService {
           if (ig?.ignores(isDir ? `${relPath}/` : relPath)) continue;
 
           const collectible =
-            (isFile || includeDirectories) && match(name, isDir);
+            (isFile || includeDirectories) && match(name, isDir, relPath);
           if (collectible) {
             const uniqueKey = `${workspaceKey}:${relPath}`;
             if (!seen.has(uniqueKey)) {
@@ -848,39 +845,48 @@ export class FileTreeService extends DisposableService {
     includeGitignored: boolean,
     searchInContent = false,
   ): Promise<FileSearchResult[]> {
-    const lowerQuery = query.toLowerCase();
-    const boundaryPattern = new RegExp(`\\b${escapeRegExp(lowerQuery)}`);
+    const trimmedQuery = query.trim();
     const collected = await this.collectWorkspaceEntries(
       workspaceKeys,
       includeGitignored,
       {
-        maxResults: 400,
+        maxResults: 5000,
         maxDepth: 12,
         includeDirectories: true,
-        match: (name) => name.toLowerCase().includes(lowerQuery),
+        match: () => true,
       },
     );
+    const pathMatches = rankPathFuzzyCandidates(trimmedQuery, collected);
 
-    // Rank by name-match quality first, then recency. Exact > prefix >
-    // word-boundary > substring; ties broken by most-recently-modified.
-    const score = (name: string): number => {
-      const lower = name.toLowerCase();
-      if (lower === lowerQuery) return 4;
-      if (lower.startsWith(lowerQuery)) return 3;
-      if (boundaryPattern.test(lower)) return 2;
-      if (lower.includes(lowerQuery)) return 1;
-      return 0;
+    const getPathScore = (
+      result: FileSearchResult & { pathFuzzyScore?: number },
+    ): number =>
+      result.pathFuzzyScore ??
+      rankPathFuzzyCandidates(trimmedQuery, [result])[0]?.pathFuzzyScore ??
+      0;
+    const hasExactPathMatch = (result: FileSearchResult): boolean => {
+      const lowerQuery = trimmedQuery.toLowerCase();
+      const lowerRelativePath = result.relativePath.toLowerCase();
+      const lowerFileName = result.fileName.toLowerCase();
+      return lowerRelativePath === lowerQuery || lowerFileName === lowerQuery;
     };
 
     if (!searchInContent) {
-      return collected
+      return pathMatches
         .sort((a, b) => {
-          const scoreDiff = score(b.fileName) - score(a.fileName);
-          if (scoreDiff !== 0) return scoreDiff;
+          if (b.pathFuzzyScore !== a.pathFuzzyScore) {
+            return b.pathFuzzyScore - a.pathFuzzyScore;
+          }
           return b.mtimeMs - a.mtimeMs;
         })
         .slice(0, 200)
-        .map(({ absolutePath: _absolutePath, ...result }) => result);
+        .map(
+          ({
+            absolutePath: _absolutePath,
+            pathFuzzyScore: _score,
+            ...result
+          }) => result,
+        );
     }
 
     const byKey = new Map<
@@ -888,7 +894,8 @@ export class FileTreeService extends DisposableService {
       FileSearchResult & {
         mtimeMs: number;
         absolutePath: string;
-        nameScore: number;
+        pathScore: number;
+        pathFuzzyScore?: number;
         category: number;
         contentMatchCount: number;
       }
@@ -902,23 +909,25 @@ export class FileTreeService extends DisposableService {
       },
     ) => {
       const key = `${result.workspaceKey}:${result.relativePath}`;
-      const nameScore = score(result.fileName);
+      const pathScore = getPathScore(result);
       const contentMatchCount = result.contentMatchCount ?? 0;
-      const exactNameMatch = nameScore === 4;
-      const category = exactNameMatch ? 3 : contentMatchCount > 0 ? 2 : 1;
+      const exactPathMatch = hasExactPathMatch(result);
+      const category = exactPathMatch ? 3 : contentMatchCount > 0 ? 2 : 1;
       const existing = byKey.get(key);
       byKey.set(key, {
         ...existing,
         ...result,
-        nameScore,
+        pathScore,
         category,
         contentMatchCount,
         contentMatches:
-          category === 2 && nameScore === 0 ? result.contentMatches : undefined,
+          contentMatchCount > 0
+            ? (result.contentMatches ?? existing?.contentMatches)
+            : existing?.contentMatches,
       });
     };
 
-    for (const result of collected) addOrUpdate(result);
+    for (const result of pathMatches) addOrUpdate(result);
     for (const result of await this.searchContentWithRipgrep(
       query,
       workspaceKeys,
@@ -931,22 +940,23 @@ export class FileTreeService extends DisposableService {
 
     return searched
       .filter(
-        ({ nameScore, contentMatchCount }) =>
-          nameScore > 0 || contentMatchCount > 0,
+        ({ pathScore, contentMatchCount }) =>
+          pathScore > 0 || contentMatchCount > 0,
       )
       .sort((a, b) => {
         if (b.category !== a.category) return b.category - a.category;
         if (a.category === 2 && b.contentMatchCount !== a.contentMatchCount) {
           return b.contentMatchCount - a.contentMatchCount;
         }
-        if (b.nameScore !== a.nameScore) return b.nameScore - a.nameScore;
+        if (b.pathScore !== a.pathScore) return b.pathScore - a.pathScore;
         return b.mtimeMs - a.mtimeMs;
       })
       .slice(0, 200)
       .map(
         ({
           absolutePath: _absolutePath,
-          nameScore: _nameScore,
+          pathScore: _pathScore,
+          pathFuzzyScore: _pathFuzzyScore,
           category: _category,
           ...result
         }) => result,
