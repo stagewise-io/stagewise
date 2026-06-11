@@ -78,7 +78,7 @@ describe('generateSimpleTitle', () => {
     expect(title).toBe('My Title');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(hm.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'title-generation' }),
     );
@@ -210,7 +210,7 @@ describe('generateSimpleTitle', () => {
     // First model attempted, then fallback
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
@@ -240,7 +240,7 @@ describe('generateSimpleTitle', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );

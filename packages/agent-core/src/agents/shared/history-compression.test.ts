@@ -788,7 +788,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(result).toBe('The user asked the assistant to help with a task.');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'history-compression' }),
     );
@@ -907,13 +907,33 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       2,
       'gpt-5.4-nano',
+      'agent-1',
+      expect.any(Object),
+    );
+  });
+
+  it('does not start fallbacks when a timed-out model does not settle after abort', async () => {
+    generateTextMock.mockImplementationOnce(() => new Promise(() => {}));
+
+    const mps = makeMockHostModels();
+    const promise = expect(
+      generateSimpleCompressedHistory(makeMessages(4), mps, 'agent-1'),
+    ).rejects.toThrow('timed out and did not settle after abort');
+
+    await vi.advanceTimersByTimeAsync(32_000);
+    await promise;
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    expect(mps.getWithOptions).toHaveBeenCalledTimes(1);
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      1,
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
@@ -936,7 +956,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
@@ -1162,7 +1182,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-flash-lite',
       'agent-1',
       expect.any(Object),
     );
