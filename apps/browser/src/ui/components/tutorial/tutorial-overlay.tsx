@@ -59,12 +59,23 @@ function getPopoverPosition(
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
+  // Clamp a position to keep the popover fully inside the viewport.
+  // Uses clamp() for the lower bound and Math.max for the upper bound
+  // to prevent the popover from being pushed offscreen when the viewport
+  // is narrower than the popover plus margins.
+  const clampX = (x: number) =>
+    Math.min(Math.max(x, 12), Math.max(12, viewportWidth - popoverWidth - 12));
+  const clampY = (y: number) =>
+    Math.min(
+      Math.max(y, 12),
+      Math.max(12, viewportHeight - popoverHeight - 12),
+    );
+
   // Prefer below the cutout
   const belowTop = cutout.top + cutout.height + 12;
   if (belowTop + popoverHeight <= viewportHeight) {
-    const left = clamp(cutout.left + (cutout.width - popoverWidth) / 2, 12);
     return {
-      left: Math.min(left, viewportWidth - popoverWidth - 12),
+      left: clampX(cutout.left + (cutout.width - popoverWidth) / 2),
       top: belowTop,
       origin: 'below',
     };
@@ -73,9 +84,8 @@ function getPopoverPosition(
   // Fallback: above
   const aboveTop = cutout.top - popoverHeight - 12;
   if (aboveTop >= 0) {
-    const left = clamp(cutout.left + (cutout.width - popoverWidth) / 2, 12);
     return {
-      left: Math.min(left, viewportWidth - popoverWidth - 12),
+      left: clampX(cutout.left + (cutout.width - popoverWidth) / 2),
       top: aboveTop,
       origin: 'above',
     };
@@ -84,20 +94,17 @@ function getPopoverPosition(
   // Fallback: right
   const rightLeft = cutout.left + cutout.width + 12;
   if (rightLeft + popoverWidth <= viewportWidth) {
-    const top = clamp(cutout.top + (cutout.height - popoverHeight) / 2, 12);
     return {
       left: rightLeft,
-      top: Math.min(top, viewportHeight - popoverHeight - 12),
+      top: clampY(cutout.top + (cutout.height - popoverHeight) / 2),
       origin: 'right',
     };
   }
 
   // Fallback: left
-  const leftLeft = cutout.left - popoverWidth - 12;
-  const top = clamp(cutout.top + (cutout.height - popoverHeight) / 2, 12);
   return {
-    left: clamp(leftLeft, 12),
-    top: Math.min(top, viewportHeight - popoverHeight - 12),
+    left: clampX(cutout.left - popoverWidth - 12),
+    top: clampY(cutout.top + (cutout.height - popoverHeight) / 2),
     origin: 'left',
   };
 }
