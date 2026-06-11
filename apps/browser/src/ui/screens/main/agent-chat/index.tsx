@@ -121,7 +121,10 @@ export function AgentChat({
       className="@container group overflow-visible! relative z-10 flex h-full flex-col items-stretch justify-between bg-background"
     >
       {topRightActions && (
-        <div className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5">
+        <div
+          id="new-tab-buttons"
+          className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5 rounded-xl"
+        >
           {topRightActions}
         </div>
       )}

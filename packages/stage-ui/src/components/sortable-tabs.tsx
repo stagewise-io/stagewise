@@ -134,6 +134,16 @@ export interface SortableTabItem {
    */
   wrapTrigger?: (inner: ReactElement) => ReactElement;
   /**
+   * Optional tutorial marker applied to the outer bar trigger wrapper.
+   * Bar variant only.
+   */
+  tutorialId?: string;
+  /**
+   * Forces hover-revealed tab controls (pin/close) visible.
+   * Bar variant only.
+   */
+  forceActionsVisible?: boolean;
+  /**
    * When true, a dot indicator is shown next to the label (hidden on hover).
    * Bar variant only. Use case: unsaved file edits marker.
    */
@@ -207,7 +217,7 @@ function BarTriggerContent({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={item.onClose}
       className={cn(
-        'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100',
+        'absolute top-1/2 right-0.5 flex shrink-0 -translate-y-1/2 items-center justify-center p-1 text-muted-foreground opacity-0 transition-colors hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 group-data-[force-actions-visible=true]:opacity-100',
       )}
     >
       <XIcon className="size-3" />
@@ -218,6 +228,8 @@ function BarTriggerContent({
     <div
       onAuxClick={item.onAuxClick}
       onDoubleClick={item.onDoubleClick}
+      data-tutorial={item.tutorialId}
+      data-force-actions-visible={item.forceActionsVisible ? 'true' : undefined}
       className={cn(
         'group relative flex h-7 flex-row items-stretch rounded-md transition-colors duration-150 ease-out',
         isActive ? 'bg-surface-1' : 'bg-transparent hover:bg-surface-1',
@@ -238,7 +250,7 @@ function BarTriggerContent({
         <span
           data-active={isActive}
           className={cn(
-            'mask-alpha mask-l-from-black mask-l-to-black group-hover:mask-l-from-transparent mask-l-from-3 mask-l-to-6 flex-1 truncate text-left font-regular text-muted-foreground data-[active=true]:text-foreground',
+            'mask-alpha mask-l-from-black mask-l-to-black group-hover:mask-l-from-transparent group-data-[force-actions-visible=true]:mask-l-from-transparent mask-l-from-3 mask-l-to-6 flex-1 truncate text-left font-regular text-muted-foreground data-[active=true]:text-foreground',
           )}
         >
           {item.label}
@@ -249,7 +261,7 @@ function BarTriggerContent({
             className={cn(
               '-mr-1 ml-0.5 size-1.5 shrink-0 rounded-full',
               isActive ? 'bg-foreground' : 'bg-muted-foreground',
-              'group-hover:opacity-0',
+              'group-hover:opacity-0 group-data-[force-actions-visible=true]:opacity-0',
             )}
           />
         )}

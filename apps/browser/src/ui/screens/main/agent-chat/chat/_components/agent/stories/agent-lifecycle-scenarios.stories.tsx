@@ -43,6 +43,7 @@ const baseState: Partial<AppState> = {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,
       lastViewedChats: {},
+      tutorialState: {},
     },
     devAppPreview: {
       isFullScreen: false,

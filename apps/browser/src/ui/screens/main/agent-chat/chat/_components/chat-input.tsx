@@ -30,6 +30,8 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { Tutorial } from '@ui/components/tutorial';
+import { TUTORIALS } from '@ui/tutorial-steps';
 import {
   configureAttachmentExtensions,
   ALL_ATTACHMENT_NODE_NAMES,
@@ -902,42 +904,49 @@ export const ChatInputActions = memo(function ChatInputActions({
     <div className="flex shrink-0 flex-col items-end justify-end gap-1">
       {/* Element selector and image upload - always shown (can add context to queued messages) */}
       {showElementSelectorButton && (
-        <Tooltip>
-          <TooltipTrigger>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              disabled={elementSelectorDisabled}
-              className="shrink-0 data-[element-selector-active=true]:bg-primary-foreground/5 data-[element-selector-active=true]:text-primary-foreground"
-              data-element-selector-active={elementSelectionActive}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onToggleElementSelection?.();
-              }}
-              aria-label="Select context elements"
-            >
-              <SquareDashedMousePointerIcon className="size-3.5 stroke-[2.5px]" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <span className="flex items-center gap-1.5">
-              <span>
-                {elementSelectionActive
-                  ? 'Stop selecting elements'
-                  : 'Add reference elements'}
+        <>
+          <Tutorial
+            tutorialId="browser-element-selector"
+            steps={TUTORIALS['browser-element-selector']}
+          />
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={elementSelectorDisabled}
+                className="shrink-0 data-[element-selector-active=true]:bg-primary-foreground/5 data-[element-selector-active=true]:text-primary-foreground"
+                data-element-selector-active={elementSelectionActive}
+                data-tutorial="chat-element-selector"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleElementSelection?.();
+                }}
+                aria-label="Select context elements"
+              >
+                <SquareDashedMousePointerIcon className="size-3.5 stroke-[2.5px]" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>
+                  {elementSelectionActive
+                    ? 'Stop selecting elements'
+                    : 'Add reference elements'}
+                </span>
+                {elementSelectionActive ? (
+                  <ShortcutCombo value="Esc" size="xs" />
+                ) : (
+                  <HotkeyCombo
+                    action={HotkeyActions.TOGGLE_CONTEXT_SELECTOR}
+                    size="xs"
+                  />
+                )}
               </span>
-              {elementSelectionActive ? (
-                <ShortcutCombo value="Esc" size="xs" />
-              ) : (
-                <HotkeyCombo
-                  action={HotkeyActions.TOGGLE_CONTEXT_SELECTOR}
-                  size="xs"
-                />
-              )}
-            </span>
-          </TooltipContent>
-        </Tooltip>
+            </TooltipContent>
+          </Tooltip>
+        </>
       )}
       {showImageUploadButton && onAddFileAttachment && (
         <>

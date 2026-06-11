@@ -51,6 +51,9 @@ import {
   IconPinTackSlashOutline18,
 } from 'nucleo-ui-outline-18';
 import { NewTabButtons } from '../_components/new-tab-buttons';
+import { Tutorial } from '@ui/components/tutorial';
+import { useTutorial } from '@ui/contexts/tutorial';
+import { TUTORIALS } from '@ui/tutorial-steps';
 import type { KartonContract, TabState } from '@shared/karton-contracts/ui';
 import { HotkeyActions } from '@shared/hotkeys';
 import {
@@ -124,7 +127,7 @@ function TabPinIcon({
   return (
     <div className="relative size-full">
       {/* Icon — hidden on group-hover */}
-      <span className="flex size-full items-center justify-center group-hover:opacity-0">
+      <span className="flex size-full items-center justify-center group-hover:opacity-0 group-data-[force-actions-visible=true]:opacity-0">
         <TabFavicon tabState={tab} />
       </span>
       {/* Pin toggle — replaces icon on group-hover.
@@ -139,7 +142,7 @@ function TabPinIcon({
               aria-label={isAttachedToCurrentAgent ? 'Pin globally' : 'Unpin'}
               className={cn(
                 buttonVariants({ variant: 'ghost', size: 'icon-2xs' }),
-                'absolute inset-0 size-full text-subtle-foreground opacity-0 group-hover:opacity-100',
+                'absolute inset-0 size-full text-subtle-foreground opacity-0 group-hover:opacity-100 group-data-[force-actions-visible=true]:opacity-100',
               )}
               onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
               onClick={handleToggle}
@@ -208,6 +211,7 @@ export function MainSection({
 
   const { setTabUiState, removeTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
+  const { activeTutorial } = useTutorial();
   const [pendingUnsavedClose, setPendingUnsavedClose] =
     useState<FileTabUnsavedEditEntry | null>(null);
 
@@ -486,6 +490,13 @@ export function MainSection({
 
   // Build SortableTabItem[] from optimistic order + Karton tab state
   // ---------------------------------------------------------------------------
+  const tutorialTabId = useMemo(
+    () => effectiveActiveTabId ?? visibleTabIds[0] ?? null,
+    [effectiveActiveTabId, visibleTabIds],
+  );
+
+  const shouldForceTabTutorialActions = activeTutorial?.id === 'content-tabs';
+
   const tabItems = useMemo<SortableTabItem[]>(() => {
     return visibleTabIds
       .map((id): SortableTabItem | null => {
@@ -518,6 +529,9 @@ export function MainSection({
               void promoteFileTab(id);
             }
           },
+          tutorialId: id === tutorialTabId ? 'content-tab-item' : undefined,
+          forceActionsVisible:
+            id === tutorialTabId && shouldForceTabTutorialActions,
           actions:
             tab.type !== 'terminal' && (tab.isPlayingAudio || tab.isMuted) ? (
               <AudioMuteButton tab={tab} />
@@ -545,6 +559,8 @@ export function MainSection({
     tabs,
     activeTabId,
     openAgent,
+    tutorialTabId,
+    shouldForceTabTutorialActions,
     closeTabWithUnsavedCheck,
     promoteFileTab,
   ]);
@@ -698,6 +714,9 @@ export function MainSection({
         <div className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5">
           {topRightActions}
         </div>
+      )}
+      {visibleTabIds.length > 0 && (
+        <Tutorial tutorialId="content-tabs" steps={TUTORIALS['content-tabs']} />
       )}
       <BrowserTabHotkeys
         onFocusUrlBar={handleFocusUrlBar}

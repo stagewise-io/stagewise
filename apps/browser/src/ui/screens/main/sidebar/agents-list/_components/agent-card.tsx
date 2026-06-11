@@ -146,6 +146,7 @@ export const AgentCard = memo(
             startEditing();
           }
         }}
+        data-tutorial="agent-card"
         className={cn(
           buttonVariants({ variant: 'ghost', size: 'sm' }),
           'group/card relative justify-start gap-1 pr-3.5 pl-2 text-start text-muted-foreground hover:bg-foreground/8',
@@ -165,9 +166,13 @@ export const AgentCard = memo(
                   ? 'bg-success-solid'
                   : null;
           return (
-            <div className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125">
+            <div
+              data-tutorial="agent-status-indicator"
+              className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125"
+            >
               {dotColor ? (
                 <div
+                  data-tutorial="agent-status-dot"
                   className={cn(
                     'relative size-2 shrink-0 transition-opacity',
                     onTogglePinned && 'group-hover/card:opacity-0',

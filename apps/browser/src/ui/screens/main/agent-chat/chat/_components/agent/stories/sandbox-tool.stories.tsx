@@ -26,6 +26,7 @@ const createStoryState = (
           recentlyOpenedWorkspaces: [],
           hasSeenOnboardingFlow: false,
           lastViewedChats: {},
+          tutorialState: {},
         },
         devAppPreview: {
           isFullScreen: false,
