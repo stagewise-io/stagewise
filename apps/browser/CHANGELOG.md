@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.8.0 (2026-06-11)
+
+### Features
+
+* add command center content file search (4e014ff)
+* clear delete notices on watcher add event (5fc9866)
+* file tab notices, binary preview, context menu, dirty dot fixes (8583c4b)
+* handle external file edits in preview tabs (41ddcf8)
+* file tree drag-drop, perf, editor status bar and dialog fixes (5cc2656)
+* refine file tree preview controls (9e3da34)
+* add file tree sidebar (3454e4b)
+* replace upload image button with attach file, gate element selector on browsing tab (b1140c1)
+
+### Bug Fixes
+
+* address review test and mention issues (951d591)
+* open historical file mentions (a6e3c06)
+* secure workspace previews and file badge clicks (f1da7b7)
+* address command center review findings (3c562c5)
+* remove workspace mount gating from diff-review header reveal (da41b2b)
+* handle filtered-out active tab in saveTabState (d3e1ddf)
+* remove dead openExternally code (d73faff)
+* resolve all valid review findings (3fb1766)
+* hide element selector when content panel is collapsed (8afd5d5)
+* gate Cmd+I hotkey on hasVisibleBrowsingTab and agent ownership (27d4def)
+* deactivate element selection on tab switch, gate on agent ownership (dcc073b)
+
 ## 1.7.0 (2026-06-10)
 
 ### Features
