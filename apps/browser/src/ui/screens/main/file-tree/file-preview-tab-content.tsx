@@ -84,6 +84,15 @@ type CachedPreview = {
   error: string | null;
 };
 
+/** Persists Monaco scroll position across tab switches. */
+const scrollStateStore = new Map<
+  string,
+  { scrollTop: number; scrollLeft: number }
+>();
+
+/** Persists markdown preview/source mode across tab switches. */
+const markdownModeStore = new Map<string, 'preview' | 'source'>();
+
 type EditorActions = {
   save: () => void;
   /** Overwrite the on-disk file, ignoring a detected external modification. */
@@ -132,9 +141,7 @@ function normalizeHexColor(value: string, fallback: string) {
 type SourceLanguage =
   | 'plaintext'
   | 'typescript'
-  | 'typescriptreact'
   | 'javascript'
-  | 'javascriptreact'
   | 'json'
   | 'css'
   | 'scss'
@@ -154,9 +161,7 @@ type SourceLanguage =
 const LANGUAGE_EXT: Record<SourceLanguage, string> = {
   plaintext: '.txt',
   typescript: '.ts',
-  typescriptreact: '.tsx',
   javascript: '.js',
-  javascriptreact: '.jsx',
   json: '.json',
   css: '.css',
   scss: '.scss',
@@ -193,19 +198,9 @@ const SOURCE_LANGUAGE_ITEMS: Array<{
     icon: iconForLanguage('typescript'),
   },
   {
-    value: 'typescriptreact',
-    label: 'TypeScript (JSX)',
-    icon: iconForLanguage('typescriptreact'),
-  },
-  {
     value: 'javascript',
     label: 'JavaScript',
     icon: iconForLanguage('javascript'),
-  },
-  {
-    value: 'javascriptreact',
-    label: 'JavaScript (JSX)',
-    icon: iconForLanguage('javascriptreact'),
   },
   { value: 'json', label: 'JSON', icon: iconForLanguage('json') },
   { value: 'css', label: 'CSS', icon: iconForLanguage('css') },
@@ -236,12 +231,11 @@ function languageFromPath(path: string): SourceLanguage {
     case 'ts':
       return 'typescript';
     case 'tsx':
-      return 'typescriptreact';
+      return 'typescript';
     case 'js':
     case 'mjs':
-      return 'javascript';
     case 'jsx':
-      return 'javascriptreact';
+      return 'javascript';
     case 'json':
       return 'json';
     case 'css':
@@ -1261,8 +1255,28 @@ function TextEditorPreview({
         updateZoom,
         zoomPercentageRef,
       );
+      // Save scroll position on every scroll so it survives tab switches
+      // even if the editor is disposed before the unmount cleanup runs.
+      editor.onDidScrollChange((e) => {
+        scrollStateStore.set(cacheKey, {
+          scrollTop: e.scrollTop,
+          scrollLeft: e.scrollLeft,
+        });
+      });
+      // Restore the last-known scroll position for this file.
+      // Must defer because Monaco produces multiple layout events
+      // during initialisation (content layout, then font-size / option
+      // sync from the React wrapper) — each one resets the scroll.
+      // Keep restoring on every layout event for a settling window.
+      const saved = scrollStateStore.get(cacheKey);
+      if (saved) {
+        const layoutDisposable = editor.onDidLayoutChange(() => {
+          editor.setScrollPosition(saved);
+        });
+        setTimeout(() => layoutDisposable.dispose(), 300);
+      }
     },
-    [markFocused, updateZoom, zoomPercentageRef],
+    [cacheKey, markFocused, updateZoom, zoomPercentageRef],
   );
 
   const handleChange = useCallback(
@@ -1668,7 +1682,9 @@ function SvgPreview({
     preview.workspaceKey,
     preview.relativePath,
   );
-  const [mode, setMode] = useState<'preview' | 'source'>('preview');
+  const [mode, setMode] = useState<'preview' | 'source'>(
+    () => markdownModeStore.get(cacheKey) ?? 'preview',
+  );
   const [text, setText] = useState(
     () => textDraftCache.get(cacheKey) ?? preview.text ?? '',
   );
@@ -1765,11 +1781,19 @@ function SvgPreview({
   modeRef.current = mode;
   const tabUiStateRef = useRef(tabUiState);
   tabUiStateRef.current = tabUiState;
+  const persistMode = useCallback(
+    (next: 'preview' | 'source') => {
+      markdownModeStore.set(cacheKey, next);
+      setMode(next);
+    },
+    [cacheKey],
+  );
+
   const toggleCodeMode = useCallback(() => {
     if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
       return false;
-    setMode(modeRef.current === 'source' ? 'preview' : 'source');
-  }, [tabId]);
+    persistMode(modeRef.current === 'source' ? 'preview' : 'source');
+  }, [tabId, persistMode]);
   useHotKeyListener(toggleCodeMode, HotkeyActions.TOGGLE_SVG_CODE_MODE);
 
   const handleMount = useCallback(
@@ -2060,7 +2084,7 @@ function SvgPreview({
                   )}
                   aria-label="Show SVG source"
                   aria-pressed={mode === 'source'}
-                  onClick={() => setMode('source')}
+                  onClick={() => persistMode('source')}
                 >
                   <IconSquareCodeOutline18 className="size-3.5" />
                   {mode === 'source' ? <span>Code</span> : null}
@@ -2079,7 +2103,7 @@ function SvgPreview({
                   )}
                   aria-label="Show SVG preview"
                   aria-pressed={mode === 'preview'}
-                  onClick={() => setMode('preview')}
+                  onClick={() => persistMode('preview')}
                 >
                   <IconEye2Outline18 className="size-3.5" />
                   {mode === 'preview' ? <span>Preview</span> : null}
@@ -2185,7 +2209,9 @@ function MarkdownPreview({
     preview.workspaceKey,
     preview.relativePath,
   );
-  const [mode, setMode] = useState<'preview' | 'source'>('preview');
+  const [mode, setMode] = useState<'preview' | 'source'>(
+    () => markdownModeStore.get(cacheKey) ?? 'preview',
+  );
   const [text, setText] = useState(
     () => textDraftCache.get(cacheKey) ?? preview.text ?? '',
   );
@@ -2204,11 +2230,19 @@ function MarkdownPreview({
   modeRef.current = mode;
   const tabUiStateRef = useRef(tabUiState);
   tabUiStateRef.current = tabUiState;
+  const persistMode = useCallback(
+    (next: 'preview' | 'source') => {
+      markdownModeStore.set(cacheKey, next);
+      setMode(next);
+    },
+    [cacheKey],
+  );
+
   const toggleCodeMode = useCallback(() => {
     if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
       return false;
-    setMode(modeRef.current === 'source' ? 'preview' : 'source');
-  }, [tabId]);
+    persistMode(modeRef.current === 'source' ? 'preview' : 'source');
+  }, [tabId, persistMode]);
   useHotKeyListener(toggleCodeMode, HotkeyActions.TOGGLE_MARKDOWN_PREVIEW);
 
   const handleMount = useCallback(
@@ -2223,8 +2257,21 @@ function MarkdownPreview({
         updateZoom,
         zoomPercentageRef,
       );
+      editor.onDidScrollChange((e) => {
+        scrollStateStore.set(cacheKey, {
+          scrollTop: e.scrollTop,
+          scrollLeft: e.scrollLeft,
+        });
+      });
+      const saved = scrollStateStore.get(cacheKey);
+      if (saved) {
+        const layoutDisposable = editor.onDidLayoutChange(() => {
+          editor.setScrollPosition(saved);
+        });
+        setTimeout(() => layoutDisposable.dispose(), 300);
+      }
     },
-    [markFocused, zoomPercentageRef, updateZoom],
+    [cacheKey, markFocused, updateZoom, zoomPercentageRef],
   );
 
   const handleChange = useCallback(
@@ -2264,7 +2311,7 @@ function MarkdownPreview({
                 )}
                 aria-label="Show markdown source"
                 aria-pressed={mode === 'source'}
-                onClick={() => setMode('source')}
+                onClick={() => persistMode('source')}
               >
                 <IconSquareCodeOutline18 className="size-3.5" />
                 {mode === 'source' ? <span>Code</span> : null}
@@ -2283,7 +2330,7 @@ function MarkdownPreview({
                 )}
                 aria-label="Show markdown preview"
                 aria-pressed={mode === 'preview'}
-                onClick={() => setMode('preview')}
+                onClick={() => persistMode('preview')}
               >
                 <IconEye2Outline18 className="size-3.5" />
                 {mode === 'preview' ? <span>Preview</span> : null}
