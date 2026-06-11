@@ -1,6 +1,6 @@
-import { hasMatch, score } from 'fzy.js';
 import type { Logger } from '../../host/logger';
 import type { MentionFileCandidate } from '../../types/metadata';
+import { rankPathFuzzyCandidates } from './path-fuzzy-search';
 
 type MountPrefix = string;
 
@@ -134,95 +134,37 @@ export class MentionSearchService {
 
       if (!result.success || result.relativePaths.length === 0) return [];
 
-      const lowerQuery = query.toLowerCase();
-
-      const scoredFiles: Array<{
-        path: string;
-        score: number;
-        isDirectory?: boolean;
-      }> = [];
-      const dirs = new Set<string>();
-
-      for (const relPath of result.relativePaths) {
-        if (hasMatch(lowerQuery, relPath.toLowerCase())) {
-          scoredFiles.push({
-            path: relPath,
-            score: score(lowerQuery, relPath.toLowerCase()),
-          });
+      const directories = new Set<string>();
+      const files = result.relativePaths.map((relativePath) => {
+        let directory = relativePath;
+        let slashIndex = directory.lastIndexOf('/');
+        while (slashIndex > 0) {
+          directory = directory.substring(0, slashIndex);
+          if (directories.has(directory)) break;
+          directories.add(directory);
+          slashIndex = directory.lastIndexOf('/');
         }
 
-        let dir = relPath;
-        let slashIdx = dir.lastIndexOf('/');
-        while (slashIdx > 0) {
-          dir = dir.substring(0, slashIdx);
-          if (dirs.has(dir)) break;
-          dirs.add(dir);
-          slashIdx = dir.lastIndexOf('/');
-        }
-      }
+        return { relativePath, isDirectory: false };
+      });
 
-      const scoredDirs: Array<{
-        path: string;
-        score: number;
-        isDirectory: true;
-      }> = [];
-
-      const querySegs = lowerQuery.split('/').filter((s) => s.length > 0);
-      const lastQuerySeg = querySegs[querySegs.length - 1];
-      const prefixQuerySegs = querySegs.slice(0, -1);
-
-      if (lastQuerySeg !== undefined) {
-        for (const dirPath of dirs) {
-          const pathSegs = dirPath.toLowerCase().split('/');
-          const dirName = pathSegs[pathSegs.length - 1];
-          if (dirName === undefined) continue;
-
-          if (!hasMatch(lastQuerySeg, dirName)) continue;
-          const nameScore = score(lastQuerySeg, dirName);
-
-          if (prefixQuerySegs.length > 0) {
-            const ancestors = pathSegs.slice(0, -1);
-            let ai = 0;
-            let allMatch = true;
-            for (const qSeg of prefixQuerySegs) {
-              let found = false;
-              while (ai < ancestors.length) {
-                const ancestor = ancestors[ai++];
-                if (ancestor !== undefined && hasMatch(qSeg, ancestor)) {
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                allMatch = false;
-                break;
-              }
-            }
-            if (!allMatch) continue;
-          }
-
-          scoredDirs.push({
-            path: dirPath,
-            score: nameScore,
-            isDirectory: true,
-          });
-        }
-      }
-      scoredDirs.sort((a, b) => b.score - a.score);
-
-      scoredFiles.sort((a, b) => b.score - a.score);
-
-      const topFiles = scoredFiles.slice(
+      const topFiles = rankPathFuzzyCandidates(query, files).slice(
         0,
         MAX_SEARCH_RESULTS_PER_MOUNT - MAX_FOLDER_RESULTS_PER_MOUNT,
       );
-      const topDirs = scoredDirs.slice(0, MAX_FOLDER_RESULTS_PER_MOUNT);
+      const topDirs = rankPathFuzzyCandidates(
+        query,
+        Array.from(directories, (relativePath) => ({
+          relativePath,
+          isDirectory: true as const,
+        })),
+      ).slice(0, MAX_FOLDER_RESULTS_PER_MOUNT);
       const merged = [...topFiles, ...topDirs];
-      merged.sort((a, b) => b.score - a.score);
+      merged.sort((a, b) => b.pathFuzzyScore - a.pathFuzzyScore);
 
       return merged
         .slice(0, MAX_SEARCH_RESULTS_PER_MOUNT)
-        .map(({ path: relPath, isDirectory }) => ({
+        .map(({ relativePath: relPath, isDirectory }) => ({
           providerType: 'file' as const,
           mountedPath: `${mountPrefix}/${relPath}`,
           relativePath: relPath,

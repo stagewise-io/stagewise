@@ -15,6 +15,11 @@ export {
   type MentionSearchClientRuntime,
   type MentionSearchToolboxState,
 } from './mention-search';
+export {
+  rankPathFuzzyCandidates,
+  type PathFuzzyCandidate,
+  type PathFuzzyResult,
+} from './path-fuzzy-search';
 export type { MountManagerHostHooks } from './types';
 export { setAgentMounts } from './mount-state';
 export { pickOwningWorkspace } from '../../workspace';
