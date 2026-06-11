@@ -35,6 +35,16 @@ import {
 } from './command-center';
 import { FileTreeSidebar } from './file-tree/file-tree-sidebar';
 import { FileTreeToggleButton } from './file-tree/file-tree-toggle-button';
+import { SettingsSidebar } from '../settings/sidebar';
+import { SettingsContent } from '../settings/content';
+import {
+  DEFAULT_EXPANDED_SIDEBAR_SIZE,
+  SIDEBAR_PANEL_CLASS_NAME,
+  SIDEBAR_PANEL_ID,
+  SIDEBAR_PANEL_MAX_SIZE,
+  SIDEBAR_PANEL_MIN_SIZE,
+  SIDEBAR_PANEL_ORDER,
+} from './_components/sidebar-panel-config';
 
 // Reuse the same autoSaveId as the settings screen so the root panel layout
 // (sidebar width, content width) persists when switching between screens.
@@ -90,11 +100,13 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const tabs = useKartonState((s) => s.contentTabs.tabs);
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const fileTreeVisible = useKartonState((s) => s.fileTree.visible);
+  const appScreenMode = useKartonState((s) => s.appScreen.mode);
   const { setTabUiState } = useTabUIState();
   const [openAgent] = useOpenAgent();
   const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
     useContentCollapsed();
+  const settingsOpen = appScreenMode === 'settings';
 
   const hasVisibleTabs = useMemo(() => {
     return Object.values(tabs).some(
@@ -247,7 +259,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   return (
     <>
       {show && <GlobalHotkeyBindings />}
-      {show && (
+      {show && !settingsOpen && (
         <AgentHotkeyBindings
           onCreateTab={handleCreateTab}
           onCreateTerminalTab={handleOpenTerminal}
@@ -272,74 +284,105 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
           autoSaveId={rootLayoutStorageKey}
           className="overflow-visible! h-full w-full"
         >
-          <Sidebar />
+          {settingsOpen ? (
+            <>
+              <ResizablePanel
+                id={SIDEBAR_PANEL_ID}
+                order={SIDEBAR_PANEL_ORDER}
+                defaultSize={DEFAULT_EXPANDED_SIDEBAR_SIZE}
+                minSize={SIDEBAR_PANEL_MIN_SIZE}
+                maxSize={SIDEBAR_PANEL_MAX_SIZE}
+                className={SIDEBAR_PANEL_CLASS_NAME}
+              >
+                <SettingsSidebar />
+              </ResizablePanel>
 
-          {!sidebarCollapsed && <ResizableHandle />}
+              <ResizableHandle />
 
-          <ResizablePanel
-            id="content-panel"
-            order={1}
-            defaultSize={65}
-            className={cn(
-              'relative h-full overflow-hidden ring-1 ring-derived-subtle',
-              !sidebarCollapsed && 'rounded-l-xl',
-              !isMacOs && 'mt-px',
-            )}
-          >
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              <AgentChat
-                topRightActions={chatTopRightActions}
-                defaultSize={innerPanelLayout.chatSize}
-                minSize={CHAT_PANEL_MIN_SIZE}
-              />
+              <ResizablePanel
+                id="content-panel"
+                order={1}
+                defaultSize={65}
+                className={cn(
+                  'relative h-full overflow-hidden rounded-l-xl bg-background ring-1 ring-derived-subtle',
+                  !isMacOs && 'mt-px',
+                )}
+              >
+                <SettingsContent />
+              </ResizablePanel>
+            </>
+          ) : (
+            <>
+              <Sidebar />
 
-              {showContent && (
-                <>
-                  <ResizableHandle className="w-0.5 bg-border" />
-                  <MainSection
-                    onCreateTab={handleCreateTab}
-                    pendingOmniboxFocusRequest={pendingOmniboxFocusRequest}
-                    onPendingOmniboxFocusHandled={
-                      handlePendingOmniboxFocusHandled
-                    }
-                    topRightActions={
-                      contentPanelTopRightActions ??
-                      openedContentTopRightActions
-                    }
-                    defaultSize={innerPanelLayout.contentSize}
-                    onPanelResize={(size) => {
-                      contentSizeRef.current = size;
-                      persistPanelSize(contentPanelSizeKey, size);
-                    }}
+              {!sidebarCollapsed && <ResizableHandle />}
+
+              <ResizablePanel
+                id="content-panel"
+                order={1}
+                defaultSize={65}
+                className={cn(
+                  'relative h-full overflow-hidden ring-1 ring-derived-subtle',
+                  !sidebarCollapsed && 'rounded-l-xl',
+                  !isMacOs && 'mt-px',
+                )}
+              >
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  <AgentChat
+                    topRightActions={chatTopRightActions}
+                    defaultSize={innerPanelLayout.chatSize}
+                    minSize={CHAT_PANEL_MIN_SIZE}
                   />
-                </>
-              )}
 
-              {fileTreeVisible && (
-                <>
-                  <ResizableHandle className="w-0.5 bg-border" />
-                  <ResizablePanel
-                    id="file-tree-panel"
-                    order={3}
-                    defaultSize={innerPanelLayout.fileTreeSize}
-                    minSize={15}
-                    maxSize={45}
-                    onResize={(size) => {
-                      if (size > 0) {
-                        fileTreeSizeRef.current = size;
-                        persistPanelSize(fileTreePanelSizeKey, size);
-                      }
-                    }}
-                    className="relative min-w-[96px] overflow-hidden bg-background"
-                  >
-                    <div className="size-full overflow-hidden">
-                      <FileTreeSidebar />
-                    </div>
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-          </ResizablePanel>
+                  {showContent && (
+                    <>
+                      <ResizableHandle className="w-0.5 bg-border" />
+                      <MainSection
+                        onCreateTab={handleCreateTab}
+                        pendingOmniboxFocusRequest={pendingOmniboxFocusRequest}
+                        onPendingOmniboxFocusHandled={
+                          handlePendingOmniboxFocusHandled
+                        }
+                        topRightActions={
+                          contentPanelTopRightActions ??
+                          openedContentTopRightActions
+                        }
+                        defaultSize={innerPanelLayout.contentSize}
+                        onPanelResize={(size) => {
+                          contentSizeRef.current = size;
+                          persistPanelSize(contentPanelSizeKey, size);
+                        }}
+                      />
+                    </>
+                  )}
+
+                  {fileTreeVisible && (
+                    <>
+                      <ResizableHandle className="w-0.5 bg-border" />
+                      <ResizablePanel
+                        id="file-tree-panel"
+                        order={3}
+                        defaultSize={innerPanelLayout.fileTreeSize}
+                        minSize={15}
+                        maxSize={45}
+                        onResize={(size) => {
+                          if (size > 0) {
+                            fileTreeSizeRef.current = size;
+                            persistPanelSize(fileTreePanelSizeKey, size);
+                          }
+                        }}
+                        className="relative min-w-[96px] overflow-hidden bg-background"
+                      >
+                        <div className="size-full overflow-hidden">
+                          <FileTreeSidebar />
+                        </div>
+                      </ResizablePanel>
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       </div>
     </>
