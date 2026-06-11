@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTutorial } from '@ui/contexts/tutorial';
 import type { TutorialStep } from '@ui/contexts/tutorial';
 
@@ -22,27 +22,36 @@ export function Tutorial({ tutorialId, steps, enabled = true }: TutorialProps) {
   const { activeTutorial, hideTutorial, registerTutorial, unregisterTutorial } =
     useTutorial();
 
+  // Ref-stabilize callbacks so effect cleanups don't re-run when provider
+  // state changes (e.g. tutorial progress updates) give them new identities.
+  const unregisterRef = useRef(unregisterTutorial);
+  unregisterRef.current = unregisterTutorial;
+  const hideRef = useRef(hideTutorial);
+  hideRef.current = hideTutorial;
+  const registerRef = useRef(registerTutorial);
+  registerRef.current = registerTutorial;
+
   useEffect(() => {
     if (!enabled) return;
-    registerTutorial({ id: tutorialId, steps });
-  }, [enabled, tutorialId, steps, registerTutorial]);
+    registerRef.current({ id: tutorialId, steps });
+  }, [enabled, tutorialId, steps]);
 
   useEffect(() => {
     if (!enabled && activeTutorial?.id === tutorialId) {
-      hideTutorial();
+      hideRef.current();
     }
-  }, [enabled, activeTutorial, tutorialId, hideTutorial]);
+  }, [enabled, activeTutorial, tutorialId]);
 
   // Unregister when this tutorial's source unmounts — prevents queued
   // tutorials from starting after their trigger UI is gone.
   useEffect(() => {
-    return () => unregisterTutorial(tutorialId);
-  }, [tutorialId, unregisterTutorial]);
+    return () => unregisterRef.current(tutorialId);
+  }, [tutorialId]);
 
   // Also unregister when enabled becomes false (clean up queue entry)
   useEffect(() => {
-    if (!enabled) unregisterTutorial(tutorialId);
-  }, [enabled, tutorialId, unregisterTutorial]);
+    if (!enabled) unregisterRef.current(tutorialId);
+  }, [enabled, tutorialId]);
 
   return null;
 }
