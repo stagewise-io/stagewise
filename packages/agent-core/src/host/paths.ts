@@ -49,6 +49,8 @@ export interface HostPaths {
   plansDir(): string;
   /** Shared user log-channel directory. */
   logsDir(): string;
+  /** Shared read-only agent memory archive directory. */
+  memoryDir(): string;
 
   /** Root of the bundled plugins tree shipped with the host. */
   pluginsDir(): string;

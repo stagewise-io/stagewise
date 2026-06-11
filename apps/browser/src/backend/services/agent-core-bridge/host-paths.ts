@@ -14,6 +14,7 @@ import {
   getDiffHistoryDbPath,
   getDiffHistoryDir,
   getLogsDir,
+  getMemoryDir,
   getPlansDir,
   getPluginsPath,
   getRipgrepBasePath,
@@ -69,6 +70,7 @@ export function createBrowserHostPaths(): HostPaths {
     userDataDir: () => getUserDataDir(),
     plansDir: () => getPlansDir(),
     logsDir: () => getLogsDir(),
+    memoryDir: () => getMemoryDir(),
 
     pluginsDir: () => getPluginsPath(),
     builtinSkillsDir: () => getBuiltinSkillsPath(),

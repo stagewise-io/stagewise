@@ -546,7 +546,11 @@ export async function copyToolExecute(
   deps: UniversalToolboxDeps,
   options?: unknown,
 ) {
-  const src = resolveToolPath(deps, params.input_path, 'read');
+  const src = resolveToolPath(
+    deps,
+    params.input_path,
+    params.move ? 'delete' : 'read',
+  );
   const dest = resolveToolPath(deps, params.output_path, 'create');
   const srcExists = await exists(src.absolutePath);
   const srcIsDir = await isDirectory(src.absolutePath);

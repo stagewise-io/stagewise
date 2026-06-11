@@ -50,6 +50,7 @@ import { getBrowserHostPaths } from '@/services/agent-core-bridge/host-paths';
 import {
   getDataRoot,
   getLogsDir,
+  getMemoryDir,
   getPlansDir,
   getAgentShellLogsDir,
 } from '@/utils/paths';
@@ -161,6 +162,7 @@ export class ToolboxService
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
   private attRuntimes = new Map<string, ClientRuntimeNode>();
   private shellsRuntimes = new Map<string, ClientRuntimeNode>();
+  private memoryRuntime: ClientRuntimeNode | null = null;
 
   private mountManagerService: MountManagerService | null = null;
   private readonly preferencesService: PreferencesService;
@@ -201,6 +203,7 @@ export class ToolboxService
     runtimes.set('apps', this.getOrCreateAppsRuntime(agentInstanceId));
     runtimes.set(PLANS_PREFIX, this.getOrCreatePlansRuntime());
     runtimes.set(LOGS_PREFIX, this.getOrCreateLogsRuntime());
+    runtimes.set('memory', this.getOrCreateMemoryRuntime());
     runtimes.set('att', this.getOrCreateAttRuntime(agentInstanceId));
     runtimes.set('shells', this.getOrCreateShellsRuntime(agentInstanceId));
     return runtimes;
@@ -286,6 +289,17 @@ export class ToolboxService
       rgBinaryBasePath: getRipgrepBasePath(),
     });
     return this.logsRuntime;
+  }
+
+  private getOrCreateMemoryRuntime(): ClientRuntimeNode {
+    if (this.memoryRuntime) return this.memoryRuntime;
+    const memoryDir = getMemoryDir();
+    mkdirSync(memoryDir, { recursive: true });
+    this.memoryRuntime = new ClientRuntimeNode({
+      workingDirectory: memoryDir,
+      rgBinaryBasePath: getRipgrepBasePath(),
+    });
+    return this.memoryRuntime;
   }
 
   private getOrCreateGlobalSkillsRuntime(
@@ -806,6 +820,14 @@ export class ToolboxService
       permissions: FULL_PERMISSIONS,
     });
 
+    const memoryDir = getMemoryDir();
+    mkdirSync(memoryDir, { recursive: true });
+    mounts.push({
+      prefix: 'memory',
+      absolutePath: memoryDir,
+      permissions: READ_ONLY_PERMISSIONS,
+    });
+
     return mounts;
   }
 
@@ -1199,6 +1221,7 @@ export class ToolboxService
     result.set('att', this.attachments.agentBlobDir(agentInstanceId));
     result.set(PLANS_PREFIX, getPlansDir());
     result.set(LOGS_PREFIX, getLogsDir());
+    result.set('memory', getMemoryDir());
 
     for (const gs of getGlobalSkillsMounts()) {
       if (existsSync(gs.absolutePath)) {

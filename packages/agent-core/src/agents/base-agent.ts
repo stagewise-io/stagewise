@@ -67,6 +67,7 @@ import {
   generateSimpleCompressedHistory,
   estimateMessageTokens,
 } from './shared/history-compression';
+import { AgentMemoryWriter, type MemoryWriteReason } from './shared/memory';
 import type { AttachmentsService } from '../services/attachments';
 import { capToolOutput } from '../services/toolbox';
 import type { ProcessedImageCacheService } from '../services/processed-image-cache';
@@ -565,6 +566,10 @@ export abstract class BaseAgent<
   private _stepStartTime = 0;
   private _stepProviderMode = '';
   private _toolCallDurations = new Map<string, number>();
+  private _memoryWriter: AgentMemoryWriter | null = null;
+  private _memoryWriteTimer: ReturnType<typeof setTimeout> | null = null;
+  private _pendingMemoryWriteReason: MemoryWriteReason | null = null;
+  private _lastMemoryWriteAt = 0;
 
   /**
    * Set by `onFinish` once `handlePostStep` has decided whether another
@@ -766,6 +771,7 @@ export abstract class BaseAgent<
 
     // If the agent is not running, we add the message to the history and immediately send it to the model.
     this.state.commands.appendHistoryMessage({ message: msg });
+    this.scheduleMemorySnapshotWrite('user-message');
 
     void this.runStep();
 
@@ -866,6 +872,9 @@ export abstract class BaseAgent<
 
     // Send all queued messages into the chat
     this.state.commands.flushQueueIntoHistory();
+    if (flushedCount > 0) {
+      this.scheduleMemorySnapshotWrite('queued-messages');
+    }
 
     if (flushedCount > 0) {
       this.host.telemetry?.capture('agent-queue-flushed', {
@@ -1061,6 +1070,7 @@ export abstract class BaseAgent<
     }
 
     this.state.commands.truncateHistoryAt({ messageIndex: msgIndex });
+    this.scheduleMemorySnapshotWrite('user-message');
 
     return;
   }
@@ -1082,6 +1092,7 @@ export abstract class BaseAgent<
     );
     this.state.commands.setUserTitle({ title: newTitle });
     await this.saveState();
+    this.scheduleMemorySnapshotWrite('title');
   }
 
   /**
@@ -1567,6 +1578,9 @@ export abstract class BaseAgent<
     const { queueFlushIndex: flushedIndex } = this.state.commands.beginStep({
       flushQueue: !isApprovalContinuation,
     });
+    if (flushedIndex !== undefined) {
+      this.scheduleMemorySnapshotWrite('queued-messages');
+    }
     const queueFlushIndex = flushedIndex ?? -1;
 
     // Snapshot the model id used for THIS step. `updateActiveModelId` accepts
@@ -1904,6 +1918,7 @@ export abstract class BaseAgent<
       // The initial saveState() in handlePostStep ran before the refs
       // were known, so this second save is required for crash safety.
       await this.saveState();
+      this.scheduleMemorySnapshotWrite('post-step');
 
       // ─── Tail: consume the deferred continuation decision ──────────
       // `onFinish` set `_pendingContinue` before returning; now that
@@ -2117,6 +2132,7 @@ export abstract class BaseAgent<
         .get()
         .history.findIndex((m) => m.id === boundaryMessageId);
       await this.saveState(boundarySeq >= 0 ? [boundarySeq] : undefined);
+      this.scheduleMemorySnapshotWrite('compression');
     } catch (e) {
       // Fail silently — compression is best-effort. The agent continues
       // without compression until the context window is exhausted, at which
@@ -2129,6 +2145,83 @@ export abstract class BaseAgent<
     } finally {
       this._isCompressingHistory = false;
     }
+  }
+
+  private getMemoryWriter(): AgentMemoryWriter {
+    this._memoryWriter ??= new AgentMemoryWriter({
+      host: this.host,
+      agentInstanceId: this.instanceId,
+    });
+    return this._memoryWriter;
+  }
+
+  private coalesceMemoryWriteReason(
+    previous: MemoryWriteReason | null,
+    next: MemoryWriteReason,
+  ): MemoryWriteReason {
+    if (previous === 'compression' || next === 'compression') {
+      return 'compression';
+    }
+    if (previous === 'user-message' || next === 'user-message') {
+      return 'user-message';
+    }
+    if (previous === 'queued-messages' || next === 'queued-messages') {
+      return 'queued-messages';
+    }
+    if (previous === 'post-step' || next === 'post-step') return 'post-step';
+    return next;
+  }
+
+  private scheduleMemorySnapshotWrite(reason: MemoryWriteReason): void {
+    if (!this.config.persistent) return;
+    this._pendingMemoryWriteReason = this.coalesceMemoryWriteReason(
+      this._pendingMemoryWriteReason,
+      reason,
+    );
+    if (this._memoryWriteTimer) clearTimeout(this._memoryWriteTimer);
+
+    const elapsed = Date.now() - this._lastMemoryWriteAt;
+    const throttleDelay = Math.max(0, 5000 - elapsed);
+    const delay = Math.max(250, throttleDelay);
+    this._memoryWriteTimer = setTimeout(() => {
+      this._memoryWriteTimer = null;
+      const pendingReason = this._pendingMemoryWriteReason ?? reason;
+      this._pendingMemoryWriteReason = null;
+      void this.flushMemorySnapshotWrite(pendingReason).catch((error) => {
+        this.handleMemorySnapshotWriteFailure(
+          pendingReason,
+          error,
+          'scheduled',
+        );
+      });
+    }, delay);
+  }
+
+  private async flushMemorySnapshotWrite(
+    reason: MemoryWriteReason,
+  ): Promise<void> {
+    const state = this.state.get();
+    await this.getMemoryWriter().flush({
+      title: state.title,
+      activeModelId: state.activeModelId,
+      history: state.history,
+      reason,
+    });
+    this._lastMemoryWriteAt = Date.now();
+  }
+
+  private handleMemorySnapshotWriteFailure(
+    reason: MemoryWriteReason,
+    error: unknown,
+    phase: 'scheduled' | 'teardown',
+  ): void {
+    const normalizedError =
+      error instanceof Error ? error : new Error(String(error));
+    this.host.logger.warn(
+      `[BaseAgent:${this.instanceId}] ${phase === 'scheduled' ? 'Scheduled' : 'Teardown'} memory snapshot write failed`,
+      { reason, error: normalizedError },
+    );
+    this.report(normalizedError, 'writeMemorySnapshot', { reason });
   }
 
   /**
@@ -3253,7 +3346,24 @@ export abstract class BaseAgent<
   /**
    * Must be called when the agent is torn down (deleted or closed) to clean up/ free resources (e.g. sandbox memory, state, etc.).
    */
-  public onTeardown(): Promise<void> | void {
+  public async onTeardown(): Promise<void> {
+    if (this._memoryWriteTimer) {
+      clearTimeout(this._memoryWriteTimer);
+      this._memoryWriteTimer = null;
+    }
+    const pendingMemoryWriteReason = this._pendingMemoryWriteReason;
+    if (this.config.persistent && pendingMemoryWriteReason) {
+      this._pendingMemoryWriteReason = null;
+      try {
+        await this.flushMemorySnapshotWrite(pendingMemoryWriteReason);
+      } catch (error) {
+        this.handleMemorySnapshotWriteFailure(
+          pendingMemoryWriteReason,
+          error,
+          'teardown',
+        );
+      }
+    }
     void this.toolbox.clearAgentTracking(this.instanceId);
     // NOTE: `fileReadCacheService` is app-wide and owned by bootstrap;
     // do not tear it down from an individual agent instance.

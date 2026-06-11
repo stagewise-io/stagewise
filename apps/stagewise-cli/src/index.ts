@@ -19,6 +19,7 @@ import {
   ENABLED_SKILLS_DOMAIN_ID,
   FILE_DIFFS_DOMAIN_ID,
   LOGS_DOMAIN_ID,
+  MEMORY_DOMAIN_ID,
   PLANS_DOMAIN_ID,
   WORKSPACE_DOMAIN_ID,
   WORKSPACE_MD_DOMAIN_ID,
@@ -26,6 +27,7 @@ import {
   createEnabledSkillsDomainAdapter,
   createFileDiffsDomainAdapter,
   createLogsDomainAdapter,
+  createMemoryDomainAdapter,
   createPlansDomainAdapter,
   createWorkspaceDomainAdapter,
   createWorkspaceMdDomainAdapter,
@@ -121,6 +123,7 @@ function ensureRuntimeDirs(host: AgentHost): void {
     host.paths.userDataDir(),
     host.paths.plansDir(),
     host.paths.logsDir(),
+    host.paths.memoryDir(),
     host.paths.pluginsDir(),
     host.paths.builtinSkillsDir(),
     host.paths.ripgrepBaseDir(),
@@ -280,6 +283,7 @@ async function main() {
     }),
   );
   manager.registerEnvAdapter(createEnabledSkillsDomainAdapter({ host }));
+  manager.registerEnvAdapter(createMemoryDomainAdapter());
   manager.registerEnvAdapter(createPlansDomainAdapter({ host, store }));
   manager.registerEnvAdapter(createLogsDomainAdapter({ host, store }));
   manager.registerEnvAdapter(createFileDiffsDomainAdapter({ store }));
@@ -306,6 +310,7 @@ async function main() {
       AGENTS_MD_DOMAIN_ID,
       WORKSPACE_MD_DOMAIN_ID,
       ENABLED_SKILLS_DOMAIN_ID,
+      MEMORY_DOMAIN_ID,
       PLANS_DOMAIN_ID,
       LOGS_DOMAIN_ID,
       FILE_DIFFS_DOMAIN_ID,
@@ -342,15 +347,20 @@ async function main() {
     },
   };
 
+  let finalState: AgentState | undefined;
   try {
     await manager.sendUserMessage(instanceId, message);
     await waitUntilIdle(store, instanceId, 600_000);
+    finalState = store.get().agents.instances[instanceId]?.state;
   } finally {
-    // Always kill PTYs, even if the run threw or timed out.
-    await shellService.teardown();
+    try {
+      await manager.teardown();
+    } finally {
+      // Always kill PTYs, even if the run threw or timed out.
+      await shellService.teardown();
+    }
   }
 
-  const finalState = store.get().agents.instances[instanceId]?.state;
   if (finalState?.error) {
     console.error('Agent error:', finalState.error);
     process.exit(1);
