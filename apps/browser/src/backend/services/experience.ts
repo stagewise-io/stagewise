@@ -47,6 +47,9 @@ export class UserExperienceService extends DisposableService {
   private isLoadingStoredExperienceData = false;
   private hasInitializedStoredExperienceData = false;
 
+  // Serialize tutorial step writes to prevent races from fire-and-forget saves
+  private tutorialStepLock: Promise<void> = Promise.resolve();
+
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -510,6 +513,16 @@ export class UserExperienceService extends DisposableService {
   }
 
   public async setTutorialStep(tutorialId: string, stepIndex: number) {
+    // Serialize writes to prevent concurrent read-modify-write races.
+    // The UI sends these fire-and-forget, so two rapid saves can otherwise
+    // read the same stale state and overwrite each other's progress.
+    const prev = this.tutorialStepLock;
+    let release: () => void;
+    this.tutorialStepLock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await prev;
+
     try {
       const currentState = await this.readTutorialState();
       currentState[tutorialId] = stepIndex;
@@ -527,6 +540,8 @@ export class UserExperienceService extends DisposableService {
         `[UserExperienceService] Failed to save tutorial step. Error: ${error}`,
       );
       this.report(error as Error, 'saveTutorialStep');
+    } finally {
+      release!();
     }
   }
 
