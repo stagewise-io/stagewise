@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { defaultUserPreferences } from '@shared/karton-contracts/ui/shared-types';
+import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
+import { ModelProviderService } from './model-provider';
 import {
   reasoningSignatureSourceSchema,
   type ReasoningSignatureSource,
@@ -8,6 +11,296 @@ import {
   getSemanticProviderForApiSpec,
   reasoningSourcesMatch,
 } from './reasoning-signatures';
+
+function createTestModelProviderService({
+  providerModes = {},
+  modelThinkingOverrides = {},
+}: {
+  providerModes?: Record<string, 'stagewise' | 'official' | 'custom'>;
+  modelThinkingOverrides?: Record<
+    string,
+    {
+      enabled?: boolean;
+      effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    }
+  >;
+} = {}) {
+  const preferences = structuredClone(defaultUserPreferences);
+  preferences.agent.modelThinkingOverrides = modelThinkingOverrides;
+  for (const [provider, mode] of Object.entries(providerModes)) {
+    preferences.providerConfigs[
+      provider as keyof typeof preferences.providerConfigs
+    ].mode = mode;
+  }
+
+  return new ModelProviderService(
+    {
+      withTracing: vi.fn((model) => model),
+      captureException: vi.fn(),
+    } as any,
+    { accessToken: 'stagewise-token' } as any,
+    {
+      get: vi.fn(() => preferences),
+      decryptProviderApiKey: vi.fn(() => 'provider-api-key'),
+    } as any,
+  );
+}
+
+const agentStepMetadata = {
+  [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
+};
+
+describe('thinking override provider option resolution', () => {
+  it('returns base provider options unchanged when no override exists', () => {
+    const service = createTestModelProviderService();
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: { reasoningEffort: 'medium', reasoningSummary: 'auto' },
+    });
+  });
+
+  it('does not apply overrides without agent-step request purpose', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: { 'gpt-5.5': { effort: 'high' } },
+    });
+
+    const result = service.getModelWithOptions('gpt-5.5', 'trace-1');
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+    });
+  });
+
+  it('applies built-in overrides for agent-step requests', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: { 'gpt-5.5': { effort: 'high' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'high' } },
+    });
+  });
+
+  it('produces provider-specific disabled thinking options', () => {
+    const service = createTestModelProviderService({
+      providerModes: { anthropic: 'official' },
+      modelThinkingOverrides: { 'claude-fable-5': { enabled: false } },
+    });
+
+    const result = service.getModelWithOptions(
+      'claude-fable-5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      anthropic: { thinking: { type: 'disabled' } },
+    });
+    expect(result.providerOptions?.anthropic).not.toHaveProperty('effort');
+  });
+
+  it('disables OpenAI thinking by removing reasoning options', () => {
+    const service = createTestModelProviderService({
+      providerModes: { openai: 'official' },
+      modelThinkingOverrides: { 'gpt-5.5': { enabled: false } },
+    });
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions?.openai).not.toHaveProperty(
+      'reasoningEffort',
+    );
+    expect(result.providerOptions?.openai).not.toHaveProperty(
+      'reasoningSummary',
+    );
+    expect(result.providerOptions).toMatchObject({
+      openai: {
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    });
+  });
+
+  it('disables Google thinking without leaving a thinking level', () => {
+    const service = createTestModelProviderService({
+      providerModes: { google: 'official' },
+      modelThinkingOverrides: {
+        'gemini-3.1-pro-preview': { enabled: false },
+      },
+    });
+
+    const result = service.getModelWithOptions(
+      'gemini-3.1-pro-preview',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      google: { thinkingConfig: { includeThoughts: false } },
+    });
+    expect(result.providerOptions?.google).toMatchObject({
+      thinkingConfig: expect.not.objectContaining({
+        thinkingLevel: expect.anything(),
+      }),
+    });
+  });
+
+  it('disables stagewise thinking without leaving an effort', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: { 'gpt-5.5': { enabled: false } },
+    });
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: false } },
+    });
+    expect(result.providerOptions?.stagewise).toMatchObject({
+      reasoning: expect.not.objectContaining({ effort: expect.anything() }),
+    });
+  });
+
+  it('treats empty override objects as no-ops', () => {
+    const service = createTestModelProviderService({
+      providerModes: { google: 'official' },
+      modelThinkingOverrides: { 'gemini-3.1-pro-preview': {} },
+    });
+
+    const result = service.getModelWithOptions(
+      'gemini-3.1-pro-preview',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'high' },
+      },
+    });
+  });
+
+  it('preserves unrelated stagewise provider options', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: { 'deepseek-v4-pro': { effort: 'high' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'deepseek-v4-pro',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: {
+        reasoning: { enabled: true, effort: 'high' },
+        provider: { require_parameters: true },
+      },
+    });
+  });
+
+  it('maps OpenAI official overrides while preserving unrelated options', () => {
+    const service = createTestModelProviderService({
+      providerModes: { openai: 'official' },
+      modelThinkingOverrides: { 'gpt-5.5': { effort: 'high' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      openai: {
+        reasoningEffort: 'high',
+        reasoningSummary: 'auto',
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    });
+  });
+
+  it('maps Google official overrides while preserving thinking config', () => {
+    const service = createTestModelProviderService({
+      providerModes: { google: 'official' },
+      modelThinkingOverrides: {
+        'gemini-3.1-pro-preview': { effort: 'minimal' },
+      },
+    });
+
+    const result = service.getModelWithOptions(
+      'gemini-3.1-pro-preview',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'low' },
+      },
+    });
+  });
+
+  it('uses active provider defaults when enabling without effort', () => {
+    const service = createTestModelProviderService({
+      providerModes: { google: 'official' },
+      modelThinkingOverrides: {
+        'gemini-3.1-pro-preview': { enabled: true },
+      },
+    });
+
+    const result = service.getModelWithOptions(
+      'gemini-3.1-pro-preview',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'high' },
+      },
+    });
+  });
+
+  it('maps Anthropic official overrides while preserving adaptive shape', () => {
+    const service = createTestModelProviderService({
+      providerModes: { anthropic: 'official' },
+      modelThinkingOverrides: { 'claude-fable-5': { effort: 'high' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'claude-fable-5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      anthropic: { thinking: { type: 'adaptive' }, effort: 'high' },
+    });
+  });
+});
 
 describe('reasoning signature source helpers', () => {
   it('maps custom endpoint API specs to semantic providers', () => {
