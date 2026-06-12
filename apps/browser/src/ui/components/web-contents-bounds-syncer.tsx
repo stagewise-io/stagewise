@@ -179,11 +179,25 @@ export const WebContentsBoundsSyncer = () => {
     const { observer: resizeObserver, disconnect: disconnectResizeObserver } =
       createRafResizeObserver(sendBoundsUpdate);
 
+    // Track all elements we observe so we can unobserve on detach.
+    const observedElements: Element[] = [];
+    const observeEl = (el: Element) => {
+      resizeObserver.observe(el);
+      observedElements.push(el);
+    };
+    const unobserveAll = () => {
+      for (const el of observedElements) {
+        resizeObserver.unobserve(el);
+      }
+      observedElements.length = 0;
+    };
+
     const attachContainer = (el: HTMLElement | null) => {
       if (el === containerElement) return;
 
+      unobserveAll();
+
       if (containerElement) {
-        resizeObserver.unobserve(containerElement);
         containerElement.removeEventListener(
           'transitionend',
           handleTransitionEnd,
@@ -193,8 +207,29 @@ export const WebContentsBoundsSyncer = () => {
       containerElement = el;
 
       if (containerElement) {
-        resizeObserver.observe(containerElement);
+        observeEl(containerElement);
         containerElement.addEventListener('transitionend', handleTransitionEnd);
+
+        // Also observe all panels of every ancestor resizable panel group
+        // (i.e. the container's panel AND its sibling panels). When a
+        // sibling panel resizes while the container's own panel is pinned
+        // at its min size (e.g. dragging the chat handle further shrinks
+        // the file tree), the container MOVES without its own dimensions
+        // changing — neither it nor any ancestor fires a ResizeObserver
+        // event. Any redistribution that moves the container necessarily
+        // resizes at least one panel in some ancestor group, so observing
+        // the sibling panels catches every such case and triggers a
+        // bounds re-check.
+        let current: HTMLElement | null = containerElement.parentElement;
+        while (current) {
+          if (current.dataset.slot === 'resizable-panel-group') {
+            current
+              .querySelectorAll(':scope > [data-slot="resizable-panel"]')
+              .forEach(observeEl);
+          }
+          current = current.parentElement;
+        }
+
         containerVisible = checkOpacity();
       } else {
         containerVisible = false;
@@ -253,6 +288,7 @@ export const WebContentsBoundsSyncer = () => {
         cancelAnimationFrame(pendingFrameId);
         pendingFrameId = null;
       }
+      unobserveAll();
       disconnectResizeObserver();
       mutationObserver.disconnect();
       window.removeEventListener('resize', sendBoundsUpdate);
