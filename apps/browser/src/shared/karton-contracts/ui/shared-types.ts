@@ -234,15 +234,10 @@ export type OpenFilesInIde = z.infer<typeof openFilesInIdeSchema>;
 
 export const personalizationThemeIds = [
   'default',
-  'lavender',
-  'mint',
-  'sky',
   'fire',
   'forest',
   'bubblegum',
-  'zinc',
   'titanium',
-  'desert',
 ] as const;
 export const personalizationThemeIdSchema = z.enum(personalizationThemeIds);
 export type PersonalizationThemeId = z.infer<

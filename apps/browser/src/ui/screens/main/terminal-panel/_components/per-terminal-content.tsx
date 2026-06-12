@@ -354,12 +354,15 @@ export function PerTerminalContent({
   }, [terminalId, markTerminalFocused, focusTerminalIfReady]);
 
   const systemTheme = useKartonState((s) => s.systemTheme);
+  const personalizationThemeId = useKartonState(
+    (s) => s.globalConfig.personalizationThemeId,
+  );
 
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.options.theme = getTheme();
     }
-  }, [systemTheme]);
+  }, [systemTheme, personalizationThemeId]);
 
   useEffect(() => {
     const term = terminalRef.current;
