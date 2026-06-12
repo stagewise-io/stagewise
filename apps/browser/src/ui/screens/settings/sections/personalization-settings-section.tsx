@@ -12,6 +12,7 @@ import type {
   PersonalizationThemeId,
 } from '@shared/karton-contracts/ui/shared-types';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useTrack } from '@ui/hooks/use-track';
 import { applyPersonalizationThemeToRoot } from '@ui/components/personalization-theme-syncer';
 import { produceWithPatches, enablePatches } from 'immer';
 import { NotificationsSetting } from './general-settings-section';
@@ -316,6 +317,7 @@ function ThemeSetting() {
     (s) => s.globalConfig.personalizationThemeId,
   );
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
+  const track = useTrack();
   const latestSaveRequestIdRef = useRef(0);
   const latestRequestedThemeIdRef = useRef<PersonalizationThemeId | undefined>(
     undefined,
@@ -370,6 +372,7 @@ function ThemeSetting() {
       await setGlobalConfig({
         personalizationThemeId: nextThemeId,
       });
+      track('changed-theme', { theme: nextThemeId });
     } catch (error) {
       if (latestSaveRequestIdRef.current !== saveRequestId) {
         return;

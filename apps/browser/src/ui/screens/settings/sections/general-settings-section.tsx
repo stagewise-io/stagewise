@@ -5,6 +5,7 @@ import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { toast } from '@stagewise/stage-ui/components/toaster';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import { useTrack } from '@ui/hooks/use-track';
 import { PlayIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
 
 // =============================================================================
@@ -79,6 +80,7 @@ export function NotificationsSetting() {
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
   const previewSoundPack = useKartonProcedure((p) => p.config.previewSoundPack);
   const importSoundPack = useKartonProcedure((p) => p.config.importSoundPack);
+  const track = useTrack();
 
   const soundLoudness: SoundLoudness =
     globalConfig.notificationSoundLoudness ??
@@ -128,6 +130,9 @@ export function NotificationsSetting() {
       notificationSoundsEnabled: notificationSoundLoudness !== 'off',
       notificationSoundLoudness,
     });
+    track('changed-notification-sound-loudness', {
+      loudness: notificationSoundLoudness,
+    });
   };
 
   const handleSoundPackChange = async (value: unknown) => {
@@ -135,6 +140,9 @@ export function NotificationsSetting() {
     previewSound(value, soundLoudness);
     await setGlobalConfig({
       notificationSoundPack: value,
+    });
+    track('changed-notification-sound-theme', {
+      theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
     });
   };
 
