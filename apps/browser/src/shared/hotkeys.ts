@@ -35,6 +35,8 @@ export interface HotkeyDefinition {
   macAliases?: string[];
   /** If true, captures in capture phase to override web content handlers */
   captureDominantly?: boolean;
+  /** If true, lets editable elements consume matching native input events */
+  preserveNativeInput?: boolean;
 }
 
 /**
@@ -261,12 +263,17 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     captureDominantly: true,
   },
   // Content-panel tab navigation (per-agent, Mod+Alt prefixes).
+  // macOS follows the VS Code editor-tab convention: Cmd+Option+Arrow.
   [HotkeyActions.NEXT_TAB]: {
     accelerator: 'Mod+Alt+PageDown',
+    mac: 'Mod+Alt+ArrowRight',
+    macAliases: ['Mod+Alt+PageDown'],
     captureDominantly: true,
   },
   [HotkeyActions.PREV_TAB]: {
     accelerator: 'Mod+Alt+PageUp',
+    mac: 'Mod+Alt+ArrowLeft',
+    macAliases: ['Mod+Alt+PageUp'],
     captureDominantly: true,
   },
 

@@ -365,6 +365,8 @@ window.addEventListener(
   (e) => {
     const hotkeyDef = getHotkeyDefinitionForEvent(e);
     if (hotkeyDef?.captureDominantly) {
+      if (hotkeyDef.preserveNativeInput && shouldChromeConsumeEvent(e)) return;
+
       e.preventDefault();
       e.stopImmediatePropagation();
       e.stopPropagation();
