@@ -3,6 +3,7 @@ import { IconGithub } from 'nucleo-social-media';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
 import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import type { NewsType } from '@/lib/news';
 import { usePostHog } from 'posthog-js/react';
@@ -15,12 +16,11 @@ import agentManagementDark from './feature-images/agent-management-dark.webp';
 import agentManagementLight from './feature-images/agent-management-light.webp';
 import useExistingSubscriptionDark from './feature-images/use-existing-subscription-dark.webp';
 import useExistingSubscriptionLight from './feature-images/use-existing-subscription-light.webp';
-import githubRepoIssuesDark from './feature-images/github-repo-issues-dark.webp';
-import githubRepoIssuesLight from './feature-images/github-repo-issues-light.webp';
 import fullDemoDark from './feature-images/full-demo-dark.webp';
 import fullDemoLight from './feature-images/full-demo-light.webp';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
+import companyAbout from './feature-images/company-about.webp';
 
 import { NewsSection } from './news-section';
 import { ModelProviderShowcase } from './model-provider-showcase';
@@ -41,8 +41,6 @@ const AGENT_MANAGEMENT_IMAGE_SIZES =
   '(min-width: 1280px) 2100px, (min-width: 768px) 180vw, 200vw';
 const OPEN_SOURCE_IMAGE_SIZES =
   '(min-width: 1280px) 560px, (min-width: 768px) 45vw, calc(100vw - 80px)';
-const OPEN_SOURCE_ZOOM_IMAGE_SIZES =
-  '(min-width: 1280px) 840px, (min-width: 768px) 70vw, 100vw';
 
 function DownloadButtons({ className }: { className?: string }) {
   const [userOS, setUserOS] = useState<string>('your OS');
@@ -152,7 +150,7 @@ function FeatureSection() {
               </div>
             </div>
             <div
-              className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[60%]"
+              className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[60%]"
               style={{ aspectRatio: '1 / 1' }}
             >
               <Image
@@ -207,7 +205,7 @@ function FeatureSection() {
               </p>
             </div>
             <div
-              className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[60%]"
+              className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[60%]"
               style={{ aspectRatio: '1 / 1' }}
             >
               <Image
@@ -283,7 +281,7 @@ function FeatureSection() {
               </div>
             </div>
             <div
-              className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[60%]"
+              className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[60%]"
               style={{ aspectRatio: '1 / 1' }}
             >
               <Image
@@ -399,7 +397,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
             </ScrollReveal>
 
             <ScrollReveal delay={300}>
-              <div className="relative mt-6 mb-6 flex w-full items-center justify-center overflow-hidden rounded-2xl p-6 md:mt-8 md:p-10">
+              <div className="relative mt-6 mb-6 flex w-full items-center justify-center overflow-hidden rounded-2xl p-6 ring-1 ring-surface-2 md:mt-8 md:p-10">
                 <Image
                   src={bgLight}
                   alt=""
@@ -447,75 +445,79 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
       {/* News section */}
       <NewsSection posts={newsPosts} />
 
-      {/* Open-Source section */}
+      {/* Company section */}
       <section className="relative z-10 w-full py-10 md:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <ScrollReveal>
-            <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
-              <div className="space-y-3">
-                <h3 className="font-medium text-2xl">
-                  Open-Source and extensible
-                </h3>
-                <p className="text-base text-muted-foreground">
-                  A first-class coding experience, built in the open and
-                  compatible with your favorite models — including the ones you
-                  run locally.
+        <ScrollReveal>
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
+            <div className="space-y-3">
+              <h3 className="font-medium text-2xl">
+                Building applied AI for a better future
+              </h3>
+              <p className="text-base text-muted-foreground">
+                stagewise is built by a research team that focusses on making
+                artificial intelligence accessible to anyone by keeping cost low
+                and putting great emphasis on a simple user experience.
+              </p>
+              <div className="my-6">
+                <p className="mb-3 font-light text-muted-foreground text-sm">
+                  Backed by
                 </p>
-                <a
-                  href="https://github.com/stagewise-io/stagewise"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-fit items-center gap-2 text-primary-foreground hover:text-hover-derived active:text-active-derived"
-                >
-                  <IconGithub className="size-4" />
-                  View on GitHub
-                  <IconArrowRightFill18 className="inline size-4" />
-                </a>
+                <div className="flex flex-wrap items-center gap-5 opacity-40">
+                  <Image
+                    src="/logos/yc-monochrome.svg"
+                    alt="Y Combinator"
+                    width={90}
+                    height={24}
+                    className="h-5 w-auto"
+                    unoptimized
+                  />
+                  <Image
+                    src="/logos/twentytwo.webp"
+                    alt="TwentyTwo Ventures"
+                    width={80}
+                    height={20}
+                    className="h-4 w-auto"
+                  />
+                  <Image
+                    src="/logos/blast-monochrome.svg"
+                    alt="Blast Club"
+                    width={72}
+                    height={20}
+                    className="h-4 w-auto"
+                    unoptimized
+                  />
+                  <Image
+                    src="/logos/teutoseedclub-monochrome.svg"
+                    alt="Teuto Seed Club"
+                    width={80}
+                    height={20}
+                    className="h-4 w-auto"
+                    unoptimized
+                  />
+                </div>
               </div>
-              <div
-                className="relative w-full shrink-0 overflow-hidden rounded-md md:max-w-[45%]"
-                style={{ aspectRatio: '16 / 9' }}
+              <Link
+                href="/company"
+                className="inline-flex w-fit items-center gap-2 text-primary-foreground hover:text-hover-derived active:text-active-derived"
               >
-                <Image
-                  src={bgLight}
-                  className="absolute inset-0 h-full w-full object-cover dark:hidden"
-                  alt=""
-                  sizes={OPEN_SOURCE_IMAGE_SIZES}
-                  quality={70}
-                />
-                <Image
-                  src={bgDark}
-                  className="absolute inset-0 hidden h-full w-full object-cover dark:block"
-                  alt=""
-                  sizes={OPEN_SOURCE_IMAGE_SIZES}
-                  quality={70}
-                />
-                <Image
-                  src={githubRepoIssuesLight}
-                  className="absolute top-0 left-0 w-full dark:hidden"
-                  style={{
-                    transform: 'scale(1.5)',
-                    transformOrigin: 'top left',
-                  }}
-                  alt="GitHub repo issues view"
-                  sizes={OPEN_SOURCE_ZOOM_IMAGE_SIZES}
-                  quality={80}
-                />
-                <Image
-                  src={githubRepoIssuesDark}
-                  className="absolute top-0 left-0 hidden w-full dark:block"
-                  style={{
-                    transform: 'scale(1.5)',
-                    transformOrigin: 'top left',
-                  }}
-                  alt="GitHub repo issues view"
-                  sizes={OPEN_SOURCE_ZOOM_IMAGE_SIZES}
-                  quality={80}
-                />
-              </div>
+                Learn more about us
+                <IconArrowRightFill18 className="inline size-4" />
+              </Link>
             </div>
-          </ScrollReveal>
-        </div>
+            <div
+              className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[45%]"
+              style={{ aspectRatio: '4 / 3' }}
+            >
+              <Image
+                src={companyAbout}
+                className="absolute inset-0 h-full w-full object-contain"
+                alt="AI for a better future"
+                sizes={OPEN_SOURCE_IMAGE_SIZES}
+                quality={80}
+              />
+            </div>
+          </div>
+        </ScrollReveal>
       </section>
 
       {/* Second Get Started Section */}
