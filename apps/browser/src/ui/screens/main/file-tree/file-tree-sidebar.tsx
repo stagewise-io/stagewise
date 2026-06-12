@@ -29,11 +29,28 @@ import {
 } from './file-tree-utils';
 import { Tutorial } from '@ui/components/tutorial';
 
+function areFileTreeWorkspaceMountsEqual(
+  a: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
+  b: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((mount, index) => {
+      const otherMount = b[index];
+      return (
+        otherMount !== undefined &&
+        getFileTreeWorkspaceKey(mount) === getFileTreeWorkspaceKey(otherMount)
+      );
+    })
+  );
+}
+
 export function FileTreeSidebar() {
   const [openAgent] = useOpenAgent();
   const workspaceMounts = useKartonState(
-    useComparingSelector((s) =>
-      getFileTreeWorkspaceMountsForAgent(s, openAgent),
+    useComparingSelector(
+      (s) => getFileTreeWorkspaceMountsForAgent(s, openAgent),
+      areFileTreeWorkspaceMountsEqual,
     ),
   );
   const activeWorkspaceKey = useKartonState(
@@ -54,7 +71,6 @@ export function FileTreeSidebar() {
         key: getFileTreeWorkspaceKey(mount),
         name: getFileTreeWorkspaceName(mount),
         path: mount.path,
-        git: mount.git,
       })),
     [workspaceMounts],
   );
