@@ -92,7 +92,7 @@ function BackerCell({ backer, index }: { backer: Backer; index: number }) {
         alt={backer.logoAlt}
         className={
           isSvg
-            ? 'h-7 w-auto shrink-0 dark:invert'
+            ? 'h-7 w-auto shrink-0'
             : 'h-6 w-auto shrink-0 brightness-0 grayscale dark:invert'
         }
       />
@@ -105,25 +105,27 @@ function BackerCell({ backer, index }: { backer: Backer; index: number }) {
             href={backer.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="before:absolute before:inset-0 before:content-['']"
+            className="before:absolute before:inset-0"
           >
             <span className="sr-only">{backer.logoAlt}</span>
           </a>
         ) : null}
-        <ScrollReveal delay={contentDelay}>{imgEl}</ScrollReveal>
-        {backer.link ? (
-          <svg
-            className="pointer-events-none absolute top-1/2 right-4 size-3 -translate-y-1/2 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M6 3l5 5-5 5" />
-          </svg>
-        ) : null}
+        <ScrollReveal delay={contentDelay}>
+          {imgEl}
+          {backer.link ? (
+            <svg
+              className="pointer-events-none absolute top-1/2 right-4 size-3 -translate-y-1/2 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 3l5 5-5 5" />
+            </svg>
+          ) : null}
+        </ScrollReveal>
       </div>
     );
   }
@@ -395,7 +397,7 @@ export default function CompanyPage() {
                     <p className="font-medium text-foreground text-sm">
                       {job.title}
                     </p>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="shrink-0 text-muted-foreground text-xs">
                       In-Person &middot; {job.location}
                     </p>
                   </li>

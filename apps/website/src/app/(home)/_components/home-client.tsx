@@ -454,9 +454,9 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                 Building applied AI for a better future
               </h3>
               <p className="text-base text-muted-foreground">
-                stagewise focusses on making artificial intelligence accessible
-                to anyone by keeping cost low and putting great emphasis on a
-                simple user experience.
+                stagewise is built by a research team that focusses on making
+                artificial intelligence accessible to anyone by keeping cost low
+                and putting great emphasis on a simple user experience.
               </p>
               <div className="my-6">
                 <p className="mb-3 font-light text-muted-foreground text-sm">
@@ -468,7 +468,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                     alt="Y Combinator"
                     width={90}
                     height={24}
-                    className="h-5 w-auto dark:invert"
+                    className="h-5 w-auto"
                     unoptimized
                   />
                   <Image
@@ -476,14 +476,14 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                     alt="TwentyTwo Ventures"
                     width={80}
                     height={20}
-                    className="h-4 w-auto dark:invert"
+                    className="h-4 w-auto"
                   />
                   <Image
                     src="/logos/blast-monochrome.svg"
                     alt="Blast Club"
                     width={72}
                     height={20}
-                    className="h-4 w-auto dark:invert"
+                    className="h-4 w-auto"
                     unoptimized
                   />
                   <Image
@@ -491,7 +491,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                     alt="Teuto Seed Club"
                     width={80}
                     height={20}
-                    className="h-4 w-auto dark:invert"
+                    className="h-4 w-auto"
                     unoptimized
                   />
                 </div>
