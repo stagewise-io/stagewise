@@ -157,11 +157,27 @@ export function createKartonReactClient<T>(
     }
 
     const { client, subscribe } = context;
+    const selectorSnapshotRef = useRef<{
+      state: Readonly<KartonState<T>>;
+      selector: StateSelector<T, R>;
+      value: R;
+    } | null>(null);
 
-    const selectorFunc = useCallback(
-      () => selector(client.state),
-      [selector, client.state],
-    );
+    const selectorFunc = useCallback(() => {
+      const state = client.state;
+      const cachedSnapshot = selectorSnapshotRef.current;
+
+      if (
+        cachedSnapshot?.state === state &&
+        cachedSnapshot.selector === selector
+      ) {
+        return cachedSnapshot.value;
+      }
+
+      const value = selector(state);
+      selectorSnapshotRef.current = { state, selector, value };
+      return value;
+    }, [selector, client]);
 
     // Use React's built-in store subscription hook
     const selectedValue = useSyncExternalStore(
