@@ -73,6 +73,7 @@ function UiSizeSetting() {
 
   const commitUiSizeChange = (value: number) => {
     const nextValue = Math.max(70, Math.min(130, Math.round(value)));
+    const previousValue = preferences.general.uiZoomPercentage;
 
     if (commitTimeoutRef.current !== undefined) {
       window.clearTimeout(commitTimeoutRef.current);
@@ -88,7 +89,13 @@ function UiSizeSetting() {
       const [, patches] = produceWithPatches(preferences, (draft) => {
         draft.general.uiZoomPercentage = nextValue;
       });
-      await updatePreferences(patches);
+
+      try {
+        await updatePreferences(patches);
+      } catch (error) {
+        setLocalUiZoomPercentage(previousValue);
+        console.error('Failed to save UI size preference', error);
+      }
     }, 10);
   };
 
@@ -315,6 +322,8 @@ function ThemeSetting() {
   );
   const [currentThemeId, setCurrentThemeId] = useState(persistedThemeId);
   const currentThemeIdRef = useRef(persistedThemeId);
+  const persistedThemeIdRef = useRef(persistedThemeId);
+  persistedThemeIdRef.current = persistedThemeId;
 
   const setCurrentTheme = (themeId: PersonalizationThemeId) => {
     currentThemeIdRef.current = themeId;
@@ -367,8 +376,9 @@ function ThemeSetting() {
       }
 
       latestRequestedThemeIdRef.current = undefined;
-      setCurrentTheme(previousThemeId);
-      applyPersonalizationThemeToRoot(previousThemeId, { transition: true });
+      const groundTruth = persistedThemeIdRef.current;
+      setCurrentTheme(groundTruth);
+      applyPersonalizationThemeToRoot(groundTruth, { transition: true });
       console.error('Failed to save personalization theme', error);
     }
   };

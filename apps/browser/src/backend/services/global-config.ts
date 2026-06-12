@@ -94,8 +94,17 @@ export class GlobalConfigService extends DisposableService {
     const oldConfig = structuredClone(this.config);
     const parsedConfig = globalConfigSchema.parse(newConfig);
     this.config = parsedConfig;
+    try {
+      await this.saveConfigFile();
+    } catch (error) {
+      this.config = oldConfig;
+      this.logger.error(
+        '[GlobalConfigService] Failed to save config file, rolling back',
+        error,
+      );
+      throw error;
+    }
     this.applyAppColorScheme(parsedConfig);
-    await this.saveConfigFile();
     this.uiKarton.setState((draft) => {
       draft.globalConfig = parsedConfig;
     });
