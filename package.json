@@ -100,7 +100,7 @@
     "@ai-sdk/openai-compatible": "^2.0.35",
     "@aws-sdk/credential-providers": "^3.1045.0",
     "@better-auth/electron": "^1.6.10",
-    "@smithy/shared-ini-file-loader": "^4.4.9",
+    "@smithy/shared-ini-file-loader": "^4.5.6",
     "@streamdown/math": "^1.0.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-webgl": "^0.19.0",

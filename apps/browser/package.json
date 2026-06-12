@@ -89,7 +89,7 @@
     "@posthog/cli": "^0.7.11",
     "@react-three/fiber": "^9.6.1",
     "@shikijs/colorized-brackets": "3.21.0",
-    "@smithy/shared-ini-file-loader": "^4.4.9",
+    "@smithy/shared-ini-file-loader": "^4.5.6",
     "@stagewise/agent-core": "workspace:*",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@stagewise/agent-shell": "workspace:*",
