@@ -12,15 +12,30 @@ import type {
   ModelCapabilities,
   ModelProvider,
   ProviderEndpointMode,
+  UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
   PROVIDER_DISPLAY_INFO,
   PROVIDER_OFFICIAL_URLS,
 } from '@shared/karton-contracts/ui/shared-types';
 import { availableModels } from '@shared/available-models';
+import {
+  getEnabledModelThinkingOption,
+  getModelThinkingDisplayState,
+  getModelThinkingOptions,
+  type ModelThinkingDisplayState,
+} from '@ui/utils/model-thinking';
+import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
 import { CODING_PLANS, type CodingPlan } from '@shared/coding-plans';
 import { CodingPlanCard } from '@ui/components/coding-plan-card';
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+} from 'react';
 
 import { cn } from '@ui/utils';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
@@ -56,6 +71,11 @@ import {
 
 enablePatches();
 
+const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
+const EMPTY_CUSTOM_ENDPOINTS: UserPreferences['customEndpoints'] = [];
+const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
+  {};
+
 // =============================================================================
 // Model Provider Configuration
 // =============================================================================
@@ -70,6 +90,27 @@ const PROVIDERS: ModelProvider[] = [
   'z-ai',
   'minimax',
 ];
+
+function getThinkingDefaultOptionsForModel(
+  model: (typeof availableModels)[number],
+  preferences: UserPreferences,
+): Parameters<typeof getModelThinkingDisplayState>[2] {
+  const provider = model.officialProvider;
+  if (!provider) return { providerMode: 'stagewise' };
+
+  const config = preferences.providerConfigs[provider];
+  if (config.mode !== 'custom') return { providerMode: config.mode };
+
+  const endpoint = preferences.customEndpoints.find(
+    (item) => item.id === config.customProviderId,
+  );
+  if (!endpoint) return { providerMode: 'stagewise' };
+
+  return {
+    providerMode: 'custom',
+    customEndpointApiSpec: endpoint.apiSpec,
+  };
+}
 
 function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
   const setSettingsRoute = useKartonProcedure(
@@ -92,7 +133,8 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
   };
   const displayInfo = PROVIDER_DISPLAY_INFO[provider];
   const officialUrl = PROVIDER_OFFICIAL_URLS[provider];
-  const customEndpoints = preferences?.customEndpoints ?? [];
+  const customEndpoints =
+    preferences?.customEndpoints ?? EMPTY_CUSTOM_ENDPOINTS;
 
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [isSavingKey, setIsSavingKey] = useState(false);
@@ -923,16 +965,21 @@ function CustomModelDialog({
 function BuiltInModelCard({
   model,
   isEnabled,
+  thinkingDisplay,
   onToggle,
+  onEditThinking,
 }: {
   model: (typeof availableModels)[number];
   isEnabled: boolean;
+  thinkingDisplay: ModelThinkingDisplayState | null;
   onToggle: () => void;
+  onEditThinking: (event: React.MouseEvent<HTMLElement>) => void;
 }) {
   return (
     <div
+      data-model-card
       className={cn(
-        'cursor-pointer rounded-lg border border-derived bg-surface-1 p-3',
+        'group/model-card cursor-pointer rounded-lg border border-derived bg-surface-1 p-3',
         !isEnabled && 'opacity-60',
       )}
       onClick={onToggle}
@@ -941,6 +988,11 @@ function BuiltInModelCard({
         <div className="-mt-1 min-w-0 flex-1">
           <h3 className="font-medium text-foreground text-sm">
             {model.modelDisplayName}
+            {thinkingDisplay && (
+              <span className="ml-1.5 font-normal text-subtle-foreground">
+                {thinkingDisplay.label}
+              </span>
+            )}
           </h3>
           <p className="text-muted-foreground text-xs">
             {model.modelId} &middot;{' '}
@@ -969,10 +1021,23 @@ function BuiltInModelCard({
           className="flex shrink-0 items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
+          {thinkingDisplay && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              data-thinking-edit-trigger
+              className="h-5 px-1.5 opacity-0 transition-opacity group-focus-within/model-card:opacity-100 group-hover/model-card:opacity-100"
+              onClick={onEditThinking}
+            >
+              Edit
+            </Button>
+          )}
           <Switch
             checked={isEnabled}
             onCheckedChange={() => onToggle()}
             size="xs"
+            aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${model.modelDisplayName}`}
           />
         </div>
       </div>
@@ -1042,6 +1107,7 @@ function CustomModelCard({
             checked={isEnabled}
             onCheckedChange={() => onToggle()}
             size="xs"
+            aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${model.displayName}`}
           />
         </div>
       </div>
@@ -1053,12 +1119,15 @@ function CustomModelsSection() {
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
-  const customModels = preferences?.customModels ?? [];
-  const customEndpoints = preferences?.customEndpoints ?? [];
+  const customModels = preferences?.customModels ?? EMPTY_CUSTOM_MODELS;
+  const customEndpoints =
+    preferences?.customEndpoints ?? EMPTY_CUSTOM_ENDPOINTS;
   const disabledModelIds = useMemo(
-    () => new Set(preferences?.agent.disabledModelIds ?? []),
-    [preferences?.agent.disabledModelIds],
+    () => new Set(preferences.agent.disabledModelIds),
+    [preferences.agent.disabledModelIds],
   );
+  const thinkingOverrides =
+    preferences.agent.modelThinkingOverrides ?? EMPTY_MODEL_THINKING_OVERRIDES;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<CustomModel | undefined>(
@@ -1123,6 +1192,131 @@ function CustomModelsSection() {
     fadeDistance: 24,
   });
 
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const thinkingPanelRef = useRef<HTMLDivElement>(null);
+  const thinkingPanelAnchorRef = useRef<HTMLElement | null>(null);
+  const [thinkingPanelModelId, setThinkingPanelModelId] = useState<
+    string | null
+  >(null);
+  const [thinkingPanelCenterY, setThinkingPanelCenterY] = useState(0);
+  const [thinkingPanelOffset, setThinkingPanelOffset] = useState(0);
+  const [thinkingPanelLeft, setThinkingPanelLeft] = useState(0);
+  const [thinkingPanelSide, setThinkingPanelSide] = useState<'left' | 'right'>(
+    'right',
+  );
+
+  const thinkingPanelModel = useMemo(
+    () => availableModels.find((m) => m.modelId === thinkingPanelModelId),
+    [thinkingPanelModelId],
+  );
+
+  const updateThinkingPanelOffset = useCallback(() => {
+    if (
+      !thinkingPanelModelId ||
+      !thinkingPanelRef.current ||
+      !listContainerRef.current
+    ) {
+      return;
+    }
+
+    const panel = thinkingPanelRef.current;
+    const panelHeight = panel.offsetHeight;
+    const panelWidth = panel.offsetWidth;
+    const container = listContainerRef.current;
+    const containerHeight = container.offsetHeight;
+    const anchorRect = thinkingPanelAnchorRef.current?.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const panelGap = 4;
+
+    if (anchorRect) {
+      const rightSpace = window.innerWidth - anchorRect.right;
+      const leftSpace = anchorRect.left;
+      const side =
+        rightSpace >= panelWidth + panelGap || rightSpace >= leftSpace
+          ? 'right'
+          : 'left';
+      const rawLeft =
+        side === 'right'
+          ? anchorRect.right - containerRect.left + panelGap
+          : anchorRect.left - containerRect.left - panelWidth - panelGap;
+      const minLeft = panelGap - containerRect.left;
+      const maxLeft =
+        window.innerWidth - containerRect.left - panelWidth - panelGap;
+
+      setThinkingPanelSide(side);
+      setThinkingPanelLeft(Math.min(Math.max(rawLeft, minLeft), maxLeft));
+    }
+    const centerY = anchorRect
+      ? anchorRect.top + anchorRect.height / 2 - containerRect.top
+      : thinkingPanelCenterY;
+    let offset = centerY - panelHeight / 2;
+    offset = Math.max(0, offset);
+    offset = Math.min(offset, Math.max(0, containerHeight - panelHeight));
+    setThinkingPanelOffset(offset);
+  }, [thinkingPanelCenterY, thinkingPanelModelId]);
+
+  useLayoutEffect(() => {
+    updateThinkingPanelOffset();
+  }, [updateThinkingPanelOffset]);
+
+  useEffect(() => {
+    if (
+      !thinkingPanelModelId ||
+      !thinkingPanelRef.current ||
+      !listContainerRef.current
+    ) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateThinkingPanelOffset());
+    observer.observe(thinkingPanelRef.current);
+    observer.observe(listContainerRef.current);
+    listScrollViewport?.addEventListener('scroll', updateThinkingPanelOffset);
+    window.addEventListener('resize', updateThinkingPanelOffset);
+    updateThinkingPanelOffset();
+
+    return () => {
+      observer.disconnect();
+      listScrollViewport?.removeEventListener(
+        'scroll',
+        updateThinkingPanelOffset,
+      );
+      window.removeEventListener('resize', updateThinkingPanelOffset);
+    };
+  }, [listScrollViewport, thinkingPanelModelId, updateThinkingPanelOffset]);
+
+  useEffect(() => {
+    if (!thinkingPanelModelId) return;
+    if (
+      filteredBuiltIn.some((model) => model.modelId === thinkingPanelModelId)
+    ) {
+      return;
+    }
+    setThinkingPanelModelId(null);
+  }, [filteredBuiltIn, thinkingPanelModelId]);
+
+  useEffect(() => {
+    if (!thinkingPanelModelId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (thinkingPanelRef.current?.contains(target)) return;
+      if (
+        target instanceof Element &&
+        target.closest('[data-thinking-edit-trigger]')
+      ) {
+        return;
+      }
+      setThinkingPanelModelId(null);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [thinkingPanelModelId]);
+
   const handleAdd = useCallback(() => {
     setEditingModel(undefined);
     setDialogOpen(true);
@@ -1132,6 +1326,98 @@ function CustomModelsSection() {
     setEditingModel(m);
     setDialogOpen(true);
   }, []);
+
+  const handleEditThinking = useCallback(
+    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
+      event.stopPropagation();
+      event.preventDefault();
+
+      const container = listContainerRef.current;
+      const target = event.currentTarget;
+      const anchor = target.closest<HTMLElement>('[data-model-card]') ?? target;
+      thinkingPanelAnchorRef.current = target;
+
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = anchor.getBoundingClientRect();
+        setThinkingPanelCenterY(
+          itemRect.top + itemRect.height / 2 - containerRect.top,
+        );
+      }
+
+      setThinkingPanelModelId((current) => {
+        if (current === modelId) {
+          thinkingPanelAnchorRef.current = null;
+          return null;
+        }
+        return modelId;
+      });
+    },
+    [],
+  );
+
+  const handleSetThinkingEnabled = useCallback(
+    async (modelId: string, enabled: boolean) => {
+      const model = availableModels.find((item) => item.modelId === modelId);
+      if (!model) return;
+
+      const route = getThinkingDefaultOptionsForModel(model, preferences);
+      const option = enabled
+        ? getEnabledModelThinkingOption(
+            model,
+            thinkingOverrides[modelId]?.value,
+            route,
+          )
+        : (getModelThinkingOptions(model, route).find(
+            (item) => item.value === thinkingOverrides[modelId]?.value,
+          ) ?? getModelThinkingOptions(model, route)[0]);
+      if (!option) return;
+
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.agent.modelThinkingOverrides[modelId] = {
+          ...draft.agent.modelThinkingOverrides[modelId],
+          enabled,
+          provider: option.provider,
+          value: option.value,
+        };
+      });
+      await updatePreferences(patches);
+    },
+    [preferences, thinkingOverrides, updatePreferences],
+  );
+
+  const handleSetThinkingValue = useCallback(
+    async (modelId: string, value: string) => {
+      const model = availableModels.find((item) => item.modelId === modelId);
+      if (!model) return;
+
+      const route = getThinkingDefaultOptionsForModel(model, preferences);
+      const option = getModelThinkingOptions(model, route).find(
+        (item) => item.value === value,
+      );
+      if (!option) return;
+
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.agent.modelThinkingOverrides[modelId] = {
+          enabled: true,
+          provider: option.provider,
+          value: option.value,
+        };
+      });
+      await updatePreferences(patches);
+    },
+    [preferences, updatePreferences],
+  );
+
+  const handleResetThinkingOverride = useCallback(
+    async (modelId: string) => {
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        delete draft.agent.modelThinkingOverrides[modelId];
+      });
+      await updatePreferences(patches);
+    },
+    [preferences, updatePreferences],
+  );
 
   const handleSave = useCallback(
     async (
@@ -1209,41 +1495,82 @@ function CustomModelsSection() {
         </Button>
       </div>
 
-      <OverlayScrollbar
-        className="mask-alpha h-96"
-        style={listMaskStyle}
-        onViewportRef={setListScrollViewport}
-        contentClassName="space-y-3"
-      >
-        {filteredBuiltIn.map((model) => (
-          <BuiltInModelCard
-            key={model.modelId}
-            model={model}
-            isEnabled={!disabledModelIds.has(model.modelId)}
-            onToggle={() => handleToggleModel(model.modelId)}
-          />
-        ))}
+      <div ref={listContainerRef} className="relative">
+        <OverlayScrollbar
+          className="mask-alpha h-96"
+          style={listMaskStyle}
+          onViewportRef={setListScrollViewport}
+          contentClassName="space-y-3"
+        >
+          {filteredBuiltIn.map((model) => (
+            <BuiltInModelCard
+              key={model.modelId}
+              model={model}
+              isEnabled={!disabledModelIds.has(model.modelId)}
+              thinkingDisplay={getModelThinkingDisplayState(
+                model,
+                thinkingOverrides[model.modelId],
+                getThinkingDefaultOptionsForModel(model, preferences),
+              )}
+              onToggle={() => handleToggleModel(model.modelId)}
+              onEditThinking={(event) =>
+                handleEditThinking(model.modelId, event)
+              }
+            />
+          ))}
 
-        {filteredCustom.map((model) => (
-          <CustomModelCard
-            key={model.modelId}
-            model={model}
-            endpointName={resolveEndpointName(model.endpointId)}
-            isEnabled={!disabledModelIds.has(model.modelId)}
-            onToggle={() => handleToggleModel(model.modelId)}
-            onEdit={() => handleEdit(model)}
-            onDelete={() => handleDelete(model.modelId)}
-          />
-        ))}
+          {filteredCustom.map((model) => (
+            <CustomModelCard
+              key={model.modelId}
+              model={model}
+              endpointName={resolveEndpointName(model.endpointId)}
+              isEnabled={!disabledModelIds.has(model.modelId)}
+              onToggle={() => handleToggleModel(model.modelId)}
+              onEdit={() => handleEdit(model)}
+              onDelete={() => handleDelete(model.modelId)}
+            />
+          ))}
 
-        {noResults && (
-          <div className="rounded-lg border border-derived-subtle p-4">
-            <p className="text-center text-muted-foreground text-sm">
-              No models match your filter.
-            </p>
+          {noResults && (
+            <div className="rounded-lg border border-derived-subtle p-4">
+              <p className="text-center text-muted-foreground text-sm">
+                No models match your filter.
+              </p>
+            </div>
+          )}
+        </OverlayScrollbar>
+
+        {thinkingPanelModel && (
+          <div
+            ref={thinkingPanelRef}
+            className={cn(
+              'absolute z-10 flex w-64 flex-col rounded-lg border border-derived bg-background text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
+              thinkingPanelSide === 'right'
+                ? 'fade-in-0 slide-in-from-left-1 animate-in duration-150'
+                : 'fade-in-0 slide-in-from-right-1 animate-in duration-150',
+            )}
+            style={{ top: thinkingPanelOffset, left: thinkingPanelLeft }}
+          >
+            <ModelThinkingPanel
+              model={thinkingPanelModel}
+              override={thinkingOverrides[thinkingPanelModel.modelId]}
+              defaultOptions={getThinkingDefaultOptionsForModel(
+                thinkingPanelModel,
+                preferences,
+              )}
+              onEnabledChange={(enabled) =>
+                handleSetThinkingEnabled(thinkingPanelModel.modelId, enabled)
+              }
+              onValueChange={(value) =>
+                handleSetThinkingValue(thinkingPanelModel.modelId, value)
+              }
+              onReset={() =>
+                handleResetThinkingOverride(thinkingPanelModel.modelId)
+              }
+            />
           </div>
         )}
-      </OverlayScrollbar>
+      </div>
 
       <CustomModelDialog
         model={editingModel}

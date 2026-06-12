@@ -200,6 +200,41 @@ describe('isEventMatch', () => {
   });
 
   describe('layout-dependent symbol keys', () => {
+    it('uses Mod+Alt+Slash for cycling model thinking effort', () => {
+      const def = hotkeyDefinitions[HotkeyActions.CYCLE_MODEL_THINKING_EFFORT];
+      const ev = createKeyboardEvent({
+        code: 'Slash',
+        key: '÷',
+        metaKey: true,
+        altKey: true,
+      });
+
+      expect(isEventMatch(ev, def, 'mac')).toBe(true);
+    });
+
+    it('does NOT match physical Slash without Alt when it produces another character', () => {
+      const def: HotkeyDefinition = { accelerator: 'Mod+Slash' };
+      const ev = createKeyboardEvent({
+        code: 'Slash',
+        key: '-',
+        metaKey: true,
+      });
+
+      expect(isEventMatch(ev, def, 'mac')).toBe(false);
+    });
+
+    it('keeps shifted Slash available for Open Model Select layouts', () => {
+      const def = hotkeyDefinitions[HotkeyActions.OPEN_MODEL_SELECT];
+      const ev = createKeyboardEvent({
+        code: 'Digit7',
+        key: '/',
+        metaKey: true,
+        shiftKey: true,
+      });
+
+      expect(isEventMatch(ev, def, 'mac')).toBe(true);
+    });
+
     it('matches Slash by produced character', () => {
       const def: HotkeyDefinition = { accelerator: 'Mod+Slash' };
       const ev = createKeyboardEvent({
@@ -210,26 +245,13 @@ describe('isEventMatch', () => {
       expect(isEventMatch(ev, def, 'mac')).toBe(true);
     });
 
-    it('does NOT match Slash by physical key when it produces minus', () => {
-      const def: HotkeyDefinition = { accelerator: 'Mod+Slash' };
+    it('matches physical Slash with Alt when it produces another character', () => {
+      const def: HotkeyDefinition = { accelerator: 'Mod+Alt+Slash' };
       const ev = createKeyboardEvent({
         code: 'Slash',
-        key: '-',
+        key: '÷',
         metaKey: true,
-      });
-      expect(isEventMatch(ev, def, 'mac')).toBe(false);
-    });
-
-    it('matches shifted Slash aliases on QWERTZ-style layouts', () => {
-      const def: HotkeyDefinition = {
-        accelerator: 'Mod+Slash',
-        aliases: ['Mod+Shift+Slash'],
-      };
-      const ev = createKeyboardEvent({
-        code: 'Digit7',
-        key: '/',
-        metaKey: true,
-        shiftKey: true,
+        altKey: true,
       });
       expect(isEventMatch(ev, def, 'mac')).toBe(true);
     });
@@ -260,6 +282,11 @@ describe('getDisplayString', () => {
     const def: HotkeyDefinition = { accelerator: 'Mod+Shift+T' };
     // Modifiers appear in accelerator string order (Shift before Cmd symbol)
     expect(getDisplayString(def, 'mac')).toBe('⇧⌘T');
+  });
+
+  it('displays cycle model thinking effort as Cmd+Alt+Slash on Mac', () => {
+    const def = hotkeyDefinitions[HotkeyActions.CYCLE_MODEL_THINKING_EFFORT];
+    expect(getDisplayString(def, 'mac')).toBe('⌥⌘/');
   });
 
   it('returns Alt symbol on Mac', () => {

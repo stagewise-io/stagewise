@@ -153,31 +153,33 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {
         modelThinkingOverrides: {
-          'gpt-5.5': { enabled: true, effort: 'high' },
-          'claude-sonnet-4.6': { enabled: false },
+          'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+          'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
         },
       },
     });
 
     expect(parsed.agent.modelThinkingOverrides).toEqual({
-      'gpt-5.5': { enabled: true, effort: 'high' },
-      'claude-sonnet-4.6': { enabled: false },
+      'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+      'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
     });
   });
 
-  it('sanitizes invalid model thinking override entries', () => {
+  it('sanitizes invalid model thinking override entries field-by-field', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {
         modelThinkingOverrides: {
-          'gpt-5.5': { enabled: true, effort: 'invalid' },
-          'claude-sonnet-4.6': null,
+          'gpt-5.5': { enabled: true, provider: 'invalid', value: 'high' },
+          'claude-opus-4.8': { enabled: 'nope', provider: 'anthropic' },
+          'gemini-3.1-pro-preview': null,
         },
       },
     });
 
     expect(parsed.agent.modelThinkingOverrides).toEqual({
-      'gpt-5.5': {},
-      'claude-sonnet-4.6': {},
+      'gpt-5.5': { enabled: true, value: 'high' },
+      'claude-opus-4.8': { provider: 'anthropic' },
+      'gemini-3.1-pro-preview': {},
     });
   });
 });
