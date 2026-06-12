@@ -50,6 +50,7 @@ export enum HotkeyActions {
   EDIT_NEAREST_USER_MESSAGE = 'edit_nearest_user_message',
   OPEN_WORKSPACE_SELECT = 'open_workspace_select',
   OPEN_MODEL_SELECT = 'open_model_select',
+  CYCLE_MODEL_THINKING_EFFORT = 'cycle_model_thinking_effort',
   OPEN_COMMAND_CENTER = 'open_command_center',
   OPEN_FILE_SEARCH = 'open_file_search',
   OPEN_CONTENT_FILE_SEARCH = 'open_content_file_search',
@@ -180,6 +181,10 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.OPEN_MODEL_SELECT]: {
     accelerator: 'Mod+Slash',
     aliases: ['Mod+Shift+Slash'],
+    captureDominantly: true,
+  },
+  [HotkeyActions.CYCLE_MODEL_THINKING_EFFORT]: {
+    accelerator: 'Mod+Alt+Slash',
     captureDominantly: true,
   },
   [HotkeyActions.OPEN_COMMAND_CENTER]: {
@@ -551,7 +556,11 @@ function parseAccelerator(accelerator: string): ParsedAccelerator {
  * Matches the key part of an accelerator against a KeyboardEvent.
  * Handles letters, digits, function keys, arrows, and special keys.
  */
-function matchKeyToken(ev: KeyboardEvent, token: string): boolean {
+function matchKeyToken(
+  ev: KeyboardEvent,
+  token: string,
+  options: { allowPhysicalSlash?: boolean } = {},
+): boolean {
   // Handle single letters (A-Z)
   if (token.length === 1 && /^[A-Z]$/.test(token))
     return ev.code === `Key${token}`;
@@ -628,7 +637,14 @@ function matchKeyToken(ev: KeyboardEvent, token: string): boolean {
     case 'PERIOD':
       return ev.code === 'Period';
     case 'SLASH':
-      return ev.key === '/' || ev.code === 'NumpadDivide';
+      // Match produced `/` for layout portability (QWERTZ uses Shift+7),
+      // but allow the physical slash key for Option/Alt shortcuts because
+      // macOS mutates the produced character (e.g. Option+/ -> `÷`).
+      return (
+        ev.key === '/' ||
+        ev.code === 'NumpadDivide' ||
+        (options.allowPhysicalSlash === true && ev.code === 'Slash')
+      );
 
     // Function keys (F1-F24)
     default:
@@ -667,7 +683,9 @@ function matchAccelerator(
 
   // Match the key
   if (!parsed.keyToken) return false;
-  return matchKeyToken(ev, parsed.keyToken);
+  return matchKeyToken(ev, parsed.keyToken, {
+    allowPhysicalSlash: requiredAlt,
+  });
 }
 
 /**

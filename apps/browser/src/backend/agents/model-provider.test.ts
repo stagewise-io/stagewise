@@ -15,22 +15,28 @@ import {
 function createTestModelProviderService({
   providerModes = {},
   modelThinkingOverrides = {},
+  customEndpoints = [],
 }: {
   providerModes?: Record<string, 'stagewise' | 'official' | 'custom'>;
   modelThinkingOverrides?: Record<
     string,
     {
       enabled?: boolean;
-      effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+      value?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
     }
   >;
+  customEndpoints?: typeof defaultUserPreferences.customEndpoints;
 } = {}) {
   const preferences = structuredClone(defaultUserPreferences);
   preferences.agent.modelThinkingOverrides = modelThinkingOverrides;
+  preferences.customEndpoints = customEndpoints;
   for (const [provider, mode] of Object.entries(providerModes)) {
-    preferences.providerConfigs[
-      provider as keyof typeof preferences.providerConfigs
-    ].mode = mode;
+    const config =
+      preferences.providerConfigs[
+        provider as keyof typeof preferences.providerConfigs
+      ];
+    config.mode = mode;
+    if (mode === 'custom') config.customProviderId = `${provider}-custom`;
   }
 
   return new ModelProviderService(
@@ -68,7 +74,7 @@ describe('thinking override provider option resolution', () => {
 
   it('does not apply overrides without agent-step request purpose', () => {
     const service = createTestModelProviderService({
-      modelThinkingOverrides: { 'gpt-5.5': { effort: 'high' } },
+      modelThinkingOverrides: { 'gpt-5.5': { value: 'high' } },
     });
 
     const result = service.getModelWithOptions('gpt-5.5', 'trace-1');
@@ -80,7 +86,7 @@ describe('thinking override provider option resolution', () => {
 
   it('applies built-in overrides for agent-step requests', () => {
     const service = createTestModelProviderService({
-      modelThinkingOverrides: { 'gpt-5.5': { effort: 'high' } },
+      modelThinkingOverrides: { 'gpt-5.5': { value: 'high' } },
     });
 
     const result = service.getModelWithOptions(
@@ -90,7 +96,8 @@ describe('thinking override provider option resolution', () => {
     );
 
     expect(result.providerOptions).toMatchObject({
-      stagewise: { reasoning: { enabled: true, effort: 'high' } },
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: { reasoningEffort: 'high' },
     });
   });
 
@@ -112,7 +119,7 @@ describe('thinking override provider option resolution', () => {
     expect(result.providerOptions?.anthropic).not.toHaveProperty('effort');
   });
 
-  it('disables OpenAI thinking by removing reasoning options', () => {
+  it('disables OpenAI thinking with the provider-native off value', () => {
     const service = createTestModelProviderService({
       providerModes: { openai: 'official' },
       modelThinkingOverrides: { 'gpt-5.5': { enabled: false } },
@@ -124,14 +131,9 @@ describe('thinking override provider option resolution', () => {
       agentStepMetadata,
     );
 
-    expect(result.providerOptions?.openai).not.toHaveProperty(
-      'reasoningEffort',
-    );
-    expect(result.providerOptions?.openai).not.toHaveProperty(
-      'reasoningSummary',
-    );
     expect(result.providerOptions).toMatchObject({
       openai: {
+        reasoningEffort: 'none',
         parallelToolCalls: true,
         strictJsonSchema: true,
       },
@@ -162,7 +164,7 @@ describe('thinking override provider option resolution', () => {
     });
   });
 
-  it('disables stagewise thinking without leaving an effort', () => {
+  it('disables stagewise-routed OpenAI thinking with provider-native options', () => {
     const service = createTestModelProviderService({
       modelThinkingOverrides: { 'gpt-5.5': { enabled: false } },
     });
@@ -174,10 +176,8 @@ describe('thinking override provider option resolution', () => {
     );
 
     expect(result.providerOptions).toMatchObject({
-      stagewise: { reasoning: { enabled: false } },
-    });
-    expect(result.providerOptions?.stagewise).toMatchObject({
-      reasoning: expect.not.objectContaining({ effort: expect.anything() }),
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: { reasoningEffort: 'none' },
     });
   });
 
@@ -203,7 +203,7 @@ describe('thinking override provider option resolution', () => {
 
   it('preserves unrelated stagewise provider options', () => {
     const service = createTestModelProviderService({
-      modelThinkingOverrides: { 'deepseek-v4-pro': { effort: 'high' } },
+      modelThinkingOverrides: { 'deepseek-v4-pro': { value: 'high' } },
     });
 
     const result = service.getModelWithOptions(
@@ -213,17 +213,36 @@ describe('thinking override provider option resolution', () => {
     );
 
     expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'high' },
       stagewise: {
-        reasoning: { enabled: true, effort: 'high' },
+        reasoning: { enabled: true, effort: 'medium' },
         provider: { require_parameters: true },
       },
     });
   });
 
+  it('maps OpenAI-compatible official overrides to the OpenAI provider namespace', () => {
+    const service = createTestModelProviderService({
+      providerModes: { deepseek: 'official' },
+      modelThinkingOverrides: { 'deepseek-v4-pro': { value: 'high' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'deepseek-v4-pro',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions?.openai).toMatchObject({
+      reasoningEffort: 'high',
+    });
+    expect(result.providerOptions).not.toHaveProperty('deepseek');
+  });
+
   it('maps OpenAI official overrides while preserving unrelated options', () => {
     const service = createTestModelProviderService({
       providerModes: { openai: 'official' },
-      modelThinkingOverrides: { 'gpt-5.5': { effort: 'high' } },
+      modelThinkingOverrides: { 'gpt-5.5': { value: 'high' } },
     });
 
     const result = service.getModelWithOptions(
@@ -246,7 +265,7 @@ describe('thinking override provider option resolution', () => {
     const service = createTestModelProviderService({
       providerModes: { google: 'official' },
       modelThinkingOverrides: {
-        'gemini-3.1-pro-preview': { effort: 'minimal' },
+        'gemini-3.1-pro-preview': { value: 'low' },
       },
     });
 
@@ -287,7 +306,7 @@ describe('thinking override provider option resolution', () => {
   it('maps Anthropic official overrides while preserving adaptive shape', () => {
     const service = createTestModelProviderService({
       providerModes: { anthropic: 'official' },
-      modelThinkingOverrides: { 'claude-fable-5': { effort: 'high' } },
+      modelThinkingOverrides: { 'claude-fable-5': { value: 'high' } },
     });
 
     const result = service.getModelWithOptions(
@@ -298,6 +317,49 @@ describe('thinking override provider option resolution', () => {
 
     expect(result.providerOptions).toMatchObject({
       anthropic: { thinking: { type: 'adaptive' }, effort: 'high' },
+    });
+  });
+
+  it('maps Stagewise-routed Anthropic overrides to Anthropic options', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: { 'claude-opus-4.8': { value: 'max' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'claude-opus-4.8',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      anthropic: { thinking: { type: 'adaptive' }, effort: 'max' },
+    });
+  });
+
+  it('uses OpenAI-compatible options for custom chat completions endpoints', () => {
+    const service = createTestModelProviderService({
+      providerModes: { openai: 'custom' },
+      modelThinkingOverrides: { 'gpt-5.5': { value: 'xhigh' } },
+      customEndpoints: [
+        {
+          id: 'openai-custom',
+          name: 'OpenAI-compatible',
+          apiSpec: 'openai-chat-completions',
+          baseUrl: 'https://example.com/v1',
+          awsAuthMode: 'access-keys',
+        },
+      ],
+    });
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'medium' },
     });
   });
 });

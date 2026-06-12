@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
-import { useKartonState } from '@ui/hooks/use-karton';
+import { useComparingSelector, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import {
   useOpenAgent,
@@ -22,19 +22,24 @@ export function ChatPanel() {
 
   // Narrow selectors: only extract primitive/stable values so streaming
   // chunks on unrelated agents don't trigger a re-render.
-  const openAgentExists = useKartonState((s) =>
-    openAgent ? !!s.agents.instances[openAgent] : false,
+  const agentHistoryLengths = useKartonState(
+    useComparingSelector((s) =>
+      Object.fromEntries(
+        Object.entries(s.agents.instances).map(([id, agent]) => [
+          id,
+          agent.state.history?.length ?? 0,
+        ]),
+      ),
+    ),
   );
+  const openAgentExists = openAgent ? openAgent in agentHistoryLengths : false;
   // Defer heavy chat rendering so the sidebar updates instantly while the
   // chat area stays empty during the transition.
   const deferredAgent = useDeferredValue(openAgent);
   const isTransitioning = openAgent !== deferredAgent;
-
-  const deferredAgentHistoryLen = useKartonState((s) =>
-    deferredAgent
-      ? (s.agents.instances[deferredAgent]?.state.history?.length ?? 0)
-      : 0,
-  );
+  const deferredAgentHistoryLen = deferredAgent
+    ? (agentHistoryLengths[deferredAgent] ?? 0)
+    : 0;
 
   // Auto-selecting the first agent when openAgent is null is handled
   // centrally by `useAutoSelectFirstAgent` at the main layout root —

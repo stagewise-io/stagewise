@@ -216,23 +216,36 @@ export const PROVIDER_DISPLAY_INFO: Record<
   },
 };
 
-export const thinkingEffortSchema = z.enum([
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
+export const thinkingProviderSchema = z.enum([
+  'stagewise',
+  'openai',
+  'google',
+  'anthropic',
+  'openai-compatible',
 ]);
-export type ThinkingEffort = z.infer<typeof thinkingEffortSchema>;
+export type ThinkingProvider = z.infer<typeof thinkingProviderSchema>;
 
-export const modelThinkingOverrideSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    effort: thinkingEffortSchema.optional(),
-  })
-  .default({})
-  .catch({});
+export const modelThinkingOverrideSchema = z.unknown().transform((value) => {
+  if (!isPlainRecord(value)) return {};
+
+  return {
+    ...(typeof value.enabled === 'boolean' ? { enabled: value.enabled } : {}),
+    ...(thinkingProviderSchema.safeParse(value.provider).success
+      ? { provider: value.provider as ThinkingProvider }
+      : {}),
+    ...(typeof value.value === 'string' ? { value: value.value } : {}),
+  };
+});
 export type ModelThinkingOverride = z.infer<typeof modelThinkingOverrideSchema>;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
 
 /**
  * GLOBAL CONFIG CAPABILITIES

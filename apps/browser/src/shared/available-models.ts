@@ -715,7 +715,9 @@ export const availableModels = [
     headers: googleHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
-      anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } },
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'medium' },
+      },
     },
     thinkingEnabled: true,
     pricing: {
@@ -791,7 +793,9 @@ export const availableModels = [
     headers: googleHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
-      anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } },
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'medium' },
+      },
     },
     thinkingEnabled: true,
     pricing: {

@@ -3,7 +3,9 @@ import {
   IconArrowUpOutline18,
   IconArrowDownOutline18,
   IconXmarkOutline18,
+  IconBrainOutline18,
 } from 'nucleo-ui-outline-18';
+import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Combobox,
   ComboboxGroup,
@@ -19,7 +21,6 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import type { ModelId } from '@shared/available-models';
-import { IconBrainOutline18 } from 'nucleo-ui-outline-18';
 import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
 import { availableModels } from '@shared/available-models';
 import { HotkeyActions } from '@shared/hotkeys';
@@ -38,6 +39,17 @@ import { cn } from '@ui/utils';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
+import {
+  getEnabledModelThinkingOption,
+  getModelThinkingDisplayState,
+  getNextModelThinkingOption,
+  getModelThinkingOptions,
+} from '@ui/utils/model-thinking';
+import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
+import { enablePatches, produceWithPatches } from 'immer';
+
+enablePatches();
 
 interface ModelOption {
   modelId: string;
@@ -45,6 +57,8 @@ interface ModelOption {
   description: string;
   context: string;
   thinkingEnabled: boolean;
+  thinkingLabel?: string;
+  catalogModel?: (typeof availableModels)[number];
   pricingMultiplier?: number;
   group?: string;
 }
@@ -84,9 +98,36 @@ interface ModelSelectProps {
   onModelChange?: () => void;
 }
 
+function getThinkingDefaultOptionsForModel(
+  model: (typeof availableModels)[number],
+  preferences: UserPreferences,
+): Parameters<typeof getModelThinkingDisplayState>[2] {
+  const provider = model.officialProvider;
+  if (!provider) return { providerMode: 'stagewise' };
+
+  const config = preferences.providerConfigs[provider];
+  if (config.mode !== 'custom') return { providerMode: config.mode };
+
+  const endpoint = preferences.customEndpoints.find(
+    (item) => item.id === config.customProviderId,
+  );
+  if (!endpoint) return { providerMode: 'stagewise' };
+
+  return {
+    providerMode: 'custom',
+    customEndpointApiSpec: endpoint.apiSpec,
+  };
+}
+
 // Sentinel value for the "Open model settings" row. Picked to be
 // impossible to collide with any real `ModelId` (leading `@@` + spaces).
 const OPEN_MODEL_SETTINGS_VALUE = '@@open model settings@@';
+
+const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
+const EMPTY_DISABLED_MODEL_IDS: UserPreferences['agent']['disabledModelIds'] =
+  [];
+const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
+  {};
 
 export const ModelSelect = memo(function ModelSelect({
   onModelChange,
@@ -97,9 +138,18 @@ export const ModelSelect = memo(function ModelSelect({
   );
   const setSelectedModel = useKartonProcedure((p) => p.agents.setActiveModelId);
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
-  const customModels = useKartonState((s) => s.preferences.customModels);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const preferences = useKartonState((s) => s.preferences);
+  const customModels = useKartonState(
+    (s) => s.preferences.customModels ?? EMPTY_CUSTOM_MODELS,
+  );
   const disabledModelIds = useKartonState(
-    (s) => s.preferences.agent.disabledModelIds,
+    (s) => s.preferences.agent.disabledModelIds ?? EMPTY_DISABLED_MODEL_IDS,
+  );
+  const modelThinkingOverrides = useKartonState(
+    (s) =>
+      s.preferences.agent.modelThinkingOverrides ??
+      EMPTY_MODEL_THINKING_OVERRIDES,
   );
 
   // Build flat model options list
@@ -107,14 +157,24 @@ export const ModelSelect = memo(function ModelSelect({
     const disabled = new Set(disabledModelIds);
     const builtIn: ModelOption[] = availableModels
       .filter((m) => !disabled.has(m.modelId))
-      .map((model) => ({
-        modelId: model.modelId,
-        displayName: model.modelDisplayName,
-        description: model.modelDescription,
-        context: model.modelContext,
-        thinkingEnabled: 'thinkingEnabled' in model && !!model.thinkingEnabled,
-        pricingMultiplier: model.pricing?.relativeMultiplier,
-      }));
+      .map((model) => {
+        const thinkingDisplay = getModelThinkingDisplayState(
+          model,
+          modelThinkingOverrides[model.modelId],
+          getThinkingDefaultOptionsForModel(model, preferences),
+        );
+
+        return {
+          modelId: model.modelId,
+          displayName: model.modelDisplayName,
+          description: model.modelDescription,
+          context: model.modelContext,
+          thinkingEnabled: thinkingDisplay !== null,
+          thinkingLabel: thinkingDisplay?.label,
+          catalogModel: model,
+          pricingMultiplier: model.pricing?.relativeMultiplier,
+        };
+      });
 
     const custom: ModelOption[] = customModels
       .filter((m) => !disabled.has(m.modelId))
@@ -124,11 +184,12 @@ export const ModelSelect = memo(function ModelSelect({
         description: model.description,
         context: `${Math.round(model.contextWindowSize / 1000)}k context`,
         thinkingEnabled: !!model.thinkingEnabled,
+        thinkingLabel: model.thinkingEnabled ? 'Thinking' : undefined,
         group: 'Custom',
       }));
 
     return [...builtIn, ...custom];
-  }, [customModels, disabledModelIds]);
+  }, [customModels, disabledModelIds, modelThinkingOverrides, preferences]);
 
   // Index by modelId for fast lookups
   const modelMap = useMemo(() => {
@@ -185,10 +246,15 @@ export const ModelSelect = memo(function ModelSelect({
     (g) => g.models.length > 0,
   );
 
-  // Display label for the trigger
+  // Display labels for the trigger
   const selectedDisplayName = useMemo(() => {
     if (!selectedModel) return 'Select model';
     return modelMap.get(selectedModel)?.displayName ?? selectedModel;
+  }, [modelMap, selectedModel]);
+
+  const selectedThinkingLabel = useMemo(() => {
+    if (!selectedModel) return undefined;
+    return modelMap.get(selectedModel)?.thinkingLabel;
   }, [modelMap, selectedModel]);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -197,14 +263,42 @@ export const ModelSelect = memo(function ModelSelect({
   const containerRef = useRef<HTMLDivElement>(null);
   const sidePanelRef = useRef<HTMLDivElement>(null);
   const [hoveredModel, setHoveredModel] = useState<ModelOption | null>(null);
+  const [editingThinkingModelId, setEditingThinkingModelId] = useState<
+    string | null
+  >(null);
   const [itemCenterY, setItemCenterY] = useState(0);
   const [sidePanelOffset, setSidePanelOffset] = useState(0);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const cancelPendingClear = useCallback(() => {
+    if (clearTimerRef.current !== undefined) {
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = undefined;
+    }
+  }, []);
+
+  const scheduleClear = useCallback(() => {
+    cancelPendingClear();
+    clearTimerRef.current = setTimeout(() => {
+      setHoveredModel(null);
+      setEditingThinkingModelId(null);
+      clearTimerRef.current = undefined;
+    }, 150);
+  }, [cancelPendingClear]);
+
+  useEffect(() => () => cancelPendingClear(), [cancelPendingClear]);
 
   const listScrollRef = useRef<HTMLDivElement>(null);
   const { maskStyle: listMaskStyle } = useScrollFadeMask(listScrollRef, {
     axis: 'vertical',
     fadeDistance: 16,
   });
+
+  const editingThinkingModel = useMemo(
+    () =>
+      availableModels.find((model) => model.modelId === editingThinkingModelId),
+    [editingThinkingModelId],
+  );
 
   useLayoutEffect(() => {
     if (!hoveredModel || !sidePanelRef.current || !containerRef.current) return;
@@ -213,16 +307,20 @@ export const ModelSelect = memo(function ModelSelect({
 
     let offset = itemCenterY - panelHeight / 2;
     offset = Math.max(0, offset);
-    offset = Math.min(offset, containerHeight - panelHeight);
+    offset = Math.min(offset, Math.max(0, containerHeight - panelHeight));
 
     setSidePanelOffset(offset);
-  }, [hoveredModel, itemCenterY]);
+  }, [hoveredModel, itemCenterY, editingThinkingModelId]);
 
   const handleItemHover = useCallback(
     (model: ModelOption, element: HTMLElement) => {
+      cancelPendingClear();
       const container = containerRef.current;
       if (!container) {
         setHoveredModel(model);
+        setEditingThinkingModelId((current) =>
+          current === model.modelId ? current : null,
+        );
         return;
       }
 
@@ -232,8 +330,11 @@ export const ModelSelect = memo(function ModelSelect({
 
       setItemCenterY(centerY);
       setHoveredModel(model);
+      setEditingThinkingModelId((current) =>
+        current === model.modelId ? current : null,
+      );
     },
-    [],
+    [cancelPendingClear],
   );
 
   const handleValueChange = useCallback(
@@ -250,13 +351,119 @@ export const ModelSelect = memo(function ModelSelect({
     [openAgent, openSettings, setSelectedModel, onModelChange],
   );
 
-  const handleOpenChange = useCallback((nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (!nextOpen) {
-      setHoveredModel(null);
-      setQuery('');
-    }
-  }, []);
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (!nextOpen) {
+        cancelPendingClear();
+        setHoveredModel(null);
+        setEditingThinkingModelId(null);
+        setQuery('');
+      }
+    },
+    [cancelPendingClear],
+  );
+
+  const handleEditThinking = useCallback(
+    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setEditingThinkingModelId((current) =>
+        current === modelId ? null : modelId,
+      );
+    },
+    [],
+  );
+
+  const handleSetThinkingEnabled = useCallback(
+    async (modelId: string, enabled: boolean) => {
+      const model = availableModels.find((item) => item.modelId === modelId);
+      if (!model) return;
+
+      const route = getThinkingDefaultOptionsForModel(model, preferences);
+      const option = enabled
+        ? getEnabledModelThinkingOption(
+            model,
+            modelThinkingOverrides[modelId]?.value,
+            route,
+          )
+        : (getModelThinkingOptions(model, route).find(
+            (item) => item.value === modelThinkingOverrides[modelId]?.value,
+          ) ?? getModelThinkingOptions(model, route)[0]);
+      if (!option) return;
+
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.agent.modelThinkingOverrides[modelId] = {
+          ...draft.agent.modelThinkingOverrides[modelId],
+          enabled,
+          provider: option.provider,
+          value: option.value,
+        };
+      });
+      await updatePreferences(patches);
+    },
+    [modelThinkingOverrides, preferences, updatePreferences],
+  );
+
+  const handleSetThinkingValue = useCallback(
+    async (modelId: string, value: string) => {
+      const model = availableModels.find((item) => item.modelId === modelId);
+      if (!model) return;
+
+      const route = getThinkingDefaultOptionsForModel(model, preferences);
+      const option = getModelThinkingOptions(model, route).find(
+        (item) => item.value === value,
+      );
+      if (!option) return;
+
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        draft.agent.modelThinkingOverrides[modelId] = {
+          enabled: true,
+          provider: option.provider,
+          value: option.value,
+        };
+      });
+      await updatePreferences(patches);
+    },
+    [preferences, updatePreferences],
+  );
+
+  const handleResetThinkingOverride = useCallback(
+    async (modelId: string) => {
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        delete draft.agent.modelThinkingOverrides[modelId];
+      });
+      await updatePreferences(patches);
+    },
+    [preferences, updatePreferences],
+  );
+
+  const handleCycleThinkingEffort = useCallback(() => {
+    if (!selectedModel) return false;
+
+    const model = availableModels.find(
+      (item) => item.modelId === selectedModel,
+    );
+    if (!model) return false;
+
+    const display = getModelThinkingDisplayState(
+      model,
+      modelThinkingOverrides[model.modelId],
+      getThinkingDefaultOptionsForModel(model, preferences),
+    );
+    if (!display) return false;
+
+    const route = getThinkingDefaultOptionsForModel(model, preferences);
+    const nextOption = getNextModelThinkingOption(model, display.value, route);
+    const [, patches] = produceWithPatches(preferences, (draft) => {
+      draft.agent.modelThinkingOverrides[model.modelId] = {
+        enabled: true,
+        provider: nextOption.provider,
+        value: nextOption.value,
+      };
+    });
+    void updatePreferences(patches);
+  }, [modelThinkingOverrides, preferences, selectedModel, updatePreferences]);
 
   useHotKeyListener(
     useCallback(() => {
@@ -268,6 +475,11 @@ export const ModelSelect = memo(function ModelSelect({
       });
     }, []),
     HotkeyActions.OPEN_MODEL_SELECT,
+  );
+
+  useHotKeyListener(
+    handleCycleThinkingEffort,
+    HotkeyActions.CYCLE_MODEL_THINKING_EFFORT,
   );
 
   return (
@@ -282,24 +494,38 @@ export const ModelSelect = memo(function ModelSelect({
         <TooltipTrigger>
           <ComboboxBase.Trigger
             className={cn(
-              'inline-flex min-w-0 max-w-full cursor-pointer items-center justify-between gap-1 rounded-lg p-0 font-normal text-xs shadow-none transition-colors',
+              'group/trigger inline-flex min-w-0 max-w-full cursor-pointer items-center justify-between gap-1 rounded-lg p-0 font-normal text-xs shadow-none transition-colors',
               'focus-visible:outline-1 focus-visible:outline-muted-foreground/35 focus-visible:-outline-offset-2',
               'has-disabled:pointer-events-none has-disabled:opacity-50',
               'bg-transparent text-muted-foreground hover:text-foreground data-popup-open:text-foreground',
               'h-4 w-auto',
             )}
           >
-            <span className="truncate">{selectedDisplayName}</span>
+            <span className="min-w-0 truncate">{selectedDisplayName}</span>
+            {selectedThinkingLabel && (
+              <span className="shrink-0 text-subtle-foreground transition-colors group-hover/trigger:text-muted-foreground group-data-[popup-open]/trigger:text-muted-foreground">
+                {selectedThinkingLabel}
+              </span>
+            )}
             <ComboboxBase.Icon className="shrink-0">
               <IconChevronDownFill18 className="size-3" />
             </ComboboxBase.Icon>
           </ComboboxBase.Trigger>
         </TooltipTrigger>
         <TooltipContent side="top">
-          <span className="flex items-center gap-1.5">
-            <span>Switch model</span>
-            <HotkeyCombo action={HotkeyActions.OPEN_MODEL_SELECT} size="xs" />
-          </span>
+          <div className="flex flex-col gap-1">
+            <span className="flex items-center justify-between gap-2">
+              <span>Switch model</span>
+              <HotkeyCombo action={HotkeyActions.OPEN_MODEL_SELECT} size="xs" />
+            </span>
+            <span className="flex items-center justify-between gap-2">
+              <span>Change reasoning effort</span>
+              <HotkeyCombo
+                action={HotkeyActions.CYCLE_MODEL_THINKING_EFFORT}
+                size="xs"
+              />
+            </span>
+          </div>
         </TooltipContent>
       </Tooltip>
 
@@ -314,7 +540,7 @@ export const ModelSelect = memo(function ModelSelect({
           <div
             ref={containerRef}
             className="relative flex flex-row items-start gap-1"
-            onMouseLeave={() => setHoveredModel(null)}
+            onMouseLeave={scheduleClear}
           >
             <ComboboxBase.Popup
               className={cn(
@@ -350,6 +576,7 @@ export const ModelSelect = memo(function ModelSelect({
                             key={model.modelId}
                             model={model}
                             onHighlight={handleItemHover}
+                            onEditThinking={handleEditThinking}
                           />
                         ))}
                       </ComboboxGroup>
@@ -359,6 +586,7 @@ export const ModelSelect = memo(function ModelSelect({
                           key={model.modelId}
                           model={model}
                           onHighlight={handleItemHover}
+                          onEditThinking={handleEditThinking}
                         />
                       ))
                     ),
@@ -382,18 +610,49 @@ export const ModelSelect = memo(function ModelSelect({
             {hoveredModel && (
               <div
                 ref={sidePanelRef}
+                onMouseEnter={cancelPendingClear}
                 className={cn(
-                  'absolute left-full ml-1 flex max-w-64 flex-col gap-1 rounded-lg border border-derived bg-background p-2.5 text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
+                  'absolute left-full ml-1 flex w-64 flex-col rounded-lg border border-derived bg-background text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
                   'fade-in-0 slide-in-from-left-1 animate-in duration-150',
                 )}
                 style={{ top: sidePanelOffset }}
               >
-                <ModelTooltipContent
-                  model={hoveredModel.displayName}
-                  description={hoveredModel.description}
-                  context={hoveredModel.context}
-                  pricingMultiplier={hoveredModel.pricingMultiplier}
-                />
+                {editingThinkingModel ? (
+                  <ModelThinkingPanel
+                    model={editingThinkingModel}
+                    override={
+                      modelThinkingOverrides[editingThinkingModel.modelId]
+                    }
+                    defaultOptions={getThinkingDefaultOptionsForModel(
+                      editingThinkingModel,
+                      preferences,
+                    )}
+                    onEnabledChange={(enabled) =>
+                      handleSetThinkingEnabled(
+                        editingThinkingModel.modelId,
+                        enabled,
+                      )
+                    }
+                    onValueChange={(value) =>
+                      handleSetThinkingValue(
+                        editingThinkingModel.modelId,
+                        value,
+                      )
+                    }
+                    onReset={() =>
+                      handleResetThinkingOverride(editingThinkingModel.modelId)
+                    }
+                  />
+                ) : (
+                  <div className="p-2.5">
+                    <ModelTooltipContent
+                      model={hoveredModel.displayName}
+                      description={hoveredModel.description}
+                      context={hoveredModel.context}
+                      pricingMultiplier={hoveredModel.pricingMultiplier}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -406,9 +665,14 @@ export const ModelSelect = memo(function ModelSelect({
 const ModelItem = memo(function ModelItem({
   model,
   onHighlight,
+  onEditThinking,
 }: {
   model: ModelOption;
   onHighlight: (model: ModelOption, element: HTMLElement) => void;
+  onEditThinking: (
+    modelId: string,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
 }) {
   const PriceIcon =
     model.pricingMultiplier != null
@@ -450,10 +714,24 @@ const ModelItem = memo(function ModelItem({
             </span>
           )}
         </div>
-        {model.thinkingEnabled && (
-          <div className="flex size-4 shrink-0 items-center justify-center">
-            <IconBrainOutline18 className="size-3 text-muted-foreground" />
-          </div>
+        {model.thinkingLabel && (
+          <span className="relative flex h-4 min-w-14 shrink-0 items-center justify-end text-[10px]">
+            <span className="inline-flex items-center gap-1 text-subtle-foreground group-data-[highlighted]/item:opacity-0">
+              <IconBrainOutline18 className="size-2.75" />
+              {model.thinkingLabel}
+            </span>
+            {model.catalogModel && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="absolute right-0 h-auto px-0 py-0 text-[10px] opacity-0 group-data-[highlighted]/item:opacity-100"
+                onClick={(event) => onEditThinking(model.modelId, event)}
+              >
+                Edit
+              </Button>
+            )}
+          </span>
         )}
       </span>
     </ComboboxItem>
