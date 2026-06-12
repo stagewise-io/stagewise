@@ -45,8 +45,18 @@ export function shouldNativeInputConsumeEvent(e: KeyboardEvent): boolean {
         if (target.isContentEditable && ['b', 'i', 'u'].includes(key))
           return true;
 
-        // 2. Text Navigation (Cmd+Arrows on Mac, Ctrl+Arrows on Win)
-        if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key))
+        // 2. Text Navigation (Cmd+Arrows/Page keys on Mac,
+        // Ctrl+Arrows/Page keys on Win)
+        if (
+          [
+            'arrowup',
+            'arrowdown',
+            'arrowleft',
+            'arrowright',
+            'pageup',
+            'pagedown',
+          ].includes(key)
+        )
           return true;
 
         // 3. Deletion (Cmd+Backspace delete line, Ctrl+Backspace delete word)

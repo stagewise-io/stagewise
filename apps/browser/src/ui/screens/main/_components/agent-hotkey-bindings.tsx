@@ -112,7 +112,7 @@ export function AgentHotkeyBindings({
     agentHotkeysEnabled,
   );
 
-  // -- Content panel tab navigation (Mod+Alt+PageDown / Mod+Alt+PageUp) --
+  // -- Content panel tab navigation (macOS: Cmd+Option+←/→) -----------
   // Only tabs visible for the current agent (global + agent-attached), in
   // the same order as the rendered tab bar.
   const visibleTabIds = [
