@@ -39,12 +39,7 @@ const config = {
       },
       {
         source: '/team',
-        destination: '/company',
-        permanent: true,
-      },
-      {
-        source: '/mission',
-        destination: '/company',
+        destination: '/mission',
         permanent: true,
       },
     ];
