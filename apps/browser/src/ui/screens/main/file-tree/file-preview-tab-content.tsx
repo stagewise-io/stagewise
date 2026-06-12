@@ -1264,12 +1264,15 @@ function TextEditorPreview({
         });
       });
       // Restore the last-known scroll position for this file.
-      // Must defer because Monaco produces multiple layout events
-      // during initialisation (content layout, then font-size / option
-      // sync from the React wrapper) — each one resets the scroll.
-      // Keep restoring on every layout event for a settling window.
+      // Set immediately so the position is correct even if no layout
+      // event fires after mount.  Monaco produces multiple layout
+      // events during initialisation (content layout, then font-size /
+      // option sync from the React wrapper) — each one resets the
+      // scroll, so keep re-restoring on every layout event for a
+      // settling window.
       const saved = scrollStateStore.get(cacheKey);
       if (saved) {
+        editor.setScrollPosition(saved);
         const layoutDisposable = editor.onDidLayoutChange(() => {
           editor.setScrollPosition(saved);
         });
@@ -2263,8 +2266,16 @@ function MarkdownPreview({
           scrollLeft: e.scrollLeft,
         });
       });
+      // Restore the last-known scroll position for this file.
+      // Set immediately so the position is correct even if no layout
+      // event fires after mount.  Monaco produces multiple layout
+      // events during initialisation (content layout, then font-size /
+      // option sync from the React wrapper) — each one resets the
+      // scroll, so keep re-restoring on every layout event for a
+      // settling window.
       const saved = scrollStateStore.get(cacheKey);
       if (saved) {
+        editor.setScrollPosition(saved);
         const layoutDisposable = editor.onDidLayoutChange(() => {
           editor.setScrollPosition(saved);
         });
