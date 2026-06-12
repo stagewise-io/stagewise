@@ -193,7 +193,7 @@ export const WebContentsBoundsSyncer = () => {
     };
 
     const attachContainer = (el: HTMLElement | null) => {
-      if (el === containerElement) return;
+      if (el === null && containerElement === null) return;
 
       unobserveAll();
 
