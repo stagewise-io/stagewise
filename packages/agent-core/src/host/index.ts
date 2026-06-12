@@ -21,7 +21,13 @@ export type {
   WorkspaceAgentSettingsEntry,
 } from './environment-sources';
 export type { Logger } from './logger';
-export type { HostModels, ModelWithOptions, ProviderMode } from './models';
+export {
+  MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  type HostModels,
+  type ModelRequestPurpose,
+  type ModelWithOptions,
+  type ProviderMode,
+} from './models';
 export type { ModelCapabilities } from '../types/models';
 export type { HostPaths } from './paths';
 export type { TelemetrySink } from './telemetry';

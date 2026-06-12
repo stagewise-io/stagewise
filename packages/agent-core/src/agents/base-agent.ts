@@ -26,7 +26,10 @@ import type { AgentTypes } from '../types/agent';
 import type { ModelCapabilities } from '../types/models';
 import type { AgentStateMutations } from '../services/agent-manager/state-mutations';
 import type { AgentHost } from '../host/host';
-import type { ModelWithOptions } from '../host/models';
+import {
+  MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  type ModelWithOptions,
+} from '../host/models';
 import type { AgentCtor, AgentTypeRegistry } from './agents-registry';
 
 /**
@@ -1599,6 +1602,7 @@ export abstract class BaseAgent<
         {
           $ai_span_name: `${this.agentType}-history`,
           $ai_parent_id: this.instanceId,
+          [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
         },
       );
       this._stepProviderMode = modelWithOptions.providerMode;

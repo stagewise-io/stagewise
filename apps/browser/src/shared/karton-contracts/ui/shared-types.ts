@@ -216,6 +216,24 @@ export const PROVIDER_DISPLAY_INFO: Record<
   },
 };
 
+export const thinkingEffortSchema = z.enum([
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+]);
+export type ThinkingEffort = z.infer<typeof thinkingEffortSchema>;
+
+export const modelThinkingOverrideSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    effort: thinkingEffortSchema.optional(),
+  })
+  .default({})
+  .catch({});
+export type ModelThinkingOverride = z.infer<typeof modelThinkingOverrideSchema>;
+
 /**
  * GLOBAL CONFIG CAPABILITIES
  */
@@ -495,6 +513,11 @@ export const userPreferencesSchema = z.object({
       workspaceGitActionPreferences: workspaceGitActionPreferencesSchema,
       /** Snoozed worktree cleanup candidates keyed by worktree path */
       workspaceGitCleanup: workspaceGitCleanupPreferencesSchema,
+      /** Per-built-in-model thinking overrides keyed by model ID */
+      modelThinkingOverrides: z
+        .record(z.string(), modelThinkingOverrideSchema)
+        .default({})
+        .catch({}),
     })
     .default({
       workspaceSettings: {},
@@ -502,6 +525,7 @@ export const userPreferencesSchema = z.object({
       disabledPluginIds: [],
       workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
       workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
+      modelThinkingOverrides: {},
     }),
   /** LLM provider endpoint configurations (API keys, custom URLs) */
   providerConfigs: providerConfigsSchema.default({
@@ -613,6 +637,7 @@ export const defaultUserPreferences: UserPreferences = {
     disabledPluginIds: [],
     workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
     workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
+    modelThinkingOverrides: {},
   },
   providerConfigs: {
     anthropic: { mode: 'stagewise' },

@@ -13,6 +13,17 @@ import type { ReasoningSignatureSource } from '../types/metadata';
 export type ProviderMode = 'stagewise' | 'official' | 'custom';
 
 /**
+ * Purpose for a host model resolution request.
+ *
+ * Hosts may use this metadata to decide whether user-facing runtime
+ * preferences should affect the returned provider options. Missing purpose
+ * should be treated as `internal` for backward compatibility.
+ */
+export type ModelRequestPurpose = 'agent-step' | 'internal';
+
+export const MODEL_REQUEST_PURPOSE_METADATA_KEY = '$model_request_purpose';
+
+/**
  * Fully-resolved model with all the options `BaseAgent` needs to
  * invoke `streamText` / `generateText`.
  *
@@ -78,8 +89,10 @@ export interface HostModels {
    * `traceId` is passed through so the host can attach it to any
    * telemetry/middleware it wraps around the returned model.
    * `metadata` carries optional host-specific trace properties
-   * (currently used for PostHog) and must not change the returned
-   * model's semantics.
+   * (currently used for PostHog). Hosts may also read the reserved
+   * {@link MODEL_REQUEST_PURPOSE_METADATA_KEY} key to distinguish
+   * user-facing agent steps from internal utility calls. Missing purpose
+   * must be treated as `internal` for backward compatibility.
    */
   getWithOptions(
     modelId: string,

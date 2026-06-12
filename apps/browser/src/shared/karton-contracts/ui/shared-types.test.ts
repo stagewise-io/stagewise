@@ -134,6 +134,54 @@ describe('userPreferencesSchema worktree cleanup snooze defaults', () => {
   });
 });
 
+describe('userPreferencesSchema model thinking override defaults', () => {
+  it('defaults model thinking overrides when missing', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        workspaceSettings: {},
+        disabledModelIds: [],
+        disabledPluginIds: [],
+        workspaceGitActionPreferences: { general: {}, repositories: {} },
+        workspaceGitCleanup: { dismissedCandidates: {} },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({});
+  });
+
+  it('preserves valid model thinking overrides', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'gpt-5.5': { enabled: true, effort: 'high' },
+          'claude-sonnet-4.6': { enabled: false },
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'gpt-5.5': { enabled: true, effort: 'high' },
+      'claude-sonnet-4.6': { enabled: false },
+    });
+  });
+
+  it('sanitizes invalid model thinking override entries', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'gpt-5.5': { enabled: true, effort: 'invalid' },
+          'claude-sonnet-4.6': null,
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'gpt-5.5': {},
+      'claude-sonnet-4.6': {},
+    });
+  });
+});
+
 describe('userPreferencesSchema workspace Git action defaults', () => {
   it('defaults workspace Git action preferences when missing', () => {
     const parsed = userPreferencesSchema.parse({

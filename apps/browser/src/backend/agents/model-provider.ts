@@ -5,6 +5,8 @@ import type {
   ApiSpec,
   CustomModel,
   CustomEndpoint,
+  ModelThinkingOverride,
+  ThinkingEffort,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { ReasoningSignatureSource } from '@shared/karton-contracts/ui/agent/metadata';
 import {
@@ -26,8 +28,10 @@ import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
 import type { streamText, LanguageModelMiddleware } from 'ai';
 import { wrapLanguageModel } from 'ai';
+import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
 
 type ProviderOptions = Parameters<typeof streamText>[0]['providerOptions'];
+type BuiltInModelSettings = (typeof availableModels)[number];
 
 /**
  * Converts an OpenRouter-style Anthropic model ID (dots in version, e.g.
@@ -336,7 +340,7 @@ export class ModelProviderService {
   }
 
   private createBuiltInModelWithOptions(
-    modelSettings: (typeof availableModels)[number],
+    modelSettings: BuiltInModelSettings,
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
   ): ModelWithOptions {
@@ -348,13 +352,18 @@ export class ModelProviderService {
       : { apiKey: '', baseURL: undefined, mode: 'stagewise' as const };
     const { apiKey, baseURL, mode } = resolved;
     const headers = modelSettings.headers ?? {};
+    const baseProviderOptions = modelSettings.providerOptions as Record<
+      string,
+      unknown
+    >;
+    const posthogProperties = omitModelRequestMetadata(otherPostHogProperties);
 
     const posthogConfig = {
       posthogTraceId: traceId,
       posthogProperties: {
         posthogTraceId: traceId,
         modelId: modelSettings.modelId,
-        ...otherPostHogProperties,
+        ...posthogProperties,
       },
     };
 
@@ -386,9 +395,17 @@ export class ModelProviderService {
       return {
         model: this.telemetryService.withTracing(model, posthogConfig),
         headers,
-        providerOptions: modelSettings.providerOptions as Parameters<
-          typeof streamText
-        >[0]['providerOptions'],
+        providerOptions: resolveThinkingProviderOptions({
+          baseProviderOptions,
+          modelSettings,
+          override:
+            this.preferencesService.get().agent.modelThinkingOverrides[
+              modelSettings.modelId
+            ],
+          providerMode: 'stagewise',
+          semanticProvider: officialProvider,
+          requestMetadata: otherPostHogProperties,
+        }),
         contextWindowSize: modelSettings.modelContextRaw,
         providerMode: 'stagewise',
         reasoningSignatureSource: createReasoningSignatureSource(
@@ -425,7 +442,19 @@ export class ModelProviderService {
         ...this.createModelViaEndpoint(
           resolved.customEndpoint,
           remappedModelId,
-          modelSettings.providerOptions as Record<string, unknown>,
+          resolveThinkingProviderOptions({
+            baseProviderOptions,
+            modelSettings,
+            override:
+              this.preferencesService.get().agent.modelThinkingOverrides[
+                modelSettings.modelId
+              ],
+            providerMode: 'custom',
+            semanticProvider: getSemanticProviderForApiSpec(
+              resolved.customEndpoint.apiSpec,
+            ),
+            requestMetadata: otherPostHogProperties,
+          }) as Record<string, unknown>,
           headers,
           modelSettings.modelContextRaw,
           posthogConfig,
@@ -447,7 +476,17 @@ export class ModelProviderService {
         apiKey,
         baseURL,
         modelSettings.modelId,
-        modelSettings.providerOptions as Record<string, unknown>,
+        resolveThinkingProviderOptions({
+          baseProviderOptions,
+          modelSettings,
+          override:
+            this.preferencesService.get().agent.modelThinkingOverrides[
+              modelSettings.modelId
+            ],
+          providerMode: 'official',
+          semanticProvider: officialProvider,
+          requestMetadata: otherPostHogProperties,
+        }) as Record<string, unknown>,
         headers,
         modelSettings.modelContextRaw,
         posthogConfig,
@@ -799,6 +838,7 @@ export class ModelProviderService {
       customModel.endpointId,
     );
     const headers = customModel.headers ?? {};
+    const posthogProperties = omitModelRequestMetadata(otherPostHogProperties);
 
     const posthogConfig = {
       posthogTraceId: traceId,
@@ -806,7 +846,7 @@ export class ModelProviderService {
         posthogTraceId: traceId,
         modelId: customModel.modelId,
         isCustomModel: true,
-        ...otherPostHogProperties,
+        ...posthogProperties,
       },
     };
 
@@ -962,6 +1002,311 @@ export class ModelProviderService {
 }
 
 // =============================================================================
+// Thinking override utilities
+// =============================================================================
+
+const STAGEWISE_EFFORTS: Record<ThinkingEffort, string> = {
+  minimal: 'minimal',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'xhigh',
+};
+
+const OPENAI_EFFORTS: Record<ThinkingEffort, string> = {
+  minimal: 'minimal',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'high',
+};
+
+const GOOGLE_EFFORTS: Record<ThinkingEffort, string> = {
+  minimal: 'low',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'high',
+};
+
+const ANTHROPIC_BUDGET_TOKENS: Record<ThinkingEffort, number> = {
+  minimal: 4_000,
+  low: 6_000,
+  medium: 10_000,
+  high: 16_000,
+  xhigh: 24_000,
+};
+
+type ThinkingProviderOptionsInput = {
+  baseProviderOptions: Record<string, unknown>;
+  modelSettings: BuiltInModelSettings;
+  override?: ModelThinkingOverride;
+  providerMode: ProviderMode;
+  semanticProvider: ModelProvider;
+  requestMetadata?: Record<string, unknown>;
+};
+
+function resolveThinkingProviderOptions({
+  baseProviderOptions,
+  modelSettings,
+  override,
+  providerMode,
+  semanticProvider,
+  requestMetadata,
+}: ThinkingProviderOptionsInput): ProviderOptions {
+  if (requestMetadata?.[MODEL_REQUEST_PURPOSE_METADATA_KEY] !== 'agent-step') {
+    return baseProviderOptions as ProviderOptions;
+  }
+
+  if (
+    !modelSettings.thinkingEnabled ||
+    !override ||
+    !hasExplicitThinkingOverride(override)
+  ) {
+    return baseProviderOptions as ProviderOptions;
+  }
+
+  const effort =
+    override.effort ??
+    getDefaultThinkingEffort(
+      baseProviderOptions,
+      providerMode,
+      semanticProvider,
+    );
+
+  const patch = createThinkingProviderOptionsPatch({
+    baseProviderOptions,
+    override,
+    effort,
+    providerMode,
+    semanticProvider,
+  });
+
+  if (!patch) return baseProviderOptions as ProviderOptions;
+
+  return deepMergeProviderOptions(baseProviderOptions, patch);
+}
+
+type ThinkingProviderOptionsPatchInput = Pick<
+  ThinkingProviderOptionsInput,
+  'baseProviderOptions' | 'providerMode' | 'semanticProvider'
+> & {
+  override: ModelThinkingOverride;
+  effort: ThinkingEffort;
+};
+
+function createThinkingProviderOptionsPatch({
+  baseProviderOptions,
+  override,
+  effort,
+  providerMode,
+  semanticProvider,
+}: ThinkingProviderOptionsPatchInput): Record<string, unknown> | undefined {
+  const enabled = override.enabled ?? true;
+
+  if (providerMode === 'stagewise') {
+    return {
+      stagewise: {
+        reasoning: {
+          enabled,
+          effort: enabled ? STAGEWISE_EFFORTS[effort] : undefined,
+        },
+      },
+    };
+  }
+
+  switch (semanticProvider) {
+    case 'openai':
+    case 'moonshotai':
+    case 'alibaba':
+    case 'deepseek':
+    case 'z-ai':
+    case 'minimax':
+      return {
+        openai: enabled
+          ? { reasoningEffort: OPENAI_EFFORTS[effort] }
+          : { reasoningEffort: undefined, reasoningSummary: undefined },
+      };
+    case 'google':
+      return {
+        google: {
+          thinkingConfig: {
+            includeThoughts: enabled,
+            thinkingLevel: enabled ? GOOGLE_EFFORTS[effort] : undefined,
+          },
+        },
+      };
+    case 'anthropic':
+      return {
+        anthropic: createAnthropicThinkingPatch(
+          baseProviderOptions.anthropic,
+          enabled,
+          effort,
+        ),
+      };
+    default: {
+      const _exhaustive: never = semanticProvider;
+      return _exhaustive;
+    }
+  }
+}
+
+function createAnthropicThinkingPatch(
+  baseAnthropicOptions: unknown,
+  enabled: boolean,
+  effort: ThinkingEffort,
+): Record<string, unknown> {
+  if (!enabled) {
+    return { thinking: { type: 'disabled' }, effort: undefined };
+  }
+
+  const thinking = isPlainObject(baseAnthropicOptions)
+    ? baseAnthropicOptions.thinking
+    : undefined;
+  if (
+    isPlainObject(thinking) &&
+    typeof thinking.type === 'string' &&
+    thinking.type !== 'adaptive'
+  ) {
+    return {
+      thinking: {
+        ...thinking,
+        type: 'enabled',
+        budgetTokens: ANTHROPIC_BUDGET_TOKENS[effort],
+      },
+    };
+  }
+
+  return {
+    thinking: { type: 'adaptive' },
+    effort,
+  };
+}
+
+function getDefaultThinkingEffort(
+  providerOptions: Record<string, unknown>,
+  providerMode: ProviderMode,
+  semanticProvider: ModelProvider,
+): ThinkingEffort {
+  const providerEffort = getProviderSpecificThinkingEffort(
+    providerOptions,
+    semanticProvider,
+  );
+  if (providerMode !== 'stagewise' && providerEffort) {
+    return providerEffort;
+  }
+
+  const stagewiseEffort = getStagewiseThinkingEffort(providerOptions);
+  return stagewiseEffort ?? providerEffort ?? 'medium';
+}
+
+function getStagewiseThinkingEffort(
+  providerOptions: Record<string, unknown>,
+): ThinkingEffort | undefined {
+  const stagewise = providerOptions.stagewise;
+  if (!isPlainObject(stagewise)) return undefined;
+
+  const reasoning = stagewise.reasoning;
+  if (isPlainObject(reasoning) && isThinkingEffort(reasoning.effort)) {
+    return reasoning.effort;
+  }
+
+  return undefined;
+}
+
+function getProviderSpecificThinkingEffort(
+  providerOptions: Record<string, unknown>,
+  semanticProvider: ModelProvider,
+): ThinkingEffort | undefined {
+  switch (semanticProvider) {
+    case 'openai':
+    case 'moonshotai':
+    case 'alibaba':
+    case 'deepseek':
+    case 'z-ai':
+    case 'minimax': {
+      const openai = providerOptions.openai;
+      if (!isPlainObject(openai)) return undefined;
+      return isThinkingEffort(openai.reasoningEffort)
+        ? openai.reasoningEffort
+        : undefined;
+    }
+    case 'google': {
+      const google = providerOptions.google;
+      if (!isPlainObject(google)) return undefined;
+      const thinkingConfig = google.thinkingConfig;
+      if (!isPlainObject(thinkingConfig)) return undefined;
+      return toThinkingEffort(thinkingConfig.thinkingLevel);
+    }
+    case 'anthropic': {
+      const anthropic = providerOptions.anthropic;
+      if (!isPlainObject(anthropic)) return undefined;
+      if (isThinkingEffort(anthropic.effort)) return anthropic.effort;
+      const thinking = anthropic.thinking;
+      if (!isPlainObject(thinking)) return undefined;
+      return getThinkingEffortFromAnthropicBudget(thinking.budgetTokens);
+    }
+    default: {
+      const _exhaustive: never = semanticProvider;
+      return _exhaustive;
+    }
+  }
+}
+
+function toThinkingEffort(value: unknown): ThinkingEffort | undefined {
+  if (isThinkingEffort(value)) return value;
+  if (value === 'low' || value === 'medium' || value === 'high') return value;
+  return undefined;
+}
+
+function getThinkingEffortFromAnthropicBudget(
+  budgetTokens: unknown,
+): ThinkingEffort | undefined {
+  if (typeof budgetTokens !== 'number') return undefined;
+
+  let closestEffort: ThinkingEffort = 'medium';
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const [effort, budget] of Object.entries(ANTHROPIC_BUDGET_TOKENS) as [
+    ThinkingEffort,
+    number,
+  ][]) {
+    const distance = Math.abs(budgetTokens - budget);
+    if (distance < closestDistance) {
+      closestEffort = effort;
+      closestDistance = distance;
+    }
+  }
+
+  return closestEffort;
+}
+
+function hasExplicitThinkingOverride(override: ModelThinkingOverride): boolean {
+  return override.enabled !== undefined || override.effort !== undefined;
+}
+
+function omitModelRequestMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!metadata || !(MODEL_REQUEST_PURPOSE_METADATA_KEY in metadata)) {
+    return metadata;
+  }
+
+  const { [MODEL_REQUEST_PURPOSE_METADATA_KEY]: _purpose, ...telemetry } =
+    metadata;
+  return telemetry;
+}
+
+function isThinkingEffort(value: unknown): value is ThinkingEffort {
+  return (
+    value === 'minimal' ||
+    value === 'low' ||
+    value === 'medium' ||
+    value === 'high' ||
+    value === 'xhigh'
+  );
+}
+
+// =============================================================================
 // Deep-merge utility for provider options
 // =============================================================================
 
@@ -990,7 +1335,9 @@ export function deepMergeProviderOptions(
   for (const source of sources) {
     if (!source) continue;
     for (const [key, value] of Object.entries(source)) {
-      if (isPlainObject(value) && isPlainObject(result[key])) {
+      if (value === undefined) {
+        delete result[key];
+      } else if (isPlainObject(value) && isPlainObject(result[key])) {
         result[key] = deepMergeProviderOptions(
           result[key] as Record<string, unknown>,
           value,
