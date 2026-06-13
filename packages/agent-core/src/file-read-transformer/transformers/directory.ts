@@ -140,7 +140,7 @@ async function buildTreeEntries(
   depth: number,
   maxDepth: number = DEFAULT_DEPTH,
 ): Promise<TreeEntry[]> {
-  let dirents: Awaited<ReturnType<typeof fs.readdir>>;
+  let dirents: fs.Dirent[];
   try {
     dirents = await fs.readdir(dirPath, { withFileTypes: true });
   } catch {
@@ -153,13 +153,13 @@ async function buildTreeEntries(
   for (const dirent of dirents) {
     const isDir = dirent.isDirectory();
     const entry: TreeEntry = {
-      name: dirent.name,
+      name: String(dirent.name),
       isDirectory: isDir,
     };
 
     if (isDir && depth < maxDepth) {
       entry.children = await buildTreeEntries(
-        nodePath.join(dirPath, dirent.name),
+        nodePath.join(dirPath, String(dirent.name)),
         depth + 1,
         maxDepth,
       );

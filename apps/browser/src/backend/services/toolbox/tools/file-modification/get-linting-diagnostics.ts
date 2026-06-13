@@ -130,7 +130,10 @@ async function doGetLintingDiagnostics(
           column: diagnostic.range.start.character + 1,
           severity,
           source: diagnostic.source ?? serverID,
-          message: diagnostic.message,
+          message:
+            typeof diagnostic.message === 'string'
+              ? diagnostic.message
+              : diagnostic.message.value,
           code:
             diagnostic.code !== undefined ? String(diagnostic.code) : undefined,
         });

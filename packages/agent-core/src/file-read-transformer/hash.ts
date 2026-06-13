@@ -63,7 +63,7 @@ async function collectEntries(
     ? nodePath.join(basePath, currentRelative)
     : basePath;
 
-  let dirents: Awaited<ReturnType<typeof fs.readdir>>;
+  let dirents: fs.Dirent[];
   try {
     dirents = await fs.readdir(dirPath, { withFileTypes: true });
   } catch {
@@ -75,8 +75,8 @@ async function collectEntries(
 
   for (const dirent of dirents) {
     const entryRelative = currentRelative
-      ? `${currentRelative}/${dirent.name}`
-      : dirent.name;
+      ? `${currentRelative}/${String(dirent.name)}`
+      : String(dirent.name);
 
     // Include ALL entries — dotfiles, dotfolders, node_modules.
     // Must stay consistent with the directory transformer listing

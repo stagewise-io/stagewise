@@ -1,4 +1,4 @@
-import { readFile, readdir } from '../fs';
+import { readFile, readdir, type Dirent } from '../fs';
 import path from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 
@@ -132,7 +132,7 @@ async function findGitignoreFiles(
   const stack: string[] = [workspaceRoot];
   while (stack.length > 0) {
     const dir = stack.pop()!;
-    let entries: Awaited<ReturnType<typeof readdir>>;
+    let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
@@ -142,11 +142,14 @@ async function findGitignoreFiles(
     }
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        if (HARDCODED_DENY_SEGMENTS.has(entry.name)) continue;
-        stack.push(path.join(dir, entry.name));
-      } else if (entry.isFile() && entry.name === '.gitignore') {
+        if (HARDCODED_DENY_SEGMENTS.has(String(entry.name))) continue;
+        stack.push(path.join(dir, String(entry.name)));
+      } else if (entry.isFile() && String(entry.name) === '.gitignore') {
         try {
-          const content = await readFile(path.join(dir, entry.name), 'utf-8');
+          const content = await readFile(
+            path.join(dir, String(entry.name)),
+            'utf-8',
+          );
           collected.push({ dir, content });
         } catch {
           // Ignore read errors \u2014 treat as if the file didn't exist.

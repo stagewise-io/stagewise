@@ -39,7 +39,7 @@ export {
   realpath,
 } from 'node:fs/promises';
 export { createReadStream, createWriteStream } from 'node:fs';
-export type { ReadStream, WriteStream } from 'node:fs';
+export type { Dirent, ReadStream, WriteStream } from 'node:fs';
 
 import chokidar, { type FSWatcher, type ChokidarOptions } from 'chokidar';
 
