@@ -169,7 +169,7 @@
     "@types/node": "^22.10.2",
     "@types/xml": "^1.0.11",
     "@types/yauzl": "^2.10.3",
-    "esbuild": "0.25.9",
+    "esbuild": "0.28.1",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }

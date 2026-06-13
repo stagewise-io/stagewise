@@ -46,7 +46,7 @@
     "@types/react-dom": "19.2.3",
     "concurrently": "^9.2.1",
     "culori": "^4.0.2",
-    "esbuild": "^0.24.2",
+    "esbuild": "^0.28.1",
     "glob": "^11.0.0",
     "nodemon": "^3.1.14",
     "postcss": "^8.5.14",
