@@ -19,6 +19,6 @@
   },
   "deprecated": "stagewise CLI has been deprecated. Download the desktop app at https://stagewise.io/download",
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.12"
   }
 }

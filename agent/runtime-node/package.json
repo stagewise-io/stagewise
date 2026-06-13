@@ -31,18 +31,18 @@
     "ignore": "^7.0.5",
     "minimatch": "9.0.9",
     "proxy-from-env": "^1.1.0",
-    "yauzl": "^3.3.0"
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/node": "^20.0.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.19.43",
     "@types/proxy-from-env": "^1.0.4",
     "@types/ws": "^8.18.1",
     "@types/yauzl": "^2.10.3",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.6",
     "esbuild": "0.25.9",
-    "rimraf": "^5.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^3.2.4"
+    "rimraf": "^5.0.10",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }

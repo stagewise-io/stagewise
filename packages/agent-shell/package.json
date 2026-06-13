@@ -37,9 +37,9 @@
   },
   "devDependencies": {
     "@stagewise/typescript-config": "workspace:*",
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.19.21",
     "esbuild": "0.25.9",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }

@@ -9,7 +9,6 @@
   "files": [
     "dist"
   ],
-
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +19,6 @@
       "require": "./dist/index.cjs"
     }
   },
-
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -28,16 +26,14 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-
   "peerDependencies": {
     "tailwindcss": "^4.3.0"
   },
-
   "devDependencies": {
-    "tsup": "^8.0.0",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "postcss": "^8.5.14",
-    "@tailwindcss/postcss": "^4.3.0"
+    "@tailwindcss/postcss": "^4.3.1",
+    "postcss": "^8.5.15",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.6"
   }
 }

@@ -34,7 +34,7 @@
     "@biomejs/biome": "2.4.15",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@commitlint/config-pnpm-scopes": "^20.1.0",
+    "@commitlint/config-pnpm-scopes": "^20.5.2",
     "@stagewise/typescript-config": "workspace:*",
     "@types/node": "22.15.2",
     "@types/semver": "^7.7.1",
@@ -42,11 +42,11 @@
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "conventional-recommended-bump": "^11.2.0",
     "git-raw-commits": "^5.0.1",
-    "lefthook": "^1.12.2",
-    "semver": "^7.8.0",
+    "lefthook": "^1.13.6",
+    "semver": "^7.8.4",
     "ts-node": "10.9.2",
-    "turbo": "^2.9.12",
-    "typescript": "^5.8.3"
+    "turbo": "^2.9.18",
+    "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@10.30.3",
   "engines": {
@@ -94,23 +94,23 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^4.0.77",
-    "@ai-sdk/azure": "^3.0.42",
-    "@ai-sdk/google-vertex": "^4.0.80",
-    "@ai-sdk/openai-compatible": "^2.0.35",
-    "@aws-sdk/credential-providers": "^3.1045.0",
-    "@better-auth/electron": "^1.6.10",
+    "@ai-sdk/amazon-bedrock": "^4.0.117",
+    "@ai-sdk/azure": "^3.0.74",
+    "@ai-sdk/google-vertex": "^4.0.145",
+    "@ai-sdk/openai-compatible": "^2.0.50",
+    "@aws-sdk/credential-providers": "^3.1068.0",
+    "@better-auth/electron": "^1.6.18",
     "@smithy/shared-ini-file-loader": "4.5.6",
     "@streamdown/math": "^1.0.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/headless": "^6.0.0",
     "@xterm/xterm": "^6.0.0",
-    "better-auth": "^1.6.10",
+    "better-auth": "^1.6.18",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
-    "nucleo-ui-outline-12": "^1.4.1",
-    "tsx": "^4.20.3"
+    "nucleo-ui-outline-12": "^1.4.2",
+    "tsx": "^4.22.4"
   },
   "config": {
     "forge": "./forge.config.mts"
