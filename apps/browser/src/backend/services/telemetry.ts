@@ -6,8 +6,10 @@ import type { IdentifierService } from './identifier';
 import type { PreferencesService } from './preferences';
 import {
   modelProviderSchema,
+  personalizationThemeIdSchema,
   socialAuthProviderSchema,
   type ModelProvider,
+  type PersonalizationThemeId,
   type SocialAuthProvider,
   type TelemetryLevel,
   type ToolApprovalMode,
@@ -447,6 +449,15 @@ export type EventProperties = {
     /** Truncated error message when `model_id === 'failed'`. */
     error?: string;
   };
+
+  // Personalization
+  'changed-theme': { theme: PersonalizationThemeId };
+  'changed-notification-sound-loudness': {
+    loudness: 'off' | 'subtle' | 'loud';
+  };
+  'changed-notification-sound-theme': {
+    theme: string;
+  };
 };
 
 export const UI_TELEMETRY_EVENT_NAMES = [
@@ -495,6 +506,9 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'workspace-connect-failed',
   'workspace-connect-finished',
   'workspace-connect-started',
+  'changed-theme',
+  'changed-notification-sound-loudness',
+  'changed-notification-sound-theme',
 ] as const satisfies ReadonlyArray<keyof EventProperties>;
 
 export type UIEventName = (typeof UI_TELEMETRY_EVENT_NAMES)[number];
@@ -638,6 +652,15 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'workspace-connect-finished': z.undefined().optional(),
   'workspace-connect-started': z.undefined().optional(),
+  'changed-theme': z.object({
+    theme: personalizationThemeIdSchema,
+  }),
+  'changed-notification-sound-loudness': z.object({
+    loudness: z.enum(['off', 'subtle', 'loud']),
+  }),
+  'changed-notification-sound-theme': z.object({
+    theme: z.string(),
+  }),
 } satisfies {
   [K in UIEventName]: z.ZodType<UIEventProperties[K]>;
 };
