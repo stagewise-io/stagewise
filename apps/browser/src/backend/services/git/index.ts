@@ -566,11 +566,13 @@ export class GitService extends DisposableService {
     const branchName = branchParts.join('/');
     if (!remoteName || !branchName) return null;
 
+    // Fetch all refs from the remote (not just the target branch) so that
+    // the worktree sees the latest state from the remote, not stale
+    // locally-cached tracking refs.
     const result = await this.runGitStrict(workspacePath, [
       'fetch',
       '--prune',
       remoteName,
-      `refs/heads/${branchName}:refs/remotes/${remoteName}/${branchName}`,
     ]);
     if (result.exitCode === 0) return null;
 
@@ -762,9 +764,10 @@ export class GitService extends DisposableService {
     if (!branches)
       return this.failure('not-git-repo', 'Workspace is not a Git repo.');
 
-    if (
-      !branches.branches.some((branch) => branch.name === options.sourceBranch)
-    ) {
+    const sourceBranch = branches.branches.find(
+      (branch) => branch.name === options.sourceBranch,
+    );
+    if (!sourceBranch) {
       return this.failure(
         'branch-not-found',
         `Source branch ${options.sourceBranch} does not exist.`,
@@ -776,6 +779,14 @@ export class GitService extends DisposableService {
         'branch-already-exists',
         `Branch ${branchName} already exists.`,
       );
+    }
+
+    if (sourceBranch.kind === 'remote') {
+      const fetchFailure = await this.fetchRemoteSourceBranch(
+        workspacePath,
+        sourceBranch.name,
+      );
+      if (fetchFailure) return fetchFailure;
     }
 
     const result = await this.runGitStrict(workspacePath, [

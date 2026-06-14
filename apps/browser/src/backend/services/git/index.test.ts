@@ -601,6 +601,23 @@ describe('GitService', () => {
     expect(mutationCalls).toContain('checkout -b feature/login main');
   });
 
+  it('fetches remote source branches before creating a branch', async () => {
+    const { service, mutationCalls } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+      'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+    });
+
+    await expect(
+      service.createBranch('/repo', {
+        branchName: 'feature/new',
+        sourceBranch: 'origin/main',
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(mutationCalls).toContain('fetch --prune origin');
+    expect(mutationCalls).toContain('checkout -b feature/new origin/main');
+  });
+
   it('rejects create-branch branch collisions', async () => {
     const { service } = await createGitService({
       ...baseReadResponses,
@@ -661,9 +678,7 @@ describe('GitService', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(mutationCalls).toContain(
-      'fetch --prune origin refs/heads/main:refs/remotes/origin/main',
-    );
+    expect(mutationCalls).toContain('fetch --prune origin');
     expect(
       mutationCalls.find((call) => call.startsWith('worktree add -b ')),
     ).toContain('worktree add -b new-work --no-track ');
