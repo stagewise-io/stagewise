@@ -13,6 +13,8 @@ import type {
   GitCreateBranchOptions,
   GitCreateWorktreeOptions,
   GitCreateWorktreeResult,
+  GitDiffNumstatEntry,
+  GitDiffNumstatSummary,
   GitMutationResult,
   GitMergedTargetResult,
   GitRepositoryInfo,
@@ -36,6 +38,8 @@ export type {
   GitCreateBranchOptions,
   GitCreateWorktreeOptions,
   GitCreateWorktreeResult,
+  GitDiffNumstatEntry,
+  GitDiffNumstatSummary,
   GitMutationResult,
   GitMergedTargetResult,
   GitRepositoryInfo,
@@ -931,6 +935,88 @@ export class GitService extends DisposableService {
     message: string,
   ): GitActionFailure {
     return { ok: false, reason, message };
+  }
+
+  public async getDiffNumstat(
+    workspacePath: string,
+  ): Promise<GitDiffNumstatSummary | null> {
+    const repositoryInfo = await this.getRepositoryInfo(workspacePath);
+    if (!repositoryInfo) return null;
+
+    const [unstagedRaw, stagedRaw] = await Promise.all([
+      this.runGit(workspacePath, ['diff', '--numstat']),
+      this.runGit(workspacePath, ['diff', '--cached', '--numstat']),
+    ]);
+
+    if (unstagedRaw === null && stagedRaw === null) return null;
+
+    const stagedEntries = stagedRaw ? this.parseNumstat(stagedRaw, true) : [];
+    const unstagedEntries = unstagedRaw
+      ? this.parseNumstat(unstagedRaw, false)
+      : [];
+
+    // Merge staged + unstaged entries for the same file.
+    const merged = new Map<string, GitDiffNumstatEntry>();
+
+    for (const entry of [...stagedEntries, ...unstagedEntries]) {
+      const existing = merged.get(entry.path);
+      if (existing) {
+        existing.added += entry.added;
+        existing.deleted += entry.deleted;
+        existing.staged = existing.staged || entry.staged;
+      } else {
+        merged.set(entry.path, { ...entry });
+      }
+    }
+
+    const entries = [...merged.values()];
+    const totalAdded = entries.reduce((sum, e) => sum + e.added, 0);
+    const totalDeleted = entries.reduce((sum, e) => sum + e.deleted, 0);
+
+    return { entries, totalAdded, totalDeleted };
+  }
+
+  private parseNumstat(raw: string, staged: boolean): GitDiffNumstatEntry[] {
+    const entries: GitDiffNumstatEntry[] = [];
+    for (const line of raw.split('\n')) {
+      if (!line) continue;
+      const parts = line.split('\t');
+      if (parts.length === 3) {
+        const [addedStr, deletedStr, pathStr] = parts;
+        const added =
+          addedStr === '-' ? 0 : Number.parseInt(addedStr!, 10) || 0;
+        const deleted =
+          deletedStr === '-' ? 0 : Number.parseInt(deletedStr!, 10) || 0;
+
+        // Handle renamed files: numstat format for renames is
+        // {added}\t{deleted}\t{oldPath => newPath}
+        const renameMatch = pathStr!.match(/^(.+)\s*=>\s*(.+)$/);
+        if (renameMatch) {
+          entries.push({
+            path: renameMatch[2]!,
+            added,
+            deleted,
+            changeType: 'renamed' as const,
+            oldPath: renameMatch[1]!,
+            staged,
+          });
+        } else {
+          // Determine changeType from (added,deleted).
+          let changeType: GitDiffNumstatEntry['changeType'] = 'modified';
+          if (added === 0 && deleted > 0) changeType = 'deleted';
+          else if (deleted === 0 && added > 0) changeType = 'added';
+
+          entries.push({
+            path: pathStr!,
+            added,
+            deleted,
+            changeType,
+            staged,
+          });
+        }
+      }
+    }
+    return entries;
   }
 
   private async getStatusSummary(

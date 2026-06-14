@@ -11,7 +11,7 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { XIcon } from 'lucide-react';
+import { XIcon, GitBranchIcon } from 'lucide-react';
 import {
   IconFileSearchOutline18,
   IconFolderSearchOutline18,
@@ -22,6 +22,7 @@ import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { useCommandCenter } from '../command-center';
 import { FileTreePreviewCoordinator } from './file-tree-preview-coordinator';
 import { FileTreeWorkspaceView } from './file-tree-workspace-view';
+import { FileTreeDiffView } from './file-tree-diff-view';
 import {
   getFileTreeWorkspaceKey,
   getFileTreeWorkspaceMountsForAgent,
@@ -56,14 +57,20 @@ export function FileTreeSidebar() {
   const activeWorkspaceKey = useKartonState(
     (s) => s.fileTree.activeWorkspaceKey,
   );
+  const viewMode = useKartonState((s) => s.fileTree.viewMode);
   const setVisible = useKartonProcedure((p) => p.fileTree.setVisible);
   const setActiveWorkspace = useKartonProcedure(
     (p) => p.fileTree.setActiveWorkspace,
+  );
+  const setViewMode = useKartonProcedure((p) => p.fileTree.setViewMode);
+  const getWorkspaceDiffSummary = useKartonProcedure(
+    (p) => p.toolbox.getWorkspaceDiffSummary,
   );
   const { open: openCommandCenter } = useCommandCenter();
   const [previewTargetPath, setPreviewTargetPath] = useState<string | null>(
     null,
   );
+  const [isGitRepo, setIsGitRepo] = useState(false);
 
   const workspaces = useMemo(
     () =>
@@ -80,11 +87,37 @@ export function FileTreeSidebar() {
     ? activeWorkspaceKey
     : (workspaces[0]?.key ?? null);
 
+  const selectedWorkspacePath =
+    workspaces.find((ws) => ws.key === selectedWorkspaceKey)?.path ?? null;
+
   useEffect(() => {
     if (selectedWorkspaceKey !== activeWorkspaceKey) {
       void setActiveWorkspace(selectedWorkspaceKey);
     }
   }, [activeWorkspaceKey, selectedWorkspaceKey, setActiveWorkspace]);
+
+  // Check if the selected workspace is a git repo
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedWorkspacePath) {
+      setIsGitRepo(false);
+      return;
+    }
+    getWorkspaceDiffSummary(selectedWorkspacePath)
+      .then((result) => {
+        if (cancelled) return;
+        setIsGitRepo(result !== null);
+        if (result === null && viewMode === 'diff') {
+          void setViewMode('files');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setIsGitRepo(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedWorkspacePath]);
 
   useEffect(() => {
     setPreviewTargetPath(null);
@@ -178,53 +211,84 @@ export function FileTreeSidebar() {
       {workspaces.length > 0 && (
         <div
           data-tutorial="file-tree-search-bar"
-          className="flex h-9 shrink-0 items-center justify-end gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2"
+          className="flex h-9 shrink-0 items-center justify-between gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2"
         >
-          {/* Files/Git mode switcher hidden until Git Diff view is functional. */}
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                className="size-7 shrink-0"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Search in content"
-                onClick={() => openFileSearch(true)}
+          {/* Files / Diff tab toggle */}
+          <div className="flex items-center rounded-md bg-surface-1 p-0.5">
+            <button
+              type="button"
+              className={cn(
+                'rounded px-2 py-0.5 font-medium text-[11px] transition-colors duration-100',
+                viewMode === 'files'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setViewMode('files')}
+            >
+              Files
+            </button>
+            {isGitRepo && (
+              <button
+                type="button"
+                className={cn(
+                  'flex items-center gap-1 rounded px-2 py-0.5 font-medium text-[11px] transition-colors duration-100',
+                  viewMode === 'diff'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                onClick={() => setViewMode('diff')}
               >
-                <IconFileSearchOutline18 className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span className="flex items-center gap-1.5">
-                <span>Search in content</span>
-                <HotkeyCombo
-                  action={HotkeyActions.OPEN_CONTENT_FILE_SEARCH}
-                  size="xs"
-                />
-              </span>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                className="size-7 shrink-0"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Search files"
-                onClick={() => openFileSearch(false)}
-              >
-                <IconFolderSearchOutline18 className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span className="flex items-center gap-1.5">
-                <span>Search for files</span>
-                <HotkeyCombo
-                  action={HotkeyActions.OPEN_FILE_SEARCH}
-                  size="xs"
-                />
-              </span>
-            </TooltipContent>
-          </Tooltip>
+                <GitBranchIcon className="size-3" />
+                Diff
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  className="size-7 shrink-0"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Search in content"
+                  onClick={() => openFileSearch(true)}
+                >
+                  <IconFileSearchOutline18 className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span className="flex items-center gap-1.5">
+                  <span>Search in content</span>
+                  <HotkeyCombo
+                    action={HotkeyActions.OPEN_CONTENT_FILE_SEARCH}
+                    size="xs"
+                  />
+                </span>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  className="size-7 shrink-0"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Search files"
+                  onClick={() => openFileSearch(false)}
+                >
+                  <IconFolderSearchOutline18 className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span className="flex items-center gap-1.5">
+                  <span>Search for files</span>
+                  <HotkeyCombo
+                    action={HotkeyActions.OPEN_FILE_SEARCH}
+                    size="xs"
+                  />
+                </span>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       )}
       <FileTreePreviewCoordinator
@@ -234,10 +298,21 @@ export function FileTreeSidebar() {
         onPreviewTargetClose={handlePreviewTargetClose}
       />
       <div className="min-h-0 flex-1 pt-1">
-        <FileTreeWorkspaceView
-          workspaceKey={selectedWorkspaceKey}
-          onPreviewTargetChange={handlePreviewTargetChange}
-        />
+        {viewMode === 'diff' ? (
+          <FileTreeDiffView
+            workspacePath={
+              workspaces.find((w) => w.key === selectedWorkspaceKey)?.path ??
+              null
+            }
+            workspaceKey={selectedWorkspaceKey}
+            openAgent={openAgent}
+          />
+        ) : (
+          <FileTreeWorkspaceView
+            workspaceKey={selectedWorkspaceKey}
+            onPreviewTargetChange={handlePreviewTargetChange}
+          />
+        )}
       </div>
     </aside>
   );

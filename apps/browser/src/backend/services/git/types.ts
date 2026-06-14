@@ -123,5 +123,20 @@ export type GitCreateWorktreeOptions = {
   sourceBranch: string;
 };
 
+export type GitDiffNumstatEntry = {
+  path: string;
+  added: number;
+  deleted: number;
+  changeType: 'modified' | 'added' | 'deleted' | 'renamed';
+  oldPath?: string;
+  staged: boolean;
+};
+
+export type GitDiffNumstatSummary = {
+  entries: GitDiffNumstatEntry[];
+  totalAdded: number;
+  totalDeleted: number;
+};
+
 export type GitStatusSummary = MountedWorkspaceGitStatusSummary;
 export type { MountedWorkspaceGitSummary };
