@@ -71,6 +71,10 @@ export function FileTreeSidebar() {
     null,
   );
   const [isGitRepo, setIsGitRepo] = useState(false);
+  const [diffTotals, setDiffTotals] = useState<{
+    added: number;
+    deleted: number;
+  }>({ added: 0, deleted: 0 });
 
   const workspaces = useMemo(
     () =>
@@ -103,16 +107,32 @@ export function FileTreeSidebar() {
       setIsGitRepo(false);
       return;
     }
+    if (!selectedWorkspacePath) {
+      setIsGitRepo(false);
+      setDiffTotals({ added: 0, deleted: 0 });
+      return;
+    }
     getWorkspaceDiffSummary(selectedWorkspacePath)
       .then((result) => {
         if (cancelled) return;
         setIsGitRepo(result !== null);
-        if (result === null && viewMode === 'diff') {
-          void setViewMode('files');
+        if (result) {
+          setDiffTotals({
+            added: result.totalAdded,
+            deleted: result.totalDeleted,
+          });
+        } else {
+          setDiffTotals({ added: 0, deleted: 0 });
+          if (viewMode === 'diff') {
+            void setViewMode('files');
+          }
         }
       })
       .catch(() => {
-        if (!cancelled) setIsGitRepo(false);
+        if (!cancelled) {
+          setIsGitRepo(false);
+          setDiffTotals({ added: 0, deleted: 0 });
+        }
       });
     return () => {
       cancelled = true;
@@ -211,7 +231,7 @@ export function FileTreeSidebar() {
       {workspaces.length > 0 && (
         <div
           data-tutorial="file-tree-search-bar"
-          className="flex h-9 shrink-0 items-center justify-between gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2"
+          className="flex min-h-9 shrink-0 items-center justify-between gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2"
         >
           {/* Files / Diff tab toggle */}
           <div className="flex items-center rounded-md bg-surface-1 p-0.5">
@@ -231,15 +251,27 @@ export function FileTreeSidebar() {
               <button
                 type="button"
                 className={cn(
-                  'flex items-center gap-1 rounded px-2 py-0.5 font-medium text-[11px] transition-colors duration-100',
+                  'flex flex-col rounded px-2 py-0.5 leading-tight transition-colors duration-100',
                   viewMode === 'diff'
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
                 onClick={() => setViewMode('diff')}
               >
-                <GitBranchIcon className="size-3" />
-                Diff
+                <span className="flex items-center gap-1 font-medium text-[11px]">
+                  <GitBranchIcon className="size-3" />
+                  Diff
+                </span>
+                {(diffTotals.added > 0 || diffTotals.deleted > 0) && (
+                  <span className="flex items-center gap-1 font-mono text-[9px] tabular-nums">
+                    <span className="text-success-foreground">
+                      +{diffTotals.added}
+                    </span>
+                    <span className="text-error-foreground">
+                      -{diffTotals.deleted}
+                    </span>
+                  </span>
+                )}
               </button>
             )}
           </div>
