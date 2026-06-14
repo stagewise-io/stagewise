@@ -98,10 +98,14 @@ export class UserExperienceService extends DisposableService {
   }
 
   private async initialize() {
-    const hasSeenOnboarding = await this.readOnboardingState();
+    const [hasSeenOnboarding, tutorialState] = await Promise.all([
+      this.readOnboardingState(),
+      this.readTutorialState(),
+    ]);
     this.uiKarton.setState((draft) => {
       draft.userExperience.storedExperienceData.hasSeenOnboardingFlow =
         hasSeenOnboarding;
+      draft.userExperience.storedExperienceData.tutorialState = tutorialState;
     });
 
     this.uiKarton.registerStateChangeCallback(
