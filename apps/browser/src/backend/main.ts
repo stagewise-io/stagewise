@@ -923,6 +923,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       fileTreeService.setActiveWorkspace(workspaceKey),
   );
   uiKarton.registerServerProcedureHandler(
+    'fileTree.setViewMode',
+    async (_cid, mode: 'files' | 'diff') => fileTreeService.setViewMode(mode),
+  );
+  uiKarton.registerServerProcedureHandler(
     'fileTree.setDirectoryExpanded',
     async (
       _cid,

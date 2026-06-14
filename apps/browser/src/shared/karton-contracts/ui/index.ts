@@ -891,6 +891,21 @@ export type MountedWorkspaceGitStatusSummary = NonNullable<
  */
 export type MountedWorkspaceGitSummary = WorkspaceGitSummary;
 
+export type MountedWorkspaceGitDiffEntry = {
+  path: string;
+  added: number;
+  deleted: number;
+  changeType: 'modified' | 'added' | 'deleted' | 'renamed';
+  oldPath?: string;
+  staged: boolean;
+};
+
+export type MountedWorkspaceGitDiffSummary = {
+  entries: MountedWorkspaceGitDiffEntry[];
+  totalAdded: number;
+  totalDeleted: number;
+};
+
 export const EMPTY_MOUNTS: MountEntry[] = [];
 
 export type PendingUserQuestion = {
@@ -1069,6 +1084,7 @@ export type AppState = {
   fileTree: {
     visible: boolean;
     activeWorkspaceKey: string | null;
+    viewMode: 'files' | 'diff';
     expandedDirectoriesByWorkspaceKey: Record<string, string[]>;
     workspaceRevisions: Record<string, number>;
     directoryRevisions: Record<string, Record<string, number>>;
@@ -1278,6 +1294,9 @@ export type KartonContract = {
         agentInstanceId: string,
         mountPrefix: string,
       ) => Promise<void>;
+      getWorkspaceDiffSummary: (
+        workspacePath: string,
+      ) => Promise<MountedWorkspaceGitDiffSummary | null>;
       listGitBranchesByPath: (
         workspacePath: string,
       ) => Promise<WorkspaceGitBranchesResult | null>;
@@ -1822,6 +1841,7 @@ export type KartonContract = {
       ) => Promise<{ success: boolean; error?: string }>;
       setVisible: (visible: boolean) => Promise<void>;
       setActiveWorkspace: (workspaceKey: string | null) => Promise<void>;
+      setViewMode: (mode: 'files' | 'diff') => Promise<void>;
       recreateDeletedFile: (
         workspaceKey: string,
         relativePath: string,
@@ -2054,6 +2074,7 @@ export const defaultState: KartonContract['state'] = {
   fileTree: {
     visible: false,
     activeWorkspaceKey: null,
+    viewMode: 'files',
     expandedDirectoriesByWorkspaceKey: {},
     workspaceRevisions: {},
     directoryRevisions: {},

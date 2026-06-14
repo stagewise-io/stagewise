@@ -1223,6 +1223,12 @@ export class FileTreeService extends DisposableService {
     });
   }
 
+  setViewMode(mode: 'files' | 'diff'): void {
+    this.uiKarton.setState((draft) => {
+      draft.fileTree.viewMode = mode;
+    });
+  }
+
   setDirectoryExpanded(
     workspaceKey: string,
     directoryPath: string,

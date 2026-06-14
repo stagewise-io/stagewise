@@ -375,6 +375,13 @@ export class MountManagerService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getWorkspaceDiffSummary',
+      async (_callingClientId: string, workspacePath: string) => {
+        return this.getWorkspaceDiffSummary(workspacePath);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'toolbox.listGitBranchesByPath',
       async (_callingClientId: string, workspacePath: string) => {
         return this.listGitBranchesByPath(workspacePath);
@@ -660,6 +667,11 @@ export class MountManagerService extends DisposableService {
 
     const resolvedRepoRoot = await safeRealpath(repositoryInfo.repoRoot);
     return resolvedRepoRoot === resolvedMainWorktreePath;
+  }
+
+  private async getWorkspaceDiffSummary(workspacePath: string) {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+    return this.gitService.getDiffNumstat(workspacePath);
   }
 
   private async listGitBranchesByPath(workspacePath: string) {

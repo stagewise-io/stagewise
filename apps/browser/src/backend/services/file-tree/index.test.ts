@@ -77,6 +77,7 @@ function createState(root: string): MutableState {
     fileTree: {
       visible: false,
       activeWorkspaceKey: null,
+      viewMode: 'files' as const,
       expandedDirectoriesByWorkspaceKey: {},
       workspaceRevisions: {},
       directoryRevisions: {},
