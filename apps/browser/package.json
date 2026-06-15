@@ -109,7 +109,7 @@
     "@tanstack/router-plugin": "^1.167.35",
     "@tiptap/core": "^3.23.1",
     "@tiptap/pm": "^3.23.1",
-    "@tiptap/react": "^3.23.1",
+    "@tiptap/react": "^3.26.1",
     "@tiptap/starter-kit": "^3.23.1",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/hast": "^3.0.4",
