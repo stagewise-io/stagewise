@@ -32,9 +32,6 @@ export function BrowserTabHotkeys({
   const toggleChromeDevTools = useKartonProcedure(
     (p) => p.browser.devTools.chrome.toggle,
   );
-  const cycleColorScheme = useKartonProcedure(
-    (p) => p.browser.cycleColorScheme,
-  );
   const setZoomPercentage = useKartonProcedure(
     (p) => p.browser.setZoomPercentage,
   );
@@ -127,12 +124,6 @@ export function BrowserTabHotkeys({
     if (!activeTabId || isStateOnlyTab) return;
     toggleChromeDevTools(activeTabId);
   }, HotkeyActions.DEV_TOOLS);
-
-  // Color scheme
-  useHotKeyListener(() => {
-    if (!activeTabId || isStateOnlyTab) return;
-    cycleColorScheme(activeTabId);
-  }, HotkeyActions.CYCLE_COLOR_SCHEME);
 
   return null;
 }
