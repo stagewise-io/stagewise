@@ -7,6 +7,7 @@ import { DisposableService } from '@/services/disposable';
 import { getWorktreesDir } from '@/utils/paths';
 import type {
   GitActionFailure,
+  GitActionFailureReason,
   GitBranchInfo,
   GitBranchListResult,
   GitCommandRunner,
@@ -561,23 +562,27 @@ export class GitService extends DisposableService {
   private async fetchRemoteSourceBranch(
     workspacePath: string,
     sourceBranch: string,
+    reason: GitActionFailureReason,
   ): Promise<GitActionFailure | null> {
     const [remoteName, ...branchParts] = sourceBranch.split('/');
     const branchName = branchParts.join('/');
     if (!remoteName || !branchName) return null;
 
-    // Fetch all refs from the remote (not just the target branch) so that
-    // the worktree sees the latest state from the remote, not stale
-    // locally-cached tracking refs.
+    // Fetch the exact target branch refspec. git fetch --prune origin
+    // (without a refspec) honors the clone's default fetch refspec, which
+    // can exclude branches in single-branch clones. Explicitly specifying
+    // the refspec guarantees this branch is updated regardless of clone
+    // configuration.
     const result = await this.runGitStrict(workspacePath, [
       'fetch',
       '--prune',
       remoteName,
+      `refs/heads/${branchName}:refs/remotes/${remoteName}/${branchName}`,
     ]);
     if (result.exitCode === 0) return null;
 
     return this.failure(
-      'worktree-create-failed',
+      reason,
       result.stderr || `Failed to update ${sourceBranch} from remote.`,
     );
   }
@@ -760,6 +765,19 @@ export class GitService extends DisposableService {
       return this.failure('invalid-name', 'Branch name is invalid.');
     }
 
+    // For remote sources, fetch before existence checks so we see the
+    // latest remote state rather than returning branch-not-found against
+    // a stale local cache.
+    const isRemoteSource = options.sourceBranch.includes('/');
+    if (isRemoteSource) {
+      const fetchFailure = await this.fetchRemoteSourceBranch(
+        workspacePath,
+        options.sourceBranch,
+        'branch-create-failed',
+      );
+      if (fetchFailure) return fetchFailure;
+    }
+
     const branches = await this.listBranches(workspacePath);
     if (!branches)
       return this.failure('not-git-repo', 'Workspace is not a Git repo.');
@@ -779,14 +797,6 @@ export class GitService extends DisposableService {
         'branch-already-exists',
         `Branch ${branchName} already exists.`,
       );
-    }
-
-    if (sourceBranch.kind === 'remote') {
-      const fetchFailure = await this.fetchRemoteSourceBranch(
-        workspacePath,
-        sourceBranch.name,
-      );
-      if (fetchFailure) return fetchFailure;
     }
 
     const result = await this.runGitStrict(workspacePath, [
@@ -873,6 +883,7 @@ export class GitService extends DisposableService {
       const fetchFailure = await this.fetchRemoteSourceBranch(
         workspacePath,
         sourceBranch.name,
+        'worktree-create-failed',
       );
       if (fetchFailure) return fetchFailure;
     }

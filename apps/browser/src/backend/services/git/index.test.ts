@@ -614,7 +614,9 @@ describe('GitService', () => {
         sourceBranch: 'origin/main',
       }),
     ).resolves.toMatchObject({ ok: true });
-    expect(mutationCalls).toContain('fetch --prune origin');
+    expect(mutationCalls).toContain(
+      'fetch --prune origin refs/heads/main:refs/remotes/origin/main',
+    );
     expect(mutationCalls).toContain('checkout -b feature/new origin/main');
   });
 
@@ -678,7 +680,9 @@ describe('GitService', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(mutationCalls).toContain('fetch --prune origin');
+    expect(mutationCalls).toContain(
+      'fetch --prune origin refs/heads/main:refs/remotes/origin/main',
+    );
     expect(
       mutationCalls.find((call) => call.startsWith('worktree add -b ')),
     ).toContain('worktree add -b new-work --no-track ');
