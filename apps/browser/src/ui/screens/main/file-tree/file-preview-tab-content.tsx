@@ -484,7 +484,7 @@ const MONACO_SHARED_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions 
   {
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
-    wordWrap: 'on',
+    wordWrap: 'off',
     automaticLayout: true,
     renderLineHighlight: 'line',
     scrollbar: {
@@ -1366,12 +1366,11 @@ function DiffEditorPreview({
               readOnly: !editable,
               originalEditable: false,
               renderIndicators: true,
-              // The base `wordWrap` only reliably reaches the modified pane.
-              // The diff editor's own wrap control defaults to 'inherit',
-              // which Monaco applies inconsistently, leaving the original
-              // (left) pane unwrapped and horizontally scrollable. Force wrap
-              // on so both panes wrap identically and stay aligned.
-              diffWordWrap: 'on',
+              // Disable word wrap in both panes; lines scroll horizontally
+              // instead. The diff editor's own wrap control defaults to
+              // 'inherit', which Monaco applies inconsistently across panes,
+              // so set it explicitly to keep both sides identical.
+              diffWordWrap: 'off',
               enableSplitViewResizing: diffMode === 'split',
               // The diff editor renders both its own vertical scrollbar and a
               // wider diff overview ruler (the colored add/remove map). That
