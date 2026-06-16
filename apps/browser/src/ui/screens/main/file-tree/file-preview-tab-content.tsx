@@ -1377,10 +1377,13 @@ function DiffEditorPreview({
               // the left of the gutter. Disable it to reclaim that space.
               renderMarginRevertIcon: false,
               // Trim the remaining gutter chrome: drop the glyph margin and
-              // code folding controls, and keep a tight line-number column.
+              // code folding controls. lineNumbersMinChars keeps the (right-
+              // aligned) number column from reserving extra blank space to
+              // the left of the digits, while lineDecorationsWidth restores a
+              // readable gap between the numbers and the code.
               glyphMargin: false,
-              lineDecorationsWidth: 1,
-              lineNumbersMinChars: 3,
+              lineNumbersMinChars: 2,
+              lineDecorationsWidth: 10,
               folding: false,
               enableSplitViewResizing: diffMode === 'split',
               // The diff editor renders both its own vertical scrollbar and a
