@@ -777,9 +777,9 @@ describe('GitService', () => {
   describe('getDiffNumstat', () => {
     const diffBaseResponses = {
       'rev-parse --show-toplevel --git-common-dir': `${repoPath}\n${repoGitDir}\n`,
-      'diff --cached --numstat': null,
+      'diff --cached --find-renames --numstat': null,
       'ls-files --others --exclude-standard -z': null,
-      'diff --cached --name-status': null,
+      'diff --cached --find-renames --name-status': null,
     };
 
     it('returns null when not a git repository', async () => {
@@ -790,8 +790,8 @@ describe('GitService', () => {
     it('returns empty summary when all git commands produce empty output', async () => {
       const { service } = await createGitService({
         ...diffBaseResponses,
-        'diff --numstat': '',
-        'diff --name-status': '',
+        'diff --find-renames --numstat': '',
+        'diff --find-renames --name-status': '',
       });
       await expect(service.getDiffNumstat('/repo')).resolves.toEqual({
         entries: [],
@@ -804,8 +804,8 @@ describe('GitService', () => {
       it('parses compact rename at root: {old => new}/file.ts', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '3\t2\t{old-name => new-name}.ts',
-          'diff --name-status': 'R100\told-name.ts\tnew-name.ts',
+          'diff --find-renames --numstat': '3\t2\t{old-name => new-name}.ts',
+          'diff --find-renames --name-status': 'R100\told-name.ts\tnew-name.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -826,8 +826,9 @@ describe('GitService', () => {
       it('parses compact rename with directory prefix: src/{old => new}/file.ts', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '5\t3\tsrc/{old-dir => new-dir}/utils.ts',
-          'diff --name-status':
+          'diff --find-renames --numstat':
+            '5\t3\tsrc/{old-dir => new-dir}/utils.ts',
+          'diff --find-renames --name-status':
             'R100\tsrc/old-dir/utils.ts\tsrc/new-dir/utils.ts',
         });
 
@@ -847,8 +848,8 @@ describe('GitService', () => {
       it('parses compact rename with no prefix/suffix: {old => new}', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '0\t0\t{legacy => modern}',
-          'diff --name-status': 'R100\tlegacy\tmodern',
+          'diff --find-renames --numstat': '0\t0\t{legacy => modern}',
+          'diff --find-renames --name-status': 'R100\tlegacy\tmodern',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -867,8 +868,10 @@ describe('GitService', () => {
       it('parses full-path rename: old/file.ts => new/file.ts', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '1\t1\told/path/file.ts => new/path/file.ts',
-          'diff --name-status': 'R100\told/path/file.ts\tnew/path/file.ts',
+          'diff --find-renames --numstat':
+            '1\t1\told/path/file.ts => new/path/file.ts',
+          'diff --find-renames --name-status':
+            'R100\told/path/file.ts\tnew/path/file.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -887,8 +890,9 @@ describe('GitService', () => {
       it('parses rename with content changes (non-zero added/deleted)', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '10\t5\t{old => new}/README.md',
-          'diff --name-status': 'R078\told/README.md\tnew/README.md',
+          'diff --find-renames --numstat': '10\t5\t{old => new}/README.md',
+          'diff --find-renames --name-status':
+            'R078\told/README.md\tnew/README.md',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -911,8 +915,8 @@ describe('GitService', () => {
         // but name-status says 'M' (modified).
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '5\t0\tREADME.md',
-          'diff --name-status': 'M\tREADME.md',
+          'diff --find-renames --numstat': '5\t0\tREADME.md',
+          'diff --find-renames --name-status': 'M\tREADME.md',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -932,8 +936,8 @@ describe('GitService', () => {
         // by count logic, but name-status says 'M'.
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '0\t3\tDEPRECATED.ts',
-          'diff --name-status': 'M\tDEPRECATED.ts',
+          'diff --find-renames --numstat': '0\t3\tDEPRECATED.ts',
+          'diff --find-renames --name-status': 'M\tDEPRECATED.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -951,8 +955,8 @@ describe('GitService', () => {
       it('labels fully deleted files via name-status', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '0\t42\tremoved.ts',
-          'diff --name-status': 'D\tremoved.ts',
+          'diff --find-renames --numstat': '0\t42\tremoved.ts',
+          'diff --find-renames --name-status': 'D\tremoved.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -970,8 +974,8 @@ describe('GitService', () => {
       it('labels added files via name-status', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '100\t0\tnew-file.ts',
-          'diff --name-status': 'A\tnew-file.ts',
+          'diff --find-renames --numstat': '100\t0\tnew-file.ts',
+          'diff --find-renames --name-status': 'A\tnew-file.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -989,9 +993,9 @@ describe('GitService', () => {
       it('falls back to count-based inference when name-status is empty', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat':
+          'diff --find-renames --numstat':
             '8\t0\tadded.ts\n0\t6\tdeleted.ts\n4\t2\tmodified.ts',
-          'diff --name-status': '',
+          'diff --find-renames --name-status': '',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -1023,10 +1027,10 @@ describe('GitService', () => {
       it('merges staged and unstaged entries for the same file', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '3\t0\tboth.ts',
-          'diff --name-status': 'M\tboth.ts',
-          'diff --cached --numstat': '0\t2\tboth.ts',
-          'diff --cached --name-status': 'M\tboth.ts',
+          'diff --find-renames --numstat': '3\t0\tboth.ts',
+          'diff --find-renames --name-status': 'M\tboth.ts',
+          'diff --cached --find-renames --numstat': '0\t2\tboth.ts',
+          'diff --cached --find-renames --name-status': 'M\tboth.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
@@ -1045,13 +1049,147 @@ describe('GitService', () => {
       it('accumulates totals across all entries', async () => {
         const { service } = await createGitService({
           ...diffBaseResponses,
-          'diff --numstat': '10\t5\ta.ts\n3\t0\tb.ts\n0\t1\tc.ts',
-          'diff --name-status': 'M\ta.ts\nA\tb.ts\nD\tc.ts',
+          'diff --find-renames --numstat':
+            '10\t5\ta.ts\n3\t0\tb.ts\n0\t1\tc.ts',
+          'diff --find-renames --name-status': 'M\ta.ts\nA\tb.ts\nD\tc.ts',
         });
 
         const result = await service.getDiffNumstat('/repo');
         expect(result?.totalAdded).toBe(13);
         expect(result?.totalDeleted).toBe(6);
+      });
+    });
+
+    describe('untracked files', () => {
+      it('includes untracked files with line counts and totals', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --find-renames --numstat': '',
+          'diff --find-renames --name-status': '',
+          'ls-files --others --exclude-standard -z':
+            'new-file.ts\0unlisted.md\0',
+        });
+
+        // Spy on private countFileLines to return known line counts
+        // without touching the filesystem.
+        const countSpy = vi
+          .spyOn(
+            service as unknown as {
+              countFileLines: (p: string) => Promise<number>;
+            },
+            'countFileLines',
+          )
+          .mockImplementation(async (absPath: string) => {
+            if (absPath.endsWith('new-file.ts')) return 42;
+            if (absPath.endsWith('unlisted.md')) return 7;
+            return 0;
+          });
+
+        const result = await service.getDiffNumstat('/repo');
+
+        expect(countSpy).toHaveBeenCalledTimes(2);
+        countSpy.mockRestore();
+
+        expect(result?.entries).toEqual([
+          {
+            path: 'new-file.ts',
+            added: 42,
+            deleted: 0,
+            changeType: 'untracked',
+            staged: false,
+          },
+          {
+            path: 'unlisted.md',
+            added: 7,
+            deleted: 0,
+            changeType: 'untracked',
+            staged: false,
+          },
+        ]);
+        expect(result?.totalAdded).toBe(49);
+        expect(result?.totalDeleted).toBe(0);
+      });
+
+      it('skips untracked paths already present in diff entries', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --find-renames --numstat': '5\t0\tshared.ts',
+          'diff --find-renames --name-status': 'A\tshared.ts',
+          'ls-files --others --exclude-standard -z': 'shared.ts\0only-new.ts\0',
+        });
+
+        const countSpy = vi
+          .spyOn(
+            service as unknown as {
+              countFileLines: (p: string) => Promise<number>;
+            },
+            'countFileLines',
+          )
+          .mockImplementation(async (absPath: string) => {
+            if (absPath.endsWith('only-new.ts')) return 3;
+            return 0;
+          });
+
+        const result = await service.getDiffNumstat('/repo');
+
+        // shared.ts is already covered by the diff; only only-new.ts
+        // should trigger a countFileLines call.
+        expect(countSpy).toHaveBeenCalledTimes(1);
+        countSpy.mockRestore();
+
+        expect(result?.entries).toHaveLength(2);
+        expect(result?.entries).toEqual(
+          expect.arrayContaining([
+            {
+              path: 'shared.ts',
+              added: 5,
+              deleted: 0,
+              changeType: 'added',
+              staged: false,
+            },
+            {
+              path: 'only-new.ts',
+              added: 3,
+              deleted: 0,
+              changeType: 'untracked',
+              staged: false,
+            },
+          ]),
+        );
+        expect(result?.totalAdded).toBe(8);
+        expect(result?.totalDeleted).toBe(0);
+      });
+    });
+
+    describe('split staged/unstaged status', () => {
+      it('preserves per-side changeType when a file appears in both', async () => {
+        // staged: M (modified), unstaged: D (deleted)
+        // Without separate status maps the staged 'M' would overwrite
+        // unstaged 'D', hiding that the working-tree file was deleted.
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          // Unstaged: file deleted in working tree
+          'diff --find-renames --numstat': '0\t42\tsplit.ts',
+          'diff --find-renames --name-status': 'D\tsplit.ts',
+          // Staged: file modified and staged
+          'diff --cached --find-renames --numstat': '10\t0\tsplit.ts',
+          'diff --cached --find-renames --name-status': 'M\tsplit.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+
+        // The unstaged deletion lines (42) and staged addition lines (10)
+        // should both be present. The merge keeps the first-seen (staged)
+        // changeType for the merged entry.
+        expect(result?.totalAdded).toBe(10);
+        expect(result?.totalDeleted).toBe(42);
+        expect(result?.entries).toHaveLength(1);
+        expect(result!.entries![0]).toMatchObject({
+          path: 'split.ts',
+          added: 10,
+          deleted: 42,
+          staged: true,
+        });
       });
     });
   });
