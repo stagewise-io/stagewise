@@ -1067,7 +1067,7 @@ function DiffEditorPreview({
   const [diffError, setDiffError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const language = languageFromPath(tab.relativePath);
-  const { markFocused } = useFileCodeZoom(tabId);
+  const { fontSize, markFocused } = useFileCodeZoom(tabId);
   const diffEditorRef = useRef<Monaco.editor.IStandaloneDiffEditor | null>(
     null,
   );
@@ -1377,6 +1377,13 @@ function DiffEditorPreview({
                 vertical: 'hidden',
                 verticalScrollbarSize: 0,
               },
+              // Apply the shared file-code zoom level. IDiffEditorOptions
+              // extends the base editor options, so this propagates to both
+              // the original and modified panes. The @monaco-editor/react
+              // DiffEditor re-applies options on change, so updating the zoom
+              // store re-renders this component and rescales the diff.
+              fontSize,
+              lineHeight: fontSize * 1.5,
             }}
           />
         )}
