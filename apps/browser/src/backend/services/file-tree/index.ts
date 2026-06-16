@@ -1425,10 +1425,11 @@ export class FileTreeService extends DisposableService {
           for (const directoryPath of affectedDirectories) {
             revisions[directoryPath] = (revisions[directoryPath] ?? 0) + 1;
           }
-          return;
+        } else {
+          this.invalidateWorkspaceCache(workspaceKey);
         }
-
-        this.invalidateWorkspaceCache(workspaceKey);
+        // Always bump the workspace-level revision so consumers
+        // (diff view, toggle button) can react to any file change.
         draft.fileTree.workspaceRevisions[workspaceKey] =
           (draft.fileTree.workspaceRevisions[workspaceKey] ?? 0) + 1;
       });
