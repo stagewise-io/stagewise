@@ -1610,26 +1610,15 @@ export function AgentsList() {
     const nextKeys = new Set(nextGroups.map((group) => group.key));
     const newRepoKeys: string[] = [];
 
+    // Worktree order is intentionally NOT persisted per-repo: there is no
+    // worktree-level drag-and-drop, so there is no manual order to preserve.
+    // Leaving `worktreeKeysByRepo` empty lets the model sort worktrees
+    // deterministically on every render (root first, then newest-by-age).
+    // Persisting a discovery-time order here previously froze worktrees in
+    // whatever arbitrary order they were first seen, overriding the age sort.
     for (const group of nextGroups) {
       if (!order.repoKeys.includes(group.key)) {
         newRepoKeys.push(group.key);
-      }
-      const worktreeOrder = order.worktreeKeysByRepo[group.key] ?? [];
-      const newKeys: string[] = [];
-      for (const worktree of group.worktrees) {
-        if (!worktreeOrder.includes(worktree.key)) {
-          newKeys.push(worktree.key);
-        }
-      }
-      if (newKeys.length > 0) {
-        const combined = Array.from(new Set([...newKeys, ...worktreeOrder]));
-        // Root must always be first, even when new keys are prepended.
-        const rootIdx = combined.indexOf('root');
-        if (rootIdx > 0) {
-          combined.splice(rootIdx, 1);
-          combined.unshift('root');
-        }
-        order.worktreeKeysByRepo[group.key] = combined;
       }
     }
 

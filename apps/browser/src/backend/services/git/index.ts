@@ -366,6 +366,7 @@ export class GitService extends DisposableService {
       headSha: headShaRaw,
       isDetached: branch === null,
       isMainWorktree: true,
+      createdAt: await this.getWorktreeCreatedAt(worktreePath),
     };
   }
 
@@ -614,10 +615,45 @@ export class GitService extends DisposableService {
       .trim()
       .split(/\n\s*\n/g)
       .filter(Boolean);
-    return entries.flatMap((entry, index) => {
+    const parsed = entries.flatMap((entry, index) => {
       const info = this.parseWorktreeEntry(entry, index === 0);
       return info ? [info] : [];
     });
+    const enriched = await Promise.all(
+      parsed.map(async ({ prunable, ...info }) => ({
+        info: {
+          ...info,
+          createdAt: await this.getWorktreeCreatedAt(info.path),
+        },
+        prunable,
+      })),
+    );
+    // Drop stale worktrees whose working tree was deleted on disk but not yet
+    // pruned: git keeps reporting them (flagged `prunable`) until
+    // `git worktree prune` runs, which otherwise leaves ghost entries in the
+    // sidebar. The main worktree is always kept.
+    return enriched
+      .filter(({ info, prunable }) => info.isMainWorktree || !prunable)
+      .map(({ info }) => info);
+  }
+
+  /**
+   * Best-effort worktree creation time (epoch ms). The `.git` entry inside a
+   * worktree (a gitdir pointer file for linked worktrees, a directory for the
+   * main worktree) is written once at creation and effectively never rewritten,
+   * so its birthtime is a stable age signal. Falls back to ctime/mtime when the
+   * filesystem reports no birthtime, and to `null` when the worktree is gone.
+   */
+  private async getWorktreeCreatedAt(
+    worktreePath: string,
+  ): Promise<number | null> {
+    try {
+      const stat = await fs.stat(path.join(worktreePath, '.git'));
+      const ms = stat.birthtimeMs || stat.ctimeMs || stat.mtimeMs;
+      return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : null;
+    } catch {
+      return null;
+    }
   }
 
   public async getWorktreeStatus(
@@ -1205,11 +1241,12 @@ export class GitService extends DisposableService {
   private parseWorktreeEntry(
     entry: string,
     isMainWorktree: boolean,
-  ): GitWorktreeInfo | null {
+  ): (GitWorktreeInfo & { prunable: boolean }) | null {
     let worktreePath: string | null = null;
     let headSha: string | null = null;
     let branch: string | null = null;
     let isDetached = false;
+    let prunable = false;
 
     for (const line of entry.split('\n')) {
       if (line.startsWith('worktree ')) {
@@ -1223,6 +1260,8 @@ export class GitService extends DisposableService {
           : raw || null;
       } else if (line === 'detached') {
         isDetached = true;
+      } else if (line === 'prunable' || line.startsWith('prunable ')) {
+        prunable = true;
       }
     }
 
@@ -1235,6 +1274,8 @@ export class GitService extends DisposableService {
       headSha,
       isDetached: isDetached || branch === null,
       isMainWorktree,
+      createdAt: null,
+      prunable,
     };
   }
 

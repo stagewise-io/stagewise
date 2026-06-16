@@ -98,6 +98,12 @@ export type WorkspaceGitWorktreeInfo = {
   isDetached: boolean;
   isMainWorktree: boolean;
   current: boolean;
+  /**
+   * Worktree creation time in epoch ms (birthtime of the worktree's `.git`
+   * entry), or `null` when unavailable. The sidebar orders worktrees
+   * newest-first by this value; `git worktree list` order is not age-based.
+   */
+  createdAt: number | null;
 };
 
 export type WorkspaceGitWorktreesResult = {

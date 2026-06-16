@@ -51,6 +51,14 @@ export type GitWorktreeInfo = {
   headSha: string | null;
   isDetached: boolean;
   isMainWorktree: boolean;
+  /**
+   * Worktree creation time in epoch ms, derived from the birthtime of the
+   * worktree's `.git` entry. `null` when the worktree is gone from disk or the
+   * filesystem reports no usable timestamp. Used by the sidebar to order
+   * worktrees newest-first; `git worktree list` order is filesystem/alphabetical
+   * and not a reliable age signal.
+   */
+  createdAt: number | null;
 };
 
 export type GitBranchKind = 'local' | 'remote';
