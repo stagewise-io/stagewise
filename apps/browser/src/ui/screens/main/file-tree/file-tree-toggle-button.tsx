@@ -15,6 +15,7 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { HotkeyActions } from '@shared/hotkeys';
 import {
+  areFileTreeWorkspaceMountsEqual,
   getFileTreeWorkspaceKey,
   getFileTreeWorkspaceMountsForAgent,
 } from './file-tree-utils';
@@ -22,22 +23,6 @@ import {
 // Cache diff totals per workspace across mount/unmount cycles to
 // prevent flicker when the toggle button moves between containers.
 const diffTotalsCache = new Map<string, { added: number; deleted: number }>();
-
-function areMountsEqual(
-  a: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
-  b: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
-): boolean {
-  return (
-    a.length === b.length &&
-    a.every((mount, index) => {
-      const other = b[index];
-      return (
-        other !== undefined &&
-        getFileTreeWorkspaceKey(mount) === getFileTreeWorkspaceKey(other)
-      );
-    })
-  );
-}
 
 export function FileTreeToggleButton() {
   const visible = useKartonState((s) => s.fileTree.visible);
@@ -53,7 +38,7 @@ export function FileTreeToggleButton() {
   const workspaceMounts = useKartonState(
     useComparingSelector(
       (s) => getFileTreeWorkspaceMountsForAgent(s, openAgent),
-      areMountsEqual,
+      areFileTreeWorkspaceMountsEqual,
     ),
   );
   const activeWorkspaceKey = useKartonState(

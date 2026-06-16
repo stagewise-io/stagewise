@@ -26,27 +26,12 @@ import { FileTreePreviewCoordinator } from './file-tree-preview-coordinator';
 import { FileTreeWorkspaceView } from './file-tree-workspace-view';
 import { FileTreeDiffView } from './file-tree-diff-view';
 import {
+  areFileTreeWorkspaceMountsEqual,
   getFileTreeWorkspaceKey,
   getFileTreeWorkspaceMountsForAgent,
   getFileTreeWorkspaceName,
 } from './file-tree-utils';
 import { Tutorial } from '@ui/components/tutorial';
-
-function areFileTreeWorkspaceMountsEqual(
-  a: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
-  b: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
-): boolean {
-  return (
-    a.length === b.length &&
-    a.every((mount, index) => {
-      const otherMount = b[index];
-      return (
-        otherMount !== undefined &&
-        getFileTreeWorkspaceKey(mount) === getFileTreeWorkspaceKey(otherMount)
-      );
-    })
-  );
-}
 
 export function FileTreeSidebar() {
   const [openAgent] = useOpenAgent();
