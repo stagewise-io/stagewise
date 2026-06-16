@@ -711,11 +711,6 @@ export function MainSection({
       }}
       className="@container overflow-visible! relative flex h-full flex-1 flex-col items-start justify-between"
     >
-      {topRightActions && (
-        <div className="app-no-drag absolute top-1 right-2 z-20 flex items-center gap-0.5">
-          {topRightActions}
-        </div>
-      )}
       {visibleTabIds.length > 0 && <Tutorial tutorialId="content-tabs" />}
       <BrowserTabHotkeys
         onFocusUrlBar={handleFocusUrlBar}
@@ -723,7 +718,7 @@ export function MainSection({
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 flex-row items-stretch gap-1 border-derived-strong border-b bg-background py-1.5 pr-10 pl-1">
+        <div className="flex shrink-0 flex-row items-stretch gap-1 border-derived-strong border-b bg-background py-1.5 pr-2 pl-3">
           <SortableTabs
             value={effectiveActiveTabId ?? ''}
             onValueChange={(id) => {
@@ -765,6 +760,12 @@ export function MainSection({
               void createTerminal(undefined, openAgent)
             }
           />
+          <div className="flex-1" />
+          {topRightActions && (
+            <div className="flex shrink-0 items-center gap-0">
+              {topRightActions}
+            </div>
+          )}
         </div>
         {/* Content area with per-tab UI */}
         <div className="relative flex size-full flex-col">

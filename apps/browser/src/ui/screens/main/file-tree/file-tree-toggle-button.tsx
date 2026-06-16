@@ -19,6 +19,10 @@ import {
   getFileTreeWorkspaceMountsForAgent,
 } from './file-tree-utils';
 
+// Cache diff totals per workspace across mount/unmount cycles to
+// prevent flicker when the toggle button moves between containers.
+const diffTotalsCache = new Map<string, { added: number; deleted: number }>();
+
 function areMountsEqual(
   a: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
   b: ReturnType<typeof getFileTreeWorkspaceMountsForAgent>,
@@ -62,25 +66,38 @@ export function FileTreeToggleButton() {
     workspaceMounts[0]?.path ??
     null;
 
-  const [diffTotals, setDiffTotals] = useState({ added: 0, deleted: 0 });
+  // Re-fetch diff totals when the workspace files change.
+  const workspaceRevision = useKartonState((s) =>
+    activeWorkspaceKey
+      ? (s.fileTree.workspaceRevisions[activeWorkspaceKey] ?? 0)
+      : 0,
+  );
+
+  const [diffTotals, setDiffTotals] = useState(() => {
+    if (!selectedWorkspacePath) return { added: 0, deleted: 0 };
+    return (
+      diffTotalsCache.get(selectedWorkspacePath) ?? {
+        added: 0,
+        deleted: 0,
+      }
+    );
+  });
 
   useEffect(() => {
     if (visible || !selectedWorkspacePath) {
       setDiffTotals({ added: 0, deleted: 0 });
       return;
     }
+    const workspacePath = selectedWorkspacePath;
     let cancelled = false;
-    getWorkspaceDiffSummary(selectedWorkspacePath)
+    getWorkspaceDiffSummary(workspacePath)
       .then((result) => {
         if (cancelled) return;
-        if (result) {
-          setDiffTotals({
-            added: result.totalAdded,
-            deleted: result.totalDeleted,
-          });
-        } else {
-          setDiffTotals({ added: 0, deleted: 0 });
-        }
+        const totals = result
+          ? { added: result.totalAdded, deleted: result.totalDeleted }
+          : { added: 0, deleted: 0 };
+        diffTotalsCache.set(workspacePath, totals);
+        setDiffTotals(totals);
       })
       .catch(() => {
         if (!cancelled) setDiffTotals({ added: 0, deleted: 0 });
@@ -88,12 +105,17 @@ export function FileTreeToggleButton() {
     return () => {
       cancelled = true;
     };
-  }, [visible, selectedWorkspacePath, getWorkspaceDiffSummary]);
+  }, [
+    visible,
+    selectedWorkspacePath,
+    workspaceRevision,
+    getWorkspaceDiffSummary,
+  ]);
 
   const showDiff = !visible && (diffTotals.added > 0 || diffTotals.deleted > 0);
 
   return (
-    <>
+    <div className="flex items-center">
       <Tooltip>
         <TooltipTrigger>
           <Button
@@ -118,6 +140,6 @@ export function FileTreeToggleButton() {
           <span className="text-error-foreground">-{diffTotals.deleted}</span>
         </span>
       )}
-    </>
+    </div>
   );
 }

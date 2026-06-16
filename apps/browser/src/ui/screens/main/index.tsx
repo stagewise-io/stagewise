@@ -74,7 +74,7 @@ function persistPanelSize(key: string, size: number) {
 }
 
 function ActionDivider() {
-  return <div className="mx-px h-5 w-px bg-border-subtle" />;
+  return <div className="h-5 w-px bg-border-subtle" />;
 }
 
 export function DefaultLayout({ show }: { show: boolean }) {

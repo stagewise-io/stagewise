@@ -102,6 +102,14 @@ export function FileTreeSidebar() {
   const selectedWorkspacePath =
     workspaces.find((ws) => ws.key === selectedWorkspaceKey)?.path ?? null;
 
+  // Subscribe to workspace revisions so the diff view re-fetches when
+  // files change (agent edits, external writes, etc.).
+  const workspaceRevision = useKartonState((s) =>
+    selectedWorkspaceKey
+      ? (s.fileTree.workspaceRevisions[selectedWorkspaceKey] ?? 0)
+      : 0,
+  );
+
   useEffect(() => {
     if (selectedWorkspaceKey !== activeWorkspaceKey) {
       void setActiveWorkspace(selectedWorkspaceKey);
@@ -138,7 +146,7 @@ export function FileTreeSidebar() {
     return () => {
       cancelled = true;
     };
-  }, [selectedWorkspacePath]);
+  }, [selectedWorkspacePath, workspaceRevision]);
 
   useEffect(() => {
     setPreviewTargetPath(null);
