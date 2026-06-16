@@ -57,6 +57,7 @@ await esbuild.build({
   format: 'esm',
   sourcemap: true,
   external: [
+    '@stagewise/agent-runtime-node',
     '@ai-sdk/anthropic',
     '@ai-sdk/google',
     '@ai-sdk/openai',
