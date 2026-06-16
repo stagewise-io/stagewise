@@ -1371,12 +1371,15 @@ function DiffEditorPreview({
               // 'inherit', which Monaco applies inconsistently across panes,
               // so set it explicitly to keep both sides identical.
               diffWordWrap: 'off',
-              // Inline mode renders two line-number columns (original +
-              // modified). Trim the default gutter padding (glyph margin,
-              // line-decoration band, and minimum number width) so the line
-              // numbers don't sit behind a wide empty left margin.
+              // Monaco reserves a left margin in the modified editor for the
+              // revert-change arrow icons. In split mode that margin shows up
+              // as empty space between the two panes; in inline mode it pads
+              // the left of the gutter. Disable it to reclaim that space.
+              renderMarginRevertIcon: false,
+              // Trim the remaining gutter chrome: drop the glyph margin and
+              // code folding controls, and keep a tight line-number column.
               glyphMargin: false,
-              lineDecorationsWidth: 0,
+              lineDecorationsWidth: 1,
               lineNumbersMinChars: 3,
               folding: false,
               enableSplitViewResizing: diffMode === 'split',
