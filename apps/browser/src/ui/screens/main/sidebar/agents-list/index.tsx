@@ -1615,12 +1615,17 @@ export function AgentsList() {
         newRepoKeys.push(group.key);
       }
       const worktreeOrder = order.worktreeKeysByRepo[group.key] ?? [];
+      const newKeys: string[] = [];
       for (const worktree of group.worktrees) {
         if (!worktreeOrder.includes(worktree.key)) {
-          worktreeOrder.unshift(worktree.key);
+          newKeys.push(worktree.key);
         }
       }
-      order.worktreeKeysByRepo[group.key] = Array.from(new Set(worktreeOrder));
+      if (newKeys.length > 0) {
+        order.worktreeKeysByRepo[group.key] = Array.from(
+          new Set([...newKeys, ...worktreeOrder]),
+        );
+      }
     }
 
     order.repoKeys = [
