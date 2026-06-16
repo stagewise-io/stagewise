@@ -1622,9 +1622,14 @@ export function AgentsList() {
         }
       }
       if (newKeys.length > 0) {
-        order.worktreeKeysByRepo[group.key] = Array.from(
-          new Set([...newKeys, ...worktreeOrder]),
-        );
+        const combined = Array.from(new Set([...newKeys, ...worktreeOrder]));
+        // Root must always be first, even when new keys are prepended.
+        const rootIdx = combined.indexOf('root');
+        if (rootIdx > 0) {
+          combined.splice(rootIdx, 1);
+          combined.unshift('root');
+        }
+        order.worktreeKeysByRepo[group.key] = combined;
       }
     }
 
