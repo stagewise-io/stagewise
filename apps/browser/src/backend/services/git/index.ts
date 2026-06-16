@@ -975,31 +975,36 @@ export class GitService extends DisposableService {
     if (unstagedRaw === null && stagedRaw === null && !untrackedRaw)
       return null;
 
-    // Build a map from file path to git status code (M, A, D, R).
-    // For renames (R100\told\tnew), key by the new path.
-    const statusMap = new Map<string, string>();
-    const addStatusEntries = (raw: string | null) => {
-      if (!raw) return;
+    // Build separate status maps for staged and unstaged so that
+    // a file appearing in both (e.g. staged M + unstaged D) keeps
+    // the correct per-side change type instead of having staged
+    // status overwrite unstaged.
+    // Keys are file paths; for renames (R100\told\tnew), key by
+    // the new path.
+    const buildStatusMap = (raw: string | null): Map<string, string> => {
+      const map = new Map<string, string>();
+      if (!raw) return map;
       for (const line of raw.split('\n')) {
         if (!line) continue;
         const [code, ...rest] = line.split('\t');
         if (!code) continue;
         if (code.startsWith('R') && rest.length >= 2) {
           // R100\told\tnew — key by new path
-          statusMap.set(rest[1]!, code[0]!);
+          map.set(rest[1]!, code[0]!);
         } else if (rest.length >= 1) {
-          statusMap.set(rest[0]!, code[0]!);
+          map.set(rest[0]!, code[0]!);
         }
       }
+      return map;
     };
-    addStatusEntries(unstagedStatusRaw);
-    addStatusEntries(stagedStatusRaw);
+    const stagedStatusMap = buildStatusMap(stagedStatusRaw);
+    const unstagedStatusMap = buildStatusMap(unstagedStatusRaw);
 
     const stagedEntries = stagedRaw
-      ? this.parseNumstat(stagedRaw, true, statusMap)
+      ? this.parseNumstat(stagedRaw, true, stagedStatusMap)
       : [];
     const unstagedEntries = unstagedRaw
-      ? this.parseNumstat(unstagedRaw, false, statusMap)
+      ? this.parseNumstat(unstagedRaw, false, unstagedStatusMap)
       : [];
 
     // Merge staged + unstaged entries for the same file.
