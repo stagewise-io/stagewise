@@ -382,6 +382,24 @@ export class MountManagerService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getFileDiffContent',
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        filePath: string,
+        staged: boolean,
+        oldPath?: string,
+      ) => {
+        return this.getFileDiffContent(
+          workspacePath,
+          filePath,
+          staged,
+          oldPath,
+        );
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'toolbox.listGitBranchesByPath',
       async (_callingClientId: string, workspacePath: string) => {
         return this.listGitBranchesByPath(workspacePath);
@@ -672,6 +690,21 @@ export class MountManagerService extends DisposableService {
   private async getWorkspaceDiffSummary(workspacePath: string) {
     if (!(await this.isTrustedGitPath(workspacePath))) return null;
     return this.gitService.getDiffNumstat(workspacePath);
+  }
+
+  private async getFileDiffContent(
+    workspacePath: string,
+    filePath: string,
+    staged: boolean,
+    oldPath?: string,
+  ) {
+    if (!(await this.isTrustedGitPath(workspacePath))) return null;
+    return this.gitService.getFileDiffContent(
+      workspacePath,
+      filePath,
+      staged,
+      oldPath,
+    );
   }
 
   private async listGitBranchesByPath(workspacePath: string) {
@@ -1654,6 +1687,7 @@ export class MountManagerService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.getWorkspaceDiffSummary',
     );
+    this.uiKarton.removeServerProcedureHandler('toolbox.getFileDiffContent');
     this.uiKarton.removeServerProcedureHandler('toolbox.listGitBranchesByPath');
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.listGitWorktreesByPath',

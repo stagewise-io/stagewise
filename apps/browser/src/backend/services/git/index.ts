@@ -1279,16 +1279,14 @@ export class GitService extends DisposableService {
     };
   }
 
-  private async runGit(cwd: string, args: string[]): Promise<string | null> {
+  private async runGitRaw(cwd: string, args: string[]): Promise<string | null> {
     this.assertNotDisposed();
     try {
       const resolvedEnv = await this.getResolvedEnv();
-      const result = await this.runGitCommand(
-        cwd,
-        args,
-        resolvedEnv ?? process.env,
+      return (
+        (await this.runGitCommand(cwd, args, resolvedEnv ?? process.env)) ??
+        null
       );
-      return result?.replace(/\r?\n$/, '') ?? null;
     } catch (error) {
       this.logger.debug('[GitService] Git command failed', {
         cwd,
@@ -1297,6 +1295,53 @@ export class GitService extends DisposableService {
       });
       return null;
     }
+  }
+
+  private async runGit(cwd: string, args: string[]): Promise<string | null> {
+    const result = await this.runGitRaw(cwd, args);
+    return result?.replace(/\r?\n$/, '') ?? null;
+  }
+
+  /**
+   * Fetch the committed (HEAD) content and the current working-tree content
+   * of a file that appears in the git diff. Used by the file-tree diff view
+   * to open a side-by-side Monaco diff editor.
+   *
+   * The diff always compares `HEAD` against the file on disk — never the
+   * staged index snapshot — so the view reflects the file's latest state
+   * regardless of what is staged. The returned `mtimeMs` is the working-tree
+   * file's modification time, used as the save concurrency baseline.
+   *
+   * The `staged` flag is accepted for call-site compatibility but does not
+   * affect which versions are compared.
+   */
+  public async getFileDiffContent(
+    workspacePath: string,
+    filePath: string,
+    _staged: boolean,
+    oldPath?: string,
+  ): Promise<{
+    original: string;
+    modified: string;
+    mtimeMs: number | null;
+  } | null> {
+    const repositoryInfo = await this.getRepositoryInfo(workspacePath);
+    if (!repositoryInfo) return null;
+
+    // HEAD (committed) vs. the working-tree file on disk. For renamed files
+    // the HEAD blob lives at the old path.
+    const headPath = oldPath ?? filePath;
+    const absPath = path.join(workspacePath, filePath);
+    const [headVersion, diskVersion, stat] = await Promise.all([
+      this.runGitRaw(workspacePath, ['show', `HEAD:${headPath}`]),
+      fs.readFile(absPath, 'utf8').catch(() => null),
+      fs.stat(absPath).catch(() => null),
+    ]);
+    return {
+      original: headVersion ?? '',
+      modified: diskVersion ?? '',
+      mtimeMs: stat?.mtimeMs ?? null,
+    };
   }
 
   private async runGitStrict(

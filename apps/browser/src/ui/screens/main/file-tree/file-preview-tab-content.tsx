@@ -20,7 +20,6 @@ import type {
   FileStatResult,
   TabState,
 } from '@shared/karton-contracts/ui';
-import { FILE_SAVE_CONFLICT_CODE } from '@shared/karton-contracts/ui';
 import {
   useCallback,
   useEffect,
@@ -30,10 +29,13 @@ import {
   type ReactElement,
 } from 'react';
 import { IconDatabaseFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import type { FileDiffContent } from '@shared/karton-contracts/ui';
 import {
+  Columns3Icon,
   Loader2Icon,
   MinusIcon,
   PlusIcon,
+  PanelTopIcon,
   TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
@@ -51,7 +53,7 @@ import {
   IconUndoOutline18,
 } from 'nucleo-ui-outline-18';
 import { Menu as MenuBase } from '@base-ui/react/menu';
-import MonacoEditor from '@monaco-editor/react';
+import MonacoEditor, { DiffEditor } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
@@ -64,11 +66,11 @@ import {
   nativeFileManagerLabel,
 } from '@shared/ide-url';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
-import {
-  clearFileTabUnsavedEditEntry,
-  setFileTabUnsavedEditEntry,
-} from './file-tab-unsaved-edits';
 import { Streamdown } from '@ui/components/streamdown';
+import {
+  type EditorActions,
+  useFileEditorController,
+} from './use-file-editor-controller';
 
 const MONACO_THEME_NAME = 'stagewise-file-preview';
 
@@ -93,27 +95,8 @@ const scrollStateStore = new Map<
 /** Persists markdown preview/source mode across tab switches. */
 const markdownModeStore = new Map<string, 'preview' | 'source'>();
 
-type EditorActions = {
-  save: () => void;
-  /** Overwrite the on-disk file, ignoring a detected external modification. */
-  forceSave: () => void;
-  /** Discard local edits and load the latest on-disk content. */
-  reload: () => void;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  isDirty: boolean;
-  isSaving: boolean;
-  /** When true, the file is read-only (e.g. attachment blob) — no saving. */
-  readOnly: boolean;
-  /**
-   * True when the on-disk file changed while the user has unsaved local
-   * edits. The UI surfaces a conflict warning with reload/overwrite options
-   * instead of silently losing or overwriting either side.
-   */
-  externalChange: boolean;
-};
+/** Persists diff editor mode (inline/split) across tab switches. */
+const diffModeStore = new Map<string, 'inline' | 'split'>();
 
 type ImagePreviewBackground = SvgPreviewBackground;
 
@@ -564,28 +547,13 @@ function useSourceCursorPosition(editor: MonacoEditorInstance | null): {
   return cursorPosition;
 }
 
-function createEditorActionState(editor: MonacoEditorInstance | null) {
-  const model = editor?.getModel();
-  if (!model) {
-    return {
-      canUndo: false,
-      canRedo: false,
-    };
-  }
-
-  return {
-    canUndo: model.canUndo(),
-    canRedo: model.canRedo(),
-  };
-}
-
 function useEditorActions(
   tabId: string,
   editor: MonacoEditorInstance | null,
   preview: FilePreviewResult,
   text: string,
   setText: (value: string) => void,
-) {
+): EditorActions {
   const saveFile = useKartonProcedure((p) => p.fileTree.saveFile);
   const getFilePreview = useKartonProcedure((p) => p.fileTree.getFilePreview);
   const readOnly = preview.readOnly ?? false;
@@ -593,243 +561,96 @@ function useEditorActions(
     preview.workspaceKey,
     preview.relativePath,
   );
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const [externalChange, setExternalChange] = useState(false);
 
-  // The on-disk content + mtime the editor is currently based on. These form
-  // the baseline for dirty detection, live external-edit adoption, and the
-  // save-time conflict guard.
-  const savedTextRef = useRef(preview.text ?? '');
-  const baselineMtimeRef = useRef<number | undefined>(preview.mtimeMs);
-  const lastDiskTextRef = useRef(preview.text ?? '');
+  // Track the editor + current draft text in refs so the controller's stable
+  // callbacks always observe live values without being re-created.
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const textRef = useRef(text);
+  textRef.current = text;
 
-  const refreshActionState = useCallback(() => {
-    const state = createEditorActionState(editor);
-    const currentText = editor?.getValue() ?? text;
-    setCanUndo(state.canUndo);
-    setCanRedo(state.canRedo);
-    setIsDirty(currentText !== savedTextRef.current);
-  }, [editor, text]);
+  const controller = useFileEditorController({
+    tabId,
+    workspaceKey: preview.workspaceKey,
+    relativePath: preview.relativePath,
+    readOnly,
+    saveFile,
+    initialText: preview.text ?? '',
+    initialMtimeMs: preview.mtimeMs,
+    getModel: () => editorRef.current?.getModel(),
+    // Fall back to the draft text when the editor is unmounted (e.g. SVG /
+    // markdown preview mode) so dirty detection keeps working.
+    getValue: () => editorRef.current?.getValue() ?? textRef.current,
+    reload: async () => {
+      const result = await getFilePreview(
+        preview.workspaceKey,
+        preview.relativePath,
+      );
+      if (!result) return null;
+      const diskText = result.text ?? '';
+      const key = getPreviewCacheKey(result.workspaceKey, result.relativePath);
+      previewCache.set(key, { preview: result, error: null });
+      textDraftCache.set(key, diskText);
+      setText(diskText);
+      return { text: diskText, mtimeMs: result.mtimeMs };
+    },
+    unsavedTitle: preview.relativePath.split('/').pop() || preview.relativePath,
+    onDiscard: () => {
+      textDraftCache.delete(cacheKey);
+    },
+    onSaved: (result, nextText) => {
+      if (!result) return;
+      const key = getPreviewCacheKey(result.workspaceKey, result.relativePath);
+      previewCache.set(key, { preview: result, error: null });
+      textDraftCache.set(key, nextText);
+    },
+  });
+
+  const { reconcileDisk, refreshState, notifyContentChanged } = controller;
 
   // React to fresh on-disk content arriving from the parent's revalidation
   // (driven by the file-tree watcher bumping the backing directory's
-  // revision). With no local edits we adopt the new content live; with
-  // unsaved edits we keep them and raise a conflict so the user is warned.
+  // revision). With no local edits the new content is adopted live; with
+  // unsaved edits a conflict is raised so the user is warned.
   useEffect(() => {
     if (readOnly) return;
-    const diskText = preview.text ?? '';
-    if (diskText === lastDiskTextRef.current) {
-      // Content unchanged (e.g. a metadata-only touch) — just refresh the
-      // mtime baseline so the next save isn't flagged as a false conflict.
-      baselineMtimeRef.current = preview.mtimeMs;
-      return;
+    const outcome = reconcileDisk(preview.text ?? '', preview.mtimeMs);
+    if (outcome === 'adopted') {
+      textDraftCache.set(cacheKey, preview.text ?? '');
+      setText(preview.text ?? '');
     }
-    lastDiskTextRef.current = diskText;
-    const editorText = editor?.getValue() ?? savedTextRef.current;
-    const userHasEdits = editorText !== savedTextRef.current;
-    if (userHasEdits) {
-      setExternalChange(true);
-      return;
-    }
-    savedTextRef.current = diskText;
-    baselineMtimeRef.current = preview.mtimeMs;
-    setExternalChange(false);
-    setIsDirty(false);
-    textDraftCache.set(cacheKey, diskText);
-    setText(diskText);
-    clearFileTabUnsavedEditEntry(tabId);
   }, [
     preview.text,
     preview.mtimeMs,
     readOnly,
-    editor,
     cacheKey,
-    tabId,
     setText,
+    reconcileDisk,
   ]);
 
-  useEffect(() => {
-    return () => clearFileTabUnsavedEditEntry(tabId);
-  }, [tabId]);
-
-  const save = useCallback(
-    async (force = false): Promise<boolean> => {
-      if (readOnly || !editor || isSaving) return false;
-
-      const nextText = editor.getValue();
-      setIsSaving(true);
-      try {
-        const result = await saveFile(
-          preview.workspaceKey,
-          preview.relativePath,
-          nextText,
-          force ? null : baselineMtimeRef.current,
-        );
-        savedTextRef.current = nextText;
-        lastDiskTextRef.current = nextText;
-        baselineMtimeRef.current = result?.mtimeMs;
-        setIsDirty(false);
-        setExternalChange(false);
-        clearFileTabUnsavedEditEntry(tabId);
-        if (result) {
-          const key = getPreviewCacheKey(
-            result.workspaceKey,
-            result.relativePath,
-          );
-          previewCache.set(key, { preview: result, error: null });
-          textDraftCache.set(key, nextText);
-        }
-        return true;
-      } catch (err) {
-        // The backend rejected the save because the file was modified
-        // externally. Surface the conflict instead of throwing so the user
-        // can reload or explicitly overwrite.
-        if (
-          err instanceof Error &&
-          err.message.includes(FILE_SAVE_CONFLICT_CODE)
-        ) {
-          setExternalChange(true);
-          return false;
-        }
-        throw err;
-      } finally {
-        setIsSaving(false);
-        refreshActionState();
-      }
-    },
-    [editor, isSaving, preview, readOnly, refreshActionState, saveFile, tabId],
-  );
-
-  const handleSave = useCallback(() => {
-    // While an external-change conflict is surfaced, the regular save is
-    // blocked — the user must explicitly Reload or Overwrite from the banner.
-    if (externalChange) return;
-    void save(false);
-  }, [save, externalChange]);
-
-  const forceSave = useCallback(() => {
-    void save(true);
-  }, [save]);
-
-  // Discard local edits and load the latest on-disk content.
-  const reload = useCallback(async () => {
-    const result = await getFilePreview(
-      preview.workspaceKey,
-      preview.relativePath,
-    );
-    if (!result) return;
-    const diskText = result.text ?? '';
-    savedTextRef.current = diskText;
-    lastDiskTextRef.current = diskText;
-    baselineMtimeRef.current = result.mtimeMs;
-    const key = getPreviewCacheKey(result.workspaceKey, result.relativePath);
-    previewCache.set(key, { preview: result, error: null });
-    textDraftCache.set(key, diskText);
-    setText(diskText);
-    setExternalChange(false);
-    setIsDirty(false);
-    clearFileTabUnsavedEditEntry(tabId);
-  }, [
-    getFilePreview,
-    preview.workspaceKey,
-    preview.relativePath,
-    setText,
-    tabId,
-  ]);
-
-  const handleReload = useCallback(() => {
-    void reload();
-  }, [reload]);
-
-  const undo = useCallback(() => {
-    const model = editor?.getModel();
-    if (!model?.canUndo()) return false;
-    void model.undo();
-    window.setTimeout(refreshActionState, 0);
-  }, [editor, refreshActionState]);
-
-  const redo = useCallback(() => {
-    const model = editor?.getModel();
-    if (!model?.canRedo()) return false;
-    void model.redo();
-    window.setTimeout(refreshActionState, 0);
-  }, [editor, refreshActionState]);
-
-  useHotKeyListener(handleSave, HotkeyActions.SAVE_FILE);
-  useHotKeyListener(undo, HotkeyActions.UNDO_FILE_EDIT);
-  useHotKeyListener(redo, HotkeyActions.REDO_FILE_EDIT);
-
-  // Keep dirty state in sync with the text value regardless of editor
+  // Keep dirty/undo/redo in sync with the text value regardless of editor
   // mount state. When the editor is unmounted (e.g. SVG preview mode),
   // onDidChangeModelContent doesn't fire, so we rely on this effect.
   useEffect(() => {
-    refreshActionState();
-  }, [text, refreshActionState]);
+    refreshState();
+  }, [text, refreshState]);
 
   useEffect(() => {
     if (!editor) return;
-
-    refreshActionState();
-
+    refreshState();
     const contentDisposable = editor.onDidChangeModelContent(() => {
-      const nextText = editor.getValue();
-      const isNextDirty = nextText !== savedTextRef.current;
-      setIsDirty(isNextDirty);
-      // Read-only files (e.g. attachment blobs) can never be saved, so don't
-      // surface an unsaved-edit prompt for them.
-      if (isNextDirty && !readOnly) {
-        setFileTabUnsavedEditEntry({
-          tabId,
-          title: preview.relativePath.split('/').pop() || preview.relativePath,
-          workspaceKey: preview.workspaceKey,
-          relativePath: preview.relativePath,
-          save: () => save(false),
-          discard: () => {
-            textDraftCache.delete(
-              getPreviewCacheKey(preview.workspaceKey, preview.relativePath),
-            );
-            clearFileTabUnsavedEditEntry(tabId);
-          },
-        });
-      } else {
-        clearFileTabUnsavedEditEntry(tabId);
-      }
-      window.setTimeout(refreshActionState, 0);
+      notifyContentChanged();
     });
     const cursorDisposable = editor.onDidChangeCursorSelection(() => {
-      window.setTimeout(refreshActionState, 0);
+      window.setTimeout(refreshState, 0);
     });
-
     return () => {
       contentDisposable.dispose();
       cursorDisposable.dispose();
     };
-  }, [
-    editor,
-    readOnly,
-    refreshActionState,
-    save,
-    tabId,
-    preview.relativePath,
-    preview.workspaceKey,
-  ]);
+  }, [editor, refreshState, notifyContentChanged]);
 
-  return {
-    save: handleSave,
-    forceSave,
-    reload: handleReload,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    isDirty,
-    isSaving,
-    readOnly,
-    externalChange,
-  } satisfies EditorActions;
+  return controller.actions;
 }
 
 function ToolbarTooltip({
@@ -1218,6 +1039,350 @@ function useFileCodeZoom(tabId: string, enabled = true) {
     zoomPercentage,
     zoomPercentageRef,
   };
+}
+
+type DiffMode = 'inline' | 'split';
+
+function DiffEditorPreview({
+  tab,
+  tabId,
+}: {
+  tab: NonNullable<TabState['file']>;
+  tabId: string;
+}) {
+  const getFileDiffContent = useKartonProcedure(
+    (p) => p.toolbox.getFileDiffContent,
+  );
+  // Karton procedure identities are not guaranteed stable across renders;
+  // keep this one in a ref so the load effect/reload don't re-run every render.
+  const getFileDiffContentRef = useRef(getFileDiffContent);
+  getFileDiffContentRef.current = getFileDiffContent;
+  const saveFile = useKartonProcedure((p) => p.fileTree.saveFile);
+  const getFileStat = useKartonProcedure((p) => p.fileTree.getFileStat);
+  const [diffMode, setDiffMode] = useState<DiffMode>(() => {
+    const stored = diffModeStore.get(tabId);
+    return stored === 'inline' || stored === 'split' ? stored : 'split';
+  });
+  const [diffContent, setDiffContent] = useState<FileDiffContent | null>(null);
+  const [diffError, setDiffError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const language = languageFromPath(tab.relativePath);
+  const { markFocused } = useFileCodeZoom(tabId);
+  const diffEditorRef = useRef<Monaco.editor.IStandaloneDiffEditor | null>(
+    null,
+  );
+
+  // The diff always renders the committed (HEAD) version against the current
+  // working-tree file, so the modified/right side is the live file on disk
+  // and is editable unless the tab is explicitly read-only.
+  const editable = !(tab.readOnly ?? false);
+
+  // Last on-disk mtime we have reconciled to. Lets the live-detection effect
+  // skip a git-diff fetch when an unrelated change bumps the directory
+  // revision, and avoids treating our own writes as external edits.
+  const diskMtimeRef = useRef<number | null>(null);
+
+  const persistMode = useCallback(
+    (next: DiffMode) => {
+      diffModeStore.set(tabId, next);
+      setDiffMode(next);
+    },
+    [tabId],
+  );
+
+  // Extract the workspace path from the workspace key for the git diff
+  // procedure (it expects a filesystem path, not a composite key).
+  const workspacePath = useMemo(() => {
+    const colonIdx = tab.workspaceKey.indexOf(':');
+    return colonIdx < 0
+      ? tab.workspaceKey
+      : tab.workspaceKey.slice(colonIdx + 1);
+  }, [tab.workspaceKey]);
+
+  // All save / dirty / undo-redo / conflict / unsaved-prompt / hotkey behavior
+  // is shared with the plain source editor via this controller. The diff
+  // editor only supplies the editable (modified) model + a diff-aware reload.
+  const controller = useFileEditorController({
+    tabId,
+    workspaceKey: tab.workspaceKey,
+    relativePath: tab.relativePath,
+    readOnly: !editable,
+    saveFile,
+    getModel: () => diffEditorRef.current?.getModifiedEditor().getModel(),
+    getValue: () => diffEditorRef.current?.getModifiedEditor().getValue(),
+    reload: async () => {
+      setIsLoading(true);
+      setDiffError(null);
+      try {
+        const content = await getFileDiffContentRef.current(
+          workspacePath,
+          tab.relativePath,
+          tab.diffStaged ?? false,
+        );
+        setDiffContent(content);
+        diskMtimeRef.current = content?.mtimeMs ?? null;
+        if (!content) {
+          setDiffError('Unable to load diff content.');
+          return null;
+        }
+        return { text: content.modified, mtimeMs: content.mtimeMs };
+      } catch (err) {
+        setDiffError(
+          err instanceof Error ? err.message : 'Failed to load diff',
+        );
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    unsavedTitle: tab.relativePath.split('/').pop() || tab.relativePath,
+    onSaved: (result) => {
+      diskMtimeRef.current = result?.mtimeMs ?? null;
+    },
+    onSaveError: (err) => {
+      setDiffError(err instanceof Error ? err.message : 'Failed to save');
+    },
+  });
+
+  const { actions, reconcileDisk, refreshState, notifyContentChanged } =
+    controller;
+
+  // The @monaco-editor/react DiffEditor frequently mounts before its flex
+  // container has a measured width, collapsing both panes to zero width
+  // (only the right-edge overview ruler + scrollbar stay visible). Its
+  // built-in automaticLayout does not reliably recover, so we force a
+  // layout on mount and observe the container for size changes.
+  const handleDiffMount = useCallback(
+    (editor: Monaco.editor.IStandaloneDiffEditor) => {
+      diffEditorRef.current = editor;
+      const container = editor.getContainerDomNode();
+      const relayout = () => editor.layout();
+      // Force an initial layout once the browser has painted the container.
+      requestAnimationFrame(relayout);
+      setTimeout(relayout, 0);
+      setTimeout(relayout, 100);
+      const target = container?.parentElement ?? container;
+      if (target && typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(() => editor.layout());
+        observer.observe(target);
+        editor.onDidDispose(() => observer.disconnect());
+      }
+
+      // Wire dirty tracking on the modified (right) editor. Save/undo/redo
+      // hotkeys are handled globally by the controller.
+      const modified = editor.getModifiedEditor();
+      modified.onDidFocusEditorWidget(markFocused);
+      modified.onDidChangeModelContent(() => {
+        notifyContentChanged();
+      });
+      refreshState();
+    },
+    [markFocused, notifyContentChanged, refreshState],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setDiffError(null);
+
+    // Safety timeout — surface an error if the backend doesn't respond
+    // within a reasonable window instead of spinning forever.
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) {
+        setDiffError('Diff load timed out.');
+        setIsLoading(false);
+      }
+    }, 15_000);
+
+    getFileDiffContentRef
+      .current(workspacePath, tab.relativePath, tab.diffStaged ?? false)
+      .then((content) => {
+        if (cancelled) return;
+        setDiffContent(content);
+        diskMtimeRef.current = content?.mtimeMs ?? null;
+        controller.setBaseline(
+          content?.modified ?? '',
+          content?.mtimeMs ?? null,
+        );
+        if (!content) setDiffError('Unable to load diff content.');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setDiffError(
+          err instanceof Error ? err.message : 'Failed to load diff',
+        );
+      })
+      .finally(() => {
+        clearTimeout(safetyTimer);
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspacePath, tab.relativePath, tab.diffStaged]);
+
+  // Live external-change detection. The file-tree watcher bumps the backing
+  // directory's revision whenever its contents change on disk; on each bump we
+  // cheaply stat the file and, if it actually changed, re-fetch the diff and
+  // reconcile (adopt the new content when clean, raise a conflict otherwise).
+  const directoryRevision = useKartonState((s) => {
+    const slash = tab.relativePath.lastIndexOf('/');
+    const directoryPath = slash === -1 ? '' : tab.relativePath.slice(0, slash);
+    return (
+      s.fileTree.directoryRevisions?.[tab.workspaceKey]?.[directoryPath] ??
+      s.fileTree.workspaceRevisions?.[tab.workspaceKey] ??
+      0
+    );
+  });
+  const prevRevisionRef = useRef(directoryRevision);
+
+  useEffect(() => {
+    // Skip the initial run — the load effect owns the first fetch/baseline.
+    if (prevRevisionRef.current === directoryRevision) return;
+    prevRevisionRef.current = directoryRevision;
+    if (!editable) return;
+
+    let cancelled = false;
+    void (async () => {
+      let stat: Awaited<ReturnType<typeof getFileStat>> = null;
+      try {
+        stat = await getFileStat(tab.workspaceKey, tab.relativePath);
+      } catch {
+        return; // Transient failure — keep showing the current diff.
+      }
+      if (cancelled || !stat) return;
+      if (stat.mtimeMs === diskMtimeRef.current) return; // Unchanged on disk.
+
+      let content: FileDiffContent | null;
+      try {
+        content = await getFileDiffContentRef.current(
+          workspacePath,
+          tab.relativePath,
+          tab.diffStaged ?? false,
+        );
+      } catch {
+        return;
+      }
+      if (cancelled || !content) return;
+      diskMtimeRef.current = content.mtimeMs ?? stat.mtimeMs;
+      const outcome = reconcileDisk(content.modified, content.mtimeMs);
+      if (outcome === 'adopted') setDiffContent(content);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    directoryRevision,
+    editable,
+    getFileStat,
+    workspacePath,
+    tab.workspaceKey,
+    tab.relativePath,
+    tab.diffStaged,
+    reconcileDisk,
+  ]);
+
+  return (
+    <div className="flex size-full flex-col bg-background">
+      <FileTabToolbar
+        actions={actions}
+        openExternalPath={getPreviewAbsolutePath({
+          workspaceKey: tab.workspaceKey,
+          relativePath: tab.relativePath,
+        } as FilePreviewResult)}
+        onInteract={markFocused}
+        right={
+          <div className="flex h-7 items-center gap-1 rounded-md bg-surface-1 p-0.5">
+            <button
+              type="button"
+              className={cn(
+                'flex h-full cursor-pointer items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                diffMode === 'inline' &&
+                  'bg-background text-foreground ring-1 ring-border-subtle',
+              )}
+              aria-label="Inline diff"
+              aria-pressed={diffMode === 'inline'}
+              onClick={() => persistMode('inline')}
+            >
+              <PanelTopIcon className="size-3.5" />
+              {diffMode === 'inline' ? <span>Inline</span> : null}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'flex h-full cursor-pointer items-center gap-1 rounded px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground',
+                diffMode === 'split' &&
+                  'bg-background text-foreground ring-1 ring-border-subtle',
+              )}
+              aria-label="Split diff"
+              aria-pressed={diffMode === 'split'}
+              onClick={() => persistMode('split')}
+            >
+              <Columns3Icon className="size-3.5" />
+              {diffMode === 'split' ? <span>Split</span> : null}
+            </button>
+          </div>
+        }
+      />
+      {actions.externalChange ? (
+        <ExternalChangeBanner actions={actions} />
+      ) : null}
+      <div
+        className="min-h-0 flex-1"
+        onFocusCapture={markFocused}
+        onPointerDownCapture={markFocused}
+      >
+        {isLoading ? (
+          <div className="flex size-full items-center justify-center text-muted-foreground text-xs">
+            <div className="flex items-center gap-2">
+              <Loader2Icon className="size-3.5 animate-spin" />
+              <span>Loading diff…</span>
+            </div>
+          </div>
+        ) : diffError || !diffContent ? (
+          <div className="flex size-full items-center justify-center text-error-foreground text-sm">
+            {diffError ?? 'Unable to load diff'}
+          </div>
+        ) : (
+          <DiffEditor
+            height="100%"
+            width="100%"
+            language={language === 'plaintext' ? undefined : language}
+            original={diffContent.original}
+            modified={diffContent.modified}
+            theme={MONACO_THEME_NAME}
+            beforeMount={configureMonacoTheme}
+            onMount={handleDiffMount}
+            options={{
+              ...MONACO_SHARED_OPTIONS,
+              renderSideBySide: diffMode === 'split',
+              // Monaco otherwise auto-collapses side-by-side to inline
+              // whenever the editor is narrower than
+              // renderSideBySideInlineBreakpoint (900px). The file panel is
+              // usually narrower than that, so force the chosen mode.
+              useInlineViewWhenSpaceIsLimited: false,
+              readOnly: !editable,
+              originalEditable: false,
+              renderIndicators: true,
+              enableSplitViewResizing: diffMode === 'split',
+              // The diff editor renders both its own vertical scrollbar and a
+              // wider diff overview ruler (the colored add/remove map). That
+              // looks like two stacked scrollbars. Hide the plain scrollbar
+              // and keep the highlighted overview ruler as the sole scroll
+              // affordance (it supports click/drag-to-scroll).
+              scrollbar: {
+                ...MONACO_SHARED_OPTIONS.scrollbar,
+                vertical: 'hidden',
+                verticalScrollbarSize: 0,
+              },
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function TextEditorPreview({
@@ -2707,6 +2872,16 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
             </div>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // Git diff view: bypass the regular file preview pipeline entirely.
+  // The DiffEditorPreview loads its own content and is read-only.
+  if (tab.file?.showDiff) {
+    return (
+      <div className="absolute inset-0 z-10 flex flex-col bg-background">
+        <DiffEditorPreview tab={tab.file} tabId={tab.id} />
       </div>
     );
   }
