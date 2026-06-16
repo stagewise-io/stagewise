@@ -222,7 +222,7 @@ function deriveActivityText(
 const DEFAULT_VISIBLE = 10;
 const SHOW_MORE_INCREMENT = 20;
 const INITIAL_HISTORY_FETCH = DEFAULT_VISIBLE + SHOW_MORE_INCREMENT; // 30
-const DEFAULT_VISIBLE_WORKTREES_PER_REPO = 6;
+const DEFAULT_VISIBLE_WORKTREES_PER_REPO = 5;
 const SHOW_MORE_WORKTREES_INCREMENT = 10;
 const NO_WORKSPACE_GROUP_KEY = '__no-workspace__';
 
@@ -1617,8 +1617,7 @@ export function AgentsList() {
       const worktreeOrder = order.worktreeKeysByRepo[group.key] ?? [];
       for (const worktree of group.worktrees) {
         if (!worktreeOrder.includes(worktree.key)) {
-          if (worktree.isRoot) worktreeOrder.unshift(worktree.key);
-          else worktreeOrder.push(worktree.key);
+          worktreeOrder.unshift(worktree.key);
         }
       }
       order.worktreeKeysByRepo[group.key] = Array.from(new Set(worktreeOrder));

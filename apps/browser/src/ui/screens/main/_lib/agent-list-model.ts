@@ -289,20 +289,27 @@ function isStagewiseOwnedWorktreePath(worktreePath: string): boolean {
 function orderByStableKeys<T extends { key: string }>(
   values: T[],
   orderedKeys: string[] | undefined,
+  newItemSort?: (a: T, b: T) => number,
 ): T[] {
-  if (!orderedKeys || orderedKeys.length === 0) return values;
+  if (!orderedKeys || orderedKeys.length === 0) {
+    if (newItemSort) return [...values].sort(newItemSort);
+    return values;
+  }
   const byKey = new Map(values.map((value) => [value.key, value]));
   const used = new Set<string>();
   const ordered: T[] = [];
-  orderedKeys.forEach((key) => {
+  for (const key of orderedKeys) {
     const value = byKey.get(key);
-    if (!value) return;
+    if (!value) continue;
     ordered.push(value);
     used.add(key);
-  });
-  values.forEach((value) => {
-    if (!used.has(value.key)) ordered.push(value);
-  });
+  }
+  const newItems: T[] = [];
+  for (const value of values) {
+    if (!used.has(value.key)) newItems.push(value);
+  }
+  if (newItemSort) newItems.sort(newItemSort);
+  ordered.push(...newItems);
   return ordered;
 }
 
@@ -402,12 +409,13 @@ export function buildWorkspaceAgentGroups({
     repo.worktrees = orderByStableKeys<WorkspaceWorktreeGroup>(
       repo.worktrees,
       groupOrder.worktreeKeysByRepo[repo.key],
-    ).sort((a, b) => {
-      if (a.isRoot !== b.isRoot) return Number(b.isRoot) - Number(a.isRoot);
-      const aStagewise = isStagewiseOwnedWorktreePath(a.path);
-      const bStagewise = isStagewiseOwnedWorktreePath(b.path);
-      return Number(bStagewise) - Number(aStagewise);
-    });
+      (a, b) => {
+        if (a.isRoot !== b.isRoot) return Number(b.isRoot) - Number(a.isRoot);
+        const aStagewise = isStagewiseOwnedWorktreePath(a.path);
+        const bStagewise = isStagewiseOwnedWorktreePath(b.path);
+        return Number(bStagewise) - Number(aStagewise);
+      },
+    );
 
     repo.worktrees.forEach((worktree) => {
       worktree.severity = maxSeverity(
