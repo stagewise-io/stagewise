@@ -1179,8 +1179,8 @@ describe('GitService', () => {
         const result = await service.getDiffNumstat('/repo');
 
         // The unstaged deletion lines (42) and staged addition lines (10)
-        // should both be present. The merge keeps the first-seen (staged)
-        // changeType for the merged entry.
+        // should both be present. When either side reports deleted, the
+        // merged entry must be deleted so the Diff view disables clicks.
         expect(result?.totalAdded).toBe(10);
         expect(result?.totalDeleted).toBe(42);
         expect(result?.entries).toHaveLength(1);
@@ -1188,6 +1188,7 @@ describe('GitService', () => {
           path: 'split.ts',
           added: 10,
           deleted: 42,
+          changeType: 'deleted',
           staged: true,
         });
       });

@@ -1008,6 +1008,11 @@ export class GitService extends DisposableService {
       : [];
 
     // Merge staged + unstaged entries for the same file.
+    // When a path appears on both sides, sum the line counts and
+    // keep staged = true if either side is staged.  If either side
+    // reports the file as deleted the merged entry must be deleted
+    // too — the Diff view disables clicks for deleted files, and
+    // clicking a file that no longer exists on disk is broken UX.
     const merged = new Map<string, GitDiffNumstatEntry>();
 
     for (const entry of [...stagedEntries, ...unstagedEntries]) {
@@ -1016,6 +1021,9 @@ export class GitService extends DisposableService {
         existing.added += entry.added;
         existing.deleted += entry.deleted;
         existing.staged = existing.staged || entry.staged;
+        if (entry.changeType === 'deleted') {
+          existing.changeType = 'deleted';
+        }
       } else {
         merged.set(entry.path, { ...entry });
       }
