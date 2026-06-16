@@ -1,6 +1,8 @@
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import type {
+  MountedWorkspaceGitDiffEntry,
+  MountedWorkspaceGitDiffSummary,
   MountedWorkspaceGitStatusSummary,
   MountedWorkspaceGitSummary,
 } from '@shared/karton-contracts/ui';
@@ -123,20 +125,8 @@ export type GitCreateWorktreeOptions = {
   sourceBranch: string;
 };
 
-export type GitDiffNumstatEntry = {
-  path: string;
-  added: number;
-  deleted: number;
-  changeType: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
-  oldPath?: string;
-  staged: boolean;
-};
-
-export type GitDiffNumstatSummary = {
-  entries: GitDiffNumstatEntry[];
-  totalAdded: number;
-  totalDeleted: number;
-};
+export type GitDiffNumstatEntry = MountedWorkspaceGitDiffEntry;
+export type GitDiffNumstatSummary = MountedWorkspaceGitDiffSummary;
 
 export type GitStatusSummary = MountedWorkspaceGitStatusSummary;
 export type { MountedWorkspaceGitSummary };
