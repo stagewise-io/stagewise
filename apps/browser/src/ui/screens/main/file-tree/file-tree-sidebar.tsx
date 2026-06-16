@@ -255,46 +255,60 @@ export function FileTreeSidebar() {
         >
           {/* Files / Diff tab toggle */}
           <div className="flex h-7 items-center rounded-md bg-surface-1 p-0.5">
-            <button
-              type="button"
-              className={cn(
-                'flex h-full items-center gap-1 rounded px-2.5 text-xs transition-colors hover:text-foreground',
-                viewMode === 'files'
-                  ? 'bg-background text-foreground ring-1 ring-border-subtle'
-                  : 'text-muted-foreground',
-              )}
-              onClick={() => setViewMode('files')}
-            >
-              <IconFolder5Outline18 className="size-3.5" />
-              {viewMode === 'files' && <span>Files</span>}
-            </button>
+            <Tooltip>
+              <TooltipTrigger>
+                <button
+                  type="button"
+                  className={cn(
+                    'flex h-full items-center gap-1 rounded px-2.5 text-xs transition-colors hover:text-foreground',
+                    viewMode === 'files'
+                      ? 'bg-background text-foreground ring-1 ring-border-subtle'
+                      : 'text-muted-foreground',
+                  )}
+                  onClick={() => setViewMode('files')}
+                >
+                  <IconFolder5Outline18 className="size-3.5" />
+                  {viewMode === 'files' && <span>Files</span>}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span>Files</span>
+              </TooltipContent>
+            </Tooltip>
             {isGitRepo && (
-              <button
-                type="button"
-                className={cn(
-                  'flex h-full items-center gap-1 rounded pl-2.5 text-xs transition-colors hover:text-foreground',
-                  diffTotals.added > 0 || diffTotals.deleted > 0
-                    ? 'pr-2'
-                    : 'pr-2.5',
-                  viewMode === 'diff'
-                    ? 'bg-background text-foreground ring-1 ring-border-subtle'
-                    : 'text-muted-foreground',
-                )}
-                onClick={() => setViewMode('diff')}
-              >
-                <GitBranchIcon className="size-3.5" />
-                {viewMode === 'diff' && <span>Diff</span>}
-                {(diffTotals.added > 0 || diffTotals.deleted > 0) && (
-                  <span className="flex flex-col font-mono text-[0.5rem] tabular-nums leading-none">
-                    <span className="text-success-foreground">
-                      +{diffTotals.added}
-                    </span>
-                    <span className="text-error-foreground">
-                      -{diffTotals.deleted}
-                    </span>
-                  </span>
-                )}
-              </button>
+              <Tooltip>
+                <TooltipTrigger>
+                  <button
+                    type="button"
+                    className={cn(
+                      'flex h-full items-center gap-1 rounded pl-2.5 text-xs transition-colors hover:text-foreground',
+                      diffTotals.added > 0 || diffTotals.deleted > 0
+                        ? 'pr-2'
+                        : 'pr-2.5',
+                      viewMode === 'diff'
+                        ? 'bg-background text-foreground ring-1 ring-border-subtle'
+                        : 'text-muted-foreground',
+                    )}
+                    onClick={() => setViewMode('diff')}
+                  >
+                    <GitBranchIcon className="size-3.5" />
+                    {viewMode === 'diff' && <span>Diff</span>}
+                    {(diffTotals.added > 0 || diffTotals.deleted > 0) && (
+                      <span className="flex flex-col font-mono text-[0.5rem] tabular-nums leading-none">
+                        <span className="text-success-foreground">
+                          +{diffTotals.added}
+                        </span>
+                        <span className="text-error-foreground">
+                          -{diffTotals.deleted}
+                        </span>
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span>Changed files</span>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
           <div className="flex items-center gap-0.5">
