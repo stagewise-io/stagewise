@@ -1,7 +1,8 @@
 {
   "name": "@stagewise/agent-runtime-node",
   "version": "0.2.0",
-  "private": true,
+  "author": "stagewise GmbH",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +16,9 @@
     "dist/**/*.js",
     "dist/**/*.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsx build.ts && tsc --emitDeclarationOnly",
     "dev": "tsx build.ts --watch",
