@@ -1061,7 +1061,7 @@ function DiffEditorPreview({
   const getFileStat = useKartonProcedure((p) => p.fileTree.getFileStat);
   const [diffMode, setDiffMode] = useState<DiffMode>(() => {
     const stored = diffModeStore.get(tabId);
-    return stored === 'inline' || stored === 'split' ? stored : 'split';
+    return stored === 'inline' || stored === 'split' ? stored : 'inline';
   });
   const [diffContent, setDiffContent] = useState<FileDiffContent | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
