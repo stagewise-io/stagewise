@@ -499,6 +499,47 @@ export const availableModels = [
   },
   {
     officialProvider: 'moonshotai',
+    modelId: 'kimi-k2.7-code',
+    modelDisplayName: 'Kimi K2.7 Code',
+    modelDescription:
+      "Kimi's code-specialized model for agentic coding tasks and long-context software work.",
+    modelContext: '256k context',
+    modelContextRaw: 262144,
+    headers: {},
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      moonshotai: {
+        thinking: { type: 'adaptive' },
+        effort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.75,
+      outputPerMillion: 3.5,
+      relativeMultiplier: 0.8,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GOOGLE_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'moonshotai',
     modelId: 'kimi-k2.6',
     modelDisplayName: 'Kimi K2.6',
     modelDescription:

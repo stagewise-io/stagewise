@@ -109,6 +109,7 @@ const PROVIDERS: ProviderInfo[] = [
     monoInDark: true,
     description: 'Long-horizon coding and native multimodal input.',
     models: [
+      { name: 'Kimi K2.7 Code', tier: 'frontier' },
       { name: 'Kimi K2.6', tier: 'frontier' },
       { name: 'Kimi K2.5', tier: 'general' },
     ],
