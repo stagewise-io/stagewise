@@ -718,7 +718,7 @@ export function MainSection({
       />
       <div className="flex h-full w-full flex-col">
         {/* Tab bar */}
-        <div className="flex shrink-0 flex-row items-stretch gap-1 border-derived-strong border-b bg-background py-1.5 pr-2 pl-3">
+        <div className="flex shrink-0 flex-row items-center gap-1 border-derived-strong border-b bg-background py-1 pr-2 pl-1.5">
           <SortableTabs
             value={effectiveActiveTabId ?? ''}
             onValueChange={(id) => {
