@@ -943,7 +943,13 @@ export class GitService extends DisposableService {
     const repositoryInfo = await this.getRepositoryInfo(workspacePath);
     if (!repositoryInfo) return null;
 
-    const [unstagedRaw, stagedRaw, untrackedRaw] = await Promise.all([
+    const [
+      unstagedRaw,
+      stagedRaw,
+      untrackedRaw,
+      unstagedStatusRaw,
+      stagedStatusRaw,
+    ] = await Promise.all([
       this.runGit(workspacePath, ['diff', '--numstat']),
       this.runGit(workspacePath, ['diff', '--cached', '--numstat']),
       this.runGit(workspacePath, [
@@ -952,14 +958,38 @@ export class GitService extends DisposableService {
         '--exclude-standard',
         '-z',
       ]),
+      this.runGit(workspacePath, ['diff', '--name-status']),
+      this.runGit(workspacePath, ['diff', '--cached', '--name-status']),
     ]);
 
     if (unstagedRaw === null && stagedRaw === null && !untrackedRaw)
       return null;
 
-    const stagedEntries = stagedRaw ? this.parseNumstat(stagedRaw, true) : [];
+    // Build a map from file path to git status code (M, A, D, R).
+    // For renames (R100\told\tnew), key by the new path.
+    const statusMap = new Map<string, string>();
+    const addStatusEntries = (raw: string | null) => {
+      if (!raw) return;
+      for (const line of raw.split('\n')) {
+        if (!line) continue;
+        const [code, ...rest] = line.split('\t');
+        if (!code) continue;
+        if (code.startsWith('R') && rest.length >= 2) {
+          // R100\told\tnew — key by new path
+          statusMap.set(rest[1]!, code[0]!);
+        } else if (rest.length >= 1) {
+          statusMap.set(rest[0]!, code[0]!);
+        }
+      }
+    };
+    addStatusEntries(unstagedStatusRaw);
+    addStatusEntries(stagedStatusRaw);
+
+    const stagedEntries = stagedRaw
+      ? this.parseNumstat(stagedRaw, true, statusMap)
+      : [];
     const unstagedEntries = unstagedRaw
-      ? this.parseNumstat(unstagedRaw, false)
+      ? this.parseNumstat(unstagedRaw, false, statusMap)
       : [];
 
     // Merge staged + unstaged entries for the same file.
@@ -979,10 +1009,14 @@ export class GitService extends DisposableService {
     // Add untracked files (not in git): every line counts as "added".
     if (untrackedRaw) {
       const untrackedPaths = untrackedRaw.split('\0').filter(Boolean);
-      for (const relPath of untrackedPaths) {
-        if (merged.has(relPath)) continue;
-        const absPath = path.join(workspacePath, relPath);
-        const added = await this.countFileLines(absPath);
+      const newPaths = untrackedPaths.filter((p) => !merged.has(p));
+      const lineCounts = await Promise.all(
+        newPaths.map(async (relPath) => ({
+          relPath,
+          added: await this.countFileLines(path.join(workspacePath, relPath)),
+        })),
+      );
+      for (const { relPath, added } of lineCounts) {
         merged.set(relPath, {
           path: relPath,
           added,
@@ -1000,7 +1034,11 @@ export class GitService extends DisposableService {
     return { entries, totalAdded, totalDeleted };
   }
 
-  private parseNumstat(raw: string, staged: boolean): GitDiffNumstatEntry[] {
+  private parseNumstat(
+    raw: string,
+    staged: boolean,
+    statusMap: Map<string, string>,
+  ): GitDiffNumstatEntry[] {
     const entries: GitDiffNumstatEntry[] = [];
     for (const line of raw.split('\n')) {
       if (!line) continue;
@@ -1014,12 +1052,20 @@ export class GitService extends DisposableService {
 
         // Handle renamed files. Git numstat emits two rename formats:
         //   Full path:   old/dir/file => new/dir/file
-        //   Compact:     {old => new}/common/file
+        //   Compact:     prefix{old => new}suffix
         // Try compact first (has '{... => ...}'), then full-path.
-        const compactMatch = pathStr!.match(/^\{([^}]+)\s*=>\s*([^}]+)\}(.*)$/);
+        const compactMatch = pathStr!.match(
+          /^(.*?)\{([^}]+)\s*=>\s*([^}]+)\}(.*)$/,
+        );
         if (compactMatch) {
-          const oldPath = compactMatch[1]! + compactMatch[3]!;
-          const newPath = compactMatch[2]! + compactMatch[3]!;
+          const prefix = compactMatch[1]!;
+          // Greedy [^}]+ capture groups may include whitespace around =>.
+          // Trim to get clean path segments.
+          const oldPart = compactMatch[2]!.trim();
+          const newPart = compactMatch[3]!.trim();
+          const suffix = compactMatch[4]!;
+          const oldPath = prefix + oldPart + suffix;
+          const newPath = prefix + newPart + suffix;
           entries.push({
             path: newPath,
             added,
@@ -1032,18 +1078,32 @@ export class GitService extends DisposableService {
           const renameMatch = pathStr!.match(/^(.+)\s*=>\s*(.+)$/);
           if (renameMatch) {
             entries.push({
-              path: renameMatch[2]!,
+              path: renameMatch[2]!.trim(),
               added,
               deleted,
               changeType: 'renamed' as const,
-              oldPath: renameMatch[1]!,
+              oldPath: renameMatch[1]!.trim(),
               staged,
             });
           } else {
-            // Determine changeType from (added,deleted).
-            let changeType: GitDiffNumstatEntry['changeType'] = 'modified';
-            if (added === 0 && deleted > 0) changeType = 'deleted';
-            else if (deleted === 0 && added > 0) changeType = 'added';
+            // Use git name-status as the authoritative source for changeType.
+            // Numstat counts alone can't distinguish "file deleted" from
+            // "file modified with only deletions" (both show 0/N counts).
+            const statusCode = statusMap.get(pathStr!);
+            const changeType: GitDiffNumstatEntry['changeType'] =
+              statusCode === 'M'
+                ? 'modified'
+                : statusCode === 'A'
+                  ? 'added'
+                  : statusCode === 'D'
+                    ? 'deleted'
+                    : statusCode === 'R'
+                      ? 'renamed'
+                      : added === 0 && deleted > 0
+                        ? 'deleted'
+                        : deleted === 0 && added > 0
+                          ? 'added'
+                          : 'modified';
 
             entries.push({
               path: pathStr!,
@@ -1062,11 +1122,14 @@ export class GitService extends DisposableService {
   private async countFileLines(absPath: string): Promise<number> {
     try {
       const buf = await fs.readFile(absPath);
-      // Count \n bytes. Empty files have 0 lines.
+      if (buf.length === 0) return 0;
+      // Count \n bytes.
       let count = 0;
       for (const byte of buf) {
         if (byte === 0x0a) count++;
       }
+      // If the file doesn't end with a newline, the last line still counts.
+      if (buf[buf.length - 1] !== 0x0a) count++;
       return count;
     } catch {
       return 0;
