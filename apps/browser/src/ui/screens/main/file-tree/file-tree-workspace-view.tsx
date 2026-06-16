@@ -34,6 +34,10 @@ import { getCurrentPlatform } from '@shared/hotkeys';
 import { normalizePath } from '@shared/path-utils';
 import { nativeFileManagerLabel } from '@shared/ide-url';
 import {
+  getAllFileTreeWorkspaceMounts,
+  getFileTreeWorkspaceKey,
+} from './file-tree-utils';
+import {
   getEffectiveFileTreeActionPaths,
   selectAllFileTreeEntries,
   updateFileTreeSelection,
@@ -141,7 +145,13 @@ export function FileTreeWorkspaceView({
   const deleteEntry = useKartonProcedure((p) => p.fileTree.deleteEntry);
   const copyText = useKartonProcedure((p) => p.browser.copyText);
   const [openAgent] = useOpenAgent();
-  const workspaceMounts = useKartonState((s) => s.workspaceMounts);
+  const workspaceMount = useKartonState((s) =>
+    workspaceKey
+      ? (getAllFileTreeWorkspaceMounts(s).find(
+          (mount) => getFileTreeWorkspaceKey(mount) === workspaceKey,
+        ) ?? null)
+      : null,
+  );
   const selectedRelativePath = useKartonState((s) => {
     const activeTabId = s.contentTabs.activeTabId;
     if (!activeTabId || !workspaceKey) return null;
@@ -577,15 +587,19 @@ export function FileTreeWorkspaceView({
 
   const resolveAbsolutePath = useCallback(
     (relativePath: string): string | null => {
-      if (!workspaceKey) return null;
-      const mount = workspaceMounts.find(
-        (m) => `${m.prefix}:${normalizePath(m.path)}` === workspaceKey,
-      );
-      if (!mount) return null;
-      const root = normalizePath(mount.path);
-      return `${root}/${relativePath}`;
+      if (!workspaceMount) return null;
+      const normalizedRoot = normalizePath(workspaceMount.path);
+      const root =
+        normalizedRoot === '/' || /^[A-Za-z]:\/$/.test(normalizedRoot)
+          ? normalizedRoot
+          : normalizedRoot.replace(/\/+$/, '');
+      return relativePath
+        ? root.endsWith('/')
+          ? `${root}${relativePath}`
+          : `${root}/${relativePath}`
+        : root;
     },
-    [workspaceKey, workspaceMounts],
+    [workspaceMount],
   );
 
   const handleCopyPath = useCallback(
