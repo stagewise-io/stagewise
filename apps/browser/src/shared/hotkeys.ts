@@ -477,7 +477,7 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.TOGGLE_FILE_TREE_DIFF]: {
     accelerator: 'Mod+Shift+G',
-    captureDominantly: true,
+    captureDominantly: false,
   },
   [HotkeyActions.TOGGLE_SVG_CODE_MODE]: {
     accelerator: 'Mod+Shift+V',
