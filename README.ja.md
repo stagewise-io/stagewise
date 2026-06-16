@@ -39,7 +39,7 @@
 | **サブスクリプション** | **プロバイダー** | **注目モデル** | **ダッシュボード** |
 | --------------------- | --------------- | -------------- | ----------------- |
 | GLM Coding Plan | [Z.ai](https://z.ai) | GLM-5.1, GLM-5V-Turbo | [APIキーを取得](https://z.ai/manage-apikey/apikey-list) |
-| Kimi | [Moonshot AI](https://platform.moonshot.ai) | Kimi K2.6, Kimi K2.5 | [APIキーを取得](https://platform.moonshot.ai/console/api-keys) |
+| Kimi | [Moonshot AI](https://platform.moonshot.ai) | Kimi K2.7 Code, Kimi K2.6, Kimi K2.5 | [APIキーを取得](https://platform.moonshot.ai/console/api-keys) |
 | Qwen Coding Plan | [Alibaba DashScope](https://dashscope.console.aliyun.com) | Qwen3-Coder-30B, Qwen3-32B | [APIキーを取得](https://dashscope.console.aliyun.com/apiKey) |
 | MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [APIキーを取得](https://platform.minimax.io/user-center/basic-information/interface-key) |
 
@@ -58,7 +58,7 @@
 - **Anthropic**: Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5
 - **OpenAI**: GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
 - **Google**: Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
-- **Moonshot AI**: Kimi K2.6, Kimi K2.5
+- **Moonshot AI**: Kimi K2.7 Code, Kimi K2.6, Kimi K2.5
 - **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
 - **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
 - **Z.ai**: GLM 5.1, GLM 5V-Turbo

@@ -56,7 +56,7 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     apiKeyUrl: 'https://platform.moonshot.ai/console/api-keys',
     helpText: 'Create one at platform.moonshot.ai → Console → API keys',
     apiKeyPattern: '^sk-[A-Za-z0-9]{48}$',
-    featuredModelIds: ['kimi-k2.6', 'kimi-k2.5'],
+    featuredModelIds: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5'],
   },
   'qwen-plan': {
     id: 'qwen-plan',
