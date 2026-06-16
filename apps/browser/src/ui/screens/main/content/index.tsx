@@ -503,13 +503,22 @@ export function MainSection({
       .map((id): SortableTabItem | null => {
         const tab = tabs[id];
         if (!tab) return null;
+        // Diff tabs are prefixed with "Diff: " in the strip. Done in the UI
+        // (idempotently) so the prefix is guaranteed even for tabs persisted
+        // before the backend title logic, and never double-applied.
+        const displayTitle =
+          tab.type === 'file' && tab.file?.showDiff
+            ? tab.title.startsWith('Diff: ')
+              ? tab.title
+              : `Diff: ${tab.title}`
+            : tab.title;
         return {
           id,
           label:
             tab.type === 'file' && tab.lifecycle.kind === 'temporary' ? (
-              <span className="italic">{tab.title}</span>
+              <span className="italic">{displayTitle}</span>
             ) : (
-              tab.title
+              displayTitle
             ),
           icon: <TabPinIcon tab={tab} openAgent={openAgent} />,
           onClose: () => closeTabWithUnsavedCheck(id),
