@@ -14,6 +14,7 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { XIcon, GitBranchIcon } from 'lucide-react';
 import {
   IconFileSearchOutline18,
+  IconFolder5Outline18,
   IconFolderSearchOutline18,
 } from 'nucleo-ui-outline-18';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -234,36 +235,38 @@ export function FileTreeSidebar() {
           className="flex min-h-9 shrink-0 items-center justify-between gap-0.5 border-derived-strong border-b bg-background pr-1.5 pl-2"
         >
           {/* Files / Diff tab toggle */}
-          <div className="flex items-center rounded-md bg-surface-1 p-0.5">
+          <div className="flex h-7 items-center rounded-md bg-surface-1 p-0.5">
             <button
               type="button"
               className={cn(
-                'rounded px-2 py-0.5 font-medium text-[11px] transition-colors duration-100',
+                'flex h-full items-center gap-1 rounded px-2.5 text-xs transition-colors hover:text-foreground',
                 viewMode === 'files'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-background text-foreground ring-1 ring-border-subtle'
+                  : 'text-muted-foreground',
               )}
               onClick={() => setViewMode('files')}
             >
-              Files
+              <IconFolder5Outline18 className="size-3.5" />
+              {viewMode === 'files' && <span>Files</span>}
             </button>
             {isGitRepo && (
               <button
                 type="button"
                 className={cn(
-                  'flex flex-col rounded px-2 py-0.5 leading-tight transition-colors duration-100',
+                  'flex h-full items-center gap-1 rounded pl-2.5 text-xs transition-colors hover:text-foreground',
+                  diffTotals.added > 0 || diffTotals.deleted > 0
+                    ? 'pr-2'
+                    : 'pr-2.5',
                   viewMode === 'diff'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'bg-background text-foreground ring-1 ring-border-subtle'
+                    : 'text-muted-foreground',
                 )}
                 onClick={() => setViewMode('diff')}
               >
-                <span className="flex items-center gap-1 font-medium text-[11px]">
-                  <GitBranchIcon className="size-3" />
-                  Diff
-                </span>
+                <GitBranchIcon className="size-3.5" />
+                {viewMode === 'diff' && <span>Diff</span>}
                 {(diffTotals.added > 0 || diffTotals.deleted > 0) && (
-                  <span className="flex items-center gap-1 font-mono text-[9px] tabular-nums">
+                  <span className="flex flex-col font-mono text-[0.5rem] tabular-nums leading-none">
                     <span className="text-success-foreground">
                       +{diffTotals.added}
                     </span>
