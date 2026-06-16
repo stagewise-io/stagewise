@@ -59,17 +59,28 @@ export function FileTreeToggleButton() {
   const activeWorkspaceKey = useKartonState(
     (s) => s.fileTree.activeWorkspaceKey,
   );
-  const selectedWorkspacePath =
-    workspaceMounts.find(
-      (m) => getFileTreeWorkspaceKey(m) === activeWorkspaceKey,
-    )?.path ??
-    workspaceMounts[0]?.path ??
-    null;
+
+  // Derive the effective workspace key with fallback — same logic as the
+  // sidebar. When the sidebar is collapsed, activeWorkspaceKey can be stale
+  // or null, but we still need to track revisions for the fallback workspace.
+  const selectedWorkspaceKey = workspaceMounts.some(
+    (m) => getFileTreeWorkspaceKey(m) === activeWorkspaceKey,
+  )
+    ? activeWorkspaceKey
+    : workspaceMounts[0]
+      ? getFileTreeWorkspaceKey(workspaceMounts[0])
+      : null;
+
+  const selectedWorkspacePath = selectedWorkspaceKey
+    ? (workspaceMounts.find(
+        (m) => getFileTreeWorkspaceKey(m) === selectedWorkspaceKey,
+      )?.path ?? null)
+    : null;
 
   // Re-fetch diff totals when the workspace files change.
   const workspaceRevision = useKartonState((s) =>
-    activeWorkspaceKey
-      ? (s.fileTree.workspaceRevisions[activeWorkspaceKey] ?? 0)
+    selectedWorkspaceKey
+      ? (s.fileTree.workspaceRevisions[selectedWorkspaceKey] ?? 0)
       : 0,
   );
 

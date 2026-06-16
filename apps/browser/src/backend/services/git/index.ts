@@ -943,12 +943,19 @@ export class GitService extends DisposableService {
     const repositoryInfo = await this.getRepositoryInfo(workspacePath);
     if (!repositoryInfo) return null;
 
-    const [unstagedRaw, stagedRaw] = await Promise.all([
+    const [unstagedRaw, stagedRaw, untrackedRaw] = await Promise.all([
       this.runGit(workspacePath, ['diff', '--numstat']),
       this.runGit(workspacePath, ['diff', '--cached', '--numstat']),
+      this.runGit(workspacePath, [
+        'ls-files',
+        '--others',
+        '--exclude-standard',
+        '-z',
+      ]),
     ]);
 
-    if (unstagedRaw === null && stagedRaw === null) return null;
+    if (unstagedRaw === null && stagedRaw === null && !untrackedRaw)
+      return null;
 
     const stagedEntries = stagedRaw ? this.parseNumstat(stagedRaw, true) : [];
     const unstagedEntries = unstagedRaw
@@ -966,6 +973,23 @@ export class GitService extends DisposableService {
         existing.staged = existing.staged || entry.staged;
       } else {
         merged.set(entry.path, { ...entry });
+      }
+    }
+
+    // Add untracked files (not in git): every line counts as "added".
+    if (untrackedRaw) {
+      const untrackedPaths = untrackedRaw.split('\0').filter(Boolean);
+      for (const relPath of untrackedPaths) {
+        if (merged.has(relPath)) continue;
+        const absPath = path.join(workspacePath, relPath);
+        const added = await this.countFileLines(absPath);
+        merged.set(relPath, {
+          path: relPath,
+          added,
+          deleted: 0,
+          changeType: 'untracked',
+          staged: false,
+        });
       }
     }
 
@@ -988,35 +1012,65 @@ export class GitService extends DisposableService {
         const deleted =
           deletedStr === '-' ? 0 : Number.parseInt(deletedStr!, 10) || 0;
 
-        // Handle renamed files: numstat format for renames is
-        // {added}\t{deleted}\t{oldPath => newPath}
-        const renameMatch = pathStr!.match(/^(.+)\s*=>\s*(.+)$/);
-        if (renameMatch) {
+        // Handle renamed files. Git numstat emits two rename formats:
+        //   Full path:   old/dir/file => new/dir/file
+        //   Compact:     {old => new}/common/file
+        // Try compact first (has '{... => ...}'), then full-path.
+        const compactMatch = pathStr!.match(/^\{([^}]+)\s*=>\s*([^}]+)\}(.*)$/);
+        if (compactMatch) {
+          const oldPath = compactMatch[1]! + compactMatch[3]!;
+          const newPath = compactMatch[2]! + compactMatch[3]!;
           entries.push({
-            path: renameMatch[2]!,
+            path: newPath,
             added,
             deleted,
             changeType: 'renamed' as const,
-            oldPath: renameMatch[1]!,
+            oldPath,
             staged,
           });
         } else {
-          // Determine changeType from (added,deleted).
-          let changeType: GitDiffNumstatEntry['changeType'] = 'modified';
-          if (added === 0 && deleted > 0) changeType = 'deleted';
-          else if (deleted === 0 && added > 0) changeType = 'added';
+          const renameMatch = pathStr!.match(/^(.+)\s*=>\s*(.+)$/);
+          if (renameMatch) {
+            entries.push({
+              path: renameMatch[2]!,
+              added,
+              deleted,
+              changeType: 'renamed' as const,
+              oldPath: renameMatch[1]!,
+              staged,
+            });
+          } else {
+            // Determine changeType from (added,deleted).
+            let changeType: GitDiffNumstatEntry['changeType'] = 'modified';
+            if (added === 0 && deleted > 0) changeType = 'deleted';
+            else if (deleted === 0 && added > 0) changeType = 'added';
 
-          entries.push({
-            path: pathStr!,
-            added,
-            deleted,
-            changeType,
-            staged,
-          });
+            entries.push({
+              path: pathStr!,
+              added,
+              deleted,
+              changeType,
+              staged,
+            });
+          }
         }
       }
     }
     return entries;
+  }
+
+  private async countFileLines(absPath: string): Promise<number> {
+    try {
+      const buf = await fs.readFile(absPath);
+      // Count \n bytes. Empty files have 0 lines.
+      let count = 0;
+      for (const byte of buf) {
+        if (byte === 0x0a) count++;
+      }
+      return count;
+    } catch {
+      return 0;
+    }
   }
 
   private async getStatusSummary(

@@ -127,7 +127,7 @@ export type GitDiffNumstatEntry = {
   path: string;
   added: number;
   deleted: number;
-  changeType: 'modified' | 'added' | 'deleted' | 'renamed';
+  changeType: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
   oldPath?: string;
   staged: boolean;
 };
