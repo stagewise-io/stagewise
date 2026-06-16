@@ -773,4 +773,286 @@ describe('GitService', () => {
       message: 'Worktree name is invalid.',
     });
   });
+
+  describe('getDiffNumstat', () => {
+    const diffBaseResponses = {
+      'rev-parse --show-toplevel --git-common-dir': `${repoPath}\n${repoGitDir}\n`,
+      'diff --cached --numstat': null,
+      'ls-files --others --exclude-standard -z': null,
+      'diff --cached --name-status': null,
+    };
+
+    it('returns null when not a git repository', async () => {
+      const { service } = await createGitService({});
+      await expect(service.getDiffNumstat('/not-a-repo')).resolves.toBeNull();
+    });
+
+    it('returns empty summary when all git commands produce empty output', async () => {
+      const { service } = await createGitService({
+        ...diffBaseResponses,
+        'diff --numstat': '',
+        'diff --name-status': '',
+      });
+      await expect(service.getDiffNumstat('/repo')).resolves.toEqual({
+        entries: [],
+        totalAdded: 0,
+        totalDeleted: 0,
+      });
+    });
+
+    describe('rename detection', () => {
+      it('parses compact rename at root: {old => new}/file.ts', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '3\t2\t{old-name => new-name}.ts',
+          'diff --name-status': 'R100\told-name.ts\tnew-name.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'new-name.ts',
+            added: 3,
+            deleted: 2,
+            changeType: 'renamed',
+            oldPath: 'old-name.ts',
+            staged: false,
+          },
+        ]);
+        expect(result?.totalAdded).toBe(3);
+        expect(result?.totalDeleted).toBe(2);
+      });
+
+      it('parses compact rename with directory prefix: src/{old => new}/file.ts', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '5\t3\tsrc/{old-dir => new-dir}/utils.ts',
+          'diff --name-status':
+            'R100\tsrc/old-dir/utils.ts\tsrc/new-dir/utils.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'src/new-dir/utils.ts',
+            added: 5,
+            deleted: 3,
+            changeType: 'renamed',
+            oldPath: 'src/old-dir/utils.ts',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('parses compact rename with no prefix/suffix: {old => new}', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '0\t0\t{legacy => modern}',
+          'diff --name-status': 'R100\tlegacy\tmodern',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'modern',
+            added: 0,
+            deleted: 0,
+            changeType: 'renamed',
+            oldPath: 'legacy',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('parses full-path rename: old/file.ts => new/file.ts', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '1\t1\told/path/file.ts => new/path/file.ts',
+          'diff --name-status': 'R100\told/path/file.ts\tnew/path/file.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'new/path/file.ts',
+            added: 1,
+            deleted: 1,
+            changeType: 'renamed',
+            oldPath: 'old/path/file.ts',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('parses rename with content changes (non-zero added/deleted)', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '10\t5\t{old => new}/README.md',
+          'diff --name-status': 'R078\told/README.md\tnew/README.md',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'new/README.md',
+            added: 10,
+            deleted: 5,
+            changeType: 'renamed',
+            oldPath: 'old/README.md',
+            staged: false,
+          },
+        ]);
+      });
+    });
+
+    describe('changeType from name-status', () => {
+      it('labels modified files correctly via name-status (not count-based)', async () => {
+        // Pure additions (5/0) — would be 'added' by count logic,
+        // but name-status says 'M' (modified).
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '5\t0\tREADME.md',
+          'diff --name-status': 'M\tREADME.md',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'README.md',
+            added: 5,
+            deleted: 0,
+            changeType: 'modified',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('labels deleted files via name-status (not count-based)', async () => {
+        // Modified file with only deletions (0/3) — would be 'deleted'
+        // by count logic, but name-status says 'M'.
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '0\t3\tDEPRECATED.ts',
+          'diff --name-status': 'M\tDEPRECATED.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'DEPRECATED.ts',
+            added: 0,
+            deleted: 3,
+            changeType: 'modified',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('labels fully deleted files via name-status', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '0\t42\tremoved.ts',
+          'diff --name-status': 'D\tremoved.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'removed.ts',
+            added: 0,
+            deleted: 42,
+            changeType: 'deleted',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('labels added files via name-status', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '100\t0\tnew-file.ts',
+          'diff --name-status': 'A\tnew-file.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'new-file.ts',
+            added: 100,
+            deleted: 0,
+            changeType: 'added',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('falls back to count-based inference when name-status is empty', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat':
+            '8\t0\tadded.ts\n0\t6\tdeleted.ts\n4\t2\tmodified.ts',
+          'diff --name-status': '',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'added.ts',
+            added: 8,
+            deleted: 0,
+            changeType: 'added',
+            staged: false,
+          },
+          {
+            path: 'deleted.ts',
+            added: 0,
+            deleted: 6,
+            changeType: 'deleted',
+            staged: false,
+          },
+          {
+            path: 'modified.ts',
+            added: 4,
+            deleted: 2,
+            changeType: 'modified',
+            staged: false,
+          },
+        ]);
+      });
+
+      it('merges staged and unstaged entries for the same file', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '3\t0\tboth.ts',
+          'diff --name-status': 'M\tboth.ts',
+          'diff --cached --numstat': '0\t2\tboth.ts',
+          'diff --cached --name-status': 'M\tboth.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.entries).toEqual([
+          {
+            path: 'both.ts',
+            added: 3,
+            deleted: 2,
+            // staged=true because at least one side is staged
+            changeType: 'modified',
+            staged: true,
+          },
+        ]);
+      });
+
+      it('accumulates totals across all entries', async () => {
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --numstat': '10\t5\ta.ts\n3\t0\tb.ts\n0\t1\tc.ts',
+          'diff --name-status': 'M\ta.ts\nA\tb.ts\nD\tc.ts',
+        });
+
+        const result = await service.getDiffNumstat('/repo');
+        expect(result?.totalAdded).toBe(13);
+        expect(result?.totalDeleted).toBe(6);
+      });
+    });
+  });
 });

@@ -1651,6 +1651,9 @@ export class MountManagerService extends DisposableService {
     this.lspReady.clear();
     this.uiKarton.removeServerProcedureHandler('toolbox.mountWorkspace');
     this.uiKarton.removeServerProcedureHandler('toolbox.unmountWorkspace');
+    this.uiKarton.removeServerProcedureHandler(
+      'toolbox.getWorkspaceDiffSummary',
+    );
     this.uiKarton.removeServerProcedureHandler('toolbox.listGitBranchesByPath');
     this.uiKarton.removeServerProcedureHandler(
       'toolbox.listGitWorktreesByPath',
