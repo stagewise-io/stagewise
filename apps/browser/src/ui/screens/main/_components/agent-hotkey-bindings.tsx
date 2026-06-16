@@ -52,6 +52,7 @@ export function AgentHotkeyBindings({
   );
   const fileTreeVisible = useKartonState((s) => s.fileTree.visible);
   const setFileTreeVisible = useKartonProcedure((p) => p.fileTree.setVisible);
+  const setFileTreeViewMode = useKartonProcedure((p) => p.fileTree.setViewMode);
   const { tabUiState, requestTerminalFocus, removeTabUiState } =
     useTabUIState();
 
@@ -295,6 +296,26 @@ export function AgentHotkeyBindings({
       setFileTreeVisible(!fileTreeVisible);
     },
     HotkeyActions.TOGGLE_FILE_TREE,
+    agentHotkeysEnabled,
+  );
+
+  // Mod+Shift+E: open file tree in files view
+  useHotKeyListener(
+    () => {
+      setFileTreeVisible(true);
+      void setFileTreeViewMode('files');
+    },
+    HotkeyActions.TOGGLE_FILE_TREE_FILES,
+    agentHotkeysEnabled,
+  );
+
+  // Mod+Shift+G: open file tree in diff view
+  useHotKeyListener(
+    () => {
+      setFileTreeVisible(true);
+      void setFileTreeViewMode('diff');
+    },
+    HotkeyActions.TOGGLE_FILE_TREE_DIFF,
     agentHotkeysEnabled,
   );
 

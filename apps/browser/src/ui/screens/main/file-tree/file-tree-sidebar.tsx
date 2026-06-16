@@ -272,7 +272,13 @@ export function FileTreeSidebar() {
                 </button>
               </TooltipTrigger>
               <TooltipContent>
-                <span>Files</span>
+                <span className="flex items-center gap-1.5">
+                  <span>Files</span>
+                  <HotkeyCombo
+                    action={HotkeyActions.TOGGLE_FILE_TREE_FILES}
+                    size="xs"
+                  />
+                </span>
               </TooltipContent>
             </Tooltip>
             {isGitRepo && (
@@ -306,7 +312,13 @@ export function FileTreeSidebar() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <span>Changed files</span>
+                  <span className="flex items-center gap-1.5">
+                    <span>Changed files</span>
+                    <HotkeyCombo
+                      action={HotkeyActions.TOGGLE_FILE_TREE_DIFF}
+                      size="xs"
+                    />
+                  </span>
                 </TooltipContent>
               </Tooltip>
             )}
