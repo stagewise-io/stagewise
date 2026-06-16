@@ -48,6 +48,11 @@ export type WorkspaceWorktreeGroup = {
   path: string;
   branch: string | null;
   isRoot: boolean;
+  /**
+   * Worktree creation time in epoch ms (from git), or `null` until the
+   * worktree list resolves. Drives newest-first ordering in the sidebar.
+   */
+  createdAt: number | null;
   severity: AgentStateSeverity | null;
   agents: WorkspaceAgentRow[];
 };
@@ -282,8 +287,22 @@ function getRepoPath(workspace: AgentWorkspaceEntry): string {
   );
 }
 
-function isStagewiseOwnedWorktreePath(worktreePath: string): boolean {
-  return normalizePath(worktreePath).includes('/.stagewise/worktrees/');
+/**
+ * Orders worktree groups for the sidebar: the root worktree is always pinned
+ * to the top, then the rest sort strictly by age, newest first, using the
+ * git-provided `createdAt` timestamp. Worktrees without a timestamp (not yet
+ * resolved from the worktree list) sink to the bottom. Ties fall back to the
+ * stable group key so the order stays deterministic across renders.
+ */
+function compareWorktreesByAge(
+  a: WorkspaceWorktreeGroup,
+  b: WorkspaceWorktreeGroup,
+): number {
+  if (a.isRoot !== b.isRoot) return Number(b.isRoot) - Number(a.isRoot);
+  const aCreated = a.createdAt ?? -1;
+  const bCreated = b.createdAt ?? -1;
+  if (aCreated !== bCreated) return bCreated - aCreated;
+  return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
 }
 
 function orderByStableKeys<T extends { key: string }>(
@@ -363,6 +382,7 @@ export function buildWorkspaceAgentGroups({
           path: workspace.path,
           branch: workspace.git.branch,
           isRoot: !workspace.git.isWorktree,
+          createdAt: null,
           severity: null,
           agents: [],
         };
@@ -383,15 +403,10 @@ export function buildWorkspaceAgentGroups({
           : `worktree:${item.worktreeId}`;
         const existing = repo.worktrees.find((group) => group.key === key);
         if (existing) {
-          // Worktree groups created from agent mounts carry the branch that was
-          // captured in Karton state at mount time, which goes stale when the
-          // branch is switched outside the app. The worktree list is refetched
-          // whenever the HEAD watcher bumps the repo revision, so it is the
-          // authoritative source for the *current* branch — overlay it onto the
-          // existing group so the label tracks external `git switch`es.
           existing.branch = item.branch;
           existing.label = formatWorktreeLabel(item);
           existing.isRoot = item.isMainWorktree;
+          existing.createdAt = item.createdAt;
           return;
         }
         repo.worktrees.push({
@@ -400,6 +415,7 @@ export function buildWorkspaceAgentGroups({
           path: item.path,
           branch: item.branch,
           isRoot: item.isMainWorktree,
+          createdAt: item.createdAt,
           severity: null,
           agents: [],
         });
@@ -409,12 +425,7 @@ export function buildWorkspaceAgentGroups({
     repo.worktrees = orderByStableKeys<WorkspaceWorktreeGroup>(
       repo.worktrees,
       groupOrder.worktreeKeysByRepo[repo.key],
-      (a, b) => {
-        if (a.isRoot !== b.isRoot) return Number(b.isRoot) - Number(a.isRoot);
-        const aStagewise = isStagewiseOwnedWorktreePath(a.path);
-        const bStagewise = isStagewiseOwnedWorktreePath(b.path);
-        return Number(bStagewise) - Number(aStagewise);
-      },
+      compareWorktreesByAge,
     );
 
     repo.worktrees.forEach((worktree) => {

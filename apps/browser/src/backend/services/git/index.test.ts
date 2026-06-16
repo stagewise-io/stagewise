@@ -245,6 +245,7 @@ describe('GitService', () => {
         headSha: 'abc123',
         isDetached: false,
         isMainWorktree: true,
+        createdAt: null,
       },
       {
         worktreeId: repoLinkedPath,
@@ -253,8 +254,57 @@ describe('GitService', () => {
         headSha: 'def456',
         isDetached: false,
         isMainWorktree: false,
+        createdAt: null,
       },
     ]);
+  });
+
+  it('drops prunable worktrees whose working tree is gone', async () => {
+    const { service } = await createGitService({
+      'worktree list --porcelain': [
+        'worktree /repo',
+        'HEAD abc123',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo-linked',
+        'HEAD def456',
+        'branch refs/heads/feature/test',
+        'prunable gitdir file points to non-existent location',
+      ].join('\n'),
+    });
+
+    await expect(service.listWorktrees('/repo')).resolves.toEqual([
+      {
+        worktreeId: repoPath,
+        path: repoPath,
+        branch: 'main',
+        headSha: 'abc123',
+        isDetached: false,
+        isMainWorktree: true,
+        createdAt: null,
+      },
+    ]);
+  });
+
+  it('populates createdAt from the worktree .git birthtime', async () => {
+    const liveRepo = await fs.mkdtemp(path.join(os.tmpdir(), 'git-wt-live-'));
+    await fs.mkdir(path.join(liveRepo, '.git'));
+    try {
+      const { service } = await createGitService({
+        'worktree list --porcelain': [
+          `worktree ${liveRepo}`,
+          'HEAD abc123',
+          'branch refs/heads/main',
+        ].join('\n'),
+      });
+
+      const worktrees = await service.listWorktrees(liveRepo);
+      expect(worktrees).toHaveLength(1);
+      expect(typeof worktrees[0].createdAt).toBe('number');
+      expect(worktrees[0].createdAt).toBeGreaterThan(0);
+    } finally {
+      await fs.rm(liveRepo, { recursive: true, force: true });
+    }
   });
 
   it('returns null mounted workspace summary for a repo subdirectory', async () => {

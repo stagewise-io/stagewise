@@ -129,6 +129,102 @@ describe('agent list workspace model', () => {
     expect(groups[0]?.severity).toBe('warning');
   });
 
+  it('orders worktrees root-first then newest-by-age from the git list', () => {
+    // `git worktree list` order is filesystem/alphabetical, not age-based, so
+    // the sidebar relies on the per-worktree `createdAt` timestamp instead.
+    // It must show root first, then the remaining worktrees newest-first
+    // regardless of git-list position or whether they have agents attached.
+    const mkGit = (id: string, isMain: boolean) => ({
+      repositoryId: '/repo/.git',
+      worktreeId: id,
+      repoRoot: id,
+      mainWorktreePath: '/repo',
+      commonGitDir: '/repo/.git',
+      isWorktree: !isMain,
+      branch: null,
+      headSha: 'sha',
+      status: {
+        dirty: false,
+        stagedCount: 0,
+        unstagedCount: 0,
+        untrackedCount: 0,
+      },
+    });
+    const groups = buildWorkspaceAgentGroups({
+      entries: [
+        // Only the oldest non-root worktree has an agent. Age must still win.
+        agent('old', {
+          mountedWorkspaces: [
+            { path: '/wt/old', git: mkGit('/wt/old', false) },
+          ],
+        }),
+        agent('root', {
+          mountedWorkspaces: [{ path: '/repo', git: mkGit('/repo', true) }],
+        }),
+      ],
+      pinnedIds: new Set(),
+      worktreeLists: new Map([
+        [
+          '/repo/.git',
+          {
+            currentPath: '/repo',
+            worktrees: [
+              // Arbitrary git-list order; createdAt (not position) drives sort.
+              {
+                worktreeId: '/repo',
+                path: '/repo',
+                branch: 'main',
+                headSha: 'sha',
+                isDetached: false,
+                isMainWorktree: true,
+                current: true,
+                createdAt: 50,
+              },
+              {
+                worktreeId: '/wt/old',
+                path: '/wt/old',
+                branch: 'old',
+                headSha: 'sha',
+                isDetached: false,
+                isMainWorktree: false,
+                current: false,
+                createdAt: 100,
+              },
+              {
+                worktreeId: '/wt/new',
+                path: '/wt/new',
+                branch: 'new',
+                headSha: 'sha',
+                isDetached: false,
+                isMainWorktree: false,
+                current: false,
+                createdAt: 300,
+              },
+              {
+                worktreeId: '/wt/mid',
+                path: '/wt/mid',
+                branch: 'mid',
+                headSha: 'sha',
+                isDetached: false,
+                isMainWorktree: false,
+                current: false,
+                createdAt: 200,
+              },
+            ],
+          },
+        ],
+      ]),
+      groupOrder: { repoKeys: [], worktreeKeysByRepo: {} },
+    });
+
+    expect(groups[0]?.worktrees.map((group) => group.path)).toEqual([
+      '/repo',
+      '/wt/new',
+      '/wt/mid',
+      '/wt/old',
+    ]);
+  });
+
   it('overlays the freshly fetched worktree branch onto agent-derived groups', () => {
     // The agent mount captured `branch: 'feature'` at mount time. After an
     // external `git switch`, the HEAD watcher bumps the repo revision and the
@@ -175,6 +271,7 @@ describe('agent list workspace model', () => {
                 isDetached: false,
                 isMainWorktree: false,
                 current: true,
+                createdAt: 1000,
               },
             ],
           },
