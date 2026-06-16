@@ -950,16 +950,26 @@ export class GitService extends DisposableService {
       unstagedStatusRaw,
       stagedStatusRaw,
     ] = await Promise.all([
-      this.runGit(workspacePath, ['diff', '--numstat']),
-      this.runGit(workspacePath, ['diff', '--cached', '--numstat']),
+      this.runGit(workspacePath, ['diff', '--find-renames', '--numstat']),
+      this.runGit(workspacePath, [
+        'diff',
+        '--cached',
+        '--find-renames',
+        '--numstat',
+      ]),
       this.runGit(workspacePath, [
         'ls-files',
         '--others',
         '--exclude-standard',
         '-z',
       ]),
-      this.runGit(workspacePath, ['diff', '--name-status']),
-      this.runGit(workspacePath, ['diff', '--cached', '--name-status']),
+      this.runGit(workspacePath, ['diff', '--find-renames', '--name-status']),
+      this.runGit(workspacePath, [
+        'diff',
+        '--cached',
+        '--find-renames',
+        '--name-status',
+      ]),
     ]);
 
     if (unstagedRaw === null && stagedRaw === null && !untrackedRaw)
