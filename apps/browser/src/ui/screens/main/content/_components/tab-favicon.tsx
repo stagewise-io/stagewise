@@ -1,5 +1,6 @@
 import type { TabState } from '@shared/karton-contracts/ui';
 import {
+  IconArrowsOppositeDirectionXOutline18,
   IconBoxSparkleOutline18,
   IconEarthOutline18,
   IconSquareTerminalOutline18,
@@ -47,6 +48,8 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
         <div className="flex size-4 items-center justify-center p-[1px]">
           <Logo color="current" className="size-full text-primary-solid" />
         </div>
+      ) : tabState?.type === 'file' && tabState.file?.showDiff ? (
+        <IconArrowsOppositeDirectionXOutline18 className="size-4 text-muted-foreground" />
       ) : tabState?.type === 'file' && tabState.file ? (
         <FileIcon filePath={tabState.file.relativePath} className="size-4" />
       ) : tabState?.isLoading ? (
