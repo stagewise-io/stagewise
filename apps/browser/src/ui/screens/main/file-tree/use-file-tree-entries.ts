@@ -153,9 +153,13 @@ export function useFileTreeEntries(workspaceKey: string | null) {
     [directoryRevisions, listDirectory, workspaceRevision, workspaceKey],
   );
 
+  // Reset state only when the workspace changes, not on every revision
+  // bump. The missingDirectoryPaths computation below already detects
+  // stale cached entries and triggers re-fetches without a flash.
   useEffect(() => {
     setDirectories({});
-  }, [workspaceRevision, workspaceKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceKey]);
 
   const missingDirectoryPaths = useMemo(() => {
     if (!workspaceKey) return [];

@@ -124,7 +124,9 @@ export function FileTreeSidebar() {
       setDiffData(null);
       return;
     }
-    setDiffLoading(true);
+    // Keep stale data visible during re-fetch to prevent flicker.
+    // Only show loading spinner on the initial fetch.
+    if (!diffData) setDiffLoading(true);
     getWorkspaceDiffSummary(selectedWorkspacePath)
       .then((result) => {
         if (cancelled) return;
