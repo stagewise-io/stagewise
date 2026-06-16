@@ -1366,6 +1366,12 @@ function DiffEditorPreview({
               readOnly: !editable,
               originalEditable: false,
               renderIndicators: true,
+              // The base `wordWrap` only reliably reaches the modified pane.
+              // The diff editor's own wrap control defaults to 'inherit',
+              // which Monaco applies inconsistently, leaving the original
+              // (left) pane unwrapped and horizontally scrollable. Force wrap
+              // on so both panes wrap identically and stay aligned.
+              diffWordWrap: 'on',
               enableSplitViewResizing: diffMode === 'split',
               // The diff editor renders both its own vertical scrollbar and a
               // wider diff overview ruler (the colored add/remove map). That
