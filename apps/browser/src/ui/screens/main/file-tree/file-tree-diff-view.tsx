@@ -7,7 +7,7 @@ type DiffRow = {
   path: string;
   added: number;
   deleted: number;
-  changeType: 'modified' | 'added' | 'deleted' | 'renamed';
+  changeType: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
   oldPath?: string;
   staged: boolean;
 };
@@ -17,6 +17,7 @@ const CHANGE_LABELS: Record<DiffRow['changeType'], string> = {
   added: 'A',
   deleted: 'D',
   renamed: 'R',
+  untracked: 'U',
 };
 
 const CHANGE_COLORS: Record<DiffRow['changeType'], string> = {
@@ -24,6 +25,7 @@ const CHANGE_COLORS: Record<DiffRow['changeType'], string> = {
   added: 'text-success-foreground',
   deleted: 'text-error-foreground',
   renamed: 'text-warning-foreground',
+  untracked: 'text-success-foreground',
 };
 
 function DiffRowItem({
