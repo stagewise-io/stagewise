@@ -6,6 +6,7 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { FileIcon } from '@ui/components/file-icon';
+import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { getBaseName } from '@shared/path-utils';
 import {
   getFileTreeWorkspaceKey,
@@ -55,7 +56,7 @@ export function useFileSearchCommandItems(
   isRecent: boolean;
   workspaceOptions: FileSearchWorkspaceOption[];
 } {
-  const openAgent = useKartonState((s) => s.browser?.lastOpenAgentId ?? null);
+  const [openAgent] = useOpenAgent();
   // `useKartonProcedure` returns a fresh function reference on every render
   // (the selector arrow is new each render), so keep it in a ref and exclude
   // it from the search effect deps. Otherwise the effect re-runs on every
