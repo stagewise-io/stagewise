@@ -41,7 +41,9 @@ function DiffRowItem({
   const colorClass = CHANGE_COLORS[row.changeType];
   const fileName = getBaseName(row.path);
   const dirPath =
-    row.path === fileName ? '' : row.path.slice(0, -fileName.length);
+    row.path === fileName
+      ? ''
+      : row.path.slice(0, -fileName.length).replace(/\/$/, '');
 
   return (
     <div
@@ -75,7 +77,9 @@ function DiffRowItem({
         )}
         <span className="min-w-0 flex-1 truncate text-foreground">
           <span>{fileName}</span>
-          {dirPath && <span className="text-muted-foreground">{dirPath}</span>}
+          {dirPath && (
+            <span className="ml-1.5 text-subtle-foreground">{dirPath}</span>
+          )}
           {row.oldPath && (
             <span className="ml-1 text-[10px] text-muted-foreground">
               ← {getBaseName(row.oldPath)}
