@@ -1159,6 +1159,61 @@ describe('GitService', () => {
         expect(result?.totalAdded).toBe(8);
         expect(result?.totalDeleted).toBe(0);
       });
+
+      it('updates deleted entry when untracked file recreated at same path', async () => {
+        // staged D + recreated untracked: file was deleted and staged,
+        // then recreated on disk before committing.
+        const { service } = await createGitService({
+          ...diffBaseResponses,
+          'diff --find-renames --numstat': '',
+          'diff --find-renames --name-status': '',
+          'diff --cached --find-renames --numstat': '0\t15\treborn.ts',
+          'diff --cached --find-renames --name-status': 'D\treborn.ts',
+          'ls-files --others --exclude-standard -z': 'reborn.ts\0other.ts\0',
+        });
+
+        const countSpy = vi
+          .spyOn(
+            service as unknown as {
+              countFileLines: (p: string) => Promise<number>;
+            },
+            'countFileLines',
+          )
+          .mockImplementation(async (absPath: string) => {
+            if (absPath.endsWith('reborn.ts')) return 22;
+            if (absPath.endsWith('other.ts')) return 5;
+            return 0;
+          });
+
+        const result = await service.getDiffNumstat('/repo');
+
+        countSpy.mockRestore();
+
+        // reborn.ts: staged D (15 deleted lines) + untracked (22 new lines)
+        // → merged entry shows both, changeType promoted from deleted to
+        // modified so the Diff view allows clicking.
+        expect(result?.entries).toHaveLength(2);
+        expect(result?.entries).toEqual(
+          expect.arrayContaining([
+            {
+              path: 'reborn.ts',
+              added: 22,
+              deleted: 15,
+              changeType: 'modified',
+              staged: true,
+            },
+            {
+              path: 'other.ts',
+              added: 5,
+              deleted: 0,
+              changeType: 'untracked',
+              staged: false,
+            },
+          ]),
+        );
+        expect(result?.totalAdded).toBe(27);
+        expect(result?.totalDeleted).toBe(15);
+      });
     });
 
     describe('split staged/unstaged status', () => {

@@ -1030,9 +1030,16 @@ export class GitService extends DisposableService {
     }
 
     // Add untracked files (not in git): every line counts as "added".
+    // Normally untracked paths that already exist in merged are skipped,
+    // but when a tracked file was staged for deletion and then recreated
+    // at the same path, the untracked file represents the new content.
+    // In that case update the existing deleted entry instead of dropping
+    // the recreated file.
     if (untrackedRaw) {
       const untrackedPaths = untrackedRaw.split('\0').filter(Boolean);
-      const newPaths = untrackedPaths.filter((p) => !merged.has(p));
+      const newPaths = untrackedPaths.filter(
+        (p) => !merged.has(p) || merged.get(p)?.changeType === 'deleted',
+      );
       const lineCounts = await Promise.all(
         newPaths.map(async (relPath) => ({
           relPath,
@@ -1040,13 +1047,19 @@ export class GitService extends DisposableService {
         })),
       );
       for (const { relPath, added } of lineCounts) {
-        merged.set(relPath, {
-          path: relPath,
-          added,
-          deleted: 0,
-          changeType: 'untracked',
-          staged: false,
-        });
+        const existing = merged.get(relPath);
+        if (existing?.changeType === 'deleted') {
+          existing.added += added;
+          existing.changeType = 'modified';
+        } else {
+          merged.set(relPath, {
+            path: relPath,
+            added,
+            deleted: 0,
+            changeType: 'untracked',
+            staged: false,
+          });
+        }
       }
     }
 
