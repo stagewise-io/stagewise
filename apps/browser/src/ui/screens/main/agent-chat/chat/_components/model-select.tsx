@@ -242,9 +242,31 @@ export const ModelSelect = memo(function ModelSelect({
       .filter(({ models }) => models.length > 0);
   }, [groupedModels, query]);
 
-  const hasFilteredResults = filteredGroupedModels.some(
-    (g) => g.models.length > 0,
+  const filteredModelIds = useMemo(
+    () =>
+      filteredGroupedModels.flatMap(({ models }) =>
+        models.map((model) => model.modelId),
+      ),
+    [filteredGroupedModels],
   );
+
+  const allModelItemValues = useMemo(
+    () => [
+      ...modelOptions.map((model) => model.modelId),
+      OPEN_MODEL_SETTINGS_VALUE,
+    ],
+    [modelOptions],
+  );
+
+  const filteredItemValues = useMemo(
+    () =>
+      query.trim() === ''
+        ? allModelItemValues
+        : [...filteredModelIds, OPEN_MODEL_SETTINGS_VALUE],
+    [allModelItemValues, filteredModelIds, query],
+  );
+
+  const hasFilteredResults = filteredModelIds.length > 0;
 
   // Display labels for the trigger
   const selectedDisplayName = useMemo(() => {
@@ -486,8 +508,13 @@ export const ModelSelect = memo(function ModelSelect({
     <Combobox
       value={selectedModel}
       open={open}
+      inputValue={query}
+      items={allModelItemValues}
+      filteredItems={filteredItemValues}
+      autoHighlight
       onValueChange={handleValueChange}
       onOpenChange={handleOpenChange}
+      onInputValueChange={setQuery}
       filter={null}
     >
       <Tooltip>
@@ -552,13 +579,7 @@ export const ModelSelect = memo(function ModelSelect({
               )}
             >
               <div className="mb-1 rounded-md">
-                <ComboboxInput
-                  ref={inputRef}
-                  size="xs"
-                  placeholder="Search…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+                <ComboboxInput ref={inputRef} size="xs" placeholder="Search…" />
               </div>
 
               <ComboboxList>
