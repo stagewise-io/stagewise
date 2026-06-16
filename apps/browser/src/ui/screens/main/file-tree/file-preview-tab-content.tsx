@@ -1371,6 +1371,14 @@ function DiffEditorPreview({
               // 'inherit', which Monaco applies inconsistently across panes,
               // so set it explicitly to keep both sides identical.
               diffWordWrap: 'off',
+              // Inline mode renders two line-number columns (original +
+              // modified). Trim the default gutter padding (glyph margin,
+              // line-decoration band, and minimum number width) so the line
+              // numbers don't sit behind a wide empty left margin.
+              glyphMargin: false,
+              lineDecorationsWidth: 0,
+              lineNumbersMinChars: 3,
+              folding: false,
               enableSplitViewResizing: diffMode === 'split',
               // The diff editor renders both its own vertical scrollbar and a
               // wider diff overview ruler (the colored add/remove map). That
