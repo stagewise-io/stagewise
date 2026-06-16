@@ -110,13 +110,13 @@ export function FileTreeDiffView({
   data: MountedWorkspaceGitDiffSummary | null;
   loading: boolean;
   shownRelativePath: string | null;
-  onOpenFile: (path: string) => void;
+  onOpenFile: (path: string, staged: boolean) => void;
 }) {
   const rows: DiffRow[] = data?.entries ?? [];
 
   function handleRowClick(row: DiffRow) {
     if (!workspaceKey || row.changeType === 'deleted') return;
-    onOpenFile(row.path);
+    onOpenFile(row.path, row.staged);
   }
 
   if (loading) {

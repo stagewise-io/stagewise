@@ -174,10 +174,19 @@ export function FileTreeSidebar() {
       : null;
   });
 
+  const _getFileDiffContent = useKartonProcedure(
+    (p) => p.toolbox.getFileDiffContent,
+  );
+
   const handleDiffOpenFile = useCallback(
-    (path: string) => {
+    (path: string, staged: boolean) => {
       if (!selectedWorkspaceKey) return;
-      void openFileTab(selectedWorkspaceKey, path, openAgent);
+      // Open the file as a diff tab — the content will be fetched inside
+      // the DiffEditorPreview component.
+      void openFileTab(selectedWorkspaceKey, path, openAgent, {
+        showDiff: true,
+        diffStaged: staged,
+      });
     },
     [openFileTab, selectedWorkspaceKey, openAgent],
   );

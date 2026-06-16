@@ -643,6 +643,17 @@ export type FileTabNotice =
   | { kind: 'moved'; fromRelativePath: string }
   | { kind: 'deleted' };
 
+export type FileDiffContent = {
+  original: string;
+  modified: string;
+  /**
+   * mtime (ms) of the working-tree file the `modified` side was read from.
+   * Used as the optimistic-concurrency baseline when saving edits made in
+   * the diff view. `null` when the file does not exist on disk.
+   */
+  mtimeMs: number | null;
+};
+
 export type FileTabMetadata = {
   workspaceKey: FileTreeWorkspaceKey;
   relativePath: string;
@@ -658,6 +669,16 @@ export type FileTabMetadata = {
   displayName?: string;
   /** When true, the tab content is read-only (e.g. attachment blobs). */
   readOnly?: boolean;
+  /**
+   * When true, the tab opens a git diff editor (Monaco DiffEditor)
+   * showing the changes for this file instead of the regular editor.
+   */
+  showDiff?: boolean;
+  /**
+   * Whether the diff is staged (HEAD vs index) or unstaged (index vs
+   * working tree). Only meaningful when showDiff is true.
+   */
+  diffStaged?: boolean;
 };
 
 export type TabLifecycle =
@@ -667,6 +688,10 @@ export type TabLifecycle =
 export type OpenFileTabOptions = {
   preview?: boolean;
   temporaryGroupKey?: string;
+  /** Open the tab as a git diff editor (Monaco DiffEditor). */
+  showDiff?: boolean;
+  /** Staged (HEAD vs index) or unstaged (index vs working tree). */
+  diffStaged?: boolean;
 };
 
 export type FileTreeClipboardOperation = 'copy' | 'cut';
@@ -1303,6 +1328,16 @@ export type KartonContract = {
       getWorkspaceDiffSummary: (
         workspacePath: string,
       ) => Promise<MountedWorkspaceGitDiffSummary | null>;
+      /**
+       * Fetch the original and modified content for a file that appears
+       * in the git diff, so the file-tree can open a Monaco DiffEditor.
+       */
+      getFileDiffContent: (
+        workspacePath: string,
+        filePath: string,
+        staged: boolean,
+        oldPath?: string,
+      ) => Promise<FileDiffContent | null>;
       listGitBranchesByPath: (
         workspacePath: string,
       ) => Promise<WorkspaceGitBranchesResult | null>;

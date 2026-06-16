@@ -387,6 +387,8 @@ export class FileTreeService extends DisposableService {
         mimeType: preview.mimeType,
         size: preview.size,
         readOnly: preview.readOnly,
+        showDiff: options?.showDiff,
+        diffStaged: options?.diffStaged,
       },
       agentInstanceId,
       options,

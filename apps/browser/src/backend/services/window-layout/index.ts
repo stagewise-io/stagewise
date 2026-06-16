@@ -74,6 +74,8 @@ const fileTabMetadataSchema = z.object({
   size: z.number(),
   displayName: z.string().optional(),
   readOnly: z.boolean().optional(),
+  showDiff: z.boolean().optional(),
+  diffStaged: z.boolean().optional(),
 });
 
 const tabEntrySchema = z.discriminatedUnion('type', [
@@ -834,7 +836,12 @@ export class WindowLayoutService extends DisposableService {
         tab.type === 'file' &&
         tab.file?.workspaceKey === file.workspaceKey &&
         tab.file.relativePath === file.relativePath &&
-        tab.agentInstanceId === (agentInstanceId ?? null),
+        tab.agentInstanceId === (agentInstanceId ?? null) &&
+        // A diff tab and a regular file tab for the same path are distinct
+        // surfaces — opening the file while its diff is open must create a
+        // separate plain-editor tab instead of switching to the diff.
+        Boolean(tab.file.showDiff) === Boolean(file.showDiff) &&
+        Boolean(tab.file.diffStaged) === Boolean(file.diffStaged),
     );
     if (existing) {
       if (!options?.preview) this.promoteFileTab(existing[0]);
@@ -854,8 +861,9 @@ export class WindowLayoutService extends DisposableService {
             tab.agentInstanceId === (agentInstanceId ?? null),
         )
       : undefined;
-    const title =
+    const baseTitle =
       file.displayName?.trim() || path.basename(file.relativePath) || 'File';
+    const title = file.showDiff ? `Diff: ${baseTitle}` : baseTitle;
 
     if (reusablePreview) {
       const [id] = reusablePreview;
