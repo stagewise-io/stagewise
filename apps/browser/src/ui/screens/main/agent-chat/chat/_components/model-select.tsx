@@ -262,7 +262,9 @@ export const ModelSelect = memo(function ModelSelect({
     () =>
       query.trim() === ''
         ? allModelItemValues
-        : [...filteredModelIds, OPEN_MODEL_SETTINGS_VALUE],
+        : filteredModelIds.length > 0
+          ? [...filteredModelIds, OPEN_MODEL_SETTINGS_VALUE]
+          : [],
     [allModelItemValues, filteredModelIds, query],
   );
 
