@@ -12,6 +12,7 @@ import {
 } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { XIcon, GitBranchIcon } from 'lucide-react';
+import type { MountedWorkspaceGitDiffSummary } from '@shared/karton-contracts/ui';
 import {
   IconFileSearchOutline18,
   IconFolder5Outline18,
@@ -72,10 +73,16 @@ export function FileTreeSidebar() {
     null,
   );
   const [isGitRepo, setIsGitRepo] = useState(false);
-  const [diffTotals, setDiffTotals] = useState<{
-    added: number;
-    deleted: number;
-  }>({ added: 0, deleted: 0 });
+  const [diffData, setDiffData] =
+    useState<MountedWorkspaceGitDiffSummary | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const diffTotals = useMemo(
+    () => ({
+      added: diffData?.totalAdded ?? 0,
+      deleted: diffData?.totalDeleted ?? 0,
+    }),
+    [diffData],
+  );
 
   const workspaces = useMemo(
     () =>
@@ -101,39 +108,32 @@ export function FileTreeSidebar() {
     }
   }, [activeWorkspaceKey, selectedWorkspaceKey, setActiveWorkspace]);
 
-  // Check if the selected workspace is a git repo
+  // Fetch diff summary when workspace changes
   useEffect(() => {
     let cancelled = false;
     if (!selectedWorkspacePath) {
       setIsGitRepo(false);
+      setDiffData(null);
       return;
     }
-    if (!selectedWorkspacePath) {
-      setIsGitRepo(false);
-      setDiffTotals({ added: 0, deleted: 0 });
-      return;
-    }
+    setDiffLoading(true);
     getWorkspaceDiffSummary(selectedWorkspacePath)
       .then((result) => {
         if (cancelled) return;
         setIsGitRepo(result !== null);
-        if (result) {
-          setDiffTotals({
-            added: result.totalAdded,
-            deleted: result.totalDeleted,
-          });
-        } else {
-          setDiffTotals({ added: 0, deleted: 0 });
-          if (viewMode === 'diff') {
-            void setViewMode('files');
-          }
+        setDiffData(result);
+        if (!result) {
+          void setViewMode('files');
         }
       })
       .catch(() => {
         if (!cancelled) {
           setIsGitRepo(false);
-          setDiffTotals({ added: 0, deleted: 0 });
+          setDiffData(null);
         }
+      })
+      .finally(() => {
+        if (!cancelled) setDiffLoading(false);
       });
     return () => {
       cancelled = true;
@@ -166,6 +166,25 @@ export function FileTreeSidebar() {
       });
     },
     [openCommandCenter, selectedWorkspaceKey],
+  );
+
+  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
+
+  const shownRelativePath = useKartonState((s) => {
+    const activeTabId = s.contentTabs.activeTabId;
+    if (!activeTabId || !selectedWorkspaceKey) return null;
+    const file = s.contentTabs.tabs[activeTabId]?.file;
+    return file?.workspaceKey === selectedWorkspaceKey
+      ? file.relativePath
+      : null;
+  });
+
+  const handleDiffOpenFile = useCallback(
+    (path: string) => {
+      if (!selectedWorkspaceKey) return;
+      void openFileTab(selectedWorkspaceKey, path, openAgent);
+    },
+    [openFileTab, selectedWorkspaceKey, openAgent],
   );
 
   const previewGroupKey = `file-tree-preview:${openAgent ?? 'global'}`;
@@ -335,12 +354,11 @@ export function FileTreeSidebar() {
       <div className="min-h-0 flex-1 pt-1">
         {viewMode === 'diff' ? (
           <FileTreeDiffView
-            workspacePath={
-              workspaces.find((w) => w.key === selectedWorkspaceKey)?.path ??
-              null
-            }
             workspaceKey={selectedWorkspaceKey}
-            openAgent={openAgent}
+            data={diffData}
+            loading={diffLoading}
+            shownRelativePath={shownRelativePath}
+            onOpenFile={handleDiffOpenFile}
           />
         ) : (
           <FileTreeWorkspaceView

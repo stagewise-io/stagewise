@@ -1,5 +1,3 @@
-import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { useEffect, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { cn } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
@@ -100,64 +98,23 @@ function DiffRowItem({
 }
 
 export function FileTreeDiffView({
-  workspacePath,
   workspaceKey,
-  openAgent,
+  data,
+  loading,
+  shownRelativePath,
+  onOpenFile,
 }: {
-  workspacePath: string | null;
   workspaceKey: string | null;
-  openAgent: string | null;
+  data: MountedWorkspaceGitDiffSummary | null;
+  loading: boolean;
+  shownRelativePath: string | null;
+  onOpenFile: (path: string) => void;
 }) {
-  const getWorkspaceDiffSummary = useKartonProcedure(
-    (p) => p.toolbox.getWorkspaceDiffSummary,
-  );
-  const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
-
-  const shownRelativePath = useKartonState((s) => {
-    const activeTabId = s.contentTabs.activeTabId;
-    if (!activeTabId || !workspaceKey) return null;
-    const file = s.contentTabs.tabs[activeTabId]?.file;
-    return file?.workspaceKey === workspaceKey ? file.relativePath : null;
-  });
-
-  const [data, setData] = useState<MountedWorkspaceGitDiffSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!workspacePath) {
-      setData(null);
-      return;
-    }
-    setLoading(true);
-    getWorkspaceDiffSummary(workspacePath)
-      .then((result) => {
-        if (!cancelled) setData(result);
-      })
-      .catch(() => {
-        if (!cancelled) setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [workspacePath]);
-
   const rows: DiffRow[] = data?.entries ?? [];
 
   function handleRowClick(row: DiffRow) {
     if (!workspaceKey || row.changeType === 'deleted') return;
-    void openFileTab(workspaceKey, row.path, openAgent);
-  }
-
-  if (!workspacePath) {
-    return (
-      <div className="flex h-full items-center justify-center p-4 text-muted-foreground text-xs">
-        No workspace selected
-      </div>
-    );
+    onOpenFile(row.path);
   }
 
   if (loading) {
