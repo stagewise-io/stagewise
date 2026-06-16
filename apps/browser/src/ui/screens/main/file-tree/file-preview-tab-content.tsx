@@ -31,11 +31,9 @@ import {
 import { IconDatabaseFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import type { FileDiffContent } from '@shared/karton-contracts/ui';
 import {
-  Columns3Icon,
   Loader2Icon,
   MinusIcon,
   PlusIcon,
-  PanelTopIcon,
   TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
@@ -47,7 +45,9 @@ import {
   IconEye2Outline18,
   IconOpenExternalOutline18,
   IconRedoOutline18,
+  IconSplitViewOutline18,
   IconSquareCodeOutline18,
+  IconTextAlignLeft2Outline18,
   IconTextBgColorOutline18,
   IconTextColorOutline18,
   IconUndoOutline18,
@@ -1306,7 +1306,7 @@ function DiffEditorPreview({
               aria-pressed={diffMode === 'inline'}
               onClick={() => persistMode('inline')}
             >
-              <PanelTopIcon className="size-3.5" />
+              <IconTextAlignLeft2Outline18 className="size-3.5" />
               {diffMode === 'inline' ? <span>Inline</span> : null}
             </button>
             <button
@@ -1320,7 +1320,7 @@ function DiffEditorPreview({
               aria-pressed={diffMode === 'split'}
               onClick={() => persistMode('split')}
             >
-              <Columns3Icon className="size-3.5" />
+              <IconSplitViewOutline18 className="size-3.5" />
               {diffMode === 'split' ? <span>Split</span> : null}
             </button>
           </div>
