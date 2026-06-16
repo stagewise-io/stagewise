@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0 (2026-06-16)
+
+### Features
+
+* add Kimi K2.7 Code (560614f)
+* add content tab arrow shortcuts (9f11e7c)
+* add model thinking controls (ccad6bc)
+* prepare thinking overrides backend (f768384)
+* add telemetry events for theme, loudness, and sound pack changes (155002c)
+* add appearance preference (ae17273)
+* refine personalization theme badges (4ab7536)
+* refine personalization themes (3507c90)
+* add personalization themes (ca61ab6)
+
+### Bug Fixes
+
+* persist tutorial progress on restart and fix missing sidebar-panel tutorial anchor (0ad01d5)
+* register missing UI telemetry event names (7b34ca3)
+* error handling and rollback for personalization theme persistence (10aa063)
+
 ## 1.8.0 (2026-06-12)
 
 ### Features
