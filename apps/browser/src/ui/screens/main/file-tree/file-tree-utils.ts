@@ -46,6 +46,22 @@ export function getFileTreeWorkspaceMountsForAgent(
   return Array.from(mountsByKey.values());
 }
 
+export function areFileTreeWorkspaceMountsEqual(
+  a: MountEntry[],
+  b: MountEntry[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((mount, index) => {
+      const otherMount = b[index];
+      return (
+        otherMount !== undefined &&
+        getFileTreeWorkspaceKey(mount) === getFileTreeWorkspaceKey(otherMount)
+      );
+    })
+  );
+}
+
 export function getAllFileTreeWorkspaceMounts(
   state: FileTreeMountState,
 ): MountEntry[] {
