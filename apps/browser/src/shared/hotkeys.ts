@@ -135,6 +135,8 @@ export enum HotkeyActions {
 
   // File tree
   TOGGLE_FILE_TREE = 'toggle_file_tree',
+  TOGGLE_FILE_TREE_FILES = 'toggle_file_tree_files',
+  TOGGLE_FILE_TREE_DIFF = 'toggle_file_tree_diff',
 
   // SVG preview
   TOGGLE_SVG_CODE_MODE = 'toggle_svg_code_mode',
@@ -467,6 +469,14 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   },
   [HotkeyActions.TOGGLE_FILE_TREE]: {
     accelerator: 'Mod+Shift+B',
+    captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_FILE_TREE_FILES]: {
+    accelerator: 'Mod+Shift+E',
+    captureDominantly: true,
+  },
+  [HotkeyActions.TOGGLE_FILE_TREE_DIFF]: {
+    accelerator: 'Mod+Shift+G',
     captureDominantly: true,
   },
   [HotkeyActions.TOGGLE_SVG_CODE_MODE]: {
