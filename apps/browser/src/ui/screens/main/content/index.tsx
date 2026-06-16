@@ -726,7 +726,7 @@ export function MainSection({
             }}
             ref={tabBarScrollRef}
             style={maskStyle}
-            className="w-auto min-w-0 shrink gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {/* Global (pinned) tabs — shrinks independently, inner scroll handles overflow */}
             {globalTabItems.length > 0 && (
@@ -735,7 +735,7 @@ export function MainSection({
                 items={globalTabItems}
                 onReorder={handleReorderGlobal}
                 activeValue={effectiveActiveTabId ?? ''}
-                className="min-w-0 shrink"
+                className="min-w-0 shrink items-center"
               />
             )}
             {/* Separator */}
@@ -749,23 +749,20 @@ export function MainSection({
                 items={agentTabItems}
                 onReorder={handleReorderAgent}
                 activeValue={effectiveActiveTabId ?? ''}
-                className="min-w-0 shrink"
+                className="min-w-0 shrink items-center"
               />
             )}
           </SortableTabs>
-          <NewTabButtons
-            buttonClassName="size-7"
-            onCreateBrowserTab={onCreateTab}
-            onCreateTerminalTab={() =>
-              void createTerminal(undefined, openAgent)
-            }
-          />
-          <div className="flex-1" />
-          {topRightActions && (
-            <div className="flex shrink-0 items-center gap-0">
-              {topRightActions}
-            </div>
-          )}
+          <div className="app-no-drag flex shrink-0 items-center gap-0.5">
+            <NewTabButtons
+              buttonClassName="size-7"
+              onCreateBrowserTab={onCreateTab}
+              onCreateTerminalTab={() =>
+                void createTerminal(undefined, openAgent)
+              }
+            />
+            {topRightActions}
+          </div>
         </div>
         {/* Content area with per-tab UI */}
         <div className="relative flex size-full flex-col">
