@@ -2,6 +2,7 @@ import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useEffect, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { cn } from '@ui/utils';
+import { getBaseName } from '@shared/path-utils';
 import type { MountedWorkspaceGitDiffSummary } from '@shared/karton-contracts/ui';
 
 type DiffRow = {
@@ -38,6 +39,9 @@ function DiffRowItem({
 }) {
   const label = CHANGE_LABELS[row.changeType];
   const colorClass = CHANGE_COLORS[row.changeType];
+  const fileName = getBaseName(row.path);
+  const dirPath =
+    row.path === fileName ? '' : row.path.slice(0, -fileName.length);
 
   return (
     <div
@@ -69,11 +73,12 @@ function DiffRowItem({
             S
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate text-foreground/90">
-          <span>{row.path}</span>
+        <span className="min-w-0 flex-1 truncate text-foreground">
+          <span>{fileName}</span>
+          {dirPath && <span className="text-muted-foreground">{dirPath}</span>}
           {row.oldPath && (
             <span className="ml-1 text-[10px] text-muted-foreground">
-              ← {row.oldPath}
+              ← {getBaseName(row.oldPath)}
             </span>
           )}
         </span>
