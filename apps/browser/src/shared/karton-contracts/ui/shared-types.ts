@@ -1,5 +1,6 @@
 import { modelCapabilitiesSchema } from '@stagewise/agent-core/types';
 import { z } from 'zod';
+import { codingPlanIds } from '../../coding-plan-ids';
 
 export {
   environmentDiffSnapshotSchema,
@@ -53,6 +54,12 @@ export const providerEndpointModeSchema = z.enum([
 ]);
 export type ProviderEndpointMode = z.infer<typeof providerEndpointModeSchema>;
 
+export const connectedCodingPlanIdSchema = z
+  .enum(codingPlanIds)
+  .optional()
+  .catch(undefined);
+export type ConnectedCodingPlanId = z.infer<typeof connectedCodingPlanIdSchema>;
+
 /** Configuration for a single provider endpoint */
 export const providerConfigSchema = z.object({
   /** Which endpoint to route requests to */
@@ -61,6 +68,8 @@ export const providerConfigSchema = z.object({
   encryptedApiKey: z.string().optional(),
   /** ID of a custom endpoint to use (only when mode is 'custom') */
   customProviderId: z.string().optional(),
+  /** Coding plan currently connected through this provider, when applicable. */
+  connectedCodingPlanId: connectedCodingPlanIdSchema,
   /** @deprecated Migrated to customProviderId — kept for backwards compat parsing */
   customBaseUrl: z.string().optional(),
 });

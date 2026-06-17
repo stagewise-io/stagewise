@@ -14,10 +14,12 @@ import {
 
 function createTestModelProviderService({
   providerModes = {},
+  connectedCodingPlanIds = {},
   modelThinkingOverrides = {},
   customEndpoints = [],
 }: {
   providerModes?: Record<string, 'stagewise' | 'official' | 'custom'>;
+  connectedCodingPlanIds?: Record<string, string | undefined>;
   modelThinkingOverrides?: Record<
     string,
     {
@@ -38,6 +40,13 @@ function createTestModelProviderService({
     config.mode = mode;
     if (mode === 'custom') config.customProviderId = `${provider}-custom`;
   }
+  for (const [provider, connectedCodingPlanId] of Object.entries(
+    connectedCodingPlanIds,
+  )) {
+    preferences.providerConfigs[
+      provider as keyof typeof preferences.providerConfigs
+    ].connectedCodingPlanId = connectedCodingPlanId as any;
+  }
 
   return new ModelProviderService(
     {
@@ -55,6 +64,15 @@ function createTestModelProviderService({
 const agentStepMetadata = {
   [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
 };
+
+function getModelRequestUrl(
+  result: ReturnType<ModelProviderService['getModelWithOptions']>,
+) {
+  const model = result.model as unknown as {
+    config?: { url?: (options: { path: string }) => URL };
+  };
+  return model.config?.url?.({ path: '/chat/completions' }).toString();
+}
 
 describe('model alias routing', () => {
   it('accepts alias IDs as built-in models', () => {
@@ -162,6 +180,35 @@ describe('model alias routing', () => {
         provider: { require_parameters: true },
       },
     });
+  });
+});
+
+describe('official provider endpoint resolution', () => {
+  it('routes connected GLM Coding Plan requests through the coding endpoint', () => {
+    const service = createTestModelProviderService({
+      providerModes: { 'z-ai': 'official' },
+      connectedCodingPlanIds: { 'z-ai': 'glm-coding-plan' },
+    });
+
+    const result = service.getModelWithOptions('glm-5.2', 'trace-1');
+
+    expect(result.providerMode).toBe('official');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    );
+  });
+
+  it('keeps normal official Z.ai requests on the general endpoint', () => {
+    const service = createTestModelProviderService({
+      providerModes: { 'z-ai': 'official' },
+    });
+
+    const result = service.getModelWithOptions('glm-5.2', 'trace-1');
+
+    expect(result.providerMode).toBe('official');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://api.z.ai/api/paas/v4/chat/completions',
+    );
   });
 });
 

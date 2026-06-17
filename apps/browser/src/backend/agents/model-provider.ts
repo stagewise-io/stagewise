@@ -19,6 +19,7 @@ import {
   getAvailableModel,
   getModelAlias,
 } from '@shared/available-models';
+import { CODING_PLANS } from '@shared/coding-plans';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -141,14 +142,21 @@ export class ModelProviderService {
           baseURL: proxyBaseUrl,
           mode: 'stagewise',
         };
-      case 'official':
+      case 'official': {
+        const connectedCodingPlan = config.connectedCodingPlanId
+          ? CODING_PLANS[config.connectedCodingPlanId]
+          : undefined;
         return {
           apiKey: this.preferencesService.decryptProviderApiKey(
             config.encryptedApiKey,
           ),
-          baseURL: undefined,
+          baseURL:
+            connectedCodingPlan?.provider === provider
+              ? connectedCodingPlan.baseUrl
+              : undefined,
           mode: 'official',
         };
+      }
       case 'custom': {
         const endpoint = prefs.customEndpoints.find(
           (ep) => ep.id === config.customProviderId,

@@ -24,7 +24,10 @@ import {
   isCodingPlanId,
   type CodingPlanId,
 } from '@shared/coding-plans';
-import { validateApiKeys } from '../utils/validate-api-keys';
+import {
+  validateApiKeys,
+  validateCodingPlanApiKey,
+} from '../utils/validate-api-keys';
 
 // Enable Immer patches support
 enablePatches();
@@ -866,6 +869,11 @@ export class PreferencesService extends DisposableService {
         path: ['providerConfigs', provider, 'encryptedApiKey'],
         value: encryptedBase64,
       },
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'connectedCodingPlanId'],
+        value: undefined,
+      },
     ];
 
     await this.update(patches);
@@ -887,6 +895,11 @@ export class PreferencesService extends DisposableService {
       {
         op: 'replace',
         path: ['providerConfigs', provider, 'encryptedApiKey'],
+        value: undefined,
+      },
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'connectedCodingPlanId'],
         value: undefined,
       },
     ];
@@ -920,6 +933,11 @@ export class PreferencesService extends DisposableService {
       {
         op: 'replace',
         path: ['providerConfigs', provider, 'encryptedApiKey'],
+        value: undefined,
+      },
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'connectedCodingPlanId'],
         value: undefined,
       },
     ];
@@ -980,6 +998,11 @@ export class PreferencesService extends DisposableService {
         path: ['providerConfigs', provider, 'mode'],
         value: 'official',
       },
+      {
+        op: 'replace',
+        path: ['providerConfigs', provider, 'connectedCodingPlanId'],
+        value: undefined,
+      },
     ];
     await this.update(patches);
 
@@ -1010,9 +1033,8 @@ export class PreferencesService extends DisposableService {
       return { success: false, error: 'API key is required' };
     }
 
-    // 1. Validate the key against the plan's provider.
-    const results = await validateApiKeys({ [plan.provider]: apiKey });
-    const result = results[plan.provider];
+    // 1. Validate the key against the plan's provider or dedicated endpoint.
+    const result = await validateCodingPlanApiKey(plan, apiKey);
     if (!result) {
       return { success: false, error: 'Validation was skipped' };
     }
@@ -1034,6 +1056,11 @@ export class PreferencesService extends DisposableService {
         op: 'replace',
         path: ['providerConfigs', plan.provider, 'mode'],
         value: 'official',
+      },
+      {
+        op: 'replace',
+        path: ['providerConfigs', plan.provider, 'connectedCodingPlanId'],
+        value: plan.id,
       },
     ];
     await this.update(patches);

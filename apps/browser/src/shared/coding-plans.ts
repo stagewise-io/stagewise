@@ -1,22 +1,19 @@
+import { codingPlanIds, type CodingPlanId } from './coding-plan-ids';
 import type { ModelProvider } from './karton-contracts/ui/shared-types';
+
+export type { CodingPlanId } from './coding-plan-ids';
 
 /**
  * Tier-A "bring your own subscription" coding plans.
  *
- * Each plan maps to a built-in provider. Connecting a plan means:
- *   1. validate the user-supplied API key against the provider,
- *   2. encrypt+store it in providerConfigs[provider].encryptedApiKey,
- *   3. set providerConfigs[provider].mode = 'official'.
+ * Each plan maps to a built-in provider. Plans may also define dedicated
+ * runtime/validation endpoints when their subscription tokens do not work
+ * against the provider's normal official API endpoint.
  *
- * Disconnecting reuses the existing `clearProviderApiKey` procedure
- * and sets `mode` back to `'stagewise'` via `updatePreferences`.
+ * Connecting a plan validates the user-supplied API key, encrypts+stores it in
+ * providerConfigs[provider].encryptedApiKey, sets mode to 'official', and
+ * records providerConfigs[provider].connectedCodingPlanId for routing.
  */
-export type CodingPlanId =
-  | 'glm-coding-plan'
-  | 'kimi-plan'
-  | 'qwen-plan'
-  | 'minimax-plan';
-
 export type CodingPlan = {
   id: CodingPlanId;
   /** Built-in provider this plan maps to. One plan = one provider. */
@@ -31,6 +28,14 @@ export type CodingPlan = {
   helpText: string;
   /** Optional regex the UI uses for clipboard auto-detection. */
   apiKeyPattern?: string;
+  /** Dedicated runtime base URL for subscription-plan tokens. */
+  baseUrl?: string;
+  /** Dedicated validation base URL. Defaults to `baseUrl` when omitted. */
+  validationBaseUrl?: string;
+  /** Provider-native model ID to use for validation. */
+  validationModelId?: string;
+  /** Additional endpoint note rendered in plan UI. */
+  endpointHelpText?: string;
   /** Featured model IDs (must exist in availableModels) — for card copy. */
   featuredModelIds: string[];
 };
@@ -45,6 +50,11 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     apiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
     helpText: 'Create one at z.ai → Manage API keys',
     apiKeyPattern: '^[0-9a-f]{32}\\.[A-Za-z0-9]+$',
+    baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+    validationBaseUrl: 'https://api.z.ai/api/coding/paas/v4',
+    validationModelId: 'glm-5.2',
+    endpointHelpText:
+      'GLM Coding Plan keys are routed through https://api.z.ai/api/coding/paas/v4.',
     featuredModelIds: ['glm-5.2', 'glm-5.1', 'glm-5v-turbo'],
   },
   'kimi-plan': {
@@ -82,6 +92,8 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
   },
 };
 
+const codingPlanIdSet = new Set<string>(codingPlanIds);
+
 export function isCodingPlanId(value: string): value is CodingPlanId {
-  return Object.hasOwn(CODING_PLANS, value);
+  return codingPlanIdSet.has(value);
 }

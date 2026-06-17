@@ -34,7 +34,11 @@ import {
   type ModelThinkingDisplayState,
 } from '@ui/utils/model-thinking';
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
-import { CODING_PLANS, type CodingPlan } from '@shared/coding-plans';
+import {
+  CODING_PLANS,
+  type CodingPlan,
+  type CodingPlanId,
+} from '@shared/coding-plans';
 import { CodingPlanCard } from '@ui/components/coding-plan-card';
 import {
   useEffect,
@@ -152,6 +156,13 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
     null | { success: true } | { success: false; error: string }
   >(null);
   const hasKey = !!config.encryptedApiKey;
+  const connectedCodingPlan = config.connectedCodingPlanId
+    ? CODING_PLANS[config.connectedCodingPlanId as CodingPlanId]
+    : undefined;
+  const hasActiveCodingPlanConnection =
+    config.mode === 'official' &&
+    hasKey &&
+    connectedCodingPlan?.provider === provider;
 
   useEffect(() => {
     if (validated?.success) {
@@ -238,6 +249,12 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
         </p>
       </div>
 
+      {hasActiveCodingPlanConnection && (
+        <p className="rounded-md border border-derived bg-surface-1 px-2 py-1.5 text-muted-foreground text-xs">
+          Connected via {connectedCodingPlan.displayName}.
+        </p>
+      )}
+
       <RadioGroup value={config.mode} onValueChange={handleModeChange}>
         <RadioLabel>
           <Radio value="stagewise" />
@@ -263,7 +280,12 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
               Endpoint URL
             </p>
             <Input
-              value={officialUrl}
+              value={
+                connectedCodingPlan?.provider === provider &&
+                connectedCodingPlan.baseUrl
+                  ? connectedCodingPlan.baseUrl
+                  : officialUrl
+              }
               disabled
               size="sm"
               style={{ maxWidth: 'none' }}

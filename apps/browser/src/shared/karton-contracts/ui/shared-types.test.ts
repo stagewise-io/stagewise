@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { userPreferencesSchema } from './shared-types';
+import { providerConfigSchema, userPreferencesSchema } from './shared-types';
 
 describe('userPreferencesSchema sidebar defaults', () => {
   it('defaults sidebar preferences when sidebar is missing', () => {
@@ -74,6 +74,33 @@ describe('userPreferencesSchema sidebar defaults', () => {
       workspaceGroupOrder: ['repo:b', 'repo:a'],
       collapsedWorkspaceGroupKeys: ['repo:a', 'repo:a:root'],
     });
+  });
+});
+
+describe('providerConfigSchema connected coding plan defaults', () => {
+  it('preserves legacy provider configs without connected coding plan ids', () => {
+    const parsed = providerConfigSchema.parse({ mode: 'official' });
+
+    expect(parsed).toEqual({ mode: 'official' });
+  });
+
+  it('preserves valid connected coding plan ids', () => {
+    const parsed = providerConfigSchema.parse({
+      mode: 'official',
+      encryptedApiKey: 'encrypted-key',
+      connectedCodingPlanId: 'glm-coding-plan',
+    });
+
+    expect(parsed.connectedCodingPlanId).toBe('glm-coding-plan');
+  });
+
+  it('sanitizes invalid connected coding plan ids', () => {
+    const parsed = providerConfigSchema.parse({
+      mode: 'official',
+      connectedCodingPlanId: 'unknown-plan',
+    });
+
+    expect(parsed.connectedCodingPlanId).toBeUndefined();
   });
 });
 
