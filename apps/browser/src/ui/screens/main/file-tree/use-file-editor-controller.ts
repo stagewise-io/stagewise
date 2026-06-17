@@ -199,7 +199,14 @@ export function useFileEditorController(options: FileEditorControllerOptions) {
 
   const reload = useCallback(async () => {
     const baseline = await optionsRef.current.reload();
-    if (baseline) setBaseline(baseline.text, baseline.mtimeMs);
+    if (!baseline) {
+      // Reload failed (e.g. a transient fetch error). Keep the current edits,
+      // dirty/conflict flags and the unsaved-edits close prompt intact so the
+      // user's work isn't silently discarded — they can retry the reload.
+      window.setTimeout(refreshState, 0);
+      return;
+    }
+    setBaseline(baseline.text, baseline.mtimeMs);
     setExternalChange(false);
     setIsDirty(false);
     clearFileTabUnsavedEditEntry(optionsRef.current.tabId);

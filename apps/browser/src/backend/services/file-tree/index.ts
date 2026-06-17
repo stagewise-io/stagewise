@@ -389,6 +389,7 @@ export class FileTreeService extends DisposableService {
         readOnly: preview.readOnly,
         showDiff: options?.showDiff,
         diffStaged: options?.diffStaged,
+        diffOldPath: options?.diffOldPath,
       },
       agentInstanceId,
       options,

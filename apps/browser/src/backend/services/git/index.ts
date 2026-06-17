@@ -1303,22 +1303,25 @@ export class GitService extends DisposableService {
   }
 
   /**
-   * Fetch the committed (HEAD) content and the current working-tree content
-   * of a file that appears in the git diff. Used by the file-tree diff view
-   * to open a side-by-side Monaco diff editor.
+   * Fetch the original/modified content of a file that appears in the git
+   * diff. Used by the file-tree diff view to open a side-by-side Monaco diff
+   * editor.
    *
-   * The diff always compares `HEAD` against the file on disk — never the
-   * staged index snapshot — so the view reflects the file's latest state
-   * regardless of what is staged. The returned `mtimeMs` is the working-tree
-   * file's modification time, used as the save concurrency baseline.
+   * The comparison depends on `staged`:
+   * - `staged: true`  → HEAD (committed) vs. the staged index snapshot
+   *   (`git show :path`). The modified side is the index blob, which has no
+   *   working-tree file to save edits back to, so `mtimeMs` is `null` and the
+   *   caller keeps the view read-only.
+   * - `staged: false` → HEAD (committed) vs. the working-tree file on disk.
+   *   The modified side is the live file, so `mtimeMs` is its modification
+   *   time, used as the save concurrency baseline, and the view is editable.
    *
-   * The `staged` flag is accepted for call-site compatibility but does not
-   * affect which versions are compared.
+   * For renamed files the HEAD blob lives at the old path.
    */
   public async getFileDiffContent(
     workspacePath: string,
     filePath: string,
-    _staged: boolean,
+    staged: boolean,
     oldPath?: string,
   ): Promise<{
     original: string;
@@ -1328,9 +1331,26 @@ export class GitService extends DisposableService {
     const repositoryInfo = await this.getRepositoryInfo(workspacePath);
     if (!repositoryInfo) return null;
 
-    // HEAD (committed) vs. the working-tree file on disk. For renamed files
-    // the HEAD blob lives at the old path.
+    // For renamed files the HEAD blob lives at the old path.
     const headPath = oldPath ?? filePath;
+
+    if (staged) {
+      // HEAD vs. the staged index snapshot. `git show :path` reads the blob
+      // currently recorded in the index. There is no on-disk file backing the
+      // modified side, so report a null mtime baseline and let the UI treat
+      // the view as read-only.
+      const [headVersion, indexVersion] = await Promise.all([
+        this.runGitRaw(workspacePath, ['show', `HEAD:${headPath}`]),
+        this.runGitRaw(workspacePath, ['show', `:${filePath}`]),
+      ]);
+      return {
+        original: headVersion ?? '',
+        modified: indexVersion ?? '',
+        mtimeMs: null,
+      };
+    }
+
+    // HEAD (committed) vs. the working-tree file on disk (editable).
     const absPath = path.join(workspacePath, filePath);
     const [headVersion, diskVersion, stat] = await Promise.all([
       this.runGitRaw(workspacePath, ['show', `HEAD:${headPath}`]),

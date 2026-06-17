@@ -679,6 +679,12 @@ export type FileTabMetadata = {
    * working tree). Only meaningful when showDiff is true.
    */
   diffStaged?: boolean;
+  /**
+   * For renamed files, the pre-rename path where the committed (HEAD) blob
+   * lives. Used by the diff view to load the original side. Only meaningful
+   * when showDiff is true.
+   */
+  diffOldPath?: string;
 };
 
 export type TabLifecycle =
@@ -692,6 +698,8 @@ export type OpenFileTabOptions = {
   showDiff?: boolean;
   /** Staged (HEAD vs index) or unstaged (index vs working tree). */
   diffStaged?: boolean;
+  /** For renamed files, the pre-rename path of the committed (HEAD) blob. */
+  diffOldPath?: string;
 };
 
 export type FileTreeClipboardOperation = 'copy' | 'cut';
