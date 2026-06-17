@@ -1280,7 +1280,7 @@ function DiffEditorPreview({
       clearTimeout(safetyTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspacePath, tab.relativePath, tab.diffStaged]);
+  }, [workspacePath, tab.relativePath, tab.diffStaged, tab.diffOldPath]);
 
   // Live external-change detection. The file-tree watcher bumps the backing
   // directory's revision whenever its contents change on disk; on each bump we
@@ -1347,6 +1347,7 @@ function DiffEditorPreview({
     tab.workspaceKey,
     tab.relativePath,
     tab.diffStaged,
+    tab.diffOldPath,
     reconcileDisk,
   ]);
 

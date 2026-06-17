@@ -2,6 +2,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { cn } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
 import type { MountedWorkspaceGitDiffSummary } from '@shared/karton-contracts/ui';
+import { formatDiffCount } from './format-diff-count';
 
 type DiffRow = {
   path: string;
@@ -88,10 +89,14 @@ function DiffRowItem({
         </span>
         <span className="flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums">
           {row.added > 0 && (
-            <span className="text-success-foreground">+{row.added}</span>
+            <span className="text-success-foreground">
+              +{formatDiffCount(row.added)}
+            </span>
           )}
           {row.deleted > 0 && (
-            <span className="text-error-foreground">-{row.deleted}</span>
+            <span className="text-error-foreground">
+              -{formatDiffCount(row.deleted)}
+            </span>
           )}
         </span>
       </button>

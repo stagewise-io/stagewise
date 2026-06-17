@@ -25,6 +25,7 @@ import { useCommandCenter } from '../command-center';
 import { FileTreePreviewCoordinator } from './file-tree-preview-coordinator';
 import { FileTreeWorkspaceView } from './file-tree-workspace-view';
 import { FileTreeDiffView } from './file-tree-diff-view';
+import { formatDiffCount } from './format-diff-count';
 import {
   areFileTreeWorkspaceMountsEqual,
   getFileTreeWorkspaceKey,
@@ -308,10 +309,10 @@ export function FileTreeSidebar() {
                     {(diffTotals.added > 0 || diffTotals.deleted > 0) && (
                       <span className="flex flex-col font-mono text-[0.5rem] tabular-nums leading-none">
                         <span className="text-success-foreground">
-                          +{diffTotals.added}
+                          +{formatDiffCount(diffTotals.added)}
                         </span>
                         <span className="text-error-foreground">
-                          -{diffTotals.deleted}
+                          -{formatDiffCount(diffTotals.deleted)}
                         </span>
                       </span>
                     )}
