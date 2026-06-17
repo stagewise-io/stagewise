@@ -317,12 +317,16 @@ export function PerTerminalContent({
         try {
           fitAddon.fit();
           sendResize(true);
-          if (isActiveRef.current) {
-            if (terminalFocusRequestIdRef.current !== undefined) {
-              focusTerminalIfReady();
-            } else {
-              term.focus();
-            }
+          // Only claim keyboard focus on an explicit focus request
+          // (hotkey/command center). Becoming active merely because the
+          // user switched agents/tabs must NOT steal focus — the chat
+          // input owns focus on agent switch. The user can click the
+          // terminal to focus it (handled by xterm + onPointerDown).
+          if (
+            isActiveRef.current &&
+            terminalFocusRequestIdRef.current !== undefined
+          ) {
+            focusTerminalIfReady();
           }
         } catch {
           // May fail during layout transitions.
@@ -385,6 +389,12 @@ export function PerTerminalContent({
   }, [outputBuffer, baseOffset, endOffset]);
 
   // Re-fit when terminal zoom or active state changes.
+  //
+  // Deliberately does NOT call term.focus(). Re-fitting on activation or
+  // zoom must not grab keyboard focus, otherwise it competes with the chat
+  // input on agent switch and refocuses the terminal on every zoom change.
+  // Explicit focus requests are handled by the terminalFocusRequestId
+  // effect above; user clicks are handled by xterm itself.
   useEffect(() => {
     if (!isActive) return;
     const term = terminalRef.current;
@@ -399,7 +409,6 @@ export function PerTerminalContent({
         try {
           fit.fit();
           sendResize(true);
-          term.focus();
         } catch {
           // ignore
         }

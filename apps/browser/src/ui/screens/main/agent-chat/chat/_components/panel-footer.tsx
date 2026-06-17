@@ -232,6 +232,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const setChatInputState = useKartonProcedure(
     (p) => p.agents.updateInputState,
   );
+  const togglePanelKeyboardFocus = useKartonProcedure(
+    (p) => p.browser.layout.togglePanelKeyboardFocus,
+  );
 
   const [localInputState, setLocalInputState] = useState<Content | null>(() => {
     const initial = chatInputStateRef.current;
@@ -283,18 +286,51 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   const { activeEditMessageId, setMainDropHandler } = useMessageEditState();
 
-  // Focus input and recalculate send-button state when agent changes.
-  // ChatInput has key={openAgent} so it fully re-mounts on switch —
-  // the initial render with restored content doesn't fire onChange,
-  // leaving canSendMessage stale.  Recalculate after the new mount.
+  // Mirror the panel-focus procedure into a ref so the agent-switch effect
+  // below can call it without listing it as a dependency. The procedure
+  // comes from useKartonProcedure with an inline selector, so its identity
+  // is not stable across renders. Depending on it directly would make the
+  // effect run on every render and continuously reclaim UI keyboard focus,
+  // locking focus onto the chat input and making nothing else interactive.
+  const togglePanelKeyboardFocusRef = useRef(togglePanelKeyboardFocus);
+  togglePanelKeyboardFocusRef.current = togglePanelKeyboardFocus;
+
+  // Focus the chat input whenever the active agent changes, regardless of
+  // whether a browser tab or terminal is currently showing.
+  //
+  // ChatInput has key={openAgent} so it fully re-mounts on switch — the
+  // initial render with restored content doesn't fire onChange, leaving
+  // canSendMessage stale. Recalculate after the new mount.
+  //
+  // Browser-tab case: the active tab's webContents holds native OS keyboard
+  // focus, so a bare DOM .focus() on the chat input would not receive
+  // keystrokes (document.hasFocus() === false — typing goes to the page).
+  // togglePanelKeyboardFocus('stagewise-ui') reclaims native focus to the UI
+  // view first. On macOS/Linux this does NOT change z-order (see
+  // focus-handling.md, Invariant #2), so the web content stays
+  // mouse-interactive. The terminal case is handled separately by gating the
+  // terminal's own auto-focus (see per-terminal-content.tsx).
+  //
+  // Runs exactly once per agent switch (deps: [openAgent] only).
   useEffect(() => {
-    if (openAgent)
-      requestAnimationFrame(() => {
-        chatInputRef.current?.focus();
-        const textLength =
-          chatInputRef.current?.getTextContent()?.trim().length ?? 0;
-        setCanSendMessage(textLength > 0);
-      });
+    if (!openAgent) return;
+    let cancelled = false;
+    const frame = requestAnimationFrame(async () => {
+      try {
+        await togglePanelKeyboardFocusRef.current('stagewise-ui');
+      } catch {
+        // Still focus the chat input if the panel-focus handoff fails.
+      }
+      if (cancelled) return;
+      chatInputRef.current?.focus();
+      const textLength =
+        chatInputRef.current?.getTextContent()?.trim().length ?? 0;
+      setCanSendMessage(textLength > 0);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [openAgent]);
 
   const activeTabUrl = useKartonState((s) => {
@@ -332,9 +368,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [selectionModeActive, activeEditMessageId]);
 
   // Karton procedures
-  const togglePanelKeyboardFocus = useKartonProcedure(
-    (p) => p.browser.layout.togglePanelKeyboardFocus,
-  );
   const sendUserMessage = useKartonProcedure((p) => p.agents.sendUserMessage);
   const stopAgent = useKartonProcedure((p) => p.agents.stop);
   const createWorkspaceGitWorktree = useKartonProcedure(
