@@ -179,13 +179,15 @@ export function FileTreeSidebar() {
   );
 
   const handleDiffOpenFile = useCallback(
-    (path: string, staged: boolean) => {
+    (path: string, staged: boolean, oldPath?: string) => {
       if (!selectedWorkspaceKey) return;
       // Open the file as a diff tab — the content will be fetched inside
-      // the DiffEditorPreview component.
+      // the DiffEditorPreview component. `oldPath` is threaded through for
+      // renamed files so the original (HEAD) side can be located.
       void openFileTab(selectedWorkspaceKey, path, openAgent, {
         showDiff: true,
         diffStaged: staged,
+        diffOldPath: oldPath,
       });
     },
     [openFileTab, selectedWorkspaceKey, openAgent],

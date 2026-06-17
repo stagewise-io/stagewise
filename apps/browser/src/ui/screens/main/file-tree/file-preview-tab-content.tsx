@@ -204,6 +204,11 @@ const SOURCE_LANGUAGE_ITEMS: Array<{
 const previewCache = new Map<string, CachedPreview>();
 const previewRequests = new Map<string, Promise<FilePreviewResult | null>>();
 const textDraftCache = new Map<string, string>();
+// Unsaved modified-side edits for diff tabs, keyed by tab id (stable across
+// unmount/remount within a session). Lets the editable diff editor restore a
+// user's in-progress edits when its tab is hidden and shown again, mirroring
+// the plain editor's `textDraftCache`.
+const diffDraftCache = new Map<string, string>();
 function getPreviewCacheKey(workspaceKey: string, relativePath: string) {
   return `${workspaceKey}:${relativePath}`;
 }
@@ -1064,6 +1069,11 @@ function DiffEditorPreview({
     return stored === 'inline' || stored === 'split' ? stored : 'inline';
   });
   const [diffContent, setDiffContent] = useState<FileDiffContent | null>(null);
+  // The value rendered into the editable (modified/right) pane. Held separately
+  // from `diffContent.modified` (the on-disk baseline) so it can be seeded from
+  // `diffDraftCache` on mount and only reset on an explicit reload/adopt — never
+  // mid-edit — which would otherwise clobber the model's content + undo stack.
+  const [modifiedValue, setModifiedValue] = useState<string | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const language = languageFromPath(tab.relativePath);
@@ -1125,6 +1135,10 @@ function DiffEditorPreview({
           setDiffError('Unable to load diff content.');
           return null;
         }
+        // Explicit reload discards any in-progress draft and loads the fresh
+        // on-disk content into the modified pane.
+        diffDraftCache.delete(tabId);
+        setModifiedValue(content.modified);
         return { text: content.modified, mtimeMs: content.mtimeMs };
       } catch (err) {
         setDiffError(
@@ -1138,6 +1152,12 @@ function DiffEditorPreview({
     unsavedTitle: tab.relativePath.split('/').pop() || tab.relativePath,
     onSaved: (result) => {
       diskMtimeRef.current = result?.mtimeMs ?? null;
+      // Saved content now matches disk; drop the draft so a later remount
+      // reloads the clean on-disk version.
+      diffDraftCache.delete(tabId);
+    },
+    onDiscard: () => {
+      diffDraftCache.delete(tabId);
     },
     onSaveError: (err) => {
       setDiffError(err instanceof Error ? err.message : 'Failed to save');
@@ -1173,6 +1193,9 @@ function DiffEditorPreview({
       const modified = editor.getModifiedEditor();
       modified.onDidFocusEditorWidget(markFocused);
       modified.onDidChangeModelContent(() => {
+        // Persist the in-progress edit so it survives an unmount/remount of
+        // this tab (mirrors the plain editor's `textDraftCache`).
+        diffDraftCache.set(tabId, modified.getValue());
         notifyContentChanged();
       });
       refreshState();
@@ -1204,6 +1227,11 @@ function DiffEditorPreview({
           content?.modified ?? '',
           content?.mtimeMs ?? null,
         );
+        // Seed the modified pane from any cached draft (in-progress edits from
+        // a prior mount of this tab) falling back to the on-disk content. The
+        // baseline stays the on-disk content above, so a restored draft is
+        // correctly reported as dirty.
+        setModifiedValue(diffDraftCache.get(tabId) ?? content?.modified ?? '');
         if (!content) setDiffError('Unable to load diff content.');
       })
       .catch((err) => {
@@ -1268,7 +1296,13 @@ function DiffEditorPreview({
       if (cancelled || !content) return;
       diskMtimeRef.current = content.mtimeMs ?? stat.mtimeMs;
       const outcome = reconcileDisk(content.modified, content.mtimeMs);
-      if (outcome === 'adopted') setDiffContent(content);
+      // 'adopted' means the user had no local edits, so the fresh on-disk
+      // content can replace both the baseline and the visible modified pane.
+      if (outcome === 'adopted') {
+        setDiffContent(content);
+        diffDraftCache.delete(tabId);
+        setModifiedValue(content.modified);
+      }
     })();
     return () => {
       cancelled = true;
@@ -1351,7 +1385,7 @@ function DiffEditorPreview({
             width="100%"
             language={language === 'plaintext' ? undefined : language}
             original={diffContent.original}
-            modified={diffContent.modified}
+            modified={modifiedValue ?? diffContent.modified}
             theme={MONACO_THEME_NAME}
             beforeMount={configureMonacoTheme}
             onMount={handleDiffMount}

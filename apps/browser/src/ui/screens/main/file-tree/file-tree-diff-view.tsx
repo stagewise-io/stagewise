@@ -110,13 +110,15 @@ export function FileTreeDiffView({
   data: MountedWorkspaceGitDiffSummary | null;
   loading: boolean;
   shownRelativePath: string | null;
-  onOpenFile: (path: string, staged: boolean) => void;
+  onOpenFile: (path: string, staged: boolean, oldPath?: string) => void;
 }) {
   const rows: DiffRow[] = data?.entries ?? [];
 
   function handleRowClick(row: DiffRow) {
     if (!workspaceKey || row.changeType === 'deleted') return;
-    onOpenFile(row.path, row.staged);
+    // Renamed files keep their committed (HEAD) blob at the old path, so the
+    // diff view needs it to load the original side.
+    onOpenFile(row.path, row.staged, row.oldPath);
   }
 
   if (loading) {

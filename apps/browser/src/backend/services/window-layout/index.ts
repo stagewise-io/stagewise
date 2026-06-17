@@ -76,6 +76,7 @@ const fileTabMetadataSchema = z.object({
   readOnly: z.boolean().optional(),
   showDiff: z.boolean().optional(),
   diffStaged: z.boolean().optional(),
+  diffOldPath: z.string().optional(),
 });
 
 const tabEntrySchema = z.discriminatedUnion('type', [

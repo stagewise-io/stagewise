@@ -699,12 +699,47 @@ export class MountManagerService extends DisposableService {
     oldPath?: string,
   ) {
     if (!(await this.isTrustedGitPath(workspacePath))) return null;
-    return this.gitService.getFileDiffContent(
+
+    // `filePath`/`oldPath` arrive from the renderer and are interpolated into
+    // `fs.readFile`/`git show` against the workspace root. Reject anything
+    // that resolves outside the workspace (e.g. `../../etc/passwd`) and pass
+    // the normalized, workspace-relative paths downstream.
+    const sanitizedFilePath = this.sanitizeWorkspaceRelativePath(
       workspacePath,
       filePath,
-      staged,
-      oldPath,
     );
+    if (sanitizedFilePath === null) return null;
+    let sanitizedOldPath: string | undefined;
+    if (oldPath !== undefined) {
+      const sanitized = this.sanitizeWorkspaceRelativePath(
+        workspacePath,
+        oldPath,
+      );
+      if (sanitized === null) return null;
+      sanitizedOldPath = sanitized;
+    }
+
+    return this.gitService.getFileDiffContent(
+      workspacePath,
+      sanitizedFilePath,
+      staged,
+      sanitizedOldPath,
+    );
+  }
+
+  /**
+   * Resolve a renderer-supplied relative path against the workspace root and
+   * return its normalized, workspace-relative form. Returns `null` when the
+   * input is absolute or escapes the workspace via `..` segments.
+   */
+  private sanitizeWorkspaceRelativePath(
+    workspacePath: string,
+    relativePath: string,
+  ): string | null {
+    if (path.isAbsolute(relativePath)) return null;
+    const resolved = path.resolve(workspacePath, relativePath);
+    if (!this.isPathInside(workspacePath, resolved)) return null;
+    return path.relative(workspacePath, resolved);
   }
 
   private async listGitBranchesByPath(workspacePath: string) {
