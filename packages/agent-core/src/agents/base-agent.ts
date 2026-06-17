@@ -32,6 +32,12 @@ import {
 } from '../host/models';
 import type { AgentCtor, AgentTypeRegistry } from './agents-registry';
 
+type ProviderApiError = {
+  message?: string;
+  statusCode?: number;
+  providerCode?: string;
+};
+
 /**
  * Helper type — extracts the `instanceConfig` field from an agent
  * constructor type registered in `AgentTypeMap`. Wrapped in tuple
@@ -1785,9 +1791,15 @@ export abstract class BaseAgent<
             exceeded_window_count: sortedWindows.length,
           });
         }
-        const parsedOverloadBase = parsedPlanLimit
-          ? null
-          : this.parseUpstreamOverloadError(error);
+        const parsedProviderError = this.parseProviderError(error);
+        const parsedOverloadBase =
+          parsedPlanLimit ||
+          this.isZaiBillingOrQuotaError(
+            parsedProviderError,
+            modelWithOptions.reasoningSignatureSource,
+          )
+            ? null
+            : this.parseUpstreamOverloadError(error);
         const parsedOverload: Extract<
           AgentRuntimeError,
           { kind: 'upstream-overload' }
@@ -1810,7 +1822,7 @@ export abstract class BaseAgent<
         this.state.commands.recordStepError({
           error: parsedPlanLimit ??
             parsedOverload ?? {
-              message: `LLM provider error: ${error.message}`,
+              message: `LLM provider error: ${parsedProviderError?.message ?? error.message}`,
               stack: error.stack,
             },
           markUnread: 'mark-unread',
@@ -3059,11 +3071,65 @@ export abstract class BaseAgent<
     }
   }
 
+  private parseProviderError(error: Error): ProviderApiError | null {
+    const frame = BaseAgent.unwrapApiErrorFrame(error);
+    const statusCode =
+      typeof frame.statusCode === 'number' ? frame.statusCode : undefined;
+
+    let body: Record<string, unknown> | null = null;
+    if (typeof frame.responseBody === 'string') {
+      try {
+        body = JSON.parse(frame.responseBody);
+      } catch {
+        body = null;
+      }
+    }
+
+    const errInBody = (body?.error ?? undefined) as
+      | Record<string, unknown>
+      | undefined;
+    const message =
+      typeof errInBody?.message === 'string'
+        ? (errInBody.message as string)
+        : undefined;
+    const rawCode = errInBody?.code;
+    const providerCode =
+      typeof rawCode === 'string'
+        ? rawCode
+        : typeof rawCode === 'number'
+          ? String(rawCode)
+          : undefined;
+
+    if (!message && statusCode === undefined && !providerCode) return null;
+    return { message, statusCode, providerCode };
+  }
+
+  private isZaiBillingOrQuotaError(
+    providerError: ProviderApiError | null,
+    reasoningSignatureSource?: ReasoningSignatureSource,
+  ): boolean {
+    if (reasoningSignatureSource?.provider !== 'z-ai') return false;
+
+    const message = providerError?.message?.toLowerCase() ?? '';
+    const code = providerError?.providerCode;
+
+    // Keep Z.ai billing/resource-package failures generic so the UI shows
+    // the actionable upstream message instead of "temporarily unavailable".
+    return (
+      // Z.ai: { error: { code: '1113', message: 'Insufficient balance...' } }
+      code === '1113' ||
+      message.includes('insufficient balance') ||
+      message.includes('no resource package') ||
+      message.includes('please recharge')
+    );
+  }
+
   /**
    * Detect upstream-overload errors (429 rate-limits, 502/503 provider-down,
-   * Anthropic `overloaded_error`). Permissive on purpose: any HTTP status in
-   * {429, 502, 503, 529} or a body with matching shape is treated as
-   * temporary unavailability. See docs:
+   * Anthropic `overloaded_error`). 429 is ambiguous, so provider billing or
+   * quota failures are intentionally left as generic provider errors to show
+   * the actionable upstream message instead of "temporarily unavailable".
+   * See docs:
    * https://openrouter.ai/docs/api/reference/errors-and-debugging.mdx
    */
   private parseUpstreamOverloadError(error: Error): AgentRuntimeError | null {
