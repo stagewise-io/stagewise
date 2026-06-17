@@ -19,6 +19,7 @@ import {
   getFileTreeWorkspaceKey,
   getFileTreeWorkspaceMountsForAgent,
 } from './file-tree-utils';
+import { formatDiffCount } from './format-diff-count';
 
 // Cache diff totals per workspace across mount/unmount cycles to
 // prevent flicker when the toggle button moves between containers.
@@ -111,31 +112,34 @@ export function FileTreeToggleButton() {
   const showDiff = !visible && (diffTotals.added > 0 || diffTotals.deleted > 0);
 
   return (
-    <div className="flex items-center">
-      <Tooltip>
-        <TooltipTrigger>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={label}
-            onClick={() => setVisible(!visible)}
-          >
-            <Icon className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <span className="flex items-center gap-1.5">
-            <span>{label}</span>
-            <HotkeyCombo action={HotkeyActions.TOGGLE_FILE_TREE} size="xs" />
-          </span>
-        </TooltipContent>
-      </Tooltip>
-      {showDiff && (
-        <span className="flex min-w-0 shrink-0 flex-col font-mono text-[0.5rem] text-muted-foreground tabular-nums leading-none">
-          <span className="text-success-foreground">+{diffTotals.added}</span>
-          <span className="text-error-foreground">-{diffTotals.deleted}</span>
+    <Tooltip>
+      <TooltipTrigger>
+        <Button
+          variant="ghost"
+          size={showDiff ? 'sm' : 'icon-sm'}
+          aria-label={label}
+          onClick={() => setVisible(!visible)}
+          className={showDiff ? 'gap-1 rounded-full px-2' : undefined}
+        >
+          <Icon className="size-4 shrink-0" />
+          {showDiff && (
+            <span className="flex min-w-0 shrink-0 flex-col font-mono text-[0.5rem] tabular-nums leading-none">
+              <span className="text-success-foreground">
+                +{formatDiffCount(diffTotals.added)}
+              </span>
+              <span className="text-error-foreground">
+                -{formatDiffCount(diffTotals.deleted)}
+              </span>
+            </span>
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <span className="flex items-center gap-1.5">
+          <span>{label}</span>
+          <HotkeyCombo action={HotkeyActions.TOGGLE_FILE_TREE} size="xs" />
         </span>
-      )}
-    </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }

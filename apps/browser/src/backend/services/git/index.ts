@@ -1195,6 +1195,14 @@ export class GitService extends DisposableService {
     try {
       const buf = await fs.readFile(absPath);
       if (buf.length === 0) return 0;
+      // Skip binary files. Git's numstat reports binaries as `-/-` (uncounted)
+      // rather than counting newline bytes, so an untracked image/font/build
+      // artifact must not be reported as thousands of "added" lines. Mirror
+      // git's heuristic: a NUL byte within the first 8000 bytes means binary.
+      const sniffLen = Math.min(buf.length, 8000);
+      for (let i = 0; i < sniffLen; i++) {
+        if (buf[i] === 0x00) return 0;
+      }
       // Count \n bytes.
       let count = 0;
       for (const byte of buf) {

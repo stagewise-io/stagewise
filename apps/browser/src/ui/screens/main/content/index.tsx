@@ -735,7 +735,7 @@ export function MainSection({
             }}
             ref={tabBarScrollRef}
             style={maskStyle}
-            className="min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="w-auto min-w-0 max-w-full shrink items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {/* Global (pinned) tabs — shrinks independently, inner scroll handles overflow */}
             {globalTabItems.length > 0 && (
@@ -762,6 +762,10 @@ export function MainSection({
               />
             )}
           </SortableTabs>
+          {/* New-tab buttons hug the right edge of the tab list: they stay
+              outside the scrollable section and follow the list's end until
+              the flexible spacer collapses, at which point they sit next to
+              the fixed close/expand controls and the list scrolls instead. */}
           <div className="app-no-drag flex shrink-0 items-center gap-0.5">
             <NewTabButtons
               buttonClassName="size-7"
@@ -770,6 +774,9 @@ export function MainSection({
                 void createTerminal(undefined, openAgent)
               }
             />
+          </div>
+          <div className="min-w-0 flex-1" />
+          <div className="app-no-drag flex shrink-0 items-center gap-0.5">
             {topRightActions}
           </div>
         </div>
