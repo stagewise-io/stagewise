@@ -704,14 +704,14 @@ export class MountManagerService extends DisposableService {
     // `fs.readFile`/`git show` against the workspace root. Reject anything
     // that resolves outside the workspace (e.g. `../../etc/passwd`) and pass
     // the normalized, workspace-relative paths downstream.
-    const sanitizedFilePath = this.sanitizeWorkspaceRelativePath(
+    const sanitizedFilePath = await this.sanitizeWorkspaceRelativePath(
       workspacePath,
       filePath,
     );
     if (sanitizedFilePath === null) return null;
     let sanitizedOldPath: string | undefined;
     if (oldPath !== undefined) {
-      const sanitized = this.sanitizeWorkspaceRelativePath(
+      const sanitized = await this.sanitizeWorkspaceRelativePath(
         workspacePath,
         oldPath,
       );
@@ -729,17 +729,40 @@ export class MountManagerService extends DisposableService {
 
   /**
    * Resolve a renderer-supplied relative path against the workspace root and
-   * return its normalized, workspace-relative form. Returns `null` when the
-   * input is absolute or escapes the workspace via `..` segments.
+   * return its normalized, workspace-relative form using POSIX separators.
+   * Returns `null` when the input is absolute, escapes the workspace via `..`
+   * segments, or resolves (through symlinks) to a target outside the
+   * workspace.
    */
-  private sanitizeWorkspaceRelativePath(
+  private async sanitizeWorkspaceRelativePath(
     workspacePath: string,
     relativePath: string,
-  ): string | null {
+  ): Promise<string | null> {
     if (path.isAbsolute(relativePath)) return null;
     const resolved = path.resolve(workspacePath, relativePath);
+    // Lexical containment first: reject `..` escapes before touching the FS.
     if (!this.isPathInside(workspacePath, resolved)) return null;
-    return path.relative(workspacePath, resolved);
+    // Symlink containment: a workspace-internal path can still be (or live
+    // under) a symlink that points outside the workspace, which a purely
+    // lexical check would let through. Resolve real paths and re-verify
+    // containment. When the target does not exist yet, realpath returns null
+    // — fall back to the lexical result, since a missing file cannot leak
+    // data (the downstream read simply yields nothing).
+    const [realWorkspace, realResolved] = await Promise.all([
+      safeRealpath(workspacePath),
+      safeRealpath(resolved),
+    ]);
+    if (
+      realWorkspace &&
+      realResolved &&
+      !this.isPathInside(realWorkspace, realResolved)
+    ) {
+      return null;
+    }
+    // git's `show HEAD:<path>` / `show :<path>` and the downstream blob
+    // lookups expect POSIX separators; `path.relative` yields backslashes on
+    // Windows, which would break nested-file lookups. Normalize to `/`.
+    return path.relative(workspacePath, resolved).split(path.sep).join('/');
   }
 
   private async listGitBranchesByPath(workspacePath: string) {

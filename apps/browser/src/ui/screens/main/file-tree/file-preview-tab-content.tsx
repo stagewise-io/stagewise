@@ -1084,13 +1084,27 @@ function DiffEditorPreview({
 
   // The diff always renders the committed (HEAD) version against the current
   // working-tree file, so the modified/right side is the live file on disk
-  // and is editable unless the tab is explicitly read-only.
-  const editable = !(tab.readOnly ?? false);
+  // and is editable unless the tab is explicitly read-only. Staged diffs are
+  // the exception: they render the index snapshot (mtimeMs: null) with no
+  // editable on-disk backing, so saving could overwrite unrelated unstaged
+  // edits in the working tree — keep them read-only.
+  const editable = !(tab.readOnly ?? false) && !(tab.diffStaged ?? false);
 
   // Last on-disk mtime we have reconciled to. Lets the live-detection effect
   // skip a git-diff fetch when an unrelated change bumps the directory
   // revision, and avoids treating our own writes as external edits.
   const diskMtimeRef = useRef<number | null>(null);
+
+  // In-progress modified-side edits are cached by file identity — workspace +
+  // path + staged flag — not by tab id. A tab id can be reused for a different
+  // file or diff mode, and keying drafts by it would restore the wrong content
+  // into the editable pane. A ref keeps the key current for the mount-time
+  // content listener without forcing it to re-register on every render.
+  const diffDraftKey = `${tab.workspaceKey}:${tab.relativePath}:${
+    tab.diffStaged ? 'staged' : 'working'
+  }`;
+  const diffDraftKeyRef = useRef(diffDraftKey);
+  diffDraftKeyRef.current = diffDraftKey;
 
   const persistMode = useCallback(
     (next: DiffMode) => {
@@ -1128,6 +1142,7 @@ function DiffEditorPreview({
           workspacePath,
           tab.relativePath,
           tab.diffStaged ?? false,
+          tab.diffOldPath,
         );
         setDiffContent(content);
         diskMtimeRef.current = content?.mtimeMs ?? null;
@@ -1137,7 +1152,7 @@ function DiffEditorPreview({
         }
         // Explicit reload discards any in-progress draft and loads the fresh
         // on-disk content into the modified pane.
-        diffDraftCache.delete(tabId);
+        diffDraftCache.delete(diffDraftKeyRef.current);
         setModifiedValue(content.modified);
         return { text: content.modified, mtimeMs: content.mtimeMs };
       } catch (err) {
@@ -1154,10 +1169,10 @@ function DiffEditorPreview({
       diskMtimeRef.current = result?.mtimeMs ?? null;
       // Saved content now matches disk; drop the draft so a later remount
       // reloads the clean on-disk version.
-      diffDraftCache.delete(tabId);
+      diffDraftCache.delete(diffDraftKeyRef.current);
     },
     onDiscard: () => {
-      diffDraftCache.delete(tabId);
+      diffDraftCache.delete(diffDraftKeyRef.current);
     },
     onSaveError: (err) => {
       setDiffError(err instanceof Error ? err.message : 'Failed to save');
@@ -1173,8 +1188,11 @@ function DiffEditorPreview({
   // built-in automaticLayout does not reliably recover, so we force a
   // layout on mount and observe the container for size changes.
   const handleDiffMount = useCallback(
-    (editor: Monaco.editor.IStandaloneDiffEditor) => {
+    (editor: Monaco.editor.IStandaloneDiffEditor, monaco: MonacoApi) => {
       diffEditorRef.current = editor;
+      // Keep diff tabs on the live OS color scheme, matching the plain editor
+      // mount; otherwise a theme flip leaves the diff on a stale Monaco theme.
+      registerMonacoThemeSync(monaco);
       const container = editor.getContainerDomNode();
       const relayout = () => editor.layout();
       // Force an initial layout once the browser has painted the container.
@@ -1195,7 +1213,7 @@ function DiffEditorPreview({
       modified.onDidChangeModelContent(() => {
         // Persist the in-progress edit so it survives an unmount/remount of
         // this tab (mirrors the plain editor's `textDraftCache`).
-        diffDraftCache.set(tabId, modified.getValue());
+        diffDraftCache.set(diffDraftKeyRef.current, modified.getValue());
         notifyContentChanged();
       });
       refreshState();
@@ -1218,9 +1236,18 @@ function DiffEditorPreview({
     }, 15_000);
 
     getFileDiffContentRef
-      .current(workspacePath, tab.relativePath, tab.diffStaged ?? false)
+      .current(
+        workspacePath,
+        tab.relativePath,
+        tab.diffStaged ?? false,
+        tab.diffOldPath,
+      )
       .then((content) => {
         if (cancelled) return;
+        // A success that lands after the safety timeout already fired must
+        // clear the stale timeout error, otherwise the error pane stays up
+        // despite valid content now being available.
+        setDiffError(null);
         setDiffContent(content);
         diskMtimeRef.current = content?.mtimeMs ?? null;
         controller.setBaseline(
@@ -1231,7 +1258,11 @@ function DiffEditorPreview({
         // a prior mount of this tab) falling back to the on-disk content. The
         // baseline stays the on-disk content above, so a restored draft is
         // correctly reported as dirty.
-        setModifiedValue(diffDraftCache.get(tabId) ?? content?.modified ?? '');
+        setModifiedValue(
+          diffDraftCache.get(diffDraftKeyRef.current) ??
+            content?.modified ??
+            '',
+        );
         if (!content) setDiffError('Unable to load diff content.');
       })
       .catch((err) => {
@@ -1289,6 +1320,7 @@ function DiffEditorPreview({
           workspacePath,
           tab.relativePath,
           tab.diffStaged ?? false,
+          tab.diffOldPath,
         );
       } catch {
         return;
@@ -1300,7 +1332,7 @@ function DiffEditorPreview({
       // content can replace both the baseline and the visible modified pane.
       if (outcome === 'adopted') {
         setDiffContent(content);
-        diffDraftCache.delete(tabId);
+        diffDraftCache.delete(diffDraftKeyRef.current);
         setModifiedValue(content.modified);
       }
     })();
@@ -2699,6 +2731,11 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
   const [isRecreating, setIsRecreating] = useState(false);
   const workspaceKey = tab.file?.workspaceKey;
   const relativePath = tab.file?.relativePath;
+  // Git diff tabs render via DiffEditorPreview, which loads its own content.
+  // Skip the regular file-preview fetch/revalidate pipeline entirely so a
+  // diff tab doesn't trigger redundant getFilePreview calls on every watcher
+  // revision bump.
+  const isDiffTab = tab.file?.showDiff ?? false;
   const cacheKey =
     workspaceKey && relativePath
       ? getPreviewCacheKey(workspaceKey, relativePath)
@@ -2749,6 +2786,7 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
   // mount) and live external-edit detection (run on directory-revision bumps).
   // Read-only blobs (attachments) never change, so they are skipped entirely.
   const revalidate = useCallback(async () => {
+    if (isDiffTab) return;
     if (!workspaceKey || !relativePath || !cacheKey) return;
     const current = previewCache.get(cacheKey);
     // Nothing loaded yet — the initial-load effect owns the first fetch.
@@ -2792,9 +2830,17 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
     previewCache.set(cacheKey, { preview: result, error: nextError });
     setPreview(result);
     setError(nextError);
-  }, [workspaceKey, relativePath, cacheKey, getFileStat, getFilePreview]);
+  }, [
+    isDiffTab,
+    workspaceKey,
+    relativePath,
+    cacheKey,
+    getFileStat,
+    getFilePreview,
+  ]);
 
   useEffect(() => {
+    if (isDiffTab) return;
     if (!workspaceKey || !relativePath || !cacheKey) return;
     const cachedPreview = previewCache.get(cacheKey);
     if (cachedPreview) {
@@ -2843,7 +2889,7 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [workspaceKey, relativePath, cacheKey, getFilePreview]);
+  }, [isDiffTab, workspaceKey, relativePath, cacheKey, getFilePreview]);
 
   // Revalidate when the tab (re)mounts and whenever the backing directory
   // changes on disk. On mount this ensures a re-opened tab shows the latest
