@@ -1067,6 +1067,48 @@ export const availableModels = [
   },
   {
     officialProvider: 'z-ai',
+    modelId: 'glm-5.2',
+    modelDisplayName: 'GLM 5.2',
+    modelDescription:
+      "Z.ai's latest flagship with a 1M-token context window for large codebases, long-horizon coding, and agentic workflows.",
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'max' },
+        provider: { require_parameters: true },
+      },
+      openai: {
+        reasoningEffort: 'max',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.4,
+      outputPerMillion: 4.4,
+      relativeMultiplier: 0.97,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'z-ai',
     modelId: 'glm-5.1',
     modelDisplayName: 'GLM 5.1',
     modelDescription:

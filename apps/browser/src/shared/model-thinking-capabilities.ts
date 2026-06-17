@@ -67,6 +67,13 @@ const OPENAI_COMPATIBLE_OPTIONS = createOptions('openai-compatible', [
   ['high', 'High', true],
 ]);
 
+const OPENAI_COMPATIBLE_MAX_OPTIONS = createOptions('openai-compatible', [
+  ['low', 'Low', true],
+  ['medium', 'Medium', true],
+  ['high', 'High', true],
+  ['max', 'Max', true],
+]);
+
 const GOOGLE_FULL_OPTIONS = createOptions('google', [
   ['minimal', 'Minimal', true],
   ['low', 'Low', true],
@@ -186,7 +193,7 @@ export function getSupportedThinkingOptions(
         ? OPENAI_GPT_5_OPTIONS
         : OPENAI_CONSERVATIVE_OPTIONS;
     case 'openai-compatible':
-      return OPENAI_COMPATIBLE_OPTIONS;
+      return getOpenAiCompatibleOptions(modelId);
     case 'google':
       return getGoogleOptions(modelId);
     case 'anthropic':
@@ -367,6 +374,11 @@ function isMatchingOverrideProvider(
     overrideProvider === undefined ||
     (route?.providerMode === 'stagewise' && overrideProvider === 'stagewise')
   );
+}
+
+function getOpenAiCompatibleOptions(modelId: string): ThinkingOption[] {
+  if (modelId === 'glm-5.2') return OPENAI_COMPATIBLE_MAX_OPTIONS;
+  return OPENAI_COMPATIBLE_OPTIONS;
 }
 
 function getGoogleOptions(modelId: string): ThinkingOption[] {
