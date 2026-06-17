@@ -34,7 +34,7 @@ Bring Your Own Key for all popular model providers — you can also register com
 
 ### Easy Import — use your existing subscription
 
-Connect any of the following subscriptions with a single API key to unlock all models the provider offers directly inside stagewise:
+Connect any of the following subscriptions with a single API key to unlock all models the provider offers directly inside stagewise. GLM Coding Plan keys are routed through Z.ai's dedicated coding endpoint internally.
 
 | **Subscription** | **Provider** | **Featured Models** | **Dashboard** |
 | ---------------- | ------------ | ------------------- | ------------- |

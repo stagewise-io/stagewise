@@ -141,11 +141,14 @@ export function StepAuth({
 
   const hasConnectedCodingPlan = useMemo(() => {
     const cfgs = preferences.providerConfigs ?? {};
-    return Object.values(CODING_PLANS).some(
-      (plan) =>
-        cfgs[plan.provider]?.mode === 'official' &&
-        !!cfgs[plan.provider]?.encryptedApiKey,
-    );
+    return Object.values(CODING_PLANS).some((plan) => {
+      const cfg = cfgs[plan.provider];
+      return (
+        cfg?.mode === 'official' &&
+        !!cfg.encryptedApiKey &&
+        cfg.connectedCodingPlanId === plan.id
+      );
+    });
   }, [preferences.providerConfigs]);
 
   const isValid =
@@ -566,7 +569,9 @@ export function StepAuth({
                 mode: 'stagewise' as const,
               };
               const isConnected =
-                cfg.mode === 'official' && !!cfg.encryptedApiKey;
+                cfg.mode === 'official' &&
+                !!cfg.encryptedApiKey &&
+                cfg.connectedCodingPlanId === plan.id;
               return (
                 <CodingPlanGridCard
                   key={plan.id}

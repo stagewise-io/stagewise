@@ -1,6 +1,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
+import type { CodingPlan } from '@shared/coding-plans';
 import { generateText, type ModelMessage } from 'ai';
 
 export type ApiKeyProvider =
@@ -81,6 +82,34 @@ async function validateModel(model: ValidationModel): Promise<void> {
     model,
     messages: validationMessages,
   });
+}
+
+export async function validateCodingPlanApiKey(
+  plan: CodingPlan,
+  apiKey: string,
+): Promise<ApiKeyValidationResult> {
+  const validationBaseURL = plan.validationBaseUrl ?? plan.baseUrl;
+
+  if (validationBaseURL && plan.validationModelId) {
+    try {
+      await validateModel(
+        createOpenAI({
+          apiKey,
+          baseURL: validationBaseURL,
+        }).chat(plan.validationModelId),
+      );
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Invalid ${plan.displayName} key: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
+  const results = await validateApiKeys({ [plan.provider]: apiKey });
+  const result = results[plan.provider];
+  return result ?? { success: false, error: 'Validation was skipped' };
 }
 
 async function validateMiniMaxApiKey(

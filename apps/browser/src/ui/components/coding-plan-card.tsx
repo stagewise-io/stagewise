@@ -26,6 +26,7 @@ export type CodingPlanCardProps = {
   config: {
     mode: ProviderEndpointMode;
     encryptedApiKey?: string | null;
+    connectedCodingPlanId?: CodingPlanId | null;
   };
   /**
    * Validate + store + flip the provider to `official` mode. Callers are
@@ -73,7 +74,10 @@ export function CodingPlanCard({
   const inputId = `coding-plan-${plan.id}-api-key-${reactId}`;
   const errorId = `${inputId}-error`;
 
-  const isConnected = !!config.encryptedApiKey && config.mode === 'official';
+  const isConnected =
+    !!config.encryptedApiKey &&
+    config.mode === 'official' &&
+    config.connectedCodingPlanId === plan.id;
 
   const [localInput, setLocalInput] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -262,6 +266,11 @@ export function CodingPlanCard({
                   <TooltipContent>{plan.apiKeyUrl}</TooltipContent>
                 </Tooltip>
               </span>
+              {plan.endpointHelpText && (
+                <span className="block text-2xs text-subtle-foreground">
+                  {plan.endpointHelpText}
+                </span>
+              )}
             </p>
           )}
       </div>
