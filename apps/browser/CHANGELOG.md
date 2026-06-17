@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.9.0 (2026-06-17)
+
+### Features
+
+* add GLM 5.2 (febd80d)
+* add omnibox focus hotkey (eb02d55)
+* show diff line counts on collapsed file tree toggle (8badbef)
+* add hotkeys for Files/Diff file tree views (8c41768)
+* add tooltips to Files/Diff tab toggle buttons (37fdf82)
+* split diff entry into filename + directory path (6d77d67)
+* polish diff panel — active file highlight, tab control styling, label visibility (5faa664)
+* show accumulated diff totals in sidebar tab (b7db7a9)
+* add git diff panel to file tree sidebar (6d2c44d)
+* add Kimi K2.7 Code (560614f)
+* add content tab arrow shortcuts (9f11e7c)
+* add model thinking controls (ccad6bc)
+* prepare thinking overrides backend (f768384)
+* add telemetry events for theme, loudness, and sound pack changes (155002c)
+* add appearance preference (ae17273)
+* refine personalization theme badges (4ab7536)
+* refine personalization themes (3507c90)
+* add personalization themes (ca61ab6)
+
+### Bug Fixes
+
+* use GLM max effort gateway value (a2b7f25)
+* avoid selecting settings on empty model search (21e9f30)
+* copy file tree item paths (59c802d)
+* auto-highlight filtered model result (b42c957)
+* prevent tab bar action overlap (e45d921)
+* drop pruned worktrees and sort sidebar by real age (93bcc36)
+* ensure root worktree always stays first when new keys prepended (6270073)
+* preserve new worktree key order instead of reversing (c8bf61b)
+* new worktrees sort to top, cap visible at 5, preserve manual order (d5e6a6f)
+* update deleted entry when untracked file recreated at same path (d702246)
+* promote merged entry to deleted when either side is deleted (a9985cf)
+* use separate status maps for staged and unstaged git diff (223154e)
+* enable rename detection in git diff --numstat and --name-status (0d2c0c4)
+* unregister getWorkspaceDiffSummary handler on teardown (b587166)
+* use fallback workspace key for diff revision tracking in toggle button (2f2d7c5)
+* tighten tab bar height and align toggle buttons (e57ca85)
+* prevent flicker in file tree and diff view on re-fetch (099fa1b)
+* keep diff view and toggle button in sync with file changes (e91b261)
+* use captureDominantly=false for diff hotkey so find bar wins (4f1dede)
+* add null guard on selectedWorkspaceKey in handleDiffOpenFile (b92aa53)
+* align command center agent source with file tree sidebar (a7b216e)
+* persist tutorial progress on restart and fix missing sidebar-panel tutorial anchor (0ad01d5)
+* register missing UI telemetry event names (7b34ca3)
+* error handling and rollback for personalization theme persistence (10aa063)
+
+### Other Changes
+
+* alias GitDiffNumstat types to shared contract definitions (241305e)
+* extract shared workspace mounts comparator to file-tree-utils (49bc235)
+* increase spacing on dirPath, use subtle foreground, strip trailing slash (023d979)
+
 ## 1.8.0 (2026-06-12)
 
 ### Features
