@@ -72,6 +72,38 @@ describe('thinking override provider option resolution', () => {
     });
   });
 
+  it('uses stagewise-compatible xhigh for GLM 5.2 max reasoning', () => {
+    const service = createTestModelProviderService();
+
+    const result = service.getModelWithOptions(
+      'glm-5.2',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'xhigh' } },
+      openai: { reasoningEffort: 'xhigh' },
+    });
+  });
+
+  it('keeps stagewise-compatible xhigh when overriding GLM 5.2 effort', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: { 'glm-5.2': { value: 'low' } },
+    });
+
+    const result = service.getModelWithOptions(
+      'glm-5.2',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      stagewise: { reasoning: { enabled: true, effort: 'xhigh' } },
+      openai: { reasoningEffort: 'low' },
+    });
+  });
+
   it('does not apply overrides without agent-step request purpose', () => {
     const service = createTestModelProviderService({
       modelThinkingOverrides: { 'gpt-5.5': { value: 'high' } },

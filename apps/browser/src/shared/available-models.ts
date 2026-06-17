@@ -1076,11 +1076,15 @@ export const availableModels = [
     headers: {},
     providerOptions: {
       stagewise: {
-        reasoning: { enabled: true, effort: 'max' },
+        // Z.ai maps `xhigh` to GLM 5.2's native `max`; the stagewise
+        // gateway rejects literal `max` in `reasoning.effort`.
+        reasoning: { enabled: true, effort: 'xhigh' },
         provider: { require_parameters: true },
       },
       openai: {
-        reasoningEffort: 'max',
+        // Z.ai maps OpenAI-compatible `xhigh` to GLM 5.2's native `max`.
+        // The AI SDK Chat Completions provider rejects literal `max`.
+        reasoningEffort: 'xhigh',
       },
     },
     thinkingEnabled: true,
