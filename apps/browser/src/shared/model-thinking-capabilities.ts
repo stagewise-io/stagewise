@@ -71,7 +71,9 @@ const OPENAI_COMPATIBLE_MAX_OPTIONS = createOptions('openai-compatible', [
   ['low', 'Low', true],
   ['medium', 'Medium', true],
   ['high', 'High', true],
-  ['max', 'Max', true],
+  // Z.ai maps OpenAI-compatible `xhigh` to GLM 5.2's native `max`.
+  // The AI SDK Chat Completions validator rejects literal `max`.
+  ['xhigh', 'Max', true],
 ]);
 
 const GOOGLE_FULL_OPTIONS = createOptions('google', [

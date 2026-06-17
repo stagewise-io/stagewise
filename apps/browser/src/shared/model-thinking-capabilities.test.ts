@@ -65,8 +65,8 @@ const glm52Model: ThinkingCapableModel = {
   officialProvider: 'z-ai',
   thinkingEnabled: true,
   providerOptions: {
-    stagewise: { reasoning: { enabled: true, effort: 'max' } },
-    openai: { reasoningEffort: 'max' },
+    stagewise: { reasoning: { enabled: true, effort: 'xhigh' } },
+    openai: { reasoningEffort: 'xhigh' },
   },
 };
 
@@ -207,16 +207,36 @@ describe('model thinking capabilities', () => {
     ).toEqual(['low', 'medium', 'high']);
   });
 
-  it('exposes max reasoning for GLM 5.2 on OpenAI-compatible routes', () => {
-    expect(
-      getSupportedThinkingOptions(glm52Model, {
-        providerMode: 'official',
-        modelProvider: 'z-ai',
-      }).map((option) => option.value),
-    ).toEqual(['low', 'medium', 'high', 'max']);
+  it('exposes max-labeled xhigh reasoning for GLM 5.2 on OpenAI-compatible routes', () => {
+    const options = getSupportedThinkingOptions(glm52Model, {
+      providerMode: 'official',
+      modelProvider: 'z-ai',
+    });
+
+    expect(options.map((option) => option.value)).toEqual([
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+    ]);
+    expect(options.at(-1)).toMatchObject({ value: 'xhigh', label: 'Max' });
   });
 
-  it('emits OpenAI-compatible max reasoning for GLM 5.2', () => {
+  it('emits OpenAI-compatible xhigh for GLM 5.2 max reasoning', () => {
+    expect(
+      createThinkingProviderOptionsPatch({
+        model: glm52Model,
+        route: { providerMode: 'official', modelProvider: 'z-ai' },
+        override: {
+          enabled: true,
+          provider: 'openai-compatible',
+          value: 'xhigh',
+        },
+      }),
+    ).toEqual({ openai: { reasoningEffort: 'xhigh' } });
+  });
+
+  it('coerces legacy GLM 5.2 max overrides to OpenAI-compatible xhigh', () => {
     expect(
       createThinkingProviderOptionsPatch({
         model: glm52Model,
@@ -227,7 +247,7 @@ describe('model thinking capabilities', () => {
           value: 'max',
         },
       }),
-    ).toEqual({ openai: { reasoningEffort: 'max' } });
+    ).toEqual({ openai: { reasoningEffort: 'xhigh' } });
   });
 
   it('uses OpenAI-compatible values for custom chat completions endpoints', () => {
