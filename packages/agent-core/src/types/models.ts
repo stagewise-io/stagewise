@@ -67,7 +67,7 @@ export type ModelCapabilities = z.infer<typeof modelCapabilitiesSchema>;
 export type StagewiseProviderOptions = {
   reasoning?: {
     enabled: boolean;
-    effort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    effort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   };
   cache_control?: {
     type: 'ephemeral' | 'persistent';

@@ -121,6 +121,7 @@ const PROVIDERS: ProviderInfo[] = [
     monoInDark: true,
     description: 'Vision-capable agentic models for coding and browser tasks.',
     models: [
+      { name: 'GLM 5.2', tier: 'frontier' },
       { name: 'GLM 5.1', tier: 'frontier' },
       { name: 'GLM 5V-Turbo', tier: 'general' },
     ],

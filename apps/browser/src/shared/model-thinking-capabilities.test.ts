@@ -60,6 +60,16 @@ const anthropicConservativeModel: ThinkingCapableModel = {
   },
 };
 
+const glm52Model: ThinkingCapableModel = {
+  modelId: 'glm-5.2',
+  officialProvider: 'z-ai',
+  thinkingEnabled: true,
+  providerOptions: {
+    stagewise: { reasoning: { enabled: true, effort: 'max' } },
+    openai: { reasoningEffort: 'max' },
+  },
+};
+
 describe('model thinking capabilities', () => {
   it('coerces unsupported OpenAI minimal away from provider options', () => {
     expect(
@@ -195,6 +205,29 @@ describe('model thinking capabilities', () => {
         modelProvider: 'moonshotai',
       }).map((option) => option.value),
     ).toEqual(['low', 'medium', 'high']);
+  });
+
+  it('exposes max reasoning for GLM 5.2 on OpenAI-compatible routes', () => {
+    expect(
+      getSupportedThinkingOptions(glm52Model, {
+        providerMode: 'official',
+        modelProvider: 'z-ai',
+      }).map((option) => option.value),
+    ).toEqual(['low', 'medium', 'high', 'max']);
+  });
+
+  it('emits OpenAI-compatible max reasoning for GLM 5.2', () => {
+    expect(
+      createThinkingProviderOptionsPatch({
+        model: glm52Model,
+        route: { providerMode: 'official', modelProvider: 'z-ai' },
+        override: {
+          enabled: true,
+          provider: 'openai-compatible',
+          value: 'max',
+        },
+      }),
+    ).toEqual({ openai: { reasoningEffort: 'max' } });
   });
 
   it('uses OpenAI-compatible values for custom chat completions endpoints', () => {
