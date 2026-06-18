@@ -676,6 +676,27 @@ describe('GitService', () => {
     });
   });
 
+  it('creates a branch from a local slash-named source branch without fetching', async () => {
+    const { service, mutationCalls } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': [
+        'main\t*',
+        'feature/my-feature\t',
+      ].join('\n'),
+    });
+
+    await expect(
+      service.createBranch('/repo', {
+        branchName: 'new-branch',
+        sourceBranch: 'feature/my-feature',
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(mutationCalls).toContain(
+      'checkout -b new-branch feature/my-feature',
+    );
+    expect(mutationCalls.some((call) => call.startsWith('fetch '))).toBe(false);
+  });
+
   it('rejects create-branch branch collisions', async () => {
     const { service } = await createGitService({
       ...baseReadResponses,
