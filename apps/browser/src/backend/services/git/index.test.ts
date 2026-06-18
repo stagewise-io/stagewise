@@ -620,6 +620,62 @@ describe('GitService', () => {
     expect(mutationCalls).toContain('checkout -b feature/new origin/main');
   });
 
+  it('returns branch-create-failed when fetching a remote source branch fails', async () => {
+    const { service } = await createGitService(
+      {
+        ...baseReadResponses,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
+          'main\t*',
+        'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+      },
+      {
+        'fetch --prune origin refs/heads/main:refs/remotes/origin/main': {
+          exitCode: 1,
+          stderr: 'network error',
+        },
+      },
+    );
+
+    await expect(
+      service.createBranch('/repo', {
+        branchName: 'feature/new',
+        sourceBranch: 'origin/main',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'branch-create-failed',
+      message: 'network error',
+    });
+  });
+
+  it('returns worktree-create-failed when fetching a remote source branch fails for worktree', async () => {
+    const { service } = await createGitService(
+      {
+        ...baseReadResponses,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
+          'main\t*',
+        'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+      },
+      {
+        'fetch --prune origin refs/heads/main:refs/remotes/origin/main': {
+          exitCode: 1,
+          stderr: 'auth failed',
+        },
+      },
+    );
+
+    await expect(
+      service.createWorktree('/repo', {
+        worktreeName: 'new-work',
+        sourceBranch: 'origin/main',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'worktree-create-failed',
+      message: 'auth failed',
+    });
+  });
+
   it('rejects create-branch branch collisions', async () => {
     const { service } = await createGitService({
       ...baseReadResponses,
