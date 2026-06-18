@@ -102,7 +102,8 @@ export type GitActionFailureReason =
   | 'worktree-already-exists'
   | 'invalid-name'
   | 'checkout-failed'
-  | 'worktree-create-failed';
+  | 'worktree-create-failed'
+  | 'branch-create-failed';
 
 export type GitActionFailure = {
   ok: false;

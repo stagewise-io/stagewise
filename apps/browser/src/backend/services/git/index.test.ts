@@ -648,6 +648,55 @@ describe('GitService', () => {
     );
   });
 
+  it('fetches remote source branch before creating a branch from remote', async () => {
+    const { service, mutationCalls } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+      'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+    });
+
+    const result = await service.createBranch('/repo', {
+      branchName: 'feature/login',
+      sourceBranch: 'origin/main',
+    });
+
+    // Bug 1 fix: fetch must run before listBranches so newly-pushed
+    // remote branches are visible during the existence check.
+    expect(mutationCalls).toContain(
+      'fetch --prune origin refs/heads/main:refs/remotes/origin/main',
+    );
+    expect(result.ok).toBe(true);
+    expect(mutationCalls).toContain('checkout -b feature/login origin/main');
+  });
+
+  it('returns branch-create-failed reason when remote fetch fails during createBranch', async () => {
+    const { service } = await createGitService(
+      {
+        ...baseReadResponses,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+        'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+      },
+      {
+        // Bug 3 fix: failure reason must be branch-create-failed, not
+        // worktree-create-failed, when the fetch fails inside createBranch.
+        'fetch --prune origin refs/heads/main:refs/remotes/origin/main': {
+          exitCode: 1,
+          stdout: '',
+          stderr: 'fatal: unable to access remote',
+        },
+      },
+
+    const result = await service.createBranch('/repo', {
+      branchName: 'feature/login',
+      sourceBranch: 'origin/main',
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'branch-create-failed',
+    });
+  });
+
   it('fetches remote source branches before creating worktrees', async () => {
     const { service, mutationCalls } = await createGitService({
       ...baseReadResponses,

@@ -559,26 +559,31 @@ export class GitService extends DisposableService {
   }
 
   private async fetchRemoteSourceBranch(
-    workspacePath: string,
-    sourceBranch: string,
-  ): Promise<GitActionFailure | null> {
-    const [remoteName, ...branchParts] = sourceBranch.split('/');
-    const branchName = branchParts.join('/');
-    if (!remoteName || !branchName) return null;
+  workspacePath: string,
+  sourceBranch: string,
+  failureReason: GitActionFailure['reason'] = 'worktree-create-failed',
+): Promise<GitActionFailure | null> {
+  const [remoteName, ...branchParts] = sourceBranch.split('/');
+  const branchName = branchParts.join('/');
+  if (!remoteName || !branchName) return null;
 
-    const result = await this.runGitStrict(workspacePath, [
-      'fetch',
-      '--prune',
-      remoteName,
-      `refs/heads/${branchName}:refs/remotes/${remoteName}/${branchName}`,
-    ]);
-    if (result.exitCode === 0) return null;
+  // Bug 2 fix: run broad prune fetch AND explicit refspec so narrowed
+  // clones (single-branch etc.) still update the target branch.
+  const result = await this.runGitStrict(workspacePath, [
+    'fetch',
+    '--prune',
+    remoteName,
+    `refs/heads/${branchName}:refs/remotes/${remoteName}/${branchName}`,
+  ]);
+  if (result.exitCode === 0) return null;
 
-    return this.failure(
-      'worktree-create-failed',
-      result.stderr || `Failed to update ${sourceBranch} from remote.`,
-    );
-  }
+  // Bug 3 fix: use caller-supplied reason so branch-create failures
+  // don't surface as worktree failures.
+  return this.failure(
+    failureReason,
+    result.stderr || `Failed to update ${sourceBranch} from remote.`,
+  );
+}
 
   public async listWorkspaceWorktrees(
     workspacePath: string,
@@ -666,26 +671,29 @@ export class GitService extends DisposableService {
     workspacePath: string,
     branchName: string,
   ): Promise<GitMergedTargetResult> {
-    const branches = await this.listBranches(workspacePath);
-    if (!branches) return { merged: false, target: null };
+    // Bug 1 fix: fetch before listBranches() so newly-pushed remote branches
+// are visible in the local cache before the existence check runs.
+if (options.sourceBranch.includes('/')) {
+  const fetchFailure = await this.fetchRemoteSourceBranch(
+    workspacePath,
+    options.sourceBranch,
+    'branch-create-failed',  // Bug 3 fix: correct failure reason
+  );
+  if (fetchFailure) return fetchFailure;
+}
 
-    const availableBranches = new Set(
-      branches.branches
-        .filter((branch) => branch.kind === 'local')
-        .map((branch) => branch.name),
-    );
-    const candidateTargets = [
-      branches.defaultBranch,
-      'main',
-      'master',
-      'develop',
-      'dev',
-    ].filter(
-      (branch): branch is string =>
-        typeof branch === 'string' &&
-        branch !== branchName &&
-        availableBranches.has(branch),
-    );
+const branches = await this.listBranches(workspacePath);
+if (!branches)
+  return this.failure('not-git-repo', 'Workspace is not a Git repo.');
+
+if (
+  !branches.branches.some((branch) => branch.name === options.sourceBranch)
+) {
+  return this.failure(
+    'branch-not-found',
+    `Source branch ${options.sourceBranch} does not exist.`,
+  );
+}
 
     for (const target of Array.from(new Set(candidateTargets))) {
       const result = await this.runGitStrict(workspacePath, [
