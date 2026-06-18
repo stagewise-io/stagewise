@@ -401,8 +401,12 @@ export class MountManagerService extends DisposableService {
 
     this.uiKarton.registerServerProcedureHandler(
       'toolbox.listGitBranchesByPath',
-      async (_callingClientId: string, workspacePath: string) => {
-        return this.listGitBranchesByPath(workspacePath);
+      async (
+        _callingClientId: string,
+        workspacePath: string,
+        options?: { refresh?: boolean },
+      ) => {
+        return this.listGitBranchesByPath(workspacePath, options);
       },
     );
 
@@ -459,13 +463,14 @@ export class MountManagerService extends DisposableService {
         _callingClientId: string,
         agentInstanceId: string,
         mountPrefix: string,
+        options?: { refresh?: boolean },
       ) => {
         const mount = this.resolveMountedWorkspace(
           agentInstanceId,
           mountPrefix,
         );
         if (!mount) return null;
-        return this.listGitBranchesByPath(mount.path);
+        return this.listGitBranchesByPath(mount.path, options);
       },
     );
 
@@ -765,9 +770,12 @@ export class MountManagerService extends DisposableService {
     return path.relative(workspacePath, resolved).split(path.sep).join('/');
   }
 
-  private async listGitBranchesByPath(workspacePath: string) {
+  private async listGitBranchesByPath(
+    workspacePath: string,
+    options?: { refresh?: boolean },
+  ) {
     if (!(await this.isTrustedGitPath(workspacePath))) return null;
-    return this.gitService.listBranches(workspacePath);
+    return this.gitService.listBranches(workspacePath, options);
   }
 
   private async listGitWorktreesByPath(workspacePath: string) {

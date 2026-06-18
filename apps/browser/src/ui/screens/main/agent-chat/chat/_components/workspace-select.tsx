@@ -1798,6 +1798,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   const [worktreesResult, setWorktreesResult] =
     useState<WorkspaceGitWorktreesResult | null>(null);
   const [gitDataLoaded, setGitDataLoaded] = useState(false);
+  const [gitDataLoadedAt, setGitDataLoadedAt] = useState<number | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const openChangeTimeoutRef = useRef<number | null>(null);
   const { activeTutorial } = useTutorial();
@@ -1860,20 +1861,24 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   );
   const config = controlledConfig ?? localConfig;
 
-  const refreshGitData = useCallback(async () => {
-    const [nextBranches, nextWorktrees] = await Promise.all([
-      listWorkspaceGitBranches(agentInstanceId, mount.prefix),
-      listWorkspaceGitWorktrees(agentInstanceId, mount.prefix),
-    ]);
-    setBranchesResult(nextBranches);
-    setWorktreesResult(nextWorktrees);
-    setGitDataLoaded(true);
-  }, [
-    agentInstanceId,
-    listWorkspaceGitBranches,
-    listWorkspaceGitWorktrees,
-    mount.prefix,
-  ]);
+  const refreshGitData = useCallback(
+    async (options?: { refresh?: boolean }) => {
+      const [nextBranches, nextWorktrees] = await Promise.all([
+        listWorkspaceGitBranches(agentInstanceId, mount.prefix, options),
+        listWorkspaceGitWorktrees(agentInstanceId, mount.prefix),
+      ]);
+      setBranchesResult(nextBranches);
+      setWorktreesResult(nextWorktrees);
+      setGitDataLoaded(true);
+      setGitDataLoadedAt(Date.now());
+    },
+    [
+      agentInstanceId,
+      listWorkspaceGitBranches,
+      listWorkspaceGitWorktrees,
+      mount.prefix,
+    ],
+  );
 
   useEffect(() => {
     if (!mount.git || gitDataLoaded) return;
@@ -1958,15 +1963,26 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
           openChangeTimeoutRef.current = null;
         }, 150);
 
-        if (!gitDataLoaded) {
-          void refreshGitData();
+        const isStale =
+          gitDataLoadedAt !== null &&
+          Date.now() - gitDataLoadedAt > GIT_OPTIONS_STALE_MS;
+
+        if (!gitDataLoaded || isStale) {
+          void refreshGitData({ refresh: isStale });
         }
         return;
       }
 
       onOpenChange?.(mount.prefix, false);
     },
-    [activeTutorial, gitDataLoaded, mount.prefix, onOpenChange, refreshGitData],
+    [
+      activeTutorial,
+      gitDataLoaded,
+      gitDataLoadedAt,
+      mount.prefix,
+      onOpenChange,
+      refreshGitData,
+    ],
   );
 
   useEffect(() => {
@@ -2748,6 +2764,13 @@ type ConnectActionState = WorkspaceActionConfig;
 
 const CONNECT_NEW_KEY = '__new__';
 
+/**
+ * How long cached git options are considered fresh. After this threshold,
+ * the next call to `loadGitOptionsForPath` triggers a `git fetch --prune --all`
+ * on the backend before returning branch/worktree lists.
+ */
+const GIT_OPTIONS_STALE_MS = 60_000;
+
 function ConnectActionSummary({ state }: { state: ConnectActionState }) {
   switch (state.selectedAction) {
     case 'create-worktree':
@@ -2964,6 +2987,9 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
   const [pathGitOptions, setPathGitOptions] = useState<
     ReadonlyMap<string, ConnectGitOptions>
   >(() => new Map());
+  const [pathGitOptionsTimestamp, setPathGitOptionsTimestamp] = useState<
+    ReadonlyMap<string, number>
+  >(() => new Map());
   const [pathGitCapability, setPathGitCapability] = useState<
     ReadonlyMap<string, ConnectPathGitCapability>
   >(() => new Map());
@@ -3069,7 +3095,11 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       rowKey: string,
     ): Promise<ConnectGitOptions | null> => {
       const cached = pathGitOptions.get(workspacePath);
-      if (cached) return cached;
+      const cachedAt = pathGitOptionsTimestamp.get(workspacePath);
+      const isStale = !cachedAt || Date.now() - cachedAt > GIT_OPTIONS_STALE_MS;
+      if (cached && !isStale) return cached;
+
+      const needsRemoteRefresh = isStale && !!cached;
 
       setPathGitCapability((prev) => {
         if (prev.get(workspacePath) === 'loading') return prev;
@@ -3082,7 +3112,10 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       let worktreesResult: Awaited<ReturnType<typeof listGitWorktreesByPath>>;
       try {
         [branchesResult, worktreesResult] = await Promise.all([
-          listGitBranchesByPath(workspacePath),
+          listGitBranchesByPath(
+            workspacePath,
+            needsRemoteRefresh ? { refresh: true } : undefined,
+          ),
           listGitWorktreesByPath(workspacePath),
         ]);
       } catch {
@@ -3124,9 +3157,13 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         checkoutDefaultBranch,
       };
       setPathGitOptions((prev) => {
-        if (prev.has(workspacePath)) return prev;
         const next = new Map(prev);
         next.set(workspacePath, options);
+        return next;
+      });
+      setPathGitOptionsTimestamp((prev) => {
+        const next = new Map(prev);
+        next.set(workspacePath, Date.now());
         return next;
       });
       setPathGitCapability((prev) => {
@@ -3193,6 +3230,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       listGitBranchesByPath,
       listGitWorktreesByPath,
       pathGitOptions,
+      pathGitOptionsTimestamp,
     ],
   );
 

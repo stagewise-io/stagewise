@@ -1349,6 +1349,7 @@ export type KartonContract = {
       ) => Promise<FileDiffContent | null>;
       listGitBranchesByPath: (
         workspacePath: string,
+        options?: { refresh?: boolean },
       ) => Promise<WorkspaceGitBranchesResult | null>;
       listGitWorktreesByPath: (
         workspacePath: string,
@@ -1391,6 +1392,7 @@ export type KartonContract = {
       listWorkspaceGitBranches: (
         agentInstanceId: string,
         mountPrefix: string,
+        options?: { refresh?: boolean },
       ) => Promise<WorkspaceGitBranchesResult | null>;
       listWorkspaceGitWorktrees: (
         agentInstanceId: string,
