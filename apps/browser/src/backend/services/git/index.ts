@@ -378,8 +378,9 @@ export class GitService extends DisposableService {
     const summary = await this.getMountedWorkspaceSummary(workspacePath);
     if (!summary) return null;
 
+    let refreshSucceeded = false;
     if (options?.refresh) {
-      await this.fetchAllRemotes(workspacePath);
+      refreshSucceeded = await this.fetchAllRemotes(workspacePath);
     }
 
     const [localResult, remoteResult, remoteNamesResult] = await Promise.all([
@@ -453,6 +454,7 @@ export class GitService extends DisposableService {
         defaultBranch,
       ),
       branches,
+      refreshSucceeded,
     };
   }
 
@@ -564,8 +566,13 @@ export class GitService extends DisposableService {
     return branchNames.values().next().value ?? null;
   }
 
-  private async fetchAllRemotes(workspacePath: string): Promise<void> {
-    await this.runGitStrict(workspacePath, ['fetch', '--prune', '--all']);
+  private async fetchAllRemotes(workspacePath: string): Promise<boolean> {
+    const result = await this.runGitStrict(workspacePath, [
+      'fetch',
+      '--prune',
+      '--all',
+    ]);
+    return result.exitCode === 0;
   }
 
   private async fetchRemoteSourceBranch(

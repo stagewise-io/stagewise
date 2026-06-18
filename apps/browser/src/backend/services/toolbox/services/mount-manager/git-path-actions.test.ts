@@ -234,7 +234,7 @@ describe('MountManagerService path-based Git actions', () => {
     await expect(handler?.('client1', recentPath)).resolves.toMatchObject({
       current: 'main',
     });
-    expect(gitService.listBranches).toHaveBeenCalledWith(recentPath);
+    expect(gitService.listBranches).toHaveBeenCalledWith(recentPath, undefined);
   });
 
   it('accepts a mounted workspace path', async () => {
@@ -257,7 +257,10 @@ describe('MountManagerService path-based Git actions', () => {
     await expect(handler?.('client1', mountedPath)).resolves.toMatchObject({
       current: 'main',
     });
-    expect(gitService.listBranches).toHaveBeenCalledWith(mountedPath);
+    expect(gitService.listBranches).toHaveBeenCalledWith(
+      mountedPath,
+      undefined,
+    );
   });
 
   it('accepts a managed worktree path', async () => {
@@ -270,7 +273,10 @@ describe('MountManagerService path-based Git actions', () => {
     await expect(handler?.('client1', worktreePath)).resolves.toMatchObject({
       current: 'main',
     });
-    expect(gitService.listBranches).toHaveBeenCalledWith(worktreePath);
+    expect(gitService.listBranches).toHaveBeenCalledWith(
+      worktreePath,
+      undefined,
+    );
   });
 
   it('discovers managed worktrees with slash branch paths', async () => {

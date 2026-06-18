@@ -88,6 +88,12 @@ export type WorkspaceGitBranchesResult = {
   defaultBranch: string | null;
   defaultRemoteBranch: string | null;
   branches: WorkspaceGitBranchInfo[];
+  /**
+   * Whether the remote refresh succeeded. `false` when no refresh was
+   * requested or when the fetch failed. Callers should only reset their
+   * staleness timer when this is `true`.
+   */
+  refreshSucceeded: boolean;
 };
 
 export type WorkspaceGitWorktreeInfo = {

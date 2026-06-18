@@ -1870,7 +1870,12 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       setBranchesResult(nextBranches);
       setWorktreesResult(nextWorktrees);
       setGitDataLoaded(true);
-      setGitDataLoadedAt(Date.now());
+      // Only advance the staleness timer when the remote refresh actually
+      // succeeded — otherwise stale refs would be hidden behind a fresh
+      // timestamp for the next 60 seconds.
+      if (!options?.refresh || nextBranches?.refreshSucceeded) {
+        setGitDataLoadedAt(Date.now());
+      }
     },
     [
       agentInstanceId,
@@ -3099,7 +3104,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
       const isStale = !cachedAt || Date.now() - cachedAt > GIT_OPTIONS_STALE_MS;
       if (cached && !isStale) return cached;
 
-      const needsRemoteRefresh = isStale && !!cached;
+      const needsRemoteRefresh = isStale;
 
       setPathGitCapability((prev) => {
         if (prev.get(workspacePath) === 'loading') return prev;
@@ -3161,11 +3166,16 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         next.set(workspacePath, options);
         return next;
       });
-      setPathGitOptionsTimestamp((prev) => {
-        const next = new Map(prev);
-        next.set(workspacePath, Date.now());
-        return next;
-      });
+      // Only advance the staleness timer when the remote refresh actually
+      // succeeded — otherwise the fetch was silently swallowed and the
+      // on-disk refs are still stale.
+      if (!needsRemoteRefresh || branchesResult.refreshSucceeded) {
+        setPathGitOptionsTimestamp((prev) => {
+          const next = new Map(prev);
+          next.set(workspacePath, Date.now());
+          return next;
+        });
+      }
       setPathGitCapability((prev) => {
         const next = new Map(prev);
         next.set(workspacePath, 'git');
