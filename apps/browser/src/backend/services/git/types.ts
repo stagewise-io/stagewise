@@ -78,6 +78,12 @@ export type GitBranchListResult = {
   defaultBranch: string | null;
   defaultRemoteBranch: string | null;
   branches: GitBranchInfo[];
+  /**
+   * Whether the remote refresh succeeded. Always `false` when no refresh
+   * was requested. When `true`, the on-disk refs are up-to-date with the
+   * remote and the caller may reset its staleness timer.
+   */
+  refreshSucceeded: boolean;
 };
 
 export type GitWorktreeListResult = {

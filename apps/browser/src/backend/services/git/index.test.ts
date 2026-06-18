@@ -376,6 +376,7 @@ describe('GitService', () => {
       current: 'main',
       defaultBranch: 'main',
       defaultRemoteBranch: 'origin/main',
+      refreshSucceeded: false,
       branches: [
         {
           name: 'main',
@@ -498,6 +499,63 @@ describe('GitService', () => {
       defaultBranch: 'main',
       defaultRemoteBranch: null,
     });
+  });
+
+  it('reports refreshSucceeded=true when listBranches refresh fetch succeeds', async () => {
+    const { service, mutationCalls } = await createGitService(
+      {
+        ...baseReadResponses,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
+          'main\t*',
+        'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+      },
+      {
+        'fetch --prune --all': { exitCode: 0 },
+      },
+    );
+
+    await expect(
+      service.listBranches('/repo', { refresh: true }),
+    ).resolves.toMatchObject({
+      refreshSucceeded: true,
+    });
+    expect(mutationCalls).toContain('fetch --prune --all');
+  });
+
+  it('reports refreshSucceeded=false when listBranches refresh fetch fails', async () => {
+    const { service } = await createGitService(
+      {
+        ...baseReadResponses,
+        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
+          'main\t*',
+        'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+      },
+      {
+        'fetch --prune --all': {
+          exitCode: 1,
+          stderr: 'fatal: could not read from remote',
+        },
+      },
+    );
+
+    await expect(
+      service.listBranches('/repo', { refresh: true }),
+    ).resolves.toMatchObject({
+      refreshSucceeded: false,
+    });
+  });
+
+  it('reports refreshSucceeded=false when no refresh is requested', async () => {
+    const { service, mutationCalls } = await createGitService({
+      ...baseReadResponses,
+      'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads': 'main\t*',
+      'for-each-ref --format=%(refname:short) refs/remotes': 'origin/main',
+    });
+
+    await expect(service.listBranches('/repo')).resolves.toMatchObject({
+      refreshSucceeded: false,
+    });
+    expect(mutationCalls).not.toContain('fetch --prune --all');
   });
 
   it('switches branches with checkout', async () => {
