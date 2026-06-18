@@ -765,19 +765,6 @@ export class GitService extends DisposableService {
       return this.failure('invalid-name', 'Branch name is invalid.');
     }
 
-    // For remote sources, fetch before existence checks so we see the
-    // latest remote state rather than returning branch-not-found against
-    // a stale local cache.
-    const isRemoteSource = options.sourceBranch.includes('/');
-    if (isRemoteSource) {
-      const fetchFailure = await this.fetchRemoteSourceBranch(
-        workspacePath,
-        options.sourceBranch,
-        'branch-create-failed',
-      );
-      if (fetchFailure) return fetchFailure;
-    }
-
     const branches = await this.listBranches(workspacePath);
     if (!branches)
       return this.failure('not-git-repo', 'Workspace is not a Git repo.');
@@ -790,6 +777,17 @@ export class GitService extends DisposableService {
         'branch-not-found',
         `Source branch ${options.sourceBranch} does not exist.`,
       );
+    }
+
+    // For remote sources, fetch the latest state so the branch is
+    // created from up-to-date refs rather than a stale local cache.
+    if (sourceBranch.kind === 'remote') {
+      const fetchFailure = await this.fetchRemoteSourceBranch(
+        workspacePath,
+        sourceBranch.name,
+        'branch-create-failed',
+      );
+      if (fetchFailure) return fetchFailure;
     }
 
     if (branches.branches.some((branch) => branch.name === branchName)) {
