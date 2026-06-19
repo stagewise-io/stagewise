@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.10.0 (2026-06-19)
+
+### Features
+
+* add model alias presets with fixed thinking (18028e1)
+* cap large diff counts and refine tab bar controls (38f2097)
+* add inline/split diff view to file tab editor (47530cd)
+
+### Bug Fixes
+
+* support GLM coding plan endpoint (4e8f7ad)
+* use platform-correct worktree-setup script in git-path-actions tests (b5c3e04)
+* resolve stale git state in branch/worktree creation and dropdown refresh (d4a40f1)
+* add missing refreshSucceeded field to worktree-utils test fixtures (fd5947f)
+* refresh stale remote branches on dropdown open (d99dca6)
+* use listBranches kind check instead of slash heuristic (96e3b56)
+* robust remote fetch for branch and worktree creation (d7ca53c)
+* fetch all remote refs before creating worktrees and branches (890ee41)
+* address diff view PR review feedback (4778975)
+* harden diff view persistence and conflict safety (3c644a2)
+* balance diff gutter number spacing (19510ea)
+* remove diff revert-icon margin to reclaim gutter space (181bbc0)
+* trim inline diff gutter left padding (cca782d)
+* disable word wrap in all editors and diff modes (86b3009)
+* force consistent word wrap in split diff view (0245e5d)
+* use dedicated icons for diff view-mode toggle (679ae84)
+* default diff view to inline mode (aa59601)
+* prefix diff tab titles and use distinct icon (78f0606)
+* apply file-code zoom to diff editor (dd64210)
+* focus chat input on agent switch over web/terminal tabs (1830332)
+
 ## 1.9.0 (2026-06-17)
 
 ### Features
