@@ -20,6 +20,10 @@ import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
 import type { UserExperienceService } from '@/services/experience';
 import { getWorktreesDir } from '@/utils/paths';
+import {
+  WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS,
+  variantForPlatform,
+} from '@shared/worktree-setup';
 import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
 import {
   AgentStore,
@@ -212,6 +216,25 @@ function setAgentMount(
   agentMounts.set(agentId, mounts);
 }
 
+/**
+ * Writes a worktree-setup script in the variant the `WorktreeSetupRunner`
+ * actually selects for the current platform. The runner uses
+ * `variantForPlatform(process.platform)` to decide whether to look for
+ * `.sh` (POSIX) or `.ps1` (PowerShell); writing the wrong variant causes
+ * the runner to silently skip setup, which makes the test time out on
+ * Windows.
+ */
+async function writePlatformSetupScript(
+  worktreePath: string,
+  content: string,
+): Promise<void> {
+  const relativePath =
+    WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS[variantForPlatform(process.platform)];
+  const scriptPath = path.join(worktreePath, relativePath);
+  await fs.mkdir(path.dirname(scriptPath), { recursive: true });
+  await fs.writeFile(scriptPath, content);
+}
+
 function detachWorkspacePathFromAgents(
   service: MountManagerService,
   workspacePath: string,
@@ -380,13 +403,7 @@ describe('MountManagerService path-based Git actions', () => {
     const mainPath = linkedPath.replace('linked-worktree', 'main-worktree');
     await fs.mkdir(mainPath, { recursive: true });
     const createdPath = path.join(mainPath, '..', 'created-worktree');
-    const scriptPath = path.join(
-      createdPath,
-      '.stagewise',
-      'worktree-setup.sh',
-    );
-    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
-    await fs.writeFile(scriptPath, 'exit 0');
+    await writePlatformSetupScript(createdPath, 'exit 0');
     const { service, procedureHandlers, gitService, state } = createHarness({
       recentPaths: [linkedPath],
     });
@@ -457,13 +474,7 @@ describe('MountManagerService path-based Git actions', () => {
   it('starts pending setup only after mounting the created worktree', async () => {
     const recentPath = await fs.mkdtemp(path.join(os.tmpdir(), 'recent-repo-'));
     const createdPath = path.join(recentPath, '..', 'created-worktree');
-    const scriptPath = path.join(
-      createdPath,
-      '.stagewise',
-      'worktree-setup.sh',
-    );
-    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
-    await fs.writeFile(scriptPath, 'exit 0');
+    await writePlatformSetupScript(createdPath, 'exit 0');
     const { service, procedureHandlers, state } = createHarness({
       recentPaths: [recentPath],
     });
@@ -524,13 +535,12 @@ describe('MountManagerService path-based Git actions', () => {
   it('keeps failed setup worktrees mounted', async () => {
     const recentPath = await fs.mkdtemp(path.join(os.tmpdir(), 'recent-repo-'));
     const createdPath = path.join(recentPath, '..', 'created-worktree');
-    const scriptPath = path.join(
+    // PowerShell exits with `exit 1` just like POSIX shells; the stderr
+    // redirection syntax differs but the test only asserts `status`.
+    await writePlatformSetupScript(
       createdPath,
-      '.stagewise',
-      'worktree-setup.sh',
+      process.platform === 'win32' ? 'exit 1' : 'echo failed >&2\nexit 1',
     );
-    await fs.mkdir(path.dirname(scriptPath), { recursive: true });
-    await fs.writeFile(scriptPath, 'echo failed >&2\nexit 1');
     const { service, procedureHandlers, state } = createHarness({
       recentPaths: [recentPath],
     });
