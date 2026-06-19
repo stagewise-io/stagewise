@@ -1,4 +1,4 @@
-import { ChatAgent } from '@stagewise/agent-core/agents';
+import { ChatAgent, type BaseAgentConfig } from '@stagewise/agent-core/agents';
 
 /**
  * Browser-host chat agent.
@@ -10,6 +10,11 @@ import { ChatAgent } from '@stagewise/agent-core/agents';
  * `AgentTypes.CHAT` in the browser's {@link AgentTypeRegistry}.
  */
 export class BrowserChatAgent extends ChatAgent {
+  public static readonly config = {
+    ...ChatAgent.config,
+    defaultModelId: 'default',
+  } satisfies BaseAgentConfig<never>;
+
   // Return type uses `any` to bridge the `Tool` shape divergence between the
   // copy of `@ai-sdk/provider-utils` that `'ai'` resolves to at the host's
   // compile site and the copy `@stagewise/agent-core`'s `.d.ts` references

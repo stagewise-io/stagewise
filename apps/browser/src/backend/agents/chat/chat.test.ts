@@ -26,6 +26,10 @@ const HOST_TOOL_IDS = [
 ] as const;
 
 describe('BrowserChatAgent', () => {
+  it('defaults new browser chat agents to the Default alias', () => {
+    expect(BrowserChatAgent.config.defaultModelId).toBe('default');
+  });
+
   it('getAdditionalTools requests every browser host tool from the toolbox', async () => {
     const getTool = vi.fn().mockResolvedValue({ kind: 'host-tool' });
     const instance = Object.create(BrowserChatAgent.prototype) as {

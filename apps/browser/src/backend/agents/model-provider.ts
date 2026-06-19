@@ -1,5 +1,5 @@
 import type { TelemetryService } from '@/services/telemetry';
-import type { ModelId } from '@shared/available-models';
+import type { ModelAlias, ModelId } from '@shared/available-models';
 import type {
   ModelProvider,
   ApiSpec,
@@ -14,7 +14,11 @@ import {
   type ProviderMode,
 } from './reasoning-signatures';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
-import { availableModels } from '@shared/available-models';
+import {
+  type availableModels,
+  getAvailableModel,
+  getModelAlias,
+} from '@shared/available-models';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -281,7 +285,7 @@ export class ModelProviderService {
    * Check whether a model ID exists (built-in or custom).
    */
   public modelExists(modelId: ModelId): boolean {
-    if (availableModels.some((m) => m.modelId === modelId)) return true;
+    if (getAvailableModel(modelId)) return true;
     return this.preferencesService
       .get()
       .customModels.some((m) => m.modelId === modelId);
@@ -316,12 +320,19 @@ export class ModelProviderService {
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
   ): ModelWithOptions {
-    const builtIn = availableModels.find((m) => m.modelId === modelId);
+    const builtIn = getAvailableModel(modelId);
     if (builtIn) {
+      const alias = getModelAlias(modelId);
       return this.createBuiltInModelWithOptions(
         builtIn,
         traceId,
-        otherPostHogProperties,
+        alias,
+        alias
+          ? {
+              ...otherPostHogProperties,
+              requestedModelId: alias.modelId,
+            }
+          : otherPostHogProperties,
       );
     }
 
@@ -342,6 +353,7 @@ export class ModelProviderService {
   private createBuiltInModelWithOptions(
     modelSettings: BuiltInModelSettings,
     traceId: string,
+    alias?: ModelAlias,
     otherPostHogProperties?: Record<string, unknown>,
   ): ModelWithOptions {
     const officialProvider = modelSettings.officialProvider as
@@ -357,6 +369,11 @@ export class ModelProviderService {
       unknown
     >;
     const posthogProperties = omitModelRequestMetadata(otherPostHogProperties);
+    const thinkingOverride =
+      alias?.thinkingPreset ??
+      this.preferencesService.get().agent.modelThinkingOverrides[
+        modelSettings.modelId
+      ];
 
     const posthogConfig = {
       posthogTraceId: traceId,
@@ -398,10 +415,7 @@ export class ModelProviderService {
         providerOptions: resolveThinkingProviderOptions({
           baseProviderOptions,
           modelSettings,
-          override:
-            this.preferencesService.get().agent.modelThinkingOverrides[
-              modelSettings.modelId
-            ],
+          override: thinkingOverride,
           providerMode: 'stagewise',
           semanticProvider: officialProvider,
           requestMetadata: otherPostHogProperties,
@@ -445,10 +459,7 @@ export class ModelProviderService {
           resolveThinkingProviderOptions({
             baseProviderOptions,
             modelSettings,
-            override:
-              this.preferencesService.get().agent.modelThinkingOverrides[
-                modelSettings.modelId
-              ],
+            override: thinkingOverride,
             providerMode: 'custom',
             semanticProvider: getSemanticProviderForApiSpec(
               resolved.customEndpoint.apiSpec,
@@ -480,10 +491,7 @@ export class ModelProviderService {
         resolveThinkingProviderOptions({
           baseProviderOptions,
           modelSettings,
-          override:
-            this.preferencesService.get().agent.modelThinkingOverrides[
-              modelSettings.modelId
-            ],
+          override: thinkingOverride,
           providerMode: 'official',
           semanticProvider: officialProvider,
           requestMetadata: otherPostHogProperties,

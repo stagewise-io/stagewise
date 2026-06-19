@@ -18,7 +18,15 @@ import {
   PROVIDER_DISPLAY_INFO,
   PROVIDER_OFFICIAL_URLS,
 } from '@shared/karton-contracts/ui/shared-types';
-import { availableModels } from '@shared/available-models';
+import type {
+  BuiltInModel,
+  SelectableBuiltInModel,
+} from '@shared/available-models';
+import {
+  availableModelAliases,
+  getAvailableModel,
+  getSelectableBuiltInModels,
+} from '@shared/available-models';
 import {
   getEnabledModelThinkingOption,
   getModelThinkingDisplayState,
@@ -65,8 +73,6 @@ import {
   IconPlusOutline18,
   IconPenOutline18,
   IconTrashOutline18,
-  IconArrowUpOutline18,
-  IconArrowDownOutline18,
 } from 'nucleo-ui-outline-18';
 
 enablePatches();
@@ -75,6 +81,9 @@ const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
 const EMPTY_CUSTOM_ENDPOINTS: UserPreferences['customEndpoints'] = [];
 const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
   {};
+const RECOMMENDED_MODEL_IDS = availableModelAliases.map(
+  (alias) => alias.modelId,
+);
 
 // =============================================================================
 // Model Provider Configuration
@@ -92,7 +101,7 @@ const PROVIDERS: ModelProvider[] = [
 ];
 
 function getThinkingDefaultOptionsForModel(
-  model: (typeof availableModels)[number],
+  model: BuiltInModel,
   preferences: UserPreferences,
 ): Parameters<typeof getModelThinkingDisplayState>[2] {
   const provider = model.officialProvider;
@@ -479,7 +488,7 @@ function ModelProvidersSection() {
 // =============================================================================
 
 const BUILT_IN_MODEL_IDS = new Set(
-  availableModels.map((m) => m.modelId),
+  getSelectableBuiltInModels().map((m) => m.modelId),
 ) as Set<string>;
 
 function CustomModelDialog({
@@ -969,7 +978,7 @@ function BuiltInModelCard({
   onToggle,
   onEditThinking,
 }: {
-  model: (typeof availableModels)[number];
+  model: SelectableBuiltInModel;
   isEnabled: boolean;
   thinkingDisplay: ModelThinkingDisplayState | null;
   onToggle: () => void;
@@ -1000,21 +1009,6 @@ function BuiltInModelCard({
               ? PROVIDER_DISPLAY_INFO[model.officialProvider].name
               : 'Unknown'}{' '}
             &middot; {model.modelContext}
-            {model.pricing &&
-              (model.pricing.relativeMultiplier < 0.5 ||
-                model.pricing.relativeMultiplier > 2.0) && (
-                <>
-                  {' · '}
-                  <span className="inline-flex items-center">
-                    $
-                    {model.pricing.relativeMultiplier < 0.5 ? (
-                      <IconArrowDownOutline18 className="size-2.5" />
-                    ) : (
-                      <IconArrowUpOutline18 className="size-2.5" />
-                    )}
-                  </span>
-                </>
-              )}
           </p>
         </div>
         <div
@@ -1159,9 +1153,12 @@ function CustomModelsSection() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredBuiltIn = useMemo(() => {
-    if (!searchQuery.trim()) return availableModels;
+    const selectableModels = getSelectableBuiltInModels({
+      disabledModelIds: RECOMMENDED_MODEL_IDS,
+    });
+    if (!searchQuery.trim()) return selectableModels;
     const q = searchQuery.toLowerCase();
-    return availableModels.filter(
+    return selectableModels.filter(
       (m) =>
         m.modelId.toLowerCase().includes(q) ||
         m.modelDisplayName.toLowerCase().includes(q) ||
@@ -1206,7 +1203,10 @@ function CustomModelsSection() {
   );
 
   const thinkingPanelModel = useMemo(
-    () => availableModels.find((m) => m.modelId === thinkingPanelModelId),
+    () =>
+      thinkingPanelModelId
+        ? getAvailableModel(thinkingPanelModelId)
+        : undefined,
     [thinkingPanelModelId],
   );
 
@@ -1358,24 +1358,25 @@ function CustomModelsSection() {
 
   const handleSetThinkingEnabled = useCallback(
     async (modelId: string, enabled: boolean) => {
-      const model = availableModels.find((item) => item.modelId === modelId);
+      const model = getAvailableModel(modelId);
       if (!model) return;
+      const targetModelId = model.modelId;
 
       const route = getThinkingDefaultOptionsForModel(model, preferences);
       const option = enabled
         ? getEnabledModelThinkingOption(
             model,
-            thinkingOverrides[modelId]?.value,
+            thinkingOverrides[targetModelId]?.value,
             route,
           )
         : (getModelThinkingOptions(model, route).find(
-            (item) => item.value === thinkingOverrides[modelId]?.value,
+            (item) => item.value === thinkingOverrides[targetModelId]?.value,
           ) ?? getModelThinkingOptions(model, route)[0]);
       if (!option) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.modelThinkingOverrides[modelId] = {
-          ...draft.agent.modelThinkingOverrides[modelId],
+        draft.agent.modelThinkingOverrides[targetModelId] = {
+          ...draft.agent.modelThinkingOverrides[targetModelId],
           enabled,
           provider: option.provider,
           value: option.value,
@@ -1388,8 +1389,9 @@ function CustomModelsSection() {
 
   const handleSetThinkingValue = useCallback(
     async (modelId: string, value: string) => {
-      const model = availableModels.find((item) => item.modelId === modelId);
+      const model = getAvailableModel(modelId);
       if (!model) return;
+      const targetModelId = model.modelId;
 
       const route = getThinkingDefaultOptionsForModel(model, preferences);
       const option = getModelThinkingOptions(model, route).find(
@@ -1398,7 +1400,7 @@ function CustomModelsSection() {
       if (!option) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.modelThinkingOverrides[modelId] = {
+        draft.agent.modelThinkingOverrides[targetModelId] = {
           enabled: true,
           provider: option.provider,
           value: option.value,
@@ -1411,8 +1413,9 @@ function CustomModelsSection() {
 
   const handleResetThinkingOverride = useCallback(
     async (modelId: string) => {
+      const targetModelId = getAvailableModel(modelId)?.modelId ?? modelId;
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        delete draft.agent.modelThinkingOverrides[modelId];
+        delete draft.agent.modelThinkingOverrides[targetModelId];
       });
       await updatePreferences(patches);
     },
@@ -1508,9 +1511,12 @@ function CustomModelsSection() {
               model={model}
               isEnabled={!disabledModelIds.has(model.modelId)}
               thinkingDisplay={getModelThinkingDisplayState(
-                model,
+                model.targetModel,
                 thinkingOverrides[model.modelId],
-                getThinkingDefaultOptionsForModel(model, preferences),
+                getThinkingDefaultOptionsForModel(
+                  model.targetModel,
+                  preferences,
+                ),
               )}
               onToggle={() => handleToggleModel(model.modelId)}
               onEditThinking={(event) =>
