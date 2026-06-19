@@ -106,7 +106,7 @@ describe('createBrowserDomainAdapter', () => {
     expect(diff).toContain('browser-restarted');
   });
 
-  it('exposes a non-empty promptSection covering CDP/browser keywords', () => {
+  it('exposes a non-empty promptSection covering CDP/page keywords', () => {
     const adapter = createBrowserDomainAdapter({
       karton: makeKarton({ tabs: {}, activeTabId: null }),
       getBrowserSessionId: () => 'session-1',
@@ -114,6 +114,6 @@ describe('createBrowserDomainAdapter', () => {
     expect(adapter.promptSection).toBeTruthy();
     const section = adapter.promptSection ?? '';
     expect(section).toContain('CDP');
-    expect(section).toContain('Browser Access');
+    expect(section).toContain('Page Access');
   });
 });

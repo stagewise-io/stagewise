@@ -120,9 +120,9 @@ export function createBrowserAgentHost(deps: BrowserAgentHostDeps): AgentHost {
   host.registerFileReadTransformers(BROWSER_FILE_READ_TRANSFORMERS);
   host.registerToolPartSerializers(browserToolPartSerializers);
 
-  // CHAT — the full main-thread experience: every host + core
-  // adapter, the browser-specific output protocols, and the
-  // browser's intro/soul/environment fragments. Listed explicitly
+  // CHAT — the full main-thread experience: every stagewise + core
+  // adapter, the stagewise output protocols, and the
+  // stagewise intro/soul/environment fragments. Listed explicitly
   // (one entry per registered adapter) so a missing adapter or a
   // renamed domain id surfaces here at the wiring site rather than
   // silently dropping a prompt section.
@@ -139,7 +139,7 @@ export function createBrowserAgentHost(deps: BrowserAgentHostDeps): AgentHost {
   // WORKSPACE_MD — the thin "edit `.stagewise/WORKSPACE.md` only"
   // agent. It supplies its own system prompt (so prompt fragments
   // are inert here) and only needs the workspace snapshot to
-  // resolve mount prefixes against; everything else (browser tabs,
+  // resolve mount prefixes against; everything else (page targets,
   // shells, sandbox, diffs, plans, ...) is intentionally absent.
   host.defineAgentProfile(AgentTypes.WORKSPACE_MD, {
     envDomainIds: [WORKSPACE_DOMAIN_ID],
@@ -201,7 +201,7 @@ const BROWSER_OUTPUT_PROTOCOLS: readonly OutputProtocol[] = [
   {
     name: 'tab',
     syntax: '[](tab:{id})',
-    rule: 'Every reference to a specific browser tab. Use the id from the `<tab>` block in the env-snapshot.',
+    rule: 'Every reference to a specific tab/page target. Use the id from the `<tab>` block in the env-snapshot.',
   },
   {
     name: 'shell',

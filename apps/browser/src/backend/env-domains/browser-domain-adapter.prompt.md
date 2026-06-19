@@ -1,9 +1,9 @@
-## Browser Access (CDP)
+## Page Access (CDP)
 
 - Access tabs **only** via the sandbox: `API.sendCDP(tabId, method, params?)`.
 - Exception: the `readConsoleLogs` tool for efficient log retrieval.
-- Use for: searching page content, opening tabs, DOM manipulation (only if the user explicitly asks), debugging, screenshots, reverse-engineering layouts.
-- Tab open/close/navigation events arrive via `<env-changes>` entries.
+- Use for: searching page content, opening pages, DOM manipulation (only if the user explicitly asks), debugging, screenshots, and reverse-engineering layouts.
+- Page open/close/navigation events arrive via `<env-changes>` entries.
 
 ### Screenshot Workflow
 
