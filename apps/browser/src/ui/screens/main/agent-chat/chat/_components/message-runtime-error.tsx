@@ -17,7 +17,7 @@ import {
 import { ChevronDownIcon } from 'lucide-react';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { availableModels } from '@shared/available-models';
+import { getAvailableModel } from '@shared/available-models';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
 import type { AgentRuntimeError } from '@shared/karton-contracts/ui/agent';
 
@@ -226,7 +226,7 @@ function UpstreamOverloadError({
   // the active model while the card is visible does not mislabel the heading.
   const modelName = useMemo(() => {
     if (!error.modelId) return null;
-    const m = availableModels.find((m) => m.modelId === error.modelId);
+    const m = getAvailableModel(error.modelId);
     return m?.modelDisplayName ?? null;
   }, [error.modelId]);
   const heading = modelName
@@ -317,9 +317,7 @@ function GenericError({
     if (!isAuthorizationError(error)) return false;
     if (!activeModelId || !providerConfigs) return false;
 
-    const builtInModel = availableModels.find(
-      (m) => m.modelId === activeModelId,
-    );
+    const builtInModel = getAvailableModel(activeModelId);
     if (!builtInModel) return false;
 
     const provider = builtInModel.officialProvider as ModelProvider | undefined;

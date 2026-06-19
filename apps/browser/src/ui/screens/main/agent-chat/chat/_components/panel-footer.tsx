@@ -66,7 +66,7 @@ import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useContentCollapsed } from '../../../_components/content-collapsed-context';
-import { availableModels } from '@shared/available-models';
+import { getAvailableModel } from '@shared/available-models';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
 import type { Content } from '@tiptap/core';
 import {
@@ -1105,7 +1105,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const customModels = useKartonState((s) => s.preferences.customModels);
   const maxTokens = useMemo(() => {
     if (!activeModelId) return 200000;
-    const builtIn = availableModels.find((m) => m.modelId === activeModelId);
+    const builtIn = getAvailableModel(activeModelId);
     if (builtIn) return builtIn.modelContextRaw;
     const custom = customModels.find((m) => m.modelId === activeModelId);
     if (custom) return custom.contextWindowSize;

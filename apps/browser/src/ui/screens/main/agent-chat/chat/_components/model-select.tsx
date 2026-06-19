@@ -1,10 +1,5 @@
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
-import {
-  IconArrowUpOutline18,
-  IconArrowDownOutline18,
-  IconXmarkOutline18,
-  IconBrainOutline18,
-} from 'nucleo-ui-outline-18';
+import { IconXmarkOutline18, IconBrainOutline18 } from 'nucleo-ui-outline-18';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Combobox,
@@ -20,9 +15,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import type { ModelId } from '@shared/available-models';
+import type { BuiltInModel, ModelId } from '@shared/available-models';
 import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
-import { availableModels } from '@shared/available-models';
+import {
+  getAvailableModel,
+  getModelAlias,
+  getSelectableBuiltInModels,
+} from '@shared/available-models';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -58,9 +57,11 @@ interface ModelOption {
   context: string;
   thinkingEnabled: boolean;
   thinkingLabel?: string;
-  catalogModel?: (typeof availableModels)[number];
+  isAlias?: boolean;
+  catalogModel?: BuiltInModel;
+  targetModelId?: string;
   pricingMultiplier?: number;
-  group?: string;
+  group: 'Recommended' | 'Custom';
 }
 
 function ModelTooltipContent({
@@ -99,7 +100,7 @@ interface ModelSelectProps {
 }
 
 function getThinkingDefaultOptionsForModel(
-  model: (typeof availableModels)[number],
+  model: BuiltInModel,
   preferences: UserPreferences,
 ): Parameters<typeof getModelThinkingDisplayState>[2] {
   const provider = model.officialProvider;
@@ -155,26 +156,31 @@ export const ModelSelect = memo(function ModelSelect({
   // Build flat model options list
   const modelOptions = useMemo<ModelOption[]>(() => {
     const disabled = new Set(disabledModelIds);
-    const builtIn: ModelOption[] = availableModels
-      .filter((m) => !disabled.has(m.modelId))
-      .map((model) => {
-        const thinkingDisplay = getModelThinkingDisplayState(
-          model,
-          modelThinkingOverrides[model.modelId],
-          getThinkingDefaultOptionsForModel(model, preferences),
-        );
+    const builtIn: ModelOption[] = getSelectableBuiltInModels({
+      disabledModelIds,
+    }).map((model) => {
+      const thinkingDisplay = getModelThinkingDisplayState(
+        model.targetModel,
+        model.kind === 'alias'
+          ? model.alias.thinkingPreset
+          : modelThinkingOverrides[model.targetModelId],
+        getThinkingDefaultOptionsForModel(model.targetModel, preferences),
+      );
 
-        return {
-          modelId: model.modelId,
-          displayName: model.modelDisplayName,
-          description: model.modelDescription,
-          context: model.modelContext,
-          thinkingEnabled: thinkingDisplay !== null,
-          thinkingLabel: thinkingDisplay?.label,
-          catalogModel: model,
-          pricingMultiplier: model.pricing?.relativeMultiplier,
-        };
-      });
+      return {
+        modelId: model.modelId,
+        displayName: model.modelDisplayName,
+        description: model.modelDescription,
+        context: model.modelContext,
+        thinkingEnabled: thinkingDisplay !== null,
+        thinkingLabel: thinkingDisplay?.label,
+        isAlias: model.kind === 'alias',
+        catalogModel: model.kind === 'alias' ? undefined : model.targetModel,
+        targetModelId: model.targetModelId,
+        pricingMultiplier: model.pricing?.relativeMultiplier,
+        group: model.kind === 'alias' ? 'Recommended' : 'Custom',
+      };
+    });
 
     const custom: ModelOption[] = customModels
       .filter((m) => !disabled.has(m.modelId))
@@ -200,25 +206,23 @@ export const ModelSelect = memo(function ModelSelect({
     return map;
   }, [modelOptions]);
 
-  // Group models for rendering (ungrouped built-in + custom group)
+  // Group models for rendering (recommended aliases first, then the rest).
   const groupedModels = useMemo(() => {
-    const groups: { label: string | null; models: ModelOption[] }[] = [];
-    const ungrouped: ModelOption[] = [];
-    const customGroup: ModelOption[] = [];
+    const recommended: ModelOption[] = [];
+    const custom: ModelOption[] = [];
 
     for (const model of modelOptions) {
-      if (model.group === 'Custom') {
-        customGroup.push(model);
+      if (model.group === 'Recommended') {
+        recommended.push(model);
       } else {
-        ungrouped.push(model);
+        custom.push(model);
       }
     }
 
-    if (ungrouped.length > 0) groups.push({ label: null, models: ungrouped });
-    if (customGroup.length > 0)
-      groups.push({ label: 'Custom', models: customGroup });
-
-    return groups;
+    return [
+      { label: 'Recommended', models: recommended },
+      { label: 'Custom', models: custom },
+    ].filter(({ models }) => models.length > 0);
   }, [modelOptions]);
 
   const [open, setOpen] = useState(false);
@@ -271,15 +275,16 @@ export const ModelSelect = memo(function ModelSelect({
   const hasFilteredResults = filteredModelIds.length > 0;
 
   // Display labels for the trigger
-  const selectedDisplayName = useMemo(() => {
-    if (!selectedModel) return 'Select model';
-    return modelMap.get(selectedModel)?.displayName ?? selectedModel;
-  }, [modelMap, selectedModel]);
+  const selectedModelOption = selectedModel
+    ? modelMap.get(selectedModel)
+    : undefined;
 
-  const selectedThinkingLabel = useMemo(() => {
-    if (!selectedModel) return undefined;
-    return modelMap.get(selectedModel)?.thinkingLabel;
-  }, [modelMap, selectedModel]);
+  const selectedDisplayName =
+    selectedModelOption?.displayName ?? selectedModel ?? 'Select model';
+
+  const selectedThinkingLabel = selectedModelOption?.isAlias
+    ? undefined
+    : selectedModelOption?.thinkingLabel;
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -320,7 +325,9 @@ export const ModelSelect = memo(function ModelSelect({
 
   const editingThinkingModel = useMemo(
     () =>
-      availableModels.find((model) => model.modelId === editingThinkingModelId),
+      editingThinkingModelId
+        ? getAvailableModel(editingThinkingModelId)
+        : undefined,
     [editingThinkingModelId],
   );
 
@@ -401,24 +408,26 @@ export const ModelSelect = memo(function ModelSelect({
 
   const handleSetThinkingEnabled = useCallback(
     async (modelId: string, enabled: boolean) => {
-      const model = availableModels.find((item) => item.modelId === modelId);
+      const model = getAvailableModel(modelId);
       if (!model) return;
+      const targetModelId = model.modelId;
 
       const route = getThinkingDefaultOptionsForModel(model, preferences);
       const option = enabled
         ? getEnabledModelThinkingOption(
             model,
-            modelThinkingOverrides[modelId]?.value,
+            modelThinkingOverrides[targetModelId]?.value,
             route,
           )
         : (getModelThinkingOptions(model, route).find(
-            (item) => item.value === modelThinkingOverrides[modelId]?.value,
+            (item) =>
+              item.value === modelThinkingOverrides[targetModelId]?.value,
           ) ?? getModelThinkingOptions(model, route)[0]);
       if (!option) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.modelThinkingOverrides[modelId] = {
-          ...draft.agent.modelThinkingOverrides[modelId],
+        draft.agent.modelThinkingOverrides[targetModelId] = {
+          ...draft.agent.modelThinkingOverrides[targetModelId],
           enabled,
           provider: option.provider,
           value: option.value,
@@ -431,8 +440,9 @@ export const ModelSelect = memo(function ModelSelect({
 
   const handleSetThinkingValue = useCallback(
     async (modelId: string, value: string) => {
-      const model = availableModels.find((item) => item.modelId === modelId);
+      const model = getAvailableModel(modelId);
       if (!model) return;
+      const targetModelId = model.modelId;
 
       const route = getThinkingDefaultOptionsForModel(model, preferences);
       const option = getModelThinkingOptions(model, route).find(
@@ -441,7 +451,7 @@ export const ModelSelect = memo(function ModelSelect({
       if (!option) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.modelThinkingOverrides[modelId] = {
+        draft.agent.modelThinkingOverrides[targetModelId] = {
           enabled: true,
           provider: option.provider,
           value: option.value,
@@ -454,8 +464,9 @@ export const ModelSelect = memo(function ModelSelect({
 
   const handleResetThinkingOverride = useCallback(
     async (modelId: string) => {
+      const targetModelId = getAvailableModel(modelId)?.modelId ?? modelId;
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        delete draft.agent.modelThinkingOverrides[modelId];
+        delete draft.agent.modelThinkingOverrides[targetModelId];
       });
       await updatePreferences(patches);
     },
@@ -465,14 +476,16 @@ export const ModelSelect = memo(function ModelSelect({
   const handleCycleThinkingEffort = useCallback(() => {
     if (!selectedModel) return false;
 
-    const model = availableModels.find(
-      (item) => item.modelId === selectedModel,
-    );
+    // Aliases use fixed thinking presets — cycling is disabled for them.
+    if (getModelAlias(selectedModel)) return false;
+
+    const model = getAvailableModel(selectedModel);
     if (!model) return false;
+    const targetModelId = model.modelId;
 
     const display = getModelThinkingDisplayState(
       model,
-      modelThinkingOverrides[model.modelId],
+      modelThinkingOverrides[targetModelId],
       getThinkingDefaultOptionsForModel(model, preferences),
     );
     if (!display) return false;
@@ -480,7 +493,7 @@ export const ModelSelect = memo(function ModelSelect({
     const route = getThinkingDefaultOptionsForModel(model, preferences);
     const nextOption = getNextModelThinkingOption(model, display.value, route);
     const [, patches] = produceWithPatches(preferences, (draft) => {
-      draft.agent.modelThinkingOverrides[model.modelId] = {
+      draft.agent.modelThinkingOverrides[targetModelId] = {
         enabled: true,
         provider: nextOption.provider,
         value: nextOption.value,
@@ -590,30 +603,21 @@ export const ModelSelect = memo(function ModelSelect({
                   className="mask-alpha scrollbar-subtle max-h-48 overflow-y-auto"
                   style={listMaskStyle}
                 >
-                  {filteredGroupedModels.map(({ label, models }) =>
-                    label ? (
-                      <ComboboxGroup key={label}>
-                        <ComboboxGroupLabel>{label}</ComboboxGroupLabel>
-                        {models.map((model) => (
-                          <ModelItem
-                            key={model.modelId}
-                            model={model}
-                            onHighlight={handleItemHover}
-                            onEditThinking={handleEditThinking}
-                          />
-                        ))}
-                      </ComboboxGroup>
-                    ) : (
-                      models.map((model) => (
+                  {filteredGroupedModels.map(({ label, models }) => (
+                    <ComboboxGroup key={label}>
+                      <ComboboxGroupLabel className="px-1.5 pt-2 pb-1 font-normal text-sidebar-foreground text-xs first:pt-0">
+                        {label}
+                      </ComboboxGroupLabel>
+                      {models.map((model) => (
                         <ModelItem
                           key={model.modelId}
                           model={model}
                           onHighlight={handleItemHover}
                           onEditThinking={handleEditThinking}
                         />
-                      ))
-                    ),
-                  )}
+                      ))}
+                    </ComboboxGroup>
+                  ))}
                 </div>
 
                 {!hasFilteredResults && (
@@ -697,15 +701,6 @@ const ModelItem = memo(function ModelItem({
     event: React.MouseEvent<HTMLElement>,
   ) => void;
 }) {
-  const PriceIcon =
-    model.pricingMultiplier != null
-      ? model.pricingMultiplier < 0.5
-        ? IconArrowDownOutline18
-        : model.pricingMultiplier > 2.0
-          ? IconArrowUpOutline18
-          : null
-      : null;
-
   const itemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -730,18 +725,22 @@ const ModelItem = memo(function ModelItem({
       <span className="col-start-2 flex min-w-0 flex-row items-center justify-between gap-4 text-xs">
         <div className="flex flex-row items-center gap-1.5">
           <span className="truncate">{model.displayName}</span>
-          {PriceIcon && (
-            <span className="inline-flex items-center text-subtle-foreground">
-              $
-              <PriceIcon className="size-2.75" />
-            </span>
-          )}
         </div>
         {model.thinkingLabel && (
-          <span className="relative flex h-4 min-w-14 shrink-0 items-center justify-end text-[10px]">
-            <span className="inline-flex items-center gap-1 text-subtle-foreground group-data-[highlighted]/item:opacity-0">
+          <span
+            className={cn(
+              'relative flex h-4 shrink-0 items-center justify-end text-[10px]',
+              model.isAlias ? 'min-w-3' : 'min-w-14',
+            )}
+          >
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 text-subtle-foreground',
+                !model.isAlias && 'group-data-[highlighted]/item:opacity-0',
+              )}
+            >
               <IconBrainOutline18 className="size-2.75" />
-              {model.thinkingLabel}
+              {!model.isAlias && model.thinkingLabel}
             </span>
             {model.catalogModel && (
               <Button
@@ -749,7 +748,9 @@ const ModelItem = memo(function ModelItem({
                 variant="ghost"
                 size="xs"
                 className="absolute right-0 h-auto px-0 py-0 text-[10px] opacity-0 group-data-[highlighted]/item:opacity-100"
-                onClick={(event) => onEditThinking(model.modelId, event)}
+                onClick={(event) =>
+                  onEditThinking(model.targetModelId ?? model.modelId, event)
+                }
               >
                 Edit
               </Button>

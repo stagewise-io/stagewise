@@ -56,6 +56,115 @@ const agentStepMetadata = {
   [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
 };
 
+describe('model alias routing', () => {
+  it('accepts alias IDs as built-in models', () => {
+    const service = createTestModelProviderService();
+
+    expect(service.modelExists('default')).toBe(true);
+    expect(service.modelExists('quick')).toBe(true);
+    expect(service.modelExists('smart')).toBe(true);
+  });
+
+  it.each([
+    ['default', 'deepseek', 'deepseek-v4-pro'],
+    ['quick', 'google', 'gemini-3.5-flash'],
+    ['smart', 'z-ai', 'glm-5.2'],
+  ] as const)('routes %s through the target built-in model', (aliasId, provider, targetModelId) => {
+    const service = createTestModelProviderService();
+
+    const result = service.getModelWithOptions(aliasId, 'trace-1');
+
+    expect(result.contextWindowSize).toBeGreaterThan(0);
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'stagewise',
+      provider,
+      modelId: `${provider}/${targetModelId}`,
+    });
+  });
+
+  it('uses fixed preset reasoning for alias requests', () => {
+    const service = createTestModelProviderService();
+
+    const defaultResult = service.getModelWithOptions(
+      'default',
+      'trace-1',
+      agentStepMetadata,
+    );
+    const quickResult = service.getModelWithOptions(
+      'quick',
+      'trace-1',
+      agentStepMetadata,
+    );
+    const smartResult = service.getModelWithOptions(
+      'smart',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(defaultResult.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'medium' },
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        provider: { require_parameters: true },
+      },
+    });
+    expect(quickResult.providerOptions).toMatchObject({
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'low' },
+      },
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+    });
+    expect(smartResult.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'xhigh' },
+      stagewise: { reasoning: { enabled: true, effort: 'xhigh' } },
+    });
+  });
+
+  it('ignores target model thinking overrides for alias requests', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: {
+        'deepseek-v4-pro': { value: 'high' },
+      },
+    });
+
+    const result = service.getModelWithOptions(
+      'default',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'medium' },
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        provider: { require_parameters: true },
+      },
+    });
+  });
+
+  it('keeps target model thinking overrides for concrete requests', () => {
+    const service = createTestModelProviderService({
+      modelThinkingOverrides: {
+        'deepseek-v4-pro': { value: 'high' },
+      },
+    });
+
+    const result = service.getModelWithOptions(
+      'deepseek-v4-pro',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'high' },
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        provider: { require_parameters: true },
+      },
+    });
+  });
+});
+
 describe('thinking override provider option resolution', () => {
   it('returns base provider options unchanged when no override exists', () => {
     const service = createTestModelProviderService();

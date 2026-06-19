@@ -1,4 +1,7 @@
-import type { ModelSettings } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  ModelSettings,
+  ModelThinkingOverride,
+} from '@shared/karton-contracts/ui/shared-types';
 
 const anthropicHeaders = {
   'anthropic-beta':
@@ -1318,8 +1321,123 @@ export const availableModels = [
   },
 ] as const satisfies ModelSettings[];
 
-export type BuiltInModelId = (typeof availableModels)[number]['modelId'];
-export type ModelId = BuiltInModelId | (string & {});
+export type BuiltInModel = (typeof availableModels)[number];
+export type BuiltInModelId = BuiltInModel['modelId'];
+
+export const availableModelAliases = [
+  {
+    modelId: 'default',
+    targetModelId: 'deepseek-v4-pro',
+    modelDisplayName: 'Default',
+    modelDescription:
+      'Recommended balanced model for everyday agent work, powered by DeepSeek V4 Pro.',
+    thinkingPreset: { enabled: true, value: 'medium' },
+  },
+  {
+    modelId: 'quick',
+    targetModelId: 'gemini-3.5-flash',
+    modelDisplayName: 'Quick',
+    modelDescription:
+      'Recommended fast model for quick iterations and lightweight changes, powered by Gemini 3.5 Flash.',
+    thinkingPreset: { enabled: true, value: 'low' },
+  },
+  {
+    modelId: 'smart',
+    targetModelId: 'glm-5.2',
+    modelDisplayName: 'Smart',
+    modelDescription:
+      'Recommended high-reasoning model for complex coding and planning, powered by GLM 5.2.',
+    thinkingPreset: { enabled: true, value: 'xhigh' },
+  },
+] as const satisfies readonly {
+  modelId: string;
+  targetModelId: BuiltInModelId;
+  modelDisplayName: string;
+  modelDescription: string;
+  thinkingPreset: ModelThinkingOverride;
+}[];
+
+export type ModelAlias = (typeof availableModelAliases)[number];
+export type ModelAliasId = ModelAlias['modelId'];
+export type ModelId = BuiltInModelId | ModelAliasId | (string & {});
+
+type SelectableBuiltInConcreteModel = BuiltInModel & {
+  kind: 'model';
+  targetModelId: BuiltInModelId;
+  targetModel: BuiltInModel;
+};
+
+type SelectableBuiltInAliasModel = Omit<
+  BuiltInModel,
+  'modelId' | 'modelDisplayName' | 'modelDescription'
+> & {
+  kind: 'alias';
+  modelId: ModelAliasId;
+  modelDisplayName: string;
+  modelDescription: string;
+  targetModelId: BuiltInModelId;
+  targetModel: BuiltInModel;
+  alias: ModelAlias;
+};
+
+export type SelectableBuiltInModel =
+  | SelectableBuiltInConcreteModel
+  | SelectableBuiltInAliasModel;
+
+export function getModelAlias(modelId: string): ModelAlias | undefined {
+  return availableModelAliases.find((alias) => alias.modelId === modelId);
+}
+
+export function resolveModelAlias(modelId: string): string {
+  return getModelAlias(modelId)?.targetModelId ?? modelId;
+}
+
+export function getAvailableModel(modelId: string): BuiltInModel | undefined {
+  const resolvedModelId = resolveModelAlias(modelId);
+  return availableModels.find((model) => model.modelId === resolvedModelId);
+}
+
+export function getSelectableBuiltInModels({
+  disabledModelIds,
+}: {
+  disabledModelIds?: Iterable<string>;
+} = {}): SelectableBuiltInModel[] {
+  const disabled = new Set(disabledModelIds);
+  const aliases = availableModelAliases.flatMap((alias) => {
+    const targetModel = getAvailableModel(alias.targetModelId);
+    if (!targetModel) return [];
+    // Aliases are always available in the selector regardless of whether
+    // their target model is disabled. "Disabling" a model only hides it
+    // from the selector — it does not block backend routing.
+    if (disabled.has(alias.modelId)) {
+      return [];
+    }
+
+    return [
+      {
+        ...targetModel,
+        kind: 'alias' as const,
+        modelId: alias.modelId,
+        modelDisplayName: alias.modelDisplayName,
+        modelDescription: alias.modelDescription,
+        targetModelId: alias.targetModelId,
+        targetModel,
+        alias,
+      },
+    ];
+  });
+
+  const concreteModels = availableModels
+    .filter((model) => !disabled.has(model.modelId))
+    .map((model) => ({
+      ...model,
+      kind: 'model' as const,
+      targetModelId: model.modelId,
+      targetModel: model,
+    }));
+
+  return [...aliases, ...concreteModels];
+}
 
 /**
  * Look up a model's capabilities by ID.
@@ -1329,7 +1447,7 @@ export type ModelId = BuiltInModelId | (string & {});
 export function getModelCapabilities(
   modelId: ModelId,
 ): ModelSettings['capabilities'] {
-  const model = availableModels.find((m) => m.modelId === modelId);
+  const model = getAvailableModel(modelId);
   if (model) return model.capabilities;
 
   return {
