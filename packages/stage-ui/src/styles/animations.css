@@ -203,3 +203,12 @@
 @utility shimmer-to-* {
   --shimmer-color-2: --value(--color-*);
 }
+
+/* When the app window is not focused or the page is hidden, pause all
+   infinite CSS animations to let the browser compositor and GPU enter
+   low-power states. Paused animations resume from their current frame
+   when focus is restored — no visible jump. */
+:root.app-idle *,
+.app-idle * {
+  animation-play-state: paused !important;
+}
