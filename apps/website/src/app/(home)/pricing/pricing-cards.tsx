@@ -28,7 +28,7 @@ export function PricingCards({ plans }: PricingCardsProps) {
           <ScrollReveal key={plan.name} delay={100}>
             <div className="relative flex h-full flex-col rounded-2xl bg-surface-1 p-8">
               <div className="mb-8 text-center">
-                <h3 className="mb-6 font-bold text-2xl text-foreground">
+                <h3 className="mb-6 font-medium text-2xl text-foreground">
                   {plan.name}
                 </h3>
                 <div className="mb-4">

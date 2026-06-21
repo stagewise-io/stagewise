@@ -14,14 +14,40 @@ import efficientCodingAgentDark from './feature-images/efficient-coding-agent-da
 import efficientCodingAgentLight from './feature-images/efficient-coding-agent-light.webp';
 import agentManagementDark from './feature-images/agent-management-dark.webp';
 import agentManagementLight from './feature-images/agent-management-light.webp';
-import useExistingSubscriptionDark from './feature-images/use-existing-subscription-dark.webp';
-import useExistingSubscriptionLight from './feature-images/use-existing-subscription-light.webp';
 import fullDemoDark from './feature-images/full-demo-dark.webp';
 import fullDemoLight from './feature-images/full-demo-light.webp';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
 import companyAbout from './feature-images/company-about.webp';
 
+import { Cloud, Key, Monitor } from 'lucide-react';
+
+const DARK_FILTER: Record<string, string> = {
+  'openai.png': 'dark:invert',
+  'anthropic.png': 'dark:invert',
+  'ollama.png': 'dark:invert',
+  'chatgpt.png': 'dark:invert',
+  'aws.png': 'dark:[filter:invert(1)_hue-rotate(180deg)]',
+};
+
+const PROVIDER_ICONS: Record<string, string[]> = {
+  'stagewise Cloud': [
+    'chatgpt.png',
+    'claude.png',
+    'gemini.png',
+    'deepseek.png',
+    'kimi.png',
+    'minimax.png',
+  ],
+  'BYOK / External subscriptions': [
+    'openai.png',
+    'anthropic.png',
+    'aws.png',
+    'azure.png',
+    'vertex.png',
+  ],
+  'Local inference': ['vllm.png', 'lmstudio.webp', 'ollama.png'],
+};
 import { NewsSection } from './news-section';
 import { ModelProviderShowcase } from './model-provider-showcase';
 
@@ -131,6 +157,64 @@ function FeatureSection() {
       </div>
 
       <div className="flex flex-col items-stretch gap-10 md:gap-20">
+        <ScrollReveal delay={0}>
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row-reverse md:items-center md:gap-12">
+            <div className="space-y-2">
+              <h3 className="font-medium text-2xl">Use any model</h3>
+              <p className="text-base text-muted-foreground">
+                Access frontier and open-weight models through the stagewise
+                Cloud, your own API subscriptions, or run them locally — no
+                lock-in.
+              </p>
+            </div>
+            <div className="relative flex w-full shrink-0 overflow-hidden rounded-md bg-background ring-1 ring-surface-2 md:aspect-square md:max-w-[60%]">
+              <div
+                className="absolute inset-0 opacity-5"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(to right, var(--color-muted-foreground) 1px, transparent 1px), linear-gradient(to bottom, var(--color-muted-foreground) 1px, transparent 1%)',
+                  backgroundSize: '20px 20px',
+                }}
+              />
+              <div className="relative flex h-full w-full flex-col items-stretch justify-center gap-4 p-6 sm:gap-6 sm:p-12 md:gap-8 md:p-16 lg:gap-10 lg:p-20">
+                {[
+                  { icon: Cloud, label: 'stagewise Cloud' },
+                  { icon: Key, label: 'BYOK / External subscriptions' },
+                  { icon: Monitor, label: 'Local inference' },
+                ].map(({ icon: Icon, label }) => (
+                  <div
+                    key={label}
+                    className="flex flex-1 flex-col items-start justify-start gap-3 overflow-hidden rounded-md border border-border-subtle bg-background p-3 shadow-md"
+                  >
+                    <div className="flex shrink-0 flex-row items-center gap-1">
+                      <Icon className="size-4 text-muted-foreground" />
+                      <span className="font-medium text-muted-foreground text-xs">
+                        {label}
+                      </span>
+                    </div>
+                    <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-center gap-4 overflow-hidden md:gap-7">
+                      {PROVIDER_ICONS[label]?.map((icon) => (
+                        <div
+                          key={icon}
+                          className={cn('relative shrink-0', DARK_FILTER[icon])}
+                        >
+                          <Image
+                            src={`/icons/${icon}`}
+                            alt=""
+                            width={32}
+                            height={32}
+                            className="size-6 max-w-none object-contain md:size-8"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </ScrollReveal>
+
         <ScrollReveal delay={100}>
           <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
             <div className="space-y-2">
@@ -241,88 +325,6 @@ function FeatureSection() {
             </div>
           </div>
         </ScrollReveal>
-
-        <ScrollReveal delay={300}>
-          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
-            <div className="space-y-2">
-              <h3 className="font-medium text-2xl">
-                Use any coding subscription
-              </h3>
-              <p className="text-base text-muted-foreground">
-                Use all popular models through your stagewise account, or
-                connect any existing coding subscription.
-              </p>
-              <div className="pt-12">
-                <p className="mb-3 text-muted-foreground text-sm">
-                  Supported subscriptions
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    'GLM Coding Plan',
-                    'Kimi',
-                    'Qwen Coding Plan',
-                    'MiniMax',
-                    'OpenAI',
-                    'Anthropic',
-                    'Google Gemini',
-                    'DeepSeek',
-                  ].map((plan) => (
-                    <span
-                      key={plan}
-                      className="rounded-full border border-border-subtle px-3 py-1 text-foreground/80 text-sm"
-                    >
-                      {plan}
-                    </span>
-                  ))}
-                  <span className="px-1 py-1 text-muted-foreground/50 text-sm">
-                    & more
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div
-              className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[60%]"
-              style={{ aspectRatio: '1 / 1' }}
-            >
-              <Image
-                src={bgLight}
-                className="absolute inset-0 h-full w-full object-cover dark:hidden"
-                alt=""
-                sizes={FEATURE_IMAGE_SIZES}
-                quality={70}
-              />
-              <Image
-                src={bgDark}
-                className="absolute inset-0 hidden h-full w-full object-cover dark:block"
-                alt=""
-                sizes={FEATURE_IMAGE_SIZES}
-                quality={70}
-              />
-              <Image
-                src={useExistingSubscriptionLight}
-                className="absolute top-1/2 left-1/2 w-full dark:hidden"
-                style={{
-                  transform: 'translateX(-50%) translateY(-50%) scale(0.92)',
-                  transformOrigin: 'center center',
-                }}
-                alt="Use existing subscription view"
-                sizes={FEATURE_IMAGE_SIZES}
-                quality={80}
-              />
-              <Image
-                src={useExistingSubscriptionDark}
-                className="absolute top-1/2 left-1/2 hidden w-full dark:block"
-                style={{
-                  transform: 'translateX(-50%) translateY(-50%) scale(0.92)',
-                  transformOrigin: 'center center',
-                }}
-                alt="Use existing subscription view"
-                sizes={FEATURE_IMAGE_SIZES}
-                quality={80}
-              />
-            </div>
-          </div>
-        </ScrollReveal>
       </div>
     </section>
   );
@@ -366,16 +368,19 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
           <div className="w-full max-w-7xl">
             <ScrollReveal>
               <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left sm:px-0 md:mt-2 md:mb-8">
+                <span className="mb-3 inline-block rounded-full border border-primary-border px-3 py-1 font-medium text-primary-foreground text-xs">
+                  Open Source
+                </span>
                 <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
                   <span className="text-foreground">
-                    The Open Source Agentic IDE
+                    The Agentic IDE that runs on your stack
                   </span>
                 </h1>
                 <span className="mb-8 text-lg text-muted-foreground leading-relaxed">
-                  Create and orchestrate coding agents, show app previews and
-                  run git workflows.
+                  stagewise is a next-gen agent orchestrator for software
+                  engineers, leveraging our frontier-grade agent harness.
                   <br />
-                  Use your favorite models across all providers.
+                  Full model sovereignty. Runs locally, connects to anything.
                 </span>
 
                 <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -441,6 +446,30 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
 
       {/* Features */}
       <FeatureSection />
+
+      {/* Ready for your enterprise */}
+      <section className="relative z-10 w-full py-20 md:py-28">
+        <div className="flex justify-center">
+          <ScrollReveal>
+            <div className="max-w-3xl pt-8 text-center">
+              <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
+                Ready for your enterprise
+              </h2>
+              <p className="text-base text-muted-foreground">
+                Run stagewise the way your team needs — on your infrastructure,
+                with your models, under your control.
+              </p>
+              <a
+                href="https://docs.stagewise.io/enterprise"
+                className="mt-2 inline-flex items-center gap-2 text-primary-foreground hover:text-hover-derived active:text-active-derived"
+              >
+                stagewise for Enterprises
+                <IconArrowRightFill18 className="inline size-4" />
+              </a>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
 
       {/* News section */}
       <NewsSection posts={newsPosts} />
@@ -527,7 +556,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
             <div className="w-full max-w-7xl pt-8 text-center">
               <h2 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
                 <span className="text-foreground">
-                  The Open Source Agentic IDE
+                  The Agentic IDE that runs on your stack
                 </span>
               </h2>
 

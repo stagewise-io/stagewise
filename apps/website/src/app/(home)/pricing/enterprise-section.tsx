@@ -1,0 +1,272 @@
+'use client';
+
+import { useMemo, useState, useTransition } from 'react';
+import { Button } from '@stagewise/stage-ui/components/button';
+import { ScrollReveal } from '@/components/landing/scroll-reveal';
+import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
+import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { submitEnterpriseInquiry } from './actions';
+
+const MIN_LENGTH = { name: 2, company: 2, position: 2, problem: 3 };
+const VALIDATION_MSGS: Record<string, string> = {
+  name: 'Please enter your full name.',
+  company: 'Company name is too short.',
+  position: 'Position is too short.',
+  problem: 'Please describe your use case.',
+};
+
+const ENTERPRISE_FEATURES = [
+  'Regulatory and audit compliance',
+  'Global configuration of inference and models',
+  'Access to stagewise Cloud Inference and stagewise Cloud Inference EU',
+  'SSO with OIDC and SAML',
+  'Provisioning with SCIM',
+  'Optional self-hosting of the stagewise Cloud',
+];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface FormData {
+  name: string;
+  company: string;
+  position: string;
+  email: string;
+  phone: string;
+  problem: string;
+}
+
+export function EnterpriseSection() {
+  const [form, setForm] = useState<FormData>({
+    name: '',
+    company: '',
+    position: '',
+    email: '',
+    phone: '',
+    problem: '',
+  });
+
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const update = (field: keyof FormData, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+
+  const errors = useMemo(() => {
+    const e: Partial<Record<keyof FormData, string>> = {};
+    for (const field of ['name', 'company', 'position', 'problem'] as const) {
+      const val = form[field].trim();
+      const min = MIN_LENGTH[field];
+      if (val && val.length < min) {
+        e[field] = VALIDATION_MSGS[field];
+      }
+    }
+    return e;
+  }, [form]);
+
+  const emailError =
+    form.email.trim() && !EMAIL_RE.test(form.email.trim())
+      ? 'Please enter a valid email address.'
+      : undefined;
+
+  const isValid =
+    form.name.trim().length >= MIN_LENGTH.name &&
+    form.company.trim().length >= MIN_LENGTH.company &&
+    form.position.trim().length >= MIN_LENGTH.position &&
+    EMAIL_RE.test(form.email.trim()) &&
+    form.problem.trim().length >= MIN_LENGTH.problem;
+
+  const handleSubmit = () => {
+    setSubmitError(null);
+    startTransition(async () => {
+      try {
+        await submitEnterpriseInquiry({
+          name: form.name.trim(),
+          company: form.company.trim(),
+          position: form.position.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          problem: form.problem.trim(),
+        });
+        setSubmitted(true);
+      } catch {
+        setSubmitError('Something went wrong. Please try again.');
+      }
+    });
+  };
+
+  return (
+    <ScrollReveal>
+      <div className="mt-16 flex flex-col gap-10 md:flex-row md:gap-16">
+        {/* Features */}
+        <div className="flex-1 space-y-6">
+          <div className="space-y-2">
+            <h2 className="font-medium text-2xl text-foreground">
+              stagewise for Enterprise
+            </h2>
+            <p className="text-muted-foreground">
+              Built for teams that need control, compliance, and scale.
+            </p>
+          </div>
+
+          <ul className="space-y-4">
+            {ENTERPRISE_FEATURES.map((label) => (
+              <li
+                key={label}
+                className="flex items-start gap-3"
+                style={{ listStyle: 'none' }}
+              >
+                <IconCheckOutline18 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-foreground" />
+                <span className="text-foreground">{label}</span>
+              </li>
+            ))}
+          </ul>
+
+          <a
+            href="https://docs.stagewise.io/enterprise"
+            className="mt-2 inline-flex items-center gap-2 text-primary-foreground text-sm hover:text-hover-derived active:text-active-derived"
+          >
+            Learn more about stagewise for enterprises
+            <IconArrowRightFill18 className="inline size-4" />
+          </a>
+        </div>
+
+        {/* Form */}
+        {submitted ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-6 rounded-2xl bg-surface-1 p-10 text-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900">
+              <IconCheckOutline18 className="size-7 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-medium text-2xl text-foreground">
+                Thank you for your inquiry
+              </h3>
+              <p className="text-muted-foreground">
+                We have received your message and will get back to you shortly.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <form
+            className="flex-1 space-y-6 rounded-2xl bg-surface-1 p-6 md:p-8"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
+          >
+            <h3 className="font-medium text-2xl text-foreground">
+              Get in touch
+            </h3>
+
+            <div className="flex flex-col gap-2">
+              <label className="space-y-1.5">
+                <span className="font-medium text-foreground text-sm">
+                  Name
+                </span>
+                <input
+                  type="text"
+                  placeholder="Jane Smith"
+                  value={form.name}
+                  onChange={(e) => update('name', e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                />
+                {errors.name && (
+                  <p className="text-red-500 text-xs">{errors.name}</p>
+                )}
+              </label>
+              <label className="space-y-1.5">
+                <span className="font-medium text-foreground text-sm">
+                  Company
+                </span>
+                <input
+                  type="text"
+                  placeholder="Acme Inc."
+                  value={form.company}
+                  onChange={(e) => update('company', e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                />
+                {errors.company && (
+                  <p className="text-red-500 text-xs">{errors.company}</p>
+                )}
+              </label>
+              <label className="space-y-1.5">
+                <span className="font-medium text-foreground text-sm">
+                  Position
+                </span>
+                <input
+                  type="text"
+                  placeholder="VP of Engineering"
+                  value={form.position}
+                  onChange={(e) => update('position', e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                />
+                {errors.position && (
+                  <p className="text-red-500 text-xs">{errors.position}</p>
+                )}
+              </label>
+              <label className="space-y-1.5">
+                <span className="font-medium text-foreground text-sm">
+                  Company email
+                </span>
+                <input
+                  type="email"
+                  placeholder="jane@acme.com"
+                  value={form.email}
+                  onChange={(e) => update('email', e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                />
+                {emailError && (
+                  <p className="text-red-500 text-xs">{emailError}</p>
+                )}
+              </label>
+              <label className="space-y-1.5">
+                <span className="font-medium text-foreground text-sm">
+                  Phone{' '}
+                  <span className="font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </span>
+                <input
+                  type="tel"
+                  placeholder="+1 555 123 4567"
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className="font-medium text-foreground text-sm">
+                  What problem are you trying to solve?
+                </span>
+                <textarea
+                  placeholder="Tell us about your team's use case…"
+                  value={form.problem}
+                  onChange={(e) => update('problem', e.target.value)}
+                  rows={4}
+                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                />
+                {errors.problem && (
+                  <p className="text-red-500 text-xs">{errors.problem}</p>
+                )}
+              </label>
+            </div>
+
+            {submitError && (
+              <p className="text-red-500 text-sm">{submitError}</p>
+            )}
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full"
+              disabled={!isValid || isPending}
+            >
+              {isPending ? 'Sending…' : 'Send inquiry'}
+            </Button>
+          </form>
+        )}
+      </div>
+    </ScrollReveal>
+  );
+}
