@@ -3,17 +3,17 @@ import { getAllNewsPosts } from '@/lib/source';
 import { HomeClient } from './_components/home-client';
 
 export const metadata: Metadata = {
-  title: 'The Agentic IDE that runs on your stack · stagewise',
+  title: 'The Agentic IDE for Open-Source Models · stagewise',
   description:
     'Create and orchestrate powerful AI coding agents. Use any model, including frontier, open-weight, and locally deployed ones.',
   openGraph: {
-    title: 'The Agentic IDE that runs on your stack · stagewise',
+    title: 'The Agentic IDE for Open-Source Models · stagewise',
     description:
       'stagewise is a next-gen agent orchestrator for software engineers, leveraging a frontier-grade agent harness. Full model sovereignty. Runs locally, connects to anything.',
     type: 'website',
   },
   twitter: {
-    title: 'The Agentic IDE that runs on your stack · stagewise',
+    title: 'The Agentic IDE for Open-Source Models · stagewise',
     description:
       'stagewise is a next-gen agent orchestrator for software engineers, leveraging a frontier-grade agent harness. Full model sovereignty. Runs locally, connects to anything.',
     creator: '@stagewise_io',

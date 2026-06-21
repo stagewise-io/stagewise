@@ -169,7 +169,7 @@ export function ModelProviderShowcase() {
               </p>
 
               {/* Logos row */}
-              <div className="flex flex-wrap items-center justify-center gap-x-20 gap-y-12 pb-3">
+              <div className="flex flex-wrap items-center justify-center gap-x-20 gap-y-12 px-8 pb-3 sm:px-12 md:px-16 lg:px-24">
                 {PROVIDERS.map((provider) => (
                   <div
                     key={provider.id}

@@ -1,12 +1,10 @@
 import './global.css';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
 import { PostHogProvider } from '@/components/posthog-provider';
 import { CookieBanner } from '@/components/cookie-banner';
 import { SystemThemeProvider } from '@/components/theme-switcher';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   icons: {
@@ -36,7 +34,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${inter.className} scrollbar-subtle bg-background`}
+      className={`${GeistSans.className} scrollbar-subtle bg-background`}
       suppressHydrationWarning
     >
       <head>
