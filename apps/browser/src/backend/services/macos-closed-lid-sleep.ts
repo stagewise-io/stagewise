@@ -12,7 +12,7 @@ const OSASCRIPT_PATH = '/usr/bin/osascript';
 const SUDO_PATH = '/usr/bin/sudo';
 const SUDOERS_RULE_PATH = '/etc/sudoers.d/stagewise-closed-lid-sleep';
 const SUDOERS_TEMP_RULE_PATH = '/tmp/stagewise-closed-lid-sleep-sudoers';
-const STATUS_REFRESH_INTERVAL_MS = 5_000;
+const STATUS_REFRESH_INTERVAL_MS = 30_000;
 
 type ClosedLidSleepState = {
   isSupported: boolean;
@@ -130,6 +130,10 @@ export class MacOSClosedLidSleepService extends DisposableService {
     });
 
     this.statusInterval = setInterval(() => {
+      // Only poll when the feature is actively in use or transitioning.
+      // When closed-lid sleep is off and stable, skip the expensive pmset
+      // fork/exec to save energy.
+      if (!this.ownedByStagewise && !this.isChanging) return;
       this.syncState().catch((error) => {
         this.logger.debug(
           '[MacOSClosedLidSleepService] Failed to refresh state',
