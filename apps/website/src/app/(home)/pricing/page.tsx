@@ -90,7 +90,7 @@ export default function PricingPage() {
 
   return (
     <section className="relative z-10 mt-12 w-full pb-4 md:pb-6">
-      <div className="flex justify-start">
+      <div className="flex justify-center">
         <div className="w-full max-w-7xl">
           <ScrollReveal>
             <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left md:mt-2 md:mb-8">
