@@ -53,6 +53,7 @@ export default function PricingPage() {
             'Run additional models from custom endpoints',
           ],
           cta: 'Get Pro',
+          href: 'https://console.stagewise.io',
         },
         {
           label: 'Ultra',
@@ -64,6 +65,7 @@ export default function PricingPage() {
             'Run additional models from custom endpoints',
           ],
           cta: 'Get Ultra',
+          href: 'https://console.stagewise.io',
         },
       ],
     },

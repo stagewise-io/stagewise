@@ -100,6 +100,12 @@ export function EnterpriseSection() {
     ) {
       e.position = VALIDATION_MSGS.position;
     }
+    if (serverErrors.position) {
+      e.position = serverErrors.position;
+    }
+    if (serverErrors.phone) {
+      e.phone = serverErrors.phone;
+    }
     if (serverErrors.email) {
       e.email = serverErrors.email;
     } else if (emailError) {
@@ -298,6 +304,9 @@ export function EnterpriseSection() {
                     onChange={(e) => update('phone', e.target.value)}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
+                  {fieldErrors.phone && (
+                    <p className="text-red-500 text-xs">{fieldErrors.phone}</p>
+                  )}
                 </label>
               </div>
               <label className="space-y-1.5">

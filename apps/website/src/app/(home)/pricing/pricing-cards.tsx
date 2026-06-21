@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
+import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { Button } from '@stagewise/stage-ui/components/button';
+import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';
+import Link from 'next/link';
 import { DownloadButtons } from '../_components/home-client';
 
 interface PlanVariant {
@@ -13,6 +15,7 @@ interface PlanVariant {
   period: string;
   features: string[];
   cta?: string;
+  href?: string;
 }
 
 interface Plan {
@@ -57,6 +60,7 @@ function PricingCard({ plan }: { plan: Plan }) {
   const displayPeriod = variant ? variant.period : plan.period;
   const displayFeatures = variant ? variant.features : plan.features;
   const displayCta = variant?.cta ?? plan.cta;
+  const displayHref = variant?.href ?? plan.href;
 
   return (
     <div className="relative flex h-full flex-col rounded-lg bg-surface-1 p-5">
@@ -120,37 +124,46 @@ function PricingCard({ plan }: { plan: Plan }) {
 
       {plan.useDownloadButton ? (
         <DownloadButtons className="w-full" />
-      ) : plan.href ? (
-        <a href={plan.href} className="block">
-          <Button
-            className={cn('w-full', !plan.popular && 'bg-surface-2')}
-            variant={
-              plan.useSecondaryButton
+      ) : displayHref ? (
+        <Link
+          href={displayHref}
+          className={cn(
+            buttonVariants({
+              variant: plan.useSecondaryButton
                 ? 'secondary'
                 : plan.popular
                   ? 'primary'
-                  : 'secondary'
-            }
-            size="lg"
-          >
-            {displayCta ?? 'Get Started'}
-          </Button>
-        </a>
-      ) : (
-        <Button
-          onClick={() => window.open('https://console.stagewise.io', '_blank')}
-          className={cn('w-full', !plan.popular && 'bg-surface-2')}
-          variant={
-            plan.useSecondaryButton
-              ? 'secondary'
-              : plan.popular
-                ? 'primary'
-                : 'secondary'
-          }
-          size="lg"
+                  : 'secondary',
+              size: 'lg',
+            }),
+            'w-full',
+            !plan.popular && 'bg-surface-2',
+          )}
         >
           {displayCta ?? 'Get Started'}
-        </Button>
+          <IconArrowRightFill18 className="inline size-4" />
+        </Link>
+      ) : (
+        <Link
+          href="https://console.stagewise.io"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            buttonVariants({
+              variant: plan.useSecondaryButton
+                ? 'secondary'
+                : plan.popular
+                  ? 'primary'
+                  : 'secondary',
+              size: 'lg',
+            }),
+            'w-full',
+            !plan.popular && 'bg-surface-2',
+          )}
+        >
+          {displayCta ?? 'Get Started'}
+          <IconArrowRightFill18 className="inline size-4" />
+        </Link>
       )}
     </div>
   );
