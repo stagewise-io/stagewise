@@ -103,7 +103,7 @@ export function buildChatSystemPrompt(args: BuildChatSystemPromptArgs): string {
 function renderProtocolsTable(protocols: readonly OutputProtocol[]): string {
   if (protocols.length === 0) return '';
   const rows = protocols.map(
-    (p) => `| \`${p.name}\` | \`${p.syntax}\` | ${p.rule} |`,
+    (p) => `| \`${p.name}\` | ${p.syntax} | ${p.rule} |`,
   );
   return [
     '### Protocols',
@@ -120,7 +120,7 @@ function renderAliasesTable(aliases: readonly OutputAlias[]): string {
   return [
     '### Aliases',
     '',
-    'Markdown links with descriptive labels and these alias hrefs render as host-resolved URLs (e.g. `[Report an issue](report-agent-issue)`).',
+    'Markdown links with descriptive labels and these alias hrefs render as host-resolved URLs (e.g. [Report an issue](report-agent-issue)).',
     '',
     '| Alias | Use Case |',
     '|-------|----------|',
