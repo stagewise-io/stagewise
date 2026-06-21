@@ -6,6 +6,7 @@ import bgDark from '../_components/feature-images/bg-dark.jpg';
 import bgLight from '../_components/feature-images/bg-light.jpg';
 import githubRepoIssuesDark from '../_components/feature-images/github-repo-issues-dark.webp';
 import githubRepoIssuesLight from '../_components/feature-images/github-repo-issues-light.webp';
+import foundersImage from './team-pic.jpg';
 
 interface Backer {
   name: string;
@@ -153,7 +154,7 @@ function BackerCell({ backer, index }: { backer: Backer; index: number }) {
 
 export default function CompanyPage() {
   return (
-    <div className="relative mx-auto w-full max-w-7xl px-4">
+    <div className="relative mx-auto w-full max-w-5xl px-4">
       <ScrollReveal>
         <div className="flex flex-col items-start gap-1 text-left">
           <p className="font-medium text-muted-foreground text-sm uppercase tracking-wide">
@@ -213,6 +214,41 @@ export default function CompanyPage() {
               not just into one of these systems at a time, but doing meaningful
               work across platforms, databases, and machines in parallel.
             </p>
+
+            <div className="not-prose my-12 rounded-lg bg-surface-1 p-6">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-10">
+                <Image
+                  src={foundersImage}
+                  alt="Glenn Töws and Julian Götze, the founders of stagewise"
+                  className="w-full shrink-0 rounded-md md:max-h-64 md:w-auto md:max-w-1/2"
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  quality={95}
+                />
+                <div className="space-y-6">
+                  <h2 className="font-medium text-2xl text-foreground tracking-tight md:text-3xl">
+                    Meet our founders
+                  </h2>
+                  <div className="grid grid-cols-1 gap-x-10 gap-y-3 md:grid-cols-2 md:gap-x-24">
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground text-lg">
+                        Glenn Töws
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        Chief Executive Officer
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground text-lg">
+                        Julian Götze
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        Chief Technology Officer
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <h2 className="font-medium text-foreground text-xl">
               Openness, Configurability, Affordability and Simplicity

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { PricingCards } from './pricing-cards';
+import { EnterpriseSection } from './enterprise-section';
 
 export const metadata: Metadata = {
   title: 'Pricing · stagewise',
@@ -73,6 +74,10 @@ export default function PricingPage() {
       <div className="mt-12">
         <PricingCards plans={plans} />
       </div>
+
+      <div className="mt-20 border-border border-t" />
+
+      <EnterpriseSection />
     </div>
   );
 }
