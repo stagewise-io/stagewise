@@ -368,12 +368,9 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
           <div className="w-full max-w-7xl">
             <ScrollReveal>
               <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left sm:px-0 md:mt-2 md:mb-8">
-                <span className="mb-3 inline-block rounded-full border border-primary-border px-3 py-1 font-medium text-primary-foreground text-xs">
-                  Open Source
-                </span>
                 <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
                   <span className="text-foreground">
-                    The Agentic IDE that runs on your stack
+                    The Agentic IDE for Open-Source Models
                   </span>
                 </h1>
                 <span className="mb-8 text-lg text-muted-foreground leading-relaxed">
@@ -556,7 +553,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
             <div className="w-full max-w-7xl pt-8 text-center">
               <h2 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
                 <span className="text-foreground">
-                  The Agentic IDE that runs on your stack
+                  The Agentic IDE for Open-Source Models
                 </span>
               </h2>
 
