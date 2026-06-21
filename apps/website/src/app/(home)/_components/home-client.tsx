@@ -456,13 +456,13 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                 Run stagewise the way your team needs — on your infrastructure,
                 with your models, under your control.
               </p>
-              <a
+              <Link
                 href="/enterprise"
                 className="mt-2 inline-flex items-center gap-2 text-base text-primary-foreground hover:text-hover-derived active:text-active-derived"
               >
                 stagewise for Enterprises
                 <IconArrowRightFill18 className="inline size-4" />
-              </a>
+              </Link>
             </div>
           </ScrollReveal>
         </div>

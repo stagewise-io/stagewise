@@ -56,7 +56,7 @@ function PricingCard({ plan }: { plan: Plan }) {
   const displayPrice = variant ? variant.price : plan.price;
   const displayPeriod = variant ? variant.period : plan.period;
   const displayFeatures = variant ? variant.features : plan.features;
-  const displayCta = variant ? variant.cta : plan.cta;
+  const displayCta = variant?.cta ?? plan.cta;
 
   return (
     <div className="relative flex h-full flex-col rounded-lg bg-surface-1 p-5">
@@ -87,6 +87,7 @@ function PricingCard({ plan }: { plan: Plan }) {
               <button
                 key={v.label}
                 type="button"
+                aria-pressed={i === selectedVariant}
                 onClick={() => setSelectedVariant(i)}
                 className={cn(
                   'rounded-md px-3 py-1 text-sm transition-colors',

@@ -5,7 +5,7 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
 import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
-import { submitEnterpriseInquiry } from './actions';
+import { submitEnterpriseInquiry, type EnterpriseFormErrors } from './actions';
 
 const MIN_LENGTH = { name: 2, company: 2, position: 2, problem: 3 };
 const VALIDATION_MSGS: Record<string, string> = {
@@ -70,27 +70,43 @@ export function EnterpriseSection() {
 
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [serverErrors, setServerErrors] = useState<EnterpriseFormErrors>({});
   const [isPending, startTransition] = useTransition();
 
   const update = (field: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const errors = useMemo(() => {
+  const emailError =
+    form.email.trim() && !EMAIL_RE.test(form.email.trim())
+      ? 'Please enter a valid email address.'
+      : undefined;
+
+  const fieldErrors = useMemo(() => {
     const e: Partial<Record<keyof FormData, string>> = {};
-    for (const field of ['name', 'company', 'position', 'problem'] as const) {
+    for (const field of ['name', 'company', 'problem'] as const) {
       const val = form[field].trim();
       const min = MIN_LENGTH[field];
       if (val && val.length < min) {
         e[field] = VALIDATION_MSGS[field];
       }
+      if (serverErrors[field]) {
+        e[field] = serverErrors[field];
+      }
+    }
+    // position is client-validated only (not required server-side)
+    if (
+      form.position.trim() &&
+      form.position.trim().length < MIN_LENGTH.position
+    ) {
+      e.position = VALIDATION_MSGS.position;
+    }
+    if (serverErrors.email) {
+      e.email = serverErrors.email;
+    } else if (emailError) {
+      e.email = emailError;
     }
     return e;
-  }, [form]);
-
-  const emailError =
-    form.email.trim() && !EMAIL_RE.test(form.email.trim())
-      ? 'Please enter a valid email address.'
-      : undefined;
+  }, [form, serverErrors, emailError]);
 
   const isValid =
     form.name.trim().length >= MIN_LENGTH.name &&
@@ -101,9 +117,10 @@ export function EnterpriseSection() {
 
   const handleSubmit = () => {
     setSubmitError(null);
+    setServerErrors({});
     startTransition(async () => {
       try {
-        await submitEnterpriseInquiry({
+        const result = await submitEnterpriseInquiry({
           name: form.name.trim(),
           company: form.company.trim(),
           position: form.position.trim(),
@@ -111,7 +128,11 @@ export function EnterpriseSection() {
           phone: form.phone.trim(),
           problem: form.problem.trim(),
         });
-        setSubmitted(true);
+        if (result.success) {
+          setSubmitted(true);
+        } else {
+          setServerErrors(result.errors);
+        }
       } catch {
         setSubmitError('Something went wrong. Please try again.');
       }
@@ -123,9 +144,9 @@ export function EnterpriseSection() {
       <div className="mt-16 flex flex-col gap-10 md:flex-row md:gap-16">
         {/* Features */}
         <div className="flex-1 space-y-6">
-          <p className="text-foreground">
+          <h2 className="font-medium text-foreground text-lg">
             Leverage AI driven development in your organization with stagewise.
-          </p>
+          </h2>
 
           <ul className="space-y-4">
             {ENTERPRISE_FEATURES.map((label) => (
@@ -210,8 +231,8 @@ export function EnterpriseSection() {
                     onChange={(e) => update('name', e.target.value)}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
-                  {errors.name && (
-                    <p className="text-red-500 text-xs">{errors.name}</p>
+                  {fieldErrors.name && (
+                    <p className="text-red-500 text-xs">{fieldErrors.name}</p>
                   )}
                 </label>
                 <label className="space-y-1.5">
@@ -225,8 +246,10 @@ export function EnterpriseSection() {
                     onChange={(e) => update('company', e.target.value)}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
-                  {errors.company && (
-                    <p className="text-red-500 text-xs">{errors.company}</p>
+                  {fieldErrors.company && (
+                    <p className="text-red-500 text-xs">
+                      {fieldErrors.company}
+                    </p>
                   )}
                 </label>
               </div>
@@ -241,8 +264,8 @@ export function EnterpriseSection() {
                   onChange={(e) => update('position', e.target.value)}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                 />
-                {errors.position && (
-                  <p className="text-red-500 text-xs">{errors.position}</p>
+                {fieldErrors.position && (
+                  <p className="text-red-500 text-xs">{fieldErrors.position}</p>
                 )}
               </label>
               <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
@@ -257,8 +280,8 @@ export function EnterpriseSection() {
                     onChange={(e) => update('email', e.target.value)}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
-                  {emailError && (
-                    <p className="text-red-500 text-xs">{emailError}</p>
+                  {fieldErrors.email && (
+                    <p className="text-red-500 text-xs">{fieldErrors.email}</p>
                   )}
                 </label>
                 <label className="space-y-1.5">
@@ -288,8 +311,8 @@ export function EnterpriseSection() {
                   rows={4}
                   className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                 />
-                {errors.problem && (
-                  <p className="text-red-500 text-xs">{errors.problem}</p>
+                {fieldErrors.problem && (
+                  <p className="text-red-500 text-xs">{fieldErrors.problem}</p>
                 )}
               </label>
             </div>
