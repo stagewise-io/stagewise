@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { PricingCards } from './pricing-cards';
-import { EnterpriseSection } from './enterprise-section';
 
 export const metadata: Metadata = {
   title: 'Pricing · stagewise',
@@ -25,59 +24,90 @@ export const metadata: Metadata = {
 export default function PricingPage() {
   const plans = [
     {
-      name: 'Free',
-      price: '$0',
-      period: 'per month',
-      description: 'Access all models',
+      name: 'Hobby',
+      price: 'Free',
+      period: '',
       features: [
         'Limited access to all models',
         'Bring Your Own Key (BYOK) for unlimited access and custom models',
       ],
       cta: 'Start now',
       popular: false,
+      useDownloadButton: true,
     },
     {
-      name: 'Pro',
-      price: '$20',
-      period: 'per month',
-      description: 'Everything in Free, plus',
-      features: ['6x higher limits for all models'],
-      cta: 'Get Pro',
-      popular: true,
-    },
-    {
-      name: 'Ultra',
-      price: '$200',
-      period: 'per month',
-      description: 'Everything in Pro, plus',
-      features: ['75x higher limits for all models'],
-      cta: 'Get Ultra',
+      name: 'Individual',
+      price: '',
+      period: '',
+      features: [],
       popular: false,
+      useSecondaryButton: true,
+      variants: [
+        {
+          label: 'Pro',
+          price: '$20',
+          period: '/mo',
+          features: [
+            '6x higher limits on all models',
+            'Extend usage with extra credits',
+            'Run additional models from custom endpoints',
+          ],
+          cta: 'Get Pro',
+        },
+        {
+          label: 'Ultra',
+          price: '$200',
+          period: '/mo',
+          features: [
+            '75x higher limits on all models',
+            'Extend usage with extra credits',
+            'Run additional models from custom endpoints',
+          ],
+          cta: 'Get Ultra',
+        },
+      ],
+    },
+    {
+      name: 'Enterprise',
+      price: 'Custom',
+      period: '',
+      features: [
+        'Regulatory and audit compliance',
+        'Global configuration of inference and models',
+        'Access to stagewise Cloud Inference and stagewise Cloud Inference EU',
+        'SSO with OIDC and SAML',
+        'Provisioning with SCIM',
+        'Optional self-hosting of the stagewise Cloud',
+      ],
+      cta: 'Contact Sales',
+      popular: false,
+      useSecondaryButton: true,
+      href: '/enterprise',
     },
   ];
 
   return (
-    <div className="relative mx-auto w-full max-w-7xl px-4">
-      <ScrollReveal>
-        <div className="flex flex-col items-start gap-4 text-left">
-          <h1 className="font-medium text-3xl text-foreground tracking-tight md:text-5xl">
-            Simple, transparent pricing
-          </h1>
-          <p className="max-w-2xl text-lg text-muted-foreground">
-            Start for free, then upgrade to Pro or Ultra for significantly
-            higher limits across all models - or bring your own key for
-            unlimited access.
-          </p>
+    <section className="relative z-10 mt-12 w-full pb-4 md:pb-6">
+      <div className="flex justify-start">
+        <div className="w-full max-w-7xl">
+          <ScrollReveal>
+            <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left md:mt-2 md:mb-8">
+              <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
+                <span className="text-foreground">Pricing</span>
+              </h1>
+              <p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+                Start for free, then upgrade to Pro or Ultra for significantly
+                higher limits across all models - or bring your own key for
+                unlimited access.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <div className="mt-12 px-4">
+            <PricingCards plans={plans} />
+          </div>
         </div>
-      </ScrollReveal>
-
-      <div className="mt-12">
-        <PricingCards plans={plans} />
       </div>
-
-      <div className="mt-20 border-border border-t" />
-
-      <EnterpriseSection />
-    </div>
+    </section>
   );
 }

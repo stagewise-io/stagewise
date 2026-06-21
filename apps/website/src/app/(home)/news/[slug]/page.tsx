@@ -20,7 +20,7 @@ export default async function PostPage(props: {
   });
 
   return (
-    <div className="flex w-full max-w-5xl flex-col gap-12 p-4">
+    <div className="mt-12 flex w-full max-w-5xl flex-col gap-12 p-4">
       <div className="flex flex-col items-start gap-4 text-left">
         <span className="text-base text-muted-foreground">
           {post.date.toLocaleString('en-US', {

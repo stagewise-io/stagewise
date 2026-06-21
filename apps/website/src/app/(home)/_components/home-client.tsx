@@ -68,7 +68,7 @@ const AGENT_MANAGEMENT_IMAGE_SIZES =
 const OPEN_SOURCE_IMAGE_SIZES =
   '(min-width: 1280px) 560px, (min-width: 768px) 45vw, calc(100vw - 80px)';
 
-function DownloadButtons({ className }: { className?: string }) {
+export function DownloadButtons({ className }: { className?: string }) {
   const [userOS, setUserOS] = useState<string>('your OS');
   const [downloadUrl, setDownloadUrl] = useState<string>('#');
   const [isMobile, setIsMobile] = useState(false);
@@ -367,7 +367,7 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
         <div className="flex justify-start">
           <div className="w-full max-w-7xl">
             <ScrollReveal>
-              <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left sm:px-0 md:mt-2 md:mb-8">
+              <div className="mt-0 mb-6 flex flex-col items-start text-left md:mt-2 md:mb-8">
                 <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
                   <span className="text-foreground">
                     The Agentic IDE for Open-Source Models
@@ -457,8 +457,8 @@ export function HomeClient({ newsPosts }: { newsPosts: NewsPost[] }) {
                 with your models, under your control.
               </p>
               <a
-                href="https://docs.stagewise.io/enterprise"
-                className="mt-2 inline-flex items-center gap-2 text-primary-foreground hover:text-hover-derived active:text-active-derived"
+                href="/enterprise"
+                className="mt-2 inline-flex items-center gap-2 text-base text-primary-foreground hover:text-hover-derived active:text-active-derived"
               >
                 stagewise for Enterprises
                 <IconArrowRightFill18 className="inline size-4" />
