@@ -15,7 +15,7 @@ export const BASELINE_OUTPUT_PROTOCOLS: readonly OutputProtocol[] = [
   {
     name: 'path',
     syntax: '[](path:{PATH})',
-    rule: 'Every reference to files, folders, workspaces, or attachments. Append `?display=expanded` (e.g. `[](path:./README.md?display=expanded)`) for inline preview.',
+    rule: 'Every reference to files, folders, workspaces, or attachments. Append `?display=expanded` (e.g. [](path:./README.md?display=expanded)) for inline preview.',
   },
 ];
 
