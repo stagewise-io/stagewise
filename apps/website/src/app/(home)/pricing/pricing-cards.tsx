@@ -66,7 +66,7 @@ function PricingCard({ plan }: { plan: Plan }) {
         </h3>
 
         <div className="mb-3 flex items-baseline justify-center">
-          <span className="font-medium text-muted-foreground text-xl">
+          <span className="font-normal text-muted-foreground text-xl">
             {displayPrice}
             {displayPeriod && (
               <span className="ml-0.5 font-normal text-muted-foreground text-sm">
