@@ -61,11 +61,11 @@ function PricingCard({ plan }: { plan: Plan }) {
   return (
     <div className="relative flex h-full flex-col rounded-lg bg-surface-1 p-5">
       <div className="mb-6 text-center">
-        <h3 className="mb-3 font-medium text-2xl text-foreground">
+        <h3 className="mb-0.5 font-medium text-2xl text-foreground">
           {plan.name}
         </h3>
 
-        <div className="mb-3 flex items-baseline justify-center">
+        <div className="mb-2 flex items-baseline justify-center">
           <span className="font-normal text-muted-foreground text-xl">
             {displayPrice}
             {displayPeriod && (
