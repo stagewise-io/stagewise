@@ -5,7 +5,10 @@ const WEBHOOK_URL = process.env.ATTIO_ENTERPRISE_CONTACT_WEBHOOK_URL;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type EnterpriseFormErrors = Partial<
-  Record<'name' | 'company' | 'email' | 'problem', string>
+  Record<
+    'name' | 'company' | 'position' | 'email' | 'phone' | 'problem',
+    string
+  >
 >;
 
 export type EnterpriseFormResult =
@@ -40,6 +43,14 @@ function validateFormData(formData: {
     errors.email = 'Please enter a valid email address';
   } else if (formData.email.trim().length > 320) {
     errors.email = 'Email must be at most 320 characters';
+  }
+
+  if (formData.position.trim().length > 200) {
+    errors.position = 'Position must be at most 200 characters';
+  }
+
+  if (formData.phone.trim().length > 50) {
+    errors.phone = 'Phone must be at most 50 characters';
   }
 
   if (!formData.problem.trim()) {
