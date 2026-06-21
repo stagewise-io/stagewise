@@ -154,7 +154,7 @@ function BackerCell({ backer, index }: { backer: Backer; index: number }) {
 
 export default function CompanyPage() {
   return (
-    <div className="relative mx-auto w-full max-w-5xl px-4">
+    <div className="relative mx-auto mt-12 w-full max-w-5xl px-4">
       <ScrollReveal>
         <div className="flex flex-col items-start gap-1 text-left">
           <p className="font-medium text-muted-foreground text-sm uppercase tracking-wide">

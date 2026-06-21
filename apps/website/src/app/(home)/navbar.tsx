@@ -198,9 +198,7 @@ export function Navbar() {
           <div className="pointer-events-none absolute inset-x-0 hidden items-center justify-center sm:flex">
             <div className="pointer-events-auto flex items-center">
               <NavLink href="/pricing">Pricing</NavLink>
-              <NavLink href="https://docs.stagewise.io/enterprise">
-                Enterprise
-              </NavLink>
+              <NavLink href="/enterprise">Enterprise</NavLink>
               <ResourcesDropdown />
             </div>
           </div>
@@ -244,10 +242,7 @@ export function Navbar() {
               <NavLink href="/pricing" onClick={() => setIsOpen(false)}>
                 Pricing
               </NavLink>
-              <NavLink
-                href="https://docs.stagewise.io/enterprise"
-                onClick={() => setIsOpen(false)}
-              >
+              <NavLink href="/enterprise" onClick={() => setIsOpen(false)}>
                 Enterprise
               </NavLink>
               <button

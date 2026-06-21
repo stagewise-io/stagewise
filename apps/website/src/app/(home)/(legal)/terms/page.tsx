@@ -32,7 +32,7 @@ export default async function TermsPage() {
   });
 
   return (
-    <div className="prose dark:prose-invert mx-auto w-full max-w-7xl px-4">
+    <div className="prose dark:prose-invert mx-auto mt-12 w-full max-w-7xl px-4">
       {content}
     </div>
   );

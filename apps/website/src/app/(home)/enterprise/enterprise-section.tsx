@@ -15,6 +15,29 @@ const VALIDATION_MSGS: Record<string, string> = {
   problem: 'Please describe your use case.',
 };
 
+const VC_LOGOS = [
+  {
+    src: '/logos/yc-monochrome.svg',
+    alt: 'Y Combinator',
+    isSvg: true,
+  },
+  {
+    src: '/logos/twentytwo.webp',
+    alt: 'TwentyTwo Ventures',
+    isSvg: false,
+  },
+  {
+    src: '/logos/blast-monochrome.svg',
+    alt: 'Blast Club',
+    isSvg: true,
+  },
+  {
+    src: '/logos/teutoseedclub-monochrome.svg',
+    alt: 'Teuto Seed Club',
+    isSvg: true,
+  },
+];
+
 const ENTERPRISE_FEATURES = [
   'Regulatory and audit compliance',
   'Global configuration of inference and models',
@@ -100,14 +123,9 @@ export function EnterpriseSection() {
       <div className="mt-16 flex flex-col gap-10 md:flex-row md:gap-16">
         {/* Features */}
         <div className="flex-1 space-y-6">
-          <div className="space-y-2">
-            <h2 className="font-medium text-2xl text-foreground">
-              stagewise for Enterprise
-            </h2>
-            <p className="text-muted-foreground">
-              Built for teams that need control, compliance, and scale.
-            </p>
-          </div>
+          <p className="text-foreground">
+            Leverage AI driven development in your organization with stagewise.
+          </p>
 
           <ul className="space-y-4">
             {ENTERPRISE_FEATURES.map((label) => (
@@ -124,11 +142,32 @@ export function EnterpriseSection() {
 
           <a
             href="https://docs.stagewise.io/enterprise"
-            className="mt-2 inline-flex items-center gap-2 text-primary-foreground text-sm hover:text-hover-derived active:text-active-derived"
+            className="mt-2 inline-flex items-center gap-2 text-base text-primary-foreground hover:text-hover-derived active:text-active-derived"
           >
-            Learn more about stagewise for enterprises
+            Learn more about stagewise for Enterprises
             <IconArrowRightFill18 className="inline size-4" />
           </a>
+
+          <div className="mt-6 space-y-3">
+            <p className="font-medium text-muted-foreground text-sm">
+              Backed by
+            </p>
+            <div className="flex flex-wrap items-center gap-6">
+              {VC_LOGOS.map((logo) => (
+                // biome-ignore lint/performance/noImgElement: Raw <img> needed — next/image sets color:transparent breaking SVG currentColor
+                <img
+                  key={logo.alt}
+                  src={logo.src}
+                  alt={logo.alt}
+                  className={
+                    logo.isSvg
+                      ? 'h-5 w-auto shrink-0 opacity-60 dark:invert'
+                      : 'h-5 w-auto shrink-0 opacity-60 brightness-0 grayscale dark:invert'
+                  }
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Form */}
@@ -159,36 +198,38 @@ export function EnterpriseSection() {
             </h3>
 
             <div className="flex flex-col gap-2">
-              <label className="space-y-1.5">
-                <span className="font-medium text-foreground text-sm">
-                  Name
-                </span>
-                <input
-                  type="text"
-                  placeholder="Jane Smith"
-                  value={form.name}
-                  onChange={(e) => update('name', e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
-                />
-                {errors.name && (
-                  <p className="text-red-500 text-xs">{errors.name}</p>
-                )}
-              </label>
-              <label className="space-y-1.5">
-                <span className="font-medium text-foreground text-sm">
-                  Company
-                </span>
-                <input
-                  type="text"
-                  placeholder="Acme Inc."
-                  value={form.company}
-                  onChange={(e) => update('company', e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
-                />
-                {errors.company && (
-                  <p className="text-red-500 text-xs">{errors.company}</p>
-                )}
-              </label>
+              <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="font-medium text-foreground text-sm">
+                    Name
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Jane Smith"
+                    value={form.name}
+                    onChange={(e) => update('name', e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                  />
+                  {errors.name && (
+                    <p className="text-red-500 text-xs">{errors.name}</p>
+                  )}
+                </label>
+                <label className="space-y-1.5">
+                  <span className="font-medium text-foreground text-sm">
+                    Company
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Acme Inc."
+                    value={form.company}
+                    onChange={(e) => update('company', e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                  />
+                  {errors.company && (
+                    <p className="text-red-500 text-xs">{errors.company}</p>
+                  )}
+                </label>
+              </div>
               <label className="space-y-1.5">
                 <span className="font-medium text-foreground text-sm">
                   Position
@@ -204,36 +245,38 @@ export function EnterpriseSection() {
                   <p className="text-red-500 text-xs">{errors.position}</p>
                 )}
               </label>
-              <label className="space-y-1.5">
-                <span className="font-medium text-foreground text-sm">
-                  Company email
-                </span>
-                <input
-                  type="email"
-                  placeholder="jane@acme.com"
-                  value={form.email}
-                  onChange={(e) => update('email', e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
-                />
-                {emailError && (
-                  <p className="text-red-500 text-xs">{emailError}</p>
-                )}
-              </label>
-              <label className="space-y-1.5">
-                <span className="font-medium text-foreground text-sm">
-                  Phone{' '}
-                  <span className="font-normal text-muted-foreground">
-                    (optional)
+              <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="font-medium text-foreground text-sm">
+                    Company email
                   </span>
-                </span>
-                <input
-                  type="tel"
-                  placeholder="+1 555 123 4567"
-                  value={form.phone}
-                  onChange={(e) => update('phone', e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
-                />
-              </label>
+                  <input
+                    type="email"
+                    placeholder="jane@acme.com"
+                    value={form.email}
+                    onChange={(e) => update('email', e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                  />
+                  {emailError && (
+                    <p className="text-red-500 text-xs">{emailError}</p>
+                  )}
+                </label>
+                <label className="space-y-1.5">
+                  <span className="font-medium text-foreground text-sm">
+                    Phone{' '}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </span>
+                  <input
+                    type="tel"
+                    placeholder="+1 555 123 4567"
+                    value={form.phone}
+                    onChange={(e) => update('phone', e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
+                  />
+                </label>
+              </div>
               <label className="space-y-1.5">
                 <span className="font-medium text-foreground text-sm">
                   What problem are you trying to solve?
