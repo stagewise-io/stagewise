@@ -268,6 +268,9 @@ export class LogIngestService {
     this.flushTimer = setInterval(() => {
       void this.flushAll();
     }, FLUSH_INTERVAL_MS);
+    // Allow Node to enter deeper idle states when no other work is active.
+    // The timer still fires on its 500ms cadence when buffers have data.
+    this.flushTimer.unref?.();
   }
 
   private async flushAll(): Promise<void> {

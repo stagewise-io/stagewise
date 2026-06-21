@@ -159,6 +159,10 @@ export class WindowLayoutService extends DisposableService {
   private activeTabId: string | null = null;
   private chatStateController: ChatStateController | null = null;
 
+  /** Tracks whether the app window is currently focused. Propagated to all
+   *  BrowsingTabControllers to gate energy-consuming intervals. */
+  private appFocused = true;
+
   private currentWebContentBounds: Electron.Rectangle | null = null;
   private isWebContentInteractive = false;
 
@@ -608,6 +612,21 @@ export class WindowLayoutService extends DisposableService {
     this.baseWindow.on('close', () => {
       this.saveWindowState();
       this.saveTabState();
+    });
+
+    // Track app focus state and propagate to all tab controllers so they can
+    // gate energy-consuming intervals (screenshots, viewport polling).
+    this.baseWindow.on('focus', () => {
+      if (!this.appFocused) {
+        this.appFocused = true;
+        this.propagateAppFocusToTabs(true);
+      }
+    });
+    this.baseWindow.on('blur', () => {
+      if (this.appFocused) {
+        this.appFocused = false;
+        this.propagateAppFocusToTabs(false);
+      }
     });
 
     // Listen for OS theme changes and update window colors accordingly
@@ -1329,6 +1348,13 @@ export class WindowLayoutService extends DisposableService {
     return this.tabs[this.activeTabId];
   }
 
+  /** Propagates the app focus state to all existing tab controllers. */
+  private propagateAppFocusToTabs(focused: boolean) {
+    for (const tab of Object.values(this.tabs)) {
+      tab.setAppFocused(focused);
+    }
+  }
+
   /**
    * Get a tab by ID, or the active tab if no ID is provided.
    * Used by services like DevToolAPIService to access tabs.
@@ -1440,6 +1466,9 @@ export class WindowLayoutService extends DisposableService {
       },
       this.telemetryService ?? undefined,
     );
+
+    // Initialize the tab's focus state to match the current app focus state.
+    tab.setAppFocused(this.appFocused);
 
     // Subscribe to state updates
     tab.on('stateUpdated', (updates) => {

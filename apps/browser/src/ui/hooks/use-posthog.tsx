@@ -49,18 +49,13 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
           if (containsResizeObserverLoopError(event)) return null;
           return event;
         },
-        disable_session_recording: telemetryLevel !== 'full',
+        disable_session_recording: true,
         autocapture: true,
         api_host: apiHost,
         ui_host: 'https://eu.posthog.com',
         capture_pageview: false, // We capture pageviews manually
         capture_pageleave: true, // Enable pageleave capture
         debug: import.meta.env.NODE_ENV === 'development',
-        session_recording: {
-          compress_events: true,
-          recordCrossOriginIframes: false,
-          recordHeaders: false,
-        },
       });
       const initKey = `${apiKey}::${apiHost ?? ''}`;
       if (registeredSuperPropsInitKey !== initKey) {

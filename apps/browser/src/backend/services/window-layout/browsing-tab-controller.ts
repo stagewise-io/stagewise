@@ -211,6 +211,11 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
   private screenshotOnResizeTimeout: NodeJS.Timeout | null = null;
   private readonly SCREENSHOT_RESIZE_DEBOUNCE_MS = 200; // 200ms debounce
 
+  // Energy-saving: track whether this tab is visible and the app window is focused.
+  // Screenshot and viewport intervals are skipped when either is false.
+  private isTabVisible = false;
+  private isAppFocused = true;
+
   // DevTools debugger tracking
   private devToolsDebugger: Electron.Debugger | null = null;
   private devToolsPlaceholderObjectId: string | null = null;
@@ -428,9 +433,42 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
 
   public setVisible(visible: boolean) {
     this.webContentsView.setVisible(visible);
+    const wasVisible = this.isTabVisible;
+    this.isTabVisible = visible;
+
     // Update audio state when tab becomes visible to ensure it's current
     if (visible) {
       this.updateAudioState();
+    }
+
+    // Trigger an immediate screenshot when the tab transitions from hidden to
+    // visible while the app is focused — the previous screenshot may be stale.
+    if (visible && !wasVisible && this.isAppFocused) {
+      this.captureScreenshot().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to capture screenshot on visibility restore: ${err}`,
+        );
+      });
+    }
+  }
+
+  /**
+   * Updates the app focus state for this tab.
+   * When the app regains focus and the tab is visible, an immediate screenshot
+   * is triggered to refresh potentially stale state.
+   */
+  public setAppFocused(focused: boolean) {
+    const wasFocused = this.isAppFocused;
+    this.isAppFocused = focused;
+
+    // Trigger an immediate screenshot when the app regains focus and the tab
+    // is visible — the previous screenshot may be stale.
+    if (focused && !wasFocused && this.isTabVisible) {
+      this.captureScreenshot().catch((err) => {
+        this.logger.debug(
+          `[TabController] Failed to capture screenshot on focus restore: ${err}`,
+        );
+      });
     }
   }
 
@@ -1633,8 +1671,10 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
       return;
     }
 
-    // Only poll viewport when context selection is active OR DevTools are open
+    // Only poll viewport when context selection is active OR DevTools are open,
+    // and only when the tab is visible and the app window is focused.
     this.viewportTrackingInterval = setInterval(() => {
+      if (!this.isTabVisible || !this.isAppFocused) return;
       // Only poll if context selection is active or DevTools are open
       if (
         this.isContextSelectionActive ||
@@ -1668,8 +1708,10 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
       return;
     }
 
-    // Capture screenshot every 15 seconds
+    // Capture screenshot every 15 seconds, but only when the tab is visible
+    // and the app window is focused. This prevents per-tab GPU work while idle.
     this.screenshotInterval = setInterval(() => {
+      if (!this.isTabVisible || !this.isAppFocused) return;
       this.captureScreenshot().catch((err) => {
         this.logger.debug(
           `[TabController] Failed to capture screenshot: ${err}`,
