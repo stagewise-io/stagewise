@@ -166,6 +166,124 @@ export function generateNewsPostOgImage({
   );
 }
 
+export function generateJobOgImage({
+  jobTitle,
+  jobLocation,
+  geistFont,
+}: {
+  jobTitle: string;
+  jobLocation?: string;
+  geistFont: Buffer;
+}): ImageResponse {
+  const logoSize = 40;
+  const padding = 56;
+
+  return new ImageResponse(
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        background: '#fdfcfc',
+        padding: `0 0 0 ${padding}px`,
+        position: 'relative',
+      }}
+    >
+      {/* Logo mark + "Career" label */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: `${logoSize * 0.4}px`,
+        }}
+      >
+        <svg
+          width={logoSize}
+          height={logoSize}
+          viewBox="0 0 100 100"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path fill="#2559fe" d={LOGO_MARK_PATH} />
+          <circle fill="#2559fe" cx="50" cy="50" r="28" />
+        </svg>
+        <div
+          style={{
+            fontSize: `${logoSize * 0.9}px`,
+            fontWeight: 500,
+            color: '#161515',
+            letterSpacing: '-0.025em',
+            fontFamily: 'Geist',
+          }}
+        >
+          Career
+        </div>
+      </div>
+      {/* Job title */}
+      <div
+        style={{
+          marginTop: '20px',
+          fontSize: '72px',
+          fontWeight: 500,
+          color: '#161515',
+          letterSpacing: '-0.025em',
+          fontFamily: 'Geist',
+          maxWidth: `${OG_SIZE.width - padding * 2}px`,
+          lineHeight: 1.1,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {jobTitle}
+      </div>
+      {/* Location */}
+      {jobLocation && (
+        <div
+          style={{
+            marginTop: '20px',
+            fontSize: '32px',
+            fontWeight: 500,
+            color: '#595855',
+            letterSpacing: '-0.01em',
+            fontFamily: 'Geist',
+          }}
+        >
+          {jobLocation}
+        </div>
+      )}
+      {/* Bottom-right URL */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: `${padding}px`,
+          right: `${padding}px`,
+          fontSize: '28px',
+          fontWeight: 500,
+          color: '#595855',
+          letterSpacing: '-0.01em',
+          fontFamily: 'Geist',
+        }}
+      >
+        stagewise.io/careers
+      </div>
+    </div>,
+    {
+      ...OG_SIZE,
+      fonts: [
+        {
+          name: 'Geist',
+          data: geistFont,
+          style: 'normal',
+          weight: 500,
+        },
+      ],
+    },
+  );
+}
+
 export function generateOgImage({
   pageName,
   pageSlug,

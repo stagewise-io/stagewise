@@ -85,6 +85,62 @@ export function getAllNewsParams(): { slug: string[] }[] {
 export { getNewsTypeLabel };
 
 // ---------------------------------------------------------------------------
+// Jobs / Career
+// ---------------------------------------------------------------------------
+
+export interface JobPosting {
+  slug: string;
+  url: string;
+  title: string;
+  location: string;
+  /** Employment type, e.g. "Full-time", "Part-time", "Contract" */
+  type: string;
+  /** Raw MDX source string */
+  source: string;
+}
+
+function loadJobPosting(filename: string): JobPosting {
+  const filepath = path.join(contentRoot, 'career', filename);
+  const raw = fs.readFileSync(filepath, 'utf-8');
+  const { data, content } = matter(raw);
+
+  const slug = filename.replace(/\.mdx?$/, '');
+
+  return {
+    slug,
+    url: `/careers/${slug}`,
+    title: data.title as string,
+    location: data.location as string,
+    type: data.type as string,
+    source: content,
+  };
+}
+
+export function getAllJobs(): JobPosting[] {
+  const dir = path.join(contentRoot, 'career');
+  if (!fs.existsSync(dir)) return [];
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.mdx') || f.endsWith('.md'));
+  return files.map(loadJobPosting);
+}
+
+export function getJob(slug: string): JobPosting | null {
+  const dir = path.join(contentRoot, 'career');
+  if (!fs.existsSync(dir)) return null;
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.mdx') || f.endsWith('.md'));
+  const filename = files.find((f) => f.replace(/\.mdx?$/, '') === slug);
+  if (!filename) return null;
+  return loadJobPosting(filename);
+}
+
+export function getAllJobParams(): { slug: string[] }[] {
+  return getAllJobs().map((j) => ({ slug: [j.slug] }));
+}
+
+// ---------------------------------------------------------------------------
 // Legal
 // ---------------------------------------------------------------------------
 

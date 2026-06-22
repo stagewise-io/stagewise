@@ -1,7 +1,9 @@
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { IconGithub } from 'nucleo-social-media';
-import { IconEnvelopePenOutline18 } from 'nucleo-ui-outline-18';
+import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { getAllJobs } from '@/lib/source';
 import Image from 'next/image';
+import Link from 'next/link';
 import bgDark from '../_components/feature-images/bg-dark.jpg';
 import bgLight from '../_components/feature-images/bg-light.jpg';
 import githubRepoIssuesDark from '../_components/feature-images/github-repo-issues-dark.webp';
@@ -153,6 +155,8 @@ function BackerCell({ backer, index }: { backer: Backer; index: number }) {
 }
 
 export default function CompanyPage() {
+  const jobs = getAllJobs();
+
   return (
     <div className="relative mx-auto mt-12 w-full max-w-5xl px-4">
       <ScrollReveal>
@@ -406,34 +410,19 @@ export default function CompanyPage() {
                 We're hiring in-person in San Francisco and Bielefeld.
               </p>
               <ul className="mb-10 divide-y divide-border/50">
-                {[
-                  {
-                    title: 'Senior Software Engineer',
-                    location: 'San Francisco, USA',
-                  },
-                  {
-                    title: 'Growth & Marketing Engineer',
-                    location: 'San Francisco, USA',
-                  },
-                  {
-                    title: 'Senior Software Engineer',
-                    location: 'Bielefeld, Germany',
-                  },
-                  {
-                    title: 'Growth & Marketing Engineer',
-                    location: 'Bielefeld, Germany',
-                  },
-                ].map((job) => (
-                  <li
-                    key={`${job.title}-${job.location}`}
-                    className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"
-                  >
-                    <p className="font-medium text-foreground text-sm">
-                      {job.title}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      In-Person &middot; {job.location}
-                    </p>
+                {jobs.map((job) => (
+                  <li key={job.slug} className="py-4 first:pt-0 last:pb-0">
+                    <Link
+                      href={job.url}
+                      className="group flex flex-col gap-1 transition-colors hover:text-hover-derived"
+                    >
+                      <span className="truncate font-medium text-foreground text-sm">
+                        {job.title}
+                      </span>
+                      <span className="truncate text-muted-foreground text-xs">
+                        {job.type} &middot; {job.location}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -441,13 +430,13 @@ export default function CompanyPage() {
                 We expect applicants to be sophisticated users of AI-driven
                 development tooling and workflows.
               </p>
-              <a
-                href="mailto:career@stagewise.io"
+              <Link
+                href="/careers"
                 className="inline-flex w-fit items-center gap-2 text-primary-foreground transition-colors hover:text-hover-derived active:text-active-derived"
               >
-                <IconEnvelopePenOutline18 className="size-4" />
-                Apply via mail
-              </a>
+                View all positions
+                <IconArrowRightFill18 className="inline size-4" />
+              </Link>
             </div>
           </ScrollReveal>
           <ScrollReveal className="h-full" delay={75}>

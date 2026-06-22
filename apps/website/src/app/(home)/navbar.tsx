@@ -119,8 +119,8 @@ function ResourcesDropdown() {
   }, []);
 
   const pathname = usePathname();
-  const isResourcesActive = ['/docs', '/news', '/company'].some((p) =>
-    p.startsWith('/') ? pathname.startsWith(p) : false,
+  const isResourcesActive = ['/docs', '/news', '/company', '/careers'].some(
+    (p) => (p.startsWith('/') ? pathname.startsWith(p) : false),
   );
 
   return (
@@ -154,6 +154,7 @@ function ResourcesDropdown() {
           <NavLink href="https://docs.stagewise.io">Docs</NavLink>
           <NavLink href="/news">News</NavLink>
           <NavLink href="/company">Company</NavLink>
+          <NavLink href="/careers">Careers</NavLink>
         </div>
       )}
     </div>
@@ -279,6 +280,9 @@ export function Navbar() {
                   </NavLink>
                   <NavLink href="/company" onClick={() => setIsOpen(false)}>
                     Company
+                  </NavLink>
+                  <NavLink href="/careers" onClick={() => setIsOpen(false)}>
+                    Career
                   </NavLink>
                 </div>
               )}
