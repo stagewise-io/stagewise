@@ -12,6 +12,13 @@ export function createProcedureProxy(
   path?: string,
   options?: RPCCallOptions,
 ): any {
+  // Cache child proxies by property name so that repeated property
+  // accesses return the same reference. Without this, every render
+  // that calls a selector like `(p) => p.toolbox.getWorkspaceDiffSummary`
+  // produces a brand-new Proxy, breaking useMemo/useEffect dependency
+  // checks and causing infinite render loops.
+  const childCache = new Map<string | symbol, any>();
+
   return new Proxy(() => {}, {
     get(_target, prop) {
       // Handle special properties
@@ -23,16 +30,24 @@ export function createProcedureProxy(
         return undefined;
       }
 
+      const cached = childCache.get(prop);
+      if (cached !== undefined) return cached;
+
+      let child: any;
+
       // .fire returns a proxy variant that uses fire-and-forget
       if (prop === 'fire') {
-        return createProcedureProxy(call, path, {
+        child = createProcedureProxy(call, path, {
           ...options,
           fireAndForget: true,
         });
+      } else {
+        const newPath = path ? `${path}.${String(prop)}` : String(prop);
+        child = createProcedureProxy(call, newPath, options);
       }
 
-      const newPath = path ? `${path}.${String(prop)}` : String(prop);
-      return createProcedureProxy(call, newPath, options);
+      childCache.set(prop, child);
+      return child;
     },
 
     apply(_target, _thisArg, args) {
