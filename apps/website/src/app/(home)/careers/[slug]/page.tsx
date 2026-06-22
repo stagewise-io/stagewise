@@ -50,6 +50,9 @@ export default async function JobDetailPage(props: {
           </h1>
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex items-center rounded-full border border-derived-subtle bg-surface-tinted px-3 py-1 font-medium text-[11px] text-primary-foreground">
+              {job.section}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-derived-subtle bg-surface-tinted px-3 py-1 font-medium text-[11px] text-primary-foreground">
               {job.type}
             </span>
             <span className="inline-flex items-center rounded-full border border-derived-subtle bg-surface-tinted px-3 py-1 font-medium text-[11px] text-primary-foreground">
