@@ -101,16 +101,31 @@ export interface JobPosting {
   source: string;
 }
 
+function sanitizeSlugSegment(input: string): string | null {
+  const normalized = input
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized.length > 0 ? normalized : null;
+}
+
 function loadJobPosting(filename: string): JobPosting {
   const filepath = path.join(contentRoot, 'career', filename);
   const raw = fs.readFileSync(filepath, 'utf-8');
   const { data, content } = matter(raw);
 
-  const slug = filename.replace(/\.mdx?$/, '');
+  const rawSlug = filename.replace(/\.mdx?$/, '');
+  const slug = sanitizeSlugSegment(rawSlug);
+  if (!slug) {
+    throw new Error(`Invalid job filename slug: ${filename}`);
+  }
 
   return {
     slug,
-    url: `/careers/${slug}`,
+    url: `/careers/${encodeURIComponent(slug)}`,
     title: data.title as string,
     location: data.location as string,
     type: data.type as string,
@@ -125,7 +140,16 @@ export function getAllJobs(): JobPosting[] {
   const files = fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.mdx') || f.endsWith('.md'));
-  return files.map(loadJobPosting);
+  return files
+    .map((file) => {
+      try {
+        return loadJobPosting(file);
+      } catch {
+        return null;
+      }
+    })
+    .filter((job): job is JobPosting => job !== null)
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export function getJob(slug: string): JobPosting | null {
@@ -139,8 +163,8 @@ export function getJob(slug: string): JobPosting | null {
   return loadJobPosting(filename);
 }
 
-export function getAllJobParams(): { slug: string[] }[] {
-  return getAllJobs().map((j) => ({ slug: [j.slug] }));
+export function getAllJobParams(): { slug: string }[] {
+  return getAllJobs().map((j) => ({ slug: j.slug }));
 }
 
 // ---------------------------------------------------------------------------

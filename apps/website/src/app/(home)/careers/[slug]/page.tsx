@@ -72,7 +72,7 @@ export default async function JobDetailPage(props: {
 }
 
 export async function generateStaticParams() {
-  return getAllJobParams().map(({ slug }) => ({ slug: slug[0] }));
+  return getAllJobParams();
 }
 
 export async function generateMetadata(props: {
