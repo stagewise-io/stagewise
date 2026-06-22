@@ -81,6 +81,8 @@ export default function CareerPage() {
                         </p>
                       </div>
                       <svg
+                        aria-hidden="true"
+                        focusable="false"
                         className="pointer-events-none size-4 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100"
                         viewBox="0 0 16 16"
                         fill="none"
@@ -158,6 +160,8 @@ export default function CareerPage() {
               className="inline-flex items-center gap-2 text-primary-foreground transition-colors hover:text-hover-derived active:text-active-derived"
             >
               <svg
+                aria-hidden="true"
+                focusable="false"
                 className="size-4"
                 viewBox="0 0 24 24"
                 fill="none"

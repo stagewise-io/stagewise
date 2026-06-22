@@ -282,7 +282,7 @@ export function Navbar() {
                     Company
                   </NavLink>
                   <NavLink href="/careers" onClick={() => setIsOpen(false)}>
-                    Career
+                    Careers
                   </NavLink>
                 </div>
               )}

@@ -14,7 +14,7 @@ export default function Image() {
   const geistMedium = loadGeistMedium();
   return generateOgImage({
     pageName: 'Career',
-    pageSlug: 'career',
+    pageSlug: 'careers',
     geistFont: geistMedium,
   });
 }
