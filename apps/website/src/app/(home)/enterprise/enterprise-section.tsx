@@ -1,9 +1,14 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Button } from '@stagewise/stage-ui/components/button';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconCheckOutline18,
+  IconPhoneOutline18,
+  IconArrowRightOutline18,
+} from 'nucleo-ui-outline-18';
 import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { submitEnterpriseInquiry, type EnterpriseFormErrors } from './actions';
 
@@ -71,10 +76,17 @@ export function EnterpriseSection() {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrors, setServerErrors] = useState<EnterpriseFormErrors>({});
+  const [touched, setTouched] = useState<
+    Partial<Record<keyof FormData, boolean>>
+  >({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const update = (field: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+
+  const blur = (field: keyof FormData) =>
+    setTouched((prev) => ({ ...prev, [field]: true }));
 
   const emailError =
     form.email.trim() && !EMAIL_RE.test(form.email.trim())
@@ -83,10 +95,12 @@ export function EnterpriseSection() {
 
   const fieldErrors = useMemo(() => {
     const e: Partial<Record<keyof FormData, string>> = {};
+    const show = (field: keyof FormData) => touched[field] || submitAttempted;
+
     for (const field of ['name', 'company', 'problem'] as const) {
       const val = form[field].trim();
       const min = MIN_LENGTH[field];
-      if (val && val.length < min) {
+      if (val && val.length < min && show(field)) {
         e[field] = VALIDATION_MSGS[field];
       }
       if (serverErrors[field]) {
@@ -96,7 +110,8 @@ export function EnterpriseSection() {
     // position is client-validated only (not required server-side)
     if (
       form.position.trim() &&
-      form.position.trim().length < MIN_LENGTH.position
+      form.position.trim().length < MIN_LENGTH.position &&
+      show('position')
     ) {
       e.position = VALIDATION_MSGS.position;
     }
@@ -108,11 +123,11 @@ export function EnterpriseSection() {
     }
     if (serverErrors.email) {
       e.email = serverErrors.email;
-    } else if (emailError) {
+    } else if (emailError && show('email')) {
       e.email = emailError;
     }
     return e;
-  }, [form, serverErrors, emailError]);
+  }, [form, serverErrors, emailError, touched, submitAttempted]);
 
   const isValid =
     form.name.trim().length >= MIN_LENGTH.name &&
@@ -124,6 +139,7 @@ export function EnterpriseSection() {
   const handleSubmit = () => {
     setSubmitError(null);
     setServerErrors({});
+    setSubmitAttempted(true);
     startTransition(async () => {
       try {
         const result = await submitEnterpriseInquiry({
@@ -235,6 +251,7 @@ export function EnterpriseSection() {
                     placeholder="Jane Smith"
                     value={form.name}
                     onChange={(e) => update('name', e.target.value)}
+                    onBlur={() => blur('name')}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
                   {fieldErrors.name && (
@@ -250,6 +267,7 @@ export function EnterpriseSection() {
                     placeholder="Acme Inc."
                     value={form.company}
                     onChange={(e) => update('company', e.target.value)}
+                    onBlur={() => blur('company')}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
                   {fieldErrors.company && (
@@ -268,6 +286,7 @@ export function EnterpriseSection() {
                   placeholder="VP of Engineering"
                   value={form.position}
                   onChange={(e) => update('position', e.target.value)}
+                  onBlur={() => blur('position')}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                 />
                 {fieldErrors.position && (
@@ -284,6 +303,7 @@ export function EnterpriseSection() {
                     placeholder="jane@acme.com"
                     value={form.email}
                     onChange={(e) => update('email', e.target.value)}
+                    onBlur={() => blur('email')}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
                   {fieldErrors.email && (
@@ -302,6 +322,7 @@ export function EnterpriseSection() {
                     placeholder="+1 555 123 4567"
                     value={form.phone}
                     onChange={(e) => update('phone', e.target.value)}
+                    onBlur={() => blur('phone')}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                   />
                   {fieldErrors.phone && (
@@ -317,6 +338,7 @@ export function EnterpriseSection() {
                   placeholder="Tell us about your team's use case…"
                   value={form.problem}
                   onChange={(e) => update('problem', e.target.value)}
+                  onBlur={() => blur('problem')}
                   rows={4}
                   className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-foreground text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary-500"
                 />
@@ -330,15 +352,30 @@ export function EnterpriseSection() {
               <p className="text-red-500 text-sm">{submitError}</p>
             )}
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full"
-              disabled={!isValid || isPending}
-            >
-              {isPending ? 'Sending…' : 'Send inquiry'}
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <a
+                href="https://calendar.app.google/84HftBtaqpwiEXbv8"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  buttonVariants({ variant: 'secondary', size: 'lg' }),
+                  'bg-surface-2',
+                )}
+              >
+                Book a call
+                <IconPhoneOutline18 className="size-[18px] shrink-0" />
+              </a>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="w-full"
+                disabled={!isValid || isPending}
+              >
+                {isPending ? 'Sending…' : 'Send inquiry'}
+                <IconArrowRightOutline18 className="size-[18px] shrink-0" />
+              </Button>
+            </div>
           </form>
         )}
       </div>
