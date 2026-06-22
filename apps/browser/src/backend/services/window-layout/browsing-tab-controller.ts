@@ -1750,6 +1750,11 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     // Schedule screenshot capture after debounce period
     this.screenshotOnResizeTimeout = setTimeout(() => {
       this.screenshotOnResizeTimeout = null;
+      // Energy-saving: mirror the interval guards. Skip resize-driven captures
+      // while the tab is hidden or the app window is unfocused. A fresh capture
+      // is triggered automatically on visibility/focus restore (see setVisible /
+      // setAppFocused), so the screenshot is never left stale once visible.
+      if (!this.isTabVisible || !this.isAppFocused) return;
       this.captureScreenshot().catch((err) => {
         this.logger.debug(
           `[TabController] Failed to capture screenshot on resize: ${err}`,
