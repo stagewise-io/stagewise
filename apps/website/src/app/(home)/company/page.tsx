@@ -420,7 +420,8 @@ export default function CompanyPage() {
                         {job.title}
                       </span>
                       <span className="truncate text-muted-foreground text-xs">
-                        {job.type} &middot; {job.location}
+                        {job.section} &middot; {job.type} &middot;{' '}
+                        {job.location}
                       </span>
                     </Link>
                   </li>

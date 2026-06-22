@@ -95,6 +95,8 @@ export interface JobPosting {
   location: string;
   /** Employment type, e.g. "Full-time", "Part-time", "Contract" */
   type: string;
+  /** Department section, e.g. "Engineering", "Marketing", "Operations", "Sales" */
+  section: string;
   /** Raw MDX source string */
   source: string;
 }
@@ -112,6 +114,7 @@ function loadJobPosting(filename: string): JobPosting {
     title: data.title as string,
     location: data.location as string,
     type: data.type as string,
+    section: data.section as string,
     source: content,
   };
 }

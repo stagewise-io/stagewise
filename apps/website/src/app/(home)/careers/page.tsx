@@ -76,7 +76,8 @@ export default function CareerPage() {
                           {job.title}
                         </h3>
                         <p className="text-muted-foreground text-sm">
-                          {job.type} &middot; {job.location}
+                          {job.section} &middot; {job.type} &middot;{' '}
+                          {job.location}
                         </p>
                       </div>
                       <svg
