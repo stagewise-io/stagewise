@@ -30,9 +30,30 @@ export interface BrowserDomainAdapterDeps {
   getBrowserSessionId?: () => string;
 }
 
-function projectBrowserSnapshot(karton: KartonService): BrowserSnapshot {
-  const browser = karton.state.browser;
-  const tabs = Object.values(browser.tabs)
+/**
+ * Project a per-agent browser snapshot from `contentTabs`.
+ *
+ * Tab entries live in `contentTabs.tabs` (not `browser.tabs`, which is
+ * a legacy/unused slice). Only browser-type tabs that are either global
+ * (agentInstanceId === null) or assigned to the requesting agent are
+ * included. The active tab is only reported if it is visible to this
+ * agent.
+ */
+function projectBrowserSnapshot(
+  karton: KartonService,
+  agentInstanceId: string,
+): BrowserSnapshot {
+  const contentTabs = karton.state.contentTabs;
+
+  const isTabVisible = (tab: { agentInstanceId: string | null }) =>
+    tab.agentInstanceId == null || tab.agentInstanceId === agentInstanceId;
+
+  const isBrowserTab = (tab: { type?: string }) =>
+    tab.type === undefined || tab.type === 'browser';
+
+  const tabs = Object.values(contentTabs.tabs)
+    .filter(isBrowserTab)
+    .filter(isTabVisible)
     .sort((a, b) => b.lastFocusedAt - a.lastFocusedAt)
     .map((tab) => ({
       id: tab.id,
@@ -49,7 +70,16 @@ function projectBrowserSnapshot(karton: KartonService): BrowserSnapshot {
         : null,
       lastFocusedAt: tab.lastFocusedAt,
     }));
-  return { tabs, activeTabId: browser.activeTabId ?? null };
+
+  // Only report an active tab if it is a browser tab visible to this agent.
+  const activeTabId = contentTabs.activeTabId;
+  const activeTab = activeTabId ? contentTabs.tabs[activeTabId] : undefined;
+  const activeTabIdVisible =
+    activeTab && isBrowserTab(activeTab) && isTabVisible(activeTab)
+      ? activeTabId
+      : null;
+
+  return { tabs, activeTabId: activeTabIdVisible };
 }
 
 function formatTimestamp(epochMs: number): string {
@@ -161,13 +191,12 @@ function computeBrowserChanges(
     }
   }
 
-  if (
-    previous.browser.activeTabId !== current.browser.activeTabId &&
-    current.browser.activeTabId !== null
-  ) {
-    const attrs: Record<string, string> = { to: current.browser.activeTabId };
+  if (previous.browser.activeTabId !== current.browser.activeTabId) {
+    const attrs: Record<string, string> = {};
     if (previous.browser.activeTabId !== null)
       attrs.from = previous.browser.activeTabId;
+    if (current.browser.activeTabId !== null)
+      attrs.to = current.browser.activeTabId;
     changes.push({ type: 'active-tab-changed', attributes: attrs });
   }
 
@@ -186,9 +215,9 @@ export function createBrowserDomainAdapter(
     renderOrder: 0,
     schemaVersion: BROWSER_DOMAIN_SCHEMA_VERSION,
     promptSection: BrowserDomainPromptSection,
-    getState() {
+    getState(agentInstanceId: string) {
       return {
-        browser: projectBrowserSnapshot(deps.karton),
+        browser: projectBrowserSnapshot(deps.karton, agentInstanceId),
         browserSessionId: resolveSessionId(),
       };
     },

@@ -19,9 +19,18 @@ export const tabProvider: MentionProvider = {
     <GlobeIcon className={cn('size-2.5 shrink-0', className)} />
   ),
   query: (_input: string, ctx: MentionContext): TabMentionItem[] => {
-    const entries = Object.entries(ctx.tabs).sort(([a], [b]) =>
-      a.localeCompare(b),
-    );
+    const entries = Object.entries(ctx.tabs)
+      .filter(([, tab]) => {
+        // Only browser-type tabs (exclude terminal/file tabs)
+        const isBrowserTab = tab.type === undefined || tab.type === 'browser';
+        if (!isBrowserTab) return false;
+        // Only global tabs (null) and tabs assigned to the active agent
+        return (
+          tab.agentInstanceId == null ||
+          tab.agentInstanceId === ctx.agentInstanceId
+        );
+      })
+      .sort(([a], [b]) => a.localeCompare(b));
     return entries.map(([tabId, tab]) => ({
       id: tabId,
       label: safeHost(tab.url),
