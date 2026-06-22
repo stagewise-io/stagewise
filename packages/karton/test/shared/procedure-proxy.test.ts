@@ -84,6 +84,32 @@ describe('Procedure Proxy', () => {
       expect(proxy.test.valueOf()).toBe('[Proxy: test]');
       expect(mockCall).not.toHaveBeenCalled();
     });
+
+    it('should return the same reference for repeated property accesses', () => {
+      const mockCall = vi.fn();
+      
+      const proxy = createProcedureProxy(mockCall);
+      
+      // Same property accessed twice must return the same proxy
+      const a = proxy.toolbox.getWorkspaceDiffSummary;
+      const b = proxy.toolbox.getWorkspaceDiffSummary;
+      expect(a).toBe(b);
+      
+      // Intermediate proxies are also cached
+      const c = proxy.toolbox;
+      const d = proxy.toolbox;
+      expect(c).toBe(d);
+    });
+
+    it('should return different references for different paths', () => {
+      const mockCall = vi.fn();
+      
+      const proxy = createProcedureProxy(mockCall);
+      
+      const a = proxy.api.v1;
+      const b = proxy.api.v2;
+      expect(a).not.toBe(b);
+    });
   });
 
   describe('extractProceduresFromTree', () => {
