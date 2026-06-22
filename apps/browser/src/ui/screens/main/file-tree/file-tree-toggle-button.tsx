@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
@@ -80,6 +80,14 @@ export function FileTreeToggleButton() {
     );
   });
 
+  // Use a ref for the procedure to keep it out of the effect deps.
+  // useKartonProcedure takes an inline selector (new function identity each
+  // render), so even though the underlying proxy is cached, the useMemo
+  // inside the hook recomputes. Including the result in deps is fragile —
+  // a ref avoids the issue entirely, matching the sidebar's pattern.
+  const getWorkspaceDiffSummaryRef = useRef(getWorkspaceDiffSummary);
+  getWorkspaceDiffSummaryRef.current = getWorkspaceDiffSummary;
+
   useEffect(() => {
     if (visible || !selectedWorkspacePath) {
       setDiffTotals({ added: 0, deleted: 0 });
@@ -87,7 +95,8 @@ export function FileTreeToggleButton() {
     }
     const workspacePath = selectedWorkspacePath;
     let cancelled = false;
-    getWorkspaceDiffSummary(workspacePath)
+    getWorkspaceDiffSummaryRef
+      .current(workspacePath)
       .then((result) => {
         if (cancelled) return;
         const totals = result
@@ -102,12 +111,7 @@ export function FileTreeToggleButton() {
     return () => {
       cancelled = true;
     };
-  }, [
-    visible,
-    selectedWorkspacePath,
-    workspaceRevision,
-    getWorkspaceDiffSummary,
-  ]);
+  }, [visible, selectedWorkspacePath, workspaceRevision]);
 
   const showDiff = !visible && (diffTotals.added > 0 || diffTotals.deleted > 0);
 
