@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { getAllNewsPosts } from '@/lib/source';
+import { getAllJobs, getAllNewsPosts } from '@/lib/source';
 import type { MetadataRoute } from 'next';
 
 const siteUrl = 'https://stagewise.io';
@@ -71,7 +71,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     createSitemapEntry(post.url, post.date),
   );
 
-  const entries = [...staticPageEntries, ...newsEntries];
+  const jobEntries = getAllJobs().map((job) => createSitemapEntry(job.url));
+
+  const entries = [...staticPageEntries, ...newsEntries, ...jobEntries];
   const dedupedEntries = new Map(entries.map((entry) => [entry.url, entry]));
 
   return [...dedupedEntries.values()].sort((a, b) =>

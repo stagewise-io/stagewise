@@ -153,3 +153,22 @@
 .news-prose p {
   text-align: left;
 }
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.prose blockquote {
+  font-weight: 400;
+  font-style: italic;
+}
+
+.prose em {
+  font-style: oblique 5deg;
+}

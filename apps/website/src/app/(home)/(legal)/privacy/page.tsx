@@ -28,7 +28,9 @@ export default async function PrivacyPolicyPage() {
 
   const { content } = await compileMDX({
     source: page.source,
-    options: { development: true } as never,
+    options: {
+      mdxOptions: { development: process.env.NODE_ENV !== 'production' },
+    },
   });
 
   return (

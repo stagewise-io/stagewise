@@ -15,7 +15,9 @@ export default async function PostPage(props: {
 
   const { content } = await compileMDX({
     source: post.source,
-    options: { development: true } as never,
+    options: {
+      mdxOptions: { development: process.env.NODE_ENV !== 'production' },
+    },
     components: getMDXComponents(),
   });
 
