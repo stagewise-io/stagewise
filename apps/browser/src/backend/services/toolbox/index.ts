@@ -1442,19 +1442,18 @@ export class ToolboxService
     // Create TerminalService for user-controllable terminal tabs.
     // Requires a detected shell — if no shell is available, terminal
     // creation will silently fail (procedure handler not registered).
-    const terminalEnv =
-      resolvedEnv ??
-      Object.fromEntries(
-        Object.entries(process.env).filter(
-          (entry): entry is [string, string] => typeof entry[1] === 'string',
-        ),
-      );
+    // When resolvedEnv is null (shell-env resolution failed), pass null
+    // directly — sanitizeEnv will fall back to process.env internally
+    // and apply the BLOCKLIST to strip host-process contamination vars
+    // (NODE_ENV, BUILD_MODE, etc.). Constructing a process.env copy here
+    // would bypass the blocklist since sanitizeEnv treats any non-null
+    // value as a resolved shell env.
     if (this.detectedShell) {
       this.terminalService = new TerminalService(
         this.logger,
         this.uiKarton,
         this.detectedShell,
-        terminalEnv,
+        resolvedEnv,
       );
       this.terminalService.initialize();
       // Restore PTYs for terminal tabs persisted in loadTabState.
