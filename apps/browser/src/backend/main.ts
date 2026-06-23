@@ -1184,6 +1184,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
 
   logger.debug('[Main] Normal operation services bootstrapped');
 
+  void toolboxService
+    .scanWorkspaceGitCleanupCandidatesOnStartup()
+    .catch((error) => {
+      logger.warn(
+        `[Main] Failed to scan worktree cleanup candidates: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
   logger.debug('[Main] Startup complete');
 
   // Handle command line arguments for URLs on initial startup
