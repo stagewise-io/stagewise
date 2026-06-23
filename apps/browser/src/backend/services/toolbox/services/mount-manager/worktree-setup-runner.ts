@@ -295,9 +295,11 @@ export class WorktreeSetupRunner {
     // (on fallback) BLOCKLIST vars. User-set BLOCKLIST vars from
     // resolvedEnv are preserved. STAGEWISE_*_WORKTREE_PATH vars are
     // merged on top after sanitization.
-    const sanitizedBase = sanitizeEnv(resolvedEnv, undefined, {
-      forAgent: false,
-    });
+    const sanitizedBase = sanitizeEnv(
+      resolvedEnv,
+      variant === 'powershell' ? 'powershell' : 'sh',
+      { forAgent: false },
+    );
     const env: NodeJS.ProcessEnv = mergeEnv(sanitizedBase, {
       STAGEWISE_SOURCE_WORKTREE_PATH: metadata.sourceWorktreePath,
       STAGEWISE_TARGET_WORKTREE_PATH: metadata.workspacePath,
