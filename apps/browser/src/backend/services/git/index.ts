@@ -5,6 +5,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { DisposableService } from '@/services/disposable';
 import { getWorktreesDir } from '@/utils/paths';
+import { sanitizeEnv } from '@stagewise/agent-shell';
 import type {
   GitActionFailure,
   GitActionFailureReason,
@@ -1327,10 +1328,14 @@ export class GitService extends DisposableService {
     this.assertNotDisposed();
     try {
       const resolvedEnv = await this.getResolvedEnv();
-      return (
-        (await this.runGitCommand(cwd, args, resolvedEnv ?? process.env)) ??
-        null
-      );
+      // Sanitize the fallback env to strip host-process contamination
+      // vars (NODE_ENV, BUILD_MODE, app config keys/URLs). When
+      // resolvedEnv is available it comes from the user's login shell
+      // and is used as-is; the fallback to process.env is the path that
+      // would leak app-internal vars into git child processes.
+      const env =
+        resolvedEnv ?? sanitizeEnv(undefined, undefined, { forAgent: false });
+      return (await this.runGitCommand(cwd, args, env)) ?? null;
     } catch (error) {
       this.logger.debug('[GitService] Git command failed', {
         cwd,
@@ -1414,11 +1419,9 @@ export class GitService extends DisposableService {
   ): Promise<GitStrictCommandResult> {
     this.assertNotDisposed();
     const resolvedEnv = await this.getResolvedEnv();
-    const result = await this.runGitMutationCommand(
-      cwd,
-      args,
-      resolvedEnv ?? process.env,
-    );
+    const env =
+      resolvedEnv ?? sanitizeEnv(undefined, undefined, { forAgent: false });
+    const result = await this.runGitMutationCommand(cwd, args, env);
     this.logger.debug('[GitService] Git mutation finished', {
       cwd,
       args,

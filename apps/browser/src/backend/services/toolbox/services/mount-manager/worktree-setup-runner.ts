@@ -8,6 +8,7 @@ import {
   WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS,
   variantForPlatform,
 } from '@shared/worktree-setup';
+import { sanitizeEnv } from '@stagewise/agent-shell';
 import type { KartonService } from '@/services/karton';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
@@ -289,7 +290,14 @@ export class WorktreeSetupRunner {
     }
     if (activeRun.settled) return;
 
-    const env: NodeJS.ProcessEnv = mergeEnv(process.env, {
+    // Use sanitized process.env as the base to prevent host-process
+    // contamination vars (NODE_ENV, BUILD_MODE, app config keys/URLs)
+    // from leaking into the worktree setup script and its children.
+    // resolvedEnv (from the user's login shell) overrides on top.
+    const sanitizedBase = sanitizeEnv(undefined, undefined, {
+      forAgent: false,
+    });
+    const env: NodeJS.ProcessEnv = mergeEnv(sanitizedBase, {
       ...(resolvedEnv ?? {}),
       STAGEWISE_SOURCE_WORKTREE_PATH: metadata.sourceWorktreePath,
       STAGEWISE_TARGET_WORKTREE_PATH: metadata.workspacePath,

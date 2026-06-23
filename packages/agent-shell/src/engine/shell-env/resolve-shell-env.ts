@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { homedir, userInfo } from 'node:os';
 import { normalizeWindowsPath } from './normalize-windows-path';
+import { BLOCKLIST } from '../sanitize-env';
 import type { DetectedShell } from './types.ts';
 
 const DEFAULT_RESOLVE_TIMEOUT_MS = 10_000;
@@ -183,6 +184,23 @@ export async function resolveShellEnv(
     SHELL: shell.path,
     STAGEWISE_RESOLVING_ENVIRONMENT: '1',
   } as Record<string, string>;
+
+  // Strip host-process contamination vars (NODE_ENV, BUILD_MODE, app
+  // config) so they don't leak into the resolved env via the login
+  // shell's inherited environment. Without this, `env -0` would report
+  // the app's NODE_ENV=production back in its output.
+  for (const key of BLOCKLIST) {
+    delete env[key];
+  }
+
+  // Strip ELECTRON_* vars from the seed env. sanitizeEnv removes these
+  // downstream at terminal spawn, but any consumer that uses resolvedEnv
+  // directly (e.g. worktree setup runner) would otherwise see them.
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('ELECTRON_') || key.startsWith('ELECTRON ')) {
+      delete env[key];
+    }
+  }
 
   return new Promise<Record<string, string> | null>((resolve) => {
     const child = spawn(shell.path, shellArgs, {

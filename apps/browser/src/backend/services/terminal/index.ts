@@ -22,6 +22,7 @@ import type { Logger } from '@/services/logger';
 import type { KartonService } from '@/services/karton';
 import {
   OscParser,
+  sanitizeEnv,
   DEFAULT_TERMINAL_COLS,
   DEFAULT_TERMINAL_ROWS,
 } from '@stagewise/agent-shell';
@@ -370,14 +371,15 @@ export class TerminalService extends DisposableService {
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.shell = shell;
-    this.resolvedEnv = Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string',
-      ),
-    );
-    if (resolvedEnv) {
-      Object.assign(this.resolvedEnv, resolvedEnv);
-    }
+    // Sanitize the environment before passing it to user terminal PTYs.
+    // This strips host-process contamination vars (NODE_ENV, BUILD_MODE,
+    // app config keys/URLs) that would otherwise leak from the stagewise
+    // app process into every terminal session. Uses the same sanitizeEnv
+    // as agent terminals, but with forAgent: false so user terminals
+    // keep normal shell history and don't carry the STAGEWISE_SHELL marker.
+    this.resolvedEnv = sanitizeEnv(resolvedEnv, shell.type, {
+      forAgent: false,
+    });
   }
 
   // ─── Initialisation ──────────────────────────────────────────
