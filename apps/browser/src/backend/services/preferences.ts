@@ -145,6 +145,7 @@ export class PreferencesService extends DisposableService {
       'deepseek',
       'z-ai',
       'minimax',
+      'xiaomi-mimo',
     ] as const;
     let needsSave = false;
 

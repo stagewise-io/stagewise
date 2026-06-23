@@ -3,6 +3,7 @@ export const codingPlanIds = [
   'kimi-plan',
   'qwen-plan',
   'minimax-plan',
+  'mimo-plan',
 ] as const;
 
 export type CodingPlanId = (typeof codingPlanIds)[number];

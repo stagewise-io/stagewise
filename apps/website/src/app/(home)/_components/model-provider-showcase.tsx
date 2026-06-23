@@ -126,6 +126,18 @@ const PROVIDERS: ProviderInfo[] = [
       { name: 'GLM 5V-Turbo', tier: 'general' },
     ],
   },
+  {
+    id: 'xiaomi-mimo',
+    name: 'Xiaomi MiMo',
+    logo: '/provider-logos/xiaomi-mimo.svg',
+    monoInDark: true,
+    description:
+      'Trillion-parameter MoE models with 1M context for agentic coding and omnimodal understanding.',
+    models: [
+      { name: 'MiMo-V2.5-Pro', tier: 'frontier' },
+      { name: 'MiMo-V2.5', tier: 'general' },
+    ],
+  },
 ];
 
 export function ModelProviderShowcase() {

@@ -1485,6 +1485,7 @@ export type KartonContract = {
         deepseek?: string;
         'z-ai'?: string;
         minimax?: string;
+        'xiaomi-mimo'?: string;
       }) => Promise<{
         anthropic: ApiKeyValidationResult;
         openai: ApiKeyValidationResult;
@@ -1494,6 +1495,7 @@ export type KartonContract = {
         deepseek: ApiKeyValidationResult;
         'z-ai': ApiKeyValidationResult;
         minimax: ApiKeyValidationResult;
+        'xiaomi-mimo': ApiKeyValidationResult;
       }>;
     };
     userExperience: {
@@ -1524,7 +1526,8 @@ export type KartonContract = {
                   | 'glm-coding-plan'
                   | 'kimi-plan'
                   | 'qwen-plan'
-                  | 'minimax-plan';
+                  | 'minimax-plan'
+                  | 'mimo-plan';
               };
               suggestion?: { id: string; url: string; prompt: string };
             },

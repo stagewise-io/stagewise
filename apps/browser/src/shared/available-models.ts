@@ -126,6 +126,29 @@ const MINIMAX_M3_INPUT_CONSTRAINTS: InputConstraints = {
   },
 };
 
+const MIMO_V25_INPUT_CONSTRAINTS: InputConstraints = {
+  image: {
+    mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    maxBytes: 10_485_760, // 10 MB per image
+  },
+  video: {
+    mimeTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
+    maxBytes: 52_428_800, // 50 MB inline video input
+  },
+  audio: {
+    mimeTypes: [
+      'audio/aac',
+      'audio/flac',
+      'audio/mp3',
+      'audio/mpeg',
+      'audio/ogg',
+      'audio/wav',
+      'audio/webm',
+    ],
+    maxBytes: 20_971_520, // 20 MB inline audio input
+  },
+};
+
 export const availableModels = [
   // Anthropic Models
   {
@@ -1316,6 +1339,83 @@ export const availableModels = [
         video: false,
         file: false,
       },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'xiaomi-mimo',
+    modelId: 'mimo-v2.5-pro',
+    modelDisplayName: 'MiMo-V2.5-Pro',
+    modelDescription:
+      "Xiaomi's flagship 1T-parameter MoE model (42B active) with 1M-token context, purpose-built for agentic coding and long-horizon software engineering.",
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.435,
+      outputPerMillion: 0.87,
+      relativeMultiplier: 0.22,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'xiaomi-mimo',
+    modelId: 'mimo-v2.5',
+    modelDisplayName: 'MiMo-V2.5',
+    modelDescription:
+      "Xiaomi's native omnimodal model — processes text, image, video, and audio in a unified architecture with strong agentic capabilities and 1M-token context.",
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.14,
+      outputPerMillion: 0.28,
+      relativeMultiplier: 0.07,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: true,
+        image: true,
+        video: true,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: MIMO_V25_INPUT_CONSTRAINTS,
       toolCalling: true,
     },
   },

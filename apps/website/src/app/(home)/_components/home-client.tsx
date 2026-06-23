@@ -19,6 +19,8 @@ import fullDemoLight from './feature-images/full-demo-light.webp';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
 import companyAbout from './feature-images/company-about.webp';
+import useExistingSubscriptionDark from './feature-images/use-existing-subscription-dark.webp';
+import useExistingSubscriptionLight from './feature-images/use-existing-subscription-light.webp';
 
 import { Cloud, Key, Monitor } from 'lucide-react';
 
@@ -321,6 +323,88 @@ function FeatureSection() {
                 alt="Agent management view"
                 sizes={AGENT_MANAGEMENT_IMAGE_SIZES}
                 quality={85}
+              />
+            </div>
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={300}>
+          <div className="flex flex-col items-start justify-between gap-6 rounded-lg bg-surface-1 p-6 md:flex-row md:items-center md:gap-12">
+            <div className="space-y-2">
+              <h3 className="font-medium text-2xl">
+                Use any coding subscription
+              </h3>
+              <p className="text-base text-muted-foreground">
+                Use all popular models through your stagewise account, or
+                connect any existing coding subscription.
+              </p>
+              <div className="pt-12">
+                <p className="mb-3 text-muted-foreground text-sm">
+                  Supported subscriptions
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'GLM Coding Plan',
+                    'Kimi',
+                    'Qwen Coding Plan',
+                    'MiniMax',
+                    'Xiaomi MiMo',
+                    'OpenAI',
+                    'Anthropic',
+                    'Google Gemini',
+                    'DeepSeek',
+                  ].map((plan) => (
+                    <span
+                      key={plan}
+                      className="rounded-full border border-border-subtle px-3 py-1 text-foreground/80 text-sm"
+                    >
+                      {plan}
+                    </span>
+                  ))}
+                  <span className="px-1 py-1 text-muted-foreground/50 text-sm">
+                    & more
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div
+              className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[60%]"
+              style={{ aspectRatio: '1 / 1' }}
+            >
+              <Image
+                src={bgLight}
+                className="absolute inset-0 h-full w-full object-cover dark:hidden"
+                alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
+              />
+              <Image
+                src={bgDark}
+                className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+                alt=""
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={70}
+              />
+              <Image
+                src={useExistingSubscriptionLight}
+                className="absolute top-1/2 left-1/2 w-full dark:hidden"
+                style={{
+                  transform: 'translateX(-50%) translateY(-50%) scale(0.92)',
+                  transformOrigin: 'center center',
+                }}
+                alt="Use existing subscription view"
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={80}
+              />
+              <Image
+                src={useExistingSubscriptionDark}
+                className="absolute top-1/2 left-1/2 hidden w-full dark:block"
+                style={{
+                  transform: 'translateX(-50%) translateY(-50%) scale(0.92)',
+                  transformOrigin: 'center center',
+                }}
+                alt="Use existing subscription view"
+                sizes={FEATURE_IMAGE_SIZES}
+                quality={80}
               />
             </div>
           </div>

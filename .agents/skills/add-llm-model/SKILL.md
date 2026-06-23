@@ -40,6 +40,18 @@ Use this workflow when adding or updating model support in stagewise.
    - Prefer a cheap broadly available model, or fallback probes that accept success from any supported entitlement.
    - Keep validation errors compatible with existing `{ success: false; error: string }` callers.
 
+7. **Always verify subscription-plan base URLs.**
+   - Many providers use **different API endpoints** for subscription/token-plan keys vs. pay-as-you-go (BYOK) keys.
+   - Example: GLM uses `https://api.z.ai/api/paas/v4` for BYOK but `https://api.z.ai/api/coding/paas/v4` for coding-plan subscriptions. Xiaomi MiMo uses `https://api.xiaomimimo.com/v1` for BYOK but `https://token-plan-cn.xiaomimimo.com/v1` for token-plan subscriptions.
+   - The two key types are often **non-interchangeable** — a subscription key will be rejected by the BYOK endpoint and vice versa.
+   - Before finalizing a coding-plan entry, **always** check the provider's official documentation to confirm:
+     - Whether subscription tokens require a separate `baseUrl` / `validationBaseUrl`.
+     - The correct cluster or region-specific URL (some providers offer multiple regional endpoints for subscriptions).
+     - The API key format prefix (e.g. `tp-` for MiMo token plan vs `sk-` for BYOK).
+   - Set `baseUrl`, `validationBaseUrl`, `validationModelId`, `apiKeyPattern`, and `endpointHelpText` on the coding-plan entry accordingly.
+   - If the provider exposes documentation via `llms.txt`, fetch it — it links to raw markdown doc pages that contain the authoritative endpoint and auth details.
+   - Update `apiKeyUrl` and `helpText` to point to the subscription management page (not the BYOK API keys page) when the two are separate.
+
 ## Validation
 
 After changes:
