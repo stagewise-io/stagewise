@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.10.1 (2026-06-23)
+
+### Bug Fixes
+
+* project browser env snapshot from contentTabs with agent filtering (06f4d10)
+
+### Other Changes
+
+* gate resize-driven screenshot capture on visibility and focus (e884cdc)
+* gate idle energy consumers behind focus and visibility (89131e3)
+
 ## 1.10.0 (2026-06-19)
 
 ### Features
