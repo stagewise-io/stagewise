@@ -198,7 +198,8 @@ export class ModelProviderService {
       endpointId === 'alibaba' ||
       endpointId === 'deepseek' ||
       endpointId === 'z-ai' ||
-      endpointId === 'minimax'
+      endpointId === 'minimax' ||
+      endpointId === 'xiaomi-mimo'
     ) {
       const { apiKey, baseURL } = this.resolveProviderEndpoint(endpointId);
       const apiSpecMap: Record<ModelProvider, ApiSpec> = {
@@ -210,6 +211,7 @@ export class ModelProviderService {
         deepseek: 'openai-chat-completions',
         'z-ai': 'openai-chat-completions',
         minimax: 'openai-chat-completions',
+        'xiaomi-mimo': 'openai-chat-completions',
       };
       return { apiKey, baseURL, apiSpec: apiSpecMap[endpointId] };
     }
@@ -403,6 +405,7 @@ export class ModelProviderService {
       // OpenRouter uses different provider prefixes for some vendors
       const OPENROUTER_PROVIDER_MAP: Partial<Record<ModelProvider, string>> = {
         alibaba: 'qwen',
+        'xiaomi-mimo': 'xiaomi',
       };
       const routerProvider =
         OPENROUTER_PROVIDER_MAP[officialProvider] ?? officialProvider;
@@ -667,6 +670,26 @@ export class ModelProviderService {
           model: this.telemetryService.withTracing(
             // MiniMax's OpenAI-compatible endpoint speaks Chat Completions.
             p.chat(toNativeMiniMaxModelId(modelId) as any),
+            posthogConfig,
+          ),
+          headers,
+          providerOptions: providerOptions as Parameters<
+            typeof streamText
+          >[0]['providerOptions'],
+          contextWindowSize,
+          reasoningSignatureSource,
+        };
+      }
+      case 'xiaomi-mimo': {
+        const p = createOpenAI({
+          apiKey,
+          baseURL: baseURL ?? 'https://api.xiaomimimo.com/v1',
+        });
+        return {
+          model: this.telemetryService.withTracing(
+            // Xiaomi MiMo's OpenAI-compatible endpoint speaks Chat
+            // Completions. Internal model IDs already match native API IDs.
+            p.chat(modelId as any),
             posthogConfig,
           ),
           headers,

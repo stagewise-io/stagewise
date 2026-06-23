@@ -7,6 +7,7 @@ import { GoogleLogo } from './google';
 import { MinimaxLogo } from './minimax';
 import { MoonshotAiLogo } from './moonshotai';
 import { OpenAiLogo } from './openai';
+import { XiaomiMiMoLogo } from './xiaomi-mimo';
 import { ZAiLogo } from './z-ai';
 
 export type ProviderLogoComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -26,6 +27,7 @@ export const PROVIDER_LOGOS: Record<ModelProvider, ProviderLogoComponent> = {
   deepseek: DeepSeekLogo,
   'z-ai': ZAiLogo,
   minimax: MinimaxLogo,
+  'xiaomi-mimo': XiaomiMiMoLogo,
 };
 
 /**
@@ -48,5 +50,6 @@ export {
   MinimaxLogo,
   MoonshotAiLogo,
   OpenAiLogo,
+  XiaomiMiMoLogo,
   ZAiLogo,
 };

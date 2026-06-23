@@ -102,6 +102,7 @@ const PROVIDERS: ModelProvider[] = [
   'deepseek',
   'z-ai',
   'minimax',
+  'xiaomi-mimo',
 ];
 
 function getThinkingDefaultOptionsForModel(
@@ -689,6 +690,7 @@ function CustomModelDialog({
       { value: 'deepseek', label: 'DeepSeek', group: 'Built-in' },
       { value: 'z-ai', label: 'Z.ai', group: 'Built-in' },
       { value: 'minimax', label: 'MiniMax', group: 'Built-in' },
+      { value: 'xiaomi-mimo', label: 'Xiaomi MiMo', group: 'Built-in' },
     ];
     const custom = customEndpoints.map((ep) => ({
       value: ep.id,
@@ -1165,6 +1167,7 @@ function CustomModelsSection() {
       if (endpointId === 'deepseek') return 'DeepSeek';
       if (endpointId === 'z-ai') return 'Z.ai';
       if (endpointId === 'minimax') return 'MiniMax';
+      if (endpointId === 'xiaomi-mimo') return 'Xiaomi MiMo';
       return (
         customEndpoints.find((ep) => ep.id === endpointId)?.name ?? 'Unknown'
       );

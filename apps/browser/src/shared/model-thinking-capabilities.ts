@@ -168,6 +168,7 @@ export function getThinkingProviderForRoute({
     case 'deepseek':
     case 'z-ai':
     case 'minimax':
+    case 'xiaomi-mimo':
       return 'openai-compatible';
     default:
       return providerMode === 'stagewise' ? 'stagewise' : 'stagewise';

@@ -12,7 +12,8 @@ export type ApiKeyProvider =
   | 'alibaba'
   | 'deepseek'
   | 'z-ai'
-  | 'minimax';
+  | 'minimax'
+  | 'xiaomi-mimo';
 
 export type ApiKeyValidationResult =
   | null
@@ -75,6 +76,11 @@ const providerConfigs: Record<
       apiKey,
       baseURL: baseURL ?? 'https://api.minimax.io/v1',
     }).chat('minimax-m2.7'),
+  'xiaomi-mimo': (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://api.xiaomimimo.com/v1',
+    }).chat('mimo-v2.5'),
 };
 
 async function validateModel(model: ValidationModel): Promise<void> {
@@ -158,6 +164,7 @@ export async function validateApiKeys(
     deepseek: null,
     'z-ai': null,
     minimax: null,
+    'xiaomi-mimo': null,
   };
 
   const promises: Promise<void>[] = [];

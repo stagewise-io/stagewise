@@ -65,6 +65,7 @@ const CODING_PLAN_LOGO_PROVIDERS = [
   'moonshotai',
   'alibaba',
   'minimax',
+  'xiaomi-mimo',
 ] as const;
 
 function CodingPlanLogoStack() {

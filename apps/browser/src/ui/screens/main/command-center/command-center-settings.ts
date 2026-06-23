@@ -53,6 +53,7 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
       'alibaba',
       'z-ai',
       'minimax',
+      'xiaomi-mimo',
     ],
     url: '',
     settingsRoute: ROUTE_MODELS_PROVIDERS,

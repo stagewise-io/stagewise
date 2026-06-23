@@ -48,13 +48,12 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     tagline: 'GLM-5.2, 5.1, 5V-Turbo via Z.ai subscription',
     subscribeUrl: 'https://z.ai/subscribe',
     apiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
-    helpText: 'Create one at z.ai → Manage API keys',
+    helpText: 'Get your key at z.ai → Manage API keys',
     apiKeyPattern: '^[0-9a-f]{32}\\.[A-Za-z0-9]+$',
     baseUrl: 'https://api.z.ai/api/coding/paas/v4',
     validationBaseUrl: 'https://api.z.ai/api/coding/paas/v4',
     validationModelId: 'glm-5.2',
-    endpointHelpText:
-      'GLM Coding Plan keys are routed through https://api.z.ai/api/coding/paas/v4.',
+    endpointHelpText: 'Routed through api.z.ai/api/coding/paas/v4.',
     featuredModelIds: ['glm-5.2', 'glm-5.1', 'glm-5v-turbo'],
   },
   'kimi-plan': {
@@ -89,6 +88,22 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
       'https://platform.minimax.io/user-center/basic-information/interface-key',
     helpText: 'Create one at platform.minimax.io → User Center → Interface key',
     featuredModelIds: ['minimax-m3', 'minimax-m2.7'],
+  },
+  'mimo-plan': {
+    id: 'mimo-plan',
+    provider: 'xiaomi-mimo',
+    displayName: 'Xiaomi MiMo',
+    tagline: 'MiMo V2.5-series via platform.xiaomimimo.com',
+    subscribeUrl: 'https://platform.xiaomimimo.com/#/token-plan',
+    apiKeyUrl: 'https://platform.xiaomimimo.com/#/console/plan-manage',
+    helpText: 'Get your tp- key at platform.xiaomimimo.com → Subscription',
+    apiKeyPattern: '^tp-[A-Za-z0-9]+$',
+    baseUrl: 'https://token-plan-cn.xiaomimimo.com/v1',
+    validationBaseUrl: 'https://token-plan-cn.xiaomimimo.com/v1',
+    validationModelId: 'mimo-v2.5',
+    endpointHelpText:
+      'MiMo Token Plan keys (tp-xxxxx) are routed through https://token-plan-cn.xiaomimimo.com/v1. Singapore and Europe clusters are also available (token-plan-sgp / token-plan-ams).',
+    featuredModelIds: ['mimo-v2.5-pro', 'mimo-v2.5'],
   },
 };
 

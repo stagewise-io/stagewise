@@ -40,6 +40,7 @@ export const modelProviderSchema = z.enum([
   'deepseek',
   'z-ai',
   'minimax',
+  'xiaomi-mimo',
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
@@ -85,6 +86,7 @@ export const providerConfigsSchema = z.object({
   deepseek: providerConfigSchema.default({ mode: 'stagewise' }),
   'z-ai': providerConfigSchema.default({ mode: 'stagewise' }),
   minimax: providerConfigSchema.default({ mode: 'stagewise' }),
+  'xiaomi-mimo': providerConfigSchema.default({ mode: 'stagewise' }),
 });
 export type ProviderConfigs = z.infer<typeof providerConfigsSchema>;
 
@@ -184,6 +186,7 @@ export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> = {
   deepseek: 'https://api.deepseek.com/v1',
   'z-ai': 'https://api.z.ai/api/paas/v4',
   minimax: 'https://api.minimax.io/v1',
+  'xiaomi-mimo': 'https://api.xiaomimimo.com/v1',
 };
 
 /** Display info for each provider (for UI) */
@@ -222,6 +225,10 @@ export const PROVIDER_DISPLAY_INFO: Record<
   minimax: {
     name: 'MiniMax',
     description: 'MiniMax M-series models',
+  },
+  'xiaomi-mimo': {
+    name: 'Xiaomi MiMo',
+    description: 'MiMo V2.5-series models',
   },
 };
 
@@ -559,6 +566,7 @@ export const userPreferencesSchema = z.object({
     deepseek: { mode: 'stagewise' },
     'z-ai': { mode: 'stagewise' },
     minimax: { mode: 'stagewise' },
+    'xiaomi-mimo': { mode: 'stagewise' },
   }),
   /** User-defined API endpoints */
   customEndpoints: z.array(customEndpointSchema).default([]),
@@ -670,6 +678,7 @@ export const defaultUserPreferences: UserPreferences = {
     deepseek: { mode: 'stagewise' },
     'z-ai': { mode: 'stagewise' },
     minimax: { mode: 'stagewise' },
+    'xiaomi-mimo': { mode: 'stagewise' },
   },
   customEndpoints: [],
   customModels: [],

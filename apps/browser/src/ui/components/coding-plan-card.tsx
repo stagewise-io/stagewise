@@ -163,7 +163,7 @@ export function CodingPlanCard({
                 </span>
               )}
             </h3>
-            <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">
+            <p className="mt-0.5 truncate text-muted-foreground text-xs">
               {plan.tagline}
             </p>
           </div>
