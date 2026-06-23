@@ -5,7 +5,7 @@ export { DisposableService } from './disposable';
 export { SessionManager } from './session-manager';
 export { OscParser, wrapWithSentinel } from './osc-parser';
 export { SessionLogger } from './session-logger';
-export { sanitizeEnv } from './sanitize-env';
+export { sanitizeEnv, BLOCKLIST } from './sanitize-env';
 export {
   detectShell,
   resolveShellEnv,

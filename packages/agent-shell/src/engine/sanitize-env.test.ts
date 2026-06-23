@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { sanitizeEnv } from './sanitize-env';
+import { sanitizeEnv, BLOCKLIST } from './sanitize-env';
 
 describe('sanitizeEnv', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -68,6 +68,75 @@ describe('sanitizeEnv', () => {
     expect(env.SOME_NORMAL_VAR).toBe('hello');
   });
 
+  describe('host-process contamination blocklist', () => {
+    // BLOCKLIST only applies when falling back to process.env (no
+    // resolved shell env). When a resolved env is available, values
+    // come from the user's own shell profile and should pass through.
+
+    it('strips NODE_ENV from process.env fallback', () => {
+      process.env.NODE_ENV = 'production';
+
+      const env = sanitizeEnv();
+
+      expect(env.NODE_ENV).toBeUndefined();
+    });
+
+    it('preserves NODE_ENV from resolvedEnv (user-set in .zshrc)', () => {
+      const env = sanitizeEnv({
+        PATH: '/usr/bin',
+        NODE_ENV: 'development',
+      });
+
+      expect(env.NODE_ENV).toBe('development');
+    });
+
+    it('strips all blocklisted vars from process.env fallback', () => {
+      for (const key of BLOCKLIST) {
+        process.env[key] = 'should-be-stripped';
+      }
+
+      const env = sanitizeEnv();
+
+      for (const key of BLOCKLIST) {
+        expect(env[key]).toBeUndefined();
+      }
+    });
+
+    it('preserves non-sensitive blocklisted vars from resolvedEnv', () => {
+      // Only non-sensitive blocklisted vars should pass through from
+      // resolved env. Keys like POSTHOG_API_KEY still get stripped by
+      // the sensitive-pattern filter even from resolved env.
+      const nonSensitive = [
+        'NODE_ENV',
+        'BUILD_MODE',
+        'POSTHOG_HOST',
+        'STAGEWISE_CONSOLE_URL',
+        'API_URL',
+        'LLM_PROXY_URL',
+        'UPDATE_SERVER_ORIGIN',
+        'SUPABASE_URL',
+      ];
+      const resolved: Record<string, string> = {};
+      for (const key of nonSensitive) {
+        resolved[key] = 'user-set';
+      }
+
+      const env = sanitizeEnv(resolved);
+
+      for (const key of nonSensitive) {
+        expect(env[key]).toBe('user-set');
+      }
+    });
+
+    it('strips BUILD_MODE from process.env even though it is not sensitive', () => {
+      process.env.BUILD_MODE = 'production';
+
+      const env = sanitizeEnv();
+
+      expect(env.BUILD_MODE).toBeUndefined();
+    });
+  });
+
   it('strips the inherited shell-integration guard so each PTY can re-source', () => {
     // If this leaks into the spawn env, the integration script's first-line
     // guard short-circuits before registering OSC 133 hooks and every session
@@ -134,5 +203,45 @@ describe('sanitizeEnv', () => {
     expect(env.MY_SECRET_TOKEN).toBeUndefined();
     expect(env.ELECTRON_RUN_AS_NODE).toBeUndefined();
     expect(env.STAGEWISE_SHELL).toBe('1');
+  });
+
+  describe('forAgent option', () => {
+    it('applies agent-specific env by default (STAGEWISE_SHELL, HISTFILE)', () => {
+      const env = sanitizeEnv();
+
+      expect(env.STAGEWISE_SHELL).toBe('1');
+      expect(env.HISTFILE).toBe('/dev/null');
+      expect(env.HISTSIZE).toBe('0');
+      expect(env.SAVEHIST).toBe('0');
+    });
+
+    it('omits agent-specific env when forAgent is false', () => {
+      const env = sanitizeEnv(undefined, undefined, { forAgent: false });
+
+      expect(env.STAGEWISE_SHELL).toBeUndefined();
+      expect(env.HISTFILE).toBeUndefined();
+      expect(env.HISTSIZE).toBeUndefined();
+      expect(env.SAVEHIST).toBeUndefined();
+    });
+
+    it('preserves user-set vars from resolved env for user terminals', () => {
+      const env = sanitizeEnv(
+        { NODE_ENV: 'development', PATH: '/usr/bin' },
+        undefined,
+        { forAgent: false },
+      );
+
+      // Resolved env values come from the user's shell profile — pass through.
+      expect(env.NODE_ENV).toBe('development');
+      expect(env.PATH).toBe('/usr/bin');
+    });
+
+    it('strips blocklisted vars from process.env fallback for user terminals', () => {
+      process.env.NODE_ENV = 'production';
+
+      const env = sanitizeEnv(undefined, undefined, { forAgent: false });
+
+      expect(env.NODE_ENV).toBeUndefined();
+    });
   });
 });
