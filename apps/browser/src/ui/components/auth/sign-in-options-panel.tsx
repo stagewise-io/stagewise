@@ -34,8 +34,8 @@ export type SignInOptionsPanelProps = {
   verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
   signInSocial: (provider: SocialAuthProvider) => Promise<{ error?: string }>;
   signInEmail: () => Promise<{ error?: string }>;
-  onUseApiKeys: () => void;
-  onUseSubscription: () => void;
+  onUseApiKeys?: () => void;
+  onUseSubscription?: () => void;
   trackingPrefix: TrackingPrefix;
   track: TrackEvent;
   onAuthenticated?: (method: SignInMethod) => void;
@@ -490,37 +490,45 @@ export function SignInOptionsPanel({
               Continue with Email
             </Button>
           </div>
-          <div className="relative text-center text-subtle-foreground text-xs after:absolute after:inset-x-0 after:top-1/2 after:border-border-subtle after:border-t">
-            <span className="relative z-10 bg-background px-2">or</span>
-          </div>
-          <div className="grid gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setError(null);
-                onUseApiKeys();
-              }}
-              disabled={loading}
-            >
-              <IconKey2Outline18 className="size-4" />
-              Use your own API keys
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setError(null);
-                onUseSubscription();
-              }}
-              disabled={loading}
-            >
-              <CodingPlanLogoStack />
-              Use existing subscription
-            </Button>
-          </div>
+          {(onUseApiKeys || onUseSubscription) && (
+            <div className="relative text-center text-subtle-foreground text-xs after:absolute after:inset-x-0 after:top-1/2 after:border-border-subtle after:border-t">
+              <span className="relative z-10 bg-background px-2">or</span>
+            </div>
+          )}
+          {(onUseApiKeys || onUseSubscription) && (
+            <div className="grid gap-2">
+              {onUseApiKeys && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setError(null);
+                    onUseApiKeys();
+                  }}
+                  disabled={loading}
+                >
+                  <IconKey2Outline18 className="size-4" />
+                  Use your own API keys
+                </Button>
+              )}
+              {onUseSubscription && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setError(null);
+                    onUseSubscription();
+                  }}
+                  disabled={loading}
+                >
+                  <CodingPlanLogoStack />
+                  Use existing subscription
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
