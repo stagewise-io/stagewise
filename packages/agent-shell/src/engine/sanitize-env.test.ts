@@ -253,5 +253,38 @@ describe('sanitizeEnv', () => {
 
       expect(env.NODE_ENV).toBeUndefined();
     });
+
+    it('preserves credential vars for user terminals (forAgent: false)', () => {
+      // User terminals and worktree setup scripts need credentials like
+      // NPM_TOKEN, GITHUB_TOKEN to authenticate — same as a regular
+      // terminal. Sensitive-var stripping is agent-only.
+      const env = sanitizeEnv(
+        {
+          NPM_TOKEN: 'abc123',
+          GITHUB_TOKEN: 'ghp_xyz',
+          DB_PASSWORD: 'secret',
+          PRIVATE_KEY: 'key',
+          SSH_AUTH_SOCK: '/tmp/ssh-agent',
+        },
+        undefined,
+        { forAgent: false },
+      );
+
+      expect(env.NPM_TOKEN).toBe('abc123');
+      expect(env.GITHUB_TOKEN).toBe('ghp_xyz');
+      expect(env.DB_PASSWORD).toBe('secret');
+      expect(env.PRIVATE_KEY).toBe('key');
+      expect(env.SSH_AUTH_SOCK).toBe('/tmp/ssh-agent');
+    });
+
+    it('strips credential vars for agent terminals (default)', () => {
+      const env = sanitizeEnv({
+        NPM_TOKEN: 'abc123',
+        GITHUB_TOKEN: 'ghp_xyz',
+      });
+
+      expect(env.NPM_TOKEN).toBeUndefined();
+      expect(env.GITHUB_TOKEN).toBeUndefined();
+    });
   });
 });

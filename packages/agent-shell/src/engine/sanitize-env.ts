@@ -166,7 +166,13 @@ export function sanitizeEnv(
     // sanitization while still affecting tools that check case-insensitively.
     if (!hasResolvedEnv && BLOCKLIST.has(key.toUpperCase())) continue;
 
-    if (!isWhitelisted(key) && isSensitive(key)) continue;
+    // Strip credential-like vars (SECRET, TOKEN, KEY, PASSWORD, etc.)
+    // only for agent terminals — to keep them out of LLM context. User
+    // terminals and worktree setup scripts need these (NPM_TOKEN,
+    // GITHUB_TOKEN, etc.) to authenticate against private registries
+    // and services, just like a regular terminal session would.
+    if (options?.forAgent !== false && !isWhitelisted(key) && isSensitive(key))
+      continue;
 
     env[key] = value;
   }
