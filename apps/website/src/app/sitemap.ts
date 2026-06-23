@@ -7,6 +7,11 @@ const siteUrl = 'https://stagewise.io';
 const appRoot = path.join(process.cwd(), 'src', 'app');
 const pageFilePattern = /^page\.(tsx|ts|jsx|js|mdx|md)$/;
 const ignoredRouteSegments = new Set(['vscode-extension']);
+const hiddenRoutes = new Set([
+  '/use-cases/minimax',
+  '/use-cases/qwen',
+  '/use-cases/kimi',
+]);
 
 function getRouteFromPageFile(filepath: string): string | null {
   const relativePath = path.relative(appRoot, filepath);
@@ -62,6 +67,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     .map((filepath) => {
       const route = getRouteFromPageFile(filepath);
       if (!route) return null;
+
+      if (hiddenRoutes.has(route)) return null;
 
       return createSitemapEntry(route);
     })
