@@ -38,7 +38,7 @@ const WHITELIST = new Set([
  * not leak through. The user's shell rc files can still export these
  * vars themselves; we only strip the inherited app-process values.
  */
-export const BLOCKLIST = new Set([
+export const BLOCKLIST: ReadonlySet<string> = new Set([
   'NODE_ENV',
   'BUILD_MODE',
   'POSTHOG_API_KEY',
@@ -159,7 +159,12 @@ export function sanitizeEnv(
     // user's own — if they export NODE_ENV in .zshrc, that should pass
     // through. resolveShellEnv already strips BLOCKLIST vars from its
     // seed env, so the login shell never sees the app's contamination.
-    if (!hasResolvedEnv && BLOCKLIST.has(key)) continue;
+    // Case-insensitive match: env vars on Unix are case-sensitive, but
+    // the blocklist targets app-set vars that are conventionally
+    // uppercase. Matching case-insensitively is defense-in-depth against
+    // mixed-case variants (e.g. Node_Env) that would otherwise bypass
+    // sanitization while still affecting tools that check case-insensitively.
+    if (!hasResolvedEnv && BLOCKLIST.has(key.toUpperCase())) continue;
 
     if (!isWhitelisted(key) && isSensitive(key)) continue;
 

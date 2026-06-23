@@ -135,6 +135,16 @@ describe('sanitizeEnv', () => {
 
       expect(env.BUILD_MODE).toBeUndefined();
     });
+
+    it('strips blocklisted vars case-insensitively', () => {
+      process.env.node_env = 'production';
+      process.env.Build_Mode = 'production';
+
+      const env = sanitizeEnv();
+
+      expect(env.node_env).toBeUndefined();
+      expect(env.Build_Mode).toBeUndefined();
+    });
   });
 
   it('strips the inherited shell-integration guard so each PTY can re-source', () => {
