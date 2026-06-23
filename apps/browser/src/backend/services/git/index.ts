@@ -1327,14 +1327,14 @@ export class GitService extends DisposableService {
   private async runGitRaw(cwd: string, args: string[]): Promise<string | null> {
     this.assertNotDisposed();
     try {
+      // Always pass resolvedEnv through sanitizeEnv. When resolvedEnv is
+      // available (from the user's login shell), sanitizeEnv preserves
+      // user-set BLOCKLIST vars (NODE_ENV, etc.) but still strips
+      // ELECTRON_*, sensitive keys, and the shell-integration guard.
+      // When resolvedEnv is null, sanitizeEnv falls back to a sanitized
+      // process.env with BLOCKLIST vars removed.
       const resolvedEnv = await this.getResolvedEnv();
-      // Sanitize the fallback env to strip host-process contamination
-      // vars (NODE_ENV, BUILD_MODE, app config keys/URLs). When
-      // resolvedEnv is available it comes from the user's login shell
-      // and is used as-is; the fallback to process.env is the path that
-      // would leak app-internal vars into git child processes.
-      const env =
-        resolvedEnv ?? sanitizeEnv(undefined, undefined, { forAgent: false });
+      const env = sanitizeEnv(resolvedEnv, undefined, { forAgent: false });
       return (await this.runGitCommand(cwd, args, env)) ?? null;
     } catch (error) {
       this.logger.debug('[GitService] Git command failed', {
@@ -1419,8 +1419,7 @@ export class GitService extends DisposableService {
   ): Promise<GitStrictCommandResult> {
     this.assertNotDisposed();
     const resolvedEnv = await this.getResolvedEnv();
-    const env =
-      resolvedEnv ?? sanitizeEnv(undefined, undefined, { forAgent: false });
+    const env = sanitizeEnv(resolvedEnv, undefined, { forAgent: false });
     const result = await this.runGitMutationCommand(cwd, args, env);
     this.logger.debug('[GitService] Git mutation finished', {
       cwd,

@@ -290,15 +290,15 @@ export class WorktreeSetupRunner {
     }
     if (activeRun.settled) return;
 
-    // Use sanitized process.env as the base to prevent host-process
-    // contamination vars (NODE_ENV, BUILD_MODE, app config keys/URLs)
-    // from leaking into the worktree setup script and its children.
-    // resolvedEnv (from the user's login shell) overrides on top.
-    const sanitizedBase = sanitizeEnv(undefined, undefined, {
+    // Sanitize resolvedEnv (or process.env fallback) to strip
+    // ELECTRON_*, sensitive keys, the shell-integration guard, and
+    // (on fallback) BLOCKLIST vars. User-set BLOCKLIST vars from
+    // resolvedEnv are preserved. STAGEWISE_*_WORKTREE_PATH vars are
+    // merged on top after sanitization.
+    const sanitizedBase = sanitizeEnv(resolvedEnv, undefined, {
       forAgent: false,
     });
     const env: NodeJS.ProcessEnv = mergeEnv(sanitizedBase, {
-      ...(resolvedEnv ?? {}),
       STAGEWISE_SOURCE_WORKTREE_PATH: metadata.sourceWorktreePath,
       STAGEWISE_TARGET_WORKTREE_PATH: metadata.workspacePath,
       STAGEWISE_MAIN_WORKTREE_PATH: metadata.mainWorktreePath,
