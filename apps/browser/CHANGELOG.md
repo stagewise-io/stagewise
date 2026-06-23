@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.2 (2026-06-23)
+
+### Bug Fixes
+
+* remove unstable procedure from useEffect deps (1f06ead)
+
 ## 1.10.1 (2026-06-23)
 
 ### Bug Fixes
