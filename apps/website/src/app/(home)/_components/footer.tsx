@@ -44,6 +44,42 @@ export function Footer() {
           </div>
           <div className="flex w-full flex-row flex-wrap justify-end gap-x-20 gap-y-6 text-right">
             <div className="flex flex-col items-end gap-1">
+              <span
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'pointer-events-none mb-1 justify-end font-medium text-subtle-foreground hover:bg-transparent hover:text-subtle-foreground',
+                )}
+              >
+                Use cases
+              </span>
+              <Link
+                href="/use-cases/deepseek"
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'justify-end',
+                )}
+              >
+                stagewise with DeepSeek
+              </Link>
+              <Link
+                href="/use-cases/glm"
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'justify-end',
+                )}
+              >
+                stagewise with GLM
+              </Link>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'pointer-events-none mb-1 justify-end font-medium text-subtle-foreground hover:bg-transparent hover:text-subtle-foreground',
+                )}
+              >
+                Legal
+              </span>
               <Link
                 href="/terms"
                 className={cn(
@@ -82,6 +118,14 @@ export function Footer() {
               </Link>
             </div>
             <div className="flex flex-col items-end gap-1">
+              <span
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'pointer-events-none mb-1 justify-end font-medium text-subtle-foreground hover:bg-transparent hover:text-subtle-foreground',
+                )}
+              >
+                Socials
+              </span>
               <Link
                 href="https://github.com/stagewise-io/stagewise"
                 className={cn(
