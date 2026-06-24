@@ -343,7 +343,6 @@ function FeatureSection() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    'GLM Coding Plan',
                     'Kimi',
                     'Qwen Coding Plan',
                     'MiniMax',

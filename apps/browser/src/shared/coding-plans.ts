@@ -36,6 +36,8 @@ export type CodingPlan = {
   validationModelId?: string;
   /** Additional endpoint note rendered in plan UI. */
   endpointHelpText?: string;
+  /** Optional disclaimer rendered below the help text (e.g. unofficial status). */
+  disclaimer?: string;
   /** Featured model IDs (must exist in availableModels) — for card copy. */
   featuredModelIds: string[];
 };
@@ -54,6 +56,8 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     validationBaseUrl: 'https://api.z.ai/api/coding/paas/v4',
     validationModelId: 'glm-5.2',
     endpointHelpText: 'Routed through api.z.ai/api/coding/paas/v4.',
+    disclaimer:
+      'stagewise is not yet an officially supported tool for the GLM Coding Plan. We are working with Z.ai on a partnership.',
     featuredModelIds: ['glm-5.2', 'glm-5.1', 'glm-5v-turbo'],
   },
   'kimi-plan': {

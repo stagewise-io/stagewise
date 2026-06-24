@@ -273,6 +273,9 @@ export function CodingPlanCard({
               )}
             </p>
           )}
+        {plan.disclaimer && (
+          <p className="text-2xs text-warning-foreground">{plan.disclaimer}</p>
+        )}
       </div>
     </div>
   );

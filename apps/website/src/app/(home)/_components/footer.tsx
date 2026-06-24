@@ -61,15 +61,6 @@ export function Footer() {
               >
                 stagewise with DeepSeek
               </Link>
-              <Link
-                href="/use-cases/glm"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'xs' }),
-                  'justify-end',
-                )}
-              >
-                stagewise with GLM
-              </Link>
             </div>
             <div className="flex flex-col items-end gap-1">
               <span
