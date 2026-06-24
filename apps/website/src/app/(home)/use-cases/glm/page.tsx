@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { permanentRedirect } from 'next/navigation';
 import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { DownloadButtons } from '../../_components/home-client';
@@ -25,11 +24,6 @@ export const metadata: Metadata = {
 };
 
 export default function GLMUseCasePage() {
-  // Remove this redirect when the Z.ai partnership is established
-  if ('remove-when-partnership-established'.includes('partnership')) {
-    permanentRedirect('/');
-  }
-
   return (
     <>
       {/* Hero */}
