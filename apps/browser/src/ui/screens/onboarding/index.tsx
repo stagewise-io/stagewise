@@ -15,6 +15,7 @@ import { StepExistingSubscriptions } from './steps/03-existing-subscriptions';
 import { StepCustomEndpoints } from './steps/04-custom-endpoints';
 import { StepCustomModels } from './steps/05-custom-models';
 import { StepDone } from './steps/06-done';
+import { StepTheme } from './steps/07-theme';
 
 type ScreenId =
   | 'login'
@@ -22,6 +23,7 @@ type ScreenId =
   | 'existing-subscriptions'
   | 'custom-endpoints'
   | 'custom-models'
+  | 'theme'
   | 'done';
 
 export function OnboardingWizard() {
@@ -65,7 +67,7 @@ export function OnboardingWizard() {
         )}
         {screen === 'model-access' && (
           <StepModelAccess
-            onSelectStagewise={() => navigate('done')}
+            onSelectStagewise={() => navigate('theme')}
             onSelectExistingSubscriptions={() =>
               navigate('existing-subscriptions')
             }
@@ -75,7 +77,7 @@ export function OnboardingWizard() {
         )}
         {screen === 'existing-subscriptions' && (
           <StepExistingSubscriptions
-            onNext={() => navigate('done')}
+            onNext={() => navigate('theme')}
             onBack={() => navigate('model-access')}
           />
         )}
@@ -87,15 +89,18 @@ export function OnboardingWizard() {
         )}
         {screen === 'custom-models' && (
           <StepCustomModels
-            onNext={() => navigate('done')}
+            onNext={() => navigate('theme')}
             onBack={() => navigate('custom-endpoints')}
           />
         )}
-        {screen === 'done' && (
-          <StepDone
-            onComplete={complete}
+        {screen === 'theme' && (
+          <StepTheme
+            onNext={() => navigate('done')}
             onBack={() => navigate('model-access')}
           />
+        )}
+        {screen === 'done' && (
+          <StepDone onComplete={complete} onBack={() => navigate('theme')} />
         )}
       </div>
     </div>

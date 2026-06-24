@@ -1,5 +1,6 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
+import { LogoCombo } from '@stagewise/stage-ui/components/logo-combo';
 import { cn } from '@ui/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useState, useCallback } from 'react';
@@ -130,8 +131,10 @@ export function StepLogin({
 
   return (
     <>
-      <div className="flex flex-1 flex-col items-center justify-center gap-4">
+      <div className="flex flex-1 flex-col items-center justify-center gap-6">
+        <LogoCombo size={32} />
         <SignInOptionsPanel
+          title={null}
           sendOtp={(email, token) => sendOtp(email, token ?? '')}
           verifyOtp={verifyOtp}
           signInSocial={signInSocial}

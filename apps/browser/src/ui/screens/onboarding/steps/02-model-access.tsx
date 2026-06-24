@@ -1,7 +1,36 @@
+import type { ReactNode } from 'react';
 import { cn } from '@ui/utils';
 import { IconChevronRightOutline18 } from 'nucleo-ui-outline-18';
+import {
+  IconCloudeCodeFillDuo18,
+  IconServerFillDuo18,
+} from 'nucleo-ui-fill-duo-18';
+import { Logo } from '@stagewise/stage-ui/components/logo';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { BackButton, OnboardingBottomNav } from '../index';
+
+type BadgeVariant = 'default' | 'primary';
+
+function Badge({
+  children,
+  variant = 'default',
+}: {
+  children: ReactNode;
+  variant?: BadgeVariant;
+}) {
+  return (
+    <span
+      className={cn(
+        'shrink-0 rounded-full border px-2 py-0.5 font-medium text-[10px] leading-none',
+        variant === 'primary'
+          ? 'border-primary-solid bg-primary-solid text-solid-foreground'
+          : 'border-derived bg-surface-2 text-muted-foreground',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
 
 type ModelAccessChoice = 'stagewise' | 'existing-subscriptions' | 'custom';
 
@@ -36,26 +65,36 @@ export function StepModelAccess({
 
   const cards: {
     choice: ModelAccessChoice;
+    icon: ReactNode;
     label: string;
     description: string;
+    badge?: ReactNode;
   }[] = [
     {
       choice: 'stagewise',
-      label: 'Use stagewise Account',
+      icon: <Logo className="size-5" pathClassName="text-foreground" />,
+      label: 'Use your stagewise account',
       description:
-        'Use stagewise Cloud Inference to get easy access to a huge model library through one account.',
+        'Access a wide variety of frontier and open-weight models with one subscription.',
+      badge: isAuthenticated ? (
+        <Badge variant="primary">Recommended</Badge>
+      ) : (
+        <Badge>Needs stagewise account</Badge>
+      ),
     },
     {
       choice: 'existing-subscriptions',
-      label: 'Use existing subscriptions',
+      icon: <IconCloudeCodeFillDuo18 className="size-5 text-foreground" />,
+      label: 'Use existing subscription or API keys',
       description:
-        'Configure any of your existing coding plans or API keys for well known inference providers.',
+        'Continue using your existing subscription with one of the well-known services.',
     },
     {
       choice: 'custom',
-      label: 'Custom endpoints & models',
+      icon: <IconServerFillDuo18 className="size-5 text-foreground" />,
+      label: 'Use custom model providers',
       description:
-        'Configure new endpoints, no matter if they\u2019re in the cloud, specific to your organization or even local inference.',
+        'Connect a custom model endpoint from the cloud or your local inference setup.',
     },
   ];
 
@@ -75,8 +114,10 @@ export function StepModelAccess({
           {cards.map((card) => (
             <ModelAccessCard
               key={card.choice}
+              icon={card.icon}
               label={card.label}
               description={card.description}
+              badge={card.badge}
               onClick={() => handleSelect(card.choice)}
             />
           ))}
@@ -91,12 +132,16 @@ export function StepModelAccess({
 }
 
 function ModelAccessCard({
+  icon,
   label,
   description,
+  badge,
   onClick,
 }: {
+  icon: ReactNode;
   label: string;
   description: string;
+  badge?: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -107,8 +152,12 @@ function ModelAccessCard({
         'app-no-drag flex cursor-pointer items-center gap-3 rounded-lg border border-derived bg-surface-1 p-3 text-left transition-colors hover:bg-surface-2',
       )}
     >
+      <div className="flex shrink-0 items-center justify-center">{icon}</div>
       <div className="min-w-0 flex-1">
-        <h3 className="font-medium text-foreground text-sm">{label}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium text-foreground text-sm">{label}</h3>
+          {badge}
+        </div>
         <p className="text-muted-foreground text-xs leading-relaxed">
           {description}
         </p>
