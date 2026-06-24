@@ -16,6 +16,7 @@ export const API_URL = process.env.API_URL || 'https://api.stagewise.io';
 const CONSOLE_URL =
   process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 const ELECTRON_CLIENT_ID = 'electron';
+const STAGEWISE_PRODUCTION_API_ORIGIN = 'https://api.stagewise.io';
 const STABLE_AUTH_CALLBACK_SCHEME = 'stagewise';
 // @better-auth/electron stores Electron OAuth PKCE code verifiers in this
 // process-global map keyed by OAuth state. Our API-hosted handoff constructs
@@ -39,25 +40,16 @@ function getOrigin(url: string): string | null {
 }
 
 function shouldUseStableHostedApiAuthScheme(): boolean {
-  if (AUTH_CALLBACK_SCHEME !== 'stagewise-dev') return false;
-  const origin = getOrigin(API_URL);
-  if (!origin) return false;
-  // Any stagewise-hosted API (api.stagewise.io, fly-api.stagewise.io, etc.)
-  // trusts the production Electron origin. Local dev builds use
-  // `stagewise-dev:/`, which hosted auth endpoints reject with
-  // "invalid origin". Use the stable `stagewise` scheme when targeting
-  // any stagewise-hosted API; keep `stagewise-dev` only for localhost APIs.
-  try {
-    return new URL(origin).hostname.endsWith('.stagewise.io');
-  } catch {
-    return false;
-  }
+  return (
+    AUTH_CALLBACK_SCHEME === 'stagewise-dev' &&
+    getOrigin(API_URL) === STAGEWISE_PRODUCTION_API_ORIGIN
+  );
 }
 
-// The hosted stagewise API trusts the production Electron origin. Local dev
+// The hosted production API trusts the production Electron origin. Local dev
 // builds normally use `stagewise-dev:/`, which makes hosted auth endpoints fail
-// with "invalid origin". When a dev build targets any stagewise-hosted API,
-// use the stable auth scheme while still keeping `stagewise-dev` for localhost.
+// with "invalid origin". When a dev build targets the hosted API, use the
+// stable auth origin while still keeping `stagewise-dev` for non-hosted APIs.
 export const API_AUTH_CALLBACK_SCHEME = shouldUseStableHostedApiAuthScheme()
   ? STABLE_AUTH_CALLBACK_SCHEME
   : AUTH_CALLBACK_SCHEME;
