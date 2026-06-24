@@ -1,6 +1,7 @@
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { Select } from '@stagewise/stage-ui/components/select';
+import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useCallback, useMemo } from 'react';
 import { produceWithPatches, enablePatches } from 'immer';
@@ -99,8 +100,8 @@ export function StepCustomModels({
 
   return (
     <>
-      <div className="app-no-drag flex flex-1 flex-col items-center justify-center gap-4 px-8">
-        <div className="flex flex-col items-center gap-2 text-center">
+      <div className="app-no-drag flex flex-1 flex-col items-center gap-4 overflow-hidden px-8 py-8">
+        <div className="flex shrink-0 flex-col items-center gap-2 text-center">
           <h1 className="font-medium text-foreground text-xl">Custom Models</h1>
           <p className="max-w-md text-muted-foreground text-sm">
             Define models served through your custom endpoints. You can skip
@@ -108,7 +109,10 @@ export function StepCustomModels({
           </p>
         </div>
 
-        <div className="flex w-full max-w-lg flex-col gap-3">
+        <OverlayScrollbar
+          className="w-full max-w-lg flex-1"
+          contentClassName="flex flex-col gap-3 pb-4"
+        >
           {customModels.length === 0 ? (
             <div className="rounded-lg border border-derived-subtle p-6">
               <p className="text-center text-muted-foreground text-sm">
@@ -146,7 +150,7 @@ export function StepCustomModels({
               Add a custom endpoint first before creating models.
             </p>
           )}
-        </div>
+        </OverlayScrollbar>
       </div>
       <OnboardingBottomNav
         left={<BackButton onClick={onBack} />}
