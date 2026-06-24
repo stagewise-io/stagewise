@@ -3,9 +3,9 @@
   <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
-### 开源 Agentic IDE
+### 面向开源模型的 Agentic IDE
 
-[English](./README.md) | 简体中文 | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md)
+[English](./README.md) | 简体中文 | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [हिन्दी](./README.hi.md) | [Русский](./README.ru.md) | [Українська](./README.uk.md)
 
  ![NPM License](https://img.shields.io/npm/l/stagewise) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise)
 
@@ -15,7 +15,7 @@
 
 ## 关于项目
 
-**stagewise** 是一款专为开发者设计的浏览器，内置编程智能体。
+**stagewise** 是一款面向开发者的开源 Agentic IDE，内置编程智能体。
 
 - **在同一工具中浏览与构建** — 无需切换上下文
 - **使用编程智能体**，该智能体可**完整访问你标签页的控制台与调试器**
@@ -34,15 +34,14 @@
 
 ### 一键导入 —— 直接使用现有订阅
 
-通过一个 API 密钥接入以下任意订阅，即可在 stagewise 中解锁该服务商提供的所有模型。GLM 编程计划密钥会在内部路由到 Z.ai 专用编程端点。
+通过一个 API 密钥接入以下任意订阅，即可在 stagewise 中解锁该服务商提供的所有模型。
 
 | **订阅** | **服务商** | **主推模型** | **控制台** |
 | -------- | ---------- | ------------ | ---------- |
-| GLM 编程计划 | [Z.ai](https://z.ai) | GLM-5.2、GLM-5.1、GLM-5V-Turbo | [获取 API 密钥](https://z.ai/manage-apikey/apikey-list) |
 | Kimi | [Moonshot AI](https://platform.moonshot.ai) | Kimi K2.7 Code、Kimi K2.6、Kimi K2.5 | [获取 API 密钥](https://platform.moonshot.ai/console/api-keys) |
-| Qwen 编程计划 | [阿里云 DashScope](https://dashscope.console.aliyun.com) | Qwen3-Coder-30B、Qwen3-32B | [获取 API 密钥](https://dashscope.console.aliyun.com/apiKey) |
+| Qwen 编程计划 | [阿里云 DashScope](https://dashscope.console.aliyun.com) | Qwen 3-Coder 30B-A3B、Qwen 3-32B | [获取 API 密钥](https://dashscope.console.aliyun.com/apiKey) |
 | MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [获取 API 密钥](https://platform.minimax.io/user-center/basic-information/interface-key) |
-| Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro、MiMo-V2.5 | [获取 API 密钥](https://platform.xiaomimimo.com/console/api-keys) |
+| Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro、MiMo-V2.5 | [获取 API 密钥](https://platform.xiaomimimo.com/#/console/plan-manage) |
 
 ### stagewise 账户
 
@@ -56,15 +55,20 @@
 
 包含模型：
 
-- **Anthropic**：Fable 5、Opus 4.8、Opus 4.7、Opus 4.6、Sonnet 4.6、Haiku 4.5
-- **OpenAI**：GPT-5.5、GPT-5.4、GPT-5.3 Codex、GPT-5.3 Instant、GPT-5.4 mini、GPT-5.4 nano
-- **Google**：Gemini 3.1 Pro（预览）、Gemini 3 Flash、Gemini 3.1 Flash Lite（预览）
+#### 开放权重模型
+
 - **Moonshot AI**：Kimi K2.7 Code、Kimi K2.6、Kimi K2.5
 - **Alibaba**：Qwen 3-32B、Qwen 3-Coder 30B-A3B
 - **DeepSeek**：DeepSeek V4 Pro、DeepSeek V4 Flash
 - **Z.ai**：GLM 5.2、GLM 5.1、GLM 5V-Turbo
 - **MiniMax**：MiniMax M3、MiniMax M2.7、MiniMax M2
 - **Xiaomi MiMo**：MiMo-V2.5-Pro、MiMo-V2.5
+
+#### 专有模型
+
+- **Anthropic**：Fable 5、Opus 4.8、Opus 4.7、Opus 4.6、Sonnet 4.6、Haiku 4.5
+- **OpenAI**：GPT-5.5、GPT-5.4、GPT-5.3 Codex、GPT-5.3 Instant、GPT-5.4 mini、GPT-5.4 nano
+- **Google**：Gemini 3.5 Flash、Gemini 3.1 Pro（预览）、Gemini 3 Flash、Gemini 3.1 Flash Lite
 
 ## 许可证
 
