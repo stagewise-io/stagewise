@@ -37,7 +37,10 @@ export type JsonName =
   | 'downloads-state'
   | 'window-state'
   | 'tab-state'
-  | 'tutorial-state';
+  | 'tutorial-state'
+  | 'experience-survey'
+  | 'experience-founder-call-survey'
+  | 'first-used-at';
 
 export const getJsonPath = (name: JsonName): string =>
   path.join(getDataRoot(), `${name}.json`);

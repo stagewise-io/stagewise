@@ -6,6 +6,7 @@
  * @warning The state of workspace-specific experiences is to be managed by the workspace manager etc.
  */
 
+import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,8 +14,12 @@ import {
   recentlyOpenedWorkspacesArraySchema,
   onboardingStateSchema,
   tutorialStateSchema,
+  experienceSurveySchema,
+  founderCallSurveySchema,
   type StoredExperienceData,
   type RecentlyOpenedWorkspace,
+  type ExperienceSurvey,
+  type FounderCallSurvey,
 } from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
@@ -49,6 +54,9 @@ export class UserExperienceService extends DisposableService {
 
   // Serialize tutorial step writes to prevent races from fire-and-forget saves
   private tutorialStepLock: Promise<void> = Promise.resolve();
+
+  // Prevent concurrent firstUsedAt writes
+  private isSettingFirstUsedAt = false;
 
   private constructor(
     logger: Logger,
@@ -98,14 +106,29 @@ export class UserExperienceService extends DisposableService {
   }
 
   private async initialize() {
-    const [hasSeenOnboarding, tutorialState] = await Promise.all([
+    const [
+      hasSeenOnboarding,
+      tutorialState,
+      surveyState,
+      founderCallSurveyState,
+      firstUsedAt,
+    ] = await Promise.all([
       this.readOnboardingState(),
       this.readTutorialState(),
+      this.readSurveyState(),
+      this.readFounderCallSurveyState(),
+      this.readFirstUsedAt(),
     ]);
     this.uiKarton.setState((draft) => {
       draft.userExperience.storedExperienceData.hasSeenOnboardingFlow =
         hasSeenOnboarding;
       draft.userExperience.storedExperienceData.tutorialState = tutorialState;
+      draft.userExperience.storedExperienceData.experienceSurvey = surveyState;
+      draft.userExperience.storedExperienceData.founderCallSurvey =
+        founderCallSurveyState;
+      draft.userExperience.storedExperienceData.firstUsedAt = firstUsedAt;
+      draft.userExperience.experienceSurvey = surveyState;
+      draft.userExperience.founderCallSurvey = founderCallSurveyState;
     });
 
     this.uiKarton.registerStateChangeCallback(
@@ -176,6 +199,36 @@ export class UserExperienceService extends DisposableService {
         await this.setHasSeenOnboardingFlow(value, auth);
       },
     );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.survey.answer',
+      async (_callingClientId: string, answer: 'yes' | 'no') => {
+        await this.answerSurvey(answer);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.survey.dismiss',
+      async (_callingClientId: string) => {
+        await this.dismissSurvey();
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.survey.submitFeedback',
+      async (_callingClientId: string, feedback: string) => {
+        await this.submitSurveyFeedback(feedback);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.founderCall.survey.open',
+      async (_callingClientId: string) => {
+        await this.openFounderCallSurvey();
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.founderCall.survey.dismiss',
+      async (_callingClientId: string) => {
+        await this.dismissFounderCallSurvey();
+      },
+    );
   }
 
   protected onTeardown(): void {
@@ -196,6 +249,17 @@ export class UserExperienceService extends DisposableService {
     );
     this.uiKarton.removeServerProcedureHandler(
       'userExperience.tutorial.setStep',
+    );
+    this.uiKarton.removeServerProcedureHandler('userExperience.survey.answer');
+    this.uiKarton.removeServerProcedureHandler('userExperience.survey.dismiss');
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.survey.submitFeedback',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.founderCall.survey.open',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.founderCall.survey.dismiss',
     );
     this.logger.debug('[UserExperienceService] Teardown complete');
   }
@@ -220,8 +284,24 @@ export class UserExperienceService extends DisposableService {
 
         this.uiKarton.setState((draft) => {
           draft.userExperience.storedExperienceData = storedExperienceData;
+          draft.userExperience.experienceSurvey =
+            storedExperienceData.experienceSurvey;
+          draft.userExperience.founderCallSurvey =
+            storedExperienceData.founderCallSurvey;
         });
       });
+    }
+
+    // Set firstUsedAt on first user message in any agent
+    const currentState = this.uiKarton.state;
+    if (this.isSettingFirstUsedAt) return;
+    if (currentState.userExperience.storedExperienceData.firstUsedAt !== null)
+      return;
+    const hasMessages = Object.values(currentState.agents.instances).some(
+      (instance) => instance.state.history.length > 0,
+    );
+    if (hasMessages) {
+      void this.setFirstUsedAt();
     }
   }
 
@@ -473,18 +553,238 @@ export class UserExperienceService extends DisposableService {
    * This combines data from recently-opened-workspaces.json and onboarding-state.json.
    */
   public async getStoredExperienceData(): Promise<StoredExperienceData> {
-    const [recentlyOpenedWorkspaces, hasSeenOnboardingFlow, tutorialState] =
-      await Promise.all([
-        this.getRecentlyOpenedWorkspaces(),
-        this.readOnboardingState(),
-        this.readTutorialState(),
-      ]);
+    const [
+      recentlyOpenedWorkspaces,
+      hasSeenOnboardingFlow,
+      tutorialState,
+      experienceSurvey,
+      founderCallSurvey,
+      firstUsedAt,
+    ] = await Promise.all([
+      this.getRecentlyOpenedWorkspaces(),
+      this.readOnboardingState(),
+      this.readTutorialState(),
+      this.readSurveyState(),
+      this.readFounderCallSurveyState(),
+      this.readFirstUsedAt(),
+    ]);
     return {
       recentlyOpenedWorkspaces,
       hasSeenOnboardingFlow,
       lastViewedChats: {},
       tutorialState,
+      experienceSurvey,
+      firstUsedAt,
+      founderCallSurvey,
     };
+  }
+
+  /**
+   * Read the experience survey state from persisted data.
+   */
+  private async readSurveyState(): Promise<ExperienceSurvey> {
+    return readPersistedData('experience-survey', experienceSurveySchema, {
+      dismissedAt: null,
+      dismissedCount: 0,
+      answered: false,
+      answeredAt: null,
+    });
+  }
+
+  /**
+   * Write the experience survey state to persisted data.
+   */
+  private async writeSurveyState(state: ExperienceSurvey): Promise<void> {
+    await writePersistedData(
+      'experience-survey',
+      experienceSurveySchema,
+      state,
+    );
+  }
+
+  public async answerSurvey(answer: 'yes' | 'no') {
+    try {
+      const now = Date.now();
+      const survey = await this.readSurveyState();
+      survey.answered = true;
+      survey.answeredAt = now;
+      await this.writeSurveyState(survey);
+
+      // Update UI state
+      const storedData = await this.getStoredExperienceData();
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.experienceSurvey = survey;
+      });
+
+      // Fire telemetry even if telemetry is off (bypass list).
+      this.telemetryService.capture('experience-survey-answered', { answer });
+
+      this.logger.debug(`[UserExperienceService] Survey answered: ${answer}`);
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to save survey answer. Error: ${error}`,
+      );
+      this.report(error as Error, 'saveSurveyAnswer');
+    }
+  }
+
+  public async dismissSurvey() {
+    try {
+      const survey = await this.readSurveyState();
+      if (survey.answered) return;
+
+      survey.dismissedAt = Date.now();
+      survey.dismissedCount = Math.min(survey.dismissedCount + 1, 3);
+      await this.writeSurveyState(survey);
+
+      const storedData = await this.getStoredExperienceData();
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.experienceSurvey = survey;
+      });
+
+      this.logger.debug(
+        `[UserExperienceService] Survey dismissed (count: ${survey.dismissedCount})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to dismiss survey. Error: ${error}`,
+      );
+      this.report(error as Error, 'dismissSurvey');
+    }
+  }
+
+  public async submitSurveyFeedback(feedback: string) {
+    try {
+      // Fire telemetry even if telemetry is off (bypass list).
+      this.telemetryService.capture('experience-survey-feedback-submitted', {
+        feedback,
+        feedback_length: feedback.length,
+      });
+
+      this.logger.debug('[UserExperienceService] Survey feedback submitted');
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to submit survey feedback. Error: ${error}`,
+      );
+      this.report(error as Error, 'submitSurveyFeedback');
+    }
+  }
+
+  /**
+   * Read the founder call survey state from persisted data.
+   */
+  private async readFounderCallSurveyState(): Promise<FounderCallSurvey> {
+    return readPersistedData(
+      'experience-founder-call-survey',
+      founderCallSurveySchema,
+      {
+        dismissedAt: null,
+        dismissedCount: 0,
+        answered: false,
+        answeredAt: null,
+      },
+    );
+  }
+
+  /**
+   * Write the founder call survey state to persisted data.
+   */
+  private async writeFounderCallSurveyState(
+    state: FounderCallSurvey,
+  ): Promise<void> {
+    await writePersistedData(
+      'experience-founder-call-survey',
+      founderCallSurveySchema,
+      state,
+    );
+  }
+
+  public async openFounderCallSurvey() {
+    try {
+      const now = Date.now();
+      const survey = await this.readFounderCallSurveyState();
+      survey.answered = true;
+      survey.answeredAt = now;
+      await this.writeFounderCallSurveyState(survey);
+
+      const storedData = await this.getStoredExperienceData();
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.founderCallSurvey = survey;
+      });
+
+      this.telemetryService.capture(
+        'experience-founder-call-survey-opened',
+        undefined,
+      );
+
+      this.logger.debug('[UserExperienceService] Founder call survey opened');
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to save founder call survey answer. Error: ${error}`,
+      );
+      this.report(error as Error, 'saveFounderCallSurveyAnswer');
+    }
+  }
+
+  public async dismissFounderCallSurvey() {
+    try {
+      const survey = await this.readFounderCallSurveyState();
+      if (survey.answered) return;
+
+      survey.dismissedAt = Date.now();
+      survey.dismissedCount = Math.min(survey.dismissedCount + 1, 3);
+      await this.writeFounderCallSurveyState(survey);
+
+      const storedData = await this.getStoredExperienceData();
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.founderCallSurvey = survey;
+      });
+
+      this.telemetryService.capture(
+        'experience-founder-call-survey-dismissed',
+        undefined,
+      );
+
+      this.logger.debug(
+        `[UserExperienceService] Founder call survey dismissed (count: ${survey.dismissedCount})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to dismiss founder call survey. Error: ${error}`,
+      );
+      this.report(error as Error, 'dismissFounderCallSurvey');
+    }
+  }
+
+  private async setFirstUsedAt() {
+    this.isSettingFirstUsedAt = true;
+    try {
+      const now = Date.now();
+      await this.writeFirstUsedAt(now);
+      this.uiKarton.setState((draft) => {
+        draft.userExperience.storedExperienceData.firstUsedAt = now;
+      });
+      this.logger.debug('[UserExperienceService] Set firstUsedAt');
+    } catch (error) {
+      this.logger.error(
+        `[UserExperienceService] Failed to set firstUsedAt. Error: ${error}`,
+      );
+      this.report(error as Error, 'setFirstUsedAt');
+    } finally {
+      this.isSettingFirstUsedAt = false;
+    }
+  }
+
+  private async readFirstUsedAt(): Promise<number | null> {
+    return readPersistedData('first-used-at', z.number().nullable(), null);
+  }
+
+  private async writeFirstUsedAt(value: number): Promise<void> {
+    await writePersistedData('first-used-at', z.number().nullable(), value);
   }
 
   public async setHasSeenOnboardingFlow(

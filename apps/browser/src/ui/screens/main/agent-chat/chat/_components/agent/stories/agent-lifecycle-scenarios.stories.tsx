@@ -39,11 +39,36 @@ const baseState: Partial<AppState> = {
   }),
   userExperience: {
     pendingOnboardingSuggestion: null,
+    experienceSurvey: {
+      answered: false,
+      answeredAt: null,
+      dismissedAt: null,
+      dismissedCount: 0,
+    },
+    founderCallSurvey: {
+      answered: false,
+      answeredAt: null,
+      dismissedAt: null,
+      dismissedCount: 0,
+    },
     storedExperienceData: {
       recentlyOpenedWorkspaces: [],
       hasSeenOnboardingFlow: false,
       lastViewedChats: {},
       tutorialState: {},
+      experienceSurvey: {
+        answered: false,
+        answeredAt: null,
+        dismissedAt: null,
+        dismissedCount: 0,
+      },
+      firstUsedAt: null,
+      founderCallSurvey: {
+        answered: false,
+        answeredAt: null,
+        dismissedAt: null,
+        dismissedCount: 0,
+      },
     },
     devAppPreview: {
       isFullScreen: false,

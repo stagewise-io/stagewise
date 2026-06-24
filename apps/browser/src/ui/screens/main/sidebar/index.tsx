@@ -15,6 +15,7 @@ import { NotificationBanners } from '../agent-chat/chat/_components/notification
 import { UsageWarningBadge } from '../agent-chat/chat/_components/usage-warning-badge';
 import { WorktreeCleanupBadge } from './worktree-cleanup-badge';
 import { SidebarAuthFooter } from '../_components/sidebar-auth-footer';
+import { SidebarExperienceSurvey } from '../_components/sidebar-experience-survey';
 import {
   DEFAULT_EXPANDED_SIDEBAR_SIZE,
   SIDEBAR_PANEL_CLASS_NAME,
@@ -84,6 +85,7 @@ export function Sidebar() {
           <AgentsList />
 
           <div className="mt-8 flex shrink-0 flex-col gap-2">
+            <SidebarExperienceSurvey />
             <NotificationBanners />
             <UsageWarningBadge />
             <WorktreeCleanupBadge />
