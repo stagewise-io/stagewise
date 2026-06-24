@@ -34,11 +34,10 @@ Bring Your Own Key for all popular model providers — you can also register com
 
 ### Easy Import — use your existing subscription
 
-Connect any of the following subscriptions with a single API key to unlock all models the provider offers directly inside stagewise. GLM Coding Plan keys are routed through Z.ai's dedicated coding endpoint internally.
+Connect any of the following subscriptions with a single API key to unlock all models the provider offers directly inside stagewise.
 
 | **Subscription** | **Provider** | **Featured Models** | **Dashboard** |
 | ---------------- | ------------ | ------------------- | ------------- |
-| GLM Coding Plan  | [Z.ai](https://z.ai) | GLM-5.2, GLM-5.1, GLM-5V-Turbo | [Get API key](https://z.ai/manage-apikey/apikey-list) |
 | Kimi             | [Moonshot AI](https://platform.moonshot.ai) | Kimi K2.7 Code, Kimi K2.6, Kimi K2.5 | [Get API key](https://platform.moonshot.ai/console/api-keys) |
 | Qwen Coding Plan | [Alibaba DashScope](https://dashscope.console.aliyun.com) | Qwen3-Coder-30B, Qwen3-32B | [Get API key](https://dashscope.console.aliyun.com/apiKey) |
 | MiniMax          | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [Get API key](https://platform.minimax.io/user-center/basic-information/interface-key) |
