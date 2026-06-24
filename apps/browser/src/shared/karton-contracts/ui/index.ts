@@ -403,11 +403,32 @@ export type TutorialState = z.infer<typeof tutorialStateSchema>;
 
 export const lastViewedChatsSchema = z.record(z.string(), z.number());
 
+export const experienceSurveySchema = z.object({
+  dismissedAt: z.number().nullable(),
+  dismissedCount: z.number(),
+  answered: z.boolean(),
+  answeredAt: z.number().nullable(),
+});
+
+export type ExperienceSurvey = z.infer<typeof experienceSurveySchema>;
+
+export const founderCallSurveySchema = z.object({
+  dismissedAt: z.number().nullable(),
+  dismissedCount: z.number(),
+  answered: z.boolean(),
+  answeredAt: z.number().nullable(),
+});
+
+export type FounderCallSurvey = z.infer<typeof founderCallSurveySchema>;
+
 export const storedExperienceDataSchema = z.object({
   recentlyOpenedWorkspaces: recentlyOpenedWorkspacesArraySchema,
   hasSeenOnboardingFlow: z.boolean().nullable(),
   lastViewedChats: lastViewedChatsSchema,
   tutorialState: tutorialStateSchema,
+  experienceSurvey: experienceSurveySchema,
+  firstUsedAt: z.number().nullable(),
+  founderCallSurvey: founderCallSurveySchema,
 });
 
 export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;
@@ -1104,6 +1125,8 @@ export type AppState = {
         presetName: string; // Preset can be a name like "mobile" or "iPhone 13" or whatever
       } | null;
     };
+    experienceSurvey: ExperienceSurvey;
+    founderCallSurvey: FounderCallSurvey;
   };
   // State of the notification service.
   notifications: {
@@ -1555,6 +1578,17 @@ export type KartonContract = {
           tutorialId: string;
           stepIndex: number;
         }) => Promise<void>;
+      };
+      survey: {
+        answer: (answer: 'yes' | 'no') => Promise<void>;
+        dismiss: () => Promise<void>;
+        submitFeedback: (feedback: string) => Promise<void>;
+      };
+      founderCall: {
+        survey: {
+          open: () => Promise<void>;
+          dismiss: () => Promise<void>;
+        };
       };
     };
     filePicker: {
@@ -2136,12 +2170,37 @@ export const defaultState: KartonContract['state'] = {
       hasSeenOnboardingFlow: null,
       lastViewedChats: {},
       tutorialState: {},
+      experienceSurvey: {
+        dismissedAt: null,
+        dismissedCount: 0,
+        answered: false,
+        answeredAt: null,
+      },
+      firstUsedAt: null,
+      founderCallSurvey: {
+        dismissedAt: null,
+        dismissedCount: 0,
+        answered: false,
+        answeredAt: null,
+      },
     },
     pendingOnboardingSuggestion: null,
     devAppPreview: {
       isFullScreen: false,
       inShowCodeMode: false,
       customScreenSize: null,
+    },
+    experienceSurvey: {
+      dismissedAt: null,
+      dismissedCount: 0,
+      answered: false,
+      answeredAt: null,
+    },
+    founderCallSurvey: {
+      dismissedAt: null,
+      dismissedCount: 0,
+      answered: false,
+      answeredAt: null,
     },
   },
   notifications: [],

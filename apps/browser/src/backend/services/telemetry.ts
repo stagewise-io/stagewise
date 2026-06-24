@@ -473,6 +473,17 @@ export type EventProperties = {
   'changed-notification-sound-theme': {
     theme: string;
   };
+
+  // Experience survey
+  'experience-survey-answered': {
+    answer: 'yes' | 'no';
+  };
+  'experience-survey-feedback-submitted': {
+    feedback: string;
+    feedback_length: number;
+  };
+  'experience-founder-call-survey-opened': undefined;
+  'experience-founder-call-survey-dismissed': undefined;
 };
 
 export const UI_TELEMETRY_EVENT_NAMES = [
@@ -524,6 +535,10 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'changed-theme',
   'changed-notification-sound-loudness',
   'changed-notification-sound-theme',
+  'experience-survey-answered',
+  'experience-survey-feedback-submitted',
+  'experience-founder-call-survey-opened',
+  'experience-founder-call-survey-dismissed',
 ] as const satisfies ReadonlyArray<keyof EventProperties>;
 
 export type UIEventName = (typeof UI_TELEMETRY_EVENT_NAMES)[number];
@@ -676,6 +691,15 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'changed-notification-sound-theme': z.object({
     theme: z.string(),
   }),
+  'experience-survey-answered': z.object({
+    answer: z.enum(['yes', 'no']),
+  }),
+  'experience-survey-feedback-submitted': z.object({
+    feedback: z.string(),
+    feedback_length: z.number(),
+  }),
+  'experience-founder-call-survey-opened': z.undefined().optional(),
+  'experience-founder-call-survey-dismissed': z.undefined().optional(),
 } satisfies {
   [K in UIEventName]: z.ZodType<UIEventProperties[K]>;
 };
@@ -864,6 +888,10 @@ export class TelemetryService extends DisposableService {
         'app-launched',
         'telemetry-level-changed',
         'onboarding-completed',
+        'experience-survey-answered',
+        'experience-survey-feedback-submitted',
+        'experience-founder-call-survey-opened',
+        'experience-founder-call-survey-dismissed',
       ];
       if (telemetryLevel === 'off' && !bypassOptOut.includes(eventName)) return;
 
