@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { cn } from '@ui/utils';
 import { IconChevronRightOutline18 } from 'nucleo-ui-outline-18';
 import { useKartonState } from '@ui/hooks/use-karton';
@@ -72,7 +71,7 @@ export function StepModelAccess({
             sources.
           </p>
         </div>
-        <div className="grid w-full max-w-4xl grid-cols-3 gap-4">
+        <div className="flex w-full max-w-lg flex-col gap-3">
           {cards.map((card) => (
             <ModelAccessCard
               key={card.choice}
@@ -100,37 +99,21 @@ function ModelAccessCard({
   description: string;
   onClick: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   return (
     <button
       type="button"
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       className={cn(
-        'app-no-drag group relative flex min-h-56 cursor-pointer flex-col justify-between rounded-xl bg-surface-1 p-5 text-left shadow-elevation-1 transition-all duration-200',
-        'hover:bg-surface-2 hover:shadow-elevation-2',
+        'app-no-drag flex cursor-pointer items-center gap-3 rounded-lg border border-derived bg-surface-1 p-3 text-left transition-colors hover:bg-surface-2',
       )}
     >
-      {/* Description in the upper area */}
-      <p className="text-muted-foreground text-sm leading-relaxed">
-        {description}
-      </p>
-
-      {/* Label in bottom-left corner */}
-      <h3 className="font-medium text-foreground text-sm">{label}</h3>
-
-      {/* Chevrons in bottom-right corner — appear on hover */}
-      <div
-        className={cn(
-          'absolute right-4 bottom-4 flex items-center gap-0.5 text-muted-foreground transition-opacity duration-200',
-          hovered ? 'opacity-100' : 'opacity-0',
-        )}
-      >
-        <IconChevronRightOutline18 className="size-4" />
-        <IconChevronRightOutline18 className="-ml-2.5 size-4" />
+      <div className="min-w-0 flex-1">
+        <h3 className="font-medium text-foreground text-sm">{label}</h3>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          {description}
+        </p>
       </div>
+      <IconChevronRightOutline18 className="size-4 shrink-0 text-muted-foreground" />
     </button>
   );
 }
