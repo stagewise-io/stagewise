@@ -24,7 +24,7 @@ type TrackEvent = (
 // `window.stagewisePagesApi`. Keep host-bound services injected through props
 // and avoid importing Karton/telemetry hooks here.
 export type SignInOptionsPanelProps = {
-  title?: string;
+  title?: string | null;
   description?: string;
   variant?: 'centered' | 'section';
   sendOtp: (
@@ -549,7 +549,7 @@ export function SignInOptionsPanel({
           />
           <Button
             variant="primary"
-            className="relative w-full overflow-visible"
+            className="w-full"
             size="sm"
             onClick={() => void handleSendOtp()}
             disabled={
@@ -561,7 +561,6 @@ export function SignInOptionsPanel({
                 !turnstileToken)
             }
           >
-            {lastUsedMethod === 'email' && <LastUsedBadge />}
             {turnstileEnabled && !turnstileReady && !turnstileError
               ? 'Loading...'
               : 'Send code'}
