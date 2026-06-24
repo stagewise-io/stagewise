@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.0 (2026-06-24)
+
+### Features
+
+* add Xiaomi MiMo V2.5 model series (e557326)
+
+### Bug Fixes
+
+* restore worktree cleanup scan on startup (2ccc259)
+* preserve credential vars for user-facing terminals (dbb52a2)
+* stop bypassing BLOCKLIST in terminal env fallback (55b2be2)
+* pass shell type to sanitizeEnv in worktree setup (6de8e86)
+
 ## 1.10.2 (2026-06-23)
 
 ### Bug Fixes
