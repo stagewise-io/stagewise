@@ -36,6 +36,7 @@ import type {
   DevToolbarOriginSettings,
   ToolApprovalMode,
   SocialAuthProvider,
+  ApiSpec,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -2077,6 +2078,20 @@ export type KartonContract = {
         provider: ModelProvider,
         apiKey: string,
       ) => Promise<{ success: true } | { success: false; error: string }>;
+      /**
+       * Probe a custom endpoint for reachability by appending the
+       * spec-specific path and issuing a lightweight request.
+       * Returns `{ reachable: true }` when the server responds with any
+       * status other than 404; `{ reachable: false, reason }` when the
+       * server is unreachable or returns 404.
+       */
+      testEndpointReachability: (
+        baseUrl: string,
+        apiSpec: ApiSpec,
+      ) => Promise<
+        | { reachable: true; status: number }
+        | { reachable: false; reason: string }
+      >;
     };
     devToolbar: {
       /** Update the global widget order */
