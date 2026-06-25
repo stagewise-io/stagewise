@@ -1419,6 +1419,162 @@ export const availableModels = [
       toolCalling: true,
     },
   },
+  {
+    officialProvider: 'mistral',
+    modelId: 'mistral-large-2512',
+    modelDisplayName: 'Mistral Large 3',
+    modelDescription:
+      "Mistral's most capable model. Sparse MoE (675B total, 41B active) with 256K context, multimodal input, and strong coding and agentic performance.",
+    modelContext: '256K context',
+    modelContextRaw: 262_144,
+    headers: {},
+    providerOptions: {},
+    thinkingEnabled: false,
+    pricing: {
+      inputPerMillion: 0.5,
+      outputPerMillion: 1.5,
+      relativeMultiplier: 0.3,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'mistral',
+    modelId: 'mistral-medium-3-5',
+    modelDisplayName: 'Mistral Medium 3.5',
+    modelDescription:
+      "Mistral's hybrid model unifying instruct, reasoning, and coding. Dense 128B with 256K context, text and image input, designed for agentic workflows and complex coding.",
+    modelContext: '256K context',
+    modelContextRaw: 262_144,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Only route to OpenRouter upstreams that support the `reasoning`
+        // parameter, preventing silent drops on non-reasoning upstreams.
+        provider: { require_parameters: true },
+      },
+      openai: {
+        reasoningEffort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.5,
+      outputPerMillion: 7.5,
+      relativeMultiplier: 1.5,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'mistral',
+    modelId: 'mistral-small-2603',
+    modelDisplayName: 'Mistral Small 4',
+    modelDescription:
+      "Mistral's latest small model unifying reasoning, instruct, and coding. 256K context with text and image input at a low price point.",
+    modelContext: '256K context',
+    modelContextRaw: 262_144,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Only route to OpenRouter upstreams that support the `reasoning`
+        // parameter, preventing silent drops on non-reasoning upstreams.
+        provider: { require_parameters: true },
+      },
+      openai: {
+        reasoningEffort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.15,
+      outputPerMillion: 0.6,
+      relativeMultiplier: 0.12,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'mistral',
+    modelId: 'codestral-2508',
+    modelDisplayName: 'Codestral',
+    modelDescription:
+      "Mistral's specialized coding model. Low-latency, high-frequency code generation and FIM with 256K context.",
+    modelContext: '256K context',
+    modelContextRaw: 262_144,
+    headers: {},
+    providerOptions: {},
+    thinkingEnabled: false,
+    pricing: {
+      inputPerMillion: 0.3,
+      outputPerMillion: 0.9,
+      relativeMultiplier: 0.18,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
 ] as const satisfies ModelSettings[];
 
 export type BuiltInModel = (typeof availableModels)[number];
