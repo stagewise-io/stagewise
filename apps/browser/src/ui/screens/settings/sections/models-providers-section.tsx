@@ -103,6 +103,7 @@ const PROVIDERS: ModelProvider[] = [
   'z-ai',
   'minimax',
   'xiaomi-mimo',
+  'mistral',
 ];
 
 function getThinkingDefaultOptionsForModel(
@@ -691,6 +692,7 @@ function CustomModelDialog({
       { value: 'z-ai', label: 'Z.ai', group: 'Built-in' },
       { value: 'minimax', label: 'MiniMax', group: 'Built-in' },
       { value: 'xiaomi-mimo', label: 'Xiaomi MiMo', group: 'Built-in' },
+      { value: 'mistral', label: 'Mistral', group: 'Built-in' },
     ];
     const custom = customEndpoints.map((ep) => ({
       value: ep.id,
@@ -1168,6 +1170,7 @@ function CustomModelsSection() {
       if (endpointId === 'z-ai') return 'Z.ai';
       if (endpointId === 'minimax') return 'MiniMax';
       if (endpointId === 'xiaomi-mimo') return 'Xiaomi MiMo';
+      if (endpointId === 'mistral') return 'Mistral';
       return (
         customEndpoints.find((ep) => ep.id === endpointId)?.name ?? 'Unknown'
       );

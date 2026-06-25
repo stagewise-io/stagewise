@@ -42,6 +42,7 @@
 | Qwen 编程计划 | [阿里云 DashScope](https://dashscope.console.aliyun.com) | Qwen 3-Coder 30B-A3B、Qwen 3-32B | [获取 API 密钥](https://dashscope.console.aliyun.com/apiKey) |
 | MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [获取 API 密钥](https://platform.minimax.io/user-center/basic-information/interface-key) |
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro、MiMo-V2.5 | [获取 API 密钥](https://platform.xiaomimimo.com/#/console/plan-manage) |
+| Mistral | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5、Mistral Large 3、Mistral Small 4、Codestral | [获取 API 密钥](https://console.mistral.ai/api-keys) |
 
 ### stagewise 账户
 
@@ -63,6 +64,7 @@
 - **Z.ai**：GLM 5.2、GLM 5.1、GLM 5V-Turbo
 - **MiniMax**：MiniMax M3、MiniMax M2.7、MiniMax M2
 - **Xiaomi MiMo**：MiMo-V2.5-Pro、MiMo-V2.5
+- **Mistral**：Mistral Medium 3.5、Mistral Large 3、Mistral Small 4、Codestral
 
 #### 专有模型
 

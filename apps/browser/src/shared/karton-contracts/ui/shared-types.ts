@@ -41,6 +41,7 @@ export const modelProviderSchema = z.enum([
   'z-ai',
   'minimax',
   'xiaomi-mimo',
+  'mistral',
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
@@ -87,6 +88,7 @@ export const providerConfigsSchema = z.object({
   'z-ai': providerConfigSchema.default({ mode: 'stagewise' }),
   minimax: providerConfigSchema.default({ mode: 'stagewise' }),
   'xiaomi-mimo': providerConfigSchema.default({ mode: 'stagewise' }),
+  mistral: providerConfigSchema.default({ mode: 'stagewise' }),
 });
 export type ProviderConfigs = z.infer<typeof providerConfigsSchema>;
 
@@ -187,6 +189,7 @@ export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> = {
   'z-ai': 'https://api.z.ai/api/paas/v4',
   minimax: 'https://api.minimax.io/v1',
   'xiaomi-mimo': 'https://api.xiaomimimo.com/v1',
+  mistral: 'https://api.mistral.ai/v1',
 };
 
 /** Display info for each provider (for UI) */
@@ -229,6 +232,10 @@ export const PROVIDER_DISPLAY_INFO: Record<
   'xiaomi-mimo': {
     name: 'Xiaomi MiMo',
     description: 'MiMo V2.5-series models',
+  },
+  mistral: {
+    name: 'Mistral',
+    description: 'Mistral AI models',
   },
 };
 
@@ -568,6 +575,7 @@ export const userPreferencesSchema = z.object({
     'z-ai': { mode: 'stagewise' },
     minimax: { mode: 'stagewise' },
     'xiaomi-mimo': { mode: 'stagewise' },
+    mistral: { mode: 'stagewise' },
   }),
   /** User-defined API endpoints */
   customEndpoints: z.array(customEndpointSchema).default([]),
@@ -680,6 +688,7 @@ export const defaultUserPreferences: UserPreferences = {
     'z-ai': { mode: 'stagewise' },
     minimax: { mode: 'stagewise' },
     'xiaomi-mimo': { mode: 'stagewise' },
+    mistral: { mode: 'stagewise' },
   },
   customEndpoints: [],
   customModels: [],

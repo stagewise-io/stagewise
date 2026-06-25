@@ -13,7 +13,8 @@ export type ApiKeyProvider =
   | 'deepseek'
   | 'z-ai'
   | 'minimax'
-  | 'xiaomi-mimo';
+  | 'xiaomi-mimo'
+  | 'mistral';
 
 export type ApiKeyValidationResult =
   | null
@@ -81,6 +82,11 @@ const providerConfigs: Record<
       apiKey,
       baseURL: baseURL ?? 'https://api.xiaomimimo.com/v1',
     }).chat('mimo-v2.5'),
+  mistral: (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://api.mistral.ai/v1',
+    }).chat('mistral-small-latest'),
 };
 
 async function validateModel(model: ValidationModel): Promise<void> {
@@ -165,6 +171,7 @@ export async function validateApiKeys(
     'z-ai': null,
     minimax: null,
     'xiaomi-mimo': null,
+    mistral: null,
   };
 
   const promises: Promise<void>[] = [];

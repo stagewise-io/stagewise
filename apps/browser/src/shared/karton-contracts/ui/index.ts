@@ -1486,6 +1486,7 @@ export type KartonContract = {
         'z-ai'?: string;
         minimax?: string;
         'xiaomi-mimo'?: string;
+        mistral?: string;
       }) => Promise<{
         anthropic: ApiKeyValidationResult;
         openai: ApiKeyValidationResult;
@@ -1496,6 +1497,7 @@ export type KartonContract = {
         'z-ai': ApiKeyValidationResult;
         minimax: ApiKeyValidationResult;
         'xiaomi-mimo': ApiKeyValidationResult;
+        mistral: ApiKeyValidationResult;
       }>;
     };
     userExperience: {

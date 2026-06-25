@@ -54,6 +54,7 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
       'z-ai',
       'minimax',
       'xiaomi-mimo',
+      'mistral',
     ],
     url: '',
     settingsRoute: ROUTE_MODELS_PROVIDERS,

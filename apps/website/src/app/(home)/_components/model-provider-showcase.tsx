@@ -138,6 +138,20 @@ const PROVIDERS: ProviderInfo[] = [
       { name: 'MiMo-V2.5', tier: 'general' },
     ],
   },
+  {
+    id: 'mistral',
+    name: 'Mistral',
+    logo: '/provider-logos/mistral.svg',
+    monoInDark: true,
+    description:
+      'Frontier and coding models with strong tool use and large context.',
+    models: [
+      { name: 'Mistral Large 3', tier: 'frontier' },
+      { name: 'Mistral Medium 3.5', tier: 'frontier' },
+      { name: 'Mistral Small 4', tier: 'general' },
+      { name: 'Codestral', tier: 'general' },
+    ],
+  },
 ];
 
 export function ModelProviderShowcase() {

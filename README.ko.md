@@ -42,6 +42,7 @@
 | Qwen Coding Plan | [Alibaba DashScope](https://dashscope.console.aliyun.com) | Qwen 3-Coder 30B-A3B, Qwen 3-32B | [API 키 받기](https://dashscope.console.aliyun.com/apiKey) |
 | MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [API 키 받기](https://platform.minimax.io/user-center/basic-information/interface-key) |
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5 | [API 키 받기](https://platform.xiaomimimo.com/#/console/plan-manage) |
+| Mistral | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral | [API 키 받기](https://console.mistral.ai/api-keys) |
 
 ### stagewise 계정
 
@@ -63,6 +64,7 @@
 - **Z.ai**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
 - **MiniMax**: MiniMax M3, MiniMax M2.7, MiniMax M2
 - **Xiaomi MiMo**: MiMo-V2.5-Pro, MiMo-V2.5
+- **Mistral**: Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral
 
 #### 독점 모델
 
