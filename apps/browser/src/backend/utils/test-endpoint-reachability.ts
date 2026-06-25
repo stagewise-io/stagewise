@@ -63,7 +63,7 @@ export async function testEndpointReachability(
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 3000);
 
     const response = await fetch(probeUrl, {
       method: 'GET',
@@ -90,7 +90,7 @@ export async function testEndpointReachability(
     if (err instanceof Error && err.name === 'AbortError') {
       return {
         reachable: false,
-        reason: 'Connection timed out after 5 seconds',
+        reason: 'Connection timed out after 3 seconds',
       };
     }
     return {
