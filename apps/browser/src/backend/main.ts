@@ -490,6 +490,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     uiKarton,
     telemetryService,
     gitService,
+    () => persistence.agentDb.getOldestAgentCreatedAt(),
   );
 
   const credentialsService = await CredentialsService.create(logger);

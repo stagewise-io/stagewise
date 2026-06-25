@@ -40,11 +40,14 @@ function redactWorkspacePathForTelemetry(workspacePath: string): string {
   return createHash('sha256').update(workspacePath).digest('hex').slice(0, 12);
 }
 
+export type GetOldestAgentCreatedAt = () => Promise<Date | null>;
+
 export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
   private readonly telemetryService: TelemetryService;
   private readonly gitService: GitService;
+  private readonly getOldestAgentCreatedAt?: GetOldestAgentCreatedAt;
   // Store bound callback reference for proper unregistration
   private readonly boundHandleServiceStateChange: () => void;
 
@@ -63,12 +66,14 @@ export class UserExperienceService extends DisposableService {
     uiKarton: KartonService,
     telemetryService: TelemetryService,
     gitService: GitService,
+    getOldestAgentCreatedAt?: GetOldestAgentCreatedAt,
   ) {
     super();
     this.logger = logger;
     this.uiKarton = uiKarton;
     this.telemetryService = telemetryService;
     this.gitService = gitService;
+    this.getOldestAgentCreatedAt = getOldestAgentCreatedAt;
 
     // Bind once and store reference for later unregistration
     this.boundHandleServiceStateChange =
@@ -92,6 +97,7 @@ export class UserExperienceService extends DisposableService {
     uiKarton: KartonService,
     telemetryService: TelemetryService,
     gitService: GitService,
+    getOldestAgentCreatedAt?: GetOldestAgentCreatedAt,
   ) {
     logger.debug('[UserExperienceService] Creating service');
     const instance = new UserExperienceService(
@@ -99,6 +105,7 @@ export class UserExperienceService extends DisposableService {
       uiKarton,
       telemetryService,
       gitService,
+      getOldestAgentCreatedAt,
     );
     await instance.initialize();
     logger.debug('[UserExperienceService] Created service');
@@ -763,12 +770,24 @@ export class UserExperienceService extends DisposableService {
   private async setFirstUsedAt() {
     this.isSettingFirstUsedAt = true;
     try {
-      const now = Date.now();
-      await this.writeFirstUsedAt(now);
+      // For existing users with chat history, backfill from the oldest
+      // agent instance's createdAt instead of using Date.now(). This
+      // ensures long-time users are immediately eligible for the founder
+      // call survey instead of having to wait 4 more days.
+      let timestamp = Date.now();
+      if (this.getOldestAgentCreatedAt) {
+        const oldest = await this.getOldestAgentCreatedAt();
+        if (oldest !== null) {
+          timestamp = oldest.getTime();
+        }
+      }
+      await this.writeFirstUsedAt(timestamp);
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData.firstUsedAt = now;
+        draft.userExperience.storedExperienceData.firstUsedAt = timestamp;
       });
-      this.logger.debug('[UserExperienceService] Set firstUsedAt');
+      this.logger.debug(
+        `[UserExperienceService] Set firstUsedAt to ${new Date(timestamp).toISOString()}`,
+      );
     } catch (error) {
       this.logger.error(
         `[UserExperienceService] Failed to set firstUsedAt. Error: ${error}`,

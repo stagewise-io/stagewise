@@ -6,6 +6,7 @@ import {
   notInArray,
   inArray,
   desc,
+  asc,
   isNull,
   eq,
   sql,
@@ -665,5 +666,20 @@ export class AgentPersistenceDB {
 
     // Clean up dirty-tracking state
     this._lastPersistedIds.delete(id);
+  }
+
+  /**
+   * Returns the earliest `createdAt` among all agent instances, or null if
+   * no agents exist. Used to backfill `firstUsedAt` for existing users who
+   * already have chat history before the founder-call survey feature was
+   * introduced.
+   */
+  public async getOldestAgentCreatedAt(): Promise<Date | null> {
+    const result = await this._db
+      .select({ createdAt: schema.agentInstances.createdAt })
+      .from(schema.agentInstances)
+      .orderBy(asc(schema.agentInstances.createdAt))
+      .limit(1);
+    return result[0]?.createdAt ?? null;
   }
 }
