@@ -381,8 +381,8 @@ export function StepAuth({
             )}
             {mode === 'coding-plan' && (
               <p className="text-muted-foreground text-sm">
-                Connect a GLM, Kimi, Qwen, or MiniMax coding plan to
-                authenticate.
+                Connect a GLM, Kimi, Qwen, MiniMax Token Plan, or MiMo
+                subscription to authenticate.
               </p>
             )}
           </div>
