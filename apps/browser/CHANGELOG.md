@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.13.0 (2026-06-25)
+
+### Features
+
+* add model-restricted error UI with upgrade CTAs (dc8fda9)
+* route email sign-in through web console (271f2e8)
+* add Mistral model provider (aec1738)
+
+### Bug Fixes
+
+* accept callbacks on any valid stagewise protocol, extend auth RPC timeout (9be28c7)
+* persist switchBranchTarget in workspace git action preferences (3f3f778)
+
 ## 1.12.0 (2026-06-25)
 
 ### Features
