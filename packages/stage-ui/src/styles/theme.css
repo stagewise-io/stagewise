@@ -32,6 +32,9 @@
   --color-primary-foreground: var(--color-primary-450); /* rm */
   --color-primary-solid: var(--color-primary-500);
 
+  --color-brand-foreground: var(--color-brand-450);
+  --color-brand-solid: var(--color-brand-500);
+
   --color-solid-foreground: var(--color-base-50);
 
   --color-surface-tinted: color-mix(in oklch, var(--color-primary-50) 50%, oklch(0.992 0 none)); 
@@ -66,6 +69,9 @@
 
     --color-primary-foreground: var(--color-primary-400);
     --color-primary-solid: var(--color-primary-500);
+
+    --color-brand-foreground: var(--color-brand-400);
+    --color-brand-solid: var(--color-brand-500);
 
     --color-surface-1: var(--color-base-700);
     --color-surface-2: var(--color-base-600);
