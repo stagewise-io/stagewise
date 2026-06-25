@@ -49,9 +49,9 @@ Per facilità d'uso e accesso immediato a un'ampia libreria di modelli, basta cr
 
 | **Piano** | **Prezzo**    | **Limiti**                              |
 | -------- | ------------- | --------------------------------------- |
-| Free     | $0 / mese     | Accesso limitato a tutti i modelli      |
-| Pro      | $20 / mese    | Limiti 6x più alti per tutti i modelli  |
-| Ultra    | $200 / mese   | Limiti 75x più alti per tutti i modelli |
+| Free     | $0 / mese     | Accesso limitato a 3 modelli standard (Default, Quick, Smart) |
+| Pro      | $20 / mese    | Accesso a tutti i modelli, inclusi Frontier e Open-Weights |
+| Ultra    | $200 / mese   | Accesso a tutti i modelli, limiti 15x più alti del Pro |
 
 Modelli inclusi:
 
