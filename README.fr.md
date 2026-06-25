@@ -49,9 +49,9 @@ Pour une utilisation simplifiée et un accès immédiat à une vaste bibliothèq
 
 | **Plan** | **Prix**      | **Limites**                              |
 | -------- | ------------- | ---------------------------------------- |
-| Free     | $0 / mois     | Accès limité à tous les modèles          |
-| Pro      | $20 / mois    | Limites 6x plus élevées pour tous les modèles |
-| Ultra    | $200 / mois   | Limites 75x plus élevées pour tous les modèles |
+| Free     | $0 / mois     | Accès limité à 3 modèles standard (Default, Quick, Smart) |
+| Pro      | $20 / mois    | Accès à tous les modèles, y compris Frontier et Open-Weights |
+| Ultra    | $200 / mois   | Accès à tous les modèles, limites 15x plus élevées que Pro |
 
 Modèles inclus :
 
