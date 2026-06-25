@@ -732,6 +732,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, []);
 
   const handleEscape = useCallback(() => {
+    if (isWorkingRef.current && pendingQuestionIdRef.current === null) {
+      abortAgentRef.current();
+      return;
+    }
     if (elementSelectionActive) stopContextSelector();
     else setChatInputActive(false);
   }, [elementSelectionActive, stopContextSelector]);
@@ -1322,6 +1326,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     'keydown',
     (e: KeyboardEvent) => {
       if (e.code === 'Escape' && chatInputActive) {
+        if (e.defaultPrevented) return; // ChatInput's onEscape already handled it
+        if (isWorking && !hasPendingQuestion) {
+          abortAgentRef.current();
+          return;
+        }
         if (elementSelectionActive) stopContextSelector();
         else setChatInputActive(false);
       }
