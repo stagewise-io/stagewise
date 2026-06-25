@@ -8,7 +8,6 @@ import {
   type WidgetId,
   type DevToolbarOriginSettings,
   type ModelProvider,
-  type ApiSpec,
   userPreferencesSchema,
   defaultUserPreferences,
   PermissionSetting,
@@ -330,16 +329,6 @@ export class PreferencesService extends DisposableService {
         const { validateApiKeys } = await import('../utils/validate-api-keys');
         const results = await validateApiKeys({ [provider]: apiKey }, baseUrl);
         return results[provider];
-      },
-    );
-
-    this.uiKarton.registerServerProcedureHandler(
-      'preferences.testEndpointReachability',
-      async (_callingClientId: string, baseUrl: string, apiSpec: ApiSpec) => {
-        const { testEndpointReachability } = await import(
-          '../utils/test-endpoint-reachability'
-        );
-        return testEndpointReachability(baseUrl, apiSpec);
       },
     );
 
@@ -1267,9 +1256,6 @@ export class PreferencesService extends DisposableService {
       this.uiKarton.removeServerProcedureHandler('preferences.listAwsProfiles');
       this.uiKarton.removeServerProcedureHandler(
         'preferences.validateProviderApiKey',
-      );
-      this.uiKarton.removeServerProcedureHandler(
-        'preferences.testEndpointReachability',
       );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',
