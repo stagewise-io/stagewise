@@ -7,10 +7,17 @@ import { useCallback, useMemo, useState, useRef } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
 import { IconPlusOutline18, IconTrashOutline18 } from 'nucleo-ui-outline-18';
+import { IconTriangleWarningFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import type { CustomModel } from '@shared/karton-contracts/ui/shared-types';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
 
 enablePatches();
+
+const MIN_RECOMMENDED_CONTEXT = 64000;
+
+const SENTINEL_DISPLAY_NAME = 'New Model';
+const SENTINEL_MODEL_ID_PREFIX = 'custom-model-';
+const DEFAULT_CONTEXT_WINDOW = 128000;
 
 export function StepCustomModels({
   onNext,
@@ -48,10 +55,10 @@ export function StepCustomModels({
     const defaultEndpointId = customEndpoints[0]?.id ?? '';
     const [, patches] = produceWithPatches(preferences, (draft) => {
       draft.customModels.push({
-        modelId: `custom-model-${Date.now()}`,
-        displayName: 'New Model',
+        modelId: `${SENTINEL_MODEL_ID_PREFIX}${Date.now()}`,
+        displayName: SENTINEL_DISPLAY_NAME,
         description: '',
-        contextWindowSize: 128000,
+        contextWindowSize: DEFAULT_CONTEXT_WINDOW,
         endpointId: defaultEndpointId,
         thinkingEnabled: false,
         capabilities: {
@@ -109,6 +116,33 @@ export function StepCustomModels({
     },
     [preferences, updatePreferences],
   );
+
+  // Strict validation: every model must have a valid name, ID, endpoint, and
+  // max context length. Models with sentinel/placeholder values are invalid.
+  const invalidModelCount = useMemo(() => {
+    return customModels.filter((m) => {
+      const hasValidName =
+        m.displayName.trim().length > 0 &&
+        m.displayName !== SENTINEL_DISPLAY_NAME;
+      const hasValidId =
+        m.modelId.trim().length > 0 &&
+        !m.modelId.startsWith(SENTINEL_MODEL_ID_PREFIX);
+      const hasValidEndpoint = m.endpointId.trim().length > 0;
+      const hasValidContext = m.contextWindowSize > 0;
+      return !(
+        hasValidName &&
+        hasValidId &&
+        hasValidEndpoint &&
+        hasValidContext
+      );
+    }).length;
+  }, [customModels]);
+
+  const canProceed = customModels.length === 0 || invalidModelCount === 0;
+
+  const blockReason = canProceed
+    ? null
+    : `${invalidModelCount} model${invalidModelCount > 1 ? 's' : ''} need${invalidModelCount === 1 ? 's' : ''} a valid name, model ID, endpoint, and max context length`;
 
   return (
     <>
@@ -171,7 +205,8 @@ export function StepCustomModels({
         right={
           <NextButton
             onClick={onNext}
-            disabled={false}
+            disabled={!canProceed}
+            blockReason={blockReason}
             label={customModels.length > 0 ? 'Next' : 'Skip'}
           />
         }
@@ -191,6 +226,35 @@ function ModelRow({
   onUpdate: (updates: Partial<CustomModel>) => void;
   onDelete: () => void;
 }) {
+  const isDisplayNameSentinel = model.displayName === SENTINEL_DISPLAY_NAME;
+  const isModelIdSentinel = model.modelId.startsWith(SENTINEL_MODEL_ID_PREFIX);
+  const isContextSentinel = model.contextWindowSize === DEFAULT_CONTEXT_WINDOW;
+
+  const showContextWarning =
+    !isContextSentinel && model.contextWindowSize < MIN_RECOMMENDED_CONTEXT;
+
+  const handleDisplayNameBlur = useCallback(() => {
+    if (!model.displayName.trim()) {
+      onUpdate({ displayName: SENTINEL_DISPLAY_NAME });
+    }
+  }, [model.displayName, onUpdate]);
+
+  const handleModelIdBlur = useCallback(() => {
+    if (!model.modelId.trim()) {
+      onUpdate({ modelId: `${SENTINEL_MODEL_ID_PREFIX}${Date.now()}` });
+    }
+  }, [model.modelId, onUpdate]);
+
+  const handleContextBlur = useCallback(() => {
+    if (
+      !model.contextWindowSize ||
+      model.contextWindowSize <= 0 ||
+      Number.isNaN(model.contextWindowSize)
+    ) {
+      onUpdate({ contextWindowSize: DEFAULT_CONTEXT_WINDOW });
+    }
+  }, [model.contextWindowSize, onUpdate]);
+
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-derived bg-surface-1 p-4">
       {/* Header: display name + delete */}
@@ -200,8 +264,11 @@ function ModelRow({
             Display Name
           </span>
           <Input
-            value={model.displayName === 'New Model' ? '' : model.displayName}
-            onValueChange={(v) => onUpdate({ displayName: v || 'New Model' })}
+            value={isDisplayNameSentinel ? '' : model.displayName}
+            onValueChange={(v) =>
+              onUpdate({ displayName: v || SENTINEL_DISPLAY_NAME })
+            }
+            onBlur={handleDisplayNameBlur}
             size="sm"
             placeholder="e.g. My Custom GPT-4o"
             className="w-full"
@@ -218,12 +285,13 @@ function ModelRow({
           Model ID
         </span>
         <Input
-          value={model.modelId.startsWith('custom-model-') ? '' : model.modelId}
+          value={isModelIdSentinel ? '' : model.modelId}
           onValueChange={(v) =>
             onUpdate({
-              modelId: v || `custom-model-${Date.now()}`,
+              modelId: v || `${SENTINEL_MODEL_ID_PREFIX}${Date.now()}`,
             })
           }
+          onBlur={handleModelIdBlur}
           size="sm"
           placeholder="gpt-4o-mini"
           className="w-full"
@@ -250,21 +318,31 @@ function ModelRow({
           </span>
           <Input
             type="number"
-            value={
-              model.contextWindowSize === 128000
-                ? ''
-                : String(model.contextWindowSize)
-            }
+            value={isContextSentinel ? '' : String(model.contextWindowSize)}
             onValueChange={(val) =>
               onUpdate({
-                contextWindowSize: Number.parseInt(val, 10) || 128000,
+                contextWindowSize:
+                  Number.parseInt(val, 10) || DEFAULT_CONTEXT_WINDOW,
               })
             }
+            onBlur={handleContextBlur}
             size="sm"
             placeholder="128000"
           />
         </div>
       </div>
+
+      {/* Context window warning */}
+      {showContextWarning && (
+        <div className="flex items-start gap-1.5 rounded-md bg-warning/10 p-2">
+          <IconTriangleWarningFillDuo18 className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
+          <p className="text-warning-foreground text-xs">
+            Models with a context window smaller than{' '}
+            {MIN_RECOMMENDED_CONTEXT.toLocaleString()} tokens are not
+            recommended for use in Stagewise.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
