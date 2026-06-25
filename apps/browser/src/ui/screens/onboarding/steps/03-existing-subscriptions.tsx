@@ -78,13 +78,13 @@ export function StepExistingSubscriptions({
 
   const [showMoreProviders, setShowMoreProviders] = useState(false);
 
-  // API-keys list scroll fadeout
-  const [apiKeysViewport, setApiKeysViewport] = useState<HTMLElement | null>(
+  // Main content scroll fadeout
+  const [contentViewport, setContentViewport] = useState<HTMLElement | null>(
     null,
   );
-  const apiKeysScrollRef = useRef<HTMLElement | null>(null);
-  apiKeysScrollRef.current = apiKeysViewport;
-  const { maskStyle: apiKeysMaskStyle } = useScrollFadeMask(apiKeysScrollRef, {
+  const contentScrollRef = useRef<HTMLElement | null>(null);
+  contentScrollRef.current = contentViewport;
+  const { maskStyle: contentMaskStyle } = useScrollFadeMask(contentScrollRef, {
     axis: 'vertical',
     fadeDistance: 24,
   });
@@ -212,10 +212,10 @@ export function StepExistingSubscriptions({
 
   return (
     <>
-      <div className="flex flex-1 flex-col items-center justify-center gap-4">
+      <div className="flex flex-1 flex-col items-center overflow-hidden">
         {/* Coding plan detail sub-view */}
         {selectedCodingPlanId !== null && (
-          <div className="app-no-drag flex w-full max-w-md flex-col gap-3">
+          <div className="app-no-drag flex w-full max-w-md flex-1 flex-col justify-center gap-3 px-8 py-8">
             {(() => {
               const plan = CODING_PLANS[selectedCodingPlanId];
               const cfg = preferences.providerConfigs?.[plan.provider] ?? {
@@ -262,7 +262,12 @@ export function StepExistingSubscriptions({
 
         {/* Main view: coding plans grid + API keys */}
         {selectedCodingPlanId === null && (
-          <div className="app-no-drag flex w-full max-w-lg flex-col gap-6">
+          <OverlayScrollbar
+            className="app-no-drag mask-alpha w-full max-w-lg flex-1"
+            style={contentMaskStyle}
+            onViewportRef={setContentViewport}
+            contentClassName="flex flex-col gap-6 px-8 pt-8 pb-4"
+          >
             {/* Coding Plans */}
             <div className="flex flex-col gap-3">
               <div className="flex flex-col items-center gap-1 pb-1">
@@ -317,12 +322,7 @@ export function StepExistingSubscriptions({
                   Enter at least one provider key to authenticate.
                 </p>
               </div>
-              <OverlayScrollbar
-                className="mask-alpha max-h-72"
-                style={apiKeysMaskStyle}
-                onViewportRef={setApiKeysViewport}
-                contentClassName="space-y-3"
-              >
+              <div className="space-y-3">
                 <ApiKeyRow
                   provider="anthropic"
                   label="Anthropic"
@@ -461,7 +461,7 @@ export function StepExistingSubscriptions({
                     />
                   </>
                 )}
-              </OverlayScrollbar>
+              </div>
               <div className="flex justify-center">
                 <Button
                   variant="ghost"
@@ -480,7 +480,7 @@ export function StepExistingSubscriptions({
                 </Button>
               </div>
             </div>
-          </div>
+          </OverlayScrollbar>
         )}
       </div>
       <OnboardingBottomNav

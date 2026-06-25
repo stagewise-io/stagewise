@@ -3,9 +3,10 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
-import { cn } from '@ui/utils';
+
 import { IconPlusOutline18, IconTrashOutline18 } from 'nucleo-ui-outline-18';
 import type {
   ApiSpec,
@@ -43,6 +44,17 @@ export function StepCustomEndpoints({
   );
 
   const endpoints = preferences?.customEndpoints ?? [];
+
+  // Scroll fade mask
+  const [contentViewport, setContentViewport] = useState<HTMLElement | null>(
+    null,
+  );
+  const contentScrollRef = useRef<HTMLElement | null>(null);
+  contentScrollRef.current = contentViewport;
+  const { maskStyle: contentMaskStyle } = useScrollFadeMask(contentScrollRef, {
+    axis: 'vertical',
+    fadeDistance: 24,
+  });
 
   const handleAdd = useCallback(async () => {
     const id = crypto.randomUUID();
@@ -95,12 +107,14 @@ export function StepCustomEndpoints({
     [preferences, updatePreferences],
   );
 
-  const canProceed = endpoints.length > 0;
+  const canProceed = endpoints.some(
+    (ep) => ep.name.trim().length > 0 && ep.baseUrl.trim().length > 0,
+  );
 
   return (
     <>
-      <div className="app-no-drag flex flex-1 flex-col items-center gap-4 overflow-hidden px-8 py-8">
-        <div className="flex shrink-0 flex-col items-center gap-2 text-center">
+      <div className="app-no-drag flex flex-1 flex-col items-center gap-4 overflow-hidden pt-8">
+        <div className="flex shrink-0 flex-col items-center gap-2 px-8 text-center">
           <h1 className="font-medium text-foreground text-xl">
             Custom Endpoints
           </h1>
@@ -111,8 +125,10 @@ export function StepCustomEndpoints({
         </div>
 
         <OverlayScrollbar
-          className="w-full max-w-lg flex-1"
-          contentClassName="flex flex-col gap-3 pb-4"
+          className="mask-alpha w-full max-w-lg flex-1"
+          style={contentMaskStyle}
+          onViewportRef={setContentViewport}
+          contentClassName="flex flex-col gap-3 px-8 pb-4 pt-4"
         >
           {endpoints.length === 0 ? (
             <div className="rounded-lg border border-derived-subtle p-6">
@@ -178,25 +194,29 @@ function EndpointRow({
   const [showApiKey, setShowApiKey] = useState(false);
   const hasApiKey = !!endpoint.encryptedApiKey;
 
-  const specLabel = useMemo(
-    () =>
-      API_SPEC_OPTIONS.find((o) => o.value === endpoint.apiSpec)?.label ??
-      endpoint.apiSpec,
-    [endpoint.apiSpec],
-  );
+  const handleApiKeyBlur = useCallback(() => {
+    if (apiKeyInput.trim() && !hasApiKey) {
+      onSetApiKey(apiKeyInput.trim());
+      setApiKeyInput('');
+    }
+  }, [apiKeyInput, hasApiKey, onSetApiKey]);
 
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-derived bg-surface-1 p-4">
-      {/* Header row: name + delete */}
-      <div className="flex items-center justify-between gap-2">
-        <Input
-          value={endpoint.name}
-          onValueChange={(v) => onUpdate({ name: v })}
-          size="sm"
-          placeholder="Endpoint name"
-          className="flex-1"
-          style={{ maxWidth: 'none' }}
-        />
+      {/* Name + delete */}
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
+            Name
+          </span>
+          <Input
+            value={endpoint.name}
+            onValueChange={(v) => onUpdate({ name: v })}
+            size="sm"
+            placeholder="Endpoint name"
+            className="w-full"
+          />
+        </div>
         <Button variant="ghost" size="icon-sm" onClick={onDelete}>
           <IconTrashOutline18 className="size-3.5" />
         </Button>
@@ -204,7 +224,10 @@ function EndpointRow({
 
       {/* API spec + base URL */}
       <div className="flex gap-2">
-        <div className="w-48 shrink-0">
+        <div className="flex w-48 shrink-0 flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
+            API Spec
+          </span>
           <Select
             value={endpoint.apiSpec}
             onValueChange={(val) => onUpdate({ apiSpec: val as ApiSpec })}
@@ -213,67 +236,56 @@ function EndpointRow({
             triggerClassName="w-full"
           />
         </div>
-        <Input
-          value={endpoint.baseUrl}
-          onValueChange={(v) => onUpdate({ baseUrl: v })}
-          size="sm"
-          placeholder="https://api.example.com/v1"
-          className="flex-1"
-          style={{ maxWidth: 'none' }}
-        />
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
+            Base URL
+          </span>
+          <Input
+            value={endpoint.baseUrl}
+            onValueChange={(v) => onUpdate({ baseUrl: v })}
+            size="sm"
+            placeholder="https://api.example.com/v1"
+            className="w-full"
+          />
+        </div>
       </div>
 
       {/* API key */}
-      <div className="flex gap-1.5">
-        <Input
-          type={showApiKey || !hasApiKey ? 'text' : 'password'}
-          value={
-            hasApiKey
-              ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
-              : apiKeyInput
-          }
-          onValueChange={(v) => {
-            if (!hasApiKey) setApiKeyInput(v);
-          }}
-          size="sm"
-          placeholder="API key (optional)"
-          className="flex-1"
-          style={{ maxWidth: 'none' }}
-          disabled={hasApiKey}
-          readOnly={hasApiKey}
-        />
-        {hasApiKey ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setShowApiKey((v) => !v);
+      <div className="flex flex-col gap-1">
+        <span className="font-medium text-muted-foreground text-xs">
+          API Key
+        </span>
+        <div className="flex gap-1.5">
+          <Input
+            type={showApiKey || !hasApiKey ? 'text' : 'password'}
+            value={
+              hasApiKey
+                ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
+                : apiKeyInput
+            }
+            onValueChange={(v) => {
+              if (!hasApiKey) setApiKeyInput(v);
             }}
-          >
-            {showApiKey ? 'Hide' : 'Show'}
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
+            onBlur={handleApiKeyBlur}
             size="sm"
-            onClick={() => {
-              if (apiKeyInput.trim()) {
-                onSetApiKey(apiKeyInput.trim());
-                setApiKeyInput('');
-              }
-            }}
-            disabled={!apiKeyInput.trim()}
-          >
-            Save Key
-          </Button>
-        )}
+            placeholder="API key (optional)"
+            className="w-full"
+            disabled={hasApiKey}
+            readOnly={hasApiKey}
+          />
+          {hasApiKey && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowApiKey((v) => !v);
+              }}
+            >
+              {showApiKey ? 'Hide' : 'Show'}
+            </Button>
+          )}
+        </div>
       </div>
-
-      {/* Summary */}
-      <p className={cn('truncate text-muted-foreground text-xs')}>
-        {specLabel} \u00b7 {endpoint.baseUrl || 'No URL set'}
-        {hasApiKey && ' \u00b7 key set'}
-      </p>
     </div>
   );
 }

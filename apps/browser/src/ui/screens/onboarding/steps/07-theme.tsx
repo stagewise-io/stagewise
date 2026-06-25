@@ -30,21 +30,21 @@ export function StepTheme({
 }) {
   return (
     <>
-      <div className="app-no-drag flex flex-1 flex-col items-center gap-4 overflow-hidden px-8 py-8">
-        <div className="flex shrink-0 flex-col items-center gap-2 text-center">
-          <h1 className="font-medium text-foreground text-xl">
-            Personalize your setup
-          </h1>
-          <p className="max-w-md text-muted-foreground text-sm">
-            Choose a color theme and notification sound. You can change these
-            anytime in settings.
-          </p>
-        </div>
-
+      <div className="app-no-drag flex flex-1 flex-col items-center overflow-hidden px-8 py-8">
         <OverlayScrollbar
-          className="w-full max-w-lg flex-1"
-          contentClassName="flex flex-col gap-6 pb-4"
+          className="w-full max-w-3xl flex-1"
+          contentClassName="flex flex-col justify-center gap-10 pb-4 h-full"
         >
+          <div className="flex shrink-0 flex-col items-center gap-2 text-center">
+            <h1 className="font-medium text-foreground text-xl">
+              Personalize your setup
+            </h1>
+            <p className="max-w-md text-muted-foreground text-sm">
+              Choose a color theme and notification sound. You can change these
+              anytime in settings.
+            </p>
+          </div>
+
           <ThemeSelection />
           <SoundSelection />
         </OverlayScrollbar>
@@ -132,37 +132,24 @@ function ThemeSelection() {
   };
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h3 className="font-medium text-foreground text-sm">Color scheme</h3>
-        <p className="text-muted-foreground text-xs">
-          Adapt the color style of your stagewise setup.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-3" role="radiogroup">
-        {PERSONALIZATION_THEMES.map((theme) => {
-          const active = theme.id === currentThemeId;
-          return (
-            <button
-              key={theme.id}
-              type="button"
-              className="group rounded-lg"
-              onClick={() => handleThemeChange(theme.id)}
-              aria-checked={active}
-              aria-label={`Use ${theme.name} theme`}
-              role="radio"
-              title={theme.name}
-            >
-              <ThemeBadge
-                themeId={theme.id}
-                name={theme.name}
-                active={active}
-              />
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex flex-wrap justify-center gap-3" role="radiogroup">
+      {PERSONALIZATION_THEMES.map((theme) => {
+        const active = theme.id === currentThemeId;
+        return (
+          <button
+            key={theme.id}
+            type="button"
+            className="group rounded-lg"
+            onClick={() => handleThemeChange(theme.id)}
+            aria-checked={active}
+            aria-label={`Use ${theme.name} theme`}
+            role="radio"
+            title={theme.name}
+          >
+            <ThemeBadge themeId={theme.id} name={theme.name} active={active} />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -236,68 +223,57 @@ function SoundSelection() {
   };
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h3 className="font-medium text-foreground text-sm">
-          Notification sounds
-        </h3>
-        <p className="text-muted-foreground text-xs">
-          Play a sound when the agent finishes work or needs your attention.
-        </p>
+    <div className="flex flex-wrap justify-center gap-24">
+      <div className="space-y-2">
+        <h4 className="font-medium text-foreground text-xs">Sound pack</h4>
+        <div className="flex items-center gap-1">
+          <Select
+            value={currentPack}
+            onValueChange={handleSoundPackChange}
+            items={soundPackItems}
+            size="sm"
+            triggerClassName="w-40"
+            side="bottom"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={soundLoudness === 'off'}
+            onClick={() => previewSound()}
+            aria-label="Preview sound"
+          >
+            <PlayIcon className="size-3.5" />
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <h4 className="font-medium text-foreground text-xs">Loudness</h4>
-          <div className="w-32 space-y-0.5 pl-2">
-            <Slider
-              value={loudnessIndex}
-              min={0}
-              max={2}
-              step={1}
-              ariaLabel="Notification sound loudness"
-              thickness="default"
-              onValueChange={handleLoudnessChange}
-            />
-            <div className="relative h-3 text-[11px] text-muted-foreground">
-              {NOTIFICATION_LOUDNESS_OPTIONS.map((option, index) => (
-                <span
-                  key={option.value}
-                  className="absolute -translate-x-1/2"
-                  style={{
-                    left: `${
-                      (index / (NOTIFICATION_LOUDNESS_OPTIONS.length - 1)) * 100
-                    }%`,
-                  }}
-                >
-                  {option.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h4 className="font-medium text-foreground text-xs">Sound pack</h4>
-          <div className="flex items-center gap-1">
-            <Select
-              value={currentPack}
-              onValueChange={handleSoundPackChange}
-              items={soundPackItems}
-              size="sm"
-              triggerClassName="w-40"
-              side="bottom"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              disabled={soundLoudness === 'off'}
-              onClick={() => previewSound()}
-              aria-label="Preview sound"
-            >
-              <PlayIcon className="size-3.5" />
-            </Button>
+      <div className="space-y-2">
+        <h4 className="font-medium text-foreground text-xs">Loudness</h4>
+        <div className="w-32 space-y-0.5 pl-2">
+          <Slider
+            value={loudnessIndex}
+            min={0}
+            max={2}
+            step={1}
+            ariaLabel="Notification sound loudness"
+            thickness="default"
+            onValueChange={handleLoudnessChange}
+          />
+          <div className="relative h-3 text-[11px] text-muted-foreground">
+            {NOTIFICATION_LOUDNESS_OPTIONS.map((option, index) => (
+              <span
+                key={option.value}
+                className="absolute -translate-x-1/2"
+                style={{
+                  left: `${
+                    (index / (NOTIFICATION_LOUDNESS_OPTIONS.length - 1)) * 100
+                  }%`,
+                }}
+              >
+                {option.label}
+              </span>
+            ))}
           </div>
         </div>
       </div>
