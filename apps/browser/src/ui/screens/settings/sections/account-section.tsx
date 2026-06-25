@@ -18,6 +18,7 @@ export function AccountSection() {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
   const signInSocial = useKartonProcedure((p) => p.userAccount.signInSocial);
+  const signInEmail = useKartonProcedure((p) => p.userAccount.signInEmail);
   const logout = useKartonProcedure((p) => p.userAccount.logout);
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   // `useTrack` swallows RPC errors so a failed telemetry capture (e.g.
@@ -68,6 +69,7 @@ export function AccountSection() {
               sendOtp={(email, token) => sendOtp(email, token ?? '')}
               verifyOtp={verifyOtp}
               signInSocial={signInSocial}
+              signInEmail={signInEmail}
               trackingPrefix="account-auth"
               track={track}
               onUseApiKeys={() =>

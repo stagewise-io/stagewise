@@ -13,6 +13,8 @@ import type {
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
 
 export const API_URL = process.env.API_URL || 'https://api.stagewise.io';
+const CONSOLE_URL =
+  process.env.STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 const ELECTRON_CLIENT_ID = 'electron';
 const STAGEWISE_PRODUCTION_API_ORIGIN = 'https://api.stagewise.io';
 const STABLE_AUTH_CALLBACK_SCHEME = 'stagewise';
@@ -104,6 +106,43 @@ export async function openSocialAuthInSystemBrowser(
   } else {
     url.searchParams.set('callback_scheme', redirectTarget.scheme);
   }
+
+  try {
+    await shell.openExternal(url.toString(), { activate: true });
+  } catch (error) {
+    authStore.delete(state);
+    throw error;
+  }
+}
+
+/**
+ * Opens the system browser to the console login page for email sign-in.
+ *
+ * This follows the same PKCE pattern as `openSocialAuthInSystemBrowser`:
+ * generates a code verifier/challenge, stores the verifier in the
+ * `@better-auth/electron` global store, and opens the console with the
+ * PKCE params in the query string. The console completes the email OTP
+ * flow on a valid origin (where Turnstile works), then redirects back
+ * to the app's callback scheme (e.g. `stagewise://`, `stagewise-nightly://`)
+ * with the electron handoff token.
+ */
+export async function openEmailAuthInSystemBrowser(): Promise<void> {
+  const state = createBase64UrlRandomString(16);
+  const codeVerifier = createBase64UrlRandomString(32);
+  const codeChallenge = createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url');
+
+  const authStore = getElectronAuthStore();
+  authStore.set(state, codeVerifier);
+
+  const url = new URL(`${CONSOLE_URL}/login`);
+  url.searchParams.set('client_id', ELECTRON_CLIENT_ID);
+  url.searchParams.set('code_challenge', codeChallenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('state', state);
+  url.searchParams.set('callback_scheme', API_AUTH_CALLBACK_SCHEME);
+  url.searchParams.set('desktop_email', '1');
 
   try {
     await shell.openExternal(url.toString(), { activate: true });

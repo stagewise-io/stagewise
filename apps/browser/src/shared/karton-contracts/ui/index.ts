@@ -1468,6 +1468,7 @@ export type KartonContract = {
       signInSocial: (
         provider: SocialAuthProvider,
       ) => Promise<{ error?: string }>;
+      signInEmail: () => Promise<{ error?: string }>;
       refreshStatus: () => Promise<void>;
       logout: () => Promise<void>;
       /** Get current usage stats */
