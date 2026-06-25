@@ -149,13 +149,43 @@ describe('applyWorkspaceGitActionPreferences', () => {
     expect(config.switchWorktreeTarget).toBe('/repo');
   });
 
-  it('does not apply branch target preferences', () => {
+  it('applies available remembered switchBranchTarget from repo prefs', () => {
     const config = applyWorkspaceGitActionPreferences(
       defaults,
       sourceBranchItems,
       worktreeItems,
       undefined,
-      { switchWorktreeTarget: '/repo/worktrees/test' },
+      { switchBranchTarget: 'develop' },
+    );
+
+    expect(config.switchBranchTarget).toBe('develop');
+  });
+
+  it('ignores remembered switchBranchTarget that is unavailable', () => {
+    const config = applyWorkspaceGitActionPreferences(
+      defaults,
+      sourceBranchItems,
+      worktreeItems,
+      undefined,
+      { switchBranchTarget: 'deleted-branch' },
+    );
+
+    expect(config.switchBranchTarget).toBe('main');
+  });
+
+  it('validates switchBranchTarget against checkoutBranchItems when distinct from sourceBranches', () => {
+    const checkoutBranchItems: SelectItem<string>[] = [
+      { value: 'main', label: 'main' },
+    ];
+
+    // 'develop' is in sourceBranchItems but NOT in checkoutBranchItems
+    const config = applyWorkspaceGitActionPreferences(
+      defaults,
+      sourceBranchItems,
+      worktreeItems,
+      undefined,
+      { switchBranchTarget: 'develop' },
+      checkoutBranchItems,
     );
 
     expect(config.switchBranchTarget).toBe('main');

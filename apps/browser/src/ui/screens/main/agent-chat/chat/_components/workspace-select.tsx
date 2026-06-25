@@ -1855,6 +1855,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         worktreeItems,
         generalWorkspaceGitActionPreference,
         repositoryWorkspaceGitActionPreference,
+        checkoutBranchItems,
       ),
       mount,
     ),
@@ -1906,6 +1907,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         worktreeItems,
         generalWorkspaceGitActionPreference,
         repositoryWorkspaceGitActionPreference,
+        checkoutBranchItems,
       ),
       mount,
     );
@@ -2075,6 +2077,19 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
               'switchWorktreeTarget',
             ],
             value: partial.switchWorktreeTarget,
+          });
+        }
+        if (typeof partial.switchBranchTarget === 'string') {
+          patches.push({
+            op: 'add',
+            path: [
+              'agent',
+              'workspaceGitActionPreferences',
+              'repositories',
+              repositoryId,
+              'switchBranchTarget',
+            ],
+            value: partial.switchBranchTarget,
           });
         }
       }
@@ -2966,6 +2981,8 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
         sourceBranchItems,
         worktreeItems,
         workspaceGitActionGeneralPreference,
+        undefined,
+        checkoutBranchItems,
       ),
     [workspaceGitActionGeneralPreference],
   );
