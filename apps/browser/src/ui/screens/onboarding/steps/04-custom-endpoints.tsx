@@ -3,11 +3,12 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
 
 import { IconPlusOutline18, IconTrashOutline18 } from 'nucleo-ui-outline-18';
+import { IconTriangleWarningFillDuo18 } from 'nucleo-ui-fill-duo-18';
 import type {
   ApiSpec,
   CustomEndpoint,
@@ -29,6 +30,12 @@ const API_SPEC_OPTIONS: { value: ApiSpec; label: string; group: string }[] = [
   { value: 'amazon-bedrock', label: 'Amazon Bedrock', group: 'Cloud' },
   { value: 'google-vertex', label: 'Google Vertex AI', group: 'Cloud' },
 ];
+
+type ReachabilityState =
+  | { status: 'idle' }
+  | { status: 'testing' }
+  | { status: 'reachable' }
+  | { status: 'unreachable'; reason: string };
 
 export function StepCustomEndpoints({
   onNext,
@@ -194,12 +201,58 @@ function EndpointRow({
   const [showApiKey, setShowApiKey] = useState(false);
   const hasApiKey = !!endpoint.encryptedApiKey;
 
+  // Reachability test state
+  const [reachability, setReachability] = useState<ReachabilityState>({
+    status: 'idle',
+  });
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const testEndpointReachability = useKartonProcedure(
+    (p) => p.preferences.testEndpointReachability,
+  );
+
+  const runReachabilityTest = useCallback(
+    (baseUrl: string, apiSpec: ApiSpec) => {
+      if (!baseUrl.trim()) {
+        setReachability({ status: 'idle' });
+        return;
+      }
+      setReachability({ status: 'testing' });
+      void testEndpointReachability(baseUrl, apiSpec).then((result) => {
+        if (result.reachable) {
+          setReachability({ status: 'reachable' });
+        } else {
+          setReachability({ status: 'unreachable', reason: result.reason });
+        }
+      });
+    },
+    [testEndpointReachability],
+  );
+
+  // Debounced re-validation after baseUrl or apiSpec changes
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!endpoint.baseUrl.trim()) {
+      setReachability({ status: 'idle' });
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      runReachabilityTest(endpoint.baseUrl, endpoint.apiSpec);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [endpoint.baseUrl, endpoint.apiSpec, runReachabilityTest]);
+
   const handleApiKeyBlur = useCallback(() => {
     if (apiKeyInput.trim() && !hasApiKey) {
       onSetApiKey(apiKeyInput.trim());
       setApiKeyInput('');
     }
   }, [apiKeyInput, hasApiKey, onSetApiKey]);
+
+  const handleBaseUrlBlur = useCallback(() => {
+    runReachabilityTest(endpoint.baseUrl, endpoint.apiSpec);
+  }, [endpoint.baseUrl, endpoint.apiSpec, runReachabilityTest]);
 
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-derived bg-surface-1 p-4">
@@ -243,12 +296,32 @@ function EndpointRow({
           <Input
             value={endpoint.baseUrl}
             onValueChange={(v) => onUpdate({ baseUrl: v })}
+            onBlur={handleBaseUrlBlur}
             size="sm"
             placeholder="https://api.example.com/v1"
             className="w-full"
           />
         </div>
       </div>
+
+      {/* Reachability status */}
+      {reachability.status === 'testing' && (
+        <p className="text-muted-foreground text-xs">
+          Testing endpoint reachability...
+        </p>
+      )}
+      {reachability.status === 'reachable' && (
+        <p className="text-success-foreground text-xs">Endpoint is reachable</p>
+      )}
+      {reachability.status === 'unreachable' && (
+        <div className="flex items-start gap-1.5 rounded-md bg-warning/10 p-2">
+          <IconTriangleWarningFillDuo18 className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
+          <p className="text-warning-foreground text-xs">
+            {reachability.reason} — you can still proceed, but the endpoint may
+            not work correctly.
+          </p>
+        </div>
+      )}
 
       {/* API key */}
       <div className="flex flex-col gap-1">
