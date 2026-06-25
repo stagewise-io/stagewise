@@ -223,7 +223,7 @@ export const PROVIDER_DISPLAY_INFO: Record<
     description: 'GLM models',
   },
   minimax: {
-    name: 'MiniMax Pay-as-you-go',
+    name: 'MiniMax',
     description: 'MiniMax M-series models',
   },
   'xiaomi-mimo': {
