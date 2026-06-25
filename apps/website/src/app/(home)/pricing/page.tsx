@@ -28,7 +28,7 @@ export default function PricingPage() {
       price: 'Free',
       period: '',
       features: [
-        'Limited access to all models',
+        'Limited access to 3 standard models (Default, Quick, Smart)',
         'Bring Your Own Key (BYOK) for unlimited access and custom models',
       ],
       cta: 'Start now',
@@ -48,7 +48,7 @@ export default function PricingPage() {
           price: '$20',
           period: '/mo',
           features: [
-            '6x higher limits on all models',
+            'Access to all models, including Frontier and Open-Weights',
             'Extend usage with extra credits',
             'Run additional models from custom endpoints',
           ],
@@ -60,7 +60,7 @@ export default function PricingPage() {
           price: '$200',
           period: '/mo',
           features: [
-            '75x higher limits on all models',
+            '15x higher limits on all models',
             'Extend usage with extra credits',
             'Run additional models from custom endpoints',
           ],
