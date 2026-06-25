@@ -1791,9 +1791,19 @@ export abstract class BaseAgent<
             exceeded_window_count: sortedWindows.length,
           });
         }
+        const parsedModelRestricted = this.parseModelRestrictedError(error);
+        if (parsedModelRestricted?.kind === 'model-restricted') {
+          this.host.telemetry?.capture('model-restricted', {
+            agent_type: this.agentType,
+            model_id: stepModelId,
+            provider_mode: this._stepProviderMode,
+            plan: parsedModelRestricted.plan ?? 'unknown',
+          });
+        }
         const parsedProviderError = this.parseProviderError(error);
         const parsedOverloadBase =
           parsedPlanLimit ||
+          parsedModelRestricted ||
           this.isZaiBillingOrQuotaError(
             parsedProviderError,
             modelWithOptions.reasoningSignatureSource,
@@ -1821,16 +1831,17 @@ export abstract class BaseAgent<
         }
         this.state.commands.recordStepError({
           error: parsedPlanLimit ??
+            parsedModelRestricted ??
             parsedOverload ?? {
               message: `LLM provider error: ${parsedProviderError?.message ?? error.message}`,
               stack: error.stack,
             },
           markUnread: 'mark-unread',
         });
-        // Plan-limit errors surface their own dedicated UI affordance, so
-        // we suppress the generic error notification in that case (matches
-        // the browser host's pre-extraction behavior).
-        if (!parsedPlanLimit) {
+        // Plan-limit and model-restricted errors surface their own dedicated
+        // UI affordance, so we suppress the generic error notification in
+        // those cases (matches the browser host's pre-extraction behavior).
+        if (!parsedPlanLimit && !parsedModelRestricted) {
           this.emitNotificationEvent('error');
         }
         this.host.logger.debug(
@@ -3065,6 +3076,30 @@ export abstract class BaseAgent<
         message: body.message ?? 'Usage limit exceeded',
         plan,
         exceededWindows,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private parseModelRestrictedError(error: Error): AgentRuntimeError | null {
+    const frame = BaseAgent.unwrapApiErrorFrame(error);
+    const rawBody = frame.responseBody;
+    if (typeof rawBody !== 'string') return null;
+    try {
+      const body = JSON.parse(rawBody);
+      if (body?.error !== 'MODEL_RESTRICTED') return null;
+      const model =
+        typeof body.details?.model === 'string'
+          ? body.details.model
+          : undefined;
+      const plan =
+        typeof body.details?.plan === 'string' ? body.details.plan : undefined;
+      return {
+        kind: 'model-restricted',
+        message: body.message ?? 'This model is not available on your plan',
+        model,
+        plan,
       };
     } catch {
       return null;

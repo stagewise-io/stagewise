@@ -33,6 +33,12 @@ export type AgentRuntimeError =
       exceededWindows: ExceededWindow[];
     }
   | {
+      kind: 'model-restricted';
+      message: string;
+      model?: string;
+      plan?: string;
+    }
+  | {
       kind: 'upstream-overload';
       message: string;
       providerName?: string;
