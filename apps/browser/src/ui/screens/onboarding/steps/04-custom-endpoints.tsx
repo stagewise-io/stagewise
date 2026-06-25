@@ -1,46 +1,23 @@
 import { Button } from '@stagewise/stage-ui/components/button';
-import { Input } from '@stagewise/stage-ui/components/input';
-import { Select } from '@stagewise/stage-ui/components/select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
 
-import { IconPlusOutline18, IconTrashOutline18 } from 'nucleo-ui-outline-18';
-import { IconTriangleWarningFillDuo18 } from 'nucleo-ui-fill-duo-18';
-import type {
-  ApiSpec,
-  CustomEndpoint,
-} from '@shared/karton-contracts/ui/shared-types';
+import {
+  IconPlusOutline18,
+  IconChevronLeftOutline18,
+} from 'nucleo-ui-outline-18';
+import type { CustomEndpoint } from '@shared/karton-contracts/ui/shared-types';
+import {
+  CustomEndpointForm,
+  CustomEndpointCard,
+  type EndpointSaveData,
+} from '@ui/screens/settings/sections/custom-providers-section';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
 
 enablePatches();
-
-const API_SPEC_OPTIONS: { value: ApiSpec; label: string; group: string }[] = [
-  {
-    value: 'openai-chat-completions',
-    label: 'OpenAI (Chat Completions)',
-    group: 'Generic',
-  },
-  { value: 'openai-responses', label: 'OpenAI (Responses)', group: 'Generic' },
-  { value: 'anthropic', label: 'Anthropic', group: 'Generic' },
-  { value: 'google', label: 'Google', group: 'Generic' },
-  { value: 'azure', label: 'Azure OpenAI', group: 'Cloud' },
-  { value: 'amazon-bedrock', label: 'Amazon Bedrock', group: 'Cloud' },
-  { value: 'google-vertex', label: 'Google Vertex AI', group: 'Cloud' },
-];
-
-type ReachabilityState =
-  | { status: 'idle' }
-  | { status: 'testing' }
-  | { status: 'reachable' }
-  | { status: 'unreachable'; reason: string };
-
-/** Minimum time the "testing" indicator stays visible to avoid flicker. */
-const MIN_TESTING_DISPLAY_MS = 500;
-/** Debounce delay before triggering a reachability test after input changes. */
-const DEBOUNCE_MS = 600;
 
 export function StepCustomEndpoints({
   onNext,
@@ -54,10 +31,23 @@ export function StepCustomEndpoints({
   const setCustomEndpointApiKey = useKartonProcedure(
     (p) => p.preferences.setCustomEndpointApiKey,
   );
+  const setCustomEndpointSecretKey = useKartonProcedure(
+    (p) => p.preferences.setCustomEndpointSecretKey,
+  );
+  const setCustomEndpointGoogleCredentials = useKartonProcedure(
+    (p) => p.preferences.setCustomEndpointGoogleCredentials,
+  );
 
   const endpoints = preferences?.customEndpoints ?? [];
 
-  // Scroll fade mask
+  // Sub-view state: when formOpen is true, show the add/edit form.
+  // editingEndpoint is undefined for add mode, set for edit mode.
+  const [editingEndpoint, setEditingEndpoint] = useState<
+    CustomEndpoint | undefined
+  >(undefined);
+  const [formOpen, setFormOpen] = useState(false);
+
+  // Scroll fade mask for main list
   const [contentViewport, setContentViewport] = useState<HTMLElement | null>(
     null,
   );
@@ -68,41 +58,105 @@ export function StepCustomEndpoints({
     fadeDistance: 24,
   });
 
-  const handleAdd = useCallback(async () => {
-    const id = crypto.randomUUID();
-    const [, patches] = produceWithPatches(preferences, (draft) => {
-      draft.customEndpoints.push({
-        id,
-        name: 'New Endpoint',
-        apiSpec: 'openai-chat-completions',
-        baseUrl: '',
-        awsAuthMode: 'access-keys',
-      });
-    });
-    await updatePreferences(patches);
-  }, [preferences, updatePreferences]);
+  const handleAdd = useCallback(() => {
+    setEditingEndpoint(undefined);
+    setFormOpen(true);
+  }, []);
 
-  const handleUpdate = useCallback(
-    async (endpointId: string, updates: Partial<CustomEndpoint>) => {
-      const idx = endpoints.findIndex((ep) => ep.id === endpointId);
-      if (idx === -1) return;
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        const ep = draft.customEndpoints[idx]!;
-        if (updates.name !== undefined) ep.name = updates.name;
-        if (updates.apiSpec !== undefined) ep.apiSpec = updates.apiSpec;
-        if (updates.baseUrl !== undefined) ep.baseUrl = updates.baseUrl;
-      });
-      await updatePreferences(patches);
+  const handleEdit = useCallback((ep: CustomEndpoint) => {
+    setEditingEndpoint(ep);
+    setFormOpen(true);
+  }, []);
+
+  const handleSave = useCallback(
+    async (data: EndpointSaveData) => {
+      if (editingEndpoint) {
+        const idx = endpoints.findIndex((ep) => ep.id === editingEndpoint.id);
+        if (idx === -1) return;
+        const [, patches] = produceWithPatches(preferences, (draft) => {
+          const ep = draft.customEndpoints[idx]!;
+          ep.name = data.name;
+          ep.apiSpec = data.apiSpec;
+          ep.baseUrl = data.baseUrl;
+          ep.modelIdMapping = data.modelIdMapping;
+          ep.resourceName = data.resourceName;
+          ep.apiVersion = data.apiVersion;
+          ep.region = data.region;
+          if (data.apiSpec === 'amazon-bedrock') {
+            ep.awsAuthMode = data.awsAuthMode ?? 'access-keys';
+            ep.awsProfileName = data.awsProfileName;
+          }
+          ep.projectId = data.projectId;
+          ep.location = data.location;
+        });
+        await updatePreferences(patches);
+
+        if (data.apiKey) {
+          await setCustomEndpointApiKey(editingEndpoint.id, data.apiKey);
+        }
+        if (data.secretKey) {
+          await setCustomEndpointSecretKey(editingEndpoint.id, data.secretKey);
+        }
+        if (data.googleCredentials) {
+          await setCustomEndpointGoogleCredentials(
+            editingEndpoint.id,
+            data.googleCredentials,
+          );
+        }
+      } else {
+        const id = crypto.randomUUID();
+        const [, patches] = produceWithPatches(preferences, (draft) => {
+          draft.customEndpoints.push({
+            id,
+            name: data.name,
+            apiSpec: data.apiSpec,
+            baseUrl: data.baseUrl,
+            modelIdMapping: data.modelIdMapping,
+            resourceName: data.resourceName,
+            apiVersion: data.apiVersion,
+            region: data.region,
+            awsAuthMode:
+              data.apiSpec === 'amazon-bedrock'
+                ? (data.awsAuthMode ?? 'access-keys')
+                : 'access-keys',
+            awsProfileName:
+              data.apiSpec === 'amazon-bedrock'
+                ? data.awsProfileName
+                : undefined,
+            projectId: data.projectId,
+            location: data.location,
+          });
+        });
+        await updatePreferences(patches);
+
+        if (data.apiKey) {
+          await setCustomEndpointApiKey(id, data.apiKey);
+        }
+        if (data.secretKey) {
+          await setCustomEndpointSecretKey(id, data.secretKey);
+        }
+        if (data.googleCredentials) {
+          await setCustomEndpointGoogleCredentials(id, data.googleCredentials);
+        }
+      }
+      setFormOpen(false);
+      setEditingEndpoint(undefined);
     },
-    [endpoints, preferences, updatePreferences],
+    [
+      editingEndpoint,
+      endpoints,
+      preferences,
+      updatePreferences,
+      setCustomEndpointApiKey,
+      setCustomEndpointSecretKey,
+      setCustomEndpointGoogleCredentials,
+    ],
   );
 
-  const handleSetApiKey = useCallback(
-    async (endpointId: string, apiKey: string) => {
-      await setCustomEndpointApiKey(endpointId, apiKey);
-    },
-    [setCustomEndpointApiKey],
-  );
+  const handleCancel = useCallback(() => {
+    setFormOpen(false);
+    setEditingEndpoint(undefined);
+  }, []);
 
   const handleDelete = useCallback(
     async (endpointId: string) => {
@@ -119,9 +173,35 @@ export function StepCustomEndpoints({
     [preferences, updatePreferences],
   );
 
-  const canProceed = endpoints.some(
-    (ep) => ep.name.trim().length > 0 && ep.baseUrl.trim().length > 0,
-  );
+  // ─── Sub-view: Add / Edit form ───────────────────────────────────
+  if (formOpen) {
+    return (
+      <div className="app-no-drag flex flex-1 flex-col items-center overflow-hidden">
+        <OverlayScrollbar
+          className="w-full max-w-md flex-1"
+          contentClassName="flex flex-col gap-4 px-8 pt-8 pb-8"
+        >
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon-sm" onClick={handleCancel}>
+              <IconChevronLeftOutline18 className="size-4" />
+            </Button>
+            <h2 className="font-medium text-foreground text-sm">
+              {editingEndpoint ? 'Edit Provider' : 'Add Custom Provider'}
+            </h2>
+          </div>
+          <CustomEndpointForm
+            endpoint={editingEndpoint}
+            open={formOpen}
+            onSave={(data) => void handleSave(data)}
+            showFooterDivider={false}
+          />
+        </OverlayScrollbar>
+      </div>
+    );
+  }
+
+  // ─── Main view: endpoint list ────────────────────────────────────
+  const canProceed = endpoints.length > 0;
 
   return (
     <>
@@ -150,22 +230,17 @@ export function StepCustomEndpoints({
             </div>
           ) : (
             endpoints.map((ep) => (
-              <EndpointRow
+              <CustomEndpointCard
                 key={ep.id}
                 endpoint={ep}
-                onUpdate={(updates) => void handleUpdate(ep.id, updates)}
-                onSetApiKey={(key) => void handleSetApiKey(ep.id, key)}
+                onEdit={() => handleEdit(ep)}
                 onDelete={() => void handleDelete(ep.id)}
               />
             ))
           )}
 
           <div className="flex justify-center pt-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void handleAdd()}
-            >
+            <Button variant="secondary" size="sm" onClick={handleAdd}>
               <IconPlusOutline18 className="size-3.5" />
               Add Endpoint
             </Button>
@@ -175,213 +250,9 @@ export function StepCustomEndpoints({
       <OnboardingBottomNav
         left={<BackButton onClick={onBack} />}
         right={
-          <NextButton
-            onClick={onNext}
-            disabled={!canProceed}
-            blockReason={
-              canProceed
-                ? null
-                : 'Add at least one endpoint to continue, or go back to choose a different option'
-            }
-            label={endpoints.length > 0 ? 'Next' : 'Skip'}
-          />
+          <NextButton onClick={onNext} label={canProceed ? 'Next' : 'Skip'} />
         }
       />
     </>
-  );
-}
-
-function EndpointRow({
-  endpoint,
-  onUpdate,
-  onSetApiKey,
-  onDelete,
-}: {
-  endpoint: CustomEndpoint;
-  onUpdate: (updates: Partial<CustomEndpoint>) => void;
-  onSetApiKey: (apiKey: string) => void;
-  onDelete: () => void;
-}) {
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const hasApiKey = !!endpoint.encryptedApiKey;
-
-  // Reachability test state
-  const [reachability, setReachability] = useState<ReachabilityState>({
-    status: 'idle',
-  });
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const testEndpointReachability = useKartonProcedure(
-    (p) => p.preferences.testEndpointReachability,
-  );
-
-  const runReachabilityTest = useCallback(
-    (baseUrl: string, apiSpec: ApiSpec) => {
-      if (!baseUrl.trim()) {
-        setReachability({ status: 'idle' });
-        return;
-      }
-      setReachability({ status: 'testing' });
-      const testStart = Date.now();
-      // Client-side safety timeout: clear the testing state after 6s
-      // even if the RPC never resolves (backend timeout is 5s + roundtrip)
-      const safetyTimeout = setTimeout(() => {
-        setReachability((prev) =>
-          prev.status === 'testing'
-            ? { status: 'unreachable', reason: 'Connection timed out' }
-            : prev,
-        );
-      }, 6000);
-      void testEndpointReachability(baseUrl, apiSpec).then((result) => {
-        clearTimeout(safetyTimeout);
-        // Enforce minimum display time to avoid flicker on fast responses
-        const elapsed = Date.now() - testStart;
-        const applyResult = () => {
-          if (result.reachable) {
-            setReachability({ status: 'reachable' });
-          } else {
-            setReachability({
-              status: 'unreachable',
-              reason: result.reason,
-            });
-          }
-        };
-        if (elapsed < MIN_TESTING_DISPLAY_MS) {
-          setTimeout(applyResult, MIN_TESTING_DISPLAY_MS - elapsed);
-        } else {
-          applyResult();
-        }
-      });
-    },
-    [testEndpointReachability],
-  );
-
-  // Debounced re-validation after baseUrl or apiSpec changes
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!endpoint.baseUrl.trim()) {
-      setReachability({ status: 'idle' });
-      return;
-    }
-    debounceRef.current = setTimeout(() => {
-      runReachabilityTest(endpoint.baseUrl, endpoint.apiSpec);
-    }, DEBOUNCE_MS);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [endpoint.baseUrl, endpoint.apiSpec, runReachabilityTest]);
-
-  const handleApiKeyBlur = useCallback(() => {
-    if (apiKeyInput.trim() && !hasApiKey) {
-      onSetApiKey(apiKeyInput.trim());
-      setApiKeyInput('');
-    }
-  }, [apiKeyInput, hasApiKey, onSetApiKey]);
-
-  return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-derived bg-surface-1 p-4">
-      {/* Name + delete */}
-      <div className="flex items-end justify-between gap-2">
-        <div className="flex flex-1 flex-col gap-1">
-          <span className="font-medium text-muted-foreground text-xs">
-            Name
-          </span>
-          <Input
-            value={endpoint.name}
-            onValueChange={(v) => onUpdate({ name: v })}
-            size="sm"
-            placeholder="Endpoint name"
-            className="w-full"
-          />
-        </div>
-        <Button variant="ghost" size="icon-sm" onClick={onDelete}>
-          <IconTrashOutline18 className="size-3.5" />
-        </Button>
-      </div>
-
-      {/* API spec + base URL */}
-      <div className="flex gap-2">
-        <div className="flex w-48 shrink-0 flex-col gap-1">
-          <span className="font-medium text-muted-foreground text-xs">
-            API Spec
-          </span>
-          <Select
-            value={endpoint.apiSpec}
-            onValueChange={(val) => onUpdate({ apiSpec: val as ApiSpec })}
-            items={API_SPEC_OPTIONS}
-            size="md"
-            triggerClassName="w-full"
-          />
-        </div>
-        <div className="flex flex-1 flex-col gap-1">
-          <span className="font-medium text-muted-foreground text-xs">
-            Base URL
-          </span>
-          <Input
-            value={endpoint.baseUrl}
-            onValueChange={(v) => onUpdate({ baseUrl: v })}
-            size="sm"
-            placeholder="https://api.example.com/v1"
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      {/* Reachability status */}
-      {reachability.status === 'testing' && (
-        <p className="text-muted-foreground text-xs">
-          Testing endpoint reachability...
-        </p>
-      )}
-      {reachability.status === 'reachable' && (
-        <p className="text-success-foreground text-xs">Endpoint is reachable</p>
-      )}
-      {reachability.status === 'unreachable' && (
-        <div className="flex items-start gap-1.5 rounded-md bg-warning/10 p-2">
-          <IconTriangleWarningFillDuo18 className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
-          <p className="text-warning-foreground text-xs">
-            {reachability.reason} — you can still proceed, but the endpoint may
-            not work correctly.
-          </p>
-        </div>
-      )}
-
-      {/* API key */}
-      <div className="flex flex-col gap-1">
-        <span className="font-medium text-muted-foreground text-xs">
-          API Key
-        </span>
-        <div className="flex gap-1.5">
-          <Input
-            type={showApiKey || !hasApiKey ? 'text' : 'password'}
-            value={
-              hasApiKey
-                ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
-                : apiKeyInput
-            }
-            onValueChange={(v) => {
-              if (!hasApiKey) setApiKeyInput(v);
-            }}
-            onBlur={handleApiKeyBlur}
-            size="sm"
-            placeholder="API key (optional)"
-            className="w-full"
-            disabled={hasApiKey}
-            readOnly={hasApiKey}
-          />
-          {hasApiKey && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setShowApiKey((v) => !v);
-              }}
-            >
-              {showApiKey ? 'Hide' : 'Show'}
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }

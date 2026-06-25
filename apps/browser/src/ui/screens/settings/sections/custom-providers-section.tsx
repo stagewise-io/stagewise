@@ -23,7 +23,6 @@ import {
   DialogDescription,
   DialogClose,
   DialogHeader,
-  DialogFooter,
 } from '@stagewise/stage-ui/components/dialog';
 import { produceWithPatches, enablePatches } from 'immer';
 import {
@@ -39,7 +38,11 @@ enablePatches();
 // Custom Endpoint Components
 // =============================================================================
 
-const API_SPEC_OPTIONS: { value: ApiSpec; label: string; group: string }[] = [
+export const API_SPEC_OPTIONS: {
+  value: ApiSpec;
+  label: string;
+  group: string;
+}[] = [
   {
     value: 'openai-chat-completions',
     label: 'OpenAI (Chat Completions)',
@@ -53,7 +56,7 @@ const API_SPEC_OPTIONS: { value: ApiSpec; label: string; group: string }[] = [
   { value: 'google-vertex', label: 'Google Vertex AI', group: 'Cloud' },
 ];
 
-type EndpointSaveData = {
+export type EndpointSaveData = {
   name: string;
   apiSpec: ApiSpec;
   baseUrl: string;
@@ -574,22 +577,29 @@ function ProviderSpecificFields({
   }
 }
 
-function CustomEndpointDialog({
+export function CustomEndpointForm({
   endpoint,
-  open,
-  onOpenChange,
   onSave,
+  onCancel,
+  open,
+  showFooterDivider = true,
 }: {
   endpoint?: CustomEndpoint;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onSave: (data: EndpointSaveData) => void;
+  onCancel?: () => void;
+  /**
+   * When provided (dialog mode), the form resets whenever `open` flips
+   * to true. When omitted (inline mode), the form initializes from
+   * `endpoint` on mount and never resets.
+   */
+  open?: boolean;
+  /**
+   * When true (default), renders a top border separating the footer
+   * from the form body. Set to false for inline contexts where the
+   * surrounding layout already provides visual separation.
+   */
+  showFooterDivider?: boolean;
 }) {
-  // Pages run under a different preload than the sidebar UI, so we cannot
-  // import `@ui/hooks/use-track` here (it reaches for `window.electron`).
-  // `useTrack` from the pages hooks routes through the pages-API
-  // `captureTelemetry` bridge and swallows RPC errors so a failed capture
-  // can never crash the page.
   const track = useTrack();
   // `telemetryLevel` gates whether the raw `baseUrl` is forwarded. At
   // `full` the user has consented to detailed analytics; at `basic` we
@@ -732,6 +742,7 @@ function CustomEndpointDialog({
   // silently reset the user's in-progress form input and re-emit the
   // `*-add-started` event.
   useEffect(() => {
+    if (open === undefined) return;
     if (!open) return;
     setName(endpoint?.name ?? '');
     setApiSpec(endpoint?.apiSpec ?? 'openai-chat-completions');
@@ -847,19 +858,215 @@ function CustomEndpointDialog({
     };
   };
 
-  const handleDialogOpenChange = (next: boolean) => {
-    if (!next && open && isAddMode && !savedRef.current) {
+  const handleSave = () => {
+    let modelIdMapping: Record<string, string> | undefined;
+    if (modelIdMappingJson.trim()) {
+      try {
+        modelIdMapping = JSON.parse(modelIdMappingJson);
+      } catch {
+        setMappingError('Invalid JSON');
+        return;
+      }
+    }
+    onSave({
+      name: name.trim(),
+      apiSpec,
+      baseUrl,
+      apiKey,
+      modelIdMapping,
+      resourceName: resourceName || undefined,
+      apiVersion: apiVersion || undefined,
+      region: region || undefined,
+      secretKey: secretKey || undefined,
+      awsAuthMode: apiSpec === 'amazon-bedrock' ? awsAuthMode : undefined,
+      awsProfileName:
+        apiSpec === 'amazon-bedrock' && awsAuthMode === 'profile'
+          ? awsProfileName.trim() || undefined
+          : undefined,
+      projectId: projectId || undefined,
+      location: location || undefined,
+      googleCredentials: googleCredentials || undefined,
+    });
+    if (isAddMode) {
+      track('custom-provider-add-finished', buildUrlProps());
+    }
+    savedRef.current = true;
+  };
+
+  const handleCancel = () => {
+    if (isAddMode && !savedRef.current) {
       track('custom-provider-add-aborted', {
         had_validation_errors: hadValidationErrors,
         any_field_touched: anyFieldTouched,
         ...buildUrlProps(),
       });
     }
-    onOpenChange(next);
+    onCancel?.();
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <p className="font-medium text-foreground text-xs">Name</p>
+        <Input
+          placeholder="My Azure OpenAI"
+          value={name}
+          onValueChange={setName}
+          size="sm"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="font-medium text-foreground text-xs">Provider Type</p>
+        <Select
+          value={apiSpec}
+          onValueChange={(val) => setApiSpec(val as ApiSpec)}
+          items={API_SPEC_OPTIONS}
+          size="md"
+          triggerClassName="w-full"
+        />
+      </div>
+
+      <ProviderSpecificFields
+        apiSpec={apiSpec}
+        endpoint={endpoint}
+        baseUrl={baseUrl}
+        setBaseUrl={setBaseUrl}
+        apiKey={apiKey}
+        setApiKey={setApiKey}
+        resourceName={resourceName}
+        setResourceName={setResourceName}
+        apiVersion={apiVersion}
+        setApiVersion={setApiVersion}
+        region={region}
+        setRegion={setRegion}
+        secretKey={secretKey}
+        setSecretKey={setSecretKey}
+        projectId={projectId}
+        setProjectId={setProjectId}
+        location={location}
+        setLocation={setLocation}
+        googleCredentials={googleCredentials}
+        setGoogleCredentials={setGoogleCredentials}
+        awsAuthMode={awsAuthMode}
+        setAwsAuthMode={setAwsAuthMode}
+        awsProfileName={awsProfileName}
+        setAwsProfileName={setAwsProfileName}
+        awsProfiles={awsProfiles}
+        awsProfilesLoading={awsProfilesLoading}
+        awsProfilesError={awsProfilesError}
+        awsEnvRegion={awsEnvRegion}
+        bedrockDetectedRegion={bedrockDetectedRegion}
+      />
+
+      <div className="space-y-1.5 border-derived border-t pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium text-foreground text-xs">
+            Model ID Mapping{' '}
+            <span className="font-normal text-muted-foreground">
+              (optional)
+            </span>
+          </p>
+          {apiSpec === 'amazon-bedrock' && (
+            // Bedrock-only shortcut: Claude/Nova on Bedrock require
+            // cross-region inference-profile IDs (prefixed `us.`,
+            // `eu.`, `apac.`) rather than the bare Anthropic IDs. A
+            // toggle (rather than one-shot button) keeps the textarea
+            // in sync when region-affecting settings change, so users
+            // switching profile/region mid-config get the correct
+            // prefix without having to notice and re-click. Toggle is
+            // flipped off on any manual edit below to preserve user
+            // overrides.
+            <Tooltip>
+              <TooltipTrigger delay={300}>
+                <span
+                  className="flex cursor-pointer select-none items-center gap-1.5 text-muted-foreground text-xs"
+                  onClick={() => setBedrockSuggestionEnabled((v) => !v)}
+                >
+                  <Switch
+                    size="xs"
+                    checked={bedrockSuggestionEnabled}
+                    onCheckedChange={(checked) =>
+                      setBedrockSuggestionEnabled(checked)
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  Suggested mapping
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end">
+                <p className="max-w-xs text-xs leading-relaxed">
+                  Map the built-in Claude models to the matching Bedrock
+                  cross-region inference profiles for your region. Turn off to
+                  edit the mapping manually.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Map built-in model IDs to the IDs this endpoint expects, e.g. when the
+          provider uses different naming.
+        </p>
+        <textarea
+          className="scrollbar-subtle w-full resize-y rounded-lg border border-derived p-2 font-mono text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-muted-foreground/35"
+          rows={8}
+          placeholder='{"claude-opus-4.8": "anthropic.claude-opus-4-8"}'
+          value={modelIdMappingJson}
+          onChange={(e) => {
+            setModelIdMappingJson(e.target.value);
+            setMappingError(null);
+            // Any manual edit means the user has taken over;
+            // stop auto-regenerating so the effect above cannot
+            // overwrite their changes when region/profile shifts.
+            if (bedrockSuggestionEnabled) {
+              setBedrockSuggestionEnabled(false);
+            }
+          }}
+        />
+        {mappingError && (
+          <p className="text-error-foreground text-xs">{mappingError}</p>
+        )}
+      </div>
+
+      <div
+        className={
+          showFooterDivider
+            ? 'flex justify-end gap-2 border-derived border-t pt-3'
+            : 'flex justify-end gap-2'
+        }
+      >
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={!canSave}
+          onClick={handleSave}
+        >
+          {endpoint ? 'Save Changes' : 'Add Provider'}
+        </Button>
+        {onCancel && (
+          <Button variant="ghost" size="sm" onClick={handleCancel}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CustomEndpointDialog({
+  endpoint,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  endpoint?: CustomEndpoint;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: EndpointSaveData) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogClose />
         <DialogHeader>
@@ -870,190 +1077,21 @@ function CustomEndpointDialog({
             Configure a custom API endpoint for LLM services.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <p className="font-medium text-foreground text-xs">Name</p>
-            <Input
-              placeholder="My Azure OpenAI"
-              value={name}
-              onValueChange={setName}
-              size="sm"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="font-medium text-foreground text-xs">Provider Type</p>
-            <Select
-              value={apiSpec}
-              onValueChange={(val) => setApiSpec(val as ApiSpec)}
-              items={API_SPEC_OPTIONS}
-              size="md"
-              triggerClassName="w-full"
-            />
-          </div>
-
-          <ProviderSpecificFields
-            apiSpec={apiSpec}
-            endpoint={endpoint}
-            baseUrl={baseUrl}
-            setBaseUrl={setBaseUrl}
-            apiKey={apiKey}
-            setApiKey={setApiKey}
-            resourceName={resourceName}
-            setResourceName={setResourceName}
-            apiVersion={apiVersion}
-            setApiVersion={setApiVersion}
-            region={region}
-            setRegion={setRegion}
-            secretKey={secretKey}
-            setSecretKey={setSecretKey}
-            projectId={projectId}
-            setProjectId={setProjectId}
-            location={location}
-            setLocation={setLocation}
-            googleCredentials={googleCredentials}
-            setGoogleCredentials={setGoogleCredentials}
-            awsAuthMode={awsAuthMode}
-            setAwsAuthMode={setAwsAuthMode}
-            awsProfileName={awsProfileName}
-            setAwsProfileName={setAwsProfileName}
-            awsProfiles={awsProfiles}
-            awsProfilesLoading={awsProfilesLoading}
-            awsProfilesError={awsProfilesError}
-            awsEnvRegion={awsEnvRegion}
-            bedrockDetectedRegion={bedrockDetectedRegion}
-          />
-
-          <div className="space-y-1.5 border-derived border-t pt-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-medium text-foreground text-xs">
-                Model ID Mapping{' '}
-                <span className="font-normal text-muted-foreground">
-                  (optional)
-                </span>
-              </p>
-              {apiSpec === 'amazon-bedrock' && (
-                // Bedrock-only shortcut: Claude/Nova on Bedrock require
-                // cross-region inference-profile IDs (prefixed `us.`,
-                // `eu.`, `apac.`) rather than the bare Anthropic IDs. A
-                // toggle (rather than one-shot button) keeps the textarea
-                // in sync when region-affecting settings change, so users
-                // switching profile/region mid-config get the correct
-                // prefix without having to notice and re-click. Toggle is
-                // flipped off on any manual edit below to preserve user
-                // overrides.
-                <Tooltip>
-                  <TooltipTrigger delay={300}>
-                    <span
-                      className="flex cursor-pointer select-none items-center gap-1.5 text-muted-foreground text-xs"
-                      onClick={() => setBedrockSuggestionEnabled((v) => !v)}
-                    >
-                      <Switch
-                        size="xs"
-                        checked={bedrockSuggestionEnabled}
-                        onCheckedChange={(checked) =>
-                          setBedrockSuggestionEnabled(checked)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      Suggested mapping
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" align="end">
-                    <p className="max-w-xs text-xs leading-relaxed">
-                      Map the built-in Claude models to the matching Bedrock
-                      cross-region inference profiles for your region. Turn off
-                      to edit the mapping manually.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              Map built-in model IDs to the IDs this endpoint expects, e.g. when
-              the provider uses different naming.
-            </p>
-            <textarea
-              className="scrollbar-subtle w-full resize-y rounded-lg border border-derived p-2 font-mono text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-muted-foreground/35"
-              rows={8}
-              placeholder='{"claude-opus-4.8": "anthropic.claude-opus-4-8"}'
-              value={modelIdMappingJson}
-              onChange={(e) => {
-                setModelIdMappingJson(e.target.value);
-                setMappingError(null);
-                // Any manual edit means the user has taken over;
-                // stop auto-regenerating so the effect above cannot
-                // overwrite their changes when region/profile shifts.
-                if (bedrockSuggestionEnabled) {
-                  setBedrockSuggestionEnabled(false);
-                }
-              }}
-            />
-            {mappingError && (
-              <p className="text-error-foreground text-xs">{mappingError}</p>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canSave}
-            onClick={() => {
-              let modelIdMapping: Record<string, string> | undefined;
-              if (modelIdMappingJson.trim()) {
-                try {
-                  modelIdMapping = JSON.parse(modelIdMappingJson);
-                } catch {
-                  setMappingError('Invalid JSON');
-                  return;
-                }
-              }
-              onSave({
-                name: name.trim(),
-                apiSpec,
-                baseUrl,
-                apiKey,
-                modelIdMapping,
-                resourceName: resourceName || undefined,
-                apiVersion: apiVersion || undefined,
-                region: region || undefined,
-                secretKey: secretKey || undefined,
-                awsAuthMode:
-                  apiSpec === 'amazon-bedrock' ? awsAuthMode : undefined,
-                awsProfileName:
-                  apiSpec === 'amazon-bedrock' && awsAuthMode === 'profile'
-                    ? awsProfileName.trim() || undefined
-                    : undefined,
-                projectId: projectId || undefined,
-                location: location || undefined,
-                googleCredentials: googleCredentials || undefined,
-              });
-              if (isAddMode) {
-                track('custom-provider-add-finished', buildUrlProps());
-              }
-              savedRef.current = true;
-              onOpenChange(false);
-            }}
-          >
-            {endpoint ? 'Save Changes' : 'Add Provider'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDialogOpenChange(false)}
-          >
-            Cancel
-          </Button>
-        </DialogFooter>
+        <CustomEndpointForm
+          endpoint={endpoint}
+          open={open}
+          onSave={(data) => {
+            onSave(data);
+            onOpenChange(false);
+          }}
+          onCancel={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );
 }
 
-function CustomEndpointCard({
+export function CustomEndpointCard({
   endpoint,
   onEdit,
   onDelete,
