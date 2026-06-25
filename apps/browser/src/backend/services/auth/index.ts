@@ -13,7 +13,7 @@ import {
   type BetterAuthClient,
 } from './server-interop';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
-import { AUTH_CALLBACK_PROTOCOL } from './callback-scheme';
+import { ALL_CALLBACK_PROTOCOLS } from './callback-scheme';
 import {
   createDevLoopbackAuthServer,
   type DevLoopbackAuthServer,
@@ -365,7 +365,10 @@ export class AuthService extends DisposableService {
       parsed.host === activeLoopbackCallback.host &&
       parsed.pathname === activeLoopbackCallback.pathname;
 
-    if (parsed.protocol !== AUTH_CALLBACK_PROTOCOL && !isLoopbackCallback) {
+    if (!ALL_CALLBACK_PROTOCOLS.has(parsed.protocol) && !isLoopbackCallback) {
+      this.logger.warn(
+        `[AuthService] Auth callback protocol mismatch: got ${parsed.protocol}, expected one of ${[...ALL_CALLBACK_PROTOCOLS].join(', ')}`,
+      );
       return false;
     }
 
@@ -378,8 +381,12 @@ export class AuthService extends DisposableService {
       parsed.searchParams.has('error') ||
       parsed.hash.startsWith('#token=');
 
-    if (!isAuthCallback) return false;
-    if (!this.pendingHandoffAuth) return false;
+    if (!isAuthCallback) {
+      return false;
+    }
+    if (!this.pendingHandoffAuth) {
+      return false;
+    }
     const currentPending = this.pendingHandoffAuth;
 
     const fragmentParams = new URLSearchParams(parsed.hash.slice(1));
@@ -546,7 +553,8 @@ export class AuthService extends DisposableService {
     try {
       this.logger.debug('[AuthService] Starting email sign-in via console');
       await openEmailAuthInSystemBrowser();
-      return await completion;
+      const result = await completion;
+      return result;
     } catch (err) {
       this.logger.error(
         `[AuthService] Unexpected error during email sign-in: ${err}`,

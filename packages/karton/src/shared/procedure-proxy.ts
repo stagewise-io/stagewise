@@ -18,6 +18,10 @@ export function createProcedureProxy(
   // produces a brand-new Proxy, breaking useMemo/useEffect dependency
   // checks and causing infinite render loops.
   const childCache = new Map<string | symbol, any>();
+  // Cache for .withTimeout(ms) results, keyed by timeout duration.
+  // This ensures repeated calls like `proc.withTimeout(310_000)` return
+  // the same proxy reference, preserving useMemo/useCallback stability.
+  const timeoutCache = new Map<number, any>();
 
   return new Proxy(() => {}, {
     get(_target, prop) {
@@ -41,6 +45,20 @@ export function createProcedureProxy(
           ...options,
           fireAndForget: true,
         });
+      } else if (prop === 'withTimeout') {
+        // .withTimeout(ms) returns a proxy variant with a custom RPC timeout.
+        // Called as: procedure.withTimeout(60_000)(args)
+        // Results are cached per-ms so repeated calls return stable references.
+        child = (ms: number) => {
+          const existing = timeoutCache.get(ms);
+          if (existing !== undefined) return existing;
+          const proxied = createProcedureProxy(call, path, {
+            ...options,
+            timeout: ms,
+          });
+          timeoutCache.set(ms, proxied);
+          return proxied;
+        };
       } else {
         const newPath = path ? `${path}.${String(prop)}` : String(prop);
         child = createProcedureProxy(call, newPath, options);

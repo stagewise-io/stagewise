@@ -6,6 +6,7 @@ import { GithubMark } from '@ui/components/icons/github-mark';
 import { GoogleLogo } from '@ui/components/provider-logos/google';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { IconEnvelopeOutline18, IconKey2Outline18 } from 'nucleo-ui-outline-18';
+import { Loader2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
@@ -574,7 +575,15 @@ export function SignInOptionsPanel({
       )}
 
       {phase === 'social' && (
-        <div className="app-no-drag grid w-full max-w-sm gap-3">
+        <div className="app-no-drag grid w-full max-w-sm gap-6">
+          {socialLoading && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+              <p className="text-center text-muted-foreground text-sm">
+                Waiting for you to complete sign-in in your browser…
+              </p>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="xs"
@@ -584,6 +593,7 @@ export function SignInOptionsPanel({
               setPhase('options');
               setError(null);
             }}
+            disabled={loading}
           >
             Back to sign-in options
           </Button>
