@@ -51,7 +51,7 @@ export function StepTheme({
       </div>
       <OnboardingBottomNav
         left={<BackButton onClick={onBack} />}
-        right={<NextButton onClick={onNext} label="Continue" />}
+        right={<NextButton onClick={onNext} label="Finish" />}
       />
     </>
   );
