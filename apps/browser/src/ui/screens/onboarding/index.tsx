@@ -14,7 +14,6 @@ import { StepModelAccess } from './steps/02-model-access';
 import { StepExistingSubscriptions } from './steps/03-existing-subscriptions';
 import { StepCustomEndpoints } from './steps/04-custom-endpoints';
 import { StepCustomModels } from './steps/05-custom-models';
-import { StepDone } from './steps/06-done';
 import { StepTheme } from './steps/07-theme';
 
 type ScreenId =
@@ -23,8 +22,7 @@ type ScreenId =
   | 'existing-subscriptions'
   | 'custom-endpoints'
   | 'custom-models'
-  | 'theme'
-  | 'done';
+  | 'theme';
 
 export function OnboardingWizard() {
   const [screen, setScreen] = useState<ScreenId>('login');
@@ -95,12 +93,9 @@ export function OnboardingWizard() {
         )}
         {screen === 'theme' && (
           <StepTheme
-            onNext={() => navigate('done')}
+            onNext={complete}
             onBack={() => navigate('model-access')}
           />
-        )}
-        {screen === 'done' && (
-          <StepDone onComplete={complete} onBack={() => navigate('theme')} />
         )}
       </div>
     </div>
