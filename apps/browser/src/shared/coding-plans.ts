@@ -94,7 +94,7 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
       'Token Plan keys start with sk-cp-. Subscribe at platform.minimax.io → Token Plan.',
     apiKeyPattern: '^sk-cp-',
     endpointHelpText:
-      'Token Plan keys are validated against the /v1/token_plan/remains endpoint. Both Global (api.minimax.io) and China (api.minimaxi.com) regions are auto-detected.',
+      'Token Plan keys are validated against the /v1/token_plan/remains endpoint.',
     featuredModelIds: ['minimax-m3', 'minimax-m2.7'],
   },
   'mimo-plan': {
