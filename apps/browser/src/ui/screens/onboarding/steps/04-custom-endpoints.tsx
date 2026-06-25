@@ -37,6 +37,11 @@ type ReachabilityState =
   | { status: 'reachable' }
   | { status: 'unreachable'; reason: string };
 
+/** Minimum time the "testing" indicator stays visible to avoid flicker. */
+const MIN_TESTING_DISPLAY_MS = 500;
+/** Debounce delay before triggering a reachability test after input changes. */
+const DEBOUNCE_MS = 600;
+
 export function StepCustomEndpoints({
   onNext,
   onBack,
@@ -217,21 +222,34 @@ function EndpointRow({
         return;
       }
       setReachability({ status: 'testing' });
-      // Client-side safety timeout: clear the testing state after 4s
-      // even if the RPC never resolves (backend timeout is 3s + roundtrip)
+      const testStart = Date.now();
+      // Client-side safety timeout: clear the testing state after 6s
+      // even if the RPC never resolves (backend timeout is 5s + roundtrip)
       const safetyTimeout = setTimeout(() => {
         setReachability((prev) =>
           prev.status === 'testing'
             ? { status: 'unreachable', reason: 'Connection timed out' }
             : prev,
         );
-      }, 4000);
+      }, 6000);
       void testEndpointReachability(baseUrl, apiSpec).then((result) => {
         clearTimeout(safetyTimeout);
-        if (result.reachable) {
-          setReachability({ status: 'reachable' });
+        // Enforce minimum display time to avoid flicker on fast responses
+        const elapsed = Date.now() - testStart;
+        const applyResult = () => {
+          if (result.reachable) {
+            setReachability({ status: 'reachable' });
+          } else {
+            setReachability({
+              status: 'unreachable',
+              reason: result.reason,
+            });
+          }
+        };
+        if (elapsed < MIN_TESTING_DISPLAY_MS) {
+          setTimeout(applyResult, MIN_TESTING_DISPLAY_MS - elapsed);
         } else {
-          setReachability({ status: 'unreachable', reason: result.reason });
+          applyResult();
         }
       });
     },
@@ -247,7 +265,7 @@ function EndpointRow({
     }
     debounceRef.current = setTimeout(() => {
       runReachabilityTest(endpoint.baseUrl, endpoint.apiSpec);
-    }, 300);
+    }, DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
@@ -259,10 +277,6 @@ function EndpointRow({
       setApiKeyInput('');
     }
   }, [apiKeyInput, hasApiKey, onSetApiKey]);
-
-  const handleBaseUrlBlur = useCallback(() => {
-    runReachabilityTest(endpoint.baseUrl, endpoint.apiSpec);
-  }, [endpoint.baseUrl, endpoint.apiSpec, runReachabilityTest]);
 
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-derived bg-surface-1 p-4">
@@ -306,7 +320,6 @@ function EndpointRow({
           <Input
             value={endpoint.baseUrl}
             onValueChange={(v) => onUpdate({ baseUrl: v })}
-            onBlur={handleBaseUrlBlur}
             size="sm"
             placeholder="https://api.example.com/v1"
             className="w-full"
