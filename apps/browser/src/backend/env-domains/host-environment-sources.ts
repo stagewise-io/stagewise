@@ -16,7 +16,6 @@
  * This adapter stays thin on purpose — the orchestrator invokes it on
  * every capture, so avoid any heavy caching or invalidation logic here.
  */
-import { existsSync } from 'node:fs';
 import type {
   HostEnvironmentSources,
   ResolvedSkillEntry,
@@ -25,7 +24,7 @@ import type {
 } from '@stagewise/agent-core';
 import type { KartonService } from '../services/karton';
 import type { ToolboxService } from '../services/toolbox';
-import { getGlobalSkillsMounts } from '../services/toolbox';
+import { getEnabledGlobalSkillsMounts } from '../services/toolbox';
 
 export interface BrowserHostEnvironmentSourcesDeps {
   karton: KartonService;
@@ -78,10 +77,15 @@ export function createBrowserHostEnvironmentSources(
     },
 
     getGlobalSkillsMounts(): GlobalSkillsMount[] {
-      return getGlobalSkillsMounts().map((m) => ({
+      // Only surface enabled mounts to the core env-snapshot (symlinks
+      // table + EnabledSkillsDomainAdapter). External dirs (codex/claude)
+      // are opt-in via `preferences.agent.enabledGlobalSkillDirs`.
+      const enabled =
+        karton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [];
+      return getEnabledGlobalSkillsMounts(enabled).map((m) => ({
         prefix: m.prefix,
         absolutePath: m.absolutePath,
-        exists: existsSync(m.absolutePath),
+        exists: true,
       }));
     },
   };

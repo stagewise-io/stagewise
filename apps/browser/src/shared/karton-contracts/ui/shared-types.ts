@@ -555,6 +555,20 @@ export const userPreferencesSchema = z.object({
         .record(z.string(), modelThinkingOverrideSchema)
         .default({})
         .catch({}),
+      /**
+       * External global skill directories the user has opted in to.
+       * Contains mount prefixes (e.g. `globalskills-codex`,
+       * `globalskills-claude`). The built-in `globalskills-sw` and
+       * `globalskills-agents` dirs are always enabled and never appear
+       * here. Empty array = no external dirs loaded.
+       */
+      enabledGlobalSkillDirs: z.array(z.string()).default([]),
+      /**
+       * Skill names disabled at the global level (analogous to the
+       * per-workspace `disabledSkills`). Applies to skills discovered
+       * from any global skill directory.
+       */
+      disabledGlobalSkills: z.array(z.string()).default([]),
     })
     .default({
       workspaceSettings: {},
@@ -563,6 +577,8 @@ export const userPreferencesSchema = z.object({
       workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
       workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
       modelThinkingOverrides: {},
+      enabledGlobalSkillDirs: [],
+      disabledGlobalSkills: [],
     }),
   /** LLM provider endpoint configurations (API keys, custom URLs) */
   providerConfigs: providerConfigsSchema.default({
@@ -677,6 +693,8 @@ export const defaultUserPreferences: UserPreferences = {
     workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
     workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
     modelThinkingOverrides: {},
+    enabledGlobalSkillDirs: [],
+    disabledGlobalSkills: [],
   },
   providerConfigs: {
     anthropic: { mode: 'stagewise' },

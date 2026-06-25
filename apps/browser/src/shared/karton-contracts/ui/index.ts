@@ -1209,6 +1209,20 @@ export type AppState = {
   /** Skill definitions (builtins, workspace skills, plugin skills) */
   skills: SkillDefinitionUI[];
 
+  /**
+   * All global skills discovered from every global skill directory
+   * (stagewise, agents, codex, claude), regardless of enabled/disabled
+   * state. Used by the Settings UI to render per-dir and per-skill
+   * toggles. Each entry carries its mount prefix so the UI can group
+   * by directory.
+   */
+  globalSkills: Array<{
+    name: string;
+    description: string;
+    /** Mount prefix (e.g. `globalskills-codex`) identifying the dir. */
+    mountPrefix: string;
+  }>;
+
   /** Global plans (workspace-independent, from user-data/plans/) */
   plans: PlanEntry[];
 
@@ -2181,6 +2195,7 @@ export const defaultState: KartonContract['state'] = {
   workspaceMdGenerating: {},
   plugins: [],
   skills: [],
+  globalSkills: [],
   plans: [],
   logChannels: [],
   logIngest: null,

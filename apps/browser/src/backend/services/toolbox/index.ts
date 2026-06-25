@@ -94,7 +94,6 @@ import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/type
 import {
   getSkills,
   discoverSkills,
-  discoverGlobalSkills,
 } from '@/agents/shared/prompts/utils/get-skills';
 import type { SkillDefinition } from '@shared/skills';
 import { toSkillDefinitionUI } from '@shared/skills';
@@ -105,27 +104,14 @@ import { readLogChannels } from '@stagewise/agent-core/logs/read';
 import { LogIngestService } from '../log-ingest';
 import { ClientRuntimeNode } from '@stagewise/agent-runtime-node';
 import chokidar, { type FSWatcher } from 'chokidar';
-import { homedir } from 'node:os';
+import {
+  getGlobalSkillsMounts,
+  getEnabledGlobalSkillsMounts,
+} from './global-skills';
+export { getGlobalSkillsMounts, getEnabledGlobalSkillsMounts };
 
 type MountedPrefix = string;
 type MountedPath = string;
-
-export function getGlobalSkillsMounts(): Array<{
-  prefix: string;
-  absolutePath: string;
-}> {
-  const home = homedir();
-  return [
-    {
-      prefix: 'globalskills-sw',
-      absolutePath: path.resolve(home, '.stagewise', 'skills'),
-    },
-    {
-      prefix: 'globalskills-agents',
-      absolutePath: path.resolve(home, '.agents', 'skills'),
-    },
-  ];
-}
 
 export class ToolboxService
   extends DisposableService
@@ -193,7 +179,9 @@ export class ToolboxService
       this.mountManagerService?.getMountedRuntimes(agentInstanceId);
     if (!runtimes) return undefined;
     if (this.pluginsRuntime) runtimes.set('plugins', this.pluginsRuntime);
-    for (const mount of getGlobalSkillsMounts()) {
+    for (const mount of getEnabledGlobalSkillsMounts(
+      this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
+    )) {
       const rt = this.getOrCreateGlobalSkillsRuntime(
         mount.prefix,
         mount.absolutePath,
@@ -222,13 +210,13 @@ export class ToolboxService
       agentInstanceId,
       hostPaths: getBrowserHostPaths(),
       mountManager: this.mountManagerService,
-      staticMounts: getGlobalSkillsMounts()
-        .filter((mount) => existsSync(mount.absolutePath))
-        .map((mount) => ({
-          prefix: mount.prefix,
-          absolutePath: mount.absolutePath,
-          permissions: ['read'] satisfies readonly CoreMountPermission[],
-        })),
+      staticMounts: getEnabledGlobalSkillsMounts(
+        this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
+      ).map((mount) => ({
+        prefix: mount.prefix,
+        absolutePath: mount.absolutePath,
+        permissions: ['read'] satisfies readonly CoreMountPermission[],
+      })),
       diffHistoryService: this.diffHistoryService,
       logger: this.logger,
       rgBinaryBasePath: getRipgrepBasePath(),
@@ -255,6 +243,8 @@ export class ToolboxService
 
   /** Monotonically increasing counter to discard stale `rebuildSkillsList` results. */
   private skillsRebuildGeneration = 0;
+  /** Counter for stale `rebuildGlobalSkillsIndex` results. */
+  private globalSkillsRebuildGeneration = 0;
 
   private plansRuntime: ClientRuntimeNode | null = null;
   private plansWatcher: FSWatcher | null = null;
@@ -796,14 +786,14 @@ export class ToolboxService
       permissions: READ_ONLY_PERMISSIONS,
     });
 
-    for (const gs of getGlobalSkillsMounts()) {
-      if (existsSync(gs.absolutePath)) {
-        mounts.push({
-          prefix: gs.prefix,
-          absolutePath: gs.absolutePath,
-          permissions: READ_ONLY_PERMISSIONS,
-        });
-      }
+    for (const gs of getEnabledGlobalSkillsMounts(
+      this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
+    )) {
+      mounts.push({
+        prefix: gs.prefix,
+        absolutePath: gs.absolutePath,
+        permissions: READ_ONLY_PERMISSIONS,
+      });
     }
 
     const appsDir = getAgentAppsDir(agentInstanceId);
@@ -956,6 +946,9 @@ export class ToolboxService
         draft.skills = cmds.map(toSkillDefinitionUI);
       });
     }
+    // Always populate the global skills index for the Settings UI,
+    // even before any agent is created.
+    void this.rebuildGlobalSkillsIndex();
   }
 
   /**
@@ -973,6 +966,57 @@ export class ToolboxService
       draft.skills = commands
         .filter((c) => c.userInvocable !== false)
         .map(toSkillDefinitionUI);
+    });
+    // Also refresh the full unfiltered global-skills index used by
+    // the Settings UI (per-dir + per-skill toggles). Cheap to do
+    // here since we already triggered discovery above.
+    void this.rebuildGlobalSkillsIndex();
+  }
+
+  /**
+   * Discover ALL global skills from every global skill directory
+   * (including disabled ones), deduped by name with `.stagewise` >
+   * `.agents` > `.codex` > `.claude` ordering, and push the result
+   * to `state.globalSkills` for the Settings UI. Unlike
+   * `getSkillsList`, this does NOT filter by enabled dirs or
+   * disabled skill names — the UI needs the full roster to render
+   * toggles.
+   */
+  private async rebuildGlobalSkillsIndex(): Promise<void> {
+    const gen = ++this.globalSkillsRebuildGeneration;
+    const mounts = getGlobalSkillsMounts();
+    const perMount = await Promise.all(
+      mounts.map(async (m) => ({
+        mount: m,
+        skills: existsSync(m.absolutePath)
+          ? await discoverSkills(m.absolutePath)
+          : [],
+      })),
+    );
+    if (gen !== this.globalSkillsRebuildGeneration) return;
+
+    const seen = new Set<string>();
+    const result: Array<{
+      name: string;
+      description: string;
+      mountPrefix: string;
+    }> = [];
+    // Preserve mount order from getGlobalSkillsMounts() (stagewise >
+    // agents > codex > claude) for dedupe priority.
+    for (const { mount, skills } of perMount) {
+      for (const skill of skills) {
+        if (seen.has(skill.name)) continue;
+        seen.add(skill.name);
+        result.push({
+          name: skill.name,
+          description: skill.description,
+          mountPrefix: mount.prefix,
+        });
+      }
+    }
+
+    this.uiKarton.setState((draft) => {
+      draft.globalSkills = result;
     });
   }
 
@@ -1025,31 +1069,35 @@ export class ToolboxService
     }
 
     // Global (user-level) skills — after workspace so workspace wins on dupes.
-    // Also suppressed by workspace-level disabledSkills.
-    const globalSkills = await discoverGlobalSkills();
-    const globalMounts = getGlobalSkillsMounts();
-    for (const skill of globalSkills) {
-      if (allDisabled.has(skill.name)) continue;
-      const id = `skill:${skill.name}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      const mount = globalMounts.find(
-        (m) =>
-          skill.path === m.absolutePath ||
-          skill.path.startsWith(m.absolutePath + path.sep),
-      );
-      if (!mount) continue;
-      const relativePath = path.relative(mount.absolutePath, skill.path);
-      result.push({
-        id,
-        displayName: skill.name,
-        description: skill.description,
-        source: 'global',
-        contentPath: path.resolve(skill.path, 'SKILL.md'),
-        skillPath: `${mount.prefix}/${relativePath}`,
-        userInvocable: skill.userInvocable,
-        agentInvocable: skill.agentInvocable,
-      });
+    // Also suppressed by workspace-level disabledSkills and global-level
+    // disabledGlobalSkills. Discovery is per-mount (only enabled dirs) so
+    // that external dirs (codex/claude) are opt-in.
+    const disabledGlobalSkills = new Set(
+      this.uiKarton.state.preferences?.agent?.disabledGlobalSkills ?? [],
+    );
+    const enabledGlobalMounts = getEnabledGlobalSkillsMounts(
+      this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
+    );
+    for (const mount of enabledGlobalMounts) {
+      const skills = await discoverSkills(mount.absolutePath);
+      for (const skill of skills) {
+        if (allDisabled.has(skill.name) || disabledGlobalSkills.has(skill.name))
+          continue;
+        const id = `skill:${skill.name}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const relativePath = path.relative(mount.absolutePath, skill.path);
+        result.push({
+          id,
+          displayName: skill.name,
+          description: skill.description,
+          source: 'global',
+          contentPath: path.resolve(skill.path, 'SKILL.md'),
+          skillPath: `${mount.prefix}/${relativePath}`,
+          userInvocable: skill.userInvocable,
+          agentInvocable: skill.agentInvocable,
+        });
+      }
     }
 
     // Plugin skills
@@ -1223,10 +1271,10 @@ export class ToolboxService
     result.set(LOGS_PREFIX, getLogsDir());
     result.set('memory', getMemoryDir());
 
-    for (const gs of getGlobalSkillsMounts()) {
-      if (existsSync(gs.absolutePath)) {
-        result.set(gs.prefix, gs.absolutePath);
-      }
+    for (const gs of getEnabledGlobalSkillsMounts(
+      this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
+    )) {
+      result.set(gs.prefix, gs.absolutePath);
     }
 
     return result;
@@ -1358,6 +1406,8 @@ export class ToolboxService
       (state) => ({
         ws: state.preferences?.agent?.workspaceSettings,
         plugins: state.preferences?.agent?.disabledPluginIds,
+        globalSkillDirs: state.preferences?.agent?.enabledGlobalSkillDirs,
+        disabledGlobalSkills: state.preferences?.agent?.disabledGlobalSkills,
       }),
       () => {
         const activeIds = Object.keys(this.uiKarton.state.agents.instances);
@@ -1617,10 +1667,12 @@ export class ToolboxService
   }
 
   /**
-   * Watch parent dirs (`~/.stagewise/`, `~/.agents/`) for changes to their
-   * `skills/` subdirectories. Follows the workspace watcher pattern: watch
-   * parents with an ignored filter so we detect `skills/` being created
-   * for the first time.
+   * Watch parent dirs (`~/.stagewise/`, `~/.agents/`, `~/.codex/`,
+   * `~/.claude/`) for changes to their `skills/` subdirectories. Follows
+   * the workspace watcher pattern: watch parents with an ignored filter
+   * so we detect `skills/` being created for the first time. Watches all
+   * global mounts regardless of enabled/disabled state so toggling a dir
+   * on picks up its contents immediately.
    */
   private startGlobalSkillsWatchers(): void {
     const scheduleRefresh = () => {
@@ -1636,6 +1688,9 @@ export class ToolboxService
           )
             this.globalSkillsRuntimes.delete(mount.prefix);
         }
+        // Always refresh the global skills index for the Settings UI,
+        // even when no agents are active.
+        void this.rebuildGlobalSkillsIndex();
         // Rebuild skills list for all active agents.
         const activeIds = Object.keys(this.uiKarton.state.agents.instances);
         for (const id of activeIds) void this.rebuildSkillsList(id);

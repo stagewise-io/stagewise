@@ -16,7 +16,7 @@ import {
 } from 'react';
 import { cn } from '@ui/utils';
 import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/types';
-import type { MountEntry } from '@shared/karton-contracts/ui';
+import type { MountEntry, AppState } from '@shared/karton-contracts/ui';
 import type { Patch } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
@@ -29,6 +29,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import type { RefObject } from 'react';
 import { SettingsScrollTabs } from '../_components/settings-scroll-tabs';
+import { ALWAYS_ENABLED_GLOBAL_SKILL_PREFIXES } from '@shared/global-skill-prefixes';
 
 // =============================================================================
 // Vertical overflow detection (like useIsTruncated but for height)
@@ -258,6 +259,199 @@ function WorkspaceDetails({
 }
 
 // =============================================================================
+// Global Skills Section
+// =============================================================================
+
+/** Mount prefixes that are always enabled (not toggleable in the UI). */
+/** Display metadata for each global skill directory. */
+const GLOBAL_SKILL_DIR_META: Record<string, { label: string; dir: string }> = {
+  'globalskills-sw': { label: 'Stagewise', dir: '~/.stagewise/skills' },
+  'globalskills-agents': { label: 'Agents', dir: '~/.agents/skills' },
+  'globalskills-codex': { label: 'Codex', dir: '~/.codex/skills' },
+  'globalskills-claude': { label: 'Claude Code', dir: '~/.claude/skills' },
+};
+
+/** Stable ordering for global skill directory display. */
+const GLOBAL_SKILL_DIR_ORDER = [
+  'globalskills-sw',
+  'globalskills-agents',
+  'globalskills-codex',
+  'globalskills-claude',
+] as const;
+
+/**
+ * Lookup metadata for a global skill dir prefix. Throws if the prefix
+ * is not in `GLOBAL_SKILL_DIR_META` — all callers use
+ * `GLOBAL_SKILL_DIR_ORDER` so the key is always valid.
+ */
+function getGlobalSkillDirMeta(prefix: string): {
+  label: string;
+  dir: string;
+} {
+  const meta = GLOBAL_SKILL_DIR_META[prefix];
+  if (!meta) throw new Error(`Unknown global skill dir prefix: ${prefix}`);
+  return meta;
+}
+
+type GlobalSkillEntry = AppState['globalSkills'][number];
+
+function GlobalSkillsDetails() {
+  const preferences = useKartonState((s) => s.preferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const globalSkills = useKartonState((s) => s.globalSkills);
+
+  const enabledGlobalSkillDirs = useMemo(
+    () => preferences?.agent?.enabledGlobalSkillDirs ?? [],
+    [preferences],
+  );
+  const disabledGlobalSkills = useMemo(
+    () => preferences?.agent?.disabledGlobalSkills ?? [],
+    [preferences],
+  );
+
+  // Group skills by mount prefix for per-dir rendering.
+  const skillsByPrefix = useMemo(() => {
+    const map = new Map<string, GlobalSkillEntry[]>();
+    for (const skill of globalSkills) {
+      const arr = map.get(skill.mountPrefix) ?? [];
+      arr.push(skill);
+      map.set(skill.mountPrefix, arr);
+    }
+    // Sort skills within each group by name.
+    for (const arr of Array.from(map.values())) {
+      arr.sort((a: GlobalSkillEntry, b: GlobalSkillEntry) =>
+        a.name.localeCompare(b.name),
+      );
+    }
+    return map;
+  }, [globalSkills]);
+
+  const handleToggleDir = useCallback(
+    async (prefix: string, enabled: boolean) => {
+      const current = enabledGlobalSkillDirs;
+      const next = enabled
+        ? [...current, prefix]
+        : current.filter((p) => p !== prefix);
+      await updatePreferences([
+        {
+          op: 'replace' as const,
+          path: ['agent', 'enabledGlobalSkillDirs'],
+          value: next,
+        },
+      ]);
+    },
+    [enabledGlobalSkillDirs, updatePreferences],
+  );
+
+  const handleToggleSkill = useCallback(
+    async (skillName: string, enabled: boolean) => {
+      const current = disabledGlobalSkills;
+      const next = enabled
+        ? current.filter((s) => s !== skillName)
+        : [...current, skillName];
+      await updatePreferences([
+        {
+          op: 'replace' as const,
+          path: ['agent', 'disabledGlobalSkills'],
+          value: next,
+        },
+      ]);
+    },
+    [disabledGlobalSkills, updatePreferences],
+  );
+
+  return (
+    <div className="space-y-8">
+      {GLOBAL_SKILL_DIR_ORDER.map((prefix) => {
+        const meta = getGlobalSkillDirMeta(prefix);
+        const isAlwaysEnabled =
+          ALWAYS_ENABLED_GLOBAL_SKILL_PREFIXES.has(prefix);
+        const dirEnabled =
+          isAlwaysEnabled || enabledGlobalSkillDirs.includes(prefix);
+        const skills = skillsByPrefix.get(prefix) ?? [];
+
+        return (
+          <div key={prefix}>
+            {prefix !== GLOBAL_SKILL_DIR_ORDER[0] && (
+              <hr className="border-derived-subtle border-t" />
+            )}
+            <section className="space-y-3 pt-8 first:pt-0">
+              {/* Header with inline dir toggle next to name */}
+              <div
+                className={isAlwaysEnabled ? undefined : 'cursor-pointer'}
+                role={isAlwaysEnabled ? undefined : 'button'}
+                tabIndex={isAlwaysEnabled ? undefined : 0}
+                onClick={() => {
+                  if (!isAlwaysEnabled)
+                    void handleToggleDir(prefix, !dirEnabled);
+                }}
+                onKeyDown={(e) => {
+                  if (
+                    !isAlwaysEnabled &&
+                    (e.key === 'Enter' || e.key === ' ')
+                  ) {
+                    e.preventDefault();
+                    void handleToggleDir(prefix, !dirEnabled);
+                  }
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <h3 className="font-medium text-foreground text-lg">
+                    {meta.label} skills
+                  </h3>
+                  {!isAlwaysEnabled && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={dirEnabled}
+                        onCheckedChange={() =>
+                          void handleToggleDir(prefix, !dirEnabled)
+                        }
+                        size="xs"
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  {meta.dir}
+                  {skills.length > 0 &&
+                    ` · ${skills.length} skill${skills.length === 1 ? '' : 's'}`}
+                </p>
+              </div>
+              {/* Per-skill toggles (only when dir is enabled) */}
+              {dirEnabled && skills.length > 0 && (
+                <div className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-derived">
+                  {skills.map((skill) => {
+                    const isSkillEnabled = !disabledGlobalSkills.includes(
+                      skill.name,
+                    );
+                    return (
+                      <SkillRow
+                        key={`${prefix}:${skill.name}`}
+                        skill={skill}
+                        isEnabled={isSkillEnabled}
+                        onToggle={() =>
+                          handleToggleSkill(skill.name, !isSkillEnabled)
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {/* Empty state when dir is enabled but no skills found */}
+              {dirEnabled && skills.length === 0 && (
+                <p className="text-sm text-subtle-foreground italic">
+                  No skills found in this directory.
+                </p>
+              )}
+            </section>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =============================================================================
 // Context Files Section
 // =============================================================================
 
@@ -461,18 +655,35 @@ export function SkillsContextSection() {
     }
   }, [workspaceMdGenerating]);
 
-  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState<
-    string | null
-  >(null);
-  const selectedMount = useMemo(
-    () =>
-      workspaceMounts.find((m) => m.path === selectedWorkspacePath) ??
-      workspaceMounts[0] ??
-      null,
-    [workspaceMounts, selectedWorkspacePath],
+  const GLOBAL_TAB_ID = '__global__';
+
+  const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
+
+  // Build the tab list: "Global" first, then workspace tabs.
+  const tabItems = useMemo(
+    () => [
+      { id: GLOBAL_TAB_ID, label: 'Global' },
+      ...workspaceMounts.map((mount) => ({
+        id: mount.path,
+        label: getBaseName(mount.path) || mount.path,
+        subLabel: mount.path,
+      })),
+    ],
+    [workspaceMounts],
   );
 
-  const hasWorkspaces = workspaceMounts.length > 0;
+  const selectedMount = useMemo(
+    () =>
+      workspaceMounts.find((m) => m.path === selectedTabId) ??
+      workspaceMounts[0] ??
+      null,
+    [workspaceMounts, selectedTabId],
+  );
+
+  // Compute the effective tab ID: when the user hasn't clicked
+  // anything yet, fall back to the first tab ("Global").
+  const effectiveTabId = selectedTabId ?? tabItems[0]?.id ?? null;
+  const isGlobalTab = effectiveTabId === GLOBAL_TAB_ID;
 
   return (
     <div className="h-full w-full">
@@ -489,33 +700,22 @@ export function SkillsContextSection() {
               stagewise agent.
             </p>
           </div>
-          {!hasWorkspaces ? (
-            <div className="rounded-lg border border-derived p-4">
-              <p className="text-muted-foreground text-sm">
-                No workspaces are currently connected. Connect a workspace to an
-                agent to configure workspace-specific settings.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              <SettingsScrollTabs
-                selectedId={selectedMount?.path ?? null}
-                onSelect={setSelectedWorkspacePath}
-                truncateSubLabelFromStart
-                items={workspaceMounts.map((mount) => ({
-                  id: mount.path,
-                  label: getBaseName(mount.path) || mount.path,
-                  subLabel: mount.path,
-                }))}
+          <div className="space-y-8">
+            <SettingsScrollTabs
+              selectedId={effectiveTabId}
+              onSelect={setSelectedTabId}
+              truncateSubLabelFromStart
+              items={tabItems}
+            />
+            {isGlobalTab ? (
+              <GlobalSkillsDetails />
+            ) : selectedMount ? (
+              <WorkspaceDetails
+                mount={selectedMount}
+                contextFiles={contextFiles}
               />
-              {selectedMount ? (
-                <WorkspaceDetails
-                  mount={selectedMount}
-                  contextFiles={contextFiles}
-                />
-              ) : null}
-            </div>
-          )}
+            ) : null}
+          </div>
         </div>
       </OverlayScrollbar>
     </div>
