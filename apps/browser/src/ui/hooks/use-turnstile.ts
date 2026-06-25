@@ -32,20 +32,42 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '';
  * When `VITE_TURNSTILE_SITE_KEY` is not set, the hook is inert —
  * `enabled` is false and `token` stays null.
  *
- * Internal app pages run on the custom `stagewise://` scheme. Turnstile is
- * intentionally disabled there because custom-scheme origins are not reliable
- * challenge targets; OTP still goes through the backend auth flow without a
- * captcha token and surfaces any server-side rejection normally.
+ * On the custom `stagewise://` scheme, the widget cannot be rendered
+ * directly (custom-scheme origins are not reliable challenge targets).
+ * Instead, the hook delegates to `window.__solveTurnstile()` — a global
+ * solver registered by `turnstile-solver.ts` that renders an off-screen
+ * widget and returns the token on demand.
  */
 export function useTurnstile() {
+  const isSolverMode =
+    window.location.protocol === 'stagewise:' && !!TURNSTILE_SITE_KEY;
+  const enabled = !!TURNSTILE_SITE_KEY;
+
   const [token, setToken] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(isSolverMode);
   const [error, setError] = useState(false);
   const widgetIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isUnsupportedOrigin = window.location.protocol === 'stagewise:';
-  const enabled = !!TURNSTILE_SITE_KEY && !isUnsupportedOrigin;
+  const solveToken = useCallback(async (): Promise<string | null> => {
+    if (!window.__solveTurnstile) {
+      setError(true);
+      return null;
+    }
+    try {
+      const solved = await window.__solveTurnstile();
+      if (!solved) {
+        setError(true);
+        return null;
+      }
+      setToken(solved);
+      setError(false);
+      return solved;
+    } catch {
+      setError(true);
+      return null;
+    }
+  }, []);
 
   const initWidget = useCallback(() => {
     if (!window.turnstile || !containerRef.current) return;
@@ -77,7 +99,7 @@ export function useTurnstile() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || isSolverMode) return;
 
     let raf: number | undefined;
     let existingScript: Element | null = null;
@@ -131,7 +153,7 @@ export function useTurnstile() {
         widgetIdRef.current = null;
       }
     };
-  }, [enabled, initWidget]);
+  }, [enabled, isSolverMode, initWidget]);
 
   const reset = useCallback(() => {
     setToken(null);
@@ -141,5 +163,14 @@ export function useTurnstile() {
     }
   }, []);
 
-  return { containerRef, token, ready, error, enabled, reset };
+  return {
+    containerRef,
+    token,
+    ready,
+    error,
+    enabled,
+    reset,
+    solveToken,
+    isSolverMode,
+  };
 }

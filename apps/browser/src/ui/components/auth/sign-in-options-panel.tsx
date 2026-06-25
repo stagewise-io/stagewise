@@ -144,6 +144,8 @@ export function SignInOptionsPanel({
     error: turnstileError,
     enabled: turnstileEnabled,
     reset: resetTurnstile,
+    solveToken: solveTurnstileToken,
+    isSolverMode: turnstileSolverMode,
   } = useTurnstile();
 
   useEffect(() => {
@@ -243,18 +245,39 @@ export function SignInOptionsPanel({
 
   const handleSendOtp = useCallback(async () => {
     if (!email.trim()) return;
-    if (turnstileEnabled && !turnstileToken && !turnstileError) {
+    if (
+      turnstileEnabled &&
+      !turnstileSolverMode &&
+      !turnstileToken &&
+      !turnstileError
+    ) {
       void track(`${trackingPrefix}-otp-failed`, {
         error_kind: 'turnstile-not-ready',
       });
       setError('Security verification not ready. Please wait a moment.');
       return;
     }
-    void track(`${trackingPrefix}-otp-requested`);
     setError(null);
     setLoading(true);
+
+    // In solver mode (stagewise://), acquire the token on demand
+    let token = turnstileToken;
+    if (turnstileSolverMode) {
+      token = await solveTurnstileToken();
+      if (!token) {
+        void track(`${trackingPrefix}-otp-failed`, {
+          error_kind: 'turnstile-solve-failed',
+        });
+        setError('Security verification failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+
+    void track(`${trackingPrefix}-otp-requested`);
+
     try {
-      const result = await sendOtp(email.trim(), turnstileToken ?? '');
+      const result = await sendOtp(email.trim(), token ?? '');
       if (result?.error) {
         void track(`${trackingPrefix}-otp-failed`, {
           error_kind: 'backend-error',
@@ -279,8 +302,10 @@ export function SignInOptionsPanel({
     sendOtp,
     track,
     trackingPrefix,
+    solveTurnstileToken,
     turnstileEnabled,
     turnstileError,
+    turnstileSolverMode,
     turnstileToken,
   ]);
 
@@ -470,7 +495,10 @@ export function SignInOptionsPanel({
             disabled={
               loading ||
               !email.trim() ||
-              (turnstileEnabled && !turnstileError && !turnstileToken)
+              (turnstileEnabled &&
+                !turnstileSolverMode &&
+                !turnstileError &&
+                !turnstileToken)
             }
           >
             {lastUsedMethod === 'email' && <LastUsedBadge />}
