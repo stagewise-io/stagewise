@@ -60,7 +60,8 @@ export default function PricingPage() {
           price: '$200',
           period: '/mo',
           features: [
-            '15x higher limits on all models',
+            'Access to all models, including Frontier and Open-Weights',
+            '15x higher limits on all models than Pro',
             'Extend usage with extra credits',
             'Run additional models from custom endpoints',
           ],
