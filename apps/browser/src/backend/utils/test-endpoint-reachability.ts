@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import type { ApiSpec } from '@shared/karton-contracts/ui/shared-types';
 
 /**
@@ -25,15 +27,14 @@ export type EndpointReachabilityResult =
 /**
  * Probe a custom endpoint for reachability.
  *
- * Appends the spec-specific path to the base URL and issues a HEAD request.
+ * Appends the spec-specific path to the base URL and issues an HTTP GET
+ * request using node:http / node:https (not global fetch, which has
+ * unreliable AbortController support in the Electron main process).
+ *
  * Any response (even an auth error like 401) means the server is reachable.
  * A 404 specifically means the server is up but doesn't implement the expected
  * API path. Network errors (ECONNREFUSED, DNS failures, timeouts) mean the
  * server is unreachable.
- *
- * Cloud providers (Google, Bedrock, Vertex) use complex auth schemes that
- * can't be probed with a simple HTTP request — for those we only verify
- * the URL is well-formed and returns a 200.
  */
 export async function testEndpointReachability(
   baseUrl: string,
@@ -59,43 +60,66 @@ export async function testEndpointReachability(
   }
 
   const probePath = SPEC_PROBE_PATHS[apiSpec] ?? '';
-  const probeUrl = `${trimmed.replace(/\/$/, '')}${probePath}`;
+  const probeUrl = new URL(`${trimmed.replace(/\/$/, '')}${probePath}`);
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+  const isHttps = probeUrl.protocol === 'https:';
+  const transport = isHttps ? https : http;
 
-    const response = await fetch(probeUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
+  return new Promise<EndpointReachabilityResult>((resolve) => {
+    const req = transport.get(
+      probeUrl,
+      {
         // Some APIs require an Authorization header to return anything
         // other than a connection reset; sending a dummy key avoids that.
-        Authorization: 'Bearer probe',
+        headers: { Authorization: 'Bearer probe' },
+        timeout: 3000,
       },
+      (response) => {
+        // Drain the response to free the socket
+        response.resume();
+        const status = response.statusCode ?? 0;
+
+        if (status === 404) {
+          resolve({
+            reachable: false,
+            reason: `Server returned 404 at ${probePath || '/'}. Check that the base URL and API spec are correct.`,
+          });
+          return;
+        }
+
+        // Any other status (including 401, 403, 500) means the server is reachable
+        resolve({ reachable: true, status });
+      },
+    );
+
+    req.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ECONNREFUSED') {
+        resolve({
+          reachable: false,
+          reason:
+            'Connection refused. Check that the server is running and the URL is correct.',
+        });
+        return;
+      }
+      if (err.code === 'ENOTFOUND') {
+        resolve({
+          reachable: false,
+          reason: 'Host not found. Check that the domain name is correct.',
+        });
+        return;
+      }
+      resolve({
+        reachable: false,
+        reason: `Could not connect: ${err.message}`,
+      });
     });
 
-    clearTimeout(timeout);
-
-    if (response.status === 404) {
-      return {
-        reachable: false,
-        reason: `Server returned 404 at ${probePath || '/'}. Check that the base URL and API spec are correct.`,
-      };
-    }
-
-    // Any other status (including 401, 403, 500) means the server is reachable
-    return { reachable: true, status: response.status };
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return {
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({
         reachable: false,
         reason: 'Connection timed out after 3 seconds',
-      };
-    }
-    return {
-      reachable: false,
-      reason: `Could not connect: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
+      });
+    });
+  });
 }
