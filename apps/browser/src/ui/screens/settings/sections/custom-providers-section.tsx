@@ -595,7 +595,9 @@ function CustomEndpointDialog({
   // `full` the user has consented to detailed analytics; at `basic` we
   // keep the event but redact the URL; at `off` the backend drops the
   // event entirely and this check is moot.
-  const telemetryLevel = useKartonState((s) => s.globalConfig.telemetryLevel);
+  const telemetryLevel = useKartonState(
+    (s) => s.preferences.privacy.telemetryLevel,
+  );
   const isAddMode = !endpoint;
   // Set to true when onSave() fires; distinguishes a save-initiated close
   // from a cancel/dismiss close inside the shared `handleDialogOpenChange`.

@@ -76,6 +76,9 @@ type SoundLoudness = (typeof NOTIFICATION_LOUDNESS_OPTIONS)[number]['value'];
 
 export function NotificationsSetting() {
   const globalConfig = useKartonState((s) => s.globalConfig);
+  const notificationSoundPacks = useKartonState(
+    (s) => s.notificationSoundPacks,
+  );
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
   const previewSoundPack = useKartonProcedure((p) => p.config.previewSoundPack);
@@ -83,11 +86,10 @@ export function NotificationsSetting() {
   const track = useTrack();
 
   const soundLoudness: SoundLoudness =
-    globalConfig.notificationSoundLoudness ??
-    (globalConfig.notificationSoundsEnabled === false ? 'off' : 'subtle');
+    globalConfig.notificationSoundLoudness ?? 'subtle';
   const availablePacks =
-    globalConfig.availableSoundPacks.length > 0
-      ? globalConfig.availableSoundPacks
+    notificationSoundPacks.available.length > 0
+      ? notificationSoundPacks.available
       : [DEFAULT_SOUND_PACK];
   const configuredPack = globalConfig.notificationSoundPack?.trim();
   const currentPack =
@@ -106,7 +108,7 @@ export function NotificationsSetting() {
 
   const soundPackItems = packOptions.map((pack) => ({
     value: pack,
-    label: globalConfig.packDisplayNames[pack] ?? pack,
+    label: notificationSoundPacks.displayNames[pack] ?? pack,
   }));
 
   const previewSound = (pack = currentPack, loudness = soundLoudness) => {
@@ -127,7 +129,6 @@ export function NotificationsSetting() {
     previewSound(currentPack, notificationSoundLoudness);
 
     await setGlobalConfig({
-      notificationSoundsEnabled: notificationSoundLoudness !== 'off',
       notificationSoundLoudness,
     });
     track('changed-notification-sound-loudness', {
