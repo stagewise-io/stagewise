@@ -22,6 +22,18 @@
   initial-value: 1;
 }
 
+@property --H-brand {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 265;
+}
+
+@property --brand-chroma-scale {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 @property --base-chroma-scale {
   syntax: '<number>';
   inherits: true;
@@ -34,6 +46,8 @@
   --H-base: 85; /* Warm complement of primary, used for base neutrals */
   --primary-chroma-scale: 1;
   --base-chroma-scale: 1;
+  --H-brand: 265; /* Fixed default primary hue — never overridden by personalization themes */
+  --brand-chroma-scale: 1; /* Fixed default primary chroma — never overridden */
   --H-green: 152; /* Near triadic color */
   --H-red: 28; /* Near triadic color */
   --H-blue: 220; 
@@ -63,6 +77,27 @@
   --color-primary-850: oklch(0.34 calc(0.125 * var(--primary-chroma-scale)) var(--H-primary));
   --color-primary-900: oklch(0.31 calc(0.11 * var(--primary-chroma-scale)) var(--H-primary));
   --color-primary-950: oklch(0.26 calc(0.082 * var(--primary-chroma-scale)) var(--H-primary));
+
+  /* Brand (fixed default primary — always hue 265, chroma scale 1) */
+  --color-brand-50: oklch(0.93 calc(0.033 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-100: oklch(0.86 calc(0.07 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-150: oklch(0.82 calc(0.095 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-200: oklch(0.78 calc(0.12 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-250: oklch(0.74 calc(0.15 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-300: oklch(0.70 calc(0.18 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-350: oklch(0.66 calc(0.205 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-400: oklch(0.62 calc(0.23 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-450: oklch(0.583 calc(0.24 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-500: oklch(0.5455 calc(0.25 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-550: oklch(0.521 calc(0.235 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-600: oklch(0.49 calc(0.22 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-650: oklch(0.46 calc(0.20 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-700: oklch(0.43 calc(0.18 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-750: oklch(0.40 calc(0.16 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-800: oklch(0.37 calc(0.14 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-850: oklch(0.34 calc(0.125 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-900: oklch(0.31 calc(0.11 * var(--brand-chroma-scale)) var(--H-brand));
+  --color-brand-950: oklch(0.26 calc(0.082 * var(--brand-chroma-scale)) var(--H-brand));
 
   /* Neutrals (tinted, low chroma) - more nuance in dark range for elevation */
   --color-base-50:  oklch(0.992 calc(0.001 * var(--base-chroma-scale)) var(--H-base));
