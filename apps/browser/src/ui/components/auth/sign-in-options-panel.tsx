@@ -32,6 +32,7 @@ export type SignInOptionsPanelProps = {
   ) => Promise<{ error?: string }>;
   verifyOtp: (email: string, code: string) => Promise<{ error?: string }>;
   signInSocial: (provider: SocialAuthProvider) => Promise<{ error?: string }>;
+  signInEmail: () => Promise<{ error?: string }>;
   onUseApiKeys: () => void;
   onUseSubscription: () => void;
   trackingPrefix: TrackingPrefix;
@@ -41,12 +42,16 @@ export type SignInOptionsPanelProps = {
 };
 
 const LAST_USED_SIGN_IN_METHOD_KEY = 'stagewise:last-used-sign-in-method';
-function getSocialProviderLabel(provider: SocialAuthProvider | null) {
+function getHandoffProviderLabel(
+  provider: SocialAuthProvider | 'email' | null,
+) {
   switch (provider) {
     case 'google':
       return 'Google';
     case 'github':
       return 'GitHub';
+    case 'email':
+      return 'Email';
     default:
       return 'your provider';
   }
@@ -115,6 +120,7 @@ export function SignInOptionsPanel({
   sendOtp,
   verifyOtp,
   signInSocial,
+  signInEmail,
   onUseApiKeys,
   onUseSubscription,
   trackingPrefix,
@@ -127,9 +133,9 @@ export function SignInOptionsPanel({
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<SocialAuthProvider | null>(
-    null,
-  );
+  const [socialLoading, setSocialLoading] = useState<
+    SocialAuthProvider | 'email' | null
+  >(null);
   const [lastUsedMethod, setLastUsedMethod] = useState<SignInMethod | null>(
     null,
   );
@@ -242,6 +248,54 @@ export function SignInOptionsPanel({
       trackingPrefix,
     ],
   );
+
+  const handleEmailSignIn = useCallback(async () => {
+    if (loading) return;
+    const requestId = socialRequestIdRef.current + 1;
+    socialRequestIdRef.current = requestId;
+    setError(null);
+    setSocialLoading('email');
+    setPhase('social');
+    rememberSignInMethod('email');
+    void track(`${trackingPrefix}-email-handoff-requested`);
+    try {
+      const result = await signInEmail();
+      if (result?.error) {
+        if (socialRequestIdRef.current !== requestId) return;
+        void track(`${trackingPrefix}-method-failed`, {
+          auth_method: 'stagewise',
+          provider: 'email',
+          error_kind: 'backend-error',
+        });
+        clearRememberedSignInMethod();
+        setSocialLoading(null);
+        setError(result.error);
+        return;
+      }
+      if (!socialAuthMountedRef.current) return;
+      setSocialLoading(null);
+      void track(`${trackingPrefix}-email-handoff-verified`);
+      onAuthenticated?.('email');
+    } catch {
+      if (socialRequestIdRef.current !== requestId) return;
+      void track(`${trackingPrefix}-method-failed`, {
+        auth_method: 'stagewise',
+        provider: 'email',
+        error_kind: 'network-error',
+      });
+      clearRememberedSignInMethod();
+      setSocialLoading(null);
+      setError('Failed to complete email sign-in.');
+    }
+  }, [
+    clearRememberedSignInMethod,
+    loading,
+    onAuthenticated,
+    rememberSignInMethod,
+    signInEmail,
+    track,
+    trackingPrefix,
+  ]);
 
   const handleSendOtp = useCallback(async () => {
     if (!email.trim()) return;
@@ -357,7 +411,7 @@ export function SignInOptionsPanel({
       : phase === 'otp'
         ? `We sent a code to ${email}. Enter it below.`
         : phase === 'social'
-          ? `Please finish signing in with ${getSocialProviderLabel(socialLoading)} in your browser, then return to stagewise.`
+          ? `Please finish signing in with ${getHandoffProviderLabel(socialLoading)} in your browser, then return to stagewise.`
           : description;
 
   return (
@@ -427,10 +481,7 @@ export function SignInOptionsPanel({
               variant="secondary"
               size="sm"
               className="relative w-full overflow-visible"
-              onClick={() => {
-                setPhase('email');
-                setError(null);
-              }}
+              onClick={() => void handleEmailSignIn()}
               disabled={loading}
             >
               {lastUsedMethod === 'email' && <LastUsedBadge />}

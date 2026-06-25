@@ -9,6 +9,7 @@ import {
   AuthServerInterop,
   createBetterAuthClient,
   openSocialAuthInSystemBrowser,
+  openEmailAuthInSystemBrowser,
   type BetterAuthClient,
 } from './server-interop';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
@@ -64,7 +65,7 @@ export class AuthService extends DisposableService {
 
   private _refreshInterval: NodeJS.Timeout | null = null;
   private authChangeCallbacks: ((newAuthState: AuthState) => void)[] = [];
-  private pendingSocialAuth: {
+  private pendingHandoffAuth: {
     resolve: (result: { error?: string }) => void;
     timeout: NodeJS.Timeout;
   } | null = null;
@@ -162,6 +163,13 @@ export class AuthService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'userAccount.signInEmail',
+      async (_callingClientId: string) => {
+        return this.signInEmail();
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.logout',
       async (_callingClientId: string) => {
         await this.logout();
@@ -206,8 +214,8 @@ export class AuthService extends DisposableService {
       this._refreshInterval = null;
     }
 
-    await this.cancelPendingSocialAuth({
-      error: 'Social sign-in was cancelled.',
+    await this.cancelPendingHandoffAuth({
+      error: 'Sign-in was cancelled.',
     });
 
     await this.disposeActiveLoopbackAuthServer();
@@ -215,6 +223,7 @@ export class AuthService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('userAccount.sendOtp');
     this.uiKarton.removeServerProcedureHandler('userAccount.verifyOtp');
     this.uiKarton.removeServerProcedureHandler('userAccount.signInSocial');
+    this.uiKarton.removeServerProcedureHandler('userAccount.signInEmail');
     this.uiKarton.removeServerProcedureHandler('userAccount.logout');
     this.uiKarton.removeServerProcedureHandler('userAccount.refreshStatus');
     this.uiKarton.removeServerProcedureHandler('userAccount.validateApiKeys');
@@ -305,22 +314,22 @@ export class AuthService extends DisposableService {
     }
   }
 
-  private completePendingSocialAuth(result: { error?: string }): void {
-    if (!this.pendingSocialAuth) return;
-    clearTimeout(this.pendingSocialAuth.timeout);
-    const { resolve } = this.pendingSocialAuth;
-    this.pendingSocialAuth = null;
+  private completePendingHandoffAuth(result: { error?: string }): void {
+    if (!this.pendingHandoffAuth) return;
+    clearTimeout(this.pendingHandoffAuth.timeout);
+    const { resolve } = this.pendingHandoffAuth;
+    this.pendingHandoffAuth = null;
     void this.disposeActiveLoopbackAuthServer();
     resolve(result);
   }
 
-  private async cancelPendingSocialAuth(result: {
+  private async cancelPendingHandoffAuth(result: {
     error?: string;
   }): Promise<void> {
-    if (!this.pendingSocialAuth) return;
-    clearTimeout(this.pendingSocialAuth.timeout);
-    const { resolve } = this.pendingSocialAuth;
-    this.pendingSocialAuth = null;
+    if (!this.pendingHandoffAuth) return;
+    clearTimeout(this.pendingHandoffAuth.timeout);
+    const { resolve } = this.pendingHandoffAuth;
+    this.pendingHandoffAuth = null;
     await this.disposeActiveLoopbackAuthServer();
     resolve(result);
   }
@@ -370,8 +379,8 @@ export class AuthService extends DisposableService {
       parsed.hash.startsWith('#token=');
 
     if (!isAuthCallback) return false;
-    if (!this.pendingSocialAuth) return false;
-    const currentPending = this.pendingSocialAuth;
+    if (!this.pendingHandoffAuth) return false;
+    const currentPending = this.pendingHandoffAuth;
 
     const fragmentParams = new URLSearchParams(parsed.hash.slice(1));
     const callbackError =
@@ -384,7 +393,7 @@ export class AuthService extends DisposableService {
       this.logger.error(
         `[AuthService] Social sign-in failed: ${callbackError}`,
       );
-      this.completePendingSocialAuth({ error: callbackError });
+      this.completePendingHandoffAuth({ error: callbackError });
       return true;
     }
 
@@ -392,30 +401,30 @@ export class AuthService extends DisposableService {
       fragmentParams.get('token') ?? parsed.searchParams.get('token');
 
     if (!token) {
-      const message = 'Social sign-in callback did not include a token.';
+      const message = 'Sign-in callback did not include a token.';
       this.logger.error(`[AuthService] ${message}`);
-      this.completePendingSocialAuth({ error: message });
+      this.completePendingHandoffAuth({ error: message });
       return true;
     }
 
     try {
       const { data, error } = await this.authClient.authenticate({ token });
-      if (this.pendingSocialAuth !== currentPending) {
+      if (this.pendingHandoffAuth !== currentPending) {
         this.logger.debug(
-          '[AuthService] Ignoring stale social sign-in callback after authentication',
+          '[AuthService] Ignoring stale sign-in callback after authentication',
         );
         return true;
       }
       if (error || !data?.token) {
-        const message = error?.message ?? 'Social sign-in failed.';
-        this.logger.error(`[AuthService] Social sign-in failed: ${message}`);
-        if (this.pendingSocialAuth !== currentPending) {
+        const message = error?.message ?? 'Sign-in failed.';
+        this.logger.error(`[AuthService] Sign-in failed: ${message}`);
+        if (this.pendingHandoffAuth !== currentPending) {
           this.logger.debug(
-            '[AuthService] Ignoring stale social sign-in failure after authentication',
+            '[AuthService] Ignoring stale sign-in failure after authentication',
           );
           return true;
         }
-        this.completePendingSocialAuth({ error: message });
+        this.completePendingHandoffAuth({ error: message });
         return true;
       }
 
@@ -437,11 +446,11 @@ export class AuthService extends DisposableService {
         };
       });
 
-      this.logger.debug('[AuthService] Completed social sign-in callback');
-      this.completePendingSocialAuth({});
+      this.logger.debug('[AuthService] Completed sign-in callback');
+      this.completePendingHandoffAuth({});
       void this.refreshSession().catch((refreshError) => {
         this.logger.warn(
-          `[AuthService] Session refresh after social sign-in failed: ${refreshError}`,
+          `[AuthService] Session refresh after sign-in failed: ${refreshError}`,
         );
       });
       return true;
@@ -449,14 +458,14 @@ export class AuthService extends DisposableService {
       this.logger.error(
         `[AuthService] Unexpected error handling auth callback: ${err}`,
       );
-      if (this.pendingSocialAuth !== currentPending) {
+      if (this.pendingHandoffAuth !== currentPending) {
         this.logger.debug(
-          '[AuthService] Ignoring stale social sign-in error after callback failure',
+          '[AuthService] Ignoring stale sign-in error after callback failure',
         );
         return true;
       }
-      this.completePendingSocialAuth({
-        error: 'Failed to complete social sign-in.',
+      this.completePendingHandoffAuth({
+        error: 'Failed to complete sign-in.',
       });
       return true;
     }
@@ -465,23 +474,23 @@ export class AuthService extends DisposableService {
   public async signInSocial(
     provider: SocialAuthProvider,
   ): Promise<{ error?: string }> {
-    if (this.pendingSocialAuth) {
+    if (this.pendingHandoffAuth) {
       this.logger.debug(
-        '[AuthService] Cancelling previous social sign-in before starting a new one',
+        '[AuthService] Cancelling previous sign-in before starting a new one',
       );
-      await this.cancelPendingSocialAuth({
-        error: 'Social sign-in was cancelled.',
+      await this.cancelPendingHandoffAuth({
+        error: 'Sign-in was cancelled.',
       });
     }
 
     const completion = new Promise<{ error?: string }>((resolve) => {
       const timeout = setTimeout(() => {
-        this.pendingSocialAuth = null;
+        this.pendingHandoffAuth = null;
         void this.disposeActiveLoopbackAuthServer();
         resolve({ error: 'Social sign-in timed out.' });
       }, SOCIAL_AUTH_TIMEOUT_MS);
 
-      this.pendingSocialAuth = { resolve, timeout };
+      this.pendingHandoffAuth = { resolve, timeout };
     });
 
     try {
@@ -504,8 +513,46 @@ export class AuthService extends DisposableService {
       this.logger.error(
         `[AuthService] Unexpected error during social sign-in: ${err}`,
       );
-      this.completePendingSocialAuth({
+      this.completePendingHandoffAuth({
         error: 'Failed to complete social sign-in.',
+      });
+      return await completion;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Email sign-in via console (desktop handoff)
+  // ---------------------------------------------------------------------------
+
+  public async signInEmail(): Promise<{ error?: string }> {
+    if (this.pendingHandoffAuth) {
+      this.logger.debug(
+        '[AuthService] Cancelling previous sign-in before starting email sign-in',
+      );
+      await this.cancelPendingHandoffAuth({
+        error: 'Sign-in was cancelled.',
+      });
+    }
+
+    const completion = new Promise<{ error?: string }>((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingHandoffAuth = null;
+        resolve({ error: 'Email sign-in timed out.' });
+      }, SOCIAL_AUTH_TIMEOUT_MS);
+
+      this.pendingHandoffAuth = { resolve, timeout };
+    });
+
+    try {
+      this.logger.debug('[AuthService] Starting email sign-in via console');
+      await openEmailAuthInSystemBrowser();
+      return await completion;
+    } catch (err) {
+      this.logger.error(
+        `[AuthService] Unexpected error during email sign-in: ${err}`,
+      );
+      this.completePendingHandoffAuth({
+        error: 'Failed to open email sign-in.',
       });
       return await completion;
     }

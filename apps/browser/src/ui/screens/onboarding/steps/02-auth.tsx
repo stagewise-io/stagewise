@@ -86,6 +86,7 @@ export function StepAuth({
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
   const signInSocial = useKartonProcedure((p) => p.userAccount.signInSocial);
+  const signInEmail = useKartonProcedure((p) => p.userAccount.signInEmail);
   const disconnectProvider = useKartonProcedure(
     (p) => p.preferences.disconnectProvider,
   );
@@ -382,6 +383,7 @@ export function StepAuth({
           sendOtp={(email, token) => sendOtp(email, token ?? '')}
           verifyOtp={verifyOtp}
           signInSocial={signInSocial}
+          signInEmail={signInEmail}
           trackingPrefix="onboarding-auth"
           track={track}
           onUseApiKeys={() => switchMode('api-keys')}
