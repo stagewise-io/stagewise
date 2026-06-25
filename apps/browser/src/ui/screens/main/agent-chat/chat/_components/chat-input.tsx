@@ -999,6 +999,7 @@ export const ChatInputActions = memo(function ChatInputActions({
               <span className="flex items-center gap-1.5">
                 <span>Stop agent</span>
                 <HotkeyCombo action={HotkeyActions.STOP_AGENT} size="xs" />
+                <ShortcutCombo value="Esc" size="xs" />
               </span>
             </TooltipContent>
           </Tooltip>
