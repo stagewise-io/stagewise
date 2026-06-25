@@ -130,7 +130,7 @@ export function StepLogin({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onAuthenticated({ auth_method: 'stagewise' })}
+              onClick={() => trackAuthCompleted({ auth_method: 'stagewise' })}
               className="text-primary-foreground! hover:text-hover-derived! active:text-active-derived!"
             >
               Continue
