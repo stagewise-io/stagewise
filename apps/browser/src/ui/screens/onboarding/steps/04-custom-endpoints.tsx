@@ -217,7 +217,17 @@ function EndpointRow({
         return;
       }
       setReachability({ status: 'testing' });
+      // Client-side safety timeout: clear the testing state after 4s
+      // even if the RPC never resolves (backend timeout is 3s + roundtrip)
+      const safetyTimeout = setTimeout(() => {
+        setReachability((prev) =>
+          prev.status === 'testing'
+            ? { status: 'unreachable', reason: 'Connection timed out' }
+            : prev,
+        );
+      }, 4000);
       void testEndpointReachability(baseUrl, apiSpec).then((result) => {
+        clearTimeout(safetyTimeout);
         if (result.reachable) {
           setReachability({ status: 'reachable' });
         } else {
