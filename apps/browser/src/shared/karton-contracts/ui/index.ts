@@ -2079,11 +2079,14 @@ export type KartonContract = {
         apiKey: string,
       ) => Promise<{ success: true } | { success: false; error: string }>;
       /**
-       * Probe a custom endpoint for reachability by appending the
-       * spec-specific path and issuing a lightweight request.
-       * Returns `{ reachable: true }` when the server responds with any
-       * status other than 404; `{ reachable: false, reason }` when the
-       * server is unreachable or returns 404.
+       * Probe a custom endpoint for reachability and API compliance.
+       * Sends a minimal request to the spec-specific inference path and
+       * validates that the server returns a JSON API response (not HTML
+       * or 404).
+       * Returns `{ reachable: true }` when the server responds with a
+       * valid JSON API response; `{ reachable: false, reason }` when the
+       * server is unreachable, returns 404, or doesn't implement the
+       * expected API spec.
        */
       testEndpointReachability: (
         baseUrl: string,
