@@ -378,27 +378,22 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   const syncAvailableSoundPacks = async (
     selectedPack?: string,
   ): Promise<void> => {
-    const cfg = globalConfigService.get();
     const packs = notificationSoundsService.listPacks();
     const displayNames = notificationSoundsService.getPackDisplayNames();
-    const packsChanged =
-      cfg.availableSoundPacks.length !== packs.length ||
-      !cfg.availableSoundPacks.every((p, i) => p === packs[i]);
-    const namesChanged =
-      Object.keys(cfg.packDisplayNames).length !==
-        Object.keys(displayNames).length ||
-      Object.entries(displayNames).some(
-        ([id, name]) => cfg.packDisplayNames[id] !== name,
-      );
 
-    if (!packsChanged && !namesChanged && !selectedPack) return;
-
-    await globalConfigService.set({
-      ...cfg,
-      availableSoundPacks: packs,
-      packDisplayNames: displayNames,
-      ...(selectedPack ? { notificationSoundPack: selectedPack } : {}),
+    uiKarton.setState((draft) => {
+      draft.notificationSoundPacks = {
+        available: packs,
+        displayNames,
+      };
     });
+
+    if (selectedPack) {
+      await globalConfigService.set({
+        ...globalConfigService.get(),
+        notificationSoundPack: selectedPack,
+      });
+    }
   };
 
   void syncAvailableSoundPacks().catch((err) => {
