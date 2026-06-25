@@ -187,13 +187,23 @@ export type KartonState<T> = T extends { state: infer S } ? S : never;
 export type AsyncFunction = (...args: any[]) => Promise<any>;
 
 /**
- * Augments procedure types with a `.fire` accessor for fire-and-forget calls.
- * `procedure.fire(args)` sends the RPC without waiting for a response.
+ * Augments procedure types with:
+ * - `.fire` accessor for fire-and-forget calls (no response awaited).
+ * - `.withTimeout(ms)` accessor to override the default RPC timeout.
+ *
+ * Both return a callable proxy, so they can be chained:
+ *   procedure.fire(args)                  // fire-and-forget
+ *   procedure.withTimeout(60_000)(args)   // 60s timeout
  */
+type AugmentedFunction<A extends any[], R> = ((...args: A) => Promise<R>) & {
+  fire: (...args: A) => void;
+  withTimeout: (ms: number) => AugmentedFunction<A, R>;
+};
+
 export type WithFireAndForget<T> = T extends (
   ...args: infer A
 ) => Promise<infer R>
-  ? ((...args: A) => Promise<R>) & { fire: (...args: A) => void }
+  ? AugmentedFunction<A, R>
   : T extends object
     ? { [K in keyof T]: WithFireAndForget<T[K]> }
     : T;

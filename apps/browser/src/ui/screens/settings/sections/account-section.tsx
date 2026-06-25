@@ -17,8 +17,15 @@ export function AccountSection() {
   const userAccount = useKartonState((s) => s.userAccount);
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
-  const signInSocial = useKartonProcedure((p) => p.userAccount.signInSocial);
-  const signInEmail = useKartonProcedure((p) => p.userAccount.signInEmail);
+  // Auth handoff procedures wait for OS callbacks — see 02-auth.tsx for
+  // rationale on the extended RPC timeout.
+  const AUTH_RPC_TIMEOUT_MS = (5 * 60 + 10) * 1000; // 5 min 10 sec
+  const signInSocial = useKartonProcedure((p) =>
+    p.userAccount.signInSocial.withTimeout(AUTH_RPC_TIMEOUT_MS),
+  );
+  const signInEmail = useKartonProcedure((p) =>
+    p.userAccount.signInEmail.withTimeout(AUTH_RPC_TIMEOUT_MS),
+  );
   const logout = useKartonProcedure((p) => p.userAccount.logout);
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   // `useTrack` swallows RPC errors so a failed telemetry capture (e.g.
