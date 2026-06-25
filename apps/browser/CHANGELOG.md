@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.0 (2026-06-25)
+
+### Features
+
+* enable Turnstile token on stagewise:// via on-demand solver (ea00153)
+* support Esc as additional abort trigger alongside Ctrl+C (7e6d251)
+
 ## 1.11.0 (2026-06-24)
 
 ### Features
