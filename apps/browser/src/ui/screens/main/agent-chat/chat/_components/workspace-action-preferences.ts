@@ -29,9 +29,13 @@ export function applyWorkspaceGitActionPreferences(
   worktreeItems: SelectItem<string>[],
   generalPreference?: WorkspaceGitActionGeneralPreference,
   repositoryPreference?: WorkspaceGitActionRepositoryPreference,
+  checkoutBranchItems?: SelectItem<string>[],
 ): WorkspaceActionConfig {
   const sourceBranches = new Set(sourceBranchItems.map((item) => item.value));
   const worktrees = new Set(worktreeItems.map((item) => item.value));
+  const checkoutBranches = new Set(
+    (checkoutBranchItems ?? sourceBranchItems).map((item) => item.value),
+  );
   const switchWorktreeTarget = repositoryPreference?.switchWorktreeTarget;
 
   return {
@@ -61,5 +65,10 @@ export function applyWorkspaceGitActionPreferences(
       worktrees.has(switchWorktreeTarget)
         ? switchWorktreeTarget
         : defaults.switchWorktreeTarget,
+    switchBranchTarget:
+      typeof repositoryPreference?.switchBranchTarget === 'string' &&
+      checkoutBranches.has(repositoryPreference.switchBranchTarget)
+        ? repositoryPreference.switchBranchTarget
+        : defaults.switchBranchTarget,
   };
 }

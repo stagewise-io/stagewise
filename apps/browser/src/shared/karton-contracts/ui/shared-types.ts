@@ -366,6 +366,7 @@ const workspaceGitRepositoryActionPreferenceSchema = z
     createWorktreeFrom: z.string().optional(),
     createBranchFrom: z.string().optional(),
     switchWorktreeTarget: z.string().optional(),
+    switchBranchTarget: z.string().optional(),
   })
   .default({})
   .catch({});
