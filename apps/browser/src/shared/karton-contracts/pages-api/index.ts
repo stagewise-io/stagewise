@@ -105,12 +105,8 @@ export const defaultState: PagesApiState = {
   pendingEditsByAgentInstanceId: {},
   pendingAppMessagesByAgentInstanceId: {},
   globalConfig: {
-    telemetryLevel: 'full',
-    notificationSoundsEnabled: true,
     notificationSoundLoudness: 'subtle',
     notificationSoundPack: 'bubble-pops',
-    availableSoundPacks: ['bubble-pops'],
-    packDisplayNames: {},
     dockBounceEnabled: true,
     blockAppSuspensionWhenAgentsActive: true,
     personalizationThemeId: 'default',

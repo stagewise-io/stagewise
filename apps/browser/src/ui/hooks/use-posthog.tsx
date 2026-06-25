@@ -18,12 +18,13 @@ interface PostHogProviderProps {
 export function PostHogProvider({ children }: PostHogProviderProps) {
   const internalData = useKartonState((s) => s.internalData);
   const userAccount = useKartonState((s) => s.userAccount);
-  const globalConfig = useKartonState((s) => s.globalConfig);
+  const telemetryLevel = useKartonState(
+    (s) => s.preferences.privacy.telemetryLevel,
+  );
 
   // Add custom logic based on karton state
   useEffect(() => {
     if (!posthog) return;
-    const telemetryLevel = globalConfig.telemetryLevel;
     if (
       telemetryLevel === 'off' ||
       (import.meta.env.NODE_ENV === 'development' &&
@@ -75,14 +76,12 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
       posthog.opt_in_capturing();
     }
   }, [
-    globalConfig.telemetryLevel,
+    telemetryLevel,
     internalData.posthog?.apiKey,
     internalData.posthog?.host,
   ]);
 
   useEffect(() => {
-    const telemetryLevel = globalConfig.telemetryLevel;
-
     if (
       telemetryLevel === 'full' &&
       userAccount?.user?.id &&
@@ -105,14 +104,14 @@ export function PostHogProvider({ children }: PostHogProviderProps) {
       }
 
       posthog.identify(userAccount.user.id, {
-        telemetryLevel: globalConfig.telemetryLevel,
+        telemetryLevel,
         email: userAccount.user.email,
         machineId: userAccount.machineId,
       });
       if (userAccount?.user?.id && userAccount?.machineId)
         posthog.alias(userAccount.user.id, userAccount.machineId);
     }
-  }, [globalConfig, userAccount]);
+  }, [telemetryLevel, userAccount]);
 
   return (
     <PostHogProviderOriginal client={posthog}>
