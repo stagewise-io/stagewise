@@ -5,6 +5,7 @@ import { cn } from '@ui/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useState, useCallback } from 'react';
 import { useTrack } from '@ui/hooks/use-track';
+import { IconArrowRightOutline18 } from 'nucleo-ui-outline-18';
 import {
   SignInOptionsPanel,
   type SignInMethod,
@@ -153,6 +154,7 @@ export function StepLogin({
             className={cn('text-muted-foreground hover:text-foreground')}
           >
             Continue without account
+            <IconArrowRightOutline18 className="size-3.5" />
           </Button>
         }
       />

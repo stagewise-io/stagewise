@@ -3,7 +3,8 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
+import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
 import { IconPlusOutline18, IconTrashOutline18 } from 'nucleo-ui-outline-18';
 import type { CustomModel } from '@shared/karton-contracts/ui/shared-types';
@@ -23,6 +24,17 @@ export function StepCustomModels({
 
   const customModels = preferences?.customModels ?? [];
   const customEndpoints = preferences?.customEndpoints ?? [];
+
+  // Scroll fade mask
+  const [contentViewport, setContentViewport] = useState<HTMLElement | null>(
+    null,
+  );
+  const contentScrollRef = useRef<HTMLElement | null>(null);
+  contentScrollRef.current = contentViewport;
+  const { maskStyle: contentMaskStyle } = useScrollFadeMask(contentScrollRef, {
+    axis: 'vertical',
+    fadeDistance: 24,
+  });
 
   const endpointOptions = useMemo(() => {
     return customEndpoints.map((ep) => ({
@@ -100,8 +112,8 @@ export function StepCustomModels({
 
   return (
     <>
-      <div className="app-no-drag flex flex-1 flex-col items-center gap-4 overflow-hidden px-8 py-8">
-        <div className="flex shrink-0 flex-col items-center gap-2 text-center">
+      <div className="app-no-drag flex flex-1 flex-col items-center gap-4 overflow-hidden pt-8">
+        <div className="flex shrink-0 flex-col items-center gap-2 px-8 text-center">
           <h1 className="font-medium text-foreground text-xl">Custom Models</h1>
           <p className="max-w-md text-muted-foreground text-sm">
             Define models served through your custom endpoints. You can skip
@@ -110,8 +122,10 @@ export function StepCustomModels({
         </div>
 
         <OverlayScrollbar
-          className="w-full max-w-lg flex-1"
-          contentClassName="flex flex-col gap-3 pb-4"
+          className="mask-alpha w-full max-w-lg flex-1"
+          style={contentMaskStyle}
+          onViewportRef={setContentViewport}
+          contentClassName="flex flex-col gap-3 px-8 pb-4 pt-4"
         >
           {customModels.length === 0 ? (
             <div className="rounded-lg border border-derived-subtle p-6">
@@ -180,15 +194,19 @@ function ModelRow({
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border border-derived bg-surface-1 p-4">
       {/* Header: display name + delete */}
-      <div className="flex items-center justify-between gap-2">
-        <Input
-          value={model.displayName}
-          onValueChange={(v) => onUpdate({ displayName: v })}
-          size="sm"
-          placeholder="Display name"
-          className="flex-1"
-          style={{ maxWidth: 'none' }}
-        />
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
+            Display Name
+          </span>
+          <Input
+            value={model.displayName === 'New Model' ? '' : model.displayName}
+            onValueChange={(v) => onUpdate({ displayName: v || 'New Model' })}
+            size="sm"
+            placeholder="e.g. My Custom GPT-4o"
+            className="w-full"
+          />
+        </div>
         <Button variant="ghost" size="icon-sm" onClick={onDelete}>
           <IconTrashOutline18 className="size-3.5" />
         </Button>
@@ -196,19 +214,26 @@ function ModelRow({
 
       {/* Model ID */}
       <div className="flex flex-col gap-1">
-        <span className="text-muted-foreground text-xs">Model ID</span>
+        <span className="font-medium text-muted-foreground text-xs">
+          Model ID
+        </span>
         <Input
-          value={model.modelId}
-          onValueChange={(v) => onUpdate({ modelId: v })}
+          value={model.modelId.startsWith('custom-model-') ? '' : model.modelId}
+          onValueChange={(v) =>
+            onUpdate({
+              modelId: v || `custom-model-${Date.now()}`,
+            })
+          }
           size="sm"
           placeholder="gpt-4o-mini"
+          className="w-full"
         />
       </div>
 
       {/* Endpoint + context window */}
       <div className="flex gap-2">
-        <div className="flex-1">
-          <span className="mb-1 block text-muted-foreground text-xs">
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
             Endpoint
           </span>
           <Select
@@ -219,19 +244,24 @@ function ModelRow({
             triggerClassName="w-full"
           />
         </div>
-        <div className="w-32 shrink-0">
-          <span className="mb-1 block text-muted-foreground text-xs">
-            Context
+        <div className="flex w-36 shrink-0 flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
+            Max context length
           </span>
           <Input
             type="number"
-            value={String(model.contextWindowSize)}
+            value={
+              model.contextWindowSize === 128000
+                ? ''
+                : String(model.contextWindowSize)
+            }
             onValueChange={(val) =>
               onUpdate({
                 contextWindowSize: Number.parseInt(val, 10) || 128000,
               })
             }
             size="sm"
+            placeholder="128000"
           />
         </div>
       </div>
