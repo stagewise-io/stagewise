@@ -28,7 +28,18 @@ export function StepLogin({
 }) {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
   const verifyOtp = useKartonProcedure((p) => p.userAccount.verifyOtp);
-  const signInSocial = useKartonProcedure((p) => p.userAccount.signInSocial);
+  // Auth handoff procedures wait for OS callbacks (system browser → OAuth/OTP
+  // → redirect). The default 30s RPC timeout kills these before the user
+  // finishes. Extend to match the backend's 5-min app-level timeout plus a
+  // buffer so the backend's own timeout (with a proper error message) fires
+  // first, rather than the generic RPC "connection lost" rejection.
+  const AUTH_RPC_TIMEOUT_MS = (5 * 60 + 10) * 1000; // 5 min 10 sec
+  const signInSocial = useKartonProcedure((p) =>
+    p.userAccount.signInSocial.withTimeout(AUTH_RPC_TIMEOUT_MS),
+  );
+  const signInEmail = useKartonProcedure((p) =>
+    p.userAccount.signInEmail.withTimeout(AUTH_RPC_TIMEOUT_MS),
+  );
   const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
   const track = useTrack();
   const authStatus = useKartonState((s) => s.userAccount.status);
@@ -139,6 +150,7 @@ export function StepLogin({
           sendOtp={(email, token) => sendOtp(email, token ?? '')}
           verifyOtp={verifyOtp}
           signInSocial={signInSocial}
+          signInEmail={signInEmail}
           trackingPrefix="onboarding-auth"
           track={track}
           onAuthenticated={handleStagewiseAuthenticated}
