@@ -97,6 +97,16 @@ export function MessageRuntimeError({
     );
   }
 
+  if (error.kind === 'model-restricted') {
+    return (
+      <ModelRestrictedError
+        error={error}
+        canRetry={canShowRetry}
+        onRetry={onRetry}
+      />
+    );
+  }
+
   if (error.kind === 'waiting-for-connection') {
     return (
       <WaitingForConnectionError
@@ -191,6 +201,78 @@ function PlanLimitExceededError({
             onClick={() => void openExternalUrl(ctaHref)}
           >
             {ctaLabel}
+            <ArrowUpRightIcon className="size-3" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Shows a card when a free-tier user tries to use a model that is not on
+ * the free-tier whitelist and they have no prepaid credits. Offers CTAs to
+ * upgrade the plan or configure BYOK API keys.
+ */
+function ModelRestrictedError({
+  error,
+  canRetry,
+  onRetry,
+}: {
+  error: Extract<AgentRuntimeError, { kind: 'model-restricted' }>;
+  canRetry: boolean;
+  onRetry: () => void;
+}) {
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+
+  const modelName = useMemo(() => {
+    if (!error.model) return null;
+    // Strip the provider prefix to get the bare model ID for lookup
+    const bareId = error.model.includes('/')
+      ? error.model.split('/').slice(1).join('/')
+      : error.model;
+    const m = getAvailableModel(bareId);
+    return m?.modelDisplayName ?? null;
+  }, [error.model]);
+
+  const planLabel = error.plan ?? 'free';
+  const heading = modelName
+    ? `${modelName} is not available on the ${planLabel} plan`
+    : `Model not available on the ${planLabel} plan`;
+
+  return (
+    <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-derived-strong p-2 text-sm">
+      <span className="font-medium text-foreground">{heading}</span>
+
+      <div className="text-foreground">
+        This model is only accessible via BYOK or a Pro plan. Get your plan or
+        configure your own API key.
+      </div>
+
+      <div className="flex flex-row items-center justify-between gap-2 pt-1">
+        <div>
+          {canRetry && (
+            <Button variant="ghost" size="xs" onClick={onRetry}>
+              <RefreshCcwIcon className="size-3" />
+              Retry
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-row justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void openSettings({ section: 'models-providers' })}
+          >
+            Configure other API keys
+          </Button>
+          <Button
+            variant="primary"
+            size="xs"
+            onClick={() => void openExternalUrl(consoleUrl)}
+          >
+            Upgrade plan
             <ArrowUpRightIcon className="size-3" />
           </Button>
         </div>
