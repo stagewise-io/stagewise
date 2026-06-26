@@ -1,16 +1,22 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { XIcon, MessageSquareTextIcon, PresentationIcon } from 'lucide-react';
+import {
+  IconXmarkOutline18,
+  IconVideoOutline18,
+  IconThumbsUpOutline18,
+  IconThumbsDownOutline18,
+} from 'nucleo-ui-outline-18';
 
-const MESSAGE_THRESHOLD = 3;
+const MESSAGE_THRESHOLD = 5;
 const DISMISS_COOLDOWN_MS = 48 * 60 * 60 * 1000; // 48 hours
 const MAX_DISMISS_COUNT = 3;
 
-const FOUNDER_CALL_MESSAGE_THRESHOLD = 20;
+const FOUNDER_CALL_AGENT_THRESHOLD = 10;
 const FOUNDER_CALL_USAGE_DAYS = 4;
 const FOUNDER_CALL_STAGGER_MS = 24 * 60 * 60 * 1000; // 24 hours
-const BOOKING_URL = 'https://stagewise.io/call';
+const FOUNDER_CALL_DISMISS_COOLDOWN_MS = 96 * 60 * 60 * 1000; // 96 hours
+const BOOKING_URL = 'https://calendar.app.google/McsonxboNHu7oyUF8';
 
 export function SidebarExperienceSurvey() {
   const [feedback, setFeedback] = useState('');
@@ -45,20 +51,29 @@ export function SidebarExperienceSurvey() {
     (p) => p.userExperience.founderCall.survey.dismiss,
   );
 
-  // Count total messages across all active agents
-  const totalMessages = useKartonState((s) => {
+  // Total agent count from DB (via storedExperienceData)
+  const totalAgentCount = useKartonState(
+    (s) => s.userExperience.storedExperienceData.totalAgentCount,
+  );
+
+  // Count total user messages across all active agents (first survey trigger)
+  const totalUserMessages = useKartonState((s) => {
     let count = 0;
     for (const instance of Object.values(s.agents.instances)) {
-      count += instance.state.history.length;
+      count += instance.state.history.filter((m) => m.role === 'user').length;
     }
     return count;
   });
 
+  const [hasAnswered, setHasAnswered] = useState(false);
+
   // ── First survey visibility ──
   const shouldShow = useMemo(() => {
     if (submitted) return false;
-    if (survey.answered) return false;
-    if (totalMessages <= MESSAGE_THRESHOLD) return false;
+    // Keep the survey visible while the user is in the feedback phase,
+    // even though the backend already marked it as answered.
+    if (survey.answered && !hasAnswered) return false;
+    if (totalUserMessages <= MESSAGE_THRESHOLD) return false;
 
     // If never dismissed, show
     if (survey.dismissedAt === null || survey.dismissedCount === 0) return true;
@@ -68,7 +83,7 @@ export function SidebarExperienceSurvey() {
 
     // Show again after cooldown
     return Date.now() - survey.dismissedAt >= DISMISS_COOLDOWN_MS;
-  }, [survey, totalMessages, submitted]);
+  }, [survey, totalUserMessages, submitted, hasAnswered]);
 
   // ── Second (founder call) survey visibility ──
   const shouldShowFounderCall = useMemo(() => {
@@ -76,7 +91,7 @@ export function SidebarExperienceSurvey() {
     if (shouldShow) return false;
 
     if (founderCallSurvey.answered) return false;
-    if (totalMessages < FOUNDER_CALL_MESSAGE_THRESHOLD) return false;
+    if (totalAgentCount < FOUNDER_CALL_AGENT_THRESHOLD) return false;
 
     // Must have used stagewise for at least 4 days
     if (firstUsedAt === null) return false;
@@ -91,17 +106,18 @@ export function SidebarExperienceSurvey() {
       return false;
     }
 
-    // Dismiss logic (same pattern as first survey)
+    // Dismiss logic: reappear after 96h cooldown, up to 3 dismissals total.
     if (
       founderCallSurvey.dismissedAt === null ||
       founderCallSurvey.dismissedCount === 0
     )
       return true;
     if (founderCallSurvey.dismissedCount >= MAX_DISMISS_COUNT) return false;
-    return Date.now() - founderCallSurvey.dismissedAt >= DISMISS_COOLDOWN_MS;
-  }, [shouldShow, founderCallSurvey, totalMessages, firstUsedAt, survey]);
-
-  const [hasAnswered, setHasAnswered] = useState(false);
+    return (
+      Date.now() - founderCallSurvey.dismissedAt >=
+      FOUNDER_CALL_DISMISS_COOLDOWN_MS
+    );
+  }, [shouldShow, founderCallSurvey, totalAgentCount, firstUsedAt, survey]);
 
   const handleAnswer = useCallback(
     (answer: 'yes' | 'no') => {
@@ -136,50 +152,57 @@ export function SidebarExperienceSurvey() {
   // ── First survey ──
   if (shouldShow) {
     return (
-      <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-strong backdrop-blur-xl dark:bg-surface-1/60">
+      <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/30 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle backdrop-blur-xl dark:bg-surface-1/30">
         {!hasAnswered ? (
           <>
-            <div className="flex items-center gap-1.5">
-              <MessageSquareTextIcon className="size-3.5 shrink-0 text-foreground" />
-              <div className="mt-0.5 min-w-0 flex-1 font-medium text-foreground text-xs">
-                Do you enjoy your experience with stagewise?
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-2xs"
-                className="ml-auto shrink-0"
-                aria-label="Dismiss survey"
-                onClick={handleDismiss}
-              >
-                <XIcon className="size-3" />
-              </Button>
+            <Button
+              variant="ghost"
+              size="icon-2xs"
+              className="absolute top-1.5 right-1.5 z-10 shrink-0"
+              aria-label="Dismiss survey"
+              onClick={handleDismiss}
+            >
+              <IconXmarkOutline18 className="size-3" />
+            </Button>
+            <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
+              Do you enjoy your experience with stagewise?
             </div>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
                 size="xs"
                 className="flex-1"
+                aria-label="No"
                 onClick={() => handleAnswer('no')}
               >
+                <IconThumbsDownOutline18 className="size-3.5" />
                 No
               </Button>
               <Button
                 variant="secondary"
                 size="xs"
                 className="flex-1"
+                aria-label="Yes"
                 onClick={() => handleAnswer('yes')}
               >
+                <IconThumbsUpOutline18 className="size-3.5" />
                 Yes
               </Button>
             </div>
           </>
         ) : (
           <>
-            <div className="flex items-center gap-1.5">
-              <MessageSquareTextIcon className="size-3.5 shrink-0 text-foreground" />
-              <div className="mt-0.5 min-w-0 flex-1 font-medium text-foreground text-xs">
-                What could we improve?
-              </div>
+            <Button
+              variant="ghost"
+              size="icon-2xs"
+              className="absolute top-1.5 right-1.5 z-10 shrink-0"
+              aria-label="Dismiss survey"
+              onClick={() => setSubmitted(true)}
+            >
+              <IconXmarkOutline18 className="size-3" />
+            </Button>
+            <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
+              What could we improve?
             </div>
             <textarea
               ref={textareaRef}
@@ -189,7 +212,7 @@ export function SidebarExperienceSurvey() {
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSubmitFeedback();
                 }
@@ -197,14 +220,7 @@ export function SidebarExperienceSurvey() {
             />
             <div className="flex justify-end gap-2">
               <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setSubmitted(true)}
-              >
-                Skip
-              </Button>
-              <Button
-                variant="secondary"
+                variant="primary"
                 size="xs"
                 disabled={!feedback.trim()}
                 onClick={handleSubmitFeedback}
@@ -221,29 +237,27 @@ export function SidebarExperienceSurvey() {
   // ── Second (founder call) survey ──
   if (shouldShowFounderCall) {
     return (
-      <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-strong backdrop-blur-xl dark:bg-surface-1/60">
-        <div className="flex items-start gap-1.5">
-          <PresentationIcon className="mt-0.5 size-3.5 shrink-0 text-foreground" />
-          <div className="min-w-0 flex-1 font-medium text-foreground text-xs">
-            Tell our founders what you think and get free Pro subscription for
-            one month!
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-2xs"
-            className="ml-auto shrink-0"
-            aria-label="Dismiss survey"
-            onClick={handleDismissFounderCall}
-          >
-            <XIcon className="size-3" />
-          </Button>
+      <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/30 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle backdrop-blur-xl dark:bg-surface-1/30">
+        <Button
+          variant="ghost"
+          size="icon-2xs"
+          className="absolute top-1.5 right-1.5 z-10 shrink-0"
+          aria-label="Dismiss survey"
+          onClick={handleDismissFounderCall}
+        >
+          <IconXmarkOutline18 className="size-3" />
+        </Button>
+        <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
+          Tell our founders what you think about stagewise and get 1 month Pro
+          for free!
         </div>
         <Button
-          variant="secondary"
+          variant="primary"
           size="xs"
           className="w-full"
           onClick={handleOpenFounderCall}
         >
+          <IconVideoOutline18 className="size-3.5" />
           Book a call
         </Button>
       </div>

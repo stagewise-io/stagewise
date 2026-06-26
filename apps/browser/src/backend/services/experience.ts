@@ -41,6 +41,7 @@ function redactWorkspacePathForTelemetry(workspacePath: string): string {
 }
 
 export type GetOldestAgentCreatedAt = () => Promise<Date | null>;
+export type GetAgentCount = () => Promise<number>;
 
 export class UserExperienceService extends DisposableService {
   private readonly logger: Logger;
@@ -48,6 +49,7 @@ export class UserExperienceService extends DisposableService {
   private readonly telemetryService: TelemetryService;
   private readonly gitService: GitService;
   private readonly getOldestAgentCreatedAt?: GetOldestAgentCreatedAt;
+  private readonly getAgentCount?: GetAgentCount;
   // Store bound callback reference for proper unregistration
   private readonly boundHandleServiceStateChange: () => void;
 
@@ -67,6 +69,7 @@ export class UserExperienceService extends DisposableService {
     telemetryService: TelemetryService,
     gitService: GitService,
     getOldestAgentCreatedAt?: GetOldestAgentCreatedAt,
+    getAgentCount?: GetAgentCount,
   ) {
     super();
     this.logger = logger;
@@ -74,6 +77,7 @@ export class UserExperienceService extends DisposableService {
     this.telemetryService = telemetryService;
     this.gitService = gitService;
     this.getOldestAgentCreatedAt = getOldestAgentCreatedAt;
+    this.getAgentCount = getAgentCount;
 
     // Bind once and store reference for later unregistration
     this.boundHandleServiceStateChange =
@@ -98,6 +102,7 @@ export class UserExperienceService extends DisposableService {
     telemetryService: TelemetryService,
     gitService: GitService,
     getOldestAgentCreatedAt?: GetOldestAgentCreatedAt,
+    getAgentCount?: GetAgentCount,
   ) {
     logger.debug('[UserExperienceService] Creating service');
     const instance = new UserExperienceService(
@@ -106,6 +111,7 @@ export class UserExperienceService extends DisposableService {
       telemetryService,
       gitService,
       getOldestAgentCreatedAt,
+      getAgentCount,
     );
     await instance.initialize();
     logger.debug('[UserExperienceService] Created service');
@@ -119,12 +125,14 @@ export class UserExperienceService extends DisposableService {
       surveyState,
       founderCallSurveyState,
       firstUsedAt,
+      totalAgentCount,
     ] = await Promise.all([
       this.readOnboardingState(),
       this.readTutorialState(),
       this.readSurveyState(),
       this.readFounderCallSurveyState(),
       this.readFirstUsedAt(),
+      this.readAgentCount(),
     ]);
     this.uiKarton.setState((draft) => {
       draft.userExperience.storedExperienceData.hasSeenOnboardingFlow =
@@ -134,6 +142,8 @@ export class UserExperienceService extends DisposableService {
       draft.userExperience.storedExperienceData.founderCallSurvey =
         founderCallSurveyState;
       draft.userExperience.storedExperienceData.firstUsedAt = firstUsedAt;
+      draft.userExperience.storedExperienceData.totalAgentCount =
+        totalAgentCount;
       draft.userExperience.experienceSurvey = surveyState;
       draft.userExperience.founderCallSurvey = founderCallSurveyState;
     });
@@ -309,6 +319,21 @@ export class UserExperienceService extends DisposableService {
     );
     if (hasMessages) {
       void this.setFirstUsedAt();
+    }
+
+    // Refresh totalAgentCount from DB when loaded agent count increases
+    // beyond the last known value — new agents may have been created.
+    const loadedCount = Object.keys(currentState.agents.instances).length;
+    const storedCount =
+      currentState.userExperience.storedExperienceData.totalAgentCount;
+    if (this.getAgentCount && loadedCount > storedCount) {
+      void this.getAgentCount().then((count) => {
+        if (count > storedCount) {
+          this.uiKarton.setState((draft) => {
+            draft.userExperience.storedExperienceData.totalAgentCount = count;
+          });
+        }
+      });
     }
   }
 
@@ -567,6 +592,7 @@ export class UserExperienceService extends DisposableService {
       experienceSurvey,
       founderCallSurvey,
       firstUsedAt,
+      totalAgentCount,
     ] = await Promise.all([
       this.getRecentlyOpenedWorkspaces(),
       this.readOnboardingState(),
@@ -574,6 +600,7 @@ export class UserExperienceService extends DisposableService {
       this.readSurveyState(),
       this.readFounderCallSurveyState(),
       this.readFirstUsedAt(),
+      this.readAgentCount(),
     ]);
     return {
       recentlyOpenedWorkspaces,
@@ -583,6 +610,7 @@ export class UserExperienceService extends DisposableService {
       experienceSurvey,
       firstUsedAt,
       founderCallSurvey,
+      totalAgentCount,
     };
   }
 
@@ -590,12 +618,31 @@ export class UserExperienceService extends DisposableService {
    * Read the experience survey state from persisted data.
    */
   private async readSurveyState(): Promise<ExperienceSurvey> {
-    return readPersistedData('experience-survey', experienceSurveySchema, {
-      dismissedAt: null,
-      dismissedCount: 0,
-      answered: false,
-      answeredAt: null,
-    });
+    const state = await readPersistedData(
+      'experience-survey',
+      experienceSurveySchema,
+      {
+        dismissedAt: null,
+        dismissedCount: 0,
+        answered: false,
+        answeredAt: null,
+      },
+    );
+    const answeredAt = this.validateTimestamp(
+      state.answeredAt,
+      'survey.answeredAt',
+    );
+    const dismissedAt = this.validateTimestamp(
+      state.dismissedAt,
+      'survey.dismissedAt',
+    );
+    // If the survey was answered but the timestamp is corrupted, use now
+    // as a fallback so the founder-call stagger check has a valid baseline.
+    return {
+      ...state,
+      answeredAt: answeredAt ?? (state.answered ? Date.now() : null),
+      dismissedAt,
+    };
   }
 
   /**
@@ -683,7 +730,7 @@ export class UserExperienceService extends DisposableService {
    * Read the founder call survey state from persisted data.
    */
   private async readFounderCallSurveyState(): Promise<FounderCallSurvey> {
-    return readPersistedData(
+    const state = await readPersistedData(
       'experience-founder-call-survey',
       founderCallSurveySchema,
       {
@@ -693,6 +740,17 @@ export class UserExperienceService extends DisposableService {
         answeredAt: null,
       },
     );
+    return {
+      ...state,
+      answeredAt: this.validateTimestamp(
+        state.answeredAt,
+        'founderCallSurvey.answeredAt',
+      ),
+      dismissedAt: this.validateTimestamp(
+        state.dismissedAt,
+        'founderCallSurvey.dismissedAt',
+      ),
+    };
   }
 
   /**
@@ -778,7 +836,12 @@ export class UserExperienceService extends DisposableService {
       if (this.getOldestAgentCreatedAt) {
         const oldest = await this.getOldestAgentCreatedAt();
         if (oldest !== null) {
-          timestamp = oldest.getTime();
+          const oldestMs = oldest.getTime();
+          // Guard against corrupted records (e.g. created_at = 0 = Unix
+          // epoch). If the value is impossibly old, fall back to now.
+          if (oldestMs > 0) {
+            timestamp = oldestMs;
+          }
         }
       }
       await this.writeFirstUsedAt(timestamp);
@@ -798,8 +861,45 @@ export class UserExperienceService extends DisposableService {
     }
   }
 
+  // Minimum plausible timestamp: Jan 1, 2000. Anything below this is
+  // corrupted (e.g. 0, 100 from epoch-0 agent records) and should be
+  // treated as null so setFirstUsedAt() re-runs and backfills correctly.
+  private static readonly MIN_PLAUSIBLE_TIMESTAMP = 946684800000;
+
+  /**
+   * Returns the timestamp if plausible, or null if corrupted (pre-2000
+   * or in the future). Logs a debug message for diagnostics.
+   */
+  private validateTimestamp(raw: number | null, field: string): number | null {
+    if (raw === null) return null;
+    if (
+      raw < UserExperienceService.MIN_PLAUSIBLE_TIMESTAMP ||
+      raw > Date.now()
+    ) {
+      this.logger.debug(
+        `[UserExperienceService] Detected implausible ${field} value ${raw}, treating as null.`,
+      );
+      return null;
+    }
+    return raw;
+  }
+
   private async readFirstUsedAt(): Promise<number | null> {
-    return readPersistedData('first-used-at', z.number().nullable(), null);
+    const raw = await readPersistedData(
+      'first-used-at',
+      z.number().nullable(),
+      null,
+    );
+    return this.validateTimestamp(raw, 'firstUsedAt');
+  }
+
+  private async readAgentCount(): Promise<number> {
+    if (!this.getAgentCount) return 0;
+    try {
+      return await this.getAgentCount();
+    } catch {
+      return 0;
+    }
   }
 
   private async writeFirstUsedAt(value: number): Promise<void> {

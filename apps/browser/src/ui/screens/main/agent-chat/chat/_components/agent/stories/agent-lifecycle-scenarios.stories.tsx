@@ -69,6 +69,7 @@ const baseState: Partial<AppState> = {
         dismissedAt: null,
         dismissedCount: 0,
       },
+      totalAgentCount: 0,
     },
     devAppPreview: {
       isFullScreen: false,
