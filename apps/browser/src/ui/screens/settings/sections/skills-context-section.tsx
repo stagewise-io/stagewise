@@ -330,7 +330,9 @@ function GlobalSkillsDetails() {
     async (prefix: string, enabled: boolean) => {
       const current = enabledGlobalSkillDirs;
       const next = enabled
-        ? [...current, prefix]
+        ? current.includes(prefix)
+          ? current
+          : [...current, prefix]
         : current.filter((p) => p !== prefix);
       await updatePreferences([
         {
@@ -687,8 +689,12 @@ export function SkillsContextSection() {
   );
 
   // Compute the effective tab ID: when the user hasn't clicked
-  // anything yet, fall back to the first tab ("Global").
-  const effectiveTabId = selectedTabId ?? tabItems[0]?.id ?? null;
+  // anything yet (or the previously selected tab no longer exists),
+  // fall back to the first tab ("Global").
+  const effectiveTabId =
+    selectedTabId != null && tabItems.some((t) => t.id === selectedTabId)
+      ? selectedTabId
+      : (tabItems[0]?.id ?? null);
   const isGlobalTab = effectiveTabId === GLOBAL_TAB_ID;
 
   return (

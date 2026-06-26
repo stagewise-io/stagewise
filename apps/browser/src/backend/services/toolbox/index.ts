@@ -967,10 +967,11 @@ export class ToolboxService
         .filter((c) => c.userInvocable !== false)
         .map(toSkillDefinitionUI);
     });
-    // Also refresh the full unfiltered global-skills index used by
-    // the Settings UI (per-dir + per-skill toggles). Cheap to do
-    // here since we already triggered discovery above.
-    void this.rebuildGlobalSkillsIndex();
+    // Note: rebuildGlobalSkillsIndex is NOT called here to avoid
+    // N+1 filesystem scans when this method is invoked in a per-agent
+    // loop. The global index is independent of per-agent state (it
+    // discovers ALL skills from ALL dirs regardless of preferences),
+    // so it is rebuilt once per event at the call sites that need it.
   }
 
   /**
