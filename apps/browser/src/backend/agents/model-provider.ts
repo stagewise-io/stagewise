@@ -72,6 +72,7 @@ export type ModelWithOptions = {
   headers: Record<string, string>;
   contextWindowSize: number;
   providerMode: ProviderMode;
+  connectedCodingPlanId?: string;
   reasoningSignatureSource: ReasoningSignatureSource;
   /**
    * When true, the agent must strip the `strict` field from every tool
@@ -128,6 +129,7 @@ export class ModelProviderService {
     apiKey: string;
     baseURL: string | undefined;
     mode: 'stagewise' | 'official' | 'custom';
+    connectedCodingPlanId?: string;
     customEndpoint?: CustomEndpoint;
   } {
     const prefs = this.preferencesService.get();
@@ -155,6 +157,7 @@ export class ModelProviderService {
               ? connectedCodingPlan.baseUrl
               : undefined,
           mode: 'official',
+          connectedCodingPlanId: config.connectedCodingPlanId,
         };
       }
       case 'custom': {
@@ -374,7 +377,7 @@ export class ModelProviderService {
     const resolved = officialProvider
       ? this.resolveProviderEndpoint(officialProvider)
       : { apiKey: '', baseURL: undefined, mode: 'stagewise' as const };
-    const { apiKey, baseURL, mode } = resolved;
+    const { apiKey, baseURL, mode, connectedCodingPlanId } = resolved;
     const headers = modelSettings.headers ?? {};
     const baseProviderOptions = modelSettings.providerOptions as Record<
       string,
@@ -515,6 +518,7 @@ export class ModelProviderService {
         posthogConfig,
       ),
       providerMode: 'official',
+      connectedCodingPlanId,
     };
   }
 
