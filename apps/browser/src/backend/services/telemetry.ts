@@ -41,6 +41,7 @@ const codingPlanIdSchema = z.enum([
   'kimi-plan',
   'qwen-plan',
   'minimax-plan',
+  'mimo-plan',
 ]);
 const onboardingAuthFailureKindSchema = z.enum([
   'validation-error',
@@ -152,6 +153,19 @@ export type EventProperties = {
     agent_type: string;
     agent_instance_id: string;
     model_id: string;
+    /**
+     * Provider routing mode from the most recent completed step.
+     * Empty string on the first message in a new chat (no prior step).
+     * `'stagewise'` = stagewise backend, `'official'` = own key or coding
+     * plan, `'custom'` = custom endpoint.
+     */
+    provider_mode: string;
+    /**
+     * Connected coding plan ID when `provider_mode === 'official'` and the
+     * user connected via a coding plan (e.g. `'glm-coding-plan'`).
+     * Undefined for stagewise/custom routes or plain BYOK keys.
+     */
+    coding_plan_id?: string;
     has_attachments: boolean;
     attachment_count: number;
     slash_command_ids: string[];
@@ -192,6 +206,7 @@ export type EventProperties = {
     agent_instance_id: string;
     model_id: string;
     provider_mode: string;
+    coding_plan_id?: string;
     input_tokens: number;
     output_tokens: number;
     tool_call_count: number;

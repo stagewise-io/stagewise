@@ -1433,6 +1433,8 @@ export class AgentManager extends DisposableService {
       agent_type: instance?.type ?? 'unknown',
       agent_instance_id: instanceId,
       model_id: instance?.state.activeModelId ?? 'unknown',
+      provider_mode: agent.lastProviderMode,
+      coding_plan_id: agent.lastCodingPlanId,
       has_attachments: attachmentParts.length > 0,
       attachment_count: attachmentParts.length,
       slash_command_ids: slashCommandIdsForTelemetry,
