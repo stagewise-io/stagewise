@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useId } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import {
@@ -66,6 +67,8 @@ export function SidebarExperienceSurvey() {
   });
 
   const [hasAnswered, setHasAnswered] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
+  const feedbackLabelId = useId();
 
   // Tick to force memo recomputation at cooldown boundaries.
   // Without this, Date.now() inside the memos would stay stale while
@@ -209,16 +212,20 @@ export function SidebarExperienceSurvey() {
     void dismissSurvey();
   }, [dismissSurvey]);
 
-  const handleSubmitFeedback = useCallback(() => {
+  const handleSubmitFeedback = useCallback(async () => {
     const trimmed = feedback.trim();
     if (!trimmed) return;
-    void submitFeedback(trimmed);
-    setSubmitted(true);
+    try {
+      await submitFeedback(trimmed);
+      setSubmitted(true);
+    } catch {
+      setSubmitError(true);
+    }
   }, [feedback, submitFeedback]);
 
   const handleOpenFounderCall = useCallback(() => {
     void openFounderCallSurvey();
-    window.open(BOOKING_URL, '_blank');
+    window.open(BOOKING_URL, '_blank', 'noopener,noreferrer');
   }, [openFounderCallSurvey]);
 
   const handleDismissFounderCall = useCallback(() => {
@@ -234,7 +241,7 @@ export function SidebarExperienceSurvey() {
       >
         {!hasAnswered ? (
           <>
-            <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
+            <div className="font-medium text-foreground text-xs leading-relaxed">
               Do you enjoy your experience with stagewise?
             </div>
             <div className="flex gap-2">
@@ -262,20 +269,32 @@ export function SidebarExperienceSurvey() {
           </>
         ) : (
           <>
-            <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
+            <div
+              id={feedbackLabelId}
+              className="font-medium text-foreground text-xs leading-relaxed"
+            >
               What could we improve?
             </div>
+            {submitError && (
+              <p className="text-error-foreground text-xs">
+                Failed to submit. Please try again.
+              </p>
+            )}
             <textarea
               ref={textareaRef}
+              aria-labelledby={feedbackLabelId}
               className="scrollbar-subtle w-full resize-none rounded-md border border-derived bg-surface-1 px-2.5 py-2 text-foreground text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary-foreground"
               placeholder="What could we improve?"
               rows={3}
               value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
+              onChange={(e) => {
+                setFeedback(e.target.value);
+                if (submitError) setSubmitError(false);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSubmitFeedback();
+                  void handleSubmitFeedback();
                 }
               }}
             />
@@ -302,7 +321,7 @@ export function SidebarExperienceSurvey() {
         dismissLabel="Dismiss survey"
         onDismiss={handleDismissFounderCall}
       >
-        <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
+        <div className="font-medium text-foreground text-xs leading-relaxed">
           Tell our founders what you think about stagewise and get 1 month Pro
           for free!
         </div>
