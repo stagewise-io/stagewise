@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useKartonState } from '@ui/hooks/use-karton';
-import { Button } from '@stagewise/stage-ui/components/button';
-import { XIcon, TriangleAlertIcon } from 'lucide-react';
+import { TriangleAlertIcon } from 'lucide-react';
+import { SidebarToast } from '../../../_components/sidebar-toast';
 
 const THRESHOLDS = [80, 90, 100] as const;
 
@@ -53,24 +53,19 @@ export function UsageWarningBadge() {
   const window = stateUsageWarning.windowType;
 
   return (
-    <div className="relative flex shrink-0 flex-row items-start gap-2 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-strong backdrop-blur-xl dark:bg-surface-1/60">
+    <SidebarToast
+      dismissLabel="Dismiss usage warning"
+      onDismiss={() => {
+        lastDismissedThreshold = activeThreshold;
+        setDismissedThreshold(activeThreshold);
+      }}
+      className="flex-row items-start gap-2"
+    >
       <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0 text-warning-foreground" />
       <span className="text-foreground text-xs">
         You&apos;ve used {pct}% of your {window} limit. Consider switching to a
         cheaper model.
       </span>
-      <Button
-        variant="ghost"
-        size="icon-2xs"
-        className="ml-auto shrink-0"
-        aria-label="Dismiss usage warning"
-        onClick={() => {
-          lastDismissedThreshold = activeThreshold;
-          setDismissedThreshold(activeThreshold);
-        }}
-      >
-        <XIcon className="size-3" />
-      </Button>
-    </div>
+    </SidebarToast>
   );
 }

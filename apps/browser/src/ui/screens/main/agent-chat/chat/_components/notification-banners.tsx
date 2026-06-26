@@ -5,7 +5,7 @@ import {
   IconTriangleWarningOutline18,
   IconCircleInfoOutline18,
 } from 'nucleo-ui-outline-18';
-import { IconXmark } from 'nucleo-micro-bold';
+import { SidebarToast } from '../../../_components/sidebar-toast';
 
 export function NotificationBanners() {
   const notifications = useKartonState((s) => s.notifications);
@@ -21,11 +21,10 @@ export function NotificationBanners() {
   return (
     <div className="flex shrink-0 flex-col gap-2">
       {notifications.map((notification) => (
-        <div
+        <SidebarToast
           key={notification.id}
-          className={cn(
-            'relative flex shrink-0 flex-col gap-1.5 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-strong backdrop-blur-xl dark:bg-surface-1/60',
-          )}
+          dismissLabel="Dismiss notification"
+          onDismiss={() => dismissNotification(notification.id)}
         >
           <div className="flex flex-row items-start gap-2">
             <NotificationIcon type={notification.type} />
@@ -49,15 +48,6 @@ export function NotificationBanners() {
                 </p>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="icon-2xs"
-              className="ml-auto shrink-0"
-              aria-label="Dismiss notification"
-              onClick={() => dismissNotification(notification.id)}
-            >
-              <IconXmark className="size-3" />
-            </Button>
           </div>
           {notification.actions.length > 0 && (
             <div className="flex flex-row-reverse items-center gap-2">
@@ -76,7 +66,7 @@ export function NotificationBanners() {
               ))}
             </div>
           )}
-        </div>
+        </SidebarToast>
       ))}
     </div>
   );
