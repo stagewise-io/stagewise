@@ -314,40 +314,50 @@ export class UserExperienceService extends DisposableService {
 
     // Set firstUsedAt on first user message in any agent
     const currentState = this.uiKarton.state;
-    if (this.isSettingFirstUsedAt) return;
-    if (currentState.userExperience.storedExperienceData.firstUsedAt !== null)
-      return;
-    const hasMessages = Object.values(currentState.agents.instances).some(
-      (instance) => instance.state.history.length > 0,
-    );
-    if (hasMessages) {
-      void this.setFirstUsedAt();
+    if (
+      !this.isSettingFirstUsedAt &&
+      currentState.userExperience.storedExperienceData.firstUsedAt === null
+    ) {
+      const hasMessages = Object.values(currentState.agents.instances).some(
+        (instance) => instance.state.history.length > 0,
+      );
+      if (hasMessages) {
+        void this.setFirstUsedAt();
+      }
     }
 
     // Refresh totalAgentCount from DB — the DB is the source of truth,
     // not the in-memory agent instances (which may be a subset).
-    // The guard prevents concurrent queries from rapid state changes.
+    // Only query when the loaded instance count exceeds the stored count,
+    // indicating new agents may have been created. The guard prevents
+    // concurrent queries from rapid state changes.
     if (this.getAgentCount && !this.isRefreshingAgentCount) {
-      this.isRefreshingAgentCount = true;
-      void this.getAgentCount()
-        .then((count) => {
-          // Read storedCount fresh from state — the closure value may be stale
-          // if an earlier callback already updated it.
-          const currentStored =
-            this.uiKarton.state.userExperience.storedExperienceData
-              .totalAgentCount;
-          if (count > currentStored) {
-            this.uiKarton.setState((draft) => {
-              draft.userExperience.storedExperienceData.totalAgentCount = count;
-            });
-          }
-        })
-        .catch((error) => {
-          this.report(error as Error, 'refreshAgentCount');
-        })
-        .finally(() => {
-          this.isRefreshingAgentCount = false;
-        });
+      const loadedCount = Object.keys(currentState.agents.instances).length;
+      const storedCount =
+        currentState.userExperience.storedExperienceData.totalAgentCount;
+      if (loadedCount > storedCount) {
+        this.isRefreshingAgentCount = true;
+        void this.getAgentCount()
+          .then((count) => {
+            // Read storedCount fresh from state — the closure value may
+            // be stale if an earlier callback already updated it.
+            const currentStored =
+              this.uiKarton.state.userExperience.storedExperienceData
+                .totalAgentCount;
+            if (count > currentStored) {
+              this.uiKarton.setState((draft) => {
+                draft.userExperience.storedExperienceData.totalAgentCount =
+                  count;
+              });
+            }
+          })
+          .catch((error) => {
+            this.report(error as Error, 'refreshAgentCount');
+          })
+          .finally(() => {
+            this.isRefreshingAgentCount = false;
+          });
+      }
     }
   }
 
