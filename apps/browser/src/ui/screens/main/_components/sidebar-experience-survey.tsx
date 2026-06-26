@@ -2,11 +2,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import {
-  IconXmarkOutline18,
   IconVideoOutline18,
   IconThumbsUpOutline18,
   IconThumbsDownOutline18,
 } from 'nucleo-ui-outline-18';
+import { SidebarToast } from './sidebar-toast';
 
 const MESSAGE_THRESHOLD = 5;
 const DISMISS_COOLDOWN_MS = 48 * 60 * 60 * 1000; // 48 hours
@@ -152,18 +152,12 @@ export function SidebarExperienceSurvey() {
   // ── First survey ──
   if (shouldShow) {
     return (
-      <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/30 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle backdrop-blur-xl dark:bg-surface-1/30">
+      <SidebarToast
+        dismissLabel="Dismiss survey"
+        onDismiss={!hasAnswered ? handleDismiss : () => setSubmitted(true)}
+      >
         {!hasAnswered ? (
           <>
-            <Button
-              variant="ghost"
-              size="icon-2xs"
-              className="absolute top-1.5 right-1.5 z-10 shrink-0"
-              aria-label="Dismiss survey"
-              onClick={handleDismiss}
-            >
-              <IconXmarkOutline18 className="size-3" />
-            </Button>
             <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
               Do you enjoy your experience with stagewise?
             </div>
@@ -192,15 +186,6 @@ export function SidebarExperienceSurvey() {
           </>
         ) : (
           <>
-            <Button
-              variant="ghost"
-              size="icon-2xs"
-              className="absolute top-1.5 right-1.5 z-10 shrink-0"
-              aria-label="Dismiss survey"
-              onClick={() => setSubmitted(true)}
-            >
-              <IconXmarkOutline18 className="size-3" />
-            </Button>
             <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
               What could we improve?
             </div>
@@ -230,23 +215,17 @@ export function SidebarExperienceSurvey() {
             </div>
           </>
         )}
-      </div>
+      </SidebarToast>
     );
   }
 
   // ── Second (founder call) survey ──
   if (shouldShowFounderCall) {
     return (
-      <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/30 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle backdrop-blur-xl dark:bg-surface-1/30">
-        <Button
-          variant="ghost"
-          size="icon-2xs"
-          className="absolute top-1.5 right-1.5 z-10 shrink-0"
-          aria-label="Dismiss survey"
-          onClick={handleDismissFounderCall}
-        >
-          <IconXmarkOutline18 className="size-3" />
-        </Button>
+      <SidebarToast
+        dismissLabel="Dismiss survey"
+        onDismiss={handleDismissFounderCall}
+      >
         <div className="pr-7 font-medium text-foreground text-xs leading-relaxed">
           Tell our founders what you think about stagewise and get 1 month Pro
           for free!
@@ -260,7 +239,7 @@ export function SidebarExperienceSurvey() {
           <IconVideoOutline18 className="size-3.5" />
           Book a call
         </Button>
-      </div>
+      </SidebarToast>
     );
   }
 

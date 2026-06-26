@@ -2,9 +2,9 @@ import { useMemo, useRef } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import { XIcon } from 'lucide-react';
 import { IconTrash2Outline24 } from 'nucleo-core-outline-24';
 import { IconBranchOutOutline18 } from 'nucleo-ui-outline-18';
+import { SidebarToast } from '../_components/sidebar-toast';
 
 function getBaseName(value: string): string {
   return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value;
@@ -52,22 +52,16 @@ export function WorktreeCleanupBadge() {
   };
 
   return (
-    <div className="relative flex shrink-0 flex-col gap-2 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-strong backdrop-blur-xl dark:bg-surface-1/60">
+    <SidebarToast
+      dismissLabel="Dismiss worktree cleanup"
+      onDismiss={handleDismiss}
+    >
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1.5">
           <IconTrash2Outline24 className="size-3.5 shrink-0 text-foreground" />
           <div className="mt-0.5 min-w-0 flex-1 font-medium text-foreground text-xs">
             Clean old worktrees?
           </div>
-          <Button
-            variant="ghost"
-            size="icon-2xs"
-            className="ml-auto shrink-0"
-            aria-label="Dismiss worktree cleanup"
-            onClick={handleDismiss}
-          >
-            <XIcon className="size-3" />
-          </Button>
         </div>
         <p className="text-muted-foreground text-xs leading-snug">
           {count} clean, inactive{' '}
@@ -132,6 +126,6 @@ export function WorktreeCleanupBadge() {
           {cleanup.cleaning ? 'Cleaning…' : 'Clean worktrees'}
         </Button>
       </div>
-    </div>
+    </SidebarToast>
   );
 }
