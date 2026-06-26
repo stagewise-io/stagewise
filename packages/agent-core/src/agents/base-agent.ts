@@ -506,6 +506,23 @@ export abstract class BaseAgent<
   }
 
   /**
+   * Provider routing mode from the most recent completed step.
+   * Empty string before the first step runs. Used for telemetry at
+   * message-sent time (before the next step resolves routing).
+   */
+  public get lastProviderMode(): string {
+    return this._stepProviderMode;
+  }
+
+  /**
+   * Connected coding plan ID from the most recent completed step, if
+   * any. Undefined for non-plan routes or before the first step.
+   */
+  public get lastCodingPlanId(): string | undefined {
+    return this._stepCodingPlanId;
+  }
+
+  /**
    * The state of the agent is stored in a central store (the agent manager owns that store and manages it efficiently)
    * and is accessed by the agent through the getter and setter.
    */
@@ -574,6 +591,7 @@ export abstract class BaseAgent<
   private _stepGeneration = 0;
   private _stepStartTime = 0;
   private _stepProviderMode = '';
+  private _stepCodingPlanId: string | undefined;
   private _toolCallDurations = new Map<string, number>();
   private _memoryWriter: AgentMemoryWriter | null = null;
   private _memoryWriteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1612,6 +1630,7 @@ export abstract class BaseAgent<
         },
       );
       this._stepProviderMode = modelWithOptions.providerMode;
+      this._stepCodingPlanId = modelWithOptions.connectedCodingPlanId;
     } catch (error) {
       const err = error as Error;
       this.host.logger.error(
@@ -2406,6 +2425,7 @@ export abstract class BaseAgent<
       agent_instance_id: this.instanceId,
       model_id: this.state.get().activeModelId,
       provider_mode: this._stepProviderMode,
+      coding_plan_id: this._stepCodingPlanId,
       input_tokens: result.usage.inputTokens ?? 0,
       output_tokens: result.usage.outputTokens ?? 0,
       tool_call_count: result.toolCalls.length,

@@ -47,6 +47,14 @@ export interface ModelWithOptions {
   /** Host-specific routing mode that produced this model. */
   providerMode: ProviderMode;
   /**
+   * Host-specific identifier for a connected coding/subscription plan
+   * (e.g. `'glm-coding-plan'`). Only populated when `providerMode ===
+   * 'official'` and the user connected via a coding plan rather than a
+   * plain API key. Core stays agnostic — passes the string through to
+   * telemetry.
+   */
+  connectedCodingPlanId?: string;
+  /**
    * Semantic owner of any signed `reasoning_details` this route produces.
    * Threaded through the step so capture tags the metadata and conversion
    * re-injects signatures only for matching future routes. Optional: hosts
