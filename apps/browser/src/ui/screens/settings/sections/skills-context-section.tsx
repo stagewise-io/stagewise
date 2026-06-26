@@ -20,7 +20,7 @@ import type { MountEntry, AppState } from '@shared/karton-contracts/ui';
 import type { Patch } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
-import { getBaseName } from '@shared/path-utils';
+import { getWorkspaceDisplayInfo } from '@ui/utils/workspace-display';
 import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import {
   Tooltip,
@@ -663,11 +663,17 @@ export function SkillsContextSection() {
   const tabItems = useMemo(
     () => [
       { id: GLOBAL_TAB_ID, label: 'Global' },
-      ...workspaceMounts.map((mount) => ({
-        id: mount.path,
-        label: getBaseName(mount.path) || mount.path,
-        subLabel: mount.path,
-      })),
+      ...workspaceMounts.map((mount) => {
+        const display = getWorkspaceDisplayInfo({
+          path: mount.path,
+          git: mount.git,
+        });
+        return {
+          id: mount.path,
+          label: display.title,
+          subLabel: mount.path,
+        };
+      }),
     ],
     [workspaceMounts],
   );
