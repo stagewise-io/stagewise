@@ -63,6 +63,9 @@ export class UserExperienceService extends DisposableService {
   // Prevent concurrent firstUsedAt writes
   private isSettingFirstUsedAt = false;
 
+  // Prevent concurrent totalAgentCount refresh queries
+  private isRefreshingAgentCount = false;
+
   private constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -321,19 +324,30 @@ export class UserExperienceService extends DisposableService {
       void this.setFirstUsedAt();
     }
 
-    // Refresh totalAgentCount from DB when loaded agent count increases
-    // beyond the last known value — new agents may have been created.
-    const loadedCount = Object.keys(currentState.agents.instances).length;
-    const storedCount =
-      currentState.userExperience.storedExperienceData.totalAgentCount;
-    if (this.getAgentCount && loadedCount > storedCount) {
-      void this.getAgentCount().then((count) => {
-        if (count > storedCount) {
-          this.uiKarton.setState((draft) => {
-            draft.userExperience.storedExperienceData.totalAgentCount = count;
-          });
-        }
-      });
+    // Refresh totalAgentCount from DB — the DB is the source of truth,
+    // not the in-memory agent instances (which may be a subset).
+    // The guard prevents concurrent queries from rapid state changes.
+    if (this.getAgentCount && !this.isRefreshingAgentCount) {
+      this.isRefreshingAgentCount = true;
+      void this.getAgentCount()
+        .then((count) => {
+          // Read storedCount fresh from state — the closure value may be stale
+          // if an earlier callback already updated it.
+          const currentStored =
+            this.uiKarton.state.userExperience.storedExperienceData
+              .totalAgentCount;
+          if (count > currentStored) {
+            this.uiKarton.setState((draft) => {
+              draft.userExperience.storedExperienceData.totalAgentCount = count;
+            });
+          }
+        })
+        .catch((error) => {
+          this.report(error as Error, 'refreshAgentCount');
+        })
+        .finally(() => {
+          this.isRefreshingAgentCount = false;
+        });
     }
   }
 
