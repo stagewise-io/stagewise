@@ -851,9 +851,12 @@ export class UserExperienceService extends DisposableService {
         const oldest = await this.getOldestAgentCreatedAt();
         if (oldest !== null) {
           const oldestMs = oldest.getTime();
-          // Guard against corrupted records (e.g. created_at = 0 = Unix
-          // epoch). If the value is impossibly old, fall back to now.
-          if (oldestMs > 0) {
+          // Use the same plausibility threshold as readFirstUsedAt() /
+          // validateTimestamp(). Only persist if the value is plausible
+          // (>= Jan 1, 2000 and not in the future); otherwise fall back
+          // to now so a valid timestamp is always written and the
+          // backfill is not retried on every state change.
+          if (this.validateTimestamp(oldestMs, 'firstUsedAt') !== null) {
             timestamp = oldestMs;
           }
         }
