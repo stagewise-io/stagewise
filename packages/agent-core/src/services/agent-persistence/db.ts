@@ -675,11 +675,32 @@ export class AgentPersistenceDB {
    * introduced.
    */
   public async getOldestAgentCreatedAt(): Promise<Date | null> {
+    // Filter out invalid timestamps (0, negative, or impossibly old).
+    // Some legacy/corrupted records have created_at = 0 (Unix epoch),
+    // which would poison the firstUsedAt backfill.
     const result = await this._db
       .select({ createdAt: schema.agentInstances.createdAt })
       .from(schema.agentInstances)
+      .where(sql`${schema.agentInstances.createdAt} > 0`)
       .orderBy(asc(schema.agentInstances.createdAt))
       .limit(1);
     return result[0]?.createdAt ?? null;
+  }
+
+  /**
+   * Returns the total number of top-level chat agents (excluding sub-agents).
+   * Used by the founder-call survey to determine eligibility.
+   */
+  public async getAgentCount(): Promise<number> {
+    const result = await this._db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.agentInstances)
+      .where(
+        and(
+          isNull(schema.agentInstances.parentAgentInstanceId),
+          eq(schema.agentInstances.type, AgentTypes.CHAT),
+        ),
+      );
+    return result[0]?.count ?? 0;
   }
 }

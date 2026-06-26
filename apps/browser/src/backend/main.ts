@@ -491,6 +491,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
     gitService,
     () => persistence.agentDb.getOldestAgentCreatedAt(),
+    () => persistence.agentDb.getAgentCount(),
   );
 
   const credentialsService = await CredentialsService.create(logger);

@@ -429,6 +429,7 @@ export const storedExperienceDataSchema = z.object({
   experienceSurvey: experienceSurveySchema,
   firstUsedAt: z.number().nullable(),
   founderCallSurvey: founderCallSurveySchema,
+  totalAgentCount: z.number(),
 });
 
 export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;
@@ -2183,6 +2184,7 @@ export const defaultState: KartonContract['state'] = {
         answered: false,
         answeredAt: null,
       },
+      totalAgentCount: 0,
     },
     pendingOnboardingSuggestion: null,
     devAppPreview: {

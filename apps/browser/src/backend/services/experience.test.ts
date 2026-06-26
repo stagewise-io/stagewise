@@ -112,6 +112,7 @@ function createGitService(
 function createService(
   gitService: GitService,
   getOldestAgentCreatedAt?: () => Promise<Date | null>,
+  getAgentCount?: () => Promise<number>,
 ) {
   const state = {
     agents: { instances: {} },
@@ -120,6 +121,7 @@ function createService(
         recentlyOpenedWorkspaces: [],
         hasSeenOnboardingFlow: null,
         lastViewedChats: {},
+        totalAgentCount: 0,
       },
     },
   };
@@ -147,6 +149,7 @@ function createService(
     telemetryService,
     gitService,
     getOldestAgentCreatedAt,
+    getAgentCount,
   );
 }
 
@@ -402,5 +405,24 @@ describe('UserExperienceService firstUsedAt backfill', () => {
     const firstUsedAt = persistedData.get('first-used-at') as number;
     expect(firstUsedAt).toBeGreaterThanOrEqual(before);
     expect(firstUsedAt).toBeLessThanOrEqual(after);
+  });
+
+  it('treats implausible persisted firstUsedAt as null (self-heal)', async () => {
+    // Simulate a corrupted value (e.g. 0 or 100 from epoch-0 agent records)
+    persistedData.set('first-used-at', 100);
+    const oldestDate = new Date('2025-01-15T10:00:00Z');
+    const service = await createService(
+      createGitService({}),
+      async () => oldestDate,
+    );
+
+    // readFirstUsedAt should return null for the corrupted value
+    const readResult = await (service as any).readFirstUsedAt();
+    expect(readResult).toBeNull();
+
+    // setFirstUsedAt should backfill from the oldest agent createdAt
+    await (service as any).setFirstUsedAt();
+    const firstUsedAt = persistedData.get('first-used-at') as number;
+    expect(firstUsedAt).toBe(oldestDate.getTime());
   });
 });
