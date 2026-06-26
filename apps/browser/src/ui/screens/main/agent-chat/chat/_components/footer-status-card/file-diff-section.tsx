@@ -14,6 +14,10 @@ import { stripMountPrefix } from '@ui/utils';
 import type { MountEntry } from '@shared/karton-contracts/ui';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
 import { getWorkspaceDisplayLabel } from '@ui/utils/workspace-display';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { HotkeyActions } from '@shared/hotkeys';
 import {
   type StatusCardSection,
   type FormattedFileDiff,
@@ -261,6 +265,43 @@ function FileDiffList({
   );
 }
 
+function AcceptAllButton({
+  hunkIds,
+  onAcceptAll,
+}: {
+  hunkIds: string[];
+  onAcceptAll: (hunkIds: string[]) => void;
+}) {
+  const { setRef, isWinner } = useCmdEnterTarget({
+    id: 'file-diff-accept-all',
+    priority: CmdEnterPriority.FILE_DIFF_ACCEPT,
+    action: () => onAcceptAll(hunkIds),
+    enabled: true,
+  });
+  return (
+    <Button
+      ref={setRef}
+      variant="primary"
+      size="xs"
+      className="cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        onAcceptAll(hunkIds);
+      }}
+    >
+      Accept all
+      {isWinner && (
+        <HotkeyCombo
+          action={HotkeyActions.CMD_ENTER}
+          size="xs"
+          variant="solid"
+          className="ml-0.5"
+        />
+      )}
+    </Button>
+  );
+}
+
 export function FileDiffSection(
   props: FileDiffSectionProps,
 ): StatusCardSection | null {
@@ -319,19 +360,10 @@ export function FileDiffSection(
             >
               Reject
             </Button>
-            <Button
-              variant="primary"
-              size="xs"
-              className="cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAcceptAll(
-                  pendingDiffs?.flatMap((diff) => getHunkIds(diff)) ?? [],
-                );
-              }}
-            >
-              Accept all
-            </Button>
+            <AcceptAllButton
+              hunkIds={pendingDiffs?.flatMap((diff) => getHunkIds(diff)) ?? []}
+              onAcceptAll={onAcceptAll}
+            />
           </div>
         ) : (
           <div className="ml-auto h-6" />

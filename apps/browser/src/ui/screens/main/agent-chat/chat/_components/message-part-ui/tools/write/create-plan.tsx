@@ -22,7 +22,8 @@ import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
 import { usePlanPhase } from '@ui/hooks/use-plan-phase';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
-import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
 import {
   Tooltip,
   TooltipContent,
@@ -146,11 +147,13 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
   // Implement: send a synthetic /implement message to the agent
   const handleImplement = useSendImplement();
 
-  useHotKeyListener(
-    handleImplement,
-    HotkeyActions.IMPLEMENT_CREATED_PLAN,
-    phase === 'just-created',
-  );
+  const { setRef: implementRef, isWinner: implementIsWinner } =
+    useCmdEnterTarget({
+      id: `create-plan-implement-${part.toolCallId}`,
+      priority: CmdEnterPriority.CREATE_PLAN,
+      action: handleImplement,
+      enabled: phase === 'just-created',
+    });
 
   const handleOpenPlan = useCallback(() => {
     const baseUrl = `stagewise://internal/plan/${encodeURIComponent(filename)}`;
@@ -219,6 +222,7 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
         </Button>
         {phase === 'just-created' && (
           <Button
+            ref={implementRef}
             variant="primary"
             size="xs"
             className="pr-1"
@@ -226,11 +230,14 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
           >
             <span className="flex items-center gap-1.5">
               <span>Implement</span>
-              <HotkeyCombo
-                action={HotkeyActions.IMPLEMENT_CREATED_PLAN}
-                size="xs"
-                variant="solid"
-              />
+              {implementIsWinner && (
+                <HotkeyCombo
+                  action={HotkeyActions.CMD_ENTER}
+                  size="xs"
+                  variant="solid"
+                  className="ml-0.5"
+                />
+              )}
             </span>
           </Button>
         )}

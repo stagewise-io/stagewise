@@ -15,10 +15,15 @@ import {
   OpenAgentContext,
   noopAgentSwitcher,
 } from '@ui/hooks/use-open-chat';
+import { useCmdEnterDispatcher } from '@ui/hooks/use-cmd-enter-dispatcher';
 
 export function ChatPanel() {
   const { forwardDropEvent } = useMessageEditState();
   const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
+
+  // Single global CMD+Enter listener — dispatches to the highest-priority
+  // visible target registered via `useCmdEnterTarget`.
+  useCmdEnterDispatcher();
 
   // Narrow selectors: only extract primitive/stable values so streaming
   // chunks on unrelated agents don't trigger a re-render.

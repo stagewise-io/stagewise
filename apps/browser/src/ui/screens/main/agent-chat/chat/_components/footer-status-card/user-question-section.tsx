@@ -15,7 +15,7 @@ import {
 } from '@stagewise/stage-ui/components/radio';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import { ChevronDownIcon, CornerDownLeftIcon, XIcon } from 'lucide-react';
+import { ChevronDownIcon, XIcon } from 'lucide-react';
 import { cn } from '@ui/utils';
 import { Streamdown, InlineMarkdown } from '@ui/components/streamdown';
 import type { StatusCardSection } from './shared';
@@ -25,6 +25,10 @@ import type {
 } from '@shared/karton-contracts/ui/agent/tools/types';
 import type { PendingUserQuestion } from '@shared/karton-contracts/ui/index';
 import { dispatchArrowFromCtrl } from '@ui/utils/keyboard-nav';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { HotkeyActions } from '@shared/hotkeys';
 import { IconHelpChatOutline18 } from 'nucleo-ui-outline-18';
 
 /**
@@ -251,7 +255,26 @@ function UserQuestionForm({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey && isStepComplete && !isSubmitting) {
+      if (
+        e.key === 'Enter' &&
+        !e.shiftKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        isStepComplete &&
+        !isSubmitting
+      ) {
+        // Don't intercept Enter from interactive elements (buttons, links,
+        // non-text inputs) — let them activate normally.
+        const target = e.target as HTMLElement;
+        const tagName = target.tagName;
+        const isInteractive =
+          tagName === 'BUTTON' ||
+          tagName === 'A' ||
+          (tagName === 'INPUT' &&
+            ['button', 'submit', 'reset', 'radio', 'checkbox'].includes(
+              (target as HTMLInputElement).type,
+            ));
+        if (isInteractive) return;
         e.preventDefault();
         void handleSubmit();
       }
@@ -289,6 +312,13 @@ function UserQuestionForm({
   const { maskStyle } = useScrollFadeMask(viewportRef, {
     axis: 'vertical',
     fadeDistances: { top: 12, bottom: 20 },
+  });
+
+  const { setRef: submitRef, isWinner: submitIsWinner } = useCmdEnterTarget({
+    id: 'user-question-submit',
+    priority: CmdEnterPriority.USER_QUESTION,
+    action: handleSubmit,
+    enabled: isStepComplete && !isSubmitting,
   });
 
   if (!currentStepData) return null;
@@ -339,13 +369,21 @@ function UserQuestionForm({
           </Button>
         )}
         <Button
+          ref={submitRef}
           variant="primary"
           size="xs"
           onClick={() => void handleSubmit()}
           disabled={!isStepComplete || isSubmitting}
         >
           {isLastStep ? 'Send' : 'Next'}
-          <CornerDownLeftIcon className="ml-1 size-3" />
+          {submitIsWinner && (
+            <HotkeyCombo
+              action={HotkeyActions.CMD_ENTER}
+              size="xs"
+              variant="solid"
+              className="ml-0.5"
+            />
+          )}
         </Button>
       </div>
       {/* Focus sentinel: catches Tab past the last element and redirects to chat input */}

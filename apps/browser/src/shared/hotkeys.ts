@@ -63,7 +63,7 @@ export enum HotkeyActions {
   COMMAND_CENTER_TOGGLE_GITIGNORED = 'command_center_toggle_gitignored',
   COMMAND_CENTER_TOGGLE_SEARCH_IN_CONTENT = 'command_center_toggle_search_in_content',
   NEW_CHAT = 'new_chat',
-  IMPLEMENT_CREATED_PLAN = 'implement_created_plan',
+  CMD_ENTER = 'cmd_enter',
   STOP_AGENT = 'stop_agent',
 
   // Tab & window navigation
@@ -234,7 +234,7 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
     accelerator: 'Mod+N',
     captureDominantly: false,
   },
-  [HotkeyActions.IMPLEMENT_CREATED_PLAN]: {
+  [HotkeyActions.CMD_ENTER]: {
     accelerator: 'Mod+Enter',
     captureDominantly: true,
   },
