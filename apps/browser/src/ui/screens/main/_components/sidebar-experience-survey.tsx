@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import {
@@ -67,6 +67,11 @@ export function SidebarExperienceSurvey() {
 
   const [hasAnswered, setHasAnswered] = useState(false);
 
+  // Tick to force memo recomputation at cooldown boundaries.
+  // Without this, Date.now() inside the memos would stay stale while
+  // the app is idle, and surveys wouldn't appear when cooldowns expire.
+  const [tick, setTick] = useState(0);
+
   // ── First survey visibility ──
   const shouldShow = useMemo(() => {
     if (submitted) return false;
@@ -83,7 +88,7 @@ export function SidebarExperienceSurvey() {
 
     // Show again after cooldown
     return Date.now() - survey.dismissedAt >= DISMISS_COOLDOWN_MS;
-  }, [survey, totalUserMessages, submitted, hasAnswered]);
+  }, [survey, totalUserMessages, submitted, hasAnswered, tick]);
 
   // ── Second (founder call) survey visibility ──
   const shouldShowFounderCall = useMemo(() => {
@@ -117,7 +122,78 @@ export function SidebarExperienceSurvey() {
       Date.now() - founderCallSurvey.dismissedAt >=
       FOUNDER_CALL_DISMISS_COOLDOWN_MS
     );
-  }, [shouldShow, founderCallSurvey, totalAgentCount, firstUsedAt, survey]);
+  }, [
+    shouldShow,
+    founderCallSurvey,
+    totalAgentCount,
+    firstUsedAt,
+    survey,
+    tick,
+  ]);
+
+  // Schedule a re-render at the earliest upcoming cooldown boundary
+  // so surveys appear without waiting for an unrelated state change.
+  useEffect(() => {
+    if (shouldShow || shouldShowFounderCall) return;
+
+    const now = Date.now();
+    const boundaries: number[] = [];
+
+    // First survey: cooldown after dismissal
+    if (
+      !survey.answered &&
+      survey.dismissedAt !== null &&
+      survey.dismissedCount < MAX_DISMISS_COUNT &&
+      totalUserMessages > MESSAGE_THRESHOLD
+    ) {
+      boundaries.push(survey.dismissedAt + DISMISS_COOLDOWN_MS);
+    }
+
+    // Founder call survey: only if preconditions are met
+    if (
+      !founderCallSurvey.answered &&
+      totalAgentCount >= FOUNDER_CALL_AGENT_THRESHOLD &&
+      firstUsedAt !== null
+    ) {
+      // Usage days boundary
+      boundaries.push(
+        firstUsedAt + FOUNDER_CALL_USAGE_DAYS * 24 * 60 * 60 * 1000,
+      );
+
+      // Stagger after first survey resolution
+      const firstSurveyResolvedAt = survey.answeredAt ?? survey.dismissedAt;
+      if (firstSurveyResolvedAt !== null) {
+        boundaries.push(firstSurveyResolvedAt + FOUNDER_CALL_STAGGER_MS);
+      }
+
+      // Dismiss cooldown
+      if (
+        founderCallSurvey.dismissedAt !== null &&
+        founderCallSurvey.dismissedCount < MAX_DISMISS_COUNT
+      ) {
+        boundaries.push(
+          founderCallSurvey.dismissedAt + FOUNDER_CALL_DISMISS_COOLDOWN_MS,
+        );
+      }
+    }
+
+    const nextBoundary = boundaries
+      .filter((b) => b > now)
+      .sort((a, b) => a - b)[0];
+    if (nextBoundary === undefined) return;
+
+    const delay = nextBoundary - now;
+    const timer = setTimeout(() => setTick((t) => t + 1), delay);
+    return () => clearTimeout(timer);
+  }, [
+    shouldShow,
+    shouldShowFounderCall,
+    survey,
+    founderCallSurvey,
+    firstUsedAt,
+    totalUserMessages,
+    totalAgentCount,
+  ]);
 
   const handleAnswer = useCallback(
     (answer: 'yes' | 'no') => {
