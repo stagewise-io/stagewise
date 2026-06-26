@@ -20,6 +20,15 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { getAvailableModel } from '@shared/available-models';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
 import type { AgentRuntimeError } from '@shared/karton-contracts/ui/agent';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { HotkeyActions } from '@shared/hotkeys';
+
+interface RetryActionProps {
+  retryRef?: (element: HTMLElement | null) => void;
+  showRetryHotkey?: boolean;
+}
 
 const consoleUrl =
   import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
@@ -77,12 +86,24 @@ export function MessageRuntimeError({
 }) {
   const canShowRetry = canRetry || !isWorking;
 
+  const { setRef: retryRef, isWinner: retryIsWinner } = useCmdEnterTarget({
+    id: `message-runtime-error-retry-${agentInstanceId}`,
+    priority: CmdEnterPriority.ERROR_RETRY,
+    action: onRetry,
+    enabled: canShowRetry,
+  });
+  const retryProps: RetryActionProps = {
+    retryRef,
+    showRetryHotkey: retryIsWinner,
+  };
+
   if (error.kind === 'upstream-overload') {
     return (
       <UpstreamOverloadError
         error={error}
         isWorking={isWorking}
         onRetry={onRetry}
+        {...retryProps}
       />
     );
   }
@@ -93,6 +114,7 @@ export function MessageRuntimeError({
         error={error}
         canRetry={canShowRetry}
         onRetry={onRetry}
+        {...retryProps}
       />
     );
   }
@@ -103,6 +125,7 @@ export function MessageRuntimeError({
         error={error}
         canRetry={canShowRetry}
         onRetry={onRetry}
+        {...retryProps}
       />
     );
   }
@@ -113,6 +136,7 @@ export function MessageRuntimeError({
         error={error}
         canRetry={canShowRetry}
         onRetry={onRetry}
+        {...retryProps}
       />
     );
   }
@@ -123,6 +147,7 @@ export function MessageRuntimeError({
       error={error}
       canRetry={canShowRetry}
       onRetry={onRetry}
+      {...retryProps}
     />
   );
 }
@@ -131,11 +156,13 @@ function PlanLimitExceededError({
   error,
   canRetry,
   onRetry,
+  retryRef,
+  showRetryHotkey,
 }: {
   error: Extract<AgentRuntimeError, { kind: 'plan-limit-exceeded' }>;
   canRetry: boolean;
   onRetry: () => void;
-}) {
+} & RetryActionProps) {
   const subscription = useKartonState((s) => s.userAccount.subscription);
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
@@ -181,9 +208,17 @@ function PlanLimitExceededError({
       <div className="flex flex-row items-center justify-between gap-2 pt-1">
         <div>
           {canRetry && (
-            <Button variant="ghost" size="xs" onClick={onRetry}>
+            <Button ref={retryRef} variant="ghost" size="xs" onClick={onRetry}>
               <RefreshCcwIcon className="size-3" />
               Retry
+              {showRetryHotkey && (
+                <HotkeyCombo
+                  action={HotkeyActions.CMD_ENTER}
+                  size="xs"
+                  variant="ghost"
+                  className="ml-0.5"
+                />
+              )}
             </Button>
           )}
         </div>
@@ -218,11 +253,13 @@ function ModelRestrictedError({
   error,
   canRetry,
   onRetry,
+  retryRef,
+  showRetryHotkey,
 }: {
   error: Extract<AgentRuntimeError, { kind: 'model-restricted' }>;
   canRetry: boolean;
   onRetry: () => void;
-}) {
+} & RetryActionProps) {
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
 
@@ -253,9 +290,17 @@ function ModelRestrictedError({
       <div className="flex flex-row items-center justify-between gap-2 pt-1">
         <div>
           {canRetry && (
-            <Button variant="ghost" size="xs" onClick={onRetry}>
+            <Button ref={retryRef} variant="ghost" size="xs" onClick={onRetry}>
               <RefreshCcwIcon className="size-3" />
               Retry
+              {showRetryHotkey && (
+                <HotkeyCombo
+                  action={HotkeyActions.CMD_ENTER}
+                  size="xs"
+                  variant="ghost"
+                  className="ml-0.5"
+                />
+              )}
             </Button>
           )}
         </div>
@@ -296,11 +341,13 @@ function UpstreamOverloadError({
   error,
   isWorking,
   onRetry,
+  retryRef,
+  showRetryHotkey,
 }: {
   error: Extract<AgentRuntimeError, { kind: 'upstream-overload' }>;
   isWorking: boolean;
   onRetry: () => void;
-}) {
+} & RetryActionProps) {
   const description =
     'The upstream AI provider is temporarily at capacity. Please switch to another model or try again.';
 
@@ -323,9 +370,17 @@ function UpstreamOverloadError({
 
       {!isWorking && (
         <div className="flex flex-row items-center justify-end gap-2 pt-2">
-          <Button variant="primary" size="xs" onClick={onRetry}>
+          <Button ref={retryRef} variant="primary" size="xs" onClick={onRetry}>
             <RefreshCcwIcon className="size-3" />
             Retry
+            {showRetryHotkey && (
+              <HotkeyCombo
+                action={HotkeyActions.CMD_ENTER}
+                size="xs"
+                variant="solid"
+                className="ml-0.5"
+              />
+            )}
           </Button>
         </div>
       )}
@@ -337,11 +392,13 @@ function WaitingForConnectionError({
   error,
   canRetry,
   onRetry,
+  retryRef,
+  showRetryHotkey,
 }: {
   error: Extract<AgentRuntimeError, { kind: 'waiting-for-connection' }>;
   canRetry: boolean;
   onRetry: () => void;
-}) {
+} & RetryActionProps) {
   return (
     <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-warning-solid/30 bg-warning-background p-2 text-sm">
       <div className="flex flex-row items-center gap-1.5">
@@ -362,9 +419,17 @@ function WaitingForConnectionError({
 
       {canRetry && (
         <div className="flex flex-row justify-end pt-1">
-          <Button variant="primary" size="xs" onClick={onRetry}>
+          <Button ref={retryRef} variant="primary" size="xs" onClick={onRetry}>
             <RefreshCcwIcon className="size-3" />
             Retry
+            {showRetryHotkey && (
+              <HotkeyCombo
+                action={HotkeyActions.CMD_ENTER}
+                size="xs"
+                variant="solid"
+                className="ml-0.5"
+              />
+            )}
           </Button>
         </div>
       )}
@@ -377,12 +442,14 @@ function GenericError({
   error,
   canRetry,
   onRetry,
+  retryRef,
+  showRetryHotkey,
 }: {
   agentInstanceId: string;
   error: GenericRuntimeError;
   canRetry: boolean;
   onRetry: () => void;
-}) {
+} & RetryActionProps) {
   const [helpExpanded, setHelpExpanded] = useState(false);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [hasCopied, setHasCopied] = useState(false);
@@ -423,9 +490,22 @@ function GenericError({
         <div className="flex flex-row items-center justify-between gap-2 pt-1">
           <div>
             {canRetry && (
-              <Button variant="ghost" size="xs" onClick={onRetry}>
+              <Button
+                ref={retryRef}
+                variant="ghost"
+                size="xs"
+                onClick={onRetry}
+              >
                 <RefreshCcwIcon className="size-3" />
                 Retry
+                {showRetryHotkey && (
+                  <HotkeyCombo
+                    action={HotkeyActions.CMD_ENTER}
+                    size="xs"
+                    variant="ghost"
+                    className="ml-0.5"
+                  />
+                )}
               </Button>
             )}
           </div>
@@ -522,9 +602,17 @@ function GenericError({
 
       {canRetry && (
         <div className="flex flex-row justify-end pt-1">
-          <Button variant="primary" size="xs" onClick={onRetry}>
+          <Button ref={retryRef} variant="primary" size="xs" onClick={onRetry}>
             <RefreshCcwIcon className="size-3" />
             Retry
+            {showRetryHotkey && (
+              <HotkeyCombo
+                action={HotkeyActions.CMD_ENTER}
+                size="xs"
+                variant="solid"
+                className="ml-0.5"
+              />
+            )}
           </Button>
         </div>
       )}

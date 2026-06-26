@@ -7,6 +7,10 @@ import type { StatusCardSection } from './shared';
 import type { PlanTask, TaskGroup } from '@stagewise/agent-core/plans';
 import type { PlanUIPhase } from '@shared/plan-lifecycle';
 import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { HotkeyActions } from '@shared/hotkeys';
 
 export type { PlanTask, TaskGroup };
 
@@ -57,6 +61,49 @@ function TaskRow({ task, isCurrent }: { task: PlanTask; isCurrent: boolean }) {
         {task.text}
       </span>
     </div>
+  );
+}
+
+function PlanImplementButton({
+  planFilename,
+  onImplement,
+  isImplementing,
+}: {
+  planFilename: string;
+  onImplement: () => void;
+  isImplementing: boolean;
+}) {
+  const { setRef, isWinner } = useCmdEnterTarget({
+    id: `plan-section-implement-${planFilename}`,
+    priority: CmdEnterPriority.PLAN_SECTION,
+    action: onImplement,
+    enabled: !isImplementing,
+  });
+  return (
+    <Button
+      ref={setRef}
+      variant="primary"
+      size="xs"
+      className={cn(
+        'shrink-0',
+        isImplementing ? 'cursor-default' : 'cursor-pointer',
+      )}
+      disabled={isImplementing}
+      onClick={(e: MouseEvent) => {
+        e.stopPropagation();
+        onImplement();
+      }}
+    >
+      {isImplementing ? 'Implementing' : 'Implement'}
+      {isWinner && (
+        <HotkeyCombo
+          action={HotkeyActions.CMD_ENTER}
+          size="xs"
+          variant="solid"
+          className="ml-0.5"
+        />
+      )}
+    </Button>
   );
 }
 
@@ -153,21 +200,11 @@ export function buildPlanSections({
               </Button>
             )}
             {showImplement && (
-              <Button
-                variant="primary"
-                size="xs"
-                className={cn(
-                  'shrink-0',
-                  isImplementing ? 'cursor-default' : 'cursor-pointer',
-                )}
-                disabled={isImplementing}
-                onClick={(e: MouseEvent) => {
-                  e.stopPropagation();
-                  onImplement();
-                }}
-              >
-                {isImplementing ? 'Implementing' : 'Implement'}
-              </Button>
+              <PlanImplementButton
+                planFilename={plan.filename}
+                onImplement={onImplement}
+                isImplementing={isImplementing}
+              />
             )}
           </div>
         </div>

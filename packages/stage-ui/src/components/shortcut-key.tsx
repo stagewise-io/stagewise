@@ -30,6 +30,8 @@ const shortcutKeyVariants = cva(
         default: 'border-derived bg-active-derived',
         subtle: 'border-derived bg-active-derived opacity-80',
         surface: 'border-derived-strong bg-active-derived',
+        ghost:
+          'border-derived bg-transparent group-hover/button:bg-active-derived group-focus-visible/button:bg-active-derived group-active/button:bg-active-derived',
         solid:
           'border-transparent bg-shortcut-solid-derived group-hover/button:bg-shortcut-solid-hover-derived group-focus-visible/button:bg-shortcut-solid-hover-derived group-active/button:bg-shortcut-solid-active-derived',
       },

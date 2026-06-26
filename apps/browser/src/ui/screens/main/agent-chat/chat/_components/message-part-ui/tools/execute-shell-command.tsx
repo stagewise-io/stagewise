@@ -24,6 +24,10 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { HotkeyActions } from '@shared/hotkeys';
 
 export const ExecuteShellCommandToolPart = ({
   part,
@@ -135,6 +139,13 @@ export const ExecuteShellCommandToolPart = ({
       return;
     sendApproval(openAgentId, part.approval.id, true);
   }, [openAgentId, part.state, part.approval, sendApproval]);
+
+  const { setRef: allowRef, isWinner: allowIsWinner } = useCmdEnterTarget({
+    id: `shell-approval-${part.toolCallId}`,
+    priority: CmdEnterPriority.SHELL_APPROVAL,
+    action: handleApprove,
+    enabled: state === 'approval' && part.state !== 'input-streaming',
+  });
 
   const sessionId =
     output?.session_id ??
@@ -452,6 +463,7 @@ export const ExecuteShellCommandToolPart = ({
               </Tooltip>
             )}
             <Button
+              ref={allowRef}
               variant="primary"
               size="xs"
               onClick={handleApprove}
@@ -461,6 +473,14 @@ export const ExecuteShellCommandToolPart = ({
                 <IconLoader6Outline18 className="size-3 shrink-0 animate-spin" />
               )}
               Allow
+              {allowIsWinner && (
+                <HotkeyCombo
+                  action={HotkeyActions.CMD_ENTER}
+                  size="xs"
+                  variant="solid"
+                  className="ml-0.5"
+                />
+              )}
             </Button>
           </div>
         </div>
@@ -474,6 +494,8 @@ export const ExecuteShellCommandToolPart = ({
     currentApprovalMode,
     classifierExplanation,
     part.state,
+    allowRef,
+    allowIsWinner,
   ]);
 
   if (useMinimalShellRow) {
