@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.14.0 (2026-06-26)
+
+### Features
+
+* add provider routing and coding-plan identity to agent telemetry (95f049b)
+* use project name for workspace tab titles in Skills & Context (b7645f5)
+* support third-party global skills from ~/.codex and ~/.claude (9918d54)
+
+### Bug Fixes
+
+* fix duplicate toggles, stale tab desync, N+1 global rebuilds (3657451)
+
 ## 1.13.0 (2026-06-25)
 
 ### Features
