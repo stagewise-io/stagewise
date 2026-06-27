@@ -37,6 +37,44 @@ const validationMessages: ModelMessage[] = [
   },
 ];
 
+/**
+ * Validate a MiniMax Token Plan key by probing the lightweight
+ * `/v1/token_plan/remains` quota endpoint on the Global region.
+ * This is faster and more reliable than making a chat completion
+ * request.
+ */
+export async function validateMiniMaxTokenPlanKey(
+  apiKey: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const url = 'https://api.minimax.io/v1/token_plan/remains';
+  // MiniMax endpoints accept both Bearer and x-api-key auth styles.
+  const authHeaders: Record<string, string>[] = [
+    { Authorization: `Bearer ${apiKey}` },
+    { 'x-api-key': apiKey },
+  ];
+  for (const authHeader of authHeaders) {
+    try {
+      const res = await fetch(url, {
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as {
+        base_resp?: { status_code?: number };
+      };
+      if (data.base_resp?.status_code === 0) return { success: true };
+    } catch {
+      // try next auth style
+    }
+  }
+
+  return {
+    success: false,
+    error:
+      'Invalid MiniMax Token Plan key. Ensure the key belongs to an active Token Plan subscription.',
+  };
+}
+
 const providerConfigs: Record<
   ApiKeyProvider,
   (apiKey: string, baseURL?: string) => ValidationModel
@@ -100,6 +138,12 @@ export async function validateCodingPlanApiKey(
   plan: CodingPlan,
   apiKey: string,
 ): Promise<ApiKeyValidationResult> {
+  // MiniMax Token Plan keys use a dedicated lightweight quota endpoint
+  // with auto-region detection instead of a chat completion probe.
+  if (plan.id === 'minimax-plan') {
+    return validateMiniMaxTokenPlanKey(apiKey);
+  }
+
   const validationBaseURL = plan.validationBaseUrl ?? plan.baseUrl;
 
   if (validationBaseURL && plan.validationModelId) {
