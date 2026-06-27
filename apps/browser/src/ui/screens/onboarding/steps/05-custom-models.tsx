@@ -86,11 +86,10 @@ export function StepCustomModels({
   }, [customEndpoints, preferences, updatePreferences]);
 
   const handleUpdate = useCallback(
-    async (modelId: string, updates: Partial<CustomModel>) => {
-      const idx = customModels.findIndex((m) => m.modelId === modelId);
-      if (idx === -1) return;
+    async (index: number, updates: Partial<CustomModel>) => {
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        const model = draft.customModels[idx]!;
+        const model = draft.customModels[index]!;
+        if (model === undefined) return;
         if (updates.modelId !== undefined) model.modelId = updates.modelId;
         if (updates.displayName !== undefined)
           model.displayName = updates.displayName;
@@ -101,15 +100,14 @@ export function StepCustomModels({
       });
       await updatePreferences(patches);
     },
-    [customModels, preferences, updatePreferences],
+    [preferences, updatePreferences],
   );
 
   const handleDelete = useCallback(
-    async (modelId: string) => {
+    async (index: number) => {
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        const idx = draft.customModels.findIndex((m) => m.modelId === modelId);
-        if (idx !== -1) {
-          draft.customModels.splice(idx, 1);
+        if (index >= 0 && index < draft.customModels.length) {
+          draft.customModels.splice(index, 1);
         }
       });
       await updatePreferences(patches);
@@ -176,15 +174,13 @@ export function StepCustomModels({
               </p>
             </div>
           ) : (
-            customModels.map((model) => (
+            customModels.map((model, index) => (
               <ModelRow
-                key={model.modelId}
+                key={index}
                 model={model}
                 endpointOptions={endpointOptions}
-                onUpdate={(updates) =>
-                  void handleUpdate(model.modelId, updates)
-                }
-                onDelete={() => void handleDelete(model.modelId)}
+                onUpdate={(updates) => void handleUpdate(index, updates)}
+                onDelete={() => void handleDelete(index)}
               />
             ))
           )}

@@ -3,6 +3,7 @@ import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollb
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useState, useCallback, useRef } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
+import { useTrack } from '@ui/hooks/use-track';
 import { produceWithPatches, enablePatches } from 'immer';
 
 import {
@@ -153,10 +154,15 @@ export function StepCustomEndpoints({
     ],
   );
 
+  const track = useTrack();
+
   const handleCancel = useCallback(() => {
+    if (!editingEndpoint) {
+      track('custom-provider-add-aborted');
+    }
     setFormOpen(false);
     setEditingEndpoint(undefined);
-  }, []);
+  }, [editingEndpoint, track]);
 
   const handleDelete = useCallback(
     async (endpointId: string) => {
@@ -198,7 +204,7 @@ export function StepCustomEndpoints({
           <CustomEndpointForm
             endpoint={editingEndpoint}
             open={formOpen}
-            onSave={(data) => void handleSave(data)}
+            onSave={handleSave}
             showFooterDivider={false}
           />
         </OverlayScrollbar>

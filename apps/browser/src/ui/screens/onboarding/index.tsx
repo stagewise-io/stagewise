@@ -116,7 +116,7 @@ export function OnboardingBottomNav({
   right?: ReactNode;
 }) {
   return (
-    <div className="flex shrink-0 items-center px-6 pb-6">
+    <div className="app-no-drag flex shrink-0 items-center px-6 pb-6">
       <div className="flex flex-1 justify-start">{left ?? <span />}</div>
       <div className="flex flex-1 justify-end">{right ?? <span />}</div>
     </div>
