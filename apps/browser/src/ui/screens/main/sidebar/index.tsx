@@ -27,7 +27,7 @@ import {
 
 // Read the persisted collapsed state *once* at module eval so we can seed
 // `defaultSize` on first render. Without this the panel mounts expanded
-// (`defaultSize={12}`) and then collapses via effect on the next frame,
+// (`defaultSize={16}`) and then collapses via effect on the next frame,
 // producing a visible flash when the user last left the sidebar collapsed.
 const INITIAL_COLLAPSED = readInitialSidebarCollapsed();
 export function Sidebar() {
