@@ -586,7 +586,7 @@ export function CustomEndpointForm({
   showFooterDivider = true,
 }: {
   endpoint?: CustomEndpoint;
-  onSave: (data: EndpointSaveData) => void;
+  onSave: (data: EndpointSaveData) => void | Promise<void>;
   onCancel?: () => void;
   /**
    * When provided (dialog mode), the form resets whenever `open` flips
@@ -613,6 +613,7 @@ export function CustomEndpointForm({
   // Set to true when onSave() fires; distinguishes a save-initiated close
   // from a cancel/dismiss close inside the shared `handleDialogOpenChange`.
   const savedRef = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [name, setName] = useState(endpoint?.name ?? '');
   const [apiSpec, setApiSpec] = useState<ApiSpec>(
@@ -861,7 +862,7 @@ export function CustomEndpointForm({
     };
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     let modelIdMapping: Record<string, string> | undefined;
     if (modelIdMappingJson.trim()) {
       try {
@@ -871,29 +872,36 @@ export function CustomEndpointForm({
         return;
       }
     }
-    onSave({
-      name: name.trim(),
-      apiSpec,
-      baseUrl,
-      apiKey,
-      modelIdMapping,
-      resourceName: resourceName || undefined,
-      apiVersion: apiVersion || undefined,
-      region: region || undefined,
-      secretKey: secretKey || undefined,
-      awsAuthMode: apiSpec === 'amazon-bedrock' ? awsAuthMode : undefined,
-      awsProfileName:
-        apiSpec === 'amazon-bedrock' && awsAuthMode === 'profile'
-          ? awsProfileName.trim() || undefined
-          : undefined,
-      projectId: projectId || undefined,
-      location: location || undefined,
-      googleCredentials: googleCredentials || undefined,
-    });
-    if (isAddMode) {
-      track('custom-provider-add-finished', buildUrlProps());
+    setIsSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        apiSpec,
+        baseUrl,
+        apiKey,
+        modelIdMapping,
+        resourceName: resourceName || undefined,
+        apiVersion: apiVersion || undefined,
+        region: region || undefined,
+        secretKey: secretKey || undefined,
+        awsAuthMode: apiSpec === 'amazon-bedrock' ? awsAuthMode : undefined,
+        awsProfileName:
+          apiSpec === 'amazon-bedrock' && awsAuthMode === 'profile'
+            ? awsProfileName.trim() || undefined
+            : undefined,
+        projectId: projectId || undefined,
+        location: location || undefined,
+        googleCredentials: googleCredentials || undefined,
+      });
+      if (isAddMode) {
+        track('custom-provider-add-finished', buildUrlProps());
+      }
+      savedRef.current = true;
+    } catch (error) {
+      console.error('Failed to save custom endpoint', error);
+    } finally {
+      setIsSaving(false);
     }
-    savedRef.current = true;
   };
 
   const handleCancel = () => {
@@ -1042,7 +1050,7 @@ export function CustomEndpointForm({
         <Button
           variant="primary"
           size="sm"
-          disabled={!canSave}
+          disabled={!canSave || isSaving}
           onClick={handleSave}
         >
           {endpoint ? 'Save Changes' : 'Add Provider'}
@@ -1066,7 +1074,7 @@ function CustomEndpointDialog({
   endpoint?: CustomEndpoint;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: EndpointSaveData) => void;
+  onSave: (data: EndpointSaveData) => void | Promise<void>;
 }) {
   const track = useTrack();
   const isAddMode = !endpoint;
@@ -1100,9 +1108,9 @@ function CustomEndpointDialog({
         <CustomEndpointForm
           endpoint={endpoint}
           open={open}
-          onSave={(data) => {
+          onSave={async (data) => {
+            await onSave(data);
             savedRef.current = true;
-            onSave(data);
             onOpenChange(false);
           }}
           onCancel={() => onOpenChange(false)}

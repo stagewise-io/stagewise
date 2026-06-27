@@ -210,10 +210,8 @@ function SoundSelection() {
   const currentPack =
     configuredPack && availablePacks.includes(configuredPack)
       ? configuredPack
-      : DEFAULT_SOUND_PACK;
-  const packOptions = availablePacks.includes(currentPack)
-    ? availablePacks
-    : [currentPack, ...availablePacks];
+      : availablePacks[0]!;
+  const packOptions = availablePacks;
   const loudnessIndex = Math.max(
     0,
     NOTIFICATION_LOUDNESS_OPTIONS.findIndex(
@@ -241,24 +239,32 @@ function SoundSelection() {
 
     previewSound(currentPack, notificationSoundLoudness);
 
-    await setGlobalConfig({
-      notificationSoundsEnabled: notificationSoundLoudness !== 'off',
-      notificationSoundLoudness,
-    });
-    track('changed-notification-sound-loudness', {
-      loudness: notificationSoundLoudness,
-    });
+    try {
+      await setGlobalConfig({
+        notificationSoundsEnabled: notificationSoundLoudness !== 'off',
+        notificationSoundLoudness,
+      });
+      track('changed-notification-sound-loudness', {
+        loudness: notificationSoundLoudness,
+      });
+    } catch (error) {
+      console.error('Failed to save sound loudness', error);
+    }
   };
 
   const handleSoundPackChange = async (value: unknown) => {
     if (typeof value !== 'string' || !packOptions.includes(value)) return;
     previewSound(value, soundLoudness);
-    await setGlobalConfig({
-      notificationSoundPack: value,
-    });
-    track('changed-notification-sound-theme', {
-      theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
-    });
+    try {
+      await setGlobalConfig({
+        notificationSoundPack: value,
+      });
+      track('changed-notification-sound-theme', {
+        theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
+      });
+    } catch (error) {
+      console.error('Failed to save sound pack', error);
+    }
   };
 
   return (

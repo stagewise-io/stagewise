@@ -43,6 +43,9 @@ export function StepLogin({
   const preferencesUpdate = useKartonProcedure((p) => p.preferences.update);
   const track = useTrack();
   const authStatus = useKartonState((s) => s.userAccount.status);
+  const persistedTelemetryLevel = useKartonState(
+    (s) => s.preferences?.privacy.telemetryLevel ?? 'anonymous',
+  );
   const userEmail = useKartonState((s) =>
     s.userAccount.status === 'authenticated' ||
     s.userAccount.status === 'server_unreachable'
@@ -55,7 +58,9 @@ export function StepLogin({
       ? 'authenticated'
       : 'form-input',
   );
-  const [telemetry, setTelemetry] = useState<TelemetryLevel>('anonymous');
+  const [telemetry, setTelemetry] = useState<TelemetryLevel>(
+    persistedTelemetryLevel,
+  );
 
   const trackAuthCompleted = useCallback(
     (completion: OnboardingAuthCompletion) => {
