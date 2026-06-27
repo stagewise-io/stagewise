@@ -68,6 +68,7 @@ export function SidebarExperienceSurvey() {
 
   const [hasAnswered, setHasAnswered] = useState(false);
   const [submitError, setSubmitError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const feedbackLabelId = useId();
 
   // Tick to force memo recomputation at cooldown boundaries.
@@ -214,14 +215,17 @@ export function SidebarExperienceSurvey() {
 
   const handleSubmitFeedback = useCallback(async () => {
     const trimmed = feedback.trim();
-    if (!trimmed) return;
+    if (!trimmed || isSubmitting) return;
+    setIsSubmitting(true);
     try {
       await submitFeedback(trimmed);
       setSubmitted(true);
     } catch {
       setSubmitError(true);
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [feedback, submitFeedback]);
+  }, [feedback, submitFeedback, isSubmitting]);
 
   const handleOpenFounderCall = useCallback(() => {
     void openFounderCallSurvey();
@@ -302,7 +306,7 @@ export function SidebarExperienceSurvey() {
               <Button
                 variant="primary"
                 size="xs"
-                disabled={!feedback.trim()}
+                disabled={!feedback.trim() || isSubmitting}
                 onClick={handleSubmitFeedback}
               >
                 Send
