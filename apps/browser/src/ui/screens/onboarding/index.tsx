@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, type ReactElement } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
@@ -8,55 +8,36 @@ import {
 import { IconArrowLeftFill18, IconArrowRightFill18 } from 'nucleo-ui-fill-18';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
-import { StepWelcome } from './steps/01-welcome';
-import { StepAuth, type OnboardingAuthCompletion } from './steps/02-auth';
-import { StepDemo } from './steps/03-demo';
-const stepIds = ['welcome', 'auth', 'demo'];
+import { StepLogin } from './steps/01-login';
+import type { OnboardingAuthCompletion } from './steps/01-login';
+import { StepModelAccess } from './steps/02-model-access';
+import { StepExistingSubscriptions } from './steps/03-existing-subscriptions';
+import { StepCustomEndpoints } from './steps/04-custom-endpoints';
+import { StepCustomModels } from './steps/05-custom-models';
+import { StepTheme } from './steps/07-theme';
 
-export type StepValidityCallback = (
-  canProceed: boolean,
-  blockReason?: string,
-) => void;
+type ScreenId =
+  | 'login'
+  | 'model-access'
+  | 'existing-subscriptions'
+  | 'custom-endpoints'
+  | 'custom-models'
+  | 'theme';
 
 export function OnboardingWizard() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [canProceed, setCanProceed] = useState(false);
-  const [blockReason, setBlockReason] = useState<string | null>(null);
+  const [screen, setScreen] = useState<ScreenId>('login');
+  const [prevScreen, setPrevScreen] = useState<ScreenId>('model-access');
   const [authCompletion, setAuthCompletion] =
     useState<OnboardingAuthCompletion | null>(null);
   const setHasSeenOnboardingFlow = useKartonProcedure(
     (p) => p.userExperience.setHasSeenOnboardingFlow,
   );
 
-  const isFirstStep = currentStep === 0;
-  const isAuthStep = currentStep === 1;
-  const isLastStep = currentStep === stepIds.length - 1;
-  const hideBackButton = isFirstStep || isAuthStep;
-
-  // Reset validity when navigating between steps.
-  // Steps 0 (welcome) and 1 (auth) manage their own validity via
-  // onValidityChange, so we only default to true for later steps.
-  useEffect(() => {
-    if (currentStep > 1) {
-      setCanProceed(true);
-      setBlockReason(null);
-    }
-  }, [currentStep]);
-
-  const handleValidityChange: StepValidityCallback = useCallback(
-    (valid, reason) => {
-      setCanProceed(valid);
-      setBlockReason(reason ?? null);
-    },
-    [],
-  );
-
-  const goBack = useCallback(() => {
-    setCurrentStep((prev) => Math.max(0, prev - 1));
-  }, []);
-
-  const goNext = useCallback(() => {
-    setCurrentStep((prev) => Math.min(stepIds.length - 1, prev + 1));
+  const navigate = useCallback((next: ScreenId) => {
+    setScreen((current) => {
+      setPrevScreen(current);
+      return next;
+    });
   }, []);
 
   const complete = useCallback(() => {
@@ -75,96 +56,114 @@ export function OnboardingWizard() {
       {/* Title bar drag region */}
       <div className="h-10 w-full" />
 
-      {/* Step content — StepWelcome is always mounted (hidden when inactive)
-           so its typing animation state is preserved when navigating back. */}
+      {/* Screen content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <div
-          className={cn('flex flex-1 flex-col', currentStep !== 0 && 'hidden')}
-        >
-          <StepWelcome
-            isActive={currentStep === 0}
-            onValidityChange={handleValidityChange}
+        {screen === 'login' && (
+          <StepLogin
+            onSkip={() => navigate('model-access')}
+            onAuthenticated={(completion) => {
+              setAuthCompletion(completion);
+              navigate('model-access');
+            }}
           />
-        </div>
-        <div
-          className={cn('flex flex-1 flex-col', currentStep !== 1 && 'hidden')}
-        >
-          <StepAuth
-            isActive={currentStep === 1}
-            onValidityChange={handleValidityChange}
-            onStepComplete={() => goNext()}
-            onAuthCompleted={setAuthCompletion}
+        )}
+        {screen === 'model-access' && (
+          <StepModelAccess
+            onSelectStagewise={() => navigate('theme')}
+            onSelectExistingSubscriptions={() =>
+              navigate('existing-subscriptions')
+            }
+            onSelectCustomEndpoints={() => navigate('custom-endpoints')}
+            onBack={() => navigate('login')}
           />
-        </div>
-        {currentStep === 2 && <StepDemo />}
-      </div>
-
-      {/* Bottom navigation — flex-1 on left/right ensures dots stay centered */}
-      <div className="flex shrink-0 items-center px-6 pb-6">
-        {/* Back button */}
-        <div className="flex flex-1 justify-start">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={goBack}
-            className={cn(hideBackButton && 'invisible')}
-          >
-            <IconArrowLeftFill18 className="size-4" />
-            Back
-          </Button>
-        </div>
-
-        {/* Step indicator dots */}
-        <div className="flex items-center gap-2">
-          {stepIds.map((id, index) => (
-            <div
-              key={id}
-              className={cn(
-                'size-2 rounded-full transition-colors',
-                index === currentStep
-                  ? 'bg-foreground'
-                  : 'bg-subtle-foreground',
-              )}
-            />
-          ))}
-        </div>
-
-        {/* Next / Complete button -- wrapped in a span so the tooltip
-             trigger still receives pointer events when the button is disabled */}
-        <div className="flex flex-1 justify-end">
-          {isLastStep ? (
-            <NextButtonTooltip blockReason={blockReason}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={complete}
-                disabled={!canProceed}
-                className="text-primary-foreground! hover:text-hover-derived! active:text-active-derived!"
-              >
-                Finish
-                <IconArrowRightFill18 className="size-4" />
-              </Button>
-            </NextButtonTooltip>
-          ) : (
-            <NextButtonTooltip blockReason={blockReason}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goNext}
-                disabled={!canProceed}
-                className={cn(
-                  canProceed &&
-                    'text-primary-foreground! hover:text-hover-derived! active:text-active-derived!',
-                )}
-              >
-                Next
-                <IconArrowRightFill18 className="size-4" />
-              </Button>
-            </NextButtonTooltip>
-          )}
-        </div>
+        )}
+        {screen === 'existing-subscriptions' && (
+          <StepExistingSubscriptions
+            onNext={() => navigate('theme')}
+            onBack={() => navigate('model-access')}
+          />
+        )}
+        {screen === 'custom-endpoints' && (
+          <StepCustomEndpoints
+            onNext={() => navigate('custom-models')}
+            onBack={() => navigate('model-access')}
+          />
+        )}
+        {screen === 'custom-models' && (
+          <StepCustomModels
+            onNext={() => navigate('theme')}
+            onBack={() => navigate('custom-endpoints')}
+          />
+        )}
+        {screen === 'theme' && (
+          <StepTheme onNext={complete} onBack={() => navigate(prevScreen)} />
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Bottom navigation bar shared across onboarding screens.
+ * Left: optional back button. Right: optional next/finish button.
+ * Either side may be omitted by passing `null`.
+ */
+export function OnboardingBottomNav({
+  left,
+  right,
+}: {
+  left?: ReactNode;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="flex shrink-0 items-center px-6 pb-6">
+      <div className="flex flex-1 justify-start">{left ?? <span />}</div>
+      <div className="flex flex-1 justify-end">{right ?? <span />}</div>
+    </div>
+  );
+}
+
+/** Back button styled consistently across screens. */
+export function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick}>
+      <IconArrowLeftFill18 className="size-4" />
+      Back
+    </Button>
+  );
+}
+
+/**
+ * Next button with optional disabled tooltip. Mirrors the old
+ * `NextButtonTooltip` pattern so blocked state is surfaced to the user.
+ */
+export function NextButton({
+  onClick,
+  disabled,
+  blockReason,
+  label = 'Next',
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  blockReason?: string | null;
+  label?: string;
+}) {
+  return (
+    <NavButtonTooltip blockReason={blockReason}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          !disabled &&
+            'text-primary-foreground! hover:text-hover-derived! active:text-active-derived!',
+        )}
+      >
+        {label}
+        <IconArrowRightFill18 className="size-4" />
+      </Button>
+    </NavButtonTooltip>
   );
 }
 
@@ -172,12 +171,12 @@ export function OnboardingWizard() {
  * Wraps a button in a tooltip that only activates when there is a blockReason.
  * Uses a <span> wrapper so pointer events fire even when the button is disabled.
  */
-function NextButtonTooltip({
+function NavButtonTooltip({
   blockReason,
   children,
 }: {
-  blockReason: string | null;
-  children: ReactElement;
+  blockReason: string | null | undefined;
+  children: ReactNode;
 }) {
   const [hovered, setHovered] = useState(false);
   const showTooltip = hovered && !!blockReason;
