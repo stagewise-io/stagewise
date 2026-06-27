@@ -26,6 +26,7 @@ type ScreenId =
 
 export function OnboardingWizard() {
   const [screen, setScreen] = useState<ScreenId>('login');
+  const [prevScreen, setPrevScreen] = useState<ScreenId>('model-access');
   const [authCompletion, setAuthCompletion] =
     useState<OnboardingAuthCompletion | null>(null);
   const setHasSeenOnboardingFlow = useKartonProcedure(
@@ -33,7 +34,10 @@ export function OnboardingWizard() {
   );
 
   const navigate = useCallback((next: ScreenId) => {
-    setScreen(next);
+    setScreen((current) => {
+      setPrevScreen(current);
+      return next;
+    });
   }, []);
 
   const complete = useCallback(() => {
@@ -92,10 +96,7 @@ export function OnboardingWizard() {
           />
         )}
         {screen === 'theme' && (
-          <StepTheme
-            onNext={complete}
-            onBack={() => navigate('model-access')}
-          />
+          <StepTheme onNext={complete} onBack={() => navigate(prevScreen)} />
         )}
       </div>
     </div>

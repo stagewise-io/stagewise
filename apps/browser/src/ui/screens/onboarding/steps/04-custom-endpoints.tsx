@@ -167,6 +167,12 @@ export function StepCustomEndpoints({
         if (idx !== -1) {
           draft.customEndpoints.splice(idx, 1);
         }
+        // Cascade: remove any custom models that referenced the deleted
+        // endpoint, leaving dangling references that would fail at
+        // resolution time.
+        draft.customModels = draft.customModels.filter(
+          (m) => m.endpointId !== endpointId,
+        );
       });
       await updatePreferences(patches);
     },
