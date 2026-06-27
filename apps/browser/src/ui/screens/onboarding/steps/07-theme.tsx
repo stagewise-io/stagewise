@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -131,9 +131,46 @@ function ThemeSelection() {
     }
   };
 
+  const themeIds = PERSONALIZATION_THEMES.map((t) => t.id);
+
+  const handleThemeKeyDown = useCallback(
+    (e: React.KeyboardEvent, currentIndex: number) => {
+      const lastIndex = themeIds.length - 1;
+      let nextIndex: number | null = null;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+      } else if (e.key === 'Home') {
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        nextIndex = lastIndex;
+      }
+
+      if (nextIndex !== null) {
+        e.preventDefault();
+        const nextId = themeIds[nextIndex]!;
+        void handleThemeChange(nextId);
+        // Move focus to the newly-selected radio
+        const container = e.currentTarget.parentElement;
+        if (container) {
+          const buttons =
+            container.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+          buttons[nextIndex]?.focus();
+        }
+      }
+    },
+    [themeIds],
+  );
+
   return (
-    <div className="flex flex-wrap justify-center gap-3" role="radiogroup">
-      {PERSONALIZATION_THEMES.map((theme) => {
+    <div
+      className="flex flex-wrap justify-center gap-3"
+      role="radiogroup"
+      aria-label="Color theme"
+    >
+      {PERSONALIZATION_THEMES.map((theme, index) => {
         const active = theme.id === currentThemeId;
         return (
           <button
@@ -141,9 +178,11 @@ function ThemeSelection() {
             type="button"
             className="group rounded-lg"
             onClick={() => handleThemeChange(theme.id)}
+            onKeyDown={(e) => handleThemeKeyDown(e, index)}
             aria-checked={active}
             aria-label={`Use ${theme.name} theme`}
             role="radio"
+            tabIndex={active ? 0 : -1}
             title={theme.name}
           >
             <ThemeBadge themeId={theme.id} name={theme.name} active={active} />

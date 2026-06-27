@@ -1065,8 +1065,25 @@ function CustomEndpointDialog({
   onOpenChange: (open: boolean) => void;
   onSave: (data: EndpointSaveData) => void;
 }) {
+  const track = useTrack();
+  const isAddMode = !endpoint;
+  const savedRef = useRef(false);
+
+  // Fire abort telemetry on any non-save dismissal (Escape, backdrop
+  // click, X button). This mirrors the Cancel button path inside
+  // CustomEndpointForm.handleCancel, restoring parity with the prior
+  // implementation where the dialog's onOpenChange handled all close
+  // paths.
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isAddMode && !savedRef.current) {
+      track('custom-provider-add-aborted');
+    }
+    savedRef.current = false;
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogClose />
         <DialogHeader>
@@ -1081,6 +1098,7 @@ function CustomEndpointDialog({
           endpoint={endpoint}
           open={open}
           onSave={(data) => {
+            savedRef.current = true;
             onSave(data);
             onOpenChange(false);
           }}
