@@ -119,7 +119,10 @@ export function StepCustomModels({
 
   // Strict validation: every model must have a valid name, ID, endpoint, and
   // max context length. Models with sentinel/placeholder values are invalid.
+  // Additionally, the endpoint must still exist and model IDs must be unique.
   const invalidModelCount = useMemo(() => {
+    const endpointIds = new Set(customEndpoints.map((ep) => ep.id));
+    const seenIds = new Set<string>();
     return customModels.filter((m) => {
       const hasValidName =
         m.displayName.trim().length > 0 &&
@@ -127,16 +130,20 @@ export function StepCustomModels({
       const hasValidId =
         m.modelId.trim().length > 0 &&
         !m.modelId.startsWith(SENTINEL_MODEL_ID_PREFIX);
-      const hasValidEndpoint = m.endpointId.trim().length > 0;
+      const hasValidEndpoint =
+        m.endpointId.trim().length > 0 && endpointIds.has(m.endpointId);
       const hasValidContext = m.contextWindowSize > 0;
+      const isDuplicate = seenIds.has(m.modelId);
+      seenIds.add(m.modelId);
       return !(
         hasValidName &&
         hasValidId &&
         hasValidEndpoint &&
-        hasValidContext
+        hasValidContext &&
+        !isDuplicate
       );
     }).length;
-  }, [customModels]);
+  }, [customModels, customEndpoints]);
 
   const canProceed = customModels.length === 0 || invalidModelCount === 0;
 
