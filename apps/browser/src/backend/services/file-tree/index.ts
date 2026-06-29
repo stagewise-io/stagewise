@@ -614,6 +614,38 @@ export class FileTreeService extends DisposableService {
     }
   }
 
+  async createFile(
+    workspaceKey: string,
+    directoryPath: string,
+  ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This location is read-only and cannot be created in');
+    }
+    try {
+      const directory = await this.validatePath(workspaceKey, directoryPath);
+      const dirStat = await fs.stat(directory.absolutePath);
+      if (!dirStat.isDirectory()) {
+        return { success: false, error: 'Target path is not a directory.' };
+      }
+
+      const fileName = await this.getAvailableNewFileName(
+        directory.absolutePath,
+      );
+      const filePath = path.join(directory.absolutePath, fileName);
+      await fs.writeFile(filePath, '', 'utf-8');
+
+      const relativePath = directory.relativePath
+        ? `${directory.relativePath}/${fileName}`
+        : fileName;
+
+      this.bumpDirectoryRevisionsNow(directory.key, [directory.relativePath]);
+      return { success: true, relativePath };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }
+
   async recreateDeletedFile(
     workspaceKey: string,
     relativePath: string,
@@ -1640,6 +1672,26 @@ export class FileTreeService extends DisposableService {
     }
 
     throw new Error('Could not find an available destination name');
+  }
+
+  private async getAvailableNewFileName(
+    directoryAbsolutePath: string,
+  ): Promise<string> {
+    const baseName = 'new file';
+    const candidates = [
+      baseName,
+      ...Array.from({ length: 99 }, (_, index) => `${baseName} ${index + 2}`),
+    ];
+
+    for (const candidate of candidates) {
+      if (
+        !(await this.pathExists(path.join(directoryAbsolutePath, candidate)))
+      ) {
+        return candidate;
+      }
+    }
+
+    throw new Error('Could not find an available file name');
   }
 
   private updateFileTabsAfterMove(
