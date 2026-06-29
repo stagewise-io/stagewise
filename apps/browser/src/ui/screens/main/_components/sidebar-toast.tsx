@@ -7,7 +7,7 @@ import { IconXmarkOutline18 } from 'nucleo-ui-outline-18';
  * Shared container for sidebar toast/badge components.
  *
  * Provides the standardized visual wrapper (subtle background, ring,
- * backdrop blur, elevation) and an optional dismiss button rendered
+ * elevation) and an optional dismiss button rendered
  * top-right. Content is passed as children.
  *
  * Pass `dismissable={false}` to hide the close button (e.g. when the
@@ -32,7 +32,7 @@ export function SidebarToast({
   return (
     <div
       className={cn(
-        'relative flex shrink-0 flex-col gap-2 rounded-md bg-background/30 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle backdrop-blur-xl dark:bg-surface-1/30',
+        'relative flex shrink-0 flex-col gap-2 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle dark:bg-surface-1/60',
         onDismiss && 'pr-9',
         className,
       )}
