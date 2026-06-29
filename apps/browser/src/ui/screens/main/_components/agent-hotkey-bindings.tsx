@@ -172,9 +172,7 @@ export function AgentHotkeyBindings({
 
       if (visibleTerminalIds.length === 0) {
         if (contentCollapsed) setContentCollapsed(false);
-        void createTerminalTabSafely().then((terminalId) => {
-          if (terminalId) requestTerminalFocus(terminalId);
-        });
+        void createTerminalTabSafely();
         return;
       }
 

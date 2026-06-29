@@ -209,7 +209,8 @@ export function MainSection({
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
 
-  const { setTabUiState, removeTabUiState } = useTabUIState();
+  const { setTabUiState, removeTabUiState, requestTerminalFocus } =
+    useTabUIState();
   const [openAgent] = useOpenAgent();
   const { activeTutorial } = useTutorial();
   const [pendingUnsavedClose, setPendingUnsavedClose] =
@@ -731,7 +732,11 @@ export function MainSection({
           <SortableTabs
             value={effectiveActiveTabId ?? ''}
             onValueChange={(id) => {
-              if (id) void switchTab(id);
+              if (!id) return;
+              void switchTab(id);
+              if (tabs[id]?.type === 'terminal') {
+                requestTerminalFocus(id);
+              }
             }}
             ref={tabBarScrollRef}
             style={maskStyle}
@@ -771,7 +776,9 @@ export function MainSection({
               buttonClassName="size-7"
               onCreateBrowserTab={onCreateTab}
               onCreateTerminalTab={() =>
-                void createTerminal(undefined, openAgent)
+                void createTerminal(undefined, openAgent).then((terminalId) => {
+                  if (terminalId) requestTerminalFocus(terminalId);
+                })
               }
             />
           </div>
