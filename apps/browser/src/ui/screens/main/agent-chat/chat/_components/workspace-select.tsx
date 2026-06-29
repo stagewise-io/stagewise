@@ -2137,16 +2137,19 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             mountWorkspace,
             unmountWorkspace,
           },
-        }).then((result) => {
-          setIsExecuting(false);
-          if (!result.ok) {
-            setActionError(result.message);
-            return;
-          }
-          setOpen(false);
-          setGitDataLoaded(false);
-          void refreshGitData();
-        });
+        })
+          .then((result) => {
+            if (!result.ok) {
+              setActionError(result.message);
+              return;
+            }
+            setOpen(false);
+            setGitDataLoaded(false);
+            void refreshGitData();
+          })
+          .finally(() => {
+            setIsExecuting(false);
+          });
       }
       track('workspace-action-changed', {
         mount_path: mount.path,
