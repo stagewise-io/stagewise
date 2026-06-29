@@ -10,6 +10,16 @@ export function getFileTreeWorkspaceKey(mount: MountEntry): string {
   return `${mount.prefix}:${normalizePath(mount.path)}`;
 }
 
+/** Workspace prefixes that point to read-only, agent-internal mounts. */
+const READONLY_WORKSPACE_PREFIXES = new Set(['att', 'plugins', 'apps']);
+
+export function isReadOnlyWorkspaceKey(workspaceKey: string): boolean {
+  const separatorIndex = workspaceKey.indexOf(':');
+  if (separatorIndex <= 0) return false;
+  const prefix = workspaceKey.slice(0, separatorIndex);
+  return READONLY_WORKSPACE_PREFIXES.has(prefix);
+}
+
 export function getFileTreeWorkspaceName(mount: MountEntry): string {
   return getBaseName(mount.path) || mount.prefix;
 }
