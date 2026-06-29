@@ -50,6 +50,7 @@ import {
 } from '@stagewise/stage-ui/components/popover';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
+import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
 
@@ -1793,6 +1794,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     (p: KartonProcedures) => p.toolbox.unmountWorkspace,
   );
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [branchesResult, setBranchesResult] =
     useState<WorkspaceGitBranchesResult | null>(null);
   const [worktreesResult, setWorktreesResult] =
@@ -2123,6 +2125,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         setOpen(false);
       } else {
         setLocalConfig(nextConfig);
+        setIsExecuting(true);
         void executeWorkspaceGitAction({
           agentInstanceId,
           mount,
@@ -2135,6 +2138,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             unmountWorkspace,
           },
         }).then((result) => {
+          setIsExecuting(false);
           if (!result.ok) {
             setActionError(result.message);
             return;
@@ -2366,18 +2370,44 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
               'data-ending-style:opacity-0 data-starting-style:opacity-0',
             )}
           >
-            <WorkspaceActionPickerContent
-              config={config}
-              sourceBranchItems={sourceBranchItems}
-              checkoutBranchItems={checkoutBranchItems}
-              worktreeItems={worktreeItems}
-              onCommit={handleActionChange}
-              onUpdateAction={handleActionUpdate}
-            />
-            {actionError && (
-              <div className="px-2 pt-1 pb-1 text-error-foreground text-xs">
-                {actionError}
+            {isExecuting ? (
+              <div className="flex flex-col gap-0.5 p-1">
+                <div className="px-2 pt-2 pb-0.5">
+                  <Skeleton className="h-3 w-16" variant="text" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+                <div className="my-1 h-px bg-border-subtle" />
+                <div className="px-2 pt-2 pb-0.5">
+                  <Skeleton className="h-3 w-12" variant="text" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
               </div>
+            ) : (
+              <>
+                <WorkspaceActionPickerContent
+                  config={config}
+                  sourceBranchItems={sourceBranchItems}
+                  checkoutBranchItems={checkoutBranchItems}
+                  worktreeItems={worktreeItems}
+                  onCommit={handleActionChange}
+                  onUpdateAction={handleActionUpdate}
+                />
+                {actionError && (
+                  <div className="px-2 pt-1 pb-1 text-error-foreground text-xs">
+                    {actionError}
+                  </div>
+                )}
+              </>
             )}
           </PopoverBase.Popup>
         </PopoverBase.Positioner>
