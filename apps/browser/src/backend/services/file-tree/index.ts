@@ -628,15 +628,14 @@ export class FileTreeService extends DisposableService {
         return { success: false, error: 'Target path is not a directory.' };
       }
 
-      const fileName = await this.getAvailableNewFileName(
+      // Atomically create the file and reserve its name in a single step
+      // using O_CREAT | O_EXCL, which fails with EEXIST if the path already
+      // exists. This prevents concurrent createFile calls from racing on
+      // the same default name.
+      const { relativePath } = await this.createAvailableNewFile(
         directory.absolutePath,
+        directory.relativePath,
       );
-      const filePath = path.join(directory.absolutePath, fileName);
-      await fs.writeFile(filePath, '', 'utf-8');
-
-      const relativePath = directory.relativePath
-        ? `${directory.relativePath}/${fileName}`
-        : fileName;
 
       this.bumpDirectoryRevisionsNow(directory.key, [directory.relativePath]);
       return { success: true, relativePath };
@@ -1674,9 +1673,10 @@ export class FileTreeService extends DisposableService {
     throw new Error('Could not find an available destination name');
   }
 
-  private async getAvailableNewFileName(
+  private async createAvailableNewFile(
     directoryAbsolutePath: string,
-  ): Promise<string> {
+    directoryRelativePath: string,
+  ): Promise<{ fileName: string; relativePath: string }> {
     const baseName = 'new file';
     const candidates = [
       baseName,
@@ -1684,11 +1684,33 @@ export class FileTreeService extends DisposableService {
     ];
 
     for (const candidate of candidates) {
-      if (
-        !(await this.pathExists(path.join(directoryAbsolutePath, candidate)))
-      ) {
-        return candidate;
+      const candidatePath = path.join(directoryAbsolutePath, candidate);
+      // O_CREAT | O_EXCL atomically creates the file only if it does not
+      // already exist. This is race-free: two concurrent calls cannot
+      // both succeed on the same path.
+      let handle: fs.FileHandle | undefined;
+      try {
+        handle = await fs.open(
+          candidatePath,
+          fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
+          0o644,
+        );
+      } catch (error) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          (error as { code?: string }).code === 'EEXIST'
+        ) {
+          continue;
+        }
+        throw error;
       }
+      await handle.close();
+      const relativePath = directoryRelativePath
+        ? `${directoryRelativePath}/${candidate}`
+        : candidate;
+      return { fileName: candidate, relativePath };
     }
 
     throw new Error('Could not find an available file name');
