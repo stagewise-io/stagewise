@@ -185,8 +185,10 @@ export function FileTreeWorkspaceView({
     timer: number | null;
   }>({ value: '', timer: null });
   const restoreFocusTimersRef = useRef<number[]>([]);
-  const pendingNewFileRef = useRef<string | null>(null);
+  const pendingNewFileRef = useRef<string[]>([]);
   const openAfterRenameRef = useRef<Set<string>>(new Set());
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
   const [focusedEntryPath, setFocusedEntryPath] = useState<string | null>(null);
   const [selectedEntryPaths, setSelectedEntryPaths] = useState<string[]>([]);
   const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(
@@ -473,8 +475,9 @@ export function FileTreeWorkspaceView({
         setSelectedEntryPaths([]);
         setSelectionAnchorPath(null);
         // Track the new file so the rows-watcher effect scrolls to it and
-        // enters rename mode once it appears in the tree.
-        pendingNewFileRef.current = newFilePath;
+        // enters rename mode once it appears in the tree. Enqueued (not
+        // overwritten) so rapid repeated creates each get their turn.
+        pendingNewFileRef.current.push(newFilePath);
         openAfterRenameRef.current.add(newFilePath);
       });
     },
@@ -924,23 +927,41 @@ export function FileTreeWorkspaceView({
     };
   }, []);
 
-  // When a new file is created, wait for it to appear in the tree rows,
-  // scroll to it, and enter rename mode so the user can set the name.
+  // When new files are created, wait for them to appear in the tree rows,
+  // scroll to each in turn, and enter rename mode. Only one rename is
+  // active at a time; the rest wait in the queue until the current
+  // rename is submitted or cancelled (which sets renamingPath back to
+  // null, re-running this effect).
   useEffect(() => {
-    const pendingPath = pendingNewFileRef.current;
-    if (!pendingPath) return;
+    if (renamingPath !== null) return;
+    const queue = pendingNewFileRef.current;
+    const pendingPath = queue.shift();
+    if (pendingPath === undefined) return;
     const index = rows.findIndex(
       (row) => row.type === 'entry' && row.entry.relativePath === pendingPath,
     );
-    if (index === -1) return;
-    pendingNewFileRef.current = null;
+    if (index === -1) {
+      // Not visible yet. If the parent directory is paginated, trigger
+      // a load-more to fetch the next page so the file eventually appears
+      // in the loaded rows. Otherwise (directory loaded but file missing —
+      // e.g. tree collapsed) re-queue and wait for the next row change.
+      const parentDir = getParentDirectory(pendingPath);
+      const loadMoreRow = rows.find(
+        (row) => row.type === 'load-more' && row.directoryPath === parentDir,
+      );
+      if (loadMoreRow && loadMoreRow.type === 'load-more') {
+        loadMoreRef.current(parentDir);
+      }
+      queue.unshift(pendingPath);
+      return;
+    }
     virtuosoRef.current?.scrollToIndex({
       index,
       align: 'center',
       behavior: 'auto',
     });
     setRenamingPath(pendingPath);
-  }, [rows]);
+  }, [rows, renamingPath]);
 
   // Keep `renamingPathRef` in sync so `handleRenameCancel` can read the
   // current value without depending on `renamingPath` state.
