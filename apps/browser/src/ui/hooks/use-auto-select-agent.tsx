@@ -21,6 +21,12 @@ const RESUME_GRACE_MS = 2500;
 export function useAutoSelectFirstAgent(): void {
   const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
 
+  // Gate the auto-select effect on the main view so it doesn't fire
+  // during settings transitions — the Sidebar/AgentChat unmount-remount
+  // can cause transient state desyncs that would otherwise evict the
+  // active agent.
+  const appScreenMode = useKartonState((s) => s.appScreen.mode);
+
   const activeAgentIdsRaw = useKartonState(
     useComparingSelector((s) => Object.keys(s.agents.instances)),
   );
@@ -59,6 +65,7 @@ export function useAutoSelectFirstAgent(): void {
   const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
+    if (appScreenMode !== 'main') return;
     if (openAgent && !activeAgentIdSet.has(openAgent)) {
       // If the open agent was set very recently (e.g. by the user clicking
       // a history card), give the backend time to load it before concluding
@@ -81,6 +88,7 @@ export function useAutoSelectFirstAgent(): void {
       setOpenAgent(activeAgentIds[0]!);
     }
   }, [
+    appScreenMode,
     openAgent,
     activeAgentIdSet,
     activeAgentIds,
