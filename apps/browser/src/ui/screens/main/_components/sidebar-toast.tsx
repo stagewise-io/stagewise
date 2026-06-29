@@ -33,7 +33,6 @@ export function SidebarToast({
     <div
       className={cn(
         'relative flex shrink-0 flex-col gap-2 rounded-md bg-background/60 p-2.5 shadow-elevation-1 ring-1 ring-derived-subtle dark:bg-surface-1/60',
-        onDismiss && 'pr-9',
         className,
       )}
     >

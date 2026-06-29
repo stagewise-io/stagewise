@@ -56,7 +56,7 @@ export function WorktreeCleanupBadge() {
       dismissLabel="Dismiss worktree cleanup"
       onDismiss={handleDismiss}
     >
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 pr-7">
         <div className="flex items-center gap-1.5">
           <IconTrash2Outline24 className="size-3.5 shrink-0 text-foreground" />
           <div className="mt-0.5 min-w-0 flex-1 font-medium text-foreground text-xs">
