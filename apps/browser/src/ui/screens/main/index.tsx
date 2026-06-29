@@ -102,7 +102,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
   const activeTabId = useKartonState((s) => s.contentTabs.activeTabId);
   const fileTreeVisible = useKartonState((s) => s.fileTree.visible);
   const appScreenMode = useKartonState((s) => s.appScreen.mode);
-  const { setTabUiState } = useTabUIState();
+  const { setTabUiState, requestTerminalFocus } = useTabUIState();
   const [openAgent] = useOpenAgent();
   const { collapsed: sidebarCollapsed } = useSidebarCollapsed();
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
@@ -214,8 +214,17 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
 
   const handleOpenTerminal = useCallback(() => {
     if (contentCollapsed) setContentCollapsed(false);
-    return createTerminal(undefined, openAgent);
-  }, [createTerminal, openAgent, contentCollapsed, setContentCollapsed]);
+    return createTerminal(undefined, openAgent).then((terminalId) => {
+      if (terminalId) requestTerminalFocus(terminalId);
+      return terminalId;
+    });
+  }, [
+    createTerminal,
+    openAgent,
+    contentCollapsed,
+    setContentCollapsed,
+    requestTerminalFocus,
+  ]);
 
   const contentPanelTopRightActions =
     showContent && !fileTreeVisible ? (

@@ -81,6 +81,7 @@ import {
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useContentCollapsed } from '@ui/screens/main/_components/content-collapsed-context';
+import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import {
   memo,
   useCallback,
@@ -1008,6 +1009,7 @@ function WorkspacePreviewCardContent({
   );
   const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
     useContentCollapsed();
+  const { requestTerminalFocus } = useTabUIState();
   const setupTitle = setupRun
     ? setupRun.status === 'running'
       ? 'Worktree setup running'
@@ -1033,7 +1035,9 @@ function WorkspacePreviewCardContent({
       event.stopPropagation();
       event.preventDefault();
       if (contentCollapsed) setContentCollapsed(false);
-      void createTerminal(mount.path, openAgent);
+      void createTerminal(mount.path, openAgent).then((terminalId) => {
+        if (terminalId) requestTerminalFocus(terminalId);
+      });
     },
     [
       mount.path,
@@ -1041,6 +1045,7 @@ function WorkspacePreviewCardContent({
       createTerminal,
       contentCollapsed,
       setContentCollapsed,
+      requestTerminalFocus,
     ],
   );
 
