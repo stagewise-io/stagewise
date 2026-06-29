@@ -26,7 +26,7 @@ export function NotificationBanners() {
           dismissLabel="Dismiss notification"
           onDismiss={() => dismissNotification(notification.id)}
         >
-          <div className="flex flex-row items-start gap-2">
+          <div className="flex flex-row items-start gap-2 pr-7">
             <NotificationIcon type={notification.type} />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               {notification.title && (
