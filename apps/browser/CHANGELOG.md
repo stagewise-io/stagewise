@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.15.0 (2026-06-29)
+
+### Features
+
+* add feedback and founder call surveys with 96h dismiss cooldown (b8eefa1)
+* backfill firstUsedAt from oldest agent createdAt (dfcabb0)
+* add feedback and founder call surveys to sidebar (9431767)
+* add priority-based CMD+Enter shortcut registry (d1f83d6)
+
+### Bug Fixes
+
+* request terminal focus on creation and tab switch (4e198f4)
+* restore even padding for sidebar toast action buttons (53caf1f)
+* remove backdrop-blur from sidebar toasts to fix GPU compositing regression (b27f7c5)
+* prevent agent reset on settings toggle and widen default sidebar (32c7db8)
+* add in-flight guard to feedback submission (9dd3b1c)
+* make agent count refresh reachable and gate on loaded count (da89ba4)
+* await feedback submission, add noopener, reserve toast dismiss space, label textarea (9a0a1f1)
+* apply plausibility check to firstUsedAt backfill and add cooldown timer to survey UI (f6a8433)
+* guard concurrent agent count refresh and use DB as source of truth (7f8edaa)
+
+### Other Changes
+
+* remove duplicated telemetryLevel and clean up sound pack config (9722b78)
+* extract shared SidebarToast wrapper for all sidebar badges (ecbcc3e)
+
 ## 1.14.0 (2026-06-26)
 
 ### Features
