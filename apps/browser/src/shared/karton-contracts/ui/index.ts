@@ -1109,6 +1109,11 @@ export type AppState = {
   };
   // The global configuration of the CLI.
   globalConfig: GlobalConfig;
+  // Discovered notification sound packs (runtime, not persisted).
+  notificationSoundPacks: {
+    available: string[];
+    displayNames: Record<string, string>;
+  };
   // State of the current user experience (getting started etc.)
   userExperience: {
     storedExperienceData: StoredExperienceData;
@@ -2154,16 +2159,16 @@ export const defaultState: KartonContract['state'] = {
     errorMessage: null,
   },
   globalConfig: {
-    telemetryLevel: 'full',
-    notificationSoundsEnabled: true,
     notificationSoundLoudness: 'subtle',
     notificationSoundPack: 'bubble-pops',
-    availableSoundPacks: ['bubble-pops'],
-    packDisplayNames: {},
     dockBounceEnabled: true,
     blockAppSuspensionWhenAgentsActive: true,
     personalizationThemeId: 'default',
     appColorScheme: 'system',
+  },
+  notificationSoundPacks: {
+    available: ['bubble-pops'],
+    displayNames: {},
   },
   userExperience: {
     storedExperienceData: {

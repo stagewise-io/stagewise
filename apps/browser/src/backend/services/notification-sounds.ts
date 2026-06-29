@@ -834,16 +834,7 @@ export class NotificationSoundsService extends DisposableService {
 // ---------------------------------------------------------------------------
 
 function normalizeLoudness(config: GlobalConfig): SoundLoudness {
-  const loudness = (
-    config as GlobalConfig & {
-      notificationSoundLoudness?: SoundLoudness;
-    }
-  ).notificationSoundLoudness;
-  if (loudness === 'off' || loudness === 'subtle' || loudness === 'default') {
-    return loudness;
-  }
-  // Backwards compatibility for existing configs.
-  return config.notificationSoundsEnabled === false ? 'off' : 'subtle';
+  return config.notificationSoundLoudness;
 }
 
 function bufferToDataUrl(buffer: ArrayBuffer, mimeType: string): string | null {
