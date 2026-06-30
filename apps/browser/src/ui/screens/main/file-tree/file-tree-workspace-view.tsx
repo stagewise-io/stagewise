@@ -189,6 +189,8 @@ export function FileTreeWorkspaceView({
   const openAfterRenameRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
+  const workspaceKeyRef = useRef(workspaceKey);
+  workspaceKeyRef.current = workspaceKey;
 
   // When the displayed workspace changes, clear all pending state from the
   // previous workspace. Stale entries could otherwise match paths in the new
@@ -466,7 +468,11 @@ export function FileTreeWorkspaceView({
   const handleCreateFile = useCallback(
     (directoryPath: string) => {
       if (!workspaceKey) return;
-      void createFile(workspaceKey, directoryPath).then((result) => {
+      const activeWorkspaceKey = workspaceKey;
+      void createFile(activeWorkspaceKey, directoryPath).then((result) => {
+        // If the user switched workspaces while the create was in-flight,
+        // discard the result — the path belongs to the old workspace.
+        if (workspaceKeyRef.current !== activeWorkspaceKey) return;
         if (!result.success || !result.relativePath) {
           toast({
             id: `file-tree-create-error-${Date.now()}`,
