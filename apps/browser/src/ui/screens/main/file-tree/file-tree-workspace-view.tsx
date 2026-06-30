@@ -189,6 +189,15 @@ export function FileTreeWorkspaceView({
   const openAfterRenameRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
+
+  // When the displayed workspace changes, clear all pending state from the
+  // previous workspace. Stale entries could otherwise match paths in the new
+  // workspace (wrong rename target) or block the queue indefinitely.
+  useEffect(() => {
+    pendingNewFileRef.current = [];
+    openAfterRenameRef.current = new Set();
+    setRenamingPath(null);
+  }, [workspaceKey]);
   const [focusedEntryPath, setFocusedEntryPath] = useState<string | null>(null);
   const [selectedEntryPaths, setSelectedEntryPaths] = useState<string[]>([]);
   const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(
