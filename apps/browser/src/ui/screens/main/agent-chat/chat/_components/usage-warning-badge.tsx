@@ -59,7 +59,7 @@ export function UsageWarningBadge() {
         lastDismissedThreshold = activeThreshold;
         setDismissedThreshold(activeThreshold);
       }}
-      className="flex-row items-start gap-2"
+      className="flex-row items-start gap-2 pr-7"
     >
       <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0 text-warning-foreground" />
       <span className="text-foreground text-xs">
