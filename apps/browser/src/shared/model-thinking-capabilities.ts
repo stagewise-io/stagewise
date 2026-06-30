@@ -407,7 +407,8 @@ function getAnthropicOptions(modelId: string): ThinkingOption[] {
 
   if (
     modelId.startsWith('claude-opus-4.6') ||
-    modelId.startsWith('claude-sonnet-4.6')
+    modelId.startsWith('claude-sonnet-4.6') ||
+    modelId.startsWith('claude-sonnet-5')
   ) {
     return ANTHROPIC_ADAPTIVE_MAX_OPTIONS;
   }

@@ -486,11 +486,49 @@ export const availableModels = [
   },
   {
     officialProvider: 'anthropic',
+    modelId: 'claude-sonnet-5',
+    modelDisplayName: 'Sonnet 5',
+    modelDescription:
+      "Anthropic's next-generation mid-size model, combining strong reasoning with efficient performance for daily coding tasks.",
+    modelContext: '200k context',
+    modelContextRaw: 200000,
+    headers: anthropicHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      anthropic: { thinking: { type: 'adaptive' }, effort: 'medium' },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 3.0,
+      outputPerMillion: 15.0,
+      relativeMultiplier: 3.2,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: ANTHROPIC_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'anthropic',
     modelId: 'claude-sonnet-4.6',
 
     modelDisplayName: 'Sonnet 4.6',
     modelDescription:
-      "Anthropic's balanced model, great for daily coding tasks.",
+      'Previous-generation balanced model, still great for daily coding tasks.',
     modelContext: '200k context',
     modelContextRaw: 200000,
     headers: anthropicHeaders,

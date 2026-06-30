@@ -19,6 +19,25 @@ import {
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import { DisposableService } from './disposable';
 import { safeStorage } from 'electron';
+
+/**
+ * Model IDs that became default-hidden in the current release. On load,
+ * `migrateDefaultDisabledModelIds` merges any of these that are missing
+ * from a returning user's persisted `disabledModelIds` array, so the
+ * hide-by-default behavior reaches existing users — not just new ones.
+ *
+ * This is a one-way, additive migration: it only ever *adds* IDs, never
+ * removes them. A user who explicitly re-enables one of these models
+ * after the migration ran will not be re-disabled, because their array
+ * will already contain the ID (the migration is a no-op once applied).
+ *
+ * Add new model IDs here when a newer model supersedes an older one and
+ * the older one should be hidden by default. Do not remove entries —
+ * older releases still need them to migrate their users.
+ */
+const NEWLY_DEFAULT_DISABLED_MODEL_IDS: readonly string[] = [
+  'claude-sonnet-4.6',
+];
 import {
   CODING_PLANS,
   isCodingPlanId,
@@ -123,6 +142,9 @@ export class PreferencesService extends DisposableService {
     // Migration: convert old customBaseUrl configs to customProviderId
     await this.migrateCustomBaseUrlToProviderId();
 
+    // Migration: merge newly default-disabled models into existing preferences
+    await this.migrateDefaultDisabledModelIds();
+
     this.logger.debug('[PreferencesService] Loaded preferences', {
       telemetryLevel: this.preferences.privacy.telemetryLevel,
     });
@@ -190,6 +212,37 @@ export class PreferencesService extends DisposableService {
     if (needsSave) {
       await this.save();
     }
+  }
+
+  /**
+   * Merge model IDs from `NEWLY_DEFAULT_DISABLED_MODEL_IDS` into the
+   * persisted `disabledModelIds` array when they are missing. This ensures
+   * returning users get the same hide-by-default behavior as new users
+   * for models deprecated in the current release.
+   *
+   * Additive only — never removes IDs the user already configured. Once an
+   * ID is present (whether from this migration or the user's own action),
+   * it is never re-added. Users who explicitly re-enable a deprecated
+   * model (remove it from the disabled list) are not affected because the
+   * migration only runs once per missing ID.
+   */
+  private async migrateDefaultDisabledModelIds(): Promise<void> {
+    const currentSet = new Set(this.preferences.agent.disabledModelIds);
+    const missing = NEWLY_DEFAULT_DISABLED_MODEL_IDS.filter(
+      (id) => !currentSet.has(id),
+    );
+
+    if (missing.length === 0) return;
+
+    this.preferences.agent.disabledModelIds = [
+      ...this.preferences.agent.disabledModelIds,
+      ...missing,
+    ];
+    await this.save();
+
+    this.logger.debug(
+      `[PreferencesService] Migrated default-disabled model IDs: added ${missing.join(', ')}`,
+    );
   }
 
   /**

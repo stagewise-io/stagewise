@@ -52,6 +52,7 @@ const PROVIDERS: ProviderInfo[] = [
       { name: 'Opus 4.8', tier: 'frontier' },
       { name: 'Opus 4.7', tier: 'frontier' },
       { name: 'Opus 4.6', tier: 'frontier' },
+      { name: 'Sonnet 5', tier: 'general' },
       { name: 'Sonnet 4.6', tier: 'general' },
       { name: 'Haiku 4.5', tier: 'lightweight' },
     ],
