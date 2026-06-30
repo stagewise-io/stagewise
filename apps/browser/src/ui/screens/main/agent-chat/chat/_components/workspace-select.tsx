@@ -2,6 +2,7 @@ import type { SelectItem } from '@stagewise/stage-ui/components/select';
 import type { WorkspaceGitAction } from '@shared/karton-contracts/ui/shared-types';
 import type { Patch } from 'immer';
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
+import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import {
   Combobox,
   ComboboxInput,
@@ -1798,6 +1799,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     (p: KartonProcedures) => p.toolbox.unmountWorkspace,
   );
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [branchesResult, setBranchesResult] =
     useState<WorkspaceGitBranchesResult | null>(null);
   const [worktreesResult, setWorktreesResult] =
@@ -2122,10 +2124,12 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         return;
       }
       setActionError(null);
+      setIsExecuting(true);
       persistWorkspaceGitActionPreference(next, partial);
       if (onConfigChange) {
         onConfigChange(mount, nextConfig);
         setOpen(false);
+        setIsExecuting(false);
       } else {
         setLocalConfig(nextConfig);
         void executeWorkspaceGitAction({
@@ -2139,15 +2143,19 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             mountWorkspace,
             unmountWorkspace,
           },
-        }).then((result) => {
-          if (!result.ok) {
-            setActionError(result.message);
-            return;
-          }
-          setOpen(false);
-          setGitDataLoaded(false);
-          void refreshGitData();
-        });
+        })
+          .then((result) => {
+            if (!result.ok) {
+              setActionError(result.message);
+              return;
+            }
+            setOpen(false);
+            setGitDataLoaded(false);
+            void refreshGitData();
+          })
+          .finally(() => {
+            setIsExecuting(false);
+          });
       }
       track('workspace-action-changed', {
         mount_path: mount.path,
@@ -2323,6 +2331,8 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
               variant="ghost"
               size="xs"
               data-tutorial="workspace-action-trigger"
+              disabled={isExecuting}
+              aria-busy={isExecuting}
               className={cn(
                 'group/action flex min-w-0 justify-start gap-1.5 px-0',
                 'text-muted-foreground hover:text-muted-foreground',
@@ -2371,18 +2381,44 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
               'data-ending-style:opacity-0 data-starting-style:opacity-0',
             )}
           >
-            <WorkspaceActionPickerContent
-              config={config}
-              sourceBranchItems={sourceBranchItems}
-              checkoutBranchItems={checkoutBranchItems}
-              worktreeItems={worktreeItems}
-              onCommit={handleActionChange}
-              onUpdateAction={handleActionUpdate}
-            />
-            {actionError && (
-              <div className="px-2 pt-1 pb-1 text-error-foreground text-xs">
-                {actionError}
+            {isExecuting ? (
+              <div className="flex flex-col gap-0.5 p-1">
+                <div className="px-2 pt-2 pb-0.5">
+                  <Skeleton className="h-3 w-16" variant="text" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+                <div className="my-1 h-px bg-border-subtle" />
+                <div className="px-2 pt-2 pb-0.5">
+                  <Skeleton className="h-3 w-12" variant="text" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
+                <div className="px-2 py-1.5">
+                  <Skeleton className="h-6 w-full" />
+                </div>
               </div>
+            ) : (
+              <>
+                <WorkspaceActionPickerContent
+                  config={config}
+                  sourceBranchItems={sourceBranchItems}
+                  checkoutBranchItems={checkoutBranchItems}
+                  worktreeItems={worktreeItems}
+                  onCommit={handleActionChange}
+                  onUpdateAction={handleActionUpdate}
+                />
+                {actionError && (
+                  <div className="px-2 pt-1 pb-1 text-error-foreground text-xs">
+                    {actionError}
+                  </div>
+                )}
+              </>
             )}
           </PopoverBase.Popup>
         </PopoverBase.Positioner>
