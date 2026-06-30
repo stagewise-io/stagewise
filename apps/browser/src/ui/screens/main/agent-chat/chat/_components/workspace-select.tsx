@@ -2127,9 +2127,12 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
       setIsExecuting(true);
       persistWorkspaceGitActionPreference(next, partial);
       if (onConfigChange) {
-        onConfigChange(mount, nextConfig);
-        setOpen(false);
-        setIsExecuting(false);
+        try {
+          onConfigChange(mount, nextConfig);
+          setOpen(false);
+        } finally {
+          setIsExecuting(false);
+        }
       } else {
         setLocalConfig(nextConfig);
         void executeWorkspaceGitAction({
@@ -2152,6 +2155,13 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             setOpen(false);
             setGitDataLoaded(false);
             void refreshGitData();
+          })
+          .catch((err: unknown) => {
+            setActionError(
+              err instanceof Error
+                ? err.message
+                : 'An unexpected error occurred',
+            );
           })
           .finally(() => {
             setIsExecuting(false);
