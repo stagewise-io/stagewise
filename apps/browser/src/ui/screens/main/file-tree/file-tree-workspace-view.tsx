@@ -20,6 +20,7 @@ import {
   ClipboardIcon,
   ClipboardPasteIcon,
   CopyIcon,
+  FilePlusIcon,
   FolderOpenIcon,
   Loader2Icon,
   PencilIcon,
@@ -36,6 +37,7 @@ import { nativeFileManagerLabel } from '@shared/ide-url';
 import {
   getAllFileTreeWorkspaceMounts,
   getFileTreeWorkspaceKey,
+  isReadOnlyWorkspaceKey,
 } from './file-tree-utils';
 import {
   getEffectiveFileTreeActionPaths,
@@ -143,6 +145,7 @@ export function FileTreeWorkspaceView({
   const renameEntry = useKartonProcedure((p) => p.fileTree.renameEntry);
   const pasteEntry = useKartonProcedure((p) => p.fileTree.pasteEntry);
   const deleteEntry = useKartonProcedure((p) => p.fileTree.deleteEntry);
+  const createFile = useKartonProcedure((p) => p.fileTree.createFile);
   const copyText = useKartonProcedure((p) => p.browser.copyText);
   const [openAgent] = useOpenAgent();
   const workspaceMount = useKartonState((s) =>
@@ -182,12 +185,30 @@ export function FileTreeWorkspaceView({
     timer: number | null;
   }>({ value: '', timer: null });
   const restoreFocusTimersRef = useRef<number[]>([]);
+  const pendingNewFileRef = useRef<string[]>([]);
+  const openAfterRenameRef = useRef<Set<string>>(new Set());
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  const workspaceKeyRef = useRef(workspaceKey);
+  workspaceKeyRef.current = workspaceKey;
+
+  // When the displayed workspace changes, clear all pending state from the
+  // previous workspace. Stale entries could otherwise match paths in the new
+  // workspace (wrong rename target) or block the queue indefinitely.
+  useEffect(() => {
+    pendingNewFileRef.current = [];
+    openAfterRenameRef.current = new Set();
+    setRenamingPath(null);
+  }, [workspaceKey]);
   const [focusedEntryPath, setFocusedEntryPath] = useState<string | null>(null);
   const [selectedEntryPaths, setSelectedEntryPaths] = useState<string[]>([]);
   const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(
     null,
   );
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  // Mirror of `renamingPath` for use inside stable callbacks (avoids
+  // re-creating `handleRenameCancel` on every rename state change).
+  const renamingPathRef = useRef<string | null>(null);
   const [contextTargetPath, setContextTargetPath] = useState<string | null>(
     null,
   );
@@ -417,9 +438,65 @@ export function FileTreeWorkspaceView({
         const nextPath = result.relativePath ?? relativePath;
         setRenamingPath(null);
         setFocusedEntryPath(nextPath);
+        // If this was a newly created file, open it in a tab after rename.
+        if (openAfterRenameRef.current.delete(relativePath)) {
+          void openFileTab(workspaceKey, nextPath, openAgent, {
+            preview: false,
+          });
+        }
       });
     },
-    [renameEntry, workspaceKey],
+    [openAgent, openFileTab, renameEntry, workspaceKey],
+  );
+
+  const handleRenameCancel = useCallback(() => {
+    const cancelledPath = renamingPathRef.current;
+    setRenamingPath(null);
+    // If the user cancelled renaming a newly created file, open it with
+    // the default name so they can start editing it.
+    if (
+      cancelledPath &&
+      openAfterRenameRef.current.delete(cancelledPath) &&
+      workspaceKey
+    ) {
+      void openFileTab(workspaceKey, cancelledPath, openAgent, {
+        preview: false,
+      });
+    }
+  }, [openAgent, openFileTab, workspaceKey]);
+
+  const handleCreateFile = useCallback(
+    (directoryPath: string) => {
+      if (!workspaceKey) return;
+      const activeWorkspaceKey = workspaceKey;
+      void createFile(activeWorkspaceKey, directoryPath).then((result) => {
+        // If the user switched workspaces while the create was in-flight,
+        // discard the result — the path belongs to the old workspace.
+        if (workspaceKeyRef.current !== activeWorkspaceKey) return;
+        if (!result.success || !result.relativePath) {
+          toast({
+            id: `file-tree-create-error-${Date.now()}`,
+            title: 'New file failed',
+            message: result.error ?? 'Could not create a new file.',
+            type: 'error',
+            actions: [],
+          });
+          return;
+        }
+        const newFilePath = result.relativePath;
+        // Ensure the parent directory is expanded so the new file is visible.
+        void setDirectoryExpanded(workspaceKey, directoryPath, true);
+        setFocusedEntryPath(newFilePath);
+        setSelectedEntryPaths([]);
+        setSelectionAnchorPath(null);
+        // Track the new file so the rows-watcher effect scrolls to it and
+        // enters rename mode once it appears in the tree. Enqueued (not
+        // overwritten) so rapid repeated creates each get their turn.
+        pendingNewFileRef.current.push(newFilePath);
+        openAfterRenameRef.current.add(newFilePath);
+      });
+    },
+    [createFile, setDirectoryExpanded, workspaceKey],
   );
 
   const getActionPaths = useCallback(
@@ -865,6 +942,48 @@ export function FileTreeWorkspaceView({
     };
   }, []);
 
+  // When new files are created, wait for them to appear in the tree rows,
+  // scroll to each in turn, and enter rename mode. Only one rename is
+  // active at a time; the rest wait in the queue until the current
+  // rename is submitted or cancelled (which sets renamingPath back to
+  // null, re-running this effect).
+  useEffect(() => {
+    if (renamingPath !== null) return;
+    const queue = pendingNewFileRef.current;
+    const pendingPath = queue.shift();
+    if (pendingPath === undefined) return;
+    const index = rows.findIndex(
+      (row) => row.type === 'entry' && row.entry.relativePath === pendingPath,
+    );
+    if (index === -1) {
+      // Not visible yet. If the parent directory is paginated, trigger
+      // a load-more to fetch the next page so the file eventually appears
+      // in the loaded rows. Otherwise (directory loaded but file missing —
+      // e.g. tree collapsed) re-queue and wait for the next row change.
+      const parentDir = getParentDirectory(pendingPath);
+      const loadMoreRow = rows.find(
+        (row) => row.type === 'load-more' && row.directoryPath === parentDir,
+      );
+      if (loadMoreRow && loadMoreRow.type === 'load-more') {
+        loadMoreRef.current(parentDir);
+      }
+      queue.unshift(pendingPath);
+      return;
+    }
+    virtuosoRef.current?.scrollToIndex({
+      index,
+      align: 'center',
+      behavior: 'auto',
+    });
+    setRenamingPath(pendingPath);
+  }, [rows, renamingPath]);
+
+  // Keep `renamingPathRef` in sync so `handleRenameCancel` can read the
+  // current value without depending on `renamingPath` state.
+  useEffect(() => {
+    renamingPathRef.current = renamingPath;
+  }, [renamingPath]);
+
   const handleTreeContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       const element = (
@@ -896,6 +1015,13 @@ export function FileTreeWorkspaceView({
     : contextIsDirectory
       ? contextTargetPath
       : getParentDirectory(contextTargetPath);
+  // The directory where a new file would be created when the user clicks
+  // “New File” — the targeted directory itself, the parent of a targeted
+  // file, or the workspace root for empty-space right-clicks.
+  const contextCreateDirectory = contextPasteDirectory;
+  const workspaceIsReadOnly = workspaceKey
+    ? isReadOnlyWorkspaceKey(workspaceKey)
+    : false;
 
   return (
     <ContextMenu.Root>
@@ -985,7 +1111,7 @@ export function FileTreeWorkspaceView({
                 row.type === 'entry' && row.entry.relativePath === renamingPath
               }
               onRenameSubmit={handleRenameSubmit}
-              onRenameCancel={() => setRenamingPath(null)}
+              onRenameCancel={handleRenameCancel}
               onOpen={handleOpen}
               onMoveDrop={handleMoveDrop}
               onDragTargetChange={setDragOverDirectoryPath}
@@ -1006,6 +1132,15 @@ export function FileTreeWorkspaceView({
               'data-ending-style:opacity-0 data-starting-style:opacity-0',
             )}
           >
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={workspaceIsReadOnly}
+              onClick={() => handleCreateFile(contextCreateDirectory)}
+            >
+              <FilePlusIcon className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">New File</span>
+            </MenuBase.Item>
+            <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
             <MenuBase.Item
               className={contextMenuItemClassName}
               disabled={!contextCanRename}
