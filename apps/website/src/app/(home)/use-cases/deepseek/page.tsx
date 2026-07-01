@@ -169,11 +169,11 @@ export default function DeepSeekUseCasePage() {
                 </p>
                 <p>
                   The runtime also automatically{' '}
-                  <strong>compresses context</strong>
-                  as tasks grow. Older turns are summarized and pruned so the
-                  model keeps a focused working set. That makes longer jobs
-                  practical: multi-file features, refactors that unfold over
-                  hours, or debugging sessions for tricky issues.
+                  <strong>compresses context</strong> as tasks grow. Older turns
+                  are summarized and pruned so the model keeps a focused working
+                  set. That makes longer jobs practical: multi-file features,
+                  refactors that unfold over hours, or debugging sessions for
+                  tricky issues.
                 </p>
               </div>
             </ScrollReveal>
@@ -319,7 +319,7 @@ export default function DeepSeekUseCasePage() {
                     <strong>stagewise Cloud Inference:</strong> With a stagewise
                     Account, you get preconfigured access to a wide variety of
                     models including DeepSeek V4 Pro and V4 Flash — no keys,
-                    configuration, or external subscriptions required.
+                    configuration, or external subscriptions <em>required</em>.
                   </li>
                   <li>
                     <strong>Your API Key:</strong> Supply a DeepSeek API key, or
@@ -327,10 +327,10 @@ export default function DeepSeekUseCasePage() {
                     route your queries.
                   </li>
                   <li>
-                    <strong>Custom Endpoint:</strong> Connect stagewise to any
-                    custom endpoint — including local servers (Ollama,
-                    Llama.cpp), on-premise deployments (vLLM), or enterprise
-                    inference providers.
+                    <strong>Custom Endpoint:</strong> Connect stagewise to{' '}
+                    <em>any</em> custom endpoint — including local servers
+                    (Ollama, Llama.cpp), on-premise deployments (vLLM), or
+                    enterprise inference providers.
                   </li>
                 </ul>
               </>
@@ -343,11 +343,12 @@ export default function DeepSeekUseCasePage() {
             answer: (
               <>
                 <p>
-                  The models listed on our home page — DeepSeek V4 Pro and
-                  DeepSeek V4 Flash — are available out of the box. Beyond
-                  those, you can connect any additional DeepSeek model that has
-                  agentic capabilities through your own API key or inference
-                  provider.
+                  The models listed on our home page —{' '}
+                  <strong>DeepSeek V4 Pro</strong> and{' '}
+                  <strong>DeepSeek V4 Flash</strong> — are available{' '}
+                  <em>out of the box</em>. Beyond those, you can connect any
+                  additional DeepSeek model that has agentic capabilities
+                  through your own API key or inference provider.
                 </p>
               </>
             ),
@@ -360,9 +361,10 @@ export default function DeepSeekUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes. You can connect models from any model provider API,
-                  including your custom model variants — whether fine-tuned,
-                  quantized, or otherwise specialized.
+                  Yes. You can connect models from <em>any</em> model provider
+                  API, including your custom model variants — whether{' '}
+                  <strong>fine-tuned</strong>, <strong>quantized</strong>, or
+                  otherwise specialized.
                 </p>
               </>
             ),
@@ -374,16 +376,20 @@ export default function DeepSeekUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes. You can configure stagewise Agents to use models from any
-                  source, including a local setup using Ollama or an on-premise
-                  deployment in your own datacenter with setups like vLLM.
+                  Yes. You can configure stagewise Agents to use models from{' '}
+                  <em>any</em> source, including a local setup using Ollama or
+                  an on-premise deployment in your own datacenter with setups
+                  like vLLM.
                 </p>
                 <p>
                   We support any inference provider option that serves models
                   via one of the popular model access APIs like OpenAI Chat
                   Completions API, OpenResponses API, or Anthropic Messages API.
                 </p>
-                <p>The minimum recommended context size is 150k tokens.</p>
+                <p>
+                  The minimum recommended context size is{' '}
+                  <strong>150k tokens</strong>.
+                </p>
               </>
             ),
           },
@@ -395,9 +401,10 @@ export default function DeepSeekUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes. stagewise offers the option to connect Azure Foundry, AWS
-                  Bedrock, and Google Vertex endpoints for enterprise-grade
-                  inference.
+                  Yes. stagewise offers the option to connect{' '}
+                  <strong>Azure Foundry</strong>, <strong>AWS Bedrock</strong>,
+                  and <strong>Google Vertex</strong> endpoints for
+                  enterprise-grade inference.
                 </p>
               </>
             ),
