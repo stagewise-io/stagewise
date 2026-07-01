@@ -421,9 +421,11 @@ export default function GLMUseCasePage() {
                   Yes, but <strong>at your own risk</strong>. While we test and
                   support using the GLM coding plan within stagewise, we are{' '}
                   <em>not an official partner</em> of Z.AI&apos;s coding plan
-                  program and cannot guarantee that your access to GLM models
-                  through the coding plan API key complies with Z.AI&apos;s
-                  terms.
+                  program.
+                </p>
+                <p>
+                  We cannot guarantee that your access to GLM models through the
+                  coding plan API key complies with Z.AI&apos;s terms.
                 </p>
               </>
             ),

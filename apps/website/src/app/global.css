@@ -172,3 +172,9 @@
 .prose em {
   font-style: oblique 5deg;
 }
+
+@layer base {
+  strong {
+    font-weight: 500;
+  }
+}
