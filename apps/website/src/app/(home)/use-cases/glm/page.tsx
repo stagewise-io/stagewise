@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { DownloadButtons } from '../../_components/home-client';
+import { DownloadButtons } from '../../_components/download-buttons';
 import { HeroImage } from './hero-image';
 import { UseCaseFAQ } from '../_components/use-case-faq';
 
