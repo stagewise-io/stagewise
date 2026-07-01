@@ -27,7 +27,7 @@ export function UseCaseFAQ({ items }: UseCaseFAQProps) {
   };
 
   return (
-    <section className="relative z-10 mt-12 w-full border-surface-2 border-t py-12 md:py-16">
+    <section className="relative z-10 w-full py-6 md:py-8">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -35,7 +35,7 @@ export function UseCaseFAQ({ items }: UseCaseFAQProps) {
       <div className="flex justify-center">
         <div className="w-full max-w-4xl px-4">
           <ScrollReveal>
-            <h2 className="mb-8 text-center font-medium text-2xl text-foreground md:text-3xl">
+            <h2 className="mb-4 font-medium text-foreground text-xl">
               Frequently Asked Questions
             </h2>
             <div className="space-y-4">
