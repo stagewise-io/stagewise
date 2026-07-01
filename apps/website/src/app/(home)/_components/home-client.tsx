@@ -33,7 +33,7 @@ const DARK_FILTER: Record<string, string> = {
 };
 
 const PROVIDER_ICONS: Record<string, string[]> = {
-  'stagewise Cloud': [
+  'stagewise Cloud Inference': [
     'chatgpt.png',
     'claude.png',
     'gemini.png',
@@ -164,8 +164,8 @@ function FeatureSection() {
             <div className="space-y-2">
               <h3 className="font-medium text-2xl">Use any model</h3>
               <p className="text-base text-muted-foreground">
-                Access frontier and open-weight models through the stagewise
-                Cloud, your own API subscriptions, or run them locally — no
+                Access frontier and open-weight models through stagewise Cloud
+                Inference, your own API subscriptions, or run them locally — no
                 lock-in.
               </p>
             </div>
@@ -180,7 +180,7 @@ function FeatureSection() {
               />
               <div className="relative flex h-full w-full flex-col items-stretch justify-center gap-4 p-6 sm:gap-6 sm:p-12 md:gap-8 md:p-16 lg:gap-10 lg:p-20">
                 {[
-                  { icon: Cloud, label: 'stagewise Cloud' },
+                  { icon: Cloud, label: 'stagewise Cloud Inference' },
                   { icon: Key, label: 'BYOK / External subscriptions' },
                   { icon: Monitor, label: 'Local inference' },
                 ].map(({ icon: Icon, label }) => (
