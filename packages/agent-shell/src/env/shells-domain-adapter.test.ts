@@ -15,6 +15,7 @@ function makeSession(
     logPath: string;
     cwd: string;
     tailContent: string;
+    lastLine: string;
     createdAt: number;
   }> = {},
 ) {
@@ -29,6 +30,7 @@ function makeSession(
     ...(over.tailContent !== undefined
       ? { tailContent: over.tailContent }
       : {}),
+    ...(over.lastLine !== undefined ? { lastLine: over.lastLine } : {}),
   };
 }
 
@@ -103,6 +105,61 @@ describe('createShellsDomainAdapter', () => {
       'Shell: bash (/opt/sh&lt;weird&gt;&amp;awful/bin/bash)',
     );
     expect(full).not.toContain('<weird>');
+  });
+
+  it('does not include tailContent in diff entries', () => {
+    const adapter = createShellsDomainAdapter({
+      getSnapshot: () => ({
+        sessions: [
+          makeSession({
+            lineCount: 10,
+            tailContent: 'some raw terminal output',
+          }),
+        ],
+      }),
+      getShellInfo: () => SHELL_INFO,
+    });
+    const curr = adapter.getState('a1') as never;
+    const prev = {
+      shellInfo: SHELL_INFO,
+      shells: { sessions: [makeSession({ lineCount: 5 })] },
+    } as never;
+    const diff = adapter.renderState(prev, curr);
+    expect(diff).toContain('shell-session-new-output');
+    expect(diff).toContain('lineCount="5"');
+    expect(diff).not.toContain('some raw terminal output');
+  });
+
+  it('equals ignores tailContent and lastLine', () => {
+    const adapter = createShellsDomainAdapter({
+      getSnapshot: () => ({ sessions: [] }),
+      getShellInfo: () => SHELL_INFO,
+    });
+    const a = {
+      shellInfo: SHELL_INFO,
+      shells: {
+        sessions: [
+          makeSession({
+            tailContent: 'aaa',
+            lastLine: 'la',
+            lineCount: 5,
+          }),
+        ],
+      },
+    } as never;
+    const b = {
+      shellInfo: SHELL_INFO,
+      shells: {
+        sessions: [
+          makeSession({
+            tailContent: 'bbb',
+            lastLine: 'lb',
+            lineCount: 5,
+          }),
+        ],
+      },
+    } as never;
+    expect(adapter.equals?.(a, b)).toBe(true);
   });
 
   it('exposes a non-empty promptSection covering shell usage keywords', () => {
