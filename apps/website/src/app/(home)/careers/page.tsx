@@ -38,6 +38,33 @@ export default function CareerPage() {
         </div>
       </ScrollReveal>
 
+      {/* About stagewise */}
+      <section className="mt-12">
+        <ScrollReveal>
+          <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
+            About stagewise
+          </h2>
+        </ScrollReveal>
+        <ScrollReveal delay={100}>
+          <div className="flex flex-col gap-4 text-base text-muted-foreground">
+            <p>
+              <strong className="text-foreground">stagewise</strong> is building
+              the open-source infrastructure layer for sovereign AI agents. We
+              enable organizations to create, orchestrate, and operate AI agents
+              across their entire business while maintaining full control over
+              their models, data, and workflows.
+            </p>
+            <p>
+              Backed by{' '}
+              <strong className="text-foreground">Y Combinator</strong>, we're
+              building the foundation for a future where AI agents become a core
+              part of how companies build software, automate operations, and get
+              work done.
+            </p>
+          </div>
+        </ScrollReveal>
+      </section>
+
       {/* Job listings */}
       <section className="mt-10">
         <ScrollReveal>
@@ -100,6 +127,30 @@ export default function CareerPage() {
             </div>
           </ScrollReveal>
         )}
+      </section>
+
+      {/* Why work at stagewise */}
+      <section className="mt-16">
+        <ScrollReveal>
+          <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
+            Why work at stagewise
+          </h2>
+        </ScrollReveal>
+        <ScrollReveal delay={100}>
+          <div className="flex flex-col gap-4 text-base text-muted-foreground">
+            <p>
+              We believe the best people do their best work when they're trusted
+              with real responsibility. You'll work directly with the founders,
+              help shape our strategy and product roadmap, and have the freedom
+              to pursue ideas you believe will move the company forward.
+            </p>
+            <p>
+              We're looking for people who are excited about what we're building
+              and want to contribute to something very ambitious. If you want to
+              help revolutionize the world with AI, you'll fit right in.
+            </p>
+          </div>
+        </ScrollReveal>
       </section>
 
       {/* Our principles */}

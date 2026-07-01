@@ -146,6 +146,7 @@ function buildSuggestedBedrockMapping(prefix: string): string {
     'claude-opus-4.8': `${prefix}anthropic.claude-opus-4-8`,
     'claude-opus-4.7': `${prefix}anthropic.claude-opus-4-7`,
     'claude-opus-4.6': `${prefix}anthropic.claude-opus-4-6-v1`,
+    'claude-sonnet-5': `${prefix}anthropic.claude-sonnet-5`,
     'claude-sonnet-4.6': `${prefix}anthropic.claude-sonnet-4-6`,
     'claude-haiku-4.5': `${prefix}anthropic.claude-haiku-4-5-20251001-v1:0`,
   };

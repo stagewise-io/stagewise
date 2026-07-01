@@ -1375,9 +1375,7 @@ export class MountManagerService extends DisposableService {
     if (!currentWorktree || currentWorktree.isMainWorktree) return null;
     if (currentWorktree.isDetached || !currentWorktree.branch) return null;
 
-    const status = await this.gitService.getWorktreeStatus(
-      resolvedWorkspacePath,
-    );
+    const status = summary.status;
     if (!status || status.dirty) return null;
 
     const lastUsedAt = lastUsedByPath.get(resolvedWorkspacePath) ?? null;
@@ -1391,6 +1389,7 @@ export class MountManagerService extends DisposableService {
     const merged = await this.gitService.findMergedTarget(
       resolvedWorkspacePath,
       currentWorktree.branch,
+      { knownSummary: summary, knownWorktrees: worktrees },
     );
     if (!merged.merged || !merged.target) return null;
 

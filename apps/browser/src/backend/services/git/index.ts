@@ -374,9 +374,16 @@ export class GitService extends DisposableService {
 
   public async listBranches(
     workspacePath: string,
-    options?: { refresh?: boolean },
+    options?: {
+      refresh?: boolean;
+      knownSummary?: MountedWorkspaceGitSummary | null;
+      knownWorktrees?: GitWorktreeInfo[];
+    },
   ): Promise<GitBranchListResult | null> {
-    const summary = await this.getMountedWorkspaceSummary(workspacePath);
+    const summary =
+      options?.knownSummary !== undefined
+        ? options.knownSummary
+        : await this.getMountedWorkspaceSummary(workspacePath);
     if (!summary) return null;
 
     let refreshSucceeded = false;
@@ -399,7 +406,8 @@ export class GitService extends DisposableService {
     ]);
     if (localResult === null) return null;
 
-    const worktrees = await this.listWorktrees(workspacePath);
+    const worktrees =
+      options?.knownWorktrees ?? (await this.listWorktrees(workspacePath));
     const localBranches = localResult
       .split('\n')
       .map((line) => line.trim())
@@ -689,8 +697,12 @@ export class GitService extends DisposableService {
   public async findMergedTarget(
     workspacePath: string,
     branchName: string,
+    options?: {
+      knownSummary?: MountedWorkspaceGitSummary | null;
+      knownWorktrees?: GitWorktreeInfo[];
+    },
   ): Promise<GitMergedTargetResult> {
-    const branches = await this.listBranches(workspacePath);
+    const branches = await this.listBranches(workspacePath, options);
     if (!branches) return { merged: false, target: null };
 
     const availableBranches = new Set(
@@ -712,12 +724,11 @@ export class GitService extends DisposableService {
     );
 
     for (const target of Array.from(new Set(candidateTargets))) {
-      const result = await this.runGitStrict(workspacePath, [
-        'merge-base',
-        '--is-ancestor',
-        branchName,
-        target,
-      ]);
+      const result = await this.runGitStrict(
+        workspacePath,
+        ['merge-base', '--is-ancestor', branchName, target],
+        'query',
+      );
       if (result.exitCode === 0) return { merged: true, target };
     }
 
@@ -984,11 +995,11 @@ export class GitService extends DisposableService {
     const trimmed = name.trim();
     if (!trimmed) return null;
 
-    const result = await this.runGitStrict(workspacePath, [
-      'check-ref-format',
-      '--branch',
-      trimmed,
-    ]);
+    const result = await this.runGitStrict(
+      workspacePath,
+      ['check-ref-format', '--branch', trimmed],
+      'validation',
+    );
     if (result.exitCode !== 0) return null;
 
     return trimmed;
@@ -1416,12 +1427,13 @@ export class GitService extends DisposableService {
   private async runGitStrict(
     cwd: string,
     args: string[],
+    operation = 'mutation',
   ): Promise<GitStrictCommandResult> {
     this.assertNotDisposed();
     const resolvedEnv = await this.getResolvedEnv();
     const env = sanitizeEnv(resolvedEnv, undefined, { forAgent: false });
     const result = await this.runGitMutationCommand(cwd, args, env);
-    this.logger.debug('[GitService] Git mutation finished', {
+    this.logger.debug(`[GitService] Git ${operation} finished`, {
       cwd,
       args,
       exitCode: result.exitCode,
