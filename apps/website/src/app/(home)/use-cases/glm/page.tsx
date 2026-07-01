@@ -377,7 +377,8 @@ export default function GLMUseCasePage() {
                     <strong>stagewise Cloud Inference:</strong> With a stagewise
                     Account, you get preconfigured access to a wide variety of
                     models including GLM 5.2, GLM 5.1, and GLM 5V-Turbo — no
-                    keys, configuration, or external subscriptions required.
+                    keys, configuration, or external subscriptions{' '}
+                    <em>required</em>.
                   </li>
                   <li>
                     <strong>Your API Key:</strong> Supply your own Z.AI API key,
@@ -385,10 +386,10 @@ export default function GLMUseCasePage() {
                     to route your queries.
                   </li>
                   <li>
-                    <strong>Custom Endpoint:</strong> Connect stagewise to any
-                    custom endpoint — including local servers (Ollama,
-                    Llama.cpp), on-premise deployments (vLLM), or enterprise
-                    inference providers.
+                    <strong>Custom Endpoint:</strong> Connect stagewise to{' '}
+                    <em>any</em> custom endpoint — including local servers
+                    (Ollama, Llama.cpp), on-premise deployments (vLLM), or
+                    enterprise inference providers.
                   </li>
                 </ul>
               </>
@@ -401,8 +402,9 @@ export default function GLMUseCasePage() {
             answer: (
               <>
                 <p>
-                  The models listed on our home page — GLM 5.2, GLM 5.1, and GLM
-                  5V-Turbo — are available out of the box. Beyond those, you can
+                  The models listed on our home page — <strong>GLM 5.2</strong>,
+                  <strong>GLM 5.1</strong>, and <strong>GLM 5V-Turbo</strong> —
+                  are available <em>out of the box</em>. Beyond those, you can
                   connect any additional GLM model that has agentic capabilities
                   through your own API key or inference provider.
                 </p>
@@ -416,11 +418,12 @@ export default function GLMUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes, but at your own risk. While we test and support using the
-                  GLM coding plan within stagewise, we are not an official
-                  partner of Z.AI&apos;s coding plan program and cannot
-                  guarantee that your access to GLM models through the coding
-                  plan API key complies with Z.AI&apos;s terms.
+                  Yes, but <strong>at your own risk</strong>. While we test and
+                  support using the GLM coding plan within stagewise, we are{' '}
+                  <em>not an official partner</em> of Z.AI&apos;s coding plan
+                  program and cannot guarantee that your access to GLM models
+                  through the coding plan API key complies with Z.AI&apos;s
+                  terms.
                 </p>
               </>
             ),
@@ -433,9 +436,10 @@ export default function GLMUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes. You can connect models from any model provider API,
-                  including your custom model variants — whether fine-tuned,
-                  quantized, or otherwise specialized.
+                  Yes. You can connect models from <em>any</em> model provider
+                  API, including your custom model variants — whether{' '}
+                  <strong>fine-tuned</strong>, <strong>quantized</strong>, or
+                  otherwise specialized.
                 </p>
               </>
             ),
@@ -447,16 +451,20 @@ export default function GLMUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes. You can configure stagewise Agents to use models from any
-                  source, including a local setup using Ollama or an on-premise
-                  deployment in your own datacenter with setups like vLLM.
+                  Yes. You can configure stagewise Agents to use models from{' '}
+                  <em>any</em> source, including a local setup using Ollama or
+                  an on-premise deployment in your own datacenter with setups
+                  like vLLM.
                 </p>
                 <p>
                   We support any inference provider option that serves models
                   via one of the popular model access APIs like OpenAI Chat
                   Completions API, OpenResponses API, or Anthropic Messages API.
                 </p>
-                <p>The minimum recommended context size is 150k tokens.</p>
+                <p>
+                  The minimum recommended context size is{' '}
+                  <strong>150k tokens</strong>.
+                </p>
               </>
             ),
           },
@@ -468,9 +476,10 @@ export default function GLMUseCasePage() {
             answer: (
               <>
                 <p>
-                  Yes. stagewise offers the option to connect Azure Foundry, AWS
-                  Bedrock, and Google Vertex endpoints for enterprise-grade
-                  inference.
+                  Yes. stagewise offers the option to connect{' '}
+                  <strong>Azure Foundry</strong>, <strong>AWS Bedrock</strong>,
+                  and <strong>Google Vertex</strong> endpoints for
+                  enterprise-grade inference.
                 </p>
               </>
             ),
