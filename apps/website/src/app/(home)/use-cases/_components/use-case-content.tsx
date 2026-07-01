@@ -1,5 +1,5 @@
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { DownloadButtons } from '../../_components/home-client';
+import { DownloadButtons } from '../../_components/download-buttons';
 
 interface UseCaseContentProps {
   modelName: string;

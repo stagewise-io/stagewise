@@ -7,7 +7,7 @@ import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import Link from 'next/link';
-import { DownloadButtons } from '../_components/home-client';
+import { DownloadButtons } from '../_components/download-buttons';
 
 interface PlanVariant {
   label: string;
