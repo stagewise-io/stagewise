@@ -19,6 +19,10 @@ export const metadata: Metadata = {
     creator: '@stagewise_io',
   },
   category: 'technology',
+  alternates: {
+    canonical: 'https://stagewise.io/enterprise',
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function EnterprisePage() {

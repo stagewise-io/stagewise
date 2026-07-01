@@ -20,6 +20,10 @@ export const metadata: Metadata = {
     creator: '@stagewise_io',
   },
   category: 'legal',
+  alternates: {
+    canonical: 'https://stagewise.io/terms',
+  },
+  robots: { index: true, follow: true },
 };
 
 export default async function TermsPage() {
