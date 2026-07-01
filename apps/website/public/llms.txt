@@ -1,0 +1,50 @@
+# stagewise
+
+> stagewise is an open-source agentic IDE — a purpose-built browser for developers with a coding agent built right in. It supports any LLM, including frontier, open-weight, and locally deployed models. Full model sovereignty. Runs locally, connects to anything.
+
+## Product
+
+stagewise is a next-gen agent orchestrator for software engineers. It leverages a frontier-grade agent harness that stays continuously aware of changes in terminals and browser tabs while maintaining token efficiency. The agent can read and edit files, run shell commands, interact with browser tabs via CDP, and orchestrate complex multi-step workflows.
+
+- **Open Source**: AGPLv3 licensed — the agent runtime, UI, and toolbar are all open source
+- **Model Agnostic**: Works with Claude, GPT, DeepSeek, GLM, Qwen, Kimi, MiniMax, and any OpenAI-compatible endpoint
+- **Local Models**: Supports Ollama, vLLM, LM Studio, and any local inference server with a minimum context size of 150k tokens
+- **Cloud Inference**: stagewise Cloud Inference provides managed access to open-source models with no API key required
+- **Enterprise**: Self-hosted deployments with your own models, infrastructure, and compliance controls
+
+## Key Pages
+
+- [Homepage](https://stagewise.io/)
+- [Pricing](https://stagewise.io/pricing)
+- [Enterprise](https://stagewise.io/enterprise)
+- [Company](https://stagewise.io/company)
+- [Careers](https://stagewise.io/careers)
+- [Newsroom](https://stagewise.io/news)
+- [Download](https://stagewise.io/download)
+
+## Use Cases
+
+- [DeepSeek in stagewise](https://stagewise.io/use-cases/deepseek)
+- [GLM in stagewise](https://stagewise.io/use-cases/glm)
+
+## Supported Models
+
+- **Anthropic**: Claude Opus 4, Claude Sonnet 4, Claude Haiku 3.5
+- **OpenAI**: GPT-4.1, GPT-4.1-mini, o3, o4-mini
+- **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash
+- **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
+- **GLM (Z.AI)**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
+- **Qwen**: Qwen3 235B, Qwen3 Coder
+- **Kimi**: K2 Instruct, K2 Thinking
+- **MiniMax**: M2
+- **Local**: Any Ollama / vLLM / LM Studio model with 150k+ context
+
+## Enterprise Inference Providers
+
+Azure Foundry, AWS Bedrock, Google Vertex AI — connect via standard API endpoints.
+
+## Links
+
+- [GitHub Repository](https://github.com/stagewise-io/stagewise)
+- [Documentation](https://stagewise.io)
+- [Twitter / X](https://x.com/stagewise_io)

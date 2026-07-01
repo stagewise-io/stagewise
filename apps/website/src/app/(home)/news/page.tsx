@@ -22,6 +22,10 @@ export const metadata: Metadata = {
     creator: '@stagewise_io',
   },
   category: 'technology',
+  alternates: {
+    canonical: 'https://stagewise.io/news',
+  },
+  robots: { index: true, follow: true },
 };
 
 const filterOptions: Array<{ value: 'all' | NewsType; label: string }> = [

@@ -15,6 +15,10 @@ export const metadata: Metadata = {
     creator: '@stagewise_io',
   },
   category: 'technology',
+  alternates: {
+    canonical: 'https://stagewise.io/download',
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function DownloadLayout({ children }: { children: ReactNode }) {

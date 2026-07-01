@@ -18,6 +18,10 @@ export const metadata: Metadata = {
     creator: '@stagewise_io',
   },
   category: 'technology',
+  alternates: {
+    canonical: 'https://stagewise.io/company',
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function TeamLayout({ children }: { children: ReactNode }) {
