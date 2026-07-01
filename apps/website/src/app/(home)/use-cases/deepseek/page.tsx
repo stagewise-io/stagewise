@@ -3,31 +3,82 @@ import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { DownloadButtons } from '../../_components/home-client';
 import { HeroImage } from './hero-image';
+import { UseCaseFAQ } from '../_components/use-case-faq';
 
 export const metadata: Metadata = {
-  title: 'An Open-Source IDE Built for DeepSeek · stagewise',
+  title: 'An Open-Source IDE with First-Class DeepSeek Support · stagewise',
   description:
-    'Run DeepSeek V4 Flash and V4 Pro in stagewise with a stagewise Account, your own API setup, or local inference. Built for long-running coding tasks.',
+    'stagewise is an open-source IDE for coding agents with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
   openGraph: {
-    title: 'An Open-Source IDE Built for DeepSeek · stagewise',
+    title: 'An Open-Source IDE with First-Class DeepSeek Support · stagewise',
     description:
-      'Run DeepSeek V4 Flash and V4 Pro in stagewise with a stagewise Account, your own API setup, or local inference. Built for long-running coding tasks.',
+      'stagewise is an open-source IDE for coding agents with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
     type: 'website',
   },
   twitter: {
-    title: 'An Open-Source IDE Built for DeepSeek · stagewise',
+    title: 'An Open-Source IDE with First-Class DeepSeek Support · stagewise',
     description:
-      'Run DeepSeek V4 Flash and V4 Pro in stagewise with a stagewise Account, your own API setup, or local inference. Built for long-running coding tasks.',
+      'stagewise is an open-source IDE for coding agents with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
     creator: '@stagewise_io',
   },
+  alternates: {
+    canonical: 'https://stagewise.io/use-cases/deepseek',
+  },
+  robots: { index: true, follow: true },
   category: 'technology',
+};
+
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://stagewise.io/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'DeepSeek',
+      item: 'https://stagewise.io/use-cases/deepseek',
+    },
+  ],
 };
 
 export default function DeepSeekUseCasePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+
+      {/* Breadcrumb */}
+      <div className="relative z-10 mt-8 w-full">
+        <div className="flex justify-center">
+          <div className="w-full max-w-4xl px-4">
+            <nav aria-label="Breadcrumb">
+              <ol className="flex items-center gap-2 text-muted-foreground text-sm">
+                <li>
+                  <Link
+                    href="/"
+                    className="transition-colors hover:text-foreground"
+                  >
+                    Home
+                  </Link>
+                </li>
+                <li aria-hidden>/</li>
+                <li className="text-foreground">DeepSeek</li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+      </div>
+
       {/* Hero */}
-      <section className="relative z-10 mt-12 w-full pb-4 md:pb-6">
+      <section className="relative z-10 mt-6 w-full pb-4 md:pb-6">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl">
             <ScrollReveal>
@@ -252,6 +303,107 @@ export default function DeepSeekUseCasePage() {
           </div>
         </div>
       </section>
+
+      {/* FAQs */}
+      <UseCaseFAQ
+        items={[
+          {
+            question: 'How can I use DeepSeek in stagewise?',
+            plainTextAnswer:
+              'You can run DeepSeek in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including DeepSeek V4 Pro and V4 Flash — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply a DeepSeek API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
+            answer: (
+              <>
+                <p>You can run DeepSeek in stagewise using three options:</p>
+                <ul className="mt-2 list-disc space-y-2 pl-5">
+                  <li>
+                    <strong>stagewise Cloud Inference:</strong> With a stagewise
+                    Account, you get preconfigured access to a wide variety of
+                    models including DeepSeek V4 Pro and V4 Flash — no keys,
+                    configuration, or external subscriptions required.
+                  </li>
+                  <li>
+                    <strong>Your API Key:</strong> Supply a DeepSeek API key, or
+                    use an API aggregator (like OpenRouter or fireworks.ai) to
+                    route your queries.
+                  </li>
+                  <li>
+                    <strong>Custom Endpoint:</strong> Connect stagewise to any
+                    custom endpoint — including local servers (Ollama,
+                    Llama.cpp), on-premise deployments (vLLM), or enterprise
+                    inference providers.
+                  </li>
+                </ul>
+              </>
+            ),
+          },
+          {
+            question: 'What DeepSeek models are supported?',
+            plainTextAnswer:
+              'The models listed on our home page — DeepSeek V4 Pro and DeepSeek V4 Flash — are available out of the box. Beyond those, you can connect any additional DeepSeek model that has agentic capabilities through your own API key or inference provider.',
+            answer: (
+              <>
+                <p>
+                  The models listed on our home page — DeepSeek V4 Pro and
+                  DeepSeek V4 Flash — are available out of the box. Beyond
+                  those, you can connect any additional DeepSeek model that has
+                  agentic capabilities through your own API key or inference
+                  provider.
+                </p>
+              </>
+            ),
+          },
+          {
+            question:
+              'Can we use fine-tuned or quantized variants of DeepSeek models with stagewise?',
+            plainTextAnswer:
+              'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized.',
+            answer: (
+              <>
+                <p>
+                  Yes. You can connect models from any model provider API,
+                  including your custom model variants — whether fine-tuned,
+                  quantized, or otherwise specialized.
+                </p>
+              </>
+            ),
+          },
+          {
+            question: 'Can we use a locally hosted DeepSeek model?',
+            plainTextAnswer:
+              'Yes. You can configure stagewise Agents to use models from any source, including a local setup using Ollama or an on-premise deployment in your own datacenter with setups like vLLM. We support any inference provider option that serves models via one of the popular model access APIs like OpenAI Chat Completions API, OpenResponses API, or Anthropic Messages API. The minimum recommended context size is 150k tokens.',
+            answer: (
+              <>
+                <p>
+                  Yes. You can configure stagewise Agents to use models from any
+                  source, including a local setup using Ollama or an on-premise
+                  deployment in your own datacenter with setups like vLLM.
+                </p>
+                <p>
+                  We support any inference provider option that serves models
+                  via one of the popular model access APIs like OpenAI Chat
+                  Completions API, OpenResponses API, or Anthropic Messages API.
+                </p>
+                <p>The minimum recommended context size is 150k tokens.</p>
+              </>
+            ),
+          },
+          {
+            question:
+              'Can we connect our enterprise inference provider to use DeepSeek models?',
+            plainTextAnswer:
+              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
+            answer: (
+              <>
+                <p>
+                  Yes. stagewise offers the option to connect Azure Foundry, AWS
+                  Bedrock, and Google Vertex endpoints for enterprise-grade
+                  inference.
+                </p>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {/* Footer CTA */}
       <section className="relative z-10 w-full py-24 md:py-32">
