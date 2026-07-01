@@ -97,45 +97,39 @@ function computeShellsChanges(
   for (const [id, curr] of currMap) {
     const prev = prevMap.get(id);
     if (!prev) {
-      const entry: EnvironmentChangeEntry = {
+      changes.push({
         type: 'shell-session-started',
         attributes: {
           sessionId: id,
           lineCount: String(curr.lineCount),
           logPath: curr.logPath,
         },
-      };
-      if (curr.tailContent) entry.summary = curr.tailContent;
-      changes.push(entry);
+      });
       continue;
     }
 
     if (!prev.exited && curr.exited) {
-      const entry: EnvironmentChangeEntry = {
+      changes.push({
         type: 'shell-session-exited',
         attributes: {
           sessionId: id,
           exitCode: String(curr.exitCode ?? '?'),
           logPath: curr.logPath,
         },
-      };
-      if (curr.tailContent) entry.summary = curr.tailContent;
-      changes.push(entry);
+      });
       continue;
     }
 
     if (curr.lineCount > prev.lineCount) {
       const delta = curr.lineCount - prev.lineCount;
-      const entry: EnvironmentChangeEntry = {
+      changes.push({
         type: 'shell-session-new-output',
         attributes: {
           sessionId: id,
           lineCount: String(delta),
           logPath: curr.logPath,
         },
-      };
-      if (curr.tailContent) entry.summary = curr.tailContent;
-      changes.push(entry);
+      });
     }
   }
 
@@ -162,6 +156,30 @@ export function createShellsDomainAdapter(
     renderState(prev, curr) {
       if (prev === null) return renderFullShells(curr);
       return renderChangesXml(computeShellsChanges(prev, curr));
+    },
+    equals(a, b) {
+      if (
+        a.shellInfo?.platform !== b.shellInfo?.platform ||
+        a.shellInfo?.type !== b.shellInfo?.type ||
+        a.shellInfo?.path !== b.shellInfo?.path
+      )
+        return false;
+      if (a.shells.sessions.length !== b.shells.sessions.length) return false;
+      const bMap = new Map(b.shells.sessions.map((s) => [s.id, s]));
+      for (const sa of a.shells.sessions) {
+        const sb = bMap.get(sa.id);
+        if (!sb) return false;
+        if (
+          sa.exited !== sb.exited ||
+          sa.exitCode !== sb.exitCode ||
+          sa.lineCount !== sb.lineCount ||
+          sa.cwd !== sb.cwd ||
+          sa.createdAt !== sb.createdAt ||
+          sa.logPath !== sb.logPath
+        )
+          return false;
+      }
+      return true;
     },
   };
 }
