@@ -10,6 +10,7 @@ export function DownloadButtons({ className }: { className?: string }) {
   const [downloadUrl, setDownloadUrl] = useState<string>('#');
   const [isMobile, setIsMobile] = useState(false);
   const [isOsSupported, setIsOsSupported] = useState(true);
+  const [hasDetected, setHasDetected] = useState(false);
 
   useEffect(() => {
     const platform =
@@ -44,12 +45,13 @@ export function DownloadButtons({ className }: { className?: string }) {
     } else {
       setIsOsSupported(false);
     }
+    setHasDetected(true);
   }, []);
 
-  if (!isOsSupported) {
+  if (!hasDetected) {
     return (
       <Button size="lg" variant="primary" disabled className={className}>
-        OS not supported
+        Loading...
       </Button>
     );
   }
@@ -58,6 +60,14 @@ export function DownloadButtons({ className }: { className?: string }) {
     return (
       <Button size="lg" variant="primary" disabled className={className}>
         Download on Desktop
+      </Button>
+    );
+  }
+
+  if (!isOsSupported) {
+    return (
+      <Button size="lg" variant="primary" disabled className={className}>
+        OS not supported
       </Button>
     );
   }

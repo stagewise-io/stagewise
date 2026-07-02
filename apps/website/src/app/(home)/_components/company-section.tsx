@@ -18,7 +18,7 @@ export function CompanySection() {
               Building applied AI for a better future
             </h3>
             <p className="text-base text-muted-foreground">
-              stagewise focusses on making artificial intelligence accessible to
+              stagewise focuses on making artificial intelligence accessible to
               anyone by keeping cost low and putting great emphasis on a simple
               user experience.
             </p>

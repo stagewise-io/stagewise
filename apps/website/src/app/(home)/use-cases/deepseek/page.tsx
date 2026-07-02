@@ -69,8 +69,12 @@ export default function DeepSeekUseCasePage() {
                     Home
                   </Link>
                 </li>
-                <li aria-hidden>/</li>
-                <li className="text-foreground">DeepSeek</li>
+                <li
+                  aria-current="page"
+                  className="text-foreground before:mr-2 before:text-muted-foreground before:content-['/']"
+                >
+                  DeepSeek
+                </li>
               </ol>
             </nav>
           </div>

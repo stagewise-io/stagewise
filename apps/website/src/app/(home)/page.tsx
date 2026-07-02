@@ -23,11 +23,6 @@ const softwareAppJsonLd = {
   downloadUrl: 'https://stagewise.io/download',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   publisher: { '@type': 'Organization', name: 'stagewise' },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '4.8',
-    ratingCount: '120',
-  },
 };
 
 export const metadata: Metadata = {

@@ -100,20 +100,28 @@ export function FeatureSection() {
                       </span>
                     </div>
                     <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-center gap-4 overflow-hidden md:gap-7">
-                      {PROVIDER_ICONS[label]?.map((icon) => (
-                        <div
-                          key={icon}
-                          className={cn('relative shrink-0', DARK_FILTER[icon])}
-                        >
-                          <Image
-                            src={`/icons/${icon}`}
-                            alt=""
-                            width={32}
-                            height={32}
-                            className="size-6 max-w-none object-contain md:size-8"
-                          />
-                        </div>
-                      ))}
+                      {PROVIDER_ICONS[label]?.map((icon) => {
+                        const providerName = icon
+                          .replace(/\.(png|webp)$/, '')
+                          .replace(/-/g, ' ');
+                        return (
+                          <div
+                            key={icon}
+                            className={cn(
+                              'relative shrink-0',
+                              DARK_FILTER[icon],
+                            )}
+                          >
+                            <Image
+                              src={`/icons/${icon}`}
+                              alt={providerName}
+                              width={32}
+                              height={32}
+                              className="size-6 max-w-none object-contain md:size-8"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

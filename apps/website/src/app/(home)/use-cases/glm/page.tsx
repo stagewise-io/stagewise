@@ -69,8 +69,12 @@ export default function GLMUseCasePage() {
                     Home
                   </Link>
                 </li>
-                <li aria-hidden>/</li>
-                <li className="text-foreground">GLM</li>
+                <li
+                  aria-current="page"
+                  className="text-foreground before:mr-2 before:text-muted-foreground before:content-['/']"
+                >
+                  GLM
+                </li>
               </ol>
             </nav>
           </div>
