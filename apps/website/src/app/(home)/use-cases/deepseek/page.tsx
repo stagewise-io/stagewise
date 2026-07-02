@@ -247,7 +247,7 @@ export default function DeepSeekUseCasePage() {
                   dimensions, format, and a compact representation of the image.
                   That keeps image files inside the same workflow as source
                   files and config and makes them accessible to the agent, even
-                  if the model itself is nopt capable of actually <i>seeing</i>{' '}
+                  if the model itself is not capable of actually <i>seeing</i>{' '}
                   images.
                 </p>
               </div>
