@@ -51,7 +51,7 @@ stagewise is a next-gen agent orchestrator for software engineers. It leverages 
 stagewise supports three ways to connect models, switchable at any time:
 
 - **stagewise Cloud Inference**: Managed access to frontier and open-weight models (Claude, GPT, Gemini, DeepSeek, GLM, Kimi, MiniMax). No API key or local setup required. Billed through your stagewise account.
-- **BYOK / External subscriptions**: Bring your own API keys or coding subscriptions. Supported providers: OpenAI, Anthropic, Google Gemini, DeepSeek, Z.AI (GLM), and enterprise endpoints via Azure Foundry, AWS Bedrock, and Google Vertex AI. Also supports coding plans from Kimi, Qwen Coding Plan, MiniMax, and Xiaomi MiMo.
+- **BYOK / External subscriptions**: Bring your own API keys or coding subscriptions. Supported API key providers: OpenAI, Anthropic, Google Gemini, DeepSeek, Z.AI (GLM), and MiniMax. Also supports enterprise endpoints via Azure Foundry, AWS Bedrock, and Google Vertex AI. Coding plans from Kimi, Qwen Coding Plan, MiniMax, and Xiaomi MiMo are also supported.
 - **Local inference**: Run models on your own hardware via Ollama, vLLM, or LM Studio. Any OpenAI-compatible endpoint works. Minimum context size of 150k tokens required for agentic tasks.
 
 ### Enterprise Deployments
