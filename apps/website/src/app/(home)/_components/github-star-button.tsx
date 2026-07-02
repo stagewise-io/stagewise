@@ -1,36 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { IconGithub } from 'nucleo-social-media';
 
-export function GithubStarButton() {
+interface GithubStarButtonProps {
+  starCount: number;
+}
+
+export function GithubStarButton({ starCount }: GithubStarButtonProps) {
   const posthog = usePostHog();
-  const [starCount, setStarCount] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchStarCount = async () => {
-      try {
-        const response = await fetch(
-          'https://api.github.com/repos/stagewise-io/stagewise',
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setStarCount(data.stargazers_count);
-        } else {
-          setStarCount(4300);
-        }
-      } catch {
-        setStarCount(4300);
-      }
-    };
-
-    fetchStarCount();
-  }, []);
-
-  const formatStarCount = (count: number | null) => {
-    if (count === null) return '3K+';
+  const formatStarCount = (count: number) => {
     if (count >= 1000) {
       return `${(count / 1000).toFixed(1)}K+`;
     }
