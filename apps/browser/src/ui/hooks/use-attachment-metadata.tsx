@@ -78,10 +78,10 @@ export const AttachmentMetadataProvider = ({
  */
 export function useAttachmentMetadata() {
   const context = useContext(AttachmentMetadataContext);
-  if (!context) {
-    throw new Error(
-      'useAttachmentMetadata must be used within an AttachmentMetadataProvider',
-    );
-  }
-  return context.attachmentMetadata;
+  // When no provider is present (e.g. file tab markdown preview, Storybook
+  // stories), return an empty record instead of throwing. All consumers
+  // already handle missing entries by falling back to the raw path/file
+  // name, so this is safe and avoids a hard crash on any Streamdown render
+  // that happens to contain a path:/att: link outside a chat context.
+  return context?.attachmentMetadata ?? {};
 }
