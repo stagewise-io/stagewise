@@ -8,9 +8,26 @@ import fullDemoLight from './feature-images/full-demo-light.webp';
 import bgDark from './feature-images/bg-dark.jpg';
 import bgLight from './feature-images/bg-light.jpg';
 
+async function getGithubStarCount(): Promise<number> {
+  try {
+    const response = await fetch(
+      'https://api.github.com/repos/stagewise-io/stagewise',
+      { next: { revalidate: 3600 } },
+    );
+    if (response.ok) {
+      const data = await response.json();
+      return data.stargazers_count as number;
+    }
+  } catch {
+    // fall through to fallback
+  }
+  return 4300;
+}
+
 const HERO_IMAGE_SIZES = '(min-width: 1280px) 1216px, calc(100vw - 32px)';
 
-export function HeroSection() {
+export async function HeroSection() {
+  const starCount = await getGithubStarCount();
   return (
     <section className="relative z-10 w-full pb-4 md:pb-6">
       <div className="flex justify-start">
@@ -31,7 +48,7 @@ export function HeroSection() {
 
               <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <DownloadButtons />
-                <GithubStarButton />
+                <GithubStarButton starCount={starCount} />
               </div>
             </div>
           </ScrollReveal>
