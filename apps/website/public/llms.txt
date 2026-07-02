@@ -39,9 +39,24 @@ stagewise is a next-gen agent orchestrator for software engineers. It leverages 
 - **MiniMax**: M2
 - **Local**: Any Ollama / vLLM / LM Studio model with 150k+ context
 
-## Enterprise Inference Providers
+## Getting Started
 
-Azure Foundry, AWS Bedrock, Google Vertex AI — connect via standard API endpoints.
+1. **Download** the stagewise desktop app for [macOS (Apple Silicon)](https://dl.stagewise.io/download/stagewise/release/macos/arm64), [Windows (x64)](https://dl.stagewise.io/download/stagewise/release/win/x64), or [Linux (deb)](https://dl.stagewise.io/download/stagewise/release/linux/deb/x86_64)
+2. **Launch** stagewise and open a project directory — the agent has full file-system, terminal, and browser-tab access
+3. **Choose a model provider** (see Supported Setups below) — no complex configuration required
+4. **Start a conversation** with the agent. It can read and edit files, run shell commands, inspect browser tabs via CDP, and orchestrate multi-step workflows
+
+## Supported Setups
+
+stagewise supports three ways to connect models, switchable at any time:
+
+- **stagewise Cloud Inference**: Managed access to frontier and open-weight models (Claude, GPT, Gemini, DeepSeek, GLM, Kimi, MiniMax). No API key or local setup required. Billed through your stagewise account.
+- **BYOK / External subscriptions**: Bring your own API keys or coding subscriptions. Supported providers: OpenAI, Anthropic, Google Gemini, DeepSeek, Z.AI (GLM), and enterprise endpoints via Azure Foundry, AWS Bedrock, and Google Vertex AI. Also supports coding plans from Kimi, Qwen Coding Plan, MiniMax, and Xiaomi MiMo.
+- **Local inference**: Run models on your own hardware via Ollama, vLLM, or LM Studio. Any OpenAI-compatible endpoint works. Minimum context size of 150k tokens required for agentic tasks.
+
+### Enterprise Deployments
+
+Self-hosted on your own infrastructure with your own models, compliance controls, and SSO. Connect to Azure Foundry, AWS Bedrock, or Google Vertex AI via standard API endpoints. No data leaves your environment.
 
 ## Links
 
