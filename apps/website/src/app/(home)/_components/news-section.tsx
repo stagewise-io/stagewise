@@ -1,4 +1,3 @@
-'use client';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { getNewsTypeBadgeLabel, type NewsType } from '@/lib/news';
 import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
@@ -56,14 +55,16 @@ export function NewsSection({ posts }: { posts: NewsPost[] }) {
   return (
     <section className="relative z-10 w-full py-40 md:py-48">
       <ScrollReveal>
-        <h2 className="mb-10 font-medium text-2xl tracking-tight md:text-3xl">
-          From the news room
-        </h2>
+        <div className="mb-10 text-center">
+          <h2 className="mb-4 font-medium text-2xl tracking-tight md:text-3xl">
+            From the news room
+          </h2>
+        </div>
       </ScrollReveal>
 
       <NewsGrid posts={posts} />
 
-      <div className="flex justify-end">
+      <div className="flex justify-center">
         <ScrollReveal delay={400}>
           <Link
             href="/news"

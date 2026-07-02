@@ -1,33 +1,88 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { DownloadButtons } from '../../_components/home-client';
+import { DownloadButtons } from '../../_components/download-buttons';
 import { HeroImage } from './hero-image';
+import { UseCaseFAQ } from '../_components/use-case-faq';
 
 export const metadata: Metadata = {
-  title: 'An Open-Source IDE Built for GLM · stagewise',
+  title: 'An Open-Source IDE with First-Class GLM Support · stagewise',
   description:
-    'Use GLM 5.2 from Z.AI in stagewise. Artificial Analysis places it unusually close to Claude Opus 4.8 on intelligence, while the cost sits much lower.',
+    'stagewise is an open-source IDE for coding agents with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
   openGraph: {
-    title: 'An Open-Source IDE Built for GLM · stagewise',
+    title: 'An Open-Source IDE with First-Class GLM Support · stagewise',
     description:
-      'Use GLM 5.2 from Z.AI in stagewise. Artificial Analysis places it unusually close to Claude Opus 4.8 on intelligence, while the cost sits much lower.',
+      'stagewise is an open-source IDE for coding agents with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
     type: 'website',
   },
   twitter: {
-    title: 'An Open-Source IDE Built for GLM · stagewise',
+    title: 'An Open-Source IDE with First-Class GLM Support · stagewise',
     description:
-      'Use GLM 5.2 from Z.AI in stagewise. Artificial Analysis places it unusually close to Claude Opus 4.8 on intelligence, while the cost sits much lower.',
+      'stagewise is an open-source IDE for coding agents with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
     creator: '@stagewise_io',
   },
+  alternates: {
+    canonical: 'https://stagewise.io/use-cases/glm',
+  },
+  robots: { index: true, follow: true },
   category: 'technology',
+};
+
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://stagewise.io/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'GLM',
+      item: 'https://stagewise.io/use-cases/glm',
+    },
+  ],
 };
 
 export default function GLMUseCasePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+
+      {/* Breadcrumb */}
+      <div className="relative z-10 mt-8 w-full">
+        <div className="flex justify-center">
+          <div className="w-full max-w-4xl px-4">
+            <nav aria-label="Breadcrumb">
+              <ol className="flex items-center gap-2 text-muted-foreground text-sm">
+                <li>
+                  <Link
+                    href="/"
+                    className="transition-colors hover:text-foreground"
+                  >
+                    Home
+                  </Link>
+                </li>
+                <li
+                  aria-current="page"
+                  className="text-foreground before:mr-2 before:text-muted-foreground before:content-['/']"
+                >
+                  GLM
+                </li>
+              </ol>
+            </nav>
+          </div>
+        </div>
+      </div>
+
       {/* Hero */}
-      <section className="relative z-10 mt-12 w-full pb-4 md:pb-6">
+      <section className="relative z-10 mt-6 w-full pb-4 md:pb-6">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl">
             <ScrollReveal>
@@ -310,6 +365,133 @@ export default function GLMUseCasePage() {
           </div>
         </div>
       </section>
+
+      {/* FAQs */}
+      <UseCaseFAQ
+        items={[
+          {
+            question: 'How can I use GLM in stagewise?',
+            plainTextAnswer:
+              'You can run GLM in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including GLM 5.2, GLM 5.1, and GLM 5V-Turbo — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply your own Z.AI API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
+            answer: (
+              <>
+                <p>You can run GLM in stagewise using three options:</p>
+                <ul className="mt-2 list-disc space-y-2 pl-5">
+                  <li>
+                    <strong>stagewise Cloud Inference:</strong> With a stagewise
+                    Account, you get preconfigured access to a wide variety of
+                    models including GLM 5.2, GLM 5.1, and GLM 5V-Turbo — no
+                    keys, configuration, or external subscriptions{' '}
+                    <em>required</em>.
+                  </li>
+                  <li>
+                    <strong>Your API Key:</strong> Supply your own Z.AI API key,
+                    or use an API aggregator (like OpenRouter or fireworks.ai)
+                    to route your queries.
+                  </li>
+                  <li>
+                    <strong>Custom Endpoint:</strong> Connect stagewise to{' '}
+                    <em>any</em> custom endpoint — including local servers
+                    (Ollama, Llama.cpp), on-premise deployments (vLLM), or
+                    enterprise inference providers.
+                  </li>
+                </ul>
+              </>
+            ),
+          },
+          {
+            question: 'What GLM models are supported?',
+            plainTextAnswer:
+              'The models listed on our home page — GLM 5.2, GLM 5.1, and GLM 5V-Turbo — are available out of the box. Beyond those, you can connect any additional GLM model that has agentic capabilities through your own API key or inference provider.',
+            answer: (
+              <>
+                <p>
+                  The models listed on our home page — <strong>GLM 5.2</strong>,
+                  <strong>GLM 5.1</strong>, and <strong>GLM 5V-Turbo</strong> —
+                  are available <em>out of the box</em>. Beyond those, you can
+                  connect any additional GLM model that has agentic capabilities
+                  through your own API key or inference provider.
+                </p>
+              </>
+            ),
+          },
+          {
+            question: 'Can I use my GLM coding plan with stagewise?',
+            plainTextAnswer:
+              "Yes, but at your own risk. While we test and support using the GLM coding plan within stagewise, we are not an official partner of Z.AI's coding plan program and cannot guarantee that your access to GLM models through the coding plan API key complies with Z.AI's terms.",
+            answer: (
+              <>
+                <p>
+                  Yes, but <strong>at your own risk</strong>. While we test and
+                  support using the GLM coding plan within stagewise, we are{' '}
+                  <em>not an official partner</em> of Z.AI&apos;s coding plan
+                  program.
+                </p>
+                <p>
+                  We cannot guarantee that your access to GLM models through the
+                  coding plan API key complies with Z.AI&apos;s terms.
+                </p>
+              </>
+            ),
+          },
+          {
+            question:
+              'Can we use fine-tuned or quantized variants of GLM models with stagewise?',
+            plainTextAnswer:
+              'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized.',
+            answer: (
+              <>
+                <p>
+                  Yes. You can connect models from <em>any</em> model provider
+                  API, including your custom model variants — whether{' '}
+                  <strong>fine-tuned</strong>, <strong>quantized</strong>, or
+                  otherwise specialized.
+                </p>
+              </>
+            ),
+          },
+          {
+            question: 'Can we use a locally hosted GLM model?',
+            plainTextAnswer:
+              'Yes. You can configure stagewise Agents to use models from any source, including a local setup using Ollama or an on-premise deployment in your own datacenter with setups like vLLM. We support any inference provider option that serves models via one of the popular model access APIs like OpenAI Chat Completions API, OpenResponses API, or Anthropic Messages API. The minimum recommended context size is 150k tokens.',
+            answer: (
+              <>
+                <p>
+                  Yes. You can configure stagewise Agents to use models from{' '}
+                  <em>any</em> source, including a local setup using Ollama or
+                  an on-premise deployment in your own datacenter with setups
+                  like vLLM.
+                </p>
+                <p>
+                  We support any inference provider option that serves models
+                  via one of the popular model access APIs like OpenAI Chat
+                  Completions API, OpenResponses API, or Anthropic Messages API.
+                </p>
+                <p>
+                  The minimum recommended context size is{' '}
+                  <strong>150k tokens</strong>.
+                </p>
+              </>
+            ),
+          },
+          {
+            question:
+              'Can we connect our enterprise inference provider to use GLM models?',
+            plainTextAnswer:
+              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
+            answer: (
+              <>
+                <p>
+                  Yes. stagewise offers the option to connect{' '}
+                  <strong>Azure Foundry</strong>, <strong>AWS Bedrock</strong>,
+                  and <strong>Google Vertex</strong> endpoints for
+                  enterprise-grade inference.
+                </p>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {/* Footer CTA */}
       <section className="relative z-10 w-full py-24 md:py-32">

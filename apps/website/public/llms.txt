@@ -1,0 +1,65 @@
+# stagewise
+
+> stagewise is an open-source agentic IDE — a purpose-built browser for developers with a coding agent built right in. It supports any LLM, including frontier, open-weight, and locally deployed models. Full model sovereignty. Runs locally, connects to anything.
+
+## Product
+
+stagewise is a next-gen agent orchestrator for software engineers. It leverages a frontier-grade agent harness that stays continuously aware of changes in terminals and browser tabs while maintaining token efficiency. The agent can read and edit files, run shell commands, interact with browser tabs via CDP, and orchestrate complex multi-step workflows.
+
+- **Open Source**: AGPLv3 licensed — the agent runtime, UI, and toolbar are all open source
+- **Model Agnostic**: Works with Claude, GPT, DeepSeek, GLM, Qwen, Kimi, MiniMax, and any OpenAI-compatible endpoint
+- **Local Models**: Supports Ollama, vLLM, LM Studio, and any local inference server with a minimum context size of 150k tokens
+- **Cloud Inference**: stagewise Cloud Inference provides managed access to open-source models with no API key required
+- **Enterprise**: Self-hosted deployments with your own models, infrastructure, and compliance controls
+
+## Key Pages
+
+- [Homepage](https://stagewise.io/)
+- [Pricing](https://stagewise.io/pricing)
+- [Enterprise](https://stagewise.io/enterprise)
+- [Company](https://stagewise.io/company)
+- [Careers](https://stagewise.io/careers)
+- [Newsroom](https://stagewise.io/news)
+- [Download](https://stagewise.io/download)
+
+## Use Cases
+
+- [DeepSeek in stagewise](https://stagewise.io/use-cases/deepseek)
+- [GLM in stagewise](https://stagewise.io/use-cases/glm)
+
+## Supported Models
+
+- **Anthropic**: Claude Opus 4, Claude Sonnet 4, Claude Haiku 3.5
+- **OpenAI**: GPT-4.1, GPT-4.1-mini, o3, o4-mini
+- **Google**: Gemini 2.5 Pro, Gemini 2.5 Flash
+- **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
+- **GLM (Z.AI)**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
+- **Qwen**: Qwen3 235B, Qwen3 Coder
+- **Kimi**: K2 Instruct, K2 Thinking
+- **MiniMax**: M2
+- **Local**: Any Ollama / vLLM / LM Studio model with 150k+ context
+
+## Getting Started
+
+1. **Download** the stagewise desktop app for [macOS (Apple Silicon)](https://dl.stagewise.io/download/stagewise/release/macos/arm64), [Windows (x64)](https://dl.stagewise.io/download/stagewise/release/win/x64), or [Linux (deb)](https://dl.stagewise.io/download/stagewise/release/linux/deb/x86_64)
+2. **Launch** stagewise and open a project directory — the agent has full file-system, terminal, and browser-tab access
+3. **Choose a model provider** (see Supported Setups below) — no complex configuration required
+4. **Start a conversation** with the agent. It can read and edit files, run shell commands, inspect browser tabs via CDP, and orchestrate multi-step workflows
+
+## Supported Setups
+
+stagewise supports three ways to connect models, switchable at any time:
+
+- **stagewise Cloud Inference**: Managed access to frontier and open-weight models (Claude, GPT, Gemini, DeepSeek, GLM, Kimi, MiniMax). No API key or local setup required. Billed through your stagewise account.
+- **BYOK / External subscriptions**: Bring your own API keys or coding subscriptions. Supported API key providers: OpenAI, Anthropic, Google Gemini, DeepSeek, Z.AI (GLM), and MiniMax. Also supports enterprise endpoints via Azure Foundry, AWS Bedrock, and Google Vertex AI. Coding plans from Kimi, Qwen Coding Plan, MiniMax, and Xiaomi MiMo are also supported.
+- **Local inference**: Run models on your own hardware via Ollama, vLLM, or LM Studio. Any OpenAI-compatible endpoint works. Minimum context size of 150k tokens required for agentic tasks.
+
+### Enterprise Deployments
+
+Self-hosted on your own infrastructure with your own models, compliance controls, and SSO. When using only on-premise models, no data leaves your environment. You can also connect to Azure Foundry, AWS Bedrock, or Google Vertex AI via standard API endpoints.
+
+## Links
+
+- [GitHub Repository](https://github.com/stagewise-io/stagewise)
+- [Documentation](https://stagewise.io)
+- [Twitter / X](https://x.com/stagewise_io)
