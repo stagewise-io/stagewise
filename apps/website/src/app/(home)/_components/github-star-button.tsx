@@ -18,6 +18,8 @@ export function GithubStarButton() {
         if (response.ok) {
           const data = await response.json();
           setStarCount(data.stargazers_count);
+        } else {
+          setStarCount(4300);
         }
       } catch {
         setStarCount(4300);

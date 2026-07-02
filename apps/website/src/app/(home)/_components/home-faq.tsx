@@ -102,7 +102,7 @@ const HOME_FAQ_ITEMS = [
   {
     question: 'How does stagewise handle context for long-running tasks?',
     plainTextAnswer:
-      'stagewise keeps the conversation prefix stable across turns to maximize cache hit rates. When the environment changes, it sends a compact state delta instead of rebuilding the full context. This ensures the agent stays continuously aware of changes in terminals, browser tabs, and more, while remaining extremely token-efficient. The runtime also automatically compresses older turns as tasks grow, keeping a focused working set.',
+      'stagewise keeps the conversation prefix stable across turns to maximize cache hit rates. When the environment changes, it sends a compact state delta instead of rebuilding the full context. This ensures the agent stays continuously aware of changes in terminals, browser tabs, and more, while remaining extremely token-efficient. The runtime also automatically compresses context as tasks grow, keeping a focused working set.',
     answer: (
       <>
         <p>
