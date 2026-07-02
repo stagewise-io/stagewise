@@ -24,7 +24,7 @@ export function FaqItem({ index, question, answer }: FaqItemProps) {
           onClick={() => setIsOpen((prev) => !prev)}
           aria-expanded={isOpen}
           aria-controls={contentId}
-          className="flex w-full items-center justify-between px-6 py-5 text-left font-medium text-foreground transition-all focus:outline-none"
+          className="flex w-full items-center justify-between px-6 py-5 text-left font-medium text-foreground transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <span className="pr-4 text-base md:text-lg">{question}</span>
           <ChevronDown
@@ -39,6 +39,7 @@ export function FaqItem({ index, question, answer }: FaqItemProps) {
         id={contentId}
         role="region"
         aria-labelledby={triggerId}
+        inert={!isOpen}
         className={cn(
           'grid transition-all duration-300 ease-in-out',
           isOpen
