@@ -27,7 +27,7 @@ export function UseCaseFAQ({ items }: UseCaseFAQProps) {
   };
 
   return (
-    <section className="relative z-10 w-full py-6 md:py-8">
+    <section className="relative z-10 w-full py-12 md:py-16">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -117,8 +117,36 @@ export default function GLMUseCasePage() {
         </div>
       </section>
 
+      {/* What is stagewise */}
+      <section className="relative z-10 w-full py-3 md:py-4">
+        <div className="flex justify-center">
+          <div className="w-full max-w-4xl px-4">
+            <ScrollReveal>
+              <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
+                <p>
+                  stagewise is a local IDE that ships with its own coding agent.
+                  It runs on your machine, connects to your development
+                  environment, and can orchestrate multiple agents in parallel.
+                  The runtime is model-agnostic, so you can use frontier models,
+                  open-weight models, or local inference. It also manages
+                  context aggressively, which matters once a task starts
+                  stretching across many turns.{' '}
+                  <Link
+                    href="/"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Learn more about stagewise
+                  </Link>
+                  .
+                </p>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
       {/* Why GLM 5.2 stands out */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
@@ -127,10 +155,12 @@ export default function GLMUseCasePage() {
                   Why GLM 5.2 stands out right now
                 </h2>
                 <p>
-                  The main case for GLM 5.2 is not that it is merely good for an
-                  open-weight model. It is that it gets surprisingly close to
-                  Claude Opus 4.8 on capability while landing in a very
-                  different cost range.
+                  The release of GLM 5.2 sent shocks through the world of AI,
+                  because it showed that open-source models suddenly play at the
+                  very frontier of AI. With performance that's in many ways
+                  comparable to models like Claude Opus 4.8, but at a fraction
+                  of the cost and the capability to host the model wherever you
+                  want, the playing field for AI models changes significantly.
                 </p>
                 <p>
                   <a
@@ -177,36 +207,8 @@ export default function GLMUseCasePage() {
         </div>
       </section>
 
-      {/* What is stagewise */}
-      <section className="relative z-10 w-full py-6 md:py-8">
-        <div className="flex justify-center">
-          <div className="w-full max-w-4xl px-4">
-            <ScrollReveal>
-              <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
-                <p>
-                  stagewise is a local IDE that ships with its own coding agent.
-                  It runs on your machine, connects to your development
-                  environment, and can orchestrate multiple agents in parallel.
-                  The runtime is model-agnostic, so you can use frontier models,
-                  open-weight models, or local inference. It also manages
-                  context aggressively, which matters once a task starts
-                  stretching across many turns.{' '}
-                  <Link
-                    href="/"
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
-                    Learn more about stagewise
-                  </Link>
-                  .
-                </p>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
       {/* Efficiency through input caching */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
@@ -220,7 +222,7 @@ export default function GLMUseCasePage() {
                   runs for dozens of turns, this is where the agent matters.
                 </p>
                 <p>
-                  Our agent keeps the early part of the conversation{' '}
+                  The stagewise agent keeps the early part of the conversation{' '}
                   <strong>stable across multiple turns</strong>, so the prefix
                   stays the same from one request to the next. That improves
                   cache hit rates and often lowers both latency and cost.
@@ -249,14 +251,14 @@ export default function GLMUseCasePage() {
       </section>
 
       {/* GLM 5.2 — your way */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <h2 className="font-medium text-foreground text-xl">
-                  Use GLM through our hosted setup, your own endpoint, or local
-                  inference
+                  Use GLM through a stagewise Account, your own endpoint, or
+                  local inference
                 </h2>
                 <p>
                   You can use GLM 5.2 through a stagewise Account and start
@@ -277,9 +279,8 @@ export default function GLMUseCasePage() {
                   for the setup details.
                 </p>
                 <p>
-                  We think agent tools should not dictate where you buy
-                  inference. You choose the billing and hosting model that fits
-                  your setup.
+                  stagewise does not dictate where you buy inference. You choose
+                  the billing and hosting model that fits your setup.
                 </p>
               </div>
             </ScrollReveal>
@@ -288,7 +289,7 @@ export default function GLMUseCasePage() {
       </section>
 
       {/* Working with images */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
@@ -304,12 +305,12 @@ export default function GLMUseCasePage() {
                   files are still part of the workspace.
                 </p>
                 <p>
-                  The stagewise agent compensates for that limitation. Our file
-                  transformation pipeline turns each image into structured file
-                  context the model can reason about in text: file type,
-                  dimensions, format, and a compact representation of the image.
-                  That keeps image files inside the same workflow as source
-                  files and config.
+                  The stagewise agent compensates for that limitation. The
+                  stagewise file transformation pipeline turns each image into
+                  structured file context the model can reason about in text:
+                  file type, dimensions, format, and a compact representation of
+                  the image. That keeps image files inside the same workflow as
+                  source files and config.
                 </p>
               </div>
             </ScrollReveal>
@@ -356,12 +357,14 @@ export default function GLMUseCasePage() {
             </ScrollReveal>
 
             <ScrollReveal delay={300}>
-              <div className="prose dark:prose-invert prose-p:my-0 mt-12 max-w-none">
+              <div className="prose dark:prose-invert prose-p:my-0 mt-8 max-w-none">
                 <p>
-                  This does not give GLM vision. It does give the model enough
-                  context to work sensibly with image files in a repository —
-                  for example when updating references, resizing assets, or
-                  understanding the layout of a design directory.
+                  To be completely clear: GLM models don&apos;t natively support
+                  vision and thus, making the model <em>see</em> the image is
+                  not possible. But even with GLM models, stagewise agents are
+                  able to understand the role of the image, its format, its file
+                  size, and a lot of the other things that are required to
+                  operate with images in the software engineering context.
                 </p>
               </div>
             </ScrollReveal>
@@ -429,15 +432,16 @@ export default function GLMUseCasePage() {
           {
             question: 'What GLM models are supported?',
             plainTextAnswer:
-              'The models listed on our home page — GLM 5.2, GLM 5.1, and GLM 5V-Turbo — are available out of the box. Beyond those, you can connect any additional GLM model that has agentic capabilities through your own API key or inference provider.',
+              'The models listed on the stagewise home page — GLM 5.2, GLM 5.1, and GLM 5V-Turbo — are available out of the box. Beyond those, you can connect any additional GLM model that has agentic capabilities through your own API key or inference provider.',
             answer: (
               <>
                 <p>
-                  The models listed on our home page — <strong>GLM 5.2</strong>,
-                  <strong>GLM 5.1</strong>, and <strong>GLM 5V-Turbo</strong> —
-                  are available <em>out of the box</em>. Beyond those, you can
-                  connect any additional GLM model that has agentic capabilities
-                  through your own API key or inference provider.
+                  The models listed on the stagewise home page —{' '}
+                  <strong>GLM 5.2</strong>,<strong>GLM 5.1</strong>, and{' '}
+                  <strong>GLM 5V-Turbo</strong> — are available{' '}
+                  <em>out of the box</em>. Beyond those, you can connect any
+                  additional GLM model that has agentic capabilities through
+                  your own API key or inference provider.
                 </p>
               </>
             ),
@@ -445,25 +449,26 @@ export default function GLMUseCasePage() {
           {
             question: 'Can I use my GLM coding plan with stagewise?',
             plainTextAnswer:
-              "Yes, but at your own risk. While we test and support using the GLM coding plan within stagewise, we are not an official partner of Z.AI's coding plan program and cannot guarantee that your access to GLM models through the coding plan API key complies with Z.AI's terms.",
+              "Yes, but at your own risk. While stagewise supports using the GLM coding plan, stagewise is not an official partner of Z.AI's coding plan program and cannot guarantee that your access to GLM models through the coding plan API key complies with Z.AI's terms.",
             answer: (
               <>
                 <p>
-                  Yes, but <strong>at your own risk</strong>. While we test and
-                  support using the GLM coding plan within stagewise, we are{' '}
+                  Yes, but <strong>at your own risk</strong>. While stagewise
+                  supports using the GLM coding plan, stagewise is{' '}
                   <em>not an official partner</em> of Z.AI&apos;s coding plan
                   program.
                 </p>
                 <p>
-                  We cannot guarantee that your access to GLM models through the
-                  coding plan API key complies with Z.AI&apos;s terms.
+                  stagewise cannot guarantee that your access to GLM models
+                  through the coding plan API key complies with Z.AI&apos;s
+                  terms.
                 </p>
               </>
             ),
           },
           {
             question:
-              'Can we use fine-tuned or quantized variants of GLM models with stagewise?',
+              'Can I use fine-tuned or quantized variants of GLM models with stagewise?',
             plainTextAnswer:
               'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized.',
             answer: (
@@ -478,9 +483,9 @@ export default function GLMUseCasePage() {
             ),
           },
           {
-            question: 'Can we use a locally hosted GLM model?',
+            question: 'Can I use a locally hosted GLM model?',
             plainTextAnswer:
-              'Yes. You can configure stagewise Agents to use models from any source, including a local setup using Ollama or an on-premise deployment in your own datacenter with setups like vLLM. We support any inference provider option that serves models via one of the popular model access APIs like OpenAI Chat Completions API, OpenResponses API, or Anthropic Messages API. The minimum recommended context size is 150k tokens.',
+              'Yes. You can configure stagewise Agents to use models from any source, including a local setup using Ollama or an on-premise deployment in your own datacenter with setups like vLLM. stagewise supports any inference provider option that serves models via one of the popular model access APIs like OpenAI Chat Completions API, OpenResponses API, or Anthropic Messages API. The minimum recommended context size is 150k tokens.',
             answer: (
               <>
                 <p>
@@ -490,9 +495,10 @@ export default function GLMUseCasePage() {
                   like vLLM.
                 </p>
                 <p>
-                  We support any inference provider option that serves models
-                  via one of the popular model access APIs like OpenAI Chat
-                  Completions API, OpenResponses API, or Anthropic Messages API.
+                  stagewise supports any inference provider option that serves
+                  models via one of the popular model access APIs like OpenAI
+                  Chat Completions API, OpenResponses API, or Anthropic Messages
+                  API.
                 </p>
                 <p>
                   The minimum recommended context size is{' '}
@@ -503,7 +509,7 @@ export default function GLMUseCasePage() {
           },
           {
             question:
-              'Can we connect our enterprise inference provider to use GLM models?',
+              'Can I connect an enterprise inference provider to use GLM models?',
             plainTextAnswer:
               'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
             answer: (
