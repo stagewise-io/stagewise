@@ -1960,6 +1960,10 @@ export type KartonContract = {
       setVisible: (visible: boolean) => Promise<void>;
       setActiveWorkspace: (workspaceKey: string | null) => Promise<void>;
       setViewMode: (mode: 'files' | 'diff') => Promise<void>;
+      createFile: (
+        workspaceKey: string,
+        directoryPath: string,
+      ) => Promise<FileTreeOperationResult>;
       recreateDeletedFile: (
         workspaceKey: string,
         relativePath: string,

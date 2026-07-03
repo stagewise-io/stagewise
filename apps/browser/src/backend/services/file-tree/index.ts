@@ -614,6 +614,37 @@ export class FileTreeService extends DisposableService {
     }
   }
 
+  async createFile(
+    workspaceKey: string,
+    directoryPath: string,
+  ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This location is read-only and cannot be created in');
+    }
+    try {
+      const directory = await this.validatePath(workspaceKey, directoryPath);
+      const dirStat = await fs.stat(directory.absolutePath);
+      if (!dirStat.isDirectory()) {
+        return { success: false, error: 'Target path is not a directory.' };
+      }
+
+      // Atomically create the file and reserve its name in a single step
+      // using O_CREAT | O_EXCL, which fails with EEXIST if the path already
+      // exists. This prevents concurrent createFile calls from racing on
+      // the same default name.
+      const { relativePath } = await this.createAvailableNewFile(
+        directory.absolutePath,
+        directory.relativePath,
+      );
+
+      this.bumpDirectoryRevisionsNow(directory.key, [directory.relativePath]);
+      return { success: true, relativePath };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }
+
   async recreateDeletedFile(
     workspaceKey: string,
     relativePath: string,
@@ -1640,6 +1671,49 @@ export class FileTreeService extends DisposableService {
     }
 
     throw new Error('Could not find an available destination name');
+  }
+
+  private async createAvailableNewFile(
+    directoryAbsolutePath: string,
+    directoryRelativePath: string,
+  ): Promise<{ fileName: string; relativePath: string }> {
+    const baseName = 'new file';
+    const candidates = [
+      baseName,
+      ...Array.from({ length: 99 }, (_, index) => `${baseName} ${index + 2}`),
+    ];
+
+    for (const candidate of candidates) {
+      const candidatePath = path.join(directoryAbsolutePath, candidate);
+      // O_CREAT | O_EXCL atomically creates the file only if it does not
+      // already exist. This is race-free: two concurrent calls cannot
+      // both succeed on the same path.
+      let handle: fs.FileHandle | undefined;
+      try {
+        handle = await fs.open(
+          candidatePath,
+          fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
+          0o644,
+        );
+      } catch (error) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          (error as { code?: string }).code === 'EEXIST'
+        ) {
+          continue;
+        }
+        throw error;
+      }
+      await handle.close();
+      const relativePath = directoryRelativePath
+        ? `${directoryRelativePath}/${candidate}`
+        : candidate;
+      return { fileName: candidate, relativePath };
+    }
+
+    throw new Error('Could not find an available file name');
   }
 
   private updateFileTabsAfterMove(

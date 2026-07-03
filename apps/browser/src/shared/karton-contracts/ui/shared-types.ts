@@ -680,6 +680,7 @@ export const defaultUserPreferences: UserPreferences = {
     disabledModelIds: [
       'claude-opus-4.7',
       'claude-opus-4.6',
+      'claude-sonnet-4.6',
       'kimi-k2.5',
       'gpt-5.4',
       'MiniMax-M2',
