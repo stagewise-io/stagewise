@@ -302,7 +302,15 @@ export default function DeepSeekUseCasePage() {
                   This does not give DeepSeek vision, but: It does give the
                   model enough context to work sensibly with image files in a
                   repository — for example when updating references, resizing
-                  assets, or understanding the layout of a design directory.
+                  assets, or understanding the layout of a design directory. If
+                  your workflow requires actual visual reasoning,{' '}
+                  <Link
+                    href="/use-cases/minimax"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    MiniMax M3
+                  </Link>{' '}
+                  offers native vision capabilities.
                 </p>
               </div>
             </ScrollReveal>
@@ -346,10 +354,16 @@ export default function DeepSeekUseCasePage() {
                 <p>You can run DeepSeek in stagewise using three options:</p>
                 <ul className="mt-2 list-disc space-y-2 pl-5">
                   <li>
-                    <strong>stagewise Cloud Inference:</strong> With a stagewise
-                    Account, you get preconfigured access to a wide variety of
-                    models including DeepSeek V4 Pro and V4 Flash — no keys,
-                    configuration, or external subscriptions <em>required</em>.
+                    <Link
+                      href="/pricing"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      <strong>stagewise Cloud Inference</strong>
+                    </Link>
+                    : With a stagewise Account, you get preconfigured access to
+                    a wide variety of models including DeepSeek V4 Pro and V4
+                    Flash — no keys, configuration, or external subscriptions{' '}
+                    <em>required</em>.
                   </li>
                   <li>
                     <strong>Your API Key:</strong> Supply a DeepSeek API key, or
@@ -387,14 +401,22 @@ export default function DeepSeekUseCasePage() {
             question:
               'Can I use fine-tuned or quantized variants of DeepSeek models with stagewise?',
             plainTextAnswer:
-              'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized.',
+              'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized. See the custom models docs for details.',
             answer: (
               <>
                 <p>
                   Yes. You can connect models from <em>any</em> model provider
                   API, including your custom model variants — whether{' '}
                   <strong>fine-tuned</strong>, <strong>quantized</strong>, or
-                  otherwise specialized.
+                  otherwise specialized. See the{' '}
+                  <a
+                    href="https://docs.stagewise.io/reference/custom-models"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    custom models docs
+                  </a>{' '}
+                  for details.
                 </p>
               </>
             ),
@@ -428,14 +450,21 @@ export default function DeepSeekUseCasePage() {
             question:
               'Can I connect an enterprise inference provider to use DeepSeek models?',
             plainTextAnswer:
-              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
+              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference. See the stagewise enterprise page for more.',
             answer: (
               <>
                 <p>
                   Yes. stagewise offers the option to connect{' '}
                   <strong>Azure Foundry</strong>, <strong>AWS Bedrock</strong>,
                   and <strong>Google Vertex</strong> endpoints for
-                  enterprise-grade inference.
+                  enterprise-grade inference. See the{' '}
+                  <Link
+                    href="/enterprise"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    enterprise page
+                  </Link>{' '}
+                  for more.
                 </p>
               </>
             ),

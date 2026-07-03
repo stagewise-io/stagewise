@@ -398,12 +398,26 @@ export default function MiniMaxUseCasePage() {
                   Native vision meets agentic workflows
                 </h2>
                 <p>
-                  Unlike GLM or DeepSeek, MiniMax M3 has native vision
-                  capabilities. It can see and reason about images, screenshots,
-                  and design files — no workarounds needed. That makes it a
-                  natural fit for frontend work, UI debugging, and any task
-                  where the model needs to understand what something looks like,
-                  not just what the code says.
+                  Unlike{' '}
+                  <Link
+                    href="/use-cases/glm"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    GLM
+                  </Link>{' '}
+                  or{' '}
+                  <Link
+                    href="/use-cases/deepseek"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    DeepSeek
+                  </Link>
+                  , MiniMax M3 has native vision capabilities. It can see and
+                  reason about images, screenshots, and design files — no
+                  workarounds needed. That makes it a natural fit for frontend
+                  work, UI debugging, and any task where the model needs to
+                  understand what something looks like, not just what the code
+                  says.
                 </p>
                 <p>
                   With stagewise, this becomes practical. stagewise agents can
@@ -525,14 +539,22 @@ export default function MiniMaxUseCasePage() {
             question:
               'Can I use fine-tuned or quantized variants of MiniMax models with stagewise?',
             plainTextAnswer:
-              'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized.',
+              'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized. See the custom models docs for details.',
             answer: (
               <>
                 <p>
                   Yes. You can connect models from <em>any</em> model provider
                   API, including your custom model variants — whether{' '}
                   <strong>fine-tuned</strong>, <strong>quantized</strong>, or
-                  otherwise specialized.
+                  otherwise specialized. See the{' '}
+                  <a
+                    href="https://docs.stagewise.io/reference/custom-models"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    custom models docs
+                  </a>{' '}
+                  for details.
                 </p>
               </>
             ),
@@ -566,14 +588,21 @@ export default function MiniMaxUseCasePage() {
             question:
               'Can I connect an enterprise inference provider to use MiniMax models?',
             plainTextAnswer:
-              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
+              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference. See the stagewise enterprise page for more.',
             answer: (
               <>
                 <p>
                   Yes. stagewise offers the option to connect{' '}
                   <strong>Azure Foundry</strong>, <strong>AWS Bedrock</strong>,
                   and <strong>Google Vertex</strong> endpoints for
-                  enterprise-grade inference.
+                  enterprise-grade inference. See the{' '}
+                  <Link
+                    href="/enterprise"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    enterprise page
+                  </Link>{' '}
+                  for more.
                 </p>
               </>
             ),
