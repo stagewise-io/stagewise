@@ -70,6 +70,15 @@ export function Footer() {
               >
                 stagewise with GLM
               </Link>
+              <Link
+                href="/use-cases/minimax"
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'justify-end',
+                )}
+              >
+                stagewise with MiniMax
+              </Link>
             </div>
             <div className="flex flex-col items-end gap-1">
               <span

@@ -117,7 +117,7 @@ export default function DeepSeekUseCasePage() {
       </section>
 
       {/* What is stagewise */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
@@ -145,7 +145,7 @@ export default function DeepSeekUseCasePage() {
       </section>
 
       {/* Efficiency through input caching */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
@@ -159,7 +159,7 @@ export default function DeepSeekUseCasePage() {
                   turns. This is where the agent matters.
                 </p>
                 <p>
-                  Our agent keeps the early part of the conversation{' '}
+                  The stagewise agent keeps the early part of the conversation{' '}
                   <strong>stable across multiple turns</strong>, so the prefix
                   stays the same from one request to the next. That improves
                   cache hit rates on DeepSeek&apos;s infrastructure and often
@@ -189,14 +189,14 @@ export default function DeepSeekUseCasePage() {
       </section>
 
       {/* DeepSeek V4 Flash and V4 Pro — your way */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <h2 className="font-medium text-foreground text-xl">
-                  Use DeepSeek through our hosted setup, your own endpoint, or
-                  local inference
+                  Use DeepSeek through a stagewise Account, your own endpoint,
+                  or local inference
                 </h2>
                 <p>
                   You can use DeepSeek V4 Flash and V4 Pro through a stagewise
@@ -217,9 +217,8 @@ export default function DeepSeekUseCasePage() {
                   for the setup details.
                 </p>
                 <p>
-                  We think agent tools should not dictate where you buy
-                  inference. You choose the billing and hosting model that fits
-                  your setup.
+                  stagewise does not dictate where you buy inference. You choose
+                  the billing and hosting model that fits your setup.
                 </p>
               </div>
             </ScrollReveal>
@@ -228,7 +227,7 @@ export default function DeepSeekUseCasePage() {
       </section>
 
       {/* Working with images — even without vision */}
-      <section className="relative z-10 w-full py-6 md:py-8">
+      <section className="relative z-10 w-full py-3 md:py-4">
         <div className="flex justify-center">
           <div className="w-full max-w-4xl px-4">
             <ScrollReveal>
@@ -244,14 +243,14 @@ export default function DeepSeekUseCasePage() {
                   handling is outsourced to the model API.
                 </p>
                 <p>
-                  The stagewise agent however takes a different approach: Our
-                  file transformation pipeline turns each image into structured
-                  file context the model can reason about in text: file type,
-                  dimensions, format, and a compact representation of the image.
-                  That keeps image files inside the same workflow as source
-                  files and config and makes them accessible to the agent, even
-                  if the model itself is not capable of actually <i>seeing</i>{' '}
-                  images.
+                  The stagewise agent however takes a different approach: the
+                  stagewise file transformation pipeline turns each image into
+                  structured file context the model can reason about in text:
+                  file type, dimensions, format, and a compact representation of
+                  the image. That keeps image files inside the same workflow as
+                  source files and config and makes them accessible to the
+                  agent, even if the model itself is not capable of actually{' '}
+                  <i>seeing</i> images.
                 </p>
               </div>
             </ScrollReveal>
@@ -298,7 +297,7 @@ export default function DeepSeekUseCasePage() {
             </ScrollReveal>
 
             <ScrollReveal delay={300}>
-              <div className="prose dark:prose-invert prose-p:my-0 mt-12 max-w-none">
+              <div className="prose dark:prose-invert prose-p:my-0 mt-8 max-w-none">
                 <p>
                   This does not give DeepSeek vision, but: It does give the
                   model enough context to work sensibly with image files in a
@@ -370,11 +369,11 @@ export default function DeepSeekUseCasePage() {
           {
             question: 'What DeepSeek models are supported?',
             plainTextAnswer:
-              'The models listed on our home page — DeepSeek V4 Pro and DeepSeek V4 Flash — are available out of the box. Beyond those, you can connect any additional DeepSeek model that has agentic capabilities through your own API key or inference provider.',
+              'The models listed on the stagewise home page — DeepSeek V4 Pro and DeepSeek V4 Flash — are available out of the box. Beyond those, you can connect any additional DeepSeek model that has agentic capabilities through your own API key or inference provider.',
             answer: (
               <>
                 <p>
-                  The models listed on our home page —{' '}
+                  The models listed on the stagewise home page —{' '}
                   <strong>DeepSeek V4 Pro</strong> and{' '}
                   <strong>DeepSeek V4 Flash</strong> — are available{' '}
                   <em>out of the box</em>. Beyond those, you can connect any
@@ -386,7 +385,7 @@ export default function DeepSeekUseCasePage() {
           },
           {
             question:
-              'Can we use fine-tuned or quantized variants of DeepSeek models with stagewise?',
+              'Can I use fine-tuned or quantized variants of DeepSeek models with stagewise?',
             plainTextAnswer:
               'Yes. You can connect models from any model provider API, including your custom model variants — whether fine-tuned, quantized, or otherwise specialized.',
             answer: (
@@ -401,9 +400,9 @@ export default function DeepSeekUseCasePage() {
             ),
           },
           {
-            question: 'Can we use a locally hosted DeepSeek model?',
+            question: 'Can I use a locally hosted DeepSeek model?',
             plainTextAnswer:
-              'Yes. You can configure stagewise Agents to use models from any source, including a local setup using Ollama or an on-premise deployment in your own datacenter with setups like vLLM. We support any inference provider option that serves models via one of the popular model access APIs like OpenAI Chat Completions API, OpenResponses API, or Anthropic Messages API. The minimum recommended context size is 150k tokens.',
+              'Yes. You can configure stagewise Agents to use models from any source, including a local setup using Ollama or an on-premise deployment in your own datacenter with setups like vLLM. stagewise supports any inference provider option that serves models via one of the popular model access APIs like OpenAI Chat Completions API, OpenResponses API, or Anthropic Messages API. The minimum recommended context size is 150k tokens.',
             answer: (
               <>
                 <p>
@@ -413,9 +412,10 @@ export default function DeepSeekUseCasePage() {
                   like vLLM.
                 </p>
                 <p>
-                  We support any inference provider option that serves models
-                  via one of the popular model access APIs like OpenAI Chat
-                  Completions API, OpenResponses API, or Anthropic Messages API.
+                  stagewise supports any inference provider option that serves
+                  models via one of the popular model access APIs like OpenAI
+                  Chat Completions API, OpenResponses API, or Anthropic Messages
+                  API.
                 </p>
                 <p>
                   The minimum recommended context size is{' '}
@@ -426,7 +426,7 @@ export default function DeepSeekUseCasePage() {
           },
           {
             question:
-              'Can we connect our enterprise inference provider to use DeepSeek models?',
+              'Can I connect an enterprise inference provider to use DeepSeek models?',
             plainTextAnswer:
               'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
             answer: (

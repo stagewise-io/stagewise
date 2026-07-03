@@ -24,9 +24,9 @@ export function FaqItem({ index, question, answer }: FaqItemProps) {
           onClick={() => setIsOpen((prev) => !prev)}
           aria-expanded={isOpen}
           aria-controls={contentId}
-          className="flex w-full items-center justify-between px-6 py-5 text-left font-medium text-foreground transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          className="flex w-full items-center justify-between px-6 py-5 text-left font-normal text-foreground transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
-          <span className="pr-4 text-base md:text-lg">{question}</span>
+          <span className="pr-4 text-sm md:text-base">{question}</span>
           <ChevronDown
             className={cn(
               'h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-300',
