@@ -1760,6 +1760,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   onConfigChange,
   onOpenChange,
   agentInstanceId,
+  isExecuting: externalIsExecuting = false,
 }: {
   mount: MountEntry;
   onUnmount: (prefix: string) => void;
@@ -1767,6 +1768,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
   onConfigChange?: (mount: MountEntry, config: WorkspaceActionConfig) => void;
   onOpenChange?: (mountPrefix: string, open: boolean) => void;
   agentInstanceId: string;
+  isExecuting?: boolean;
 }) {
   const track = useTrack();
   const display = getWorkspaceDisplayInfo(mount);
@@ -1799,7 +1801,8 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
     (p: KartonProcedures) => p.toolbox.unmountWorkspace,
   );
   const [actionError, setActionError] = useState<string | null>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
+  const [isExecutingLocally, setIsExecutingLocally] = useState(false);
+  const isExecuting = externalIsExecuting || isExecutingLocally;
   const [branchesResult, setBranchesResult] =
     useState<WorkspaceGitBranchesResult | null>(null);
   const [worktreesResult, setWorktreesResult] =
@@ -2124,16 +2127,14 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
         return;
       }
       setActionError(null);
-      setIsExecuting(true);
       persistWorkspaceGitActionPreference(next, partial);
       if (onConfigChange) {
-        try {
-          onConfigChange(mount, nextConfig);
-          setOpen(false);
-        } finally {
-          setIsExecuting(false);
-        }
+        onConfigChange(mount, nextConfig);
+        // The actual Git work happens later during the first-message
+        // workspace-preparation flow in the footer. Keep the picker open so
+        // the parent-owned busy state can render while that async work runs.
       } else {
+        setIsExecutingLocally(true);
         setLocalConfig(nextConfig);
         void executeWorkspaceGitAction({
           agentInstanceId,
@@ -2164,7 +2165,7 @@ const WorkspaceActionSelect = memo(function WorkspaceActionSelect({
             );
           })
           .finally(() => {
-            setIsExecuting(false);
+            setIsExecutingLocally(false);
           });
       }
       track('workspace-action-changed', {
@@ -3708,6 +3709,7 @@ interface WorkspaceSelectProps {
     mount: MountEntry,
     config: WorkspaceActionConfig,
   ) => void;
+  executingWorkspaceActionPrefix?: string | null;
 }
 
 export const WorkspaceSelect = memo(function WorkspaceSelect({
@@ -3715,6 +3717,7 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
   chatIsEmpty,
   workspaceActionConfigs,
   onWorkspaceActionConfigChange,
+  executingWorkspaceActionPrefix,
 }: WorkspaceSelectProps) {
   const [openAgent] = useOpenAgent();
   const [openWorkspaceActionPrefixes, setOpenWorkspaceActionPrefixes] =
@@ -4024,6 +4027,7 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
               onConfigChange={onWorkspaceActionConfigChange}
               onOpenChange={handleWorkspaceActionOpenChange}
               agentInstanceId={openAgent}
+              isExecuting={executingWorkspaceActionPrefix === mount.prefix}
             />
           ) : (
             <WorkspaceBadge

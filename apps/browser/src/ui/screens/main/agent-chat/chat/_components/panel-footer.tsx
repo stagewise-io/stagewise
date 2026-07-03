@@ -809,6 +809,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       }
 
       try {
+        setExecutingWorkspaceActionPrefix(mount.prefix);
         const fallbackGitRef = formatWorkspaceGitRef(mount.git);
         const [branchesResult, worktreesResult] = await Promise.all([
           listWorkspaceGitBranches(openAgent, mount.prefix),
@@ -906,6 +907,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
               : 'Failed to execute workspace action.'
           }`,
         };
+      } finally {
+        setExecutingWorkspaceActionPrefix((current) =>
+          current === mount.prefix ? null : current,
+        );
       }
     }
 
@@ -1625,6 +1630,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const [workspaceActionError, setWorkspaceActionError] = useState<
     string | null
   >(null);
+  const [executingWorkspaceActionPrefix, setExecutingWorkspaceActionPrefix] =
+    useState<string | null>(null);
 
   const [workspaceActionConfigs, setWorkspaceActionConfigs] = useState<
     ReadonlyMap<string, WorkspaceActionConfig>
@@ -1818,6 +1825,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
         chatIsEmpty={historyIsEmpty}
         workspaceActionConfigs={workspaceActionConfigs}
         onWorkspaceActionConfigChange={handleWorkspaceActionConfigChange}
+        executingWorkspaceActionPrefix={executingWorkspaceActionPrefix}
       />
     </footer>
   );
