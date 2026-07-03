@@ -6,19 +6,22 @@ import { HeroImage } from './hero-image';
 import { UseCaseFAQ } from '../_components/use-case-faq';
 
 export const metadata: Metadata = {
-  title: 'An Open-Source IDE with First-Class DeepSeek Support · stagewise',
+  title:
+    'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
   description:
-    'stagewise is an open-source IDE for coding agents with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
+    'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
   openGraph: {
-    title: 'An Open-Source IDE with First-Class DeepSeek Support · stagewise',
+    title:
+      'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
     description:
-      'stagewise is an open-source IDE for coding agents with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
+      'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
     type: 'website',
   },
   twitter: {
-    title: 'An Open-Source IDE with First-Class DeepSeek Support · stagewise',
+    title:
+      'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
     description:
-      'stagewise is an open-source IDE for coding agents with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
+      'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
     creator: '@stagewise_io',
   },
   alternates: {
@@ -89,13 +92,13 @@ export default function DeepSeekUseCasePage() {
               <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left md:mt-2 md:mb-8">
                 <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
                   <span className="text-foreground">
-                    An Open-Source IDE Built for DeepSeek
+                    An Open-Source IDE and Coding Agent Built for DeepSeek
                   </span>
                 </h1>
                 <p className="text-lg text-muted-foreground leading-relaxed">
-                  Use DeepSeek V4 Flash and V4 Pro in a local IDE built for
-                  long-running agent work. Run it through a stagewise Account,
-                  your own API setup, or local inference.
+                  Use DeepSeek V4 Flash and V4 Pro in a local IDE with a capable
+                  coding agent, built for long-running work. Run it through a
+                  stagewise Account, your own API setup, or local inference.
                 </p>
                 <div className="mt-8">
                   <DownloadButtons />
@@ -120,13 +123,13 @@ export default function DeepSeekUseCasePage() {
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <p>
-                  stagewise is a local IDE for software engineers who work with
-                  coding agents. It runs on your machine, connects to your
-                  development environment, and can orchestrate multiple agents
-                  in parallel. The runtime is model-agnostic, so you can use
-                  frontier models, open-weight models, or local inference. It
-                  also manages context aggressively, which matters once a task
-                  starts stretching across many turns.{' '}
+                  stagewise is a local IDE that ships with its own coding agent.
+                  It runs on your machine, connects to your development
+                  environment, and can orchestrate multiple agents in parallel.
+                  The runtime is model-agnostic, so you can use frontier models,
+                  open-weight models, or local inference. It also manages
+                  context aggressively, which matters once a task starts
+                  stretching across many turns.{' '}
                   <Link
                     href="/"
                     className="text-primary underline-offset-4 hover:underline"
@@ -312,6 +315,30 @@ export default function DeepSeekUseCasePage() {
       <UseCaseFAQ
         items={[
           {
+            question:
+              'Is stagewise just an IDE, or does it come with its own coding agent?',
+            plainTextAnswer:
+              'Both. stagewise is a coding agent orchestrator: it ships its own first-class, model-independent agent harness — the runtime that handles tooling, context management, file access, and multi-agent orchestration — alongside the user interface you use to control that harness. The harness is model-agnostic, so it works with any capable model, including DeepSeek. You get the IDE and the agent in one product.',
+            answer: (
+              <>
+                <p>
+                  Both. stagewise is a coding agent orchestrator: it ships its
+                  own{' '}
+                  <strong>first-class, model-independent agent harness</strong>{' '}
+                  — the runtime that handles tooling, context management, file
+                  access, and multi-agent orchestration — alongside the{' '}
+                  <strong>user interface</strong> you use to control that
+                  harness.
+                </p>
+                <p>
+                  The harness is model-agnostic, so it works with any capable
+                  model, including DeepSeek. You get the IDE and the agent in
+                  one product.
+                </p>
+              </>
+            ),
+          },
+          {
             question: 'How can I use DeepSeek in stagewise?',
             plainTextAnswer:
               'You can run DeepSeek in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including DeepSeek V4 Pro and V4 Flash — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply a DeepSeek API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
@@ -423,7 +450,7 @@ export default function DeepSeekUseCasePage() {
             <div className="w-full max-w-4xl px-4 pt-8 text-center">
               <h2 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
                 <span className="text-foreground">
-                  An Open-Source IDE Built for DeepSeek
+                  An Open-Source IDE and Coding Agent Built for DeepSeek
                 </span>
               </h2>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">

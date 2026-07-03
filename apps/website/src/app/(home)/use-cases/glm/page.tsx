@@ -6,19 +6,22 @@ import { HeroImage } from './hero-image';
 import { UseCaseFAQ } from '../_components/use-case-faq';
 
 export const metadata: Metadata = {
-  title: 'An Open-Source IDE with First-Class GLM Support · stagewise',
+  title:
+    'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
   description:
-    'stagewise is an open-source IDE for coding agents with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
+    'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
   openGraph: {
-    title: 'An Open-Source IDE with First-Class GLM Support · stagewise',
+    title:
+      'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
     description:
-      'stagewise is an open-source IDE for coding agents with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
+      'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
     type: 'website',
   },
   twitter: {
-    title: 'An Open-Source IDE with First-Class GLM Support · stagewise',
+    title:
+      'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
     description:
-      'stagewise is an open-source IDE for coding agents with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
+      'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
     creator: '@stagewise_io',
   },
   alternates: {
@@ -89,14 +92,14 @@ export default function GLMUseCasePage() {
               <div className="mt-0 mb-6 flex flex-col items-start px-4 text-left md:mt-2 md:mb-8">
                 <h1 className="mb-4 font-medium text-3xl tracking-tight md:text-5xl">
                   <span className="text-foreground">
-                    An Open-Source IDE Built for GLM
+                    An Open-Source IDE and Coding Agent Built for GLM
                   </span>
                 </h1>
                 <p className="text-lg text-muted-foreground leading-relaxed">
                   GLM 5.2 is compelling for a simple reason: it gets unusually
                   close to Claude Opus 4.8 in quality while sitting at a much
-                  lower cost point. stagewise gives it a local IDE built for
-                  long-running agent work.
+                  lower cost point. stagewise gives it a local IDE with a
+                  capable coding agent built for long-running work.
                 </p>
                 <div className="mt-8">
                   <DownloadButtons />
@@ -181,13 +184,13 @@ export default function GLMUseCasePage() {
             <ScrollReveal>
               <div className="prose dark:prose-invert prose-p:my-0 prose-headings:mt-6 prose-headings:mb-4 max-w-none [&>p+p]:mt-5">
                 <p>
-                  stagewise is a local IDE for software engineers who work with
-                  coding agents. It runs on your machine, connects to your
-                  development environment, and can orchestrate multiple agents
-                  in parallel. The runtime is model-agnostic, so you can use
-                  frontier models, open-weight models, or local inference. It
-                  also manages context aggressively, which matters once a task
-                  starts stretching across many turns.{' '}
+                  stagewise is a local IDE that ships with its own coding agent.
+                  It runs on your machine, connects to your development
+                  environment, and can orchestrate multiple agents in parallel.
+                  The runtime is model-agnostic, so you can use frontier models,
+                  open-weight models, or local inference. It also manages
+                  context aggressively, which matters once a task starts
+                  stretching across many turns.{' '}
                   <Link
                     href="/"
                     className="text-primary underline-offset-4 hover:underline"
@@ -370,6 +373,30 @@ export default function GLMUseCasePage() {
       <UseCaseFAQ
         items={[
           {
+            question:
+              'Is stagewise just an IDE, or does it come with its own coding agent?',
+            plainTextAnswer:
+              'Both. stagewise is a coding agent orchestrator: it ships its own first-class, model-independent agent harness — the runtime that handles tooling, context management, file access, and multi-agent orchestration — alongside the user interface you use to control that harness. The harness is model-agnostic, so it works with any capable model, including GLM. You get the IDE and the agent in one product.',
+            answer: (
+              <>
+                <p>
+                  Both. stagewise is a coding agent orchestrator: it ships its
+                  own{' '}
+                  <strong>first-class, model-independent agent harness</strong>{' '}
+                  — the runtime that handles tooling, context management, file
+                  access, and multi-agent orchestration — alongside the{' '}
+                  <strong>user interface</strong> you use to control that
+                  harness.
+                </p>
+                <p>
+                  The harness is model-agnostic, so it works with any capable
+                  model, including GLM. You get the IDE and the agent in one
+                  product.
+                </p>
+              </>
+            ),
+          },
+          {
             question: 'How can I use GLM in stagewise?',
             plainTextAnswer:
               'You can run GLM in stagewise using three options: 1. stagewise Cloud Inference: With a stagewise Account, you get preconfigured access to a wide variety of models including GLM 5.2, GLM 5.1, and GLM 5V-Turbo — no keys, configuration, or external subscriptions required. 2. Your API Key: Supply your own Z.AI API key, or use an API aggregator (like OpenRouter or fireworks.ai) to route your queries. 3. Custom Endpoint: Connect stagewise to any custom endpoint — including local servers (Ollama, Llama.cpp), on-premise deployments (vLLM), or enterprise inference providers.',
@@ -500,7 +527,7 @@ export default function GLMUseCasePage() {
             <div className="w-full max-w-4xl px-4 pt-8 text-center">
               <h2 className="mb-8 font-medium text-3xl tracking-tight md:text-5xl">
                 <span className="text-foreground">
-                  An Open-Source IDE Built for GLM
+                  An Open-Source IDE and Coding Agent Built for GLM
                 </span>
               </h2>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
