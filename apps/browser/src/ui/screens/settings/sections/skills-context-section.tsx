@@ -112,7 +112,7 @@ function WorkspaceSkillsList({
             {
               op: 'add' as const,
               path: ['agent', 'workspaceSettings', workspacePath],
-              value: { respectAgentsMd: false, disabledSkills: next },
+              value: { respectAgentsMd: true, disabledSkills: next },
             },
           ];
 
@@ -475,7 +475,7 @@ function WorkspaceContextFilesList({
 
   const respectAgentsMd =
     preferences?.agent?.workspaceSettings?.[workspacePath]?.respectAgentsMd ??
-    false;
+    true;
 
   const handleGenerate = useCallback(async () => {
     await generateWorkspaceMd(workspacePath);

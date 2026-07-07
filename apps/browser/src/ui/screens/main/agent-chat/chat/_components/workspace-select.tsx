@@ -150,7 +150,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
   const respectAgentsMd = useKartonState(
     (s: KartonState) =>
       s.preferences?.agent?.workspaceSettings?.[mount.path]?.respectAgentsMd ??
-      false,
+      true,
   );
   const preferences = useKartonState((s: KartonState) => s.preferences);
   const preferencesUpdate = useKartonProcedure(
@@ -237,7 +237,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
             {
               op: 'add' as const,
               path: ['agent', 'workspaceSettings', mount.path],
-              value: { respectAgentsMd: false, disabledSkills: next },
+              value: { respectAgentsMd: true, disabledSkills: next },
             },
           ];
       void preferencesUpdate(patches);
