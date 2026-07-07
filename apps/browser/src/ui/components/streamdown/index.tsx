@@ -28,6 +28,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { cn } from '@ui/utils';
+import { useContentCollapsedOptional } from '@ui/screens/main/_components/content-collapsed-context';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
@@ -1050,6 +1051,7 @@ export const Streamdown = memo(
     const processed = useMemo(() => preprocessMarkdown(children), [children]);
     const createTab = useKartonProcedure((p) => p.browser.createTab);
     const isAltPressed = useChatLinkAltPressed();
+    const contentCollapsedCtx = useContentCollapsedOptional();
 
     const handleMouseMoveCapture = useCallback(
       (event: MouseEvent<HTMLDivElement>) => {
@@ -1071,9 +1073,11 @@ export const Streamdown = memo(
 
         event.preventDefault();
         event.stopPropagation();
+        if (contentCollapsedCtx?.collapsed)
+          contentCollapsedCtx.setCollapsed(false);
         void createTab(href, true);
       },
-      [createTab],
+      [createTab, contentCollapsedCtx],
     );
 
     return (

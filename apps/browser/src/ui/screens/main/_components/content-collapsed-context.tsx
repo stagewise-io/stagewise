@@ -79,3 +79,12 @@ export function useContentCollapsed(): ContentCollapsedCtx {
   }
   return ctx;
 }
+
+/**
+ * Optional variant — returns null instead of throwing when the provider is
+ * missing. Use in components that may render outside ContentCollapsedProvider
+ * (e.g. Storybook stories).
+ */
+export function useContentCollapsedOptional(): ContentCollapsedCtx | null {
+  return useContext(ContentCollapsedContext);
+}
