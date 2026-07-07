@@ -48,6 +48,7 @@ import {
 } from './log-channel-section';
 import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
+import { useContentCollapsed } from '@ui/screens/main/_components/content-collapsed-context';
 
 // Stable empty arrays/sets to avoid infinite loop with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -101,6 +102,10 @@ export function StatusCard() {
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
+
+  // Expand the content panel if it's collapsed so plan tabs are visible
+  const { collapsed: contentCollapsed, setCollapsed: setContentCollapsed } =
+    useContentCollapsed();
 
   const messageQueue = useKartonState((s) =>
     openAgentId
@@ -521,6 +526,8 @@ export function StatusCard() {
 
   const handleOpenPlan = useCallback(
     (filename: string) => {
+      if (contentCollapsed) setContentCollapsed(false);
+
       const baseUrl = `stagewise://internal/plan/${encodeURIComponent(filename)}`;
 
       // Reuse existing plan tab for this plan if one is already open
@@ -533,7 +540,14 @@ export function StatusCard() {
         void goToUrl(baseUrl, existingTab.id);
       } else void createTab(baseUrl, true);
     },
-    [createTab, switchTab, goToUrl, tabs],
+    [
+      createTab,
+      switchTab,
+      goToUrl,
+      tabs,
+      contentCollapsed,
+      setContentCollapsed,
+    ],
   );
 
   const handleImplement = useSendImplement();
