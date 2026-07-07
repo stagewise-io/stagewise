@@ -1041,7 +1041,7 @@ export class ToolboxService
       for (const mount of mounts) {
         const settings = this.uiKarton.state.preferences?.agent
           ?.workspaceSettings?.[mount.path] ?? {
-          respectAgentsMd: false,
+          respectAgentsMd: true,
           disabledSkills: [],
         };
         const disabled = new Set(settings.disabledSkills);
@@ -1139,7 +1139,7 @@ export class ToolboxService
         mount.prefix,
         this.uiKarton.state.preferences?.agent?.workspaceSettings?.[
           mount.path
-        ] ?? { respectAgentsMd: false, disabledSkills: [] },
+        ] ?? { respectAgentsMd: true, disabledSkills: [] },
       );
     }
     return result;

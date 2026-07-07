@@ -65,7 +65,7 @@ export function createBrowserHostEnvironmentSources(
         const wsPath = mountManager.getWorkspacePathForPrefix(prefix);
         if (!wsPath) continue;
         const entry = workspaceSettings[wsPath] ?? {
-          respectAgentsMd: false,
+          respectAgentsMd: true,
           disabledSkills: [],
         };
         result.set(wsPath, {
