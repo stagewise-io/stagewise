@@ -25,16 +25,27 @@ export function hydrateWorkspaceActionConfigWithDefaults(
     'main',
   ]);
 
+  // Source-branch fields ("Create worktree from" / "Create branch from")
+  // have the same placeholder problem as checkout-branch fields: the initial
+  // controlled config from panel-footer uses a fallback default ('main') before
+  // real Git data loads. Use a set so any of those placeholder values triggers
+  // re-hydration once the real preference-backed default is available.
+  const sourceBranchPlaceholders = new Set([
+    previousDefaults.sourceBranch,
+    previousDefaults.defaultBranch,
+    'main',
+  ]);
+
   return {
     ...config,
     createWorktreeFrom:
       config.createWorktreeFromTouched !== true &&
-      config.createWorktreeFrom === previousDefaults.sourceBranch
+      sourceBranchPlaceholders.has(config.createWorktreeFrom)
         ? defaults.createWorktreeFrom
         : config.createWorktreeFrom,
     createBranchFrom:
       config.createBranchFromTouched !== true &&
-      config.createBranchFrom === previousDefaults.sourceBranch
+      sourceBranchPlaceholders.has(config.createBranchFrom)
         ? defaults.createBranchFrom
         : config.createBranchFrom,
     switchBranchTarget:
