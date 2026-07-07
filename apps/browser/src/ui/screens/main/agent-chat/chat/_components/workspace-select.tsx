@@ -1259,10 +1259,7 @@ export function applyMountedWorkspaceActionDefault(
     };
   }
 
-  return {
-    ...config,
-    selectedAction: 'create-worktree',
-  };
+  return config;
 }
 
 export function toWorkspaceActionPayload(
