@@ -11,4 +11,4 @@ We are not yet set up for open-source development contributions. **We are not ac
 
 ## Everything else
 
-For feature ideas, integration questions, or general discussion, join our [Discord](https://discord.gg/gkdGsDYaKA) or start a conversation on [GitHub Discussions](https://github.com/stagewise-io/stagewise/discussions).
+For feature ideas, integration questions, or general discussion, join our [Discord](https://discord.gg/gkdGsDYaKA).
