@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
 import type { LspServerInfo, LspServerHandle } from '../types';
 import { BIOME_EXTENSIONS } from '../language-map';
 import { hasAnyFile, findNodeModulesBin } from './utils/root-finder';
+import { spawnStdioLspServer } from './utils/spawn-helpers';
 
 /**
  * Biome Language Server definition
@@ -40,45 +40,19 @@ function spawnBiomeServer(
   binary: string,
   root: string,
   env: Record<string, string> | NodeJS.ProcessEnv,
-): LspServerHandle {
-  const process = spawn(binary, ['lsp-proxy'], {
-    stdio: ['pipe', 'pipe', 'pipe'],
+): Promise<LspServerHandle | undefined> {
+  return spawnStdioLspServer(binary, ['lsp-proxy'], {
     cwd: root,
     env,
   });
-
-  return { process };
 }
 
-async function spawnViaNpx(
+function spawnViaNpx(
   root: string,
   env: Record<string, string> | NodeJS.ProcessEnv,
 ): Promise<LspServerHandle | undefined> {
-  try {
-    const process = spawn('npx', ['@biomejs/biome', 'lsp-proxy'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: root,
-      env,
-    });
-
-    return new Promise((resolve) => {
-      let resolved = false;
-
-      process.on('error', () => {
-        if (!resolved) {
-          resolved = true;
-          resolve(undefined);
-        }
-      });
-
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          resolve({ process });
-        }
-      }, 100);
-    });
-  } catch {
-    return undefined;
-  }
+  return spawnStdioLspServer('npx', ['@biomejs/biome', 'lsp-proxy'], {
+    cwd: root,
+    env,
+  });
 }

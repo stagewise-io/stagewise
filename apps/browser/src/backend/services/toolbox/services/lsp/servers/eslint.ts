@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { LspServerInfo, LspServerHandle } from '../types';
@@ -8,6 +7,7 @@ import {
   fileExists,
   isPackageInstalled,
 } from './utils/root-finder';
+import { spawnStdioLspServer } from './utils/spawn-helpers';
 
 // FIX: Use ES module compatible __dirname (same pattern as plugin.ts, app-menu.ts, etc.)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -107,22 +107,15 @@ function spawnEslintServer(
   serverPath: string,
   root: string,
   env: Record<string, string> | NodeJS.ProcessEnv,
-): LspServerHandle {
-  const process = spawn('node', [serverPath, '--stdio'], {
-    stdio: ['pipe', 'pipe', 'pipe'],
+): Promise<LspServerHandle | undefined> {
+  const workspaceFolderName = path.basename(root);
+
+  return spawnStdioLspServer('node', [serverPath, '--stdio'], {
     cwd: root,
     env: {
       ...env,
       ESLINT_WORKSPACE_FOLDER: root,
     },
-  });
-
-  // Provide the EXACT settings format that VS Code ESLint extension uses
-  // The workspaceFolder is CRITICAL - without it ESLint won't know where to look
-  const workspaceFolderName = path.basename(root);
-
-  return {
-    process,
     initializationOptions: {
       validate: 'on', // 'on' | 'off' | 'probe'
       packageManager: null, // Let ESLint auto-detect
@@ -153,5 +146,5 @@ function spawnEslintServer(
         showDocumentation: { enable: true },
       },
     },
-  };
+  });
 }
