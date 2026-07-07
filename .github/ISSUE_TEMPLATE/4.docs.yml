@@ -14,14 +14,14 @@ body:
   - type: textarea
     attributes:
       label: Area of Improvement
-      placeholder: I would like to see more in-depth API documentation for how to use batch-links.
+      placeholder: I would like to see more in-depth documentation for how to configure custom model providers.
     validations:
       required: true
   - type: input
     attributes:
       label: Link to related docs
       description: Does documentation already exist? Please link that here.
-      placeholder: https://stagewise.io/docs/
+      placeholder: https://docs.stagewise.io/
   - type: textarea
     attributes:
       label: Additional information

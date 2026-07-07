@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        If you encount an issue during the use of the agent or are unhappy with the behavior of the agent, please file an issue here so we can investigate and fix the problem.
+        If you encounter an issue during the use of the agent or are unhappy with the behavior of the agent, please file an issue here so we can investigate and fix the problem.
   - type: textarea
     id: behavior-issue-description
     attributes:
@@ -21,7 +21,9 @@ body:
     attributes:
       label: Chat History
       description: If possible, provide a cut-out of the relevant part of the chat history that shows the behavior issue. Simple copy-paste or screenshot upload is fine. Please note that the provided information is public.
-      placeholder: I would like to see more in-depth API documentation for how to use batch-links.
+      placeholder: |
+        User: Can you refactor this component?
+        Agent: I'm unable to help with that...
     validations:
       required: false
   - type: input

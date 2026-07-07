@@ -13,13 +13,13 @@ body:
 
   - type: checkboxes
     attributes:
-      label: 🔍 Debugging guide
+      label: 🔍 Documentation
       description: |
         Please confirm:
         
-        👉 [Read the How to debug guide](https://stagewise.io/docs/debug)
+        👉 [Read the documentation](https://docs.stagewise.io/)
       options:
-        - label: I have read the "How to debug" guide, but the problem still persists
+        - label: I have checked the documentation, but the problem still persists
     validations:
       required: true
 

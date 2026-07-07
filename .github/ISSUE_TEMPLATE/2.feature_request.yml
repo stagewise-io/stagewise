@@ -28,4 +28,4 @@ body:
     attributes:
       label: Current application version
       description: If you are already using stagewise, please provide the version you're using.
-      placeholder: 1.0.0-alpha.1
+      placeholder: 1.16.1
