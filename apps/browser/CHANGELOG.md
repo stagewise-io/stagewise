@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.1 (2026-07-07)
+
+### Bug Fixes
+
+* return empty record instead of throwing when no AttachmentMetadataProvider exists (b21e801)
+
 ## 1.16.0 (2026-06-30)
 
 ### Features
