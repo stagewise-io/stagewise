@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import type { LspServerInfo, LspServerHandle } from '../types';
 import { TYPESCRIPT_EXTENSIONS } from '../language-map';
@@ -8,6 +7,7 @@ import {
   getPackagePath,
   fileExists,
 } from './utils/root-finder';
+import { spawnStdioLspServer } from './utils/spawn-helpers';
 
 /**
  * TypeScript Language Server definition
@@ -66,57 +66,30 @@ function spawnTsServer(
   args: string[],
   tsLibPath?: string,
   env?: Record<string, string> | NodeJS.ProcessEnv,
-): LspServerHandle {
+): Promise<LspServerHandle | undefined> {
   const spawnArgs = ['--stdio', ...args];
 
-  const process = spawn(binary, spawnArgs, {
-    stdio: ['pipe', 'pipe', 'pipe'],
+  return spawnStdioLspServer(binary, spawnArgs, {
+    cwd: process.cwd(),
+    env: {
+      ...(env ?? globalThis.process.env),
+      NODE_OPTIONS: '--max-old-space-size=4096',
+    },
+    initializationOptions: tsLibPath
+      ? { typescript: { tsdk: tsLibPath } }
+      : undefined,
+  });
+}
+
+function spawnViaNpx(
+  root: string,
+  env?: Record<string, string> | NodeJS.ProcessEnv,
+): Promise<LspServerHandle | undefined> {
+  return spawnStdioLspServer('npx', ['typescript-language-server', '--stdio'], {
+    cwd: root,
     env: {
       ...(env ?? globalThis.process.env),
       NODE_OPTIONS: '--max-old-space-size=4096',
     },
   });
-
-  return {
-    process,
-    initializationOptions: tsLibPath
-      ? { typescript: { tsdk: tsLibPath } }
-      : undefined,
-  };
-}
-
-async function spawnViaNpx(
-  root: string,
-  env?: Record<string, string> | NodeJS.ProcessEnv,
-): Promise<LspServerHandle | undefined> {
-  try {
-    const process = spawn('npx', ['typescript-language-server', '--stdio'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      cwd: root,
-      env: {
-        ...(env ?? globalThis.process.env),
-        NODE_OPTIONS: '--max-old-space-size=4096',
-      },
-    });
-
-    return new Promise((resolve) => {
-      let resolved = false;
-
-      process.on('error', () => {
-        if (!resolved) {
-          resolved = true;
-          resolve(undefined);
-        }
-      });
-
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          resolve({ process });
-        }
-      }, 100);
-    });
-  } catch {
-    return undefined;
-  }
 }

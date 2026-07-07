@@ -1101,10 +1101,11 @@ export class LspClient extends EventEmitter {
    *   inside dispose. Other I/O-heavy methods (`openDocument`, delayed
    *   pull-diagnostic closures) follow the same snapshot-after-await
    *   discipline so a concurrent dispose cannot null-deref them.
-   * - Each Shutdown/Exit send is wrapped individually because some
-   *   servers close stdin the moment they answer Shutdown, which would
-   *   otherwise leak `ERR_STREAM_DESTROYED` from the Exit notification
-   *   as an unhandled rejection.
+   * - The Exit notification is skipped when stdin is already destroyed
+   *   (some servers close stdin immediately after answering Shutdown).
+   *   A no-op `.catch()` is attached to the in-flight shutdown promise
+   *   so that a timeout race — `connection.dispose()` destroying the
+   *   stream mid-write — cannot produce an unhandled rejection.
    */
   public dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise;
@@ -1124,29 +1125,45 @@ export class LspClient extends EventEmitter {
     childProcess: ChildProcessWithoutNullStreams | null,
   ): Promise<void> {
     if (connection) {
-      const gracefulShutdown = async () => {
+      const gracefulShutdown = (async () => {
         try {
           await connection.sendRequest(ShutdownRequest.type);
         } catch (err) {
           this.logger.debug(
             `[LspClient:${this.serverID}] Shutdown request failed during dispose: ${err instanceof Error ? err.message : String(err)}`,
           );
+          return;
         }
-        try {
-          await connection.sendNotification(ExitNotification.type);
-        } catch (err) {
-          this.logger.debug(
-            `[LspClient:${this.serverID}] Exit notification failed during dispose: ${err instanceof Error ? err.message : String(err)}`,
-          );
+        // Some LSP servers (e.g. ESLint) close stdin immediately after
+        // responding to Shutdown. Writing the Exit notification to a
+        // destroyed stream causes vscode-jsonrpc's StreamMessageWriter to
+        // throw a secondary ERR_STREAM_DESTROYED rejection from its
+        // internal promise chain that escapes our try/catch and surfaces
+        // as an unhandled rejection. Skip Exit when stdin is already gone.
+        if (childProcess?.stdin && !childProcess.stdin.destroyed) {
+          try {
+            await connection.sendNotification(ExitNotification.type);
+          } catch (err) {
+            this.logger.debug(
+              `[LspClient:${this.serverID}] Exit notification failed during dispose: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
         }
-      };
+      })();
 
+      let timeoutHandle: NodeJS.Timeout | undefined;
       await Promise.race([
-        gracefulShutdown(),
-        new Promise<void>((resolve) =>
-          setTimeout(resolve, LspClient.SHUTDOWN_TIMEOUT_MS),
-        ),
+        gracefulShutdown,
+        new Promise<void>((resolve) => {
+          timeoutHandle = setTimeout(resolve, LspClient.SHUTDOWN_TIMEOUT_MS);
+        }),
       ]);
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+
+      // If the timeout fired, gracefulShutdown may still be in flight.
+      // Attach a no-op catch so that connection.dispose() destroying the
+      // stream mid-write cannot produce an unhandled rejection.
+      gracefulShutdown.catch(() => {});
 
       try {
         connection.dispose();

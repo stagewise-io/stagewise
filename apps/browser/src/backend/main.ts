@@ -168,6 +168,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   });
   process.on('unhandledRejection', (reason) => {
     const error = reason instanceof Error ? reason : new Error(String(reason));
+
     logger.error(`[Process] Unhandled rejection: ${error.message}`);
     telemetryService.captureException(error, {
       service: 'process',

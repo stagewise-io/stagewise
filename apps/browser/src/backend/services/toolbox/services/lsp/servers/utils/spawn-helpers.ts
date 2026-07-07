@@ -22,6 +22,7 @@ export function spawnStdioLspServer(
     cwd: string;
     env: Record<string, string> | NodeJS.ProcessEnv;
     handshakeMs?: number;
+    initializationOptions?: Record<string, unknown>;
   },
 ): Promise<LspServerHandle | undefined> {
   const { cwd, env, handshakeMs = 150 } = options;
@@ -50,7 +51,10 @@ export function spawnStdioLspServer(
     child.on('exit', () => finish(undefined));
 
     setTimeout(() => {
-      finish({ process: child as LspServerHandle['process'] });
+      finish({
+        process: child as LspServerHandle['process'],
+        initializationOptions: options.initializationOptions,
+      });
     }, handshakeMs);
   });
 }
