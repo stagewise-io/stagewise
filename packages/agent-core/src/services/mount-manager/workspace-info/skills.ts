@@ -48,6 +48,22 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
+/**
+ * Like `stat(p).isDirectory()` but follows symlinks and never throws.
+ * A plain `Dirent.isDirectory()` check from `readdir({ withFileTypes })`
+ * returns false for symlinked directories (dirent type DT_LNK), causing
+ * symlinked skill folders to be silently skipped (issue #1373). `stat`
+ * follows the symlink and reports the target's true type. Broken or
+ * inaccessible symlinks reject and are treated as non-directories.
+ */
+async function isDirectorySafe(p: string): Promise<boolean> {
+  try {
+    return (await stat(p)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export async function discoverSkills(skillsDir: string): Promise<Skill[]> {
   if (!(await pathExists(skillsDir))) return [];
 
@@ -55,8 +71,9 @@ export async function discoverSkills(skillsDir: string): Promise<Skill[]> {
   const skills: Skill[] = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
     const skillPath = resolve(skillsDir, entry.name);
+    if (!(await isDirectorySafe(skillPath))) continue;
+
     const skillMdPath = resolve(skillPath, 'SKILL.md');
     if (!(await pathExists(skillMdPath))) continue;
 
