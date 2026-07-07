@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.17.0 (2026-07-07)
+
+### Features
+
+* enable AGENTS.md context by default for new workspace mounts (9beadeb)
+
+### Bug Fixes
+
+* remove stale links from issue templates and CONTRIBUTING (50f27b8)
+* hydrate source-branch prefs when fallback main differs from git ref (fdcba6f)
+* prevent unhandled ENOENT and ERR_STREAM_DESTROYED during LSP teardown (ae065e5)
+* expand content panel when opening plan or chat link (4f8671e)
+
 ## 1.16.1 (2026-07-07)
 
 ### Bug Fixes
