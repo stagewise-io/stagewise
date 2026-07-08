@@ -12,7 +12,7 @@ import {
   IconRefreshAnticlockwiseOutline18,
   IconGlobe3Outline18,
   IconWindowCodeOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { useDebouncedValue } from '@ui/hooks/use-debounced-value';
 

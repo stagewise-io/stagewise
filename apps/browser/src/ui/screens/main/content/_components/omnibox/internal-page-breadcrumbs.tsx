@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { IconChevronRight } from 'nucleo-micro-bold';
+import { IconChevronRight } from '@stagewise/icons';
 import { Logo } from '@ui/components/ui/logo';
 import { useKartonState } from '@ui/hooks/use-karton';
 

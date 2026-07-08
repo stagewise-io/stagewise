@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconLinkFill18 } from 'nucleo-ui-fill-18';
+import { IconLinkFill18 } from '@stagewise/icons';
 
 export function WithTabPreviewCard({
   tabState,

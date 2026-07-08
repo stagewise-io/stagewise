@@ -14,7 +14,7 @@ import {
   SquareIcon,
   SquareDashedMousePointerIcon,
 } from 'lucide-react';
-import { IconPaperclip2Outline18 } from 'nucleo-ui-outline-18';
+import { IconPaperclip2Outline18 } from '@stagewise/icons';
 import {
   useCallback,
   useMemo,

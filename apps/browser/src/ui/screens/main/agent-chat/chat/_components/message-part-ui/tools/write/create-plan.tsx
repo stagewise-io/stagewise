@@ -2,7 +2,7 @@ import type { WritePart } from '.';
 import {
   IconClipboardContentOutline18,
   IconXmarkOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import {
   parsePlanContent,
   type PlanTask,
@@ -18,7 +18,7 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { cn } from '@ui/utils';
-import { IconClipboardOutline18 } from 'nucleo-ui-outline-18';
+import { IconClipboardOutline18 } from '@stagewise/icons';
 import { usePlanPhase } from '@ui/hooks/use-plan-phase';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';

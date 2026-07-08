@@ -2,7 +2,7 @@
 
 import { usePostHog } from 'posthog-js/react';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
-import { IconGithub } from 'nucleo-social-media';
+import { IconGithub } from '@stagewise/icons';
 
 interface GithubStarButtonProps {
   starCount: number;

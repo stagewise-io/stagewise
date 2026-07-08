@@ -1,0 +1,121 @@
+import React from 'react';
+import { Icon, type IconProps } from './Icon';
+
+interface IconSunOutline18Props extends IconProps {
+  strokeWidth?: number;
+}
+export const IconSunOutline18: React.FC<IconSunOutline18Props> = ({
+  strokeWidth = 1.5,
+  ...props
+}) => {
+  return (
+    <Icon size="18px" {...props}>
+      <line
+        x1="9"
+        y1="1.25"
+        x2="9"
+        y2="2.25"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="14.48"
+        y1="3.52"
+        x2="13.773"
+        y2="4.227"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="16.75"
+        y1="9"
+        x2="15.75"
+        y2="9"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="14.48"
+        y1="14.48"
+        x2="13.773"
+        y2="13.773"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="9"
+        y1="16.75"
+        x2="9"
+        y2="15.75"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="3.52"
+        y1="14.48"
+        x2="4.227"
+        y2="13.773"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="1.25"
+        y1="9"
+        x2="2.25"
+        y2="9"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <line
+        x1="3.52"
+        y1="3.52"
+        x2="4.227"
+        y2="4.227"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+        data-color="color-2"
+      />
+      <circle
+        cx="9"
+        cy="9"
+        r="4.25"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
+      />
+    </Icon>
+  );
+};

@@ -11,7 +11,7 @@ import { useKartonState } from '@ui/hooks/use-karton';
 import {
   IconSidebarLeftHideOutline18,
   IconSidebarLeftShowOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useSidebarCollapsed } from './sidebar-collapsed-context';
 
 export function SidebarToggleButton() {

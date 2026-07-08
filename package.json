@@ -74,13 +74,6 @@
       "lefthook",
       "libsql",
       "macos-alias",
-      "nucleo-core-fill-24",
-      "nucleo-core-outline-24",
-      "nucleo-micro-bold",
-      "nucleo-ui-fill-18",
-      "nucleo-ui-fill-duo-18",
-      "nucleo-ui-outline-18",
-      "nucleo-ui-outline-duo-18",
       "node-pty",
       "sharp",
       "utf-8-validate"
@@ -109,7 +102,6 @@
     "better-auth": "^1.6.10",
     "gray-matter": "^4.0.3",
     "node-pty": "^1.1.0",
-    "nucleo-ui-outline-12": "^1.4.1",
     "tsx": "^4.20.3"
   },
   "config": {

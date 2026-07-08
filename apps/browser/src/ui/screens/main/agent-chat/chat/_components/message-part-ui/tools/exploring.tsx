@@ -16,7 +16,7 @@ import {
 import type { ReasoningUIPart } from 'ai';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { GlobToolPart } from './glob';
-import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
+import { IconMagnifierOutline18 } from '@stagewise/icons';
 import { GrepSearchToolPart } from './grep-search';
 import { ReadToolPart } from './read';
 import { LsToolPart } from './ls';

@@ -1,6 +1,6 @@
 import { Select as SelectBase } from '@base-ui/react/select';
 import { CheckIcon } from 'lucide-react';
-import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
+import { IconChevronDownFill18 } from '@stagewise/icons';
 import {
   memo,
   useCallback,

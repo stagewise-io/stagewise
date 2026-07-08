@@ -5,7 +5,7 @@ import { useTurnstile } from '@ui/hooks/use-turnstile';
 import { GithubMark } from '@ui/components/icons/github-mark';
 import { GoogleLogo } from '@ui/components/provider-logos/google';
 import { ProviderLogo } from '@ui/components/provider-logos';
-import { IconEnvelopeOutline18, IconKey2Outline18 } from 'nucleo-ui-outline-18';
+import { IconEnvelopeOutline18, IconKey2Outline18 } from '@stagewise/icons';
 import { Loader2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';

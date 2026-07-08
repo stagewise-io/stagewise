@@ -9,7 +9,7 @@ import {
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconXmarkFill18 } from 'nucleo-ui-fill-18';
+import { IconXmarkFill18 } from '@stagewise/icons';
 import { useTutorial } from '@ui/contexts/tutorial';
 import { cn } from '@ui/utils';
 

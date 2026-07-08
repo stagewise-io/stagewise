@@ -6,7 +6,7 @@ import {
   IconCloneDashed2Outline18,
   IconFilePenOutline18,
   IconFolderPenOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { resolveDisplayPath } from '@ui/utils';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 import { getBaseName, getParentPath } from '@shared/path-utils';

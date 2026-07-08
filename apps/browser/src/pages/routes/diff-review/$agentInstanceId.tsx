@@ -42,7 +42,7 @@ import {
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn, stripMountPrefix } from '@ui/utils';
-import { IconArrowUpRightOutline18 } from 'nucleo-ui-outline-18';
+import { IconArrowUpRightOutline18 } from '@stagewise/icons';
 
 export const Route = createFileRoute('/diff-review/$agentInstanceId')({
   component: Page,

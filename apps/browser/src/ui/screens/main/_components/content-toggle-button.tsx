@@ -8,7 +8,7 @@ import {
 import {
   IconSidebarRightHideOutline18,
   IconSidebarRightShowOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { useContentCollapsed } from './content-collapsed-context';
 

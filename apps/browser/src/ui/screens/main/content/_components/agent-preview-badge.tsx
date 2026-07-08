@@ -1,5 +1,5 @@
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconSidebarLeftShowOutline18 } from 'nucleo-ui-outline-18';
+import { IconSidebarLeftShowOutline18 } from '@stagewise/icons';
 import {
   Tooltip,
   TooltipTrigger,

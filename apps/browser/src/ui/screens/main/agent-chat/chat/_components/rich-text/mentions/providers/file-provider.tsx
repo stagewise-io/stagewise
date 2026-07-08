@@ -1,5 +1,5 @@
 import { FileIcon } from '@ui/components/file-icon';
-import { IconFolder5Outline18 } from 'nucleo-ui-outline-18';
+import { IconFolder5Outline18 } from '@stagewise/icons';
 import type { MentionProvider, MentionContext } from './types';
 import type { FileMentionItem } from '../types';
 import type { MentionFileCandidate } from '@shared/karton-contracts/ui/agent/metadata';

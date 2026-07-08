@@ -22,8 +22,8 @@ import {
   LoaderCircleIcon,
   ScrollTextIcon,
 } from 'lucide-react';
-import { IconGithub } from 'nucleo-social-media';
-import { IconRefreshAnticlockwiseOutline18 } from 'nucleo-ui-outline-18';
+import { IconGithub } from '@stagewise/icons';
+import { IconRefreshAnticlockwiseOutline18 } from '@stagewise/icons';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import agplLicenseText from '@assets/agpl-3.0-license.txt?raw';

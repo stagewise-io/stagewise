@@ -107,7 +107,7 @@ import {
   IconSquareDashedOutline18,
   IconTrashOutline18,
   IconTriangleWarningOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { extractTipTapText, firstWords } from '@ui/utils/text-utils';
 import { cn } from '@ui/utils';
 import { useEmptyAgentId } from '@ui/hooks/use-empty-agent';

@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import {
   IconFolder5Outline18,
   IconCodeBranchOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { FileIcon } from '@ui/components/file-icon';
 import { cn, stripMountPrefix } from '@ui/utils';
 import {

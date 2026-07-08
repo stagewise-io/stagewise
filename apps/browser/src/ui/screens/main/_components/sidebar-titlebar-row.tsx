@@ -14,7 +14,7 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { HotkeyActions } from '@shared/hotkeys';
-import { IconPenPlusOutline18 } from 'nucleo-ui-outline-18';
+import { IconPenPlusOutline18 } from '@stagewise/icons';
 import { useKartonState } from '@ui/hooks/use-karton';
 
 /**

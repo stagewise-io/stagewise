@@ -1,5 +1,5 @@
 import { useCallback, useEffect, type ReactNode } from 'react';
-import { IconPinTackFill18 } from 'nucleo-ui-fill-18';
+import { IconPinTackFill18 } from '@stagewise/icons';
 import { useInlineTitleEdit } from '../../_lib/use-inline-title-edit';
 import { cn } from '@ui/utils';
 import type {

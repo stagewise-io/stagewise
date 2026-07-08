@@ -9,7 +9,7 @@ import {
   IconChevronReduceYOutline18,
   IconLoader6Outline18,
   IconArrowUpRightOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { cn, stripMountPrefix } from '@ui/utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useDiffLines } from '@ui/hooks/use-diff-lines';

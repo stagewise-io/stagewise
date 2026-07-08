@@ -1,4 +1,4 @@
-import { IconFolder5Outline18 } from 'nucleo-ui-outline-18';
+import { IconFolder5Outline18 } from '@stagewise/icons';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { MentionProvider, MentionContext } from './types';
 import type { WorkspaceMentionItem } from '../types';

@@ -3,7 +3,7 @@ import {
   IconFolder5Outline18,
   IconGear3Outline18,
   IconMsgWritingOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import type { ComponentType } from 'react';
 import { ShortcutKey } from '@stagewise/stage-ui/components/shortcut-key';
 import { cn } from '@ui/utils';

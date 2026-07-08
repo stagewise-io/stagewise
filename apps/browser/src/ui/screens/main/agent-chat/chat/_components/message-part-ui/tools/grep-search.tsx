@@ -1,6 +1,6 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { IconSearchContentOutline18 } from 'nucleo-ui-outline-18';
+import { IconSearchContentOutline18 } from '@stagewise/icons';
 
 export const GrepSearchToolPart = ({
   part,

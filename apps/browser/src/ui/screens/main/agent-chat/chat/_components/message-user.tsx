@@ -48,7 +48,7 @@ import {
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import type { Content } from '@tiptap/core';
-import { IconMagicWandSparkle } from 'nucleo-micro-bold';
+import { IconMagicWandSparkle } from '@stagewise/icons';
 import { MessageUserPlanAction } from './message-user-plan-action';
 
 type UserMessage = AgentMessage & { role: 'user' };

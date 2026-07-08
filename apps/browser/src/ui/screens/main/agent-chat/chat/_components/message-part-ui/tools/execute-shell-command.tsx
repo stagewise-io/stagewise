@@ -3,7 +3,7 @@ import {
   IconTerminalOutline18,
   IconTriangleWarningOutline18,
   IconXmarkOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useCallback, useMemo, useRef } from 'react';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';

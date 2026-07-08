@@ -5,12 +5,12 @@ import {
   IconHistoryFillDuo18,
   IconNoteFillDuo18,
   IconSpace3dFillDuo18,
-} from 'nucleo-ui-fill-duo-18';
+} from '@stagewise/icons';
 import {
   IconBranchOutOutline18,
   IconKey2Outline18,
   IconServerOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { PaletteIcon } from 'lucide-react';
 import type { SettingCommandItem } from '../command-center-model';
 import {

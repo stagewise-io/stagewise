@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { cn } from '@ui/utils';
-import { IconTriangleWarning } from 'nucleo-micro-bold';
-import { IconLockKeyOutline18 } from 'nucleo-ui-outline-18';
+import { IconTriangleWarning } from '@stagewise/icons';
+import { IconLockKeyOutline18 } from '@stagewise/icons';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   RefreshCcwIcon,

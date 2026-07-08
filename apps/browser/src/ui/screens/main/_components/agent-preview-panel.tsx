@@ -15,7 +15,7 @@ import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import {
   IconCodeBranchOutline18,
   IconFolder5Outline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 
 /** Resolved preview data displayed in the side panel. */
 export type PreviewData = {

@@ -29,7 +29,7 @@ import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
 import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { HotkeyActions } from '@shared/hotkeys';
-import { IconHelpChatOutline18 } from 'nucleo-ui-outline-18';
+import { IconHelpChatOutline18 } from '@stagewise/icons';
 
 /**
  * Module-level store for the current form draft answers.

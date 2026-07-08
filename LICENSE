@@ -659,3 +659,20 @@ specific requirements.
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
+
+                    THIRD-PARTY ICON ADDENDUM
+
+  This project includes icon assets from the Nucleo Icon Library
+  (https://nucleoapp.com) within the @stagewise/icons package. These icons
+  are © Nucleo Team and are NOT covered by the AGPL-3.0 license above.
+
+  The Nucleo icons are included under the terms of use permitted by the
+  Nucleo Team for licensed customers. They are NOT open source and are NOT
+  freely redistributable. They may only be used within the stagewise project
+  and MAY NOT be extracted, copied, redistributed, or used in any other
+  project, product, or repository.
+
+  Any use of Nucleo icons outside of this project requires obtaining an
+  appropriate license directly from Nucleo (https://nucleoapp.com).
+
+  For full details, see the @stagewise/icons package LICENSE file.

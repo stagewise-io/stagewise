@@ -1,0 +1,40 @@
+ICON LICENSE NOTICE
+===================
+
+This package (@stagewise/icons) contains icon assets from multiple sources,
+each governed by their respective license terms.
+
+NUCLEO ICONS
+------------
+
+The majority of icons in the `nucleo/` directory are sourced from the Nucleo
+Icon Library (https://nucleoapp.com) and are © Nucleo Team.
+
+These icons are included in this repository under the terms of use permitted
+by the Nucleo Team for licensed customers of Nucleo. The Nucleo icons are
+NOT open source and are NOT freely redistributable.
+
+RESTRICTIONS:
+- Nucleo icons may only be used within the stagewise project as permitted by
+  the Nucleo license terms applicable to the stagewise project.
+- Nucleo icons MAY NOT be extracted, copied, redistributed, or used in any
+  other project, product, or repository by outside users.
+- Any use of Nucleo icons outside of this project requires obtaining an
+  appropriate license directly from Nucleo (https://nucleoapp.com).
+
+For full license terms, refer to the Nucleo license agreement at
+https://nucleoapp.com/license.
+
+CUSTOM ICONS
+------------
+
+Icons in the `custom/` directory are original works created by the stagewise
+team and are © stagewise Inc. These icons are licensed under the same terms
+as the stagewise project (AGPL-3.0-only).
+
+NO WARRANTY
+-----------
+
+This package is provided "as is" without warranty of any kind. The inclusion
+of third-party icon assets does not grant any rights beyond those explicitly
+stated in their respective license terms.

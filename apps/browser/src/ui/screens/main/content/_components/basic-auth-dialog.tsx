@@ -14,7 +14,7 @@ import {
 } from '@stagewise/stage-ui/components/form';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import type { AuthenticationRequest } from '@shared/karton-contracts/ui';
-import { IconLockKeyFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconLockKeyFillDuo18 } from '@stagewise/icons';
 import {
   Dialog,
   DialogContent,

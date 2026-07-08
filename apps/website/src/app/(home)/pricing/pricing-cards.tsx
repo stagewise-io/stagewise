@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { IconCheckOutline18 } from 'nucleo-ui-outline-18';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { IconCheckOutline18 } from '@stagewise/icons';
+import { IconArrowRightFill18 } from '@stagewise/icons';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';

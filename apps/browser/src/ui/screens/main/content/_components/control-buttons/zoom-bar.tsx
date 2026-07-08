@@ -3,7 +3,7 @@ import { Button } from '@stagewise/stage-ui/components/button';
 import {
   IconMagnifierMinusOutline18,
   IconMagnifierPlusOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import {
   Tooltip,

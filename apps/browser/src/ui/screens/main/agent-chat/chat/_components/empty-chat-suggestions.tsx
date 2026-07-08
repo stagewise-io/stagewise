@@ -5,8 +5,8 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { IconXmarkFill18 } from 'nucleo-ui-fill-18';
-import { IconFolder5Outline18 } from 'nucleo-ui-outline-18';
+import { IconXmarkFill18 } from '@stagewise/icons';
+import { IconFolder5Outline18 } from '@stagewise/icons';
 
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';

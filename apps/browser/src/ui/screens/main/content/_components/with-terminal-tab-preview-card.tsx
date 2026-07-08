@@ -8,7 +8,7 @@ import type { ReactElement } from 'react';
 import {
   IconFolderOpenOutline18,
   IconSquareTerminalOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 
 function TerminalMetadataBlock({
   icon,

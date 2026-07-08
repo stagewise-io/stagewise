@@ -10,8 +10,8 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconArrowRotateAnticlockwise,
-} from 'nucleo-micro-bold';
-import { IconMediaStopFill18 } from 'nucleo-ui-fill-18';
+} from '@stagewise/icons';
+import { IconMediaStopFill18 } from '@stagewise/icons';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 
