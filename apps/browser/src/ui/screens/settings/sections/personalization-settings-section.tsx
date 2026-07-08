@@ -1,15 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { Slider } from '@stagewise/stage-ui/components/slider';
 import { PERSONALIZATION_THEMES } from '@shared/personalization-themes';
-import type {
-  AppColorScheme,
-  PersonalizationThemeId,
-} from '@shared/karton-contracts/ui/shared-types';
+import type { AppColorScheme } from '@shared/karton-contracts/ui/shared-types';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { useTrack } from '@ui/hooks/use-track';
-import { applyPersonalizationThemeToRoot } from '@ui/components/personalization-theme-syncer';
+import { useThemeSelection } from '@ui/hooks/use-theme-selection';
 import { ThemeBadge } from '@ui/components/theme-badge';
 import { produceWithPatches, enablePatches } from 'immer';
 import { NotificationsSetting } from './general-settings-section';
@@ -149,78 +145,7 @@ function AppColorSchemeSetting() {
 }
 
 function ThemeSetting() {
-  const persistedThemeId = useKartonState(
-    (s) => s.globalConfig.personalizationThemeId,
-  );
-  const setGlobalConfig = useKartonProcedure((p) => p.config.set);
-  const track = useTrack();
-  const latestSaveRequestIdRef = useRef(0);
-  const latestRequestedThemeIdRef = useRef<PersonalizationThemeId | undefined>(
-    undefined,
-  );
-  const [currentThemeId, setCurrentThemeId] = useState(persistedThemeId);
-  const currentThemeIdRef = useRef(persistedThemeId);
-  const persistedThemeIdRef = useRef(persistedThemeId);
-  persistedThemeIdRef.current = persistedThemeId;
-
-  const setCurrentTheme = (themeId: PersonalizationThemeId) => {
-    currentThemeIdRef.current = themeId;
-    setCurrentThemeId(themeId);
-  };
-
-  useEffect(() => {
-    const latestRequestedThemeId = latestRequestedThemeIdRef.current;
-
-    if (latestRequestedThemeId !== undefined) {
-      if (persistedThemeId !== latestRequestedThemeId) {
-        return;
-      }
-
-      latestRequestedThemeIdRef.current = undefined;
-    }
-
-    setCurrentTheme(persistedThemeId);
-  }, [persistedThemeId]);
-
-  const handleThemeChange = async (value: unknown) => {
-    if (
-      typeof value !== 'string' ||
-      !PERSONALIZATION_THEMES.some((theme) => theme.id === value)
-    ) {
-      return;
-    }
-
-    const nextThemeId = value as PersonalizationThemeId;
-    const previousThemeId = currentThemeIdRef.current;
-
-    if (nextThemeId === previousThemeId) {
-      return;
-    }
-
-    const saveRequestId = latestSaveRequestIdRef.current + 1;
-    latestSaveRequestIdRef.current = saveRequestId;
-    latestRequestedThemeIdRef.current = nextThemeId;
-
-    setCurrentTheme(nextThemeId);
-    applyPersonalizationThemeToRoot(nextThemeId, { transition: true });
-
-    try {
-      await setGlobalConfig({
-        personalizationThemeId: nextThemeId,
-      });
-      track('changed-theme', { theme: nextThemeId });
-    } catch (error) {
-      if (latestSaveRequestIdRef.current !== saveRequestId) {
-        return;
-      }
-
-      latestRequestedThemeIdRef.current = undefined;
-      const groundTruth = persistedThemeIdRef.current;
-      setCurrentTheme(groundTruth);
-      applyPersonalizationThemeToRoot(groundTruth, { transition: true });
-      console.error('Failed to save personalization theme', error);
-    }
-  };
+  const { currentThemeId, handleThemeChange } = useThemeSelection();
 
   return (
     <div className="space-y-4">

@@ -1,25 +1,17 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { PERSONALIZATION_THEMES } from '@shared/personalization-themes';
-import type { PersonalizationThemeId } from '@shared/karton-contracts/ui/shared-types';
-import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useTrack } from '@ui/hooks/use-track';
-import { applyPersonalizationThemeToRoot } from '@ui/components/personalization-theme-syncer';
+import { useThemeSelection } from '@ui/hooks/use-theme-selection';
+import {
+  useSoundSettings,
+  NOTIFICATION_LOUDNESS_OPTIONS,
+} from '@ui/hooks/use-sound-settings';
 import { ThemeBadge } from '@ui/components/theme-badge';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
 import { PlayIcon } from 'lucide-react';
-
-const DEFAULT_SOUND_PACK = 'bubble-pops';
-const NOTIFICATION_LOUDNESS_OPTIONS = [
-  { value: 'off', label: 'Off' },
-  { value: 'subtle', label: 'Subtle' },
-  { value: 'default', label: 'Loud' },
-] as const;
-
-type SoundLoudness = (typeof NOTIFICATION_LOUDNESS_OPTIONS)[number]['value'];
 
 export function StepTheme({
   onNext,
@@ -58,78 +50,7 @@ export function StepTheme({
 }
 
 function ThemeSelection() {
-  const persistedThemeId = useKartonState(
-    (s) => s.globalConfig.personalizationThemeId,
-  );
-  const setGlobalConfig = useKartonProcedure((p) => p.config.set);
-  const track = useTrack();
-  const latestSaveRequestIdRef = useRef(0);
-  const latestRequestedThemeIdRef = useRef<PersonalizationThemeId | undefined>(
-    undefined,
-  );
-  const [currentThemeId, setCurrentThemeId] = useState(persistedThemeId);
-  const currentThemeIdRef = useRef(persistedThemeId);
-  const persistedThemeIdRef = useRef(persistedThemeId);
-  persistedThemeIdRef.current = persistedThemeId;
-
-  const setCurrentTheme = (themeId: PersonalizationThemeId) => {
-    currentThemeIdRef.current = themeId;
-    setCurrentThemeId(themeId);
-  };
-
-  useEffect(() => {
-    const latestRequestedThemeId = latestRequestedThemeIdRef.current;
-
-    if (latestRequestedThemeId !== undefined) {
-      if (persistedThemeId !== latestRequestedThemeId) {
-        return;
-      }
-
-      latestRequestedThemeIdRef.current = undefined;
-    }
-
-    setCurrentTheme(persistedThemeId);
-  }, [persistedThemeId]);
-
-  const handleThemeChange = async (value: unknown) => {
-    if (
-      typeof value !== 'string' ||
-      !PERSONALIZATION_THEMES.some((theme) => theme.id === value)
-    ) {
-      return;
-    }
-
-    const nextThemeId = value as PersonalizationThemeId;
-    const previousThemeId = currentThemeIdRef.current;
-
-    if (nextThemeId === previousThemeId) {
-      return;
-    }
-
-    const saveRequestId = latestSaveRequestIdRef.current + 1;
-    latestSaveRequestIdRef.current = saveRequestId;
-    latestRequestedThemeIdRef.current = nextThemeId;
-
-    setCurrentTheme(nextThemeId);
-    applyPersonalizationThemeToRoot(nextThemeId, { transition: true });
-
-    try {
-      await setGlobalConfig({
-        personalizationThemeId: nextThemeId,
-      });
-      track('changed-theme', { theme: nextThemeId });
-    } catch (error) {
-      if (latestSaveRequestIdRef.current !== saveRequestId) {
-        return;
-      }
-
-      latestRequestedThemeIdRef.current = undefined;
-      const groundTruth = persistedThemeIdRef.current;
-      setCurrentTheme(groundTruth);
-      applyPersonalizationThemeToRoot(groundTruth, { transition: true });
-      console.error('Failed to save personalization theme', error);
-    }
-  };
+  const { currentThemeId, handleThemeChange } = useThemeSelection();
 
   const themeIds = PERSONALIZATION_THEMES.map((t) => t.id);
 
@@ -161,7 +82,7 @@ function ThemeSelection() {
         }
       }
     },
-    [themeIds],
+    [themeIds, handleThemeChange],
   );
 
   return (
@@ -194,79 +115,15 @@ function ThemeSelection() {
 }
 
 function SoundSelection() {
-  const globalConfig = useKartonState((s) => s.globalConfig);
-  const soundPacks = useKartonState((s) => s.notificationSoundPacks);
-  const setGlobalConfig = useKartonProcedure((p) => p.config.set);
-  const previewSoundPack = useKartonProcedure((p) => p.config.previewSoundPack);
-  const track = useTrack();
-
-  const soundLoudness: SoundLoudness =
-    globalConfig.notificationSoundLoudness ??
-    (globalConfig.notificationSoundsEnabled === false ? 'off' : 'subtle');
-  const availablePacks =
-    soundPacks.available.length > 0
-      ? soundPacks.available
-      : [DEFAULT_SOUND_PACK];
-  const configuredPack = globalConfig.notificationSoundPack?.trim();
-  const currentPack =
-    configuredPack && availablePacks.includes(configuredPack)
-      ? configuredPack
-      : availablePacks[0]!;
-  const packOptions = availablePacks;
-  const loudnessIndex = Math.max(
-    0,
-    NOTIFICATION_LOUDNESS_OPTIONS.findIndex(
-      (option) => option.value === soundLoudness,
-    ),
-  );
-
-  const soundPackItems = packOptions.map((pack) => ({
-    value: pack,
-    label: soundPacks.displayNames[pack] ?? pack,
-  }));
-
-  const previewSound = (pack = currentPack, loudness = soundLoudness) => {
-    if (loudness === 'off') return;
-    void previewSoundPack(pack, loudness).catch(() => {});
-  };
-
-  const handleLoudnessChange = async (value: number) => {
-    const index = Math.max(
-      0,
-      Math.min(NOTIFICATION_LOUDNESS_OPTIONS.length - 1, Math.round(value)),
-    );
-    const notificationSoundLoudness =
-      NOTIFICATION_LOUDNESS_OPTIONS[index]?.value ?? 'subtle';
-
-    previewSound(currentPack, notificationSoundLoudness);
-
-    try {
-      await setGlobalConfig({
-        notificationSoundsEnabled: notificationSoundLoudness !== 'off',
-        notificationSoundLoudness,
-      });
-      track('changed-notification-sound-loudness', {
-        loudness: notificationSoundLoudness,
-      });
-    } catch (error) {
-      console.error('Failed to save sound loudness', error);
-    }
-  };
-
-  const handleSoundPackChange = async (value: unknown) => {
-    if (typeof value !== 'string' || !packOptions.includes(value)) return;
-    previewSound(value, soundLoudness);
-    try {
-      await setGlobalConfig({
-        notificationSoundPack: value,
-      });
-      track('changed-notification-sound-theme', {
-        theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
-      });
-    } catch (error) {
-      console.error('Failed to save sound pack', error);
-    }
-  };
+  const {
+    soundLoudness,
+    currentPack,
+    soundPackItems,
+    loudnessIndex,
+    previewSound,
+    handleLoudnessChange,
+    handleSoundPackChange,
+  } = useSoundSettings();
 
   return (
     <div className="flex flex-wrap justify-center gap-24">

@@ -3,7 +3,6 @@ import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollb
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useState, useCallback, useRef } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import { useTrack } from '@ui/hooks/use-track';
 import { produceWithPatches, enablePatches } from 'immer';
 
 import {
@@ -14,6 +13,7 @@ import type { CustomEndpoint } from '@shared/karton-contracts/ui/shared-types';
 import {
   CustomEndpointForm,
   CustomEndpointCard,
+  type CustomEndpointFormHandle,
   type EndpointSaveData,
 } from '@ui/screens/settings/sections/custom-providers-section';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
@@ -154,15 +154,21 @@ export function StepCustomEndpoints({
     ],
   );
 
-  const track = useTrack();
+  const formRef = useRef<CustomEndpointFormHandle>(null);
 
-  const handleCancel = useCallback(() => {
-    if (!editingEndpoint) {
-      track('custom-provider-add-aborted');
-    }
+  // Closes the form sub-view. Called by the form's onCancel (which
+  // is invoked after the form fires its own abort telemetry).
+  const closeForm = useCallback(() => {
     setFormOpen(false);
     setEditingEndpoint(undefined);
-  }, [editingEndpoint, track]);
+  }, []);
+
+  // Back button: route through the form's cancel so the rich abort
+  // telemetry (validation errors, touched state, URL props) fires,
+  // then closeForm runs via the form's onCancel callback.
+  const handleBack = useCallback(() => {
+    formRef.current?.cancel();
+  }, []);
 
   const handleDelete = useCallback(
     async (endpointId: string) => {
@@ -194,7 +200,7 @@ export function StepCustomEndpoints({
           contentClassName="flex flex-col gap-4 px-8 pt-8 pb-8"
         >
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon-sm" onClick={handleCancel}>
+            <Button variant="ghost" size="icon-sm" onClick={handleBack}>
               <IconChevronLeftOutline18 className="size-4" />
             </Button>
             <h2 className="font-medium text-foreground text-sm">
@@ -202,9 +208,11 @@ export function StepCustomEndpoints({
             </h2>
           </div>
           <CustomEndpointForm
+            ref={formRef}
             endpoint={editingEndpoint}
             open={formOpen}
             onSave={handleSave}
+            onCancel={closeForm}
             showFooterDivider={false}
           />
         </OverlayScrollbar>

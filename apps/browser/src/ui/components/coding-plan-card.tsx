@@ -281,7 +281,13 @@ export function CodingPlanCard({
   );
 }
 
-function TruncatedErrorText({ id, text }: { id?: string; text: string }) {
+export function TruncatedErrorText({
+  id,
+  text,
+}: {
+  id?: string;
+  text: string;
+}) {
   const ref = useRef<HTMLParagraphElement>(null);
   const { isTruncated, tooltipOpen, setTooltipOpen } = useIsTruncated(ref);
 

@@ -1,7 +1,14 @@
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 
 import type {
   ApiSpec,
@@ -578,29 +585,38 @@ function ProviderSpecificFields({
   }
 }
 
-export function CustomEndpointForm({
-  endpoint,
-  onSave,
-  onCancel,
-  open,
-  showFooterDivider = true,
-}: {
-  endpoint?: CustomEndpoint;
-  onSave: (data: EndpointSaveData) => void | Promise<void>;
-  onCancel?: () => void;
+export type CustomEndpointFormHandle = {
   /**
-   * When provided (dialog mode), the form resets whenever `open` flips
-   * to true. When omitted (inline mode), the form initializes from
-   * `endpoint` on mount and never resets.
+   * Triggers the form's internal cancel flow, including abort
+   * telemetry with validation context. Call from external
+   * cancel/back buttons to ensure the telemetry path is shared.
    */
-  open?: boolean;
-  /**
-   * When true (default), renders a top border separating the footer
-   * from the form body. Set to false for inline contexts where the
-   * surrounding layout already provides visual separation.
-   */
-  showFooterDivider?: boolean;
-}) {
+  cancel: () => void;
+};
+
+export const CustomEndpointForm = forwardRef<
+  CustomEndpointFormHandle,
+  {
+    endpoint?: CustomEndpoint;
+    onSave: (data: EndpointSaveData) => void | Promise<void>;
+    onCancel?: () => void;
+    /**
+     * When provided (dialog mode), the form resets whenever `open` flips
+     * to true. When omitted (inline mode), the form initializes from
+     * `endpoint` on mount and never resets.
+     */
+    open?: boolean;
+    /**
+     * When true (default), renders a top border separating the footer
+     * from the form body. Set to false for inline contexts where the
+     * surrounding layout already provides visual separation.
+     */
+    showFooterDivider?: boolean;
+  }
+>(function CustomEndpointForm(
+  { endpoint, onSave, onCancel, open, showFooterDivider = true },
+  ref,
+) {
   const track = useTrack();
   // `telemetryLevel` gates whether the raw `baseUrl` is forwarded. At
   // `full` the user has consented to detailed analytics; at `basic` we
@@ -904,7 +920,7 @@ export function CustomEndpointForm({
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     if (isAddMode && !savedRef.current) {
       track('custom-provider-add-aborted', {
         had_validation_errors: hadValidationErrors,
@@ -913,7 +929,9 @@ export function CustomEndpointForm({
       });
     }
     onCancel?.();
-  };
+  }, [isAddMode, track, hadValidationErrors, anyFieldTouched, onCancel]);
+
+  useImperativeHandle(ref, () => ({ cancel: handleCancel }), [handleCancel]);
 
   return (
     <div className="space-y-4">
@@ -1063,7 +1081,7 @@ export function CustomEndpointForm({
       </div>
     </div>
   );
-}
+});
 
 function CustomEndpointDialog({
   endpoint,
