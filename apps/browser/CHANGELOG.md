@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0 (2026-07-08)
+
+### Features
+
+* parse and render subscription-required error for free-tier users (47538d9)
+
 ## 1.17.0 (2026-07-07)
 
 ### Features
