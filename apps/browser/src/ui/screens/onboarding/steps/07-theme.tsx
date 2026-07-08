@@ -195,6 +195,7 @@ function ThemeSelection() {
 
 function SoundSelection() {
   const globalConfig = useKartonState((s) => s.globalConfig);
+  const soundPacks = useKartonState((s) => s.notificationSoundPacks);
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
   const previewSoundPack = useKartonProcedure((p) => p.config.previewSoundPack);
   const track = useTrack();
@@ -203,8 +204,8 @@ function SoundSelection() {
     globalConfig.notificationSoundLoudness ??
     (globalConfig.notificationSoundsEnabled === false ? 'off' : 'subtle');
   const availablePacks =
-    globalConfig.availableSoundPacks.length > 0
-      ? globalConfig.availableSoundPacks
+    soundPacks.available.length > 0
+      ? soundPacks.available
       : [DEFAULT_SOUND_PACK];
   const configuredPack = globalConfig.notificationSoundPack?.trim();
   const currentPack =
@@ -221,7 +222,7 @@ function SoundSelection() {
 
   const soundPackItems = packOptions.map((pack) => ({
     value: pack,
-    label: globalConfig.packDisplayNames[pack] ?? pack,
+    label: soundPacks.displayNames[pack] ?? pack,
   }));
 
   const previewSound = (pack = currentPack, loudness = soundLoudness) => {
