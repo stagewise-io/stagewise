@@ -17,7 +17,7 @@ import {
   IconFileSearchOutline18,
   IconFolder5Outline18,
   IconFolderSearchOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HotkeyActions } from '@shared/hotkeys';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';

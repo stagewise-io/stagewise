@@ -1,5 +1,5 @@
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
-import { IconXmarkOutline18, IconBrainOutline18 } from 'nucleo-ui-outline-18';
+import { IconXmarkOutline18, IconBrainOutline18 } from '@stagewise/icons';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Combobox,
@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import type { BuiltInModel, ModelId } from '@shared/available-models';
-import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
+import { IconChevronDownFill18 } from '@stagewise/icons';
 import {
   getAvailableModel,
   getModelAlias,

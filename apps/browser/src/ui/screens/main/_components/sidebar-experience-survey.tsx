@@ -6,7 +6,7 @@ import {
   IconVideoOutline18,
   IconThumbsUpOutline18,
   IconThumbsDownOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { SidebarToast } from './sidebar-toast';
 
 const MESSAGE_THRESHOLD = 5;

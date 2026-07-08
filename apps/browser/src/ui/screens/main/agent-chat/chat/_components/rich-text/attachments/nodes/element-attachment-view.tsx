@@ -25,7 +25,7 @@ import {
 import {
   IconArrowUpRightOutline18,
   IconOpenExternalOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import type { ElementAttachmentAttrs } from '../types';
 import type { InlineNodeViewProps } from '../../shared/types';
 import { truncateLabel, InlineBadge, InlineBadgeWrapper } from '../../shared';

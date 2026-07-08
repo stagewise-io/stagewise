@@ -1,6 +1,6 @@
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { getNewsTypeBadgeLabel, type NewsType } from '@/lib/news';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { IconArrowRightFill18 } from '@stagewise/icons';
 import Link from 'next/link';
 
 interface NewsPost {

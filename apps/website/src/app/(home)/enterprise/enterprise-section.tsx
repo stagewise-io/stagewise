@@ -8,8 +8,8 @@ import {
   IconCheckOutline18,
   IconPhoneOutline18,
   IconArrowRightOutline18,
-} from 'nucleo-ui-outline-18';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+} from '@stagewise/icons';
+import { IconArrowRightFill18 } from '@stagewise/icons';
 import { submitEnterpriseInquiry, type EnterpriseFormErrors } from './actions';
 
 const MIN_LENGTH = { name: 2, company: 2, position: 2, problem: 3 };

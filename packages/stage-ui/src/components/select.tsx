@@ -4,7 +4,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 import { handleCtrlNavKeys } from '../lib/keyboard-nav';
 import { OverlayScrollbar } from './overlay-scrollbar';
-import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
+import { IconChevronDownFill18 } from '@stagewise/icons';
 
 // ============================================================================
 // Types

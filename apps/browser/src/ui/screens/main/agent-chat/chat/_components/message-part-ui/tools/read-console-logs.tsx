@@ -1,8 +1,5 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
-import {
-  IconXmarkOutline18,
-  IconTerminalOutline18,
-} from 'nucleo-ui-outline-18';
+import { IconXmarkOutline18, IconTerminalOutline18 } from '@stagewise/icons';
 import { useMemo } from 'react';
 import {
   Tooltip,

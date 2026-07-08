@@ -26,7 +26,7 @@ import {
 import {
   IconChevronLeftOutline18,
   IconChevronRightOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import type { StepValidityCallback } from '../index';
 import type {
   ModelProvider,

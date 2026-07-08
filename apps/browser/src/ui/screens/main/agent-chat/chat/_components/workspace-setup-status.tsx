@@ -11,7 +11,7 @@ import { FileIcon } from '@ui/components/file-icon';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { getBaseName } from '@shared/path-utils';
 import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
-import { IconTriangleWarningOutline18 } from 'nucleo-ui-outline-18';
+import { IconTriangleWarningOutline18 } from '@stagewise/icons';
 import { Loader2Icon } from 'lucide-react';
 
 function formatSetupDuration(ms: number): string {

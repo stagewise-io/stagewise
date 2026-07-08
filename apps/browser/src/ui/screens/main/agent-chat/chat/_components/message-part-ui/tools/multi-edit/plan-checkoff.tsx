@@ -6,7 +6,7 @@ import { parsePlanContent } from '@stagewise/agent-core/plans';
 import { getBaseName } from '@shared/path-utils';
 import { stripMountPrefix } from '@ui/utils';
 import { ToolPartUINotCollapsible } from '../shared/tool-part-ui-not-collapsible';
-import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
+import { IconClipboardContentOutline18 } from '@stagewise/icons';
 
 /**
  * Compact tool-part UI for plan checkbox toggles.

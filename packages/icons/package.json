@@ -1,0 +1,28 @@
+{
+  "name": "@stagewise/icons",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./nucleo": "./src/nucleo/index.ts",
+    "./nucleo/*": "./src/nucleo/*/index.ts",
+    "./custom": "./src/custom/index.ts",
+    "./custom/*": "./src/custom/*/index.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.3"
+  }
+}

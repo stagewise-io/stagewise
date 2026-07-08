@@ -13,7 +13,7 @@ import {
   IconChevronReduceYOutline18,
   IconLoader6Outline18,
   IconArrowUpRightOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { DiffPreview } from '../shared/diff-preview';

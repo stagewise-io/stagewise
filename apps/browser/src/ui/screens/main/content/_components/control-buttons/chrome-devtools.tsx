@@ -1,6 +1,6 @@
 import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
-import { IconSquareCodeOutline18 } from 'nucleo-ui-outline-18';
+import { IconSquareCodeOutline18 } from '@stagewise/icons';
 import type { TabState } from '@shared/karton-contracts/ui';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {

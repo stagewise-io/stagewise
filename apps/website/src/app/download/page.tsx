@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconDownload4FillDuo18 } from '@stagewise/icons';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Navbar } from '../(home)/navbar';

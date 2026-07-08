@@ -1,6 +1,6 @@
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { IconGithub } from 'nucleo-social-media';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { IconGithub } from '@stagewise/icons';
+import { IconArrowRightFill18 } from '@stagewise/icons';
 import { getAllJobs } from '@/lib/source';
 import Image from 'next/image';
 import Link from 'next/link';

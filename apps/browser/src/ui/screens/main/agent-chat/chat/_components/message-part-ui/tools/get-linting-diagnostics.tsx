@@ -3,7 +3,7 @@ import {
   IconCheck2Outline18,
   IconLoader6Outline18,
   IconXmarkOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useMemo } from 'react';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { cn, stripMountPrefix } from '@ui/utils';

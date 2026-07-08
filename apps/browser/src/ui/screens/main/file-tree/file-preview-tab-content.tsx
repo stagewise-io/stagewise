@@ -28,7 +28,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { IconDatabaseFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconDatabaseFillDuo18 } from '@stagewise/icons';
 import type { FileDiffContent } from '@shared/karton-contracts/ui';
 import {
   Loader2Icon,
@@ -51,7 +51,7 @@ import {
   IconTextBgColorOutline18,
   IconTextColorOutline18,
   IconUndoOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { Menu as MenuBase } from '@base-ui/react/menu';
 import MonacoEditor, { DiffEditor } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';

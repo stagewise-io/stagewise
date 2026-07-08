@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { IconMagnifierOutline18 } from 'nucleo-ui-outline-18';
+import { IconMagnifierOutline18 } from '@stagewise/icons';
 import type { CommandCenterMode } from '../command-center-model';
 import { CommandCenterModeToggle } from './command-center-mode-toggle';
 

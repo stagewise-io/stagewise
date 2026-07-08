@@ -5,7 +5,7 @@ import {
   IconLoader6Outline18,
   IconXmarkOutline18,
   IconFolder5Outline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { FileIcon } from '@ui/components/file-icon';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@stagewise/stage-ui/components/skeleton';

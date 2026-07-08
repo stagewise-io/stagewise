@@ -3,7 +3,7 @@ import { ChevronDownIcon } from 'lucide-react';
 import { cn } from '@ui/utils';
 import type { MouseEvent } from 'react';
 import type { StatusCardSection } from './shared';
-import { IconBugOutline18 } from 'nucleo-ui-outline-18';
+import { IconBugOutline18 } from '@stagewise/icons';
 
 export interface LogChannelDisplayEntry {
   filename: string;

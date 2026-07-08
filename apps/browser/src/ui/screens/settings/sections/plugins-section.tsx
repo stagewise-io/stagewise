@@ -22,7 +22,7 @@ import {
   IconPuzzlePieceOutline18,
   IconChevronRightOutline18,
   IconChevronLeftOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 
 enablePatches();
 

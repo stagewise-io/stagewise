@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { IconArrowRightFill18 } from '@stagewise/icons';
 import { getAllNewsPosts } from '@/lib/source';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { HeroSection } from './_components/hero-section';

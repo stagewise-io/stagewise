@@ -1,6 +1,6 @@
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { IconBooks2Outline18 } from 'nucleo-ui-outline-18';
+import { IconBooks2Outline18 } from '@stagewise/icons';
 
 export const ListLibraryDocsToolPart = ({
   part,

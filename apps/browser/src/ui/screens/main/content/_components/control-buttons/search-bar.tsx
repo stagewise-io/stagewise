@@ -1,9 +1,5 @@
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import {
-  IconXmark,
-  IconChevronLeft,
-  IconChevronRight,
-} from 'nucleo-micro-bold';
+import { IconXmark, IconChevronLeft, IconChevronRight } from '@stagewise/icons';
 import {
   useCallback,
   useEffect,
@@ -13,7 +9,7 @@ import {
   type Ref,
 } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconSearchContentOutline18 } from 'nucleo-ui-outline-18';
+import { IconSearchContentOutline18 } from '@stagewise/icons';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyActions } from '@shared/hotkeys';
 import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';

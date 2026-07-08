@@ -4,7 +4,7 @@ import {
   IconBoxSparkleOutline18,
   IconEarthOutline18,
   IconSquareTerminalOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { Logo } from '@ui/components/ui/logo';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2Icon } from 'lucide-react';

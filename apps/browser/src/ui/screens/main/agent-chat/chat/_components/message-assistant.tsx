@@ -34,7 +34,7 @@ import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-quest
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
 import { isToolOrReasoningPart } from './message-utils';
 import { MessageBetweenSteps } from './message-between-steps';
-import { IconDotsOutline18 } from 'nucleo-ui-outline-18';
+import { IconDotsOutline18 } from '@stagewise/icons';
 import {
   Menu,
   MenuTrigger,

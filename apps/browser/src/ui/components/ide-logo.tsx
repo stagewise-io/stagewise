@@ -1,6 +1,6 @@
 import { IDE_LOGOS } from '@ui/assets/ide-logos';
-import { IconFolderContent2FillDuo18 } from 'nucleo-ui-fill-duo-18';
-import { IconFinderFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconFolderContent2FillDuo18 } from '@stagewise/icons';
+import { IconFinderFillDuo18 } from '@stagewise/icons';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
 import { getCurrentPlatform } from '@shared/hotkeys';

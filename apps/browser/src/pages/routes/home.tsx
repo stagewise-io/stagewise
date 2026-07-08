@@ -9,8 +9,8 @@ import type {
   HistoryResult,
 } from '@shared/karton-contracts/pages-api/types';
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconEarthFillDuo18 } from 'nucleo-ui-fill-duo-18';
-import { IconArrowRightOutline18 } from 'nucleo-ui-outline-18';
+import { IconEarthFillDuo18 } from '@stagewise/icons';
+import { IconArrowRightOutline18 } from '@stagewise/icons';
 
 const RECENT_HISTORY_FETCH_LIMIT = 50;
 const MAX_RECENT_ORIGINS = 6;

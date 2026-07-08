@@ -4,7 +4,7 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 import {
   IconTriangleWarningOutline18,
   IconCircleInfoOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { SidebarToast } from '../../../_components/sidebar-toast';
 
 export function NotificationBanners() {

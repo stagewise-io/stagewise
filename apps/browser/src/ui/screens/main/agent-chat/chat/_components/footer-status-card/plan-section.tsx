@@ -6,7 +6,7 @@ import type { MouseEvent } from 'react';
 import type { StatusCardSection } from './shared';
 import type { PlanTask, TaskGroup } from '@stagewise/agent-core/plans';
 import type { PlanUIPhase } from '@shared/plan-lifecycle';
-import { IconClipboardContentOutline18 } from 'nucleo-ui-outline-18';
+import { IconClipboardContentOutline18 } from '@stagewise/icons';
 import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
 import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';

@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { IconArrowRightFill18 } from 'nucleo-ui-fill-18';
+import { IconArrowRightFill18 } from '@stagewise/icons';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 
 import companyAbout from './feature-images/company-about.webp';

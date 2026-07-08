@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconDownload4FillDuo18 } from '@stagewise/icons';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 
 export function DownloadButtons({ className }: { className?: string }) {

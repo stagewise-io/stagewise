@@ -1,5 +1,5 @@
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
-import { IconTriangleWarningFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconTriangleWarningFillDuo18 } from '@stagewise/icons';
 import { cn } from '@pages/utils';
 
 export interface ErrorDisplayProps {

@@ -1,6 +1,6 @@
 import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
 import { CheckIcon, XIcon } from 'lucide-react';
-import { IconChevronDownFill18 } from 'nucleo-ui-fill-18';
+import { IconChevronDownFill18 } from '@stagewise/icons';
 import {
   type ComponentProps,
   type ComponentRef,

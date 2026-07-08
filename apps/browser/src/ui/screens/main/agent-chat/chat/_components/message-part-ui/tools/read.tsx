@@ -7,7 +7,7 @@ import {
   IconBugOutline18,
   IconTerminalOutline18,
   IconVersionsOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { cn, resolveDisplayPath } from '@ui/utils';
 import { useAttachmentMetadata } from '@ui/hooks/use-attachment-metadata';
 import { useKartonState } from '@ui/hooks/use-karton';

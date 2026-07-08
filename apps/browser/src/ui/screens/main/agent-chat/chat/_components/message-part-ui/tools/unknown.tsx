@@ -1,7 +1,7 @@
 import type { DynamicToolUIPart } from 'ai';
 import type { AgentToolUIPart } from '@shared/karton-contracts/ui/agent';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
-import { IconGear2Outline18 } from 'nucleo-ui-outline-18';
+import { IconGear2Outline18 } from '@stagewise/icons';
 
 export const UnknownToolPart = ({
   part,

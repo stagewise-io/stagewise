@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from '@/lib/auth-client';
-import { IconDownload4FillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconDownload4FillDuo18 } from '@stagewise/icons';
 
 function NavDownloadButton() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);

@@ -1,0 +1,59 @@
+import React from 'react';
+import { Icon, type IconProps } from './Icon';
+export const IconClipboardContent: React.FC<IconProps> = ({ ...props }) => {
+  return (
+    <Icon size="20px" {...props}>
+      <line
+        x1="12.5"
+        y1="9"
+        x2="7.5"
+        y2="9"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        data-color="color-2"
+      />
+      <line
+        x1="12.5"
+        y1="13"
+        x2="7.5"
+        y2="13"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        data-color="color-2"
+      />
+      <rect
+        x="4"
+        y="4"
+        width="12"
+        height="13"
+        rx="3"
+        ry="3"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <rect
+        x="8"
+        y="3"
+        width="4"
+        height="2"
+        rx=".25"
+        ry=".25"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        data-color="color-2"
+      />
+    </Icon>
+  );
+};

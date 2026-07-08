@@ -45,11 +45,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from 'nucleo-ui-fill-18';
+import { IconVolumeUpFill18, IconVolumeXmarkFill18 } from '@stagewise/icons';
 import {
   IconPinTackOutline18,
   IconPinTackSlashOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { NewTabButtons } from '../_components/new-tab-buttons';
 import { Tutorial } from '@ui/components/tutorial';
 import { useTutorial } from '@ui/contexts/tutorial';

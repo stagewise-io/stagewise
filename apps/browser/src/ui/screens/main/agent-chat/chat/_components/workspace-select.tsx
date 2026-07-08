@@ -26,7 +26,7 @@ import {
   IconChevronDownFill18,
   IconPlusFill18,
   IconXmarkFill18,
-} from 'nucleo-ui-fill-18';
+} from '@stagewise/icons';
 import {
   IconBranchOutOutline18,
   IconChevronRightOutline18,
@@ -37,7 +37,7 @@ import {
   IconFolderOpenOutline18,
   IconPenDrawSparkleOutline18,
   IconSquareTerminalOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import {
   Tooltip,
   TooltipTrigger,

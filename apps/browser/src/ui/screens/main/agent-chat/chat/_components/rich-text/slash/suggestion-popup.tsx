@@ -15,7 +15,7 @@ import {
   IconClipboardOutline18,
   IconImageSparkle3Outline18,
   IconSideProfileSparkleOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
 import type { SlashItem } from './types';

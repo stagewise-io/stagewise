@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import { IconGlobe2Fill18 } from 'nucleo-ui-fill-18';
+import { IconGlobe2Fill18 } from '@stagewise/icons';
 import { ExternalLinkIcon } from 'lucide-react';
 import { cn } from '@ui/utils';
 import { InlineBadge, InlineBadgeWrapper } from '../shared';

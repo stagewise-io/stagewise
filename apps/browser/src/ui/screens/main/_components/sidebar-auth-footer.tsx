@@ -12,7 +12,7 @@ import {
   IconGear3Outline18,
   IconHotDrinkOutline18,
   IconOpenRectArrowInOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 
 function getPlanLabel(plan: string | undefined): string {
   if (!plan) return 'Free';

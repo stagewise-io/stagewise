@@ -1,5 +1,5 @@
 import { Switch } from '@stagewise/stage-ui/components/switch';
-import { IconPenDrawSparkleFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import { IconPenDrawSparkleFillDuo18 } from '@stagewise/icons';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import {
   useComparingSelector,

@@ -21,9 +21,9 @@ import {
   IconConnection2Outline18,
   IconCheckOutline18,
   IconBanOutline18,
-} from 'nucleo-ui-outline-18';
-import { IconBluetoothOutline24 } from 'nucleo-core-outline-24';
-import { IconUsbOutline24 } from 'nucleo-core-outline-24';
+} from '@stagewise/icons';
+import { IconBluetoothOutline24 } from '@stagewise/icons';
+import { IconUsbOutline24 } from '@stagewise/icons';
 import {
   Popover,
   PopoverTrigger,

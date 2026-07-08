@@ -13,7 +13,7 @@ import {
 import {
   IconPinTackOutline18,
   IconPinTackSlashOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { useInlineTitleEdit } from '../../../_lib/use-inline-title-edit';
 
 function compactTimeAgo(timestamp: number): string {

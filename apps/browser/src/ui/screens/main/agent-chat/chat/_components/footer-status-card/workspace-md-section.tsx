@@ -1,5 +1,5 @@
 import { Button } from '@stagewise/stage-ui/components/button';
-import { IconMediaStopFill18 } from 'nucleo-ui-fill-18';
+import { IconMediaStopFill18 } from '@stagewise/icons';
 import { stripMountPrefix } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
 import { Loader2Icon, XIcon } from 'lucide-react';
