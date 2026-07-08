@@ -13,7 +13,7 @@ function getDefaultAuthCallbackScheme(): AuthCallbackScheme {
     case 'nightly':
       return 'stagewise-nightly';
     case 'dev':
-      return 'stagewise-nightly';
+      return 'stagewise-dev';
     default:
       throw new Error(
         `Unexpected app release channel for auth callback scheme: ${String(__APP_RELEASE_CHANNEL__)}`,
