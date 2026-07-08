@@ -5,7 +5,10 @@ import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { toast } from '@stagewise/stage-ui/components/toaster';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import { useTrack } from '@ui/hooks/use-track';
+import {
+  useSoundSettings,
+  NOTIFICATION_LOUDNESS_OPTIONS,
+} from '@ui/hooks/use-sound-settings';
 import { PlayIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
 
 // =============================================================================
@@ -65,87 +68,21 @@ function PowerSaveBlockerSetting() {
 // Notifications Setting Component
 // =============================================================================
 
-const DEFAULT_SOUND_PACK = 'bubble-pops';
-const NOTIFICATION_LOUDNESS_OPTIONS = [
-  { value: 'off', label: 'Off' },
-  { value: 'subtle', label: 'Subtle' },
-  { value: 'default', label: 'Loud' },
-] as const;
-
-type SoundLoudness = (typeof NOTIFICATION_LOUDNESS_OPTIONS)[number]['value'];
-
 export function NotificationsSetting() {
   const globalConfig = useKartonState((s) => s.globalConfig);
-  const notificationSoundPacks = useKartonState(
-    (s) => s.notificationSoundPacks,
-  );
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
-  const previewSoundPack = useKartonProcedure((p) => p.config.previewSoundPack);
   const importSoundPack = useKartonProcedure((p) => p.config.importSoundPack);
-  const track = useTrack();
 
-  const soundLoudness: SoundLoudness =
-    globalConfig.notificationSoundLoudness ?? 'subtle';
-  const availablePacks =
-    notificationSoundPacks.available.length > 0
-      ? notificationSoundPacks.available
-      : [DEFAULT_SOUND_PACK];
-  const configuredPack = globalConfig.notificationSoundPack?.trim();
-  const currentPack =
-    configuredPack && availablePacks.includes(configuredPack)
-      ? configuredPack
-      : DEFAULT_SOUND_PACK;
-  const packOptions = availablePacks.includes(currentPack)
-    ? availablePacks
-    : [currentPack, ...availablePacks];
-  const loudnessIndex = Math.max(
-    0,
-    NOTIFICATION_LOUDNESS_OPTIONS.findIndex(
-      (option) => option.value === soundLoudness,
-    ),
-  );
-
-  const soundPackItems = packOptions.map((pack) => ({
-    value: pack,
-    label: notificationSoundPacks.displayNames[pack] ?? pack,
-  }));
-
-  const previewSound = (pack = currentPack, loudness = soundLoudness) => {
-    if (loudness === 'off') return;
-    void previewSoundPack(pack, loudness).catch(() => {
-      // Preview is best-effort; config changes should still succeed.
-    });
-  };
-
-  const handleLoudnessChange = async (value: number) => {
-    const index = Math.max(
-      0,
-      Math.min(NOTIFICATION_LOUDNESS_OPTIONS.length - 1, Math.round(value)),
-    );
-    const notificationSoundLoudness =
-      NOTIFICATION_LOUDNESS_OPTIONS[index]?.value ?? 'subtle';
-
-    previewSound(currentPack, notificationSoundLoudness);
-
-    await setGlobalConfig({
-      notificationSoundLoudness,
-    });
-    track('changed-notification-sound-loudness', {
-      loudness: notificationSoundLoudness,
-    });
-  };
-
-  const handleSoundPackChange = async (value: unknown) => {
-    if (typeof value !== 'string' || !packOptions.includes(value)) return;
-    previewSound(value, soundLoudness);
-    await setGlobalConfig({
-      notificationSoundPack: value,
-    });
-    track('changed-notification-sound-theme', {
-      theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
-    });
-  };
+  const {
+    soundLoudness,
+    currentPack,
+    soundPackItems,
+    loudnessIndex,
+    previewSound,
+    handleLoudnessChange,
+    handleSoundPackChange,
+  } = useSoundSettings();
 
   const handleImportSoundPack = async () => {
     try {

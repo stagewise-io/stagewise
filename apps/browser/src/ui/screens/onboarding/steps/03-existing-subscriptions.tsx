@@ -10,10 +10,10 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import {
   CodingPlanCard,
   CODING_PLANS,
+  TruncatedErrorText,
   type CodingPlanId,
 } from '@ui/components/coding-plan-card';
 import { ProviderLogo } from '@ui/components/provider-logos';
@@ -744,33 +744,5 @@ function CodingPlanGridCard({
         <IconChevronRightOutline18 className="size-3.5 shrink-0 text-muted-foreground" />
       )}
     </button>
-  );
-}
-
-function TruncatedErrorText({ id, text }: { id: string; text: string }) {
-  const ref = useRef<HTMLParagraphElement>(null);
-  const { isTruncated, tooltipOpen, setTooltipOpen } = useIsTruncated(ref);
-
-  return (
-    <Tooltip open={isTruncated && tooltipOpen} onOpenChange={setTooltipOpen}>
-      <TooltipTrigger>
-        <p
-          ref={ref}
-          id={id}
-          role="alert"
-          className={cn(
-            'truncate text-2xs text-error-foreground',
-            isTruncated && 'app-no-drag',
-          )}
-        >
-          {text}
-        </p>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" align="start">
-        <div className="wrap-break-word line-clamp-12 max-h-48 max-w-xs overflow-y-auto text-2xs leading-relaxed">
-          {text}
-        </div>
-      </TooltipContent>
-    </Tooltip>
   );
 }
