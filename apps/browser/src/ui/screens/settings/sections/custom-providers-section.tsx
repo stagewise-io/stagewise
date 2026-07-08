@@ -851,7 +851,7 @@ export const CustomEndpointForm = forwardRef<
    * - `base_url` present only when telemetry is set to `full` AND the
    *   field is non-empty; we do not transmit URLs on `basic`.
    */
-  const buildUrlProps = (): {
+  const buildUrlProps = useCallback((): {
     api_spec: string;
     is_local?: boolean;
     base_url?: string;
@@ -876,7 +876,7 @@ export const CustomEndpointForm = forwardRef<
       ...(telemetryLevel === 'full' && { base_url: trimmed }),
       ...bedrockProps,
     };
-  };
+  }, [apiSpec, awsAuthMode, baseUrl, telemetryLevel]);
 
   const handleSave = async () => {
     let modelIdMapping: Record<string, string> | undefined;
@@ -929,7 +929,14 @@ export const CustomEndpointForm = forwardRef<
       });
     }
     onCancel?.();
-  }, [isAddMode, track, hadValidationErrors, anyFieldTouched, onCancel]);
+  }, [
+    isAddMode,
+    track,
+    hadValidationErrors,
+    anyFieldTouched,
+    onCancel,
+    buildUrlProps,
+  ]);
 
   useImperativeHandle(ref, () => ({ cancel: handleCancel }), [handleCancel]);
 
