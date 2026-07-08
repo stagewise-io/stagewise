@@ -92,6 +92,7 @@ function getNetworkRetryableErrorMessage(
   if (!error) return null;
   if (error.kind === 'plan-limit-exceeded') return null;
   if (error.kind === 'model-restricted') return null;
+  if (error.kind === 'subscription-required') return null;
   if (error.kind === 'upstream-overload') return null;
   if (error.kind === 'waiting-for-connection') return error.originalMessage;
 

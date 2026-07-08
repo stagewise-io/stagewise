@@ -130,6 +130,17 @@ export function MessageRuntimeError({
     );
   }
 
+  if (error.kind === 'subscription-required') {
+    return (
+      <SubscriptionRequiredError
+        error={error}
+        canRetry={canShowRetry}
+        onRetry={onRetry}
+        {...retryProps}
+      />
+    );
+  }
+
   if (error.kind === 'waiting-for-connection') {
     return (
       <WaitingForConnectionError
@@ -311,6 +322,78 @@ function ModelRestrictedError({
             onClick={() => void openSettings({ section: 'models-providers' })}
           >
             Configure other API keys
+          </Button>
+          <Button
+            variant="primary"
+            size="xs"
+            onClick={() => void openExternalUrl(consoleUrl)}
+          >
+            Upgrade plan
+            <ArrowUpRightIcon className="size-3" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Shows a card when a user without a subscription tries to use AI models
+ * through the stagewise gateway. Offers CTAs to upgrade, configure BYOK,
+ * or connect a coding plan.
+ */
+function SubscriptionRequiredError({
+  canRetry,
+  onRetry,
+  retryRef,
+  showRetryHotkey,
+}: {
+  error: Extract<AgentRuntimeError, { kind: 'subscription-required' }>;
+  canRetry: boolean;
+  onRetry: () => void;
+} & RetryActionProps) {
+  const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+
+  return (
+    <div className="mt-6 flex w-full flex-col gap-1.5 rounded-lg border border-derived-strong p-2 text-sm">
+      <div className="flex flex-row items-center gap-1.5">
+        <IconLockKeyOutline18 className="size-3.5 shrink-0 text-foreground" />
+        <span className="font-medium text-foreground">
+          Subscription required
+        </span>
+      </div>
+
+      <div className="text-foreground">
+        AI model access through the stagewise gateway requires a subscription.
+        Upgrade your plan, configure your own API keys, or connect a coding plan
+        to continue.
+      </div>
+
+      <div className="flex flex-row items-center justify-between gap-2 pt-1">
+        <div>
+          {canRetry && (
+            <Button ref={retryRef} variant="ghost" size="xs" onClick={onRetry}>
+              <RefreshCcwIcon className="size-3" />
+              Retry
+              {showRetryHotkey && (
+                <HotkeyCombo
+                  action={HotkeyActions.CMD_ENTER}
+                  size="xs"
+                  variant="ghost"
+                  className="ml-0.5"
+                />
+              )}
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-row justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void openSettings({ section: 'models-providers' })}
+          >
+            Configure API keys
           </Button>
           <Button
             variant="primary"
