@@ -5,7 +5,7 @@ import { cn } from '@ui/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useState, useCallback } from 'react';
 import { useTrack } from '@ui/hooks/use-track';
-import { IconArrowRightOutline18 } from 'nucleo-ui-outline-18';
+import { IconArrowRightOutline18 } from '@stagewise/icons';
 import {
   SignInOptionsPanel,
   type SignInMethod,

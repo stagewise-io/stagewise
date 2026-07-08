@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { cn } from '@ui/utils';
-import { IconChevronRightOutline18 } from 'nucleo-ui-outline-18';
 import {
+  IconChevronRightOutline18,
   IconCloudeCodeFillDuo18,
   IconServerFillDuo18,
-} from 'nucleo-ui-fill-duo-18';
+} from '@stagewise/icons';
 import { Logo } from '@stagewise/stage-ui/components/logo';
 import { useKartonState } from '@ui/hooks/use-karton';
 import { BackButton, OnboardingBottomNav } from '../index';
