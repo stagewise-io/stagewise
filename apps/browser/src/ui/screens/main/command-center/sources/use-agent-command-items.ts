@@ -173,7 +173,8 @@ export function useAgentCommandItems(
               activityIsUserInput: activity.isUserInput,
               hasError:
                 !!agent.state.error &&
-                agent.state.error.kind !== 'plan-limit-exceeded',
+                agent.state.error.kind !== 'plan-limit-exceeded' &&
+                agent.state.error.kind !== 'subscription-required',
               unread: !!agent.state.unread,
               lastMessageAt: lastMsg?.metadata?.createdAt
                 ? new Date(lastMsg.metadata.createdAt).getTime()

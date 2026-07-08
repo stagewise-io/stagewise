@@ -39,6 +39,10 @@ export type AgentRuntimeError =
       plan?: string;
     }
   | {
+      kind: 'subscription-required';
+      message: string;
+    }
+  | {
       kind: 'upstream-overload';
       message: string;
       providerName?: string;

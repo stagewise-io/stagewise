@@ -1811,6 +1811,8 @@ export abstract class BaseAgent<
           });
         }
         const parsedModelRestricted = this.parseModelRestrictedError(error);
+        const parsedSubscriptionRequired =
+          this.parseSubscriptionRequiredError(error);
         if (parsedModelRestricted?.kind === 'model-restricted') {
           this.host.telemetry?.capture('model-restricted', {
             agent_type: this.agentType,
@@ -1823,6 +1825,7 @@ export abstract class BaseAgent<
         const parsedOverloadBase =
           parsedPlanLimit ||
           parsedModelRestricted ||
+          parsedSubscriptionRequired ||
           this.isZaiBillingOrQuotaError(
             parsedProviderError,
             modelWithOptions.reasoningSignatureSource,
@@ -1851,16 +1854,21 @@ export abstract class BaseAgent<
         this.state.commands.recordStepError({
           error: parsedPlanLimit ??
             parsedModelRestricted ??
+            parsedSubscriptionRequired ??
             parsedOverload ?? {
               message: `LLM provider error: ${parsedProviderError?.message ?? error.message}`,
               stack: error.stack,
             },
           markUnread: 'mark-unread',
         });
-        // Plan-limit and model-restricted errors surface their own dedicated
-        // UI affordance, so we suppress the generic error notification in
-        // those cases (matches the browser host's pre-extraction behavior).
-        if (!parsedPlanLimit && !parsedModelRestricted) {
+        // Plan-limit, model-restricted, and subscription-required errors
+        // surface their own dedicated UI affordance, so we suppress the
+        // generic error notification in those cases.
+        if (
+          !parsedPlanLimit &&
+          !parsedModelRestricted &&
+          !parsedSubscriptionRequired
+        ) {
           this.emitNotificationEvent('error');
         }
         this.host.logger.debug(
@@ -3069,6 +3077,24 @@ export abstract class BaseAgent<
     return parts.join(', ');
   }
 
+  /**
+   * Extracts the error code from an API response body, supporting both the
+   * current shape `{ error: { code: 'CODE', message: '...' } }` and the
+   * legacy shape `{ error: 'CODE', message: '...' }`.
+   */
+  private static extractErrorCode(body: unknown): string | null {
+    if (body == null || typeof body !== 'object') return null;
+    const err = (body as Record<string, unknown>).error;
+    if (typeof err === 'string') return err;
+    if (
+      err != null &&
+      typeof err === 'object' &&
+      typeof (err as Record<string, unknown>).code === 'string'
+    )
+      return (err as Record<string, unknown>).code as string;
+    return null;
+  }
+
   private parsePlanLimitError(error: Error): AgentRuntimeError | null {
     // Read the RAW (untruncated) responseBody — classifiers must parse the
     // full JSON. `extractApiErrorContext` truncates for logging, which can
@@ -3078,7 +3104,8 @@ export abstract class BaseAgent<
     if (typeof rawBody !== 'string') return null;
     try {
       const body = JSON.parse(rawBody);
-      if (body?.error !== 'PLAN_LIMIT_EXCEEDED') return null;
+      if (BaseAgent.extractErrorCode(body) !== 'PLAN_LIMIT_EXCEEDED')
+        return null;
       const exceededWindows =
         body.details?.exceededWindows
           ?.filter(
@@ -3108,7 +3135,7 @@ export abstract class BaseAgent<
     if (typeof rawBody !== 'string') return null;
     try {
       const body = JSON.parse(rawBody);
-      if (body?.error !== 'MODEL_RESTRICTED') return null;
+      if (BaseAgent.extractErrorCode(body) !== 'MODEL_RESTRICTED') return null;
       const model =
         typeof body.details?.model === 'string'
           ? body.details.model
@@ -3120,6 +3147,27 @@ export abstract class BaseAgent<
         message: body.message ?? 'This model is not available on your plan',
         model,
         plan,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private parseSubscriptionRequiredError(
+    error: Error,
+  ): AgentRuntimeError | null {
+    const frame = BaseAgent.unwrapApiErrorFrame(error);
+    const rawBody = frame.responseBody;
+    if (typeof rawBody !== 'string') return null;
+    try {
+      const body = JSON.parse(rawBody);
+      if (BaseAgent.extractErrorCode(body) !== 'SUBSCRIPTION_REQUIRED')
+        return null;
+      return {
+        kind: 'subscription-required',
+        message:
+          body.message ??
+          'Stagewise subscription required — upgrade your plan to continue.',
       };
     } catch {
       return null;
