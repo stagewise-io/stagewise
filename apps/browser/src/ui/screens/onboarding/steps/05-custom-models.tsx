@@ -6,8 +6,11 @@ import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useCallback, useMemo, useState, useRef } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
-import { IconPlusOutline18, IconTrashOutline18 } from 'nucleo-ui-outline-18';
-import { IconTriangleWarningFillDuo18 } from 'nucleo-ui-fill-duo-18';
+import {
+  IconPlusOutline18,
+  IconTrashOutline18,
+  IconTriangleWarningFillDuo18,
+} from '@stagewise/icons';
 import type { CustomModel } from '@shared/karton-contracts/ui/shared-types';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
 

@@ -5,10 +5,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { produceWithPatches, enablePatches } from 'immer';
 
-import {
-  IconPlusOutline18,
-  IconChevronLeftOutline18,
-} from 'nucleo-ui-outline-18';
+import { IconPlusOutline18, IconChevronLeftOutline18 } from '@stagewise/icons';
 import type { CustomEndpoint } from '@shared/karton-contracts/ui/shared-types';
 import {
   CustomEndpointForm,

@@ -20,7 +20,7 @@ import { ProviderLogo } from '@ui/components/provider-logos';
 import {
   IconChevronLeftOutline18,
   IconChevronRightOutline18,
-} from 'nucleo-ui-outline-18';
+} from '@stagewise/icons';
 import { cn } from '@ui/utils';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
