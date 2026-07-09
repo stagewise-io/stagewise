@@ -153,6 +153,14 @@ const PROVIDERS: ProviderInfo[] = [
       { name: 'Codestral', tier: 'general' },
     ],
   },
+  {
+    id: 'tencent',
+    name: 'Tencent Hunyuan',
+    logo: '/provider-logos/tencent.svg',
+    description:
+      'Cost-effective MoE reasoning models with reliable tool calling for agent tasks.',
+    models: [{ name: 'Hunyuan HY3', tier: 'general' }],
+  },
 ];
 
 export function ModelProviderShowcase() {

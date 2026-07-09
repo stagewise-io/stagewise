@@ -147,6 +147,7 @@ export class PreferencesService extends DisposableService {
       'minimax',
       'xiaomi-mimo',
       'mistral',
+      'tencent',
     ] as const;
     let needsSave = false;
 

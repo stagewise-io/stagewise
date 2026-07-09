@@ -1130,6 +1130,50 @@ export const availableModels = [
     },
   },
   {
+    officialProvider: 'tencent',
+    modelId: 'hy3',
+    modelDisplayName: 'Hunyuan HY3',
+    modelDescription:
+      "Tencent's 295B-parameter MoE reasoning model with configurable chain-of-thought, built for agent tasks at a low price point.",
+    modelContext: '262k context',
+    modelContextRaw: 262_144,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Skip OpenRouter upstreams that don't accept `tools`/`tool_choice`
+        // or the `reasoning` parameter.
+        provider: { require_parameters: true },
+      },
+      openai: {
+        reasoningEffort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.14,
+      outputPerMillion: 0.58,
+      relativeMultiplier: 0.12,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
     officialProvider: 'z-ai',
     modelId: 'glm-5.2',
     modelDisplayName: 'GLM 5.2',

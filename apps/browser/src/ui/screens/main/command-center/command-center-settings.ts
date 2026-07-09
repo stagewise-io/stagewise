@@ -55,6 +55,8 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
       'minimax',
       'xiaomi-mimo',
       'mistral',
+      'tencent',
+      'hunyuan',
     ],
     url: '',
     settingsRoute: ROUTE_MODELS_PROVIDERS,
