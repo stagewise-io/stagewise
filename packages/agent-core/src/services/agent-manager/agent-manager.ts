@@ -608,8 +608,12 @@ export class AgentManager extends DisposableService {
     // the host `HostAgentStateMutations.setUnread` helper.
     this.wrapAgentRpc(
       'agents.setActiveModelId',
-      async (instanceId: string, modelId: string) => {
-        await this.updateActiveModelId(instanceId, modelId);
+      async (
+        instanceId: string,
+        modelId: string,
+        providerInstanceId?: string,
+      ) => {
+        await this.updateActiveModelId(instanceId, modelId, providerInstanceId);
       },
     );
     this.wrapAgentRpc(
@@ -740,6 +744,7 @@ export class AgentManager extends DisposableService {
         createdAt: row.createdAt,
         lastMessageAt: row.lastMessageAt,
         activeModelId: row.activeModelId,
+        activeProviderInstanceId: row.activeProviderInstanceId ?? undefined,
         messageCount: row.history.length,
         mountedWorkspaces,
       };
@@ -1274,6 +1279,7 @@ export class AgentManager extends DisposableService {
         title: agentState.title,
         titleLockedByUser: agentState.titleLockedByUser,
         activeModelId: agentState.activeModelId,
+        activeProviderInstanceId: agentState.activeProviderInstanceId,
         toolApprovalMode: agentState.toolApprovalMode as ToolApprovalMode,
         createdAt:
           (firstHistoryEntry?.metadata as UserMessageMetadata | undefined)
@@ -1678,7 +1684,11 @@ export class AgentManager extends DisposableService {
     await agent.updateInputState(inputString);
   }
 
-  private async updateActiveModelId(instanceId: string, modelId: string) {
+  private async updateActiveModelId(
+    instanceId: string,
+    modelId: string,
+    providerInstanceId?: string,
+  ) {
     const agent = this.activeAgents.get(instanceId);
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
@@ -1691,7 +1701,7 @@ export class AgentManager extends DisposableService {
     const fromModel =
       this.agentStore.get().agents.instances[instanceId]?.state.activeModelId ??
       'unknown';
-    await agent.updateActiveModelId(modelId);
+    await agent.updateActiveModelId(modelId, providerInstanceId);
     this.host.telemetry?.capture('agent-model-changed', {
       agent_type: agent.agentType,
       agent_instance_id: instanceId,

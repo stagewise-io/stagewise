@@ -1107,9 +1107,12 @@ export abstract class BaseAgent<
     return;
   }
 
-  public async updateActiveModelId(modelId: string): Promise<void> {
+  public async updateActiveModelId(
+    modelId: string,
+    providerInstanceId?: string,
+  ): Promise<void> {
     // We accept model updates at all times, and the UI has to make enforce that model changes aren't allowed
-    this.state.commands.setActiveModel({ modelId });
+    this.state.commands.setActiveModel({ modelId, providerInstanceId });
     return;
   }
 
@@ -2258,6 +2261,7 @@ export abstract class BaseAgent<
     await this.getMemoryWriter().flush({
       title: state.title,
       activeModelId: state.activeModelId,
+      activeProviderInstanceId: state.activeProviderInstanceId,
       history: state.history,
       reason,
     });

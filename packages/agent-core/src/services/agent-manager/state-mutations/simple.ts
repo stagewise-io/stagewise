@@ -43,10 +43,16 @@ export function setInputState(
 export function setActiveModel(
   store: AgentStore,
   agentInstanceId: string,
-  args: { modelId: AgentState['activeModelId'] },
+  args: {
+    modelId: AgentState['activeModelId'];
+    providerInstanceId?: string;
+  },
 ): void {
   updateAgentInstanceState(store, agentInstanceId, (state) => {
     state.activeModelId = args.modelId;
+    if (args.providerInstanceId !== undefined) {
+      state.activeProviderInstanceId = args.providerInstanceId;
+    }
   });
 }
 

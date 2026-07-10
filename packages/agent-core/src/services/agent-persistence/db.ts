@@ -492,6 +492,37 @@ export class AgentPersistenceDB {
   }
 
   /**
+   * Returns the activeProviderInstanceId of the most recently persisted
+   * chat agent, or null if no chat agents exist (or the column is null).
+   */
+  public async getLastChatProviderInstanceId(): Promise<
+    schema.StoredAgentInstance['activeProviderInstanceId'] | null
+  > {
+    const results = await this._db
+      .select({
+        activeProviderInstanceId:
+          schema.agentInstances.activeProviderInstanceId,
+      })
+      .from(schema.agentInstances)
+      .where(
+        and(
+          isNull(schema.agentInstances.parentAgentInstanceId),
+          eq(schema.agentInstances.type, AgentTypes.CHAT),
+        ),
+      )
+      .orderBy(desc(schema.agentInstances.lastMessageAt))
+      .limit(1)
+      .catch((error) => {
+        this._logger.error(
+          `[AgentPersistenceDB] Failed to fetch last chat provider instance id: ${error}`,
+        );
+        return null;
+      });
+
+    return results?.[0]?.activeProviderInstanceId ?? null;
+  }
+
+  /**
    * Returns the toolApprovalMode of the most recently persisted chat agent,
    * or null if no chat agents exist.
    */
