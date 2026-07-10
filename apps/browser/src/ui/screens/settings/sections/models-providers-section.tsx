@@ -7,17 +7,25 @@ import {
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 import type {
-  CustomEndpoint,
   CustomModel,
   ModelCapabilities,
   ModelProvider,
   ProviderEndpointMode,
+  ProviderInstance,
   UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
   PROVIDER_DISPLAY_INFO,
   PROVIDER_OFFICIAL_URLS,
 } from '@shared/karton-contracts/ui/shared-types';
+import {
+  findCodingPlanInstance,
+  findInstanceForVendor,
+  getCustomTypeInstances,
+  getVendorMode,
+  instanceTypeIdToApiSpec,
+  resolveCustomModelInstanceName,
+} from '@shared/provider-instance-helpers';
 import type {
   BuiltInModel,
   SelectableBuiltInModel,
@@ -82,7 +90,6 @@ import {
 enablePatches();
 
 const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
-const EMPTY_CUSTOM_ENDPOINTS: UserPreferences['customEndpoints'] = [];
 const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
   {};
 const RECOMMENDED_MODEL_IDS = availableModelAliases.map(
@@ -113,17 +120,18 @@ function getThinkingDefaultOptionsForModel(
   const provider = model.officialProvider;
   if (!provider) return { providerMode: 'stagewise' };
 
-  const config = preferences.providerConfigs[provider];
-  if (config.mode !== 'custom') return { providerMode: config.mode };
+  const mode = getVendorMode(preferences, provider);
+  if (mode !== 'custom') return { providerMode: mode };
 
-  const endpoint = preferences.customEndpoints.find(
-    (item) => item.id === config.customProviderId,
-  );
-  if (!endpoint) return { providerMode: 'stagewise' };
+  const instance = findInstanceForVendor(preferences, provider);
+  if (!instance) return { providerMode: 'stagewise' };
+
+  const apiSpec = instanceTypeIdToApiSpec(instance.typeId);
+  if (!apiSpec) return { providerMode: 'stagewise' };
 
   return {
     providerMode: 'custom',
-    customEndpointApiSpec: endpoint.apiSpec,
+    customEndpointApiSpec: apiSpec,
   };
 }
 
@@ -133,23 +141,25 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
   );
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const setProviderApiKey = useKartonProcedure(
-    (p) => p.preferences.setProviderApiKey,
+  const setProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceApiKey,
   );
-  const clearProviderApiKey = useKartonProcedure(
-    (p) => p.preferences.clearProviderApiKey,
+  const clearProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.clearProviderInstanceApiKey,
   );
-  const validateProviderApiKey = useKartonProcedure(
-    (p) => p.preferences.validateProviderApiKey,
+  const validateProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.validateProviderInstanceApiKey,
+  );
+  const addProviderInstance = useKartonProcedure(
+    (p) => p.preferences.addProviderInstance,
   );
 
-  const config = preferences.providerConfigs?.[provider] ?? {
-    mode: 'stagewise' as const,
-  };
+  const instance = findInstanceForVendor(preferences, provider);
+  const mode = getVendorMode(preferences, provider);
+  const instanceId = instance?.id;
   const displayInfo = PROVIDER_DISPLAY_INFO[provider];
   const officialUrl = PROVIDER_OFFICIAL_URLS[provider];
-  const customEndpoints =
-    preferences?.customEndpoints ?? EMPTY_CUSTOM_ENDPOINTS;
+  const customInstances = getCustomTypeInstances(preferences);
 
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [isSavingKey, setIsSavingKey] = useState(false);
@@ -157,14 +167,15 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
   const [validated, setValidated] = useState<
     null | { success: true } | { success: false; error: string }
   >(null);
-  const hasKey = !!config.encryptedApiKey;
-  const connectedCodingPlan = config.connectedCodingPlanId
-    ? CODING_PLANS[config.connectedCodingPlanId as CodingPlanId]
-    : undefined;
+  const hasKey =
+    !!instance &&
+    !!(instance.config as { encryptedApiKey?: string }).encryptedApiKey;
+  const connectedCodingPlan =
+    instance?.typeId === 'coding-plan'
+      ? CODING_PLANS[instance.config.planId as CodingPlanId]
+      : undefined;
   const hasActiveCodingPlanConnection =
-    config.mode === 'official' &&
-    hasKey &&
-    connectedCodingPlan?.provider === provider;
+    mode === 'official' && hasKey && connectedCodingPlan?.provider === provider;
 
   useEffect(() => {
     if (validated?.success) {
@@ -198,11 +209,37 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
       if (!key.trim()) return;
       const trimmedKey = key.trim();
 
-      if (config.mode === 'official') {
+      if (mode === 'official') {
         setIsValidating(true);
         setValidated(null);
         try {
-          const result = await validateProviderApiKey(provider, trimmedKey);
+          // If no instance exists yet, validate via addProviderInstance
+          // (which validates + creates + stores the key atomically).
+          // Otherwise validate against the existing instance.
+          if (!instanceId) {
+            const result = await addProviderInstance({
+              typeId: `${provider}-api`,
+              config: {},
+              validateApiKey: trimmedKey,
+            });
+            if (!result.success) {
+              setValidated({ success: false, error: result.error });
+              return;
+            }
+            // Instance created with key — also flip the legacy mode.
+            const [, patches] = produceWithPatches(preferences, (draft) => {
+              draft.providerConfigs[provider].mode = 'official';
+            });
+            await updatePreferences(patches);
+            setApiKeyInput('');
+            setValidated({ success: true });
+            return;
+          }
+
+          const result = await validateProviderInstanceApiKey(
+            instanceId,
+            trimmedKey,
+          );
           if (result && !result.success) {
             setValidated({ success: false, error: result.error });
             return;
@@ -218,26 +255,39 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
         }
       }
 
-      setIsSavingKey(true);
-      try {
-        await setProviderApiKey(provider, trimmedKey);
-        setApiKeyInput('');
-        setValidated({ success: true });
-      } finally {
-        setIsSavingKey(false);
+      // Instance already exists — just update the key.
+      if (instanceId) {
+        setIsSavingKey(true);
+        try {
+          await setProviderInstanceApiKey(instanceId, trimmedKey);
+          setApiKeyInput('');
+          setValidated({ success: true });
+        } finally {
+          setIsSavingKey(false);
+        }
       }
     },
-    [provider, config, setProviderApiKey, validateProviderApiKey],
+    [
+      mode,
+      instanceId,
+      provider,
+      addProviderInstance,
+      validateProviderInstanceApiKey,
+      setProviderInstanceApiKey,
+      preferences,
+      updatePreferences,
+    ],
   );
 
   const handleClearApiKey = useCallback(async () => {
-    await clearProviderApiKey(provider);
+    if (!instanceId) return;
+    await clearProviderInstanceApiKey(instanceId);
     setValidated(null);
-  }, [provider, clearProviderApiKey]);
+  }, [instanceId, clearProviderInstanceApiKey]);
 
-  const customProviderItems = customEndpoints.map((ep) => ({
-    value: ep.id,
-    label: ep.name,
+  const customProviderItems = customInstances.map((inst) => ({
+    value: inst.id,
+    label: inst.name,
   }));
 
   return (
@@ -257,7 +307,7 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
         </p>
       )}
 
-      <RadioGroup value={config.mode} onValueChange={handleModeChange}>
+      <RadioGroup value={mode} onValueChange={handleModeChange}>
         <RadioLabel>
           <Radio value="stagewise" />
           <span>Use my stagewise account</span>
@@ -275,7 +325,7 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
       </RadioGroup>
 
       {/* Official mode: API key fields */}
-      {config.mode === 'official' && (
+      {mode === 'official' && (
         <div className="grid grid-cols-1 gap-3 border-derived border-t pt-3 sm:grid-cols-2">
           <div className="space-y-1">
             <p className="font-medium text-muted-foreground text-xs">
@@ -359,9 +409,9 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
       )}
 
       {/* Custom provider mode: select from configured providers */}
-      {config.mode === 'custom' && (
+      {mode === 'custom' && (
         <div className="border-derived border-t pt-3">
-          {customEndpoints.length === 0 ? (
+          {customInstances.length === 0 ? (
             <div className="space-y-2">
               <p className="text-muted-foreground text-xs">
                 No custom providers configured yet.
@@ -383,7 +433,10 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
                 Provider
               </p>
               <Select
-                value={config.customProviderId ?? ''}
+                value={
+                  preferences.providerConfigs?.[provider]?.customProviderId ??
+                  ''
+                }
                 onValueChange={handleCustomProviderChange}
                 items={customProviderItems}
                 placeholder="Select a provider..."
@@ -412,9 +465,20 @@ function SettingsCodingPlanCard({ plan }: { plan: CodingPlan }) {
   );
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
 
-  const config = preferences.providerConfigs?.[plan.provider] ?? {
+  // Derive the card config from the coding-plan instance (if connected)
+  // or fall back to the legacy providerConfigs entry.
+  const instance = findCodingPlanInstance(preferences, plan.id);
+  const legacyConfig = preferences.providerConfigs?.[plan.provider] ?? {
     mode: 'stagewise' as const,
   };
+  const config = instance
+    ? {
+        mode: 'official' as const,
+        encryptedApiKey: (instance.config as { encryptedApiKey?: string })
+          .encryptedApiKey,
+        connectedCodingPlanId: plan.id,
+      }
+    : legacyConfig;
 
   const handleConnect = useCallback(
     (planId: typeof plan.id, apiKey: string) =>
@@ -521,7 +585,7 @@ function CustomModelDialog({
   onOpenChange,
   onSave,
   existingModelIds,
-  customEndpoints,
+  providerInstances,
 }: {
   model?: CustomModel;
   open: boolean;
@@ -533,7 +597,7 @@ function CustomModelDialog({
     },
   ) => void;
   existingModelIds: Set<string>;
-  customEndpoints: CustomEndpoint[];
+  providerInstances: ProviderInstance[];
 }) {
   // Pages run under a different preload than the sidebar UI, so we cannot
   // import `@ui/hooks/use-track` here (it reaches for `window.electron`).
@@ -552,7 +616,9 @@ function CustomModelDialog({
   const [contextWindowSize, setContextWindowSize] = useState(
     model?.contextWindowSize ?? 128000,
   );
-  const [endpointId, setEndpointId] = useState(model?.endpointId ?? 'openai');
+  const [providerInstanceId, setProviderInstanceId] = useState(
+    model?.providerInstanceId ?? model?.endpointId ?? '',
+  );
   const [thinkingEnabled, setThinkingEnabled] = useState(
     model?.thinkingEnabled ?? false,
   );
@@ -611,7 +677,7 @@ function CustomModelDialog({
     setDisplayName(model?.displayName ?? '');
     setDescription(model?.description ?? '');
     setContextWindowSize(model?.contextWindowSize ?? 128000);
-    setEndpointId(model?.endpointId ?? 'openai');
+    setProviderInstanceId(model?.providerInstanceId ?? model?.endpointId ?? '');
     setThinkingEnabled(model?.thinkingEnabled ?? false);
     setCapabilities(model?.capabilities ?? defaultCaps);
     setProviderOptionsJson(
@@ -651,7 +717,8 @@ function CustomModelDialog({
     displayName !== (model?.displayName ?? '') ||
     description !== (model?.description ?? '') ||
     contextWindowSize !== (model?.contextWindowSize ?? 128000) ||
-    endpointId !== (model?.endpointId ?? 'openai') ||
+    providerInstanceId !==
+      (model?.providerInstanceId ?? model?.endpointId ?? '') ||
     thinkingEnabled !== (model?.thinkingEnabled ?? false) ||
     providerOptionsJson !==
       (model?.providerOptions && Object.keys(model.providerOptions).length > 0
@@ -682,25 +749,19 @@ function CustomModelDialog({
   };
 
   const endpointOptions = useMemo(() => {
-    const builtIn = [
-      { value: 'anthropic', label: 'Anthropic', group: 'Built-in' },
-      { value: 'openai', label: 'OpenAI', group: 'Built-in' },
-      { value: 'google', label: 'Google', group: 'Built-in' },
-      { value: 'moonshotai', label: 'Moonshot AI', group: 'Built-in' },
-      { value: 'alibaba', label: 'Alibaba Cloud', group: 'Built-in' },
-      { value: 'deepseek', label: 'DeepSeek', group: 'Built-in' },
-      { value: 'z-ai', label: 'Z.ai', group: 'Built-in' },
-      { value: 'minimax', label: 'MiniMax', group: 'Built-in' },
-      { value: 'xiaomi-mimo', label: 'Xiaomi MiMo', group: 'Built-in' },
-      { value: 'mistral', label: 'Mistral', group: 'Built-in' },
-    ];
-    const custom = customEndpoints.map((ep) => ({
-      value: ep.id,
-      label: ep.name,
-      group: 'Custom',
-    }));
-    return [...builtIn, ...custom];
-  }, [customEndpoints]);
+    // List all non-stagewise provider instances as selectable endpoints.
+    return providerInstances
+      .filter((i) => i.typeId !== 'stagewise')
+      .map((inst) => ({
+        value: inst.id,
+        label: inst.name,
+        group: inst.typeId.endsWith('-api')
+          ? 'Built-in'
+          : inst.typeId === 'coding-plan'
+            ? 'Coding Plan'
+            : 'Custom',
+      }));
+  }, [providerInstances]);
 
   const handleSave = () => {
     let providerOptions: Record<string, unknown> = {};
@@ -728,7 +789,7 @@ function CustomModelDialog({
       displayName: displayName.trim(),
       description: description.trim(),
       contextWindowSize,
-      endpointId,
+      providerInstanceId,
       thinkingEnabled,
       capabilities,
       providerOptions,
@@ -820,8 +881,8 @@ function CustomModelDialog({
             <div className="space-y-1.5">
               <p className="font-medium text-foreground text-xs">Endpoint</p>
               <Select
-                value={endpointId}
-                onValueChange={(val) => setEndpointId(val as string)}
+                value={providerInstanceId}
+                onValueChange={(val) => setProviderInstanceId(val as string)}
                 items={endpointOptions}
                 size="md"
                 triggerClassName="w-full"
@@ -1140,8 +1201,7 @@ function CustomModelsSection() {
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const customModels = preferences?.customModels ?? EMPTY_CUSTOM_MODELS;
-  const customEndpoints =
-    preferences?.customEndpoints ?? EMPTY_CUSTOM_ENDPOINTS;
+  const providerInstances = preferences?.providerInstances ?? [];
   const disabledModelIds = useMemo(
     () => new Set(preferences.agent.disabledModelIds),
     [preferences.agent.disabledModelIds],
@@ -1160,22 +1220,11 @@ function CustomModelsSection() {
   );
 
   const resolveEndpointName = useCallback(
-    (endpointId: string) => {
-      if (endpointId === 'anthropic') return 'Anthropic';
-      if (endpointId === 'openai') return 'OpenAI';
-      if (endpointId === 'google') return 'Google';
-      if (endpointId === 'moonshotai') return 'Moonshot AI';
-      if (endpointId === 'alibaba') return 'Alibaba Cloud';
-      if (endpointId === 'deepseek') return 'DeepSeek';
-      if (endpointId === 'z-ai') return 'Z.ai';
-      if (endpointId === 'minimax') return 'MiniMax';
-      if (endpointId === 'xiaomi-mimo') return 'Xiaomi MiMo';
-      if (endpointId === 'mistral') return 'Mistral';
-      return (
-        customEndpoints.find((ep) => ep.id === endpointId)?.name ?? 'Unknown'
-      );
-    },
-    [customEndpoints],
+    (endpointId: string) =>
+      resolveCustomModelInstanceName(preferences, {
+        providerInstanceId: endpointId,
+      }),
+    [preferences],
   );
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1204,7 +1253,9 @@ function CustomModelsSection() {
       (m) =>
         m.modelId.toLowerCase().includes(q) ||
         m.displayName.toLowerCase().includes(q) ||
-        resolveEndpointName(m.endpointId).toLowerCase().includes(q),
+        resolveEndpointName(m.providerInstanceId ?? m.endpointId ?? '')
+          .toLowerCase()
+          .includes(q),
     );
   }, [searchQuery, customModels, resolveEndpointName]);
 
@@ -1557,7 +1608,9 @@ function CustomModelsSection() {
             <CustomModelCard
               key={model.modelId}
               model={model}
-              endpointName={resolveEndpointName(model.endpointId)}
+              endpointName={resolveEndpointName(
+                model.providerInstanceId ?? model.endpointId ?? '',
+              )}
               isEnabled={!disabledModelIds.has(model.modelId)}
               onToggle={() => handleToggleModel(model.modelId)}
               onEdit={() => handleEdit(model)}
@@ -1612,7 +1665,7 @@ function CustomModelsSection() {
         onOpenChange={setDialogOpen}
         onSave={handleSave}
         existingModelIds={existingModelIds}
-        customEndpoints={customEndpoints}
+        providerInstances={providerInstances}
       />
     </div>
   );

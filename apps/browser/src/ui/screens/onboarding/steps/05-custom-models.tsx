@@ -132,7 +132,9 @@ export function StepCustomModels({
         m.modelId.trim().length > 0 &&
         !m.modelId.startsWith(SENTINEL_MODEL_ID_PREFIX);
       const hasValidEndpoint =
-        m.endpointId.trim().length > 0 && endpointIds.has(m.endpointId);
+        !!m.endpointId &&
+        m.endpointId.trim().length > 0 &&
+        endpointIds.has(m.endpointId);
       const hasValidContext = m.contextWindowSize > 0;
       const isDuplicate = seenIds.has(m.modelId);
       seenIds.add(m.modelId);

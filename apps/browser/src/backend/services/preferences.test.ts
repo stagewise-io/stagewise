@@ -113,6 +113,10 @@ describe('PreferencesService coding plan connection state', () => {
       error: 'invalid key',
     });
     const service = await createServiceWithPreferences();
+    // The migration during initialize() writes once; clear it so the
+    // assertion below verifies that the failed connectCodingPlan does
+    // not trigger an additional write.
+    persistedDataMock.writePersistedData.mockClear();
 
     const result = await service.connectCodingPlan(
       'glm-coding-plan',

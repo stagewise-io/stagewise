@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { defaultUserPreferences } from '@shared/karton-contracts/ui/shared-types';
+import {
+  defaultUserPreferences,
+  type ProviderInstance,
+  type CustomEndpoint,
+} from '@shared/karton-contracts/ui/shared-types';
 import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
 import { ModelProviderService } from './model-provider';
 import {
@@ -11,6 +15,84 @@ import {
   getSemanticProviderForApiSpec,
   reasoningSourcesMatch,
 } from './reasoning-signatures';
+import { CODING_PLANS } from '@shared/coding-plans';
+
+/**
+ * Build a `ProviderInstance` for a custom-type endpoint.  Reuses the
+ * endpoint's `id` so that legacy `providerConfigs[vendor].customProviderId`
+ * links resolve correctly during the PR 1 hybrid routing.
+ */
+function customEndpointToInstance(ep: CustomEndpoint): ProviderInstance {
+  const apiSpecToTypeId: Record<string, ProviderInstance['typeId']> = {
+    anthropic: 'custom-anthropic',
+    'openai-chat-completions': 'custom-openai-chat',
+    'openai-responses': 'custom-openai-responses',
+    google: 'custom-google',
+    azure: 'azure',
+    'amazon-bedrock': 'bedrock',
+    'google-vertex': 'vertex',
+  };
+  const typeId = apiSpecToTypeId[ep.apiSpec];
+  const base = {
+    id: ep.id,
+    name: ep.name,
+    enabledModelIds: [] as string[],
+    discoveredModels: [] as Record<string, unknown>[],
+  };
+  switch (typeId) {
+    case 'custom-anthropic':
+    case 'custom-openai-chat':
+    case 'custom-openai-responses':
+    case 'custom-google':
+      return {
+        ...base,
+        typeId,
+        config: {
+          baseUrl: ep.baseUrl,
+          encryptedApiKey: ep.encryptedApiKey,
+          modelIdMapping: ep.modelIdMapping,
+        },
+      };
+    case 'azure':
+      return {
+        ...base,
+        typeId,
+        config: {
+          baseUrl: ep.baseUrl,
+          encryptedApiKey: ep.encryptedApiKey,
+          resourceName: ep.resourceName,
+          apiVersion: ep.apiVersion,
+          modelIdMapping: ep.modelIdMapping,
+        },
+      };
+    case 'bedrock':
+      return {
+        ...base,
+        typeId,
+        config: {
+          encryptedApiKey: ep.encryptedApiKey,
+          encryptedSecretKey: ep.encryptedSecretKey,
+          region: ep.region,
+          awsAuthMode: ep.awsAuthMode,
+          awsProfileName: ep.awsProfileName,
+          modelIdMapping: ep.modelIdMapping,
+        },
+      };
+    case 'vertex':
+      return {
+        ...base,
+        typeId,
+        config: {
+          encryptedGoogleCredentials: ep.encryptedGoogleCredentials,
+          projectId: ep.projectId,
+          location: ep.location,
+          modelIdMapping: ep.modelIdMapping,
+        },
+      };
+    default:
+      throw new Error(`Unsupported apiSpec: ${ep.apiSpec}`);
+  }
+}
 
 function createTestModelProviderService({
   providerModes = {},
@@ -31,22 +113,83 @@ function createTestModelProviderService({
 } = {}) {
   const preferences = structuredClone(defaultUserPreferences);
   preferences.agent.modelThinkingOverrides = modelThinkingOverrides;
-  preferences.customEndpoints = customEndpoints;
+
+  const instances: ProviderInstance[] = [];
+
   for (const [provider, mode] of Object.entries(providerModes)) {
+    if (mode === 'stagewise') continue;
+
     const config =
       preferences.providerConfigs[
         provider as keyof typeof preferences.providerConfigs
       ];
     config.mode = mode;
-    if (mode === 'custom') config.customProviderId = `${provider}-custom`;
+
+    if (mode === 'official') {
+      const planId = connectedCodingPlanIds[provider];
+      if (planId) {
+        const plan = CODING_PLANS[planId as keyof typeof CODING_PLANS];
+        instances.push({
+          id: `coding-plan-${provider}`,
+          typeId: 'coding-plan',
+          name: plan?.displayName ?? 'Coding Plan',
+          config: {
+            encryptedApiKey: 'encrypted',
+            planId,
+            baseUrl: plan?.baseUrl,
+          },
+          enabledModelIds: [],
+          discoveredModels: [],
+        });
+      } else {
+        instances.push({
+          id: `${provider}-api-default`,
+          typeId: `${provider}-api`,
+          name: provider,
+          config: { encryptedApiKey: 'encrypted' },
+          enabledModelIds: [],
+          discoveredModels: [],
+        } as unknown as ProviderInstance);
+      }
+    } else if (mode === 'custom') {
+      // For custom mode, set the legacy providerConfigs link so the
+      // hybrid routing's findInstanceForVendor can resolve the vendor
+      // to this custom instance.
+      const customId = `${provider}-custom`;
+      config.customProviderId = customId;
+      // Find or create a matching custom endpoint instance.
+      const existingEp = customEndpoints.find((ep) => ep.id === customId);
+      if (existingEp) {
+        instances.push(customEndpointToInstance(existingEp));
+      } else {
+        // If no matching endpoint is provided, create a minimal
+        // openai-chat-compatible instance.
+        instances.push({
+          id: customId,
+          typeId: 'custom-openai-chat',
+          name: `${provider} custom`,
+          config: { baseUrl: 'https://example.com/v1' },
+          enabledModelIds: [],
+          discoveredModels: [],
+        });
+      }
+    }
   }
-  for (const [provider, connectedCodingPlanId] of Object.entries(
-    connectedCodingPlanIds,
-  )) {
-    preferences.providerConfigs[
-      provider as keyof typeof preferences.providerConfigs
-    ].connectedCodingPlanId = connectedCodingPlanId as any;
+
+  // Add any remaining custom endpoints (not consumed by custom-mode
+  // vendors) as standalone instances.
+  const consumedIds = new Set(
+    Object.entries(providerModes)
+      .filter(([, m]) => m === 'custom')
+      .map(([p]) => `${p}-custom`),
+  );
+  for (const ep of customEndpoints) {
+    if (!consumedIds.has(ep.id)) {
+      instances.push(customEndpointToInstance(ep));
+    }
   }
+
+  preferences.providerInstances = instances;
 
   return new ModelProviderService(
     {
