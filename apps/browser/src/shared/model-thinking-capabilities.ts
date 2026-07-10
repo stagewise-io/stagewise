@@ -418,7 +418,7 @@ function getAnthropicOptions(modelId: string): ThinkingOption[] {
 }
 
 function isKnownOpenAiGpt5Model(modelId: string): boolean {
-  return /^gpt-5\.[1-5](?:$|-)/.test(modelId) || modelId === 'gpt-5';
+  return /^gpt-5\.[1-6](?:$|-)/.test(modelId) || modelId === 'gpt-5';
 }
 
 function findSupportedOption(

@@ -1,4 +1,5 @@
 export { Icon, type IconProps } from './Icon';
+export { IconCloudeCodeFillDuo18 } from './IconCloudeCodeFillDuo18';
 export { IconBrainNodesFillDuo18 } from './IconBrainNodesFillDuo18';
 export { IconDatabaseFillDuo18 } from './IconDatabaseFillDuo18';
 export { IconDownload4FillDuo18 } from './IconDownload4FillDuo18';
@@ -10,5 +11,6 @@ export { IconHistoryFillDuo18 } from './IconHistoryFillDuo18';
 export { IconLockKeyFillDuo18 } from './IconLockKeyFillDuo18';
 export { IconNoteFillDuo18 } from './IconNoteFillDuo18';
 export { IconPenDrawSparkleFillDuo18 } from './IconPenDrawSparkleFillDuo18';
+export { IconServerFillDuo18 } from './IconServerFillDuo18';
 export { IconSpace3dFillDuo18 } from './IconSpace3dFillDuo18';
 export { IconTriangleWarningFillDuo18 } from './IconTriangleWarningFillDuo18';

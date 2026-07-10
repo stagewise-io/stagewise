@@ -15,6 +15,7 @@ export {
 } from './nucleo/ui-fill-18';
 export {
   IconBrainNodesFillDuo18,
+  IconCloudeCodeFillDuo18,
   IconDatabaseFillDuo18,
   IconDownload4FillDuo18,
   IconEarthFillDuo18,
@@ -25,6 +26,7 @@ export {
   IconLockKeyFillDuo18,
   IconNoteFillDuo18,
   IconPenDrawSparkleFillDuo18,
+  IconServerFillDuo18,
   IconSpace3dFillDuo18,
   IconTriangleWarningFillDuo18,
 } from './nucleo/ui-fill-duo-18';
