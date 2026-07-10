@@ -13,6 +13,7 @@ import {
 import type {
   ApiSpec,
   CustomEndpoint,
+  ProviderInstance,
 } from '@shared/karton-contracts/ui/shared-types';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -31,15 +32,17 @@ import {
   DialogClose,
   DialogHeader,
 } from '@stagewise/stage-ui/components/dialog';
-import { produceWithPatches, enablePatches } from 'immer';
 import {
   IconPlusOutline18,
   IconPenOutline18,
   IconTrashOutline18,
   IconChevronLeftOutline18,
 } from '@stagewise/icons';
-
-enablePatches();
+import {
+  apiSpecToTypeId,
+  getCustomTypeInstances,
+  providerInstanceToCustomEndpoint,
+} from '@shared/provider-instance-helpers';
 
 // =============================================================================
 // Custom Endpoint Components
@@ -1210,20 +1213,102 @@ export function CustomEndpointCard({
   );
 }
 
+/**
+ * Convert `EndpointSaveData` (the form output) into a `{ typeId, config }`
+ * pair suitable for `addProviderInstance`. Only the config fields relevant
+ * to the target `typeId` are included; irrelevant fields are dropped so
+ * they don't pollute the instance config.
+ */
+function endpointSaveDataToInstanceArgs(data: EndpointSaveData): {
+  typeId: ProviderInstance['typeId'];
+  name: string;
+  config: Record<string, unknown>;
+} {
+  const typeId = apiSpecToTypeId(data.apiSpec);
+  switch (typeId) {
+    case 'custom-anthropic':
+    case 'custom-openai-chat':
+    case 'custom-openai-responses':
+    case 'custom-google':
+      return {
+        typeId,
+        name: data.name,
+        config: {
+          baseUrl: data.baseUrl,
+          modelIdMapping: data.modelIdMapping,
+        },
+      };
+    case 'azure':
+      return {
+        typeId,
+        name: data.name,
+        config: {
+          baseUrl: data.baseUrl,
+          resourceName: data.resourceName,
+          apiVersion: data.apiVersion,
+          modelIdMapping: data.modelIdMapping,
+        },
+      };
+    case 'bedrock':
+      return {
+        typeId,
+        name: data.name,
+        config: {
+          region: data.region,
+          awsAuthMode: data.awsAuthMode ?? 'access-keys',
+          awsProfileName:
+            data.awsAuthMode === 'profile' ? data.awsProfileName : undefined,
+          modelIdMapping: data.modelIdMapping,
+        },
+      };
+    case 'vertex':
+      return {
+        typeId,
+        name: data.name,
+        config: {
+          projectId: data.projectId,
+          location: data.location,
+          modelIdMapping: data.modelIdMapping,
+        },
+      };
+    default:
+      // vendor-api and coding-plan types are never created here
+      throw new Error(
+        `endpointSaveDataToInstanceArgs: unsupported typeId ${typeId}`,
+      );
+  }
+}
+
 function CustomEndpointsSection() {
   const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const setCustomEndpointApiKey = useKartonProcedure(
-    (p) => p.preferences.setCustomEndpointApiKey,
+  const addProviderInstance = useKartonProcedure(
+    (p) => p.preferences.addProviderInstance,
   );
-  const setCustomEndpointSecretKey = useKartonProcedure(
-    (p) => p.preferences.setCustomEndpointSecretKey,
+  const updateProviderInstance = useKartonProcedure(
+    (p) => p.preferences.updateProviderInstance,
   );
-  const setCustomEndpointGoogleCredentials = useKartonProcedure(
-    (p) => p.preferences.setCustomEndpointGoogleCredentials,
+  const removeProviderInstance = useKartonProcedure(
+    (p) => p.preferences.removeProviderInstance,
+  );
+  const setProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceApiKey,
+  );
+  const setProviderInstanceSecretKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceSecretKey,
+  );
+  const setProviderInstanceGoogleCredentials = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceGoogleCredentials,
   );
 
-  const endpoints = preferences?.customEndpoints ?? [];
+  // Derive the list of custom-endpoint-shaped views from provider
+  // instances.  The form/card components still consume `CustomEndpoint`
+  // objects, so we convert each custom-type instance via the helper.
+  const customInstances = preferences
+    ? getCustomTypeInstances(preferences)
+    : [];
+  const endpoints: CustomEndpoint[] = customInstances.map(
+    providerInstanceToCustomEndpoint,
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEndpoint, setEditingEndpoint] = useState<
@@ -1243,100 +1328,80 @@ function CustomEndpointsSection() {
   const handleSave = useCallback(
     async (data: EndpointSaveData) => {
       if (editingEndpoint) {
-        const idx = endpoints.findIndex((ep) => ep.id === editingEndpoint.id);
-        if (idx === -1) return;
-        const [, patches] = produceWithPatches(preferences, (draft) => {
-          const ep = draft.customEndpoints[idx]!;
-          ep.name = data.name;
-          ep.apiSpec = data.apiSpec;
-          ep.baseUrl = data.baseUrl;
-          ep.modelIdMapping = data.modelIdMapping;
-          ep.resourceName = data.resourceName;
-          ep.apiVersion = data.apiVersion;
-          ep.region = data.region;
-          // Only Bedrock reads `awsAuthMode` / `awsProfileName`. Touching
-          // the fields for other apiSpecs would silently pollute saved
-          // state; leave them alone so Zod defaults + prior Bedrock state
-          // never leak across apiSpec switches.
-          if (data.apiSpec === 'amazon-bedrock') {
-            ep.awsAuthMode = data.awsAuthMode ?? 'access-keys';
-            ep.awsProfileName = data.awsProfileName;
-          }
-          ep.projectId = data.projectId;
-          ep.location = data.location;
-        });
-        await updatePreferences(patches);
+        const instanceId = editingEndpoint.id;
+        const { typeId, name, config } = endpointSaveDataToInstanceArgs(data);
+        // `updateProviderInstance` merges into `config` and optionally
+        // updates `name`.  We pass the full config object for the
+        // resolved typeId so that fields from a previous apiSpec switch
+        // are overwritten rather than lingering.
+        await updateProviderInstance(instanceId, config, name);
 
+        // Credentials are stored encrypted on the instance.  Only call
+        // the setter when the user actually entered a value (secret
+        // fields start empty in edit-mode by design).
         if (data.apiKey) {
-          await setCustomEndpointApiKey(editingEndpoint.id, data.apiKey);
+          await setProviderInstanceApiKey(instanceId, data.apiKey);
         }
         if (data.secretKey) {
-          await setCustomEndpointSecretKey(editingEndpoint.id, data.secretKey);
+          await setProviderInstanceSecretKey(instanceId, data.secretKey);
         }
         if (data.googleCredentials) {
-          await setCustomEndpointGoogleCredentials(
-            editingEndpoint.id,
+          await setProviderInstanceGoogleCredentials(
+            instanceId,
             data.googleCredentials,
           );
         }
+        // Suppress unused-variable warning for `typeId` — it's part of
+        // the destructured return but not needed on the update path.
+        void typeId;
       } else {
-        const id = crypto.randomUUID();
-        const [, patches] = produceWithPatches(preferences, (draft) => {
-          draft.customEndpoints.push({
-            id,
-            name: data.name,
-            apiSpec: data.apiSpec,
-            baseUrl: data.baseUrl,
-            modelIdMapping: data.modelIdMapping,
-            resourceName: data.resourceName,
-            apiVersion: data.apiVersion,
-            region: data.region,
-            // `awsAuthMode` is schema-required, so we always set a value.
-            // For non-Bedrock specs we pin it to the schema default so the
-            // field is inert (not surfaced in the UI, ignored at the call
-            // site) and `awsProfileName` is left undefined.
-            awsAuthMode:
-              data.apiSpec === 'amazon-bedrock'
-                ? (data.awsAuthMode ?? 'access-keys')
-                : 'access-keys',
-            awsProfileName:
-              data.apiSpec === 'amazon-bedrock'
-                ? data.awsProfileName
-                : undefined,
-            projectId: data.projectId,
-            location: data.location,
-          });
+        const { typeId, name, config } = endpointSaveDataToInstanceArgs(data);
+        const result = await addProviderInstance({
+          typeId,
+          name,
+          config,
+          validateApiKey: data.apiKey || undefined,
         });
-        await updatePreferences(patches);
-
-        if (data.apiKey) {
-          await setCustomEndpointApiKey(id, data.apiKey);
+        if (!result.success) {
+          console.error('Failed to add provider instance:', result.error);
+          return;
         }
+        const instanceId = result.instanceId;
+
+        // Bedrock secret key and Vertex credentials are not part of
+        // `validateApiKey` (which only covers the primary API key), so
+        // they need to be set separately after creation.
         if (data.secretKey) {
-          await setCustomEndpointSecretKey(id, data.secretKey);
+          await setProviderInstanceSecretKey(instanceId, data.secretKey);
         }
         if (data.googleCredentials) {
-          await setCustomEndpointGoogleCredentials(id, data.googleCredentials);
+          await setProviderInstanceGoogleCredentials(
+            instanceId,
+            data.googleCredentials,
+          );
         }
       }
     },
     [
       editingEndpoint,
-      endpoints,
-      preferences,
-      updatePreferences,
-      setCustomEndpointApiKey,
-      setCustomEndpointSecretKey,
-      setCustomEndpointGoogleCredentials,
+      addProviderInstance,
+      updateProviderInstance,
+      setProviderInstanceApiKey,
+      setProviderInstanceSecretKey,
+      setProviderInstanceGoogleCredentials,
     ],
   );
 
   const customModels = preferences?.customModels ?? [];
 
   const handleDelete = useCallback(
-    async (endpointId: string) => {
+    async (instanceId: string) => {
+      // Check both the new `providerInstanceId` and the legacy
+      // `endpointId` so that models created before the migration are
+      // still caught by the confirmation dialog.
       const affectedModels = customModels.filter(
-        (m) => m.endpointId === endpointId,
+        (m) =>
+          m.providerInstanceId === instanceId || m.endpointId === instanceId,
       );
       if (affectedModels.length > 0) {
         const names = affectedModels.map((m) => m.displayName).join(', ');
@@ -1345,18 +1410,9 @@ function CustomEndpointsSection() {
         );
         if (!confirmed) return;
       }
-
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        const idx = draft.customEndpoints.findIndex(
-          (ep) => ep.id === endpointId,
-        );
-        if (idx !== -1) {
-          draft.customEndpoints.splice(idx, 1);
-        }
-      });
-      await updatePreferences(patches);
+      await removeProviderInstance(instanceId);
     },
-    [preferences, updatePreferences, customModels],
+    [removeProviderInstance, customModels],
   );
 
   return (

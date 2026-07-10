@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { providerConfigSchema, userPreferencesSchema } from './shared-types';
+import {
+  providerConfigSchema,
+  providerInstanceSchema,
+  customModelSchema,
+  userPreferencesSchema,
+} from './shared-types';
 
 describe('userPreferencesSchema sidebar defaults', () => {
   it('defaults sidebar preferences when sidebar is missing', () => {
@@ -275,5 +280,200 @@ describe('userPreferencesSchema workspace Git action defaults', () => {
         '/repo/.git': {},
       },
     });
+  });
+});
+
+describe('providerInstanceSchema validation', () => {
+  it('parses a valid stagewise instance', () => {
+    const parsed = providerInstanceSchema.parse({
+      id: 'stagewise-default',
+      typeId: 'stagewise',
+      name: 'Stagewise',
+      config: {},
+    });
+    expect(parsed.typeId).toBe('stagewise');
+    expect(parsed.config).toEqual({});
+    expect(parsed.enabledModelIds).toEqual([]);
+    expect(parsed.discoveredModels).toEqual([]);
+  });
+
+  it('parses a valid anthropic-api instance with encrypted key and baseUrl', () => {
+    const parsed = providerInstanceSchema.parse({
+      id: 'anthropic-api-default',
+      typeId: 'anthropic-api',
+      name: 'Anthropic',
+      config: {
+        encryptedApiKey: 'enc-key',
+        baseUrl: 'https://custom.anthropic.com',
+      },
+    });
+    expect(parsed.typeId).toBe('anthropic-api');
+    if (parsed.typeId === 'anthropic-api') {
+      expect(parsed.config.encryptedApiKey).toBe('enc-key');
+      expect(parsed.config.baseUrl).toBe('https://custom.anthropic.com');
+    }
+  });
+
+  it('parses a valid coding-plan instance', () => {
+    const parsed = providerInstanceSchema.parse({
+      id: 'coding-plan:glm-coding-plan',
+      typeId: 'coding-plan',
+      name: 'GLM Coding Plan',
+      config: {
+        encryptedApiKey: 'enc-key',
+        planId: 'glm-coding-plan',
+        baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+      },
+    });
+    expect(parsed.typeId).toBe('coding-plan');
+    if (parsed.typeId === 'coding-plan') {
+      expect(parsed.config.planId).toBe('glm-coding-plan');
+    }
+  });
+
+  it('parses a valid custom-openai-chat instance with modelIdMapping', () => {
+    const parsed = providerInstanceSchema.parse({
+      id: 'my-openai-proxy',
+      typeId: 'custom-openai-chat',
+      name: 'My Proxy',
+      config: {
+        baseUrl: 'https://proxy.example.com/v1',
+        encryptedApiKey: 'enc-key',
+        modelIdMapping: { 'gpt-5.5': 'gpt-custom' },
+      },
+    });
+    expect(parsed.typeId).toBe('custom-openai-chat');
+    if (parsed.typeId === 'custom-openai-chat') {
+      expect(parsed.config.baseUrl).toBe('https://proxy.example.com/v1');
+      expect(parsed.config.modelIdMapping).toEqual({ 'gpt-5.5': 'gpt-custom' });
+    }
+  });
+
+  it('parses a valid bedrock instance with awsAuthMode defaulting to access-keys', () => {
+    const parsed = providerInstanceSchema.parse({
+      id: 'bedrock-prod',
+      typeId: 'bedrock',
+      name: 'Bedrock Prod',
+      config: {
+        encryptedApiKey: 'enc-key',
+        encryptedSecretKey: 'enc-secret',
+        region: 'us-east-1',
+      },
+    });
+    expect(parsed.typeId).toBe('bedrock');
+    if (parsed.typeId === 'bedrock') {
+      expect(parsed.config.awsAuthMode).toBe('access-keys');
+      expect(parsed.config.region).toBe('us-east-1');
+    }
+  });
+
+  it('parses a valid vertex instance', () => {
+    const parsed = providerInstanceSchema.parse({
+      id: 'vertex-prod',
+      typeId: 'vertex',
+      name: 'Vertex Prod',
+      config: {
+        projectId: 'my-project',
+        location: 'us-central1',
+        encryptedGoogleCredentials: 'enc-creds',
+      },
+    });
+    expect(parsed.typeId).toBe('vertex');
+    if (parsed.typeId === 'vertex') {
+      expect(parsed.config.projectId).toBe('my-project');
+      expect(parsed.config.location).toBe('us-central1');
+    }
+  });
+
+  it('rejects an unknown typeId', () => {
+    expect(
+      providerInstanceSchema.safeParse({
+        id: 'unknown',
+        typeId: 'nonexistent-type',
+        name: 'Unknown',
+        config: {},
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a custom-openai-chat config missing required baseUrl', () => {
+    expect(
+      providerInstanceSchema.safeParse({
+        id: 'bad',
+        typeId: 'custom-openai-chat',
+        name: 'Bad',
+        config: { encryptedApiKey: 'key' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a coding-plan config missing required planId', () => {
+    expect(
+      providerInstanceSchema.safeParse({
+        id: 'bad',
+        typeId: 'coding-plan',
+        name: 'Bad',
+        config: { encryptedApiKey: 'key' },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('customModelSchema providerInstanceId migration', () => {
+  it('accepts providerInstanceId', () => {
+    const parsed = customModelSchema.parse({
+      modelId: 'my-model',
+      displayName: 'My Model',
+      providerInstanceId: 'anthropic-api-default',
+    });
+    expect(parsed.providerInstanceId).toBe('anthropic-api-default');
+  });
+
+  it('still accepts legacy endpointId for migration compat', () => {
+    const parsed = customModelSchema.parse({
+      modelId: 'my-model',
+      displayName: 'My Model',
+      endpointId: 'some-endpoint-id',
+    });
+    expect(parsed.endpointId).toBe('some-endpoint-id');
+  });
+
+  it('accepts both providerInstanceId and endpointId', () => {
+    const parsed = customModelSchema.parse({
+      modelId: 'my-model',
+      displayName: 'My Model',
+      providerInstanceId: 'instance-1',
+      endpointId: 'endpoint-1',
+    });
+    expect(parsed.providerInstanceId).toBe('instance-1');
+    expect(parsed.endpointId).toBe('endpoint-1');
+  });
+});
+
+describe('userPreferencesSchema providerInstances', () => {
+  it('defaults providerInstances to empty array when missing', () => {
+    const parsed = userPreferencesSchema.parse({});
+    expect(parsed.providerInstances).toEqual([]);
+  });
+
+  it('preserves providerInstances in parsed preferences', () => {
+    const parsed = userPreferencesSchema.parse({
+      providerInstances: [
+        {
+          id: 'stagewise-default',
+          typeId: 'stagewise',
+          name: 'Stagewise',
+          config: {},
+        },
+        {
+          id: 'anthropic-api-default',
+          typeId: 'anthropic-api',
+          name: 'Anthropic',
+          config: { encryptedApiKey: 'key' },
+        },
+      ],
+    });
+    expect(parsed.providerInstances).toHaveLength(2);
+    expect(parsed.providerInstances[1]?.typeId).toBe('anthropic-api');
   });
 });

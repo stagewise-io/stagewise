@@ -6,6 +6,8 @@ import type {
   CustomModel,
   CustomEndpoint,
   ModelThinkingOverride,
+  ProviderInstance,
+  UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { ReasoningSignatureSource } from '@shared/karton-contracts/ui/agent/metadata';
 import {
@@ -66,6 +68,185 @@ const stagewiseUrlPassthroughMiddleware: LanguageModelMiddleware = {
 
 export type { ProviderMode } from './reasoning-signatures';
 
+// ============================================================================
+// Provider instance helpers
+// ============================================================================
+
+/** Maps a provider instance `typeId` back to the legacy `ApiSpec`. */
+const INSTANCE_TYPE_ID_TO_API_SPEC: Record<string, ApiSpec> = {
+  'custom-anthropic': 'anthropic',
+  'custom-openai-chat': 'openai-chat-completions',
+  'custom-openai-responses': 'openai-responses',
+  'custom-google': 'google',
+  azure: 'azure',
+  bedrock: 'amazon-bedrock',
+  vertex: 'google-vertex',
+};
+
+/** Maps a vendor to the `ApiSpec` used when a custom model routes via that vendor. */
+const VENDOR_TO_API_SPEC: Record<ModelProvider, ApiSpec> = {
+  anthropic: 'anthropic',
+  openai: 'openai-responses',
+  google: 'google',
+  moonshotai: 'openai-chat-completions',
+  alibaba: 'openai-chat-completions',
+  deepseek: 'openai-chat-completions',
+  'z-ai': 'openai-chat-completions',
+  minimax: 'openai-chat-completions',
+  'xiaomi-mimo': 'openai-chat-completions',
+  mistral: 'openai-chat-completions',
+};
+
+/**
+ * Build a `CustomEndpoint`-shaped view from a provider instance so that the
+ * existing `createModelViaEndpoint` / `buildBedrockProvider` methods can
+ * consume it without internal changes. This is a mechanical data-source
+ * swap — PR 1 keeps the endpoint-shaped routing surface intact.
+ */
+function providerInstanceToCustomEndpoint(
+  instance: ProviderInstance,
+): CustomEndpoint {
+  const apiSpec = INSTANCE_TYPE_ID_TO_API_SPEC[instance.typeId];
+  if (!apiSpec) {
+    throw new Error(
+      `providerInstanceToCustomEndpoint: typeId ${instance.typeId} is not a custom-endpoint type`,
+    );
+  }
+  // Access `instance.config` inside each case so TypeScript narrows the
+  // discriminated union per typeId.
+  switch (instance.typeId) {
+    case 'custom-anthropic':
+    case 'custom-openai-chat':
+    case 'custom-openai-responses':
+    case 'custom-google':
+      return {
+        id: instance.id,
+        name: instance.name,
+        apiSpec,
+        baseUrl: instance.config.baseUrl,
+        encryptedApiKey: instance.config.encryptedApiKey,
+        modelIdMapping: instance.config.modelIdMapping,
+        resourceName: undefined,
+        apiVersion: undefined,
+        region: undefined,
+        encryptedSecretKey: undefined,
+        awsAuthMode: 'access-keys',
+        awsProfileName: undefined,
+        projectId: undefined,
+        location: undefined,
+        encryptedGoogleCredentials: undefined,
+      };
+    case 'azure':
+      return {
+        id: instance.id,
+        name: instance.name,
+        apiSpec,
+        baseUrl: instance.config.baseUrl,
+        encryptedApiKey: instance.config.encryptedApiKey,
+        modelIdMapping: instance.config.modelIdMapping,
+        resourceName: instance.config.resourceName,
+        apiVersion: instance.config.apiVersion,
+        region: undefined,
+        encryptedSecretKey: undefined,
+        awsAuthMode: 'access-keys',
+        awsProfileName: undefined,
+        projectId: undefined,
+        location: undefined,
+        encryptedGoogleCredentials: undefined,
+      };
+    case 'bedrock':
+      return {
+        id: instance.id,
+        name: instance.name,
+        apiSpec,
+        baseUrl: '',
+        encryptedApiKey: instance.config.encryptedApiKey,
+        modelIdMapping: instance.config.modelIdMapping,
+        resourceName: undefined,
+        apiVersion: undefined,
+        region: instance.config.region,
+        encryptedSecretKey: instance.config.encryptedSecretKey,
+        awsAuthMode: instance.config.awsAuthMode,
+        awsProfileName: instance.config.awsProfileName,
+        projectId: undefined,
+        location: undefined,
+        encryptedGoogleCredentials: undefined,
+      };
+    case 'vertex':
+      return {
+        id: instance.id,
+        name: instance.name,
+        apiSpec,
+        baseUrl: '',
+        encryptedApiKey: undefined,
+        modelIdMapping: instance.config.modelIdMapping,
+        resourceName: undefined,
+        apiVersion: undefined,
+        region: undefined,
+        encryptedSecretKey: undefined,
+        awsAuthMode: 'access-keys',
+        awsProfileName: undefined,
+        projectId: instance.config.projectId,
+        location: instance.config.location,
+        encryptedGoogleCredentials: instance.config.encryptedGoogleCredentials,
+      };
+    default:
+      throw new Error(
+        `providerInstanceToCustomEndpoint: unsupported typeId ${instance.typeId}`,
+      );
+  }
+}
+
+/**
+ * Resolve which provider instance serves a given vendor.
+ * Returns `undefined` when the vendor falls back to the shared stagewise
+ * instance (i.e. no vendor-specific instance is configured).
+ *
+ * PR 1 hybrid: custom-mode vendors are linked to their instance via the
+ * legacy `providerConfigs[vendor].customProviderId` field. The migration
+ * reuses the endpoint ID as the instance ID, so the lookup is a direct
+ * ID match.
+ */
+function findInstanceForVendor(
+  prefs: UserPreferences,
+  vendor: ModelProvider,
+): ProviderInstance | undefined {
+  const instances = prefs.providerInstances;
+  const legacyConfig = prefs.providerConfigs?.[vendor];
+
+  // The legacy `mode` is the source of truth for routing intent. When it is
+  // set, resolve strictly by it so that a user who switched back to
+  // 'stagewise' does not accidentally route through a leftover vendor-api
+  // instance.
+  if (legacyConfig) {
+    switch (legacyConfig.mode) {
+      case 'stagewise':
+        return undefined;
+      case 'custom':
+        if (!legacyConfig.customProviderId) return undefined;
+        return instances.find((i) => i.id === legacyConfig.customProviderId);
+      case 'official':
+        break; // fall through to instance scan below
+    }
+  }
+
+  for (const instance of instances) {
+    if (instance.typeId === 'stagewise') continue;
+    if (instance.typeId.endsWith('-api')) {
+      const v = instance.typeId.slice(0, -4); // strip `-api`
+      if (v === vendor) return instance;
+      continue;
+    }
+    if (instance.typeId === 'coding-plan') {
+      const plan =
+        CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS];
+      if (plan?.provider === vendor) return instance;
+      continue;
+    }
+  }
+  return undefined;
+}
+
 export type ModelWithOptions = {
   model: LanguageModelV3;
   providerOptions: Parameters<typeof streamText>[0]['providerOptions'];
@@ -122,8 +303,9 @@ export class ModelProviderService {
   }
 
   /**
-   * Resolve credentials and base URL for a given provider
-   * based on the user's endpoint-mode preference.
+   * Resolve credentials and base URL for a given provider by looking up
+   * the provider instance assigned to that vendor. Falls back to the
+   * shared stagewise instance when no vendor-specific instance exists.
    */
   private resolveProviderEndpoint(provider: ModelProvider): {
     apiKey: string;
@@ -133,99 +315,104 @@ export class ModelProviderService {
     customEndpoint?: CustomEndpoint;
   } {
     const prefs = this.preferencesService.get();
-    const config = prefs.providerConfigs[provider];
     const proxyBaseUrl =
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
-    switch (config.mode) {
-      case 'stagewise':
-        return {
-          apiKey: this.authService.accessToken ?? '',
-          baseURL: proxyBaseUrl,
-          mode: 'stagewise',
-        };
-      case 'official': {
-        const connectedCodingPlan = config.connectedCodingPlanId
-          ? CODING_PLANS[config.connectedCodingPlanId]
-          : undefined;
-        return {
-          apiKey: this.preferencesService.decryptProviderApiKey(
-            config.encryptedApiKey,
-          ),
-          baseURL:
-            connectedCodingPlan?.provider === provider
-              ? connectedCodingPlan.baseUrl
-              : undefined,
-          mode: 'official',
-          connectedCodingPlanId: config.connectedCodingPlanId,
-        };
-      }
-      case 'custom': {
-        const endpoint = prefs.customEndpoints.find(
-          (ep) => ep.id === config.customProviderId,
-        );
-        if (!endpoint) {
-          return {
-            apiKey: this.authService.accessToken ?? '',
-            baseURL: proxyBaseUrl,
-            mode: 'stagewise',
-          };
-        }
-        return {
-          apiKey: this.preferencesService.decryptProviderApiKey(
-            endpoint.encryptedApiKey,
-          ),
-          baseURL: endpoint.baseUrl || undefined,
-          mode: 'custom',
-          customEndpoint: endpoint,
-        };
-      }
+    const instance = findInstanceForVendor(prefs, provider);
+    if (!instance || instance.typeId === 'stagewise') {
+      return {
+        apiKey: this.authService.accessToken ?? '',
+        baseURL: proxyBaseUrl,
+        mode: 'stagewise',
+      };
     }
+
+    if (instance.typeId === 'coding-plan') {
+      const cfg = instance.config;
+      return {
+        apiKey: this.preferencesService.decryptProviderApiKey(
+          cfg.encryptedApiKey,
+        ),
+        baseURL: cfg.baseUrl,
+        mode: 'official',
+        connectedCodingPlanId: cfg.planId,
+      };
+    }
+
+    if (instance.typeId.endsWith('-api')) {
+      // `-api` is a suffix match, so TS cannot narrow the discriminated
+      // union. All vendor-api configs share the `officialApiConfig` shape.
+      const cfg = instance.config as {
+        encryptedApiKey?: string;
+        baseUrl?: string;
+      };
+      return {
+        apiKey: this.preferencesService.decryptProviderApiKey(
+          cfg.encryptedApiKey,
+        ),
+        baseURL: cfg.baseUrl,
+        mode: 'official',
+      };
+    }
+
+    // Custom-type instance serving this vendor.
+    const endpoint = providerInstanceToCustomEndpoint(instance);
+    return {
+      apiKey: this.preferencesService.decryptProviderApiKey(
+        endpoint.encryptedApiKey,
+      ),
+      baseURL: endpoint.baseUrl || undefined,
+      mode: 'custom',
+      customEndpoint: endpoint,
+    };
   }
 
   /**
-   * Resolve credentials for a custom model's endpoint reference
-   * (which can be a built-in provider name or a custom endpoint id).
+   * Resolve credentials for a custom model's provider instance reference.
+   * The `providerInstanceId` can be a vendor-backed instance id (e.g.
+   * `anthropic-api-default`) or a custom-type instance id.
    */
-  private resolveCustomEndpoint(endpointId: string): {
+  private resolveProviderInstance(providerInstanceId: string): {
     apiKey: string;
     baseURL: string | undefined;
     apiSpec: ApiSpec;
     endpoint?: CustomEndpoint;
   } {
-    if (
-      endpointId === 'anthropic' ||
-      endpointId === 'openai' ||
-      endpointId === 'google' ||
-      endpointId === 'moonshotai' ||
-      endpointId === 'alibaba' ||
-      endpointId === 'deepseek' ||
-      endpointId === 'z-ai' ||
-      endpointId === 'minimax' ||
-      endpointId === 'xiaomi-mimo' ||
-      endpointId === 'mistral'
-    ) {
-      const { apiKey, baseURL } = this.resolveProviderEndpoint(endpointId);
-      const apiSpecMap: Record<ModelProvider, ApiSpec> = {
-        anthropic: 'anthropic',
-        openai: 'openai-responses',
-        google: 'google',
-        moonshotai: 'openai-chat-completions',
-        alibaba: 'openai-chat-completions',
-        deepseek: 'openai-chat-completions',
-        'z-ai': 'openai-chat-completions',
-        minimax: 'openai-chat-completions',
-        'xiaomi-mimo': 'openai-chat-completions',
-        mistral: 'openai-chat-completions',
-      };
-      return { apiKey, baseURL, apiSpec: apiSpecMap[endpointId] };
+    const prefs = this.preferencesService.get();
+    const instance = prefs.providerInstances.find(
+      (i) => i.id === providerInstanceId,
+    );
+    if (!instance) {
+      throw new Error(`Provider instance ${providerInstanceId} not found`);
     }
 
-    const endpoint = this.preferencesService
-      .get()
-      .customEndpoints.find((ep) => ep.id === endpointId);
-    if (!endpoint) throw new Error(`Custom endpoint ${endpointId} not found`);
+    // Vendor-backed instance — delegate to the vendor resolver to pick up
+    // stagewise fallback / coding-plan base URLs.
+    if (instance.typeId === 'stagewise') {
+      throw new Error(
+        `Provider instance ${providerInstanceId} is a stagewise instance with no resolvable vendor`,
+      );
+    }
+    if (instance.typeId === 'coding-plan') {
+      const vendor =
+        CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS]
+          ?.provider;
+      if (!vendor) {
+        throw new Error(
+          `Provider instance ${providerInstanceId} has no resolvable vendor`,
+        );
+      }
+      const { apiKey, baseURL } = this.resolveProviderEndpoint(vendor);
+      return { apiKey, baseURL, apiSpec: VENDOR_TO_API_SPEC[vendor] };
+    }
+    if (instance.typeId.endsWith('-api')) {
+      const vendor = instance.typeId.slice(0, -4) as ModelProvider;
+      const { apiKey, baseURL } = this.resolveProviderEndpoint(vendor);
+      return { apiKey, baseURL, apiSpec: VENDOR_TO_API_SPEC[vendor] };
+    }
 
+    // Custom-type instance.
+    const endpoint = providerInstanceToCustomEndpoint(instance);
     return {
       apiKey: this.preferencesService.decryptProviderApiKey(
         endpoint.encryptedApiKey,
@@ -901,8 +1088,8 @@ export class ModelProviderService {
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
   ): Omit<ModelWithOptions, 'providerMode'> {
-    const { apiKey, baseURL, apiSpec, endpoint } = this.resolveCustomEndpoint(
-      customModel.endpointId,
+    const { apiKey, baseURL, apiSpec, endpoint } = this.resolveProviderInstance(
+      customModel.providerInstanceId ?? '',
     );
     const headers = customModel.headers ?? {};
     const posthogProperties = omitModelRequestMetadata(otherPostHogProperties);
@@ -938,7 +1125,10 @@ export class ModelProviderService {
       'custom',
       getSemanticProviderForApiSpec(apiSpec),
       customModel.modelId,
-      { apiSpec, endpointId: endpoint?.id ?? customModel.endpointId },
+      {
+        apiSpec,
+        endpointId: endpoint?.id ?? customModel.providerInstanceId ?? '',
+      },
     );
     const providerOptions =
       Object.keys(customModel.providerOptions).length > 0

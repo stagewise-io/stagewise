@@ -8,11 +8,15 @@ import {
   type WidgetId,
   type DevToolbarOriginSettings,
   type ModelProvider,
+  type ProviderInstance,
+  type CustomEndpoint,
+  type ApiSpec,
   userPreferencesSchema,
   defaultUserPreferences,
   PermissionSetting,
   configurablePermissionTypes,
   modelProviderSchema,
+  PROVIDER_DISPLAY_INFO,
   DEFAULT_WIDGET_ORDER,
   DEV_TOOLBAR_MAX_ORIGINS,
 } from '@shared/karton-contracts/ui/shared-types';
@@ -27,6 +31,7 @@ import {
 import {
   validateApiKeys,
   validateCodingPlanApiKey,
+  type ApiKeyValidationResult,
 } from '../utils/validate-api-keys';
 
 // Enable Immer patches support
@@ -122,6 +127,8 @@ export class PreferencesService extends DisposableService {
 
     // Migration: convert old customBaseUrl configs to customProviderId
     await this.migrateCustomBaseUrlToProviderId();
+    // Migration: convert providerConfigs/customEndpoints into providerInstances
+    await this.migrateToProviderInstances();
 
     this.logger.debug('[PreferencesService] Loaded preferences', {
       telemetryLevel: this.preferences.privacy.telemetryLevel,
@@ -189,6 +196,235 @@ export class PreferencesService extends DisposableService {
 
     if (needsSave) {
       await this.save();
+    }
+  }
+
+  /**
+   * Migrate `providerConfigs` / `customEndpoints` into a flat
+   * `providerInstances` array — the new single source of truth for routing.
+   *
+   * After migration each vendor maps to exactly one provider instance. The
+   * `stagewise` instance is shared: vendors not otherwise assigned fall back
+   * to it at routing time.
+   *
+   * Idempotent: if `providerInstances` is already populated this is a no-op.
+   */
+  private async migrateToProviderInstances(): Promise<void> {
+    if (this.preferences.providerInstances.length > 0) return;
+
+    const VENDORS: ModelProvider[] = [
+      'anthropic',
+      'openai',
+      'google',
+      'moonshotai',
+      'alibaba',
+      'deepseek',
+      'z-ai',
+      'minimax',
+      'xiaomi-mimo',
+      'mistral',
+    ];
+    const BUILT_IN_VENDOR_NAMES = new Set<string>(VENDORS);
+
+    const instances: ProviderInstance[] = [];
+    // vendor -> instance id that serves it (post-migration)
+    const vendorToInstanceId = new Map<ModelProvider, string>();
+    // endpoint ids consumed by a providerConfig custom-mode entry
+    const consumedEndpointIds = new Set<string>();
+
+    // 1. Seed the shared stagewise instance.
+    instances.push({
+      id: 'stagewise-default',
+      typeId: 'stagewise',
+      name: 'Stagewise',
+      config: {},
+      enabledModelIds: [],
+      discoveredModels: [],
+    });
+
+    // 2. Process providerConfigs.
+    for (const vendor of VENDORS) {
+      const cfg = this.preferences.providerConfigs[vendor];
+      if (!cfg) continue;
+
+      if (cfg.mode === 'stagewise') {
+        vendorToInstanceId.set(vendor, 'stagewise-default');
+        continue;
+      }
+
+      if (cfg.mode === 'official') {
+        if (cfg.connectedCodingPlanId) {
+          const plan = CODING_PLANS[cfg.connectedCodingPlanId];
+          if (plan) {
+            const id = `coding-plan:${cfg.connectedCodingPlanId}`;
+            instances.push({
+              id,
+              typeId: 'coding-plan',
+              name: plan.displayName,
+              config: {
+                encryptedApiKey: cfg.encryptedApiKey,
+                planId: cfg.connectedCodingPlanId,
+                baseUrl: plan.baseUrl,
+              },
+              enabledModelIds: [],
+              discoveredModels: [],
+            });
+            vendorToInstanceId.set(vendor, id);
+            continue;
+          }
+        }
+        // Official API without a coding plan.
+        const id = `${vendor}-api-default`;
+        instances.push({
+          id,
+          typeId: `${vendor}-api`,
+          name: PROVIDER_DISPLAY_INFO[vendor].name,
+          config: {
+            encryptedApiKey: cfg.encryptedApiKey,
+            baseUrl: undefined,
+          },
+          enabledModelIds: [],
+          discoveredModels: [],
+        });
+        vendorToInstanceId.set(vendor, id);
+        continue;
+      }
+
+      // mode === 'custom'
+      if (cfg.customProviderId) {
+        const endpoint = this.preferences.customEndpoints.find(
+          (ep) => ep.id === cfg.customProviderId,
+        );
+        if (endpoint) {
+          const instance = this.endpointToInstance(endpoint);
+          instances.push(instance);
+          vendorToInstanceId.set(vendor, instance.id);
+          consumedEndpointIds.add(endpoint.id);
+        }
+      }
+    }
+
+    // 3. Process remaining custom endpoints not consumed above.
+    for (const endpoint of this.preferences.customEndpoints) {
+      if (consumedEndpointIds.has(endpoint.id)) continue;
+      instances.push(this.endpointToInstance(endpoint));
+    }
+
+    // 5. Rewrite customModels: endpointId -> providerInstanceId.
+    for (const model of this.preferences.customModels) {
+      if (!model.providerInstanceId && model.endpointId) {
+        if (BUILT_IN_VENDOR_NAMES.has(model.endpointId)) {
+          model.providerInstanceId =
+            vendorToInstanceId.get(model.endpointId as ModelProvider) ??
+            'stagewise-default';
+        } else {
+          // Custom endpoint id — instance ids reuse endpoint ids.
+          model.providerInstanceId = model.endpointId;
+        }
+      }
+      model.endpointId = undefined;
+    }
+
+    this.preferences = {
+      ...this.preferences,
+      providerInstances: instances,
+    };
+
+    this.logger.debug(`[PreferencesService] Migrated to providerInstances`, {
+      count: instances.length,
+      vendorMap: Object.fromEntries(vendorToInstanceId),
+    });
+    await this.save();
+  }
+
+  /**
+   * Convert a legacy `CustomEndpoint` into a `ProviderInstance`.
+   * Reuses the endpoint id as the instance id to preserve custom-model
+   * references.
+   */
+  private endpointToInstance(endpoint: CustomEndpoint): ProviderInstance {
+    const apiSpecToTypeId: Record<ApiSpec, ProviderInstance['typeId']> = {
+      anthropic: 'custom-anthropic',
+      'openai-chat-completions': 'custom-openai-chat',
+      'openai-responses': 'custom-openai-responses',
+      google: 'custom-google',
+      azure: 'azure',
+      'amazon-bedrock': 'bedrock',
+      'google-vertex': 'vertex',
+    };
+    const typeId = apiSpecToTypeId[endpoint.apiSpec];
+
+    // Build the provider instance per typeId, copying only the fields
+    // relevant to it. Each case constructs the full instance object so the
+    // discriminated union narrows correctly.
+    switch (typeId) {
+      case 'custom-anthropic':
+      case 'custom-openai-chat':
+      case 'custom-openai-responses':
+      case 'custom-google':
+        return {
+          id: endpoint.id,
+          typeId,
+          name: endpoint.name,
+          config: {
+            encryptedApiKey: endpoint.encryptedApiKey,
+            baseUrl: endpoint.baseUrl,
+            modelIdMapping: endpoint.modelIdMapping,
+          },
+          enabledModelIds: [],
+          discoveredModels: [],
+        };
+      case 'azure':
+        return {
+          id: endpoint.id,
+          typeId,
+          name: endpoint.name,
+          config: {
+            encryptedApiKey: endpoint.encryptedApiKey,
+            baseUrl: endpoint.baseUrl,
+            resourceName: endpoint.resourceName,
+            apiVersion: endpoint.apiVersion,
+            modelIdMapping: endpoint.modelIdMapping,
+          },
+          enabledModelIds: [],
+          discoveredModels: [],
+        };
+      case 'bedrock':
+        return {
+          id: endpoint.id,
+          typeId,
+          name: endpoint.name,
+          config: {
+            encryptedApiKey: endpoint.encryptedApiKey,
+            encryptedSecretKey: endpoint.encryptedSecretKey,
+            region: endpoint.region,
+            awsAuthMode: endpoint.awsAuthMode ?? 'access-keys',
+            awsProfileName: endpoint.awsProfileName,
+            modelIdMapping: endpoint.modelIdMapping,
+          },
+          enabledModelIds: [],
+          discoveredModels: [],
+        };
+      case 'vertex':
+        return {
+          id: endpoint.id,
+          typeId,
+          name: endpoint.name,
+          config: {
+            encryptedGoogleCredentials: endpoint.encryptedGoogleCredentials,
+            projectId: endpoint.projectId,
+            location: endpoint.location,
+            modelIdMapping: endpoint.modelIdMapping,
+          },
+          enabledModelIds: [],
+          discoveredModels: [],
+        };
+      default:
+        // Exhaustive guard — if a new apiSpec is added without a mapping
+        // this throws at migration time rather than silently dropping data.
+        throw new Error(
+          `endpointToInstance: unmapped typeId ${typeId} for endpoint ${endpoint.id}`,
+        );
     }
   }
 
@@ -329,6 +565,87 @@ export class PreferencesService extends DisposableService {
         const { validateApiKeys } = await import('../utils/validate-api-keys');
         const results = await validateApiKeys({ [provider]: apiKey }, baseUrl);
         return results[provider];
+      },
+    );
+
+    // --- Provider instance procedures (new instance-based API) ---
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.addProviderInstance',
+      async (
+        _callingClientId: string,
+        args: {
+          typeId: string;
+          name?: string;
+          config: Record<string, unknown>;
+          validateApiKey?: string;
+        },
+      ) => {
+        return this.addProviderInstance(args);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.removeProviderInstance',
+      async (_callingClientId: string, instanceId: string) => {
+        await this.removeProviderInstance(instanceId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.updateProviderInstance',
+      async (
+        _callingClientId: string,
+        instanceId: string,
+        partialConfig: Record<string, unknown>,
+        name?: string,
+      ) => {
+        await this.updateProviderInstance(instanceId, partialConfig, name);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setProviderInstanceApiKey',
+      async (_callingClientId: string, instanceId: string, apiKey: string) => {
+        await this.setProviderInstanceApiKey(instanceId, apiKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.clearProviderInstanceApiKey',
+      async (_callingClientId: string, instanceId: string) => {
+        await this.clearProviderInstanceApiKey(instanceId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setProviderInstanceSecretKey',
+      async (
+        _callingClientId: string,
+        instanceId: string,
+        secretKey: string,
+      ) => {
+        await this.setProviderInstanceSecretKey(instanceId, secretKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setProviderInstanceGoogleCredentials',
+      async (
+        _callingClientId: string,
+        instanceId: string,
+        credentials: string,
+      ) => {
+        await this.setProviderInstanceGoogleCredentials(
+          instanceId,
+          credentials,
+        );
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.validateProviderInstanceApiKey',
+      async (_callingClientId: string, instanceId: string, apiKey: string) => {
+        return this.validateProviderInstanceApiKey(instanceId, apiKey);
       },
     );
 
@@ -1208,6 +1525,301 @@ export class PreferencesService extends DisposableService {
     }
   }
 
+  // ===========================================================================
+  // Provider Instance Methods (new instance-based API)
+  // ===========================================================================
+
+  /** Find the index of a provider instance by id, or -1. */
+  private findProviderInstanceIndex(instanceId: string): number {
+    return this.preferences.providerInstances.findIndex(
+      (i) => i.id === instanceId,
+    );
+  }
+
+  /**
+   * Add a new provider instance. When `validateApiKey` is supplied and the
+   * typeId is a vendor-api type, the key is validated before the instance is
+   * persisted. Returns the new instance id on success.
+   */
+  public async addProviderInstance(args: {
+    typeId: string;
+    name?: string;
+    config: Record<string, unknown>;
+    validateApiKey?: string;
+  }): Promise<
+    { success: true; instanceId: string } | { success: false; error: string }
+  > {
+    this.assertNotDisposed();
+
+    const { typeId, config, validateApiKey } = args;
+
+    // For vendor-api instances, validate the key first.
+    if (validateApiKey && typeId.endsWith('-api')) {
+      const vendor = typeId.slice(0, -4) as ModelProvider;
+      const results = await validateApiKeys({ [vendor]: validateApiKey });
+      const result = results[vendor];
+      if (!result) {
+        return { success: false, error: 'Validation was skipped' };
+      }
+      if (result.success === false) {
+        return result;
+      }
+    }
+
+    // For coding-plan instances, validate against the plan.
+    if (validateApiKey && typeId === 'coding-plan') {
+      const planId = config.planId as CodingPlanId;
+      if (!isCodingPlanId(planId)) {
+        return { success: false, error: `Unknown coding plan: ${planId}` };
+      }
+      const plan = CODING_PLANS[planId];
+      const result = await validateCodingPlanApiKey(plan, validateApiKey);
+      if (!result) {
+        return { success: false, error: 'Validation was skipped' };
+      }
+      if (result.success === false) {
+        return result;
+      }
+    }
+
+    // Encrypt the API key if provided in plaintext.
+    const finalConfig = { ...config };
+    if (validateApiKey) {
+      finalConfig.encryptedApiKey = safeStorage
+        .encryptString(validateApiKey)
+        .toString('base64');
+    }
+
+    const instanceId = `${typeId}-${crypto.randomUUID()}`;
+    const name =
+      args.name ??
+      (typeId.endsWith('-api')
+        ? (PROVIDER_DISPLAY_INFO[typeId.slice(0, -4) as ModelProvider]?.name ??
+          typeId)
+        : typeId === 'coding-plan'
+          ? (CODING_PLANS[finalConfig.planId as CodingPlanId]?.displayName ??
+            'Coding Plan')
+          : typeId);
+
+    const instance = {
+      id: instanceId,
+      typeId: typeId as ProviderInstance['typeId'],
+      name,
+      config: finalConfig as ProviderInstance['config'],
+      enabledModelIds: [] as string[],
+      discoveredModels: [] as Record<string, unknown>[],
+    };
+
+    const patches: Patch[] = [
+      {
+        op: 'add',
+        path: ['providerInstances', this.preferences.providerInstances.length],
+        value: instance,
+      },
+    ];
+    await this.update(patches);
+
+    this.logger.debug(
+      `[PreferencesService] Added provider instance: ${instanceId}`,
+    );
+    return { success: true, instanceId };
+  }
+
+  /**
+   * Remove a provider instance by id. Vendors that had this instance as
+   * their route fall back to the shared stagewise instance at routing time.
+   */
+  public async removeProviderInstance(instanceId: string): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const patches: Patch[] = [
+      { op: 'remove', path: ['providerInstances', idx] },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Removed provider instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Merge a partial config into an existing provider instance, and/or
+   * update its display name. Only top-level config keys are merged.
+   */
+  public async updateProviderInstance(
+    instanceId: string,
+    partialConfig: Record<string, unknown>,
+    name?: string,
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const current = this.preferences.providerInstances[idx];
+    const nextConfig = { ...current.config, ...partialConfig };
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'config'],
+        value: nextConfig,
+      },
+    ];
+    if (name !== undefined && name !== current.name) {
+      patches.push({
+        op: 'replace',
+        path: ['providerInstances', idx, 'name'],
+        value: name,
+      });
+    }
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Updated provider instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Set an encrypted API key on a provider instance.
+   */
+  public async setProviderInstanceApiKey(
+    instanceId: string,
+    plaintextKey: string,
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const encrypted = safeStorage
+      .encryptString(plaintextKey)
+      .toString('base64');
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'config', 'encryptedApiKey'],
+        value: encrypted,
+      },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Set API key for instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Clear the encrypted API key on a provider instance.
+   */
+  public async clearProviderInstanceApiKey(instanceId: string): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'config', 'encryptedApiKey'],
+        value: undefined,
+      },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Cleared API key for instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Set an encrypted secret key (Bedrock) on a provider instance.
+   */
+  public async setProviderInstanceSecretKey(
+    instanceId: string,
+    plaintextKey: string,
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const encrypted = safeStorage
+      .encryptString(plaintextKey)
+      .toString('base64');
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'config', 'encryptedSecretKey'],
+        value: encrypted,
+      },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Set secret key for instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Set encrypted Google service account credentials (Vertex) on a provider instance.
+   */
+  public async setProviderInstanceGoogleCredentials(
+    instanceId: string,
+    credentialsJson: string,
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const encrypted = safeStorage
+      .encryptString(credentialsJson)
+      .toString('base64');
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: [
+          'providerInstances',
+          idx,
+          'config',
+          'encryptedGoogleCredentials',
+        ],
+        value: encrypted,
+      },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Set Google credentials for instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Validate an API key against a provider instance's vendor endpoint.
+   */
+  public async validateProviderInstanceApiKey(
+    instanceId: string,
+    apiKey: string,
+  ): Promise<ApiKeyValidationResult> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const instance = this.preferences.providerInstances[idx];
+    if (instance.typeId.endsWith('-api')) {
+      const vendor = instance.typeId.slice(0, -4) as ModelProvider;
+      const baseUrl =
+        (instance.config as { baseUrl?: string }).baseUrl ?? undefined;
+      const results = await validateApiKeys({ [vendor]: apiKey }, baseUrl);
+      return results[vendor] ?? null;
+    }
+    if (instance.typeId === 'coding-plan') {
+      const plan =
+        CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS];
+      if (!plan) return null;
+      return validateCodingPlanApiKey(plan, apiKey);
+    }
+    return null;
+  }
+
   private notifyListeners(
     newPrefs: UserPreferences,
     oldPrefs: UserPreferences,
@@ -1256,6 +1868,30 @@ export class PreferencesService extends DisposableService {
       this.uiKarton.removeServerProcedureHandler('preferences.listAwsProfiles');
       this.uiKarton.removeServerProcedureHandler(
         'preferences.validateProviderApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.addProviderInstance',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.removeProviderInstance',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.updateProviderInstance',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setProviderInstanceApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.clearProviderInstanceApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setProviderInstanceSecretKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setProviderInstanceGoogleCredentials',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.validateProviderInstanceApiKey',
       );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',

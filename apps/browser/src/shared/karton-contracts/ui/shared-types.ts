@@ -154,7 +154,14 @@ export const customModelSchema = z.object({
   displayName: z.string().min(1),
   description: z.string().default(''),
   contextWindowSize: z.number().int().positive().default(128000),
-  endpointId: z.string(),
+  /** @deprecated Use `providerInstanceId`. Kept for migration parsing only. */
+  endpointId: z.string().optional(),
+  /**
+   * ID of the provider instance this model routes to.
+   * Optional in the schema so legacy data (which only has `endpointId`)
+   * parses; the migration backfill makes it required at runtime.
+   */
+  providerInstanceId: z.string().optional(),
   thinkingEnabled: z.boolean().default(false),
   capabilities: modelCapabilitiesSchema.default({
     inputModalities: {
@@ -177,6 +184,183 @@ export const customModelSchema = z.object({
   headers: z.record(z.string(), z.string()).default({}),
 });
 export type CustomModel = z.infer<typeof customModelSchema>;
+
+// ============================================================================
+// Provider Instances
+// ============================================================================
+
+/**
+ * The set of provider type IDs. Each ID determines the config shape and
+ * routing behavior of a provider instance. See `API_PROVIDER_SPEC.md` for
+ * the full architecture.
+ */
+export const providerInstanceTypeIds = [
+  'stagewise',
+  'anthropic-api',
+  'openai-api',
+  'google-api',
+  'moonshotai-api',
+  'alibaba-api',
+  'deepseek-api',
+  'z-ai-api',
+  'minimax-api',
+  'xiaomi-mimo-api',
+  'mistral-api',
+  'coding-plan',
+  'custom-anthropic',
+  'custom-openai-chat',
+  'custom-openai-responses',
+  'custom-google',
+  'azure',
+  'bedrock',
+  'vertex',
+] as const;
+export type ProviderInstanceTypeId = (typeof providerInstanceTypeIds)[number];
+
+/** Stagewise — no stored credentials (auth service token injected at request time) */
+const stagewiseConfigSchema = z.object({}).strict();
+
+/** Official vendor API — encrypted key + optional base URL override */
+const officialApiConfigSchema = z.object({
+  encryptedApiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+});
+
+/** Coding plan — encrypted key + plan ID + optional base URL */
+const codingPlanConfigSchema = z.object({
+  encryptedApiKey: z.string().optional(),
+  planId: z.string(),
+  baseUrl: z.string().optional(),
+});
+
+/** Generic custom-compatible endpoint (anthropic / openai-chat / openai-responses / google) */
+const customCompatibleConfigSchema = z.object({
+  encryptedApiKey: z.string().optional(),
+  baseUrl: z.string(),
+  modelIdMapping: z.record(z.string(), z.string()).optional(),
+});
+
+/** Azure OpenAI */
+const azureConfigSchema = z.object({
+  encryptedApiKey: z.string().optional(),
+  baseUrl: z.string(),
+  resourceName: z.string().optional(),
+  apiVersion: z.string().optional(),
+  modelIdMapping: z.record(z.string(), z.string()).optional(),
+});
+
+/** Amazon Bedrock */
+const bedrockConfigSchema = z.object({
+  encryptedApiKey: z.string().optional(),
+  encryptedSecretKey: z.string().optional(),
+  region: z.string().optional(),
+  awsAuthMode: z
+    .enum(['access-keys', 'profile', 'default-chain'])
+    .default('access-keys'),
+  awsProfileName: z.string().optional(),
+  modelIdMapping: z.record(z.string(), z.string()).optional(),
+});
+
+/** Google Vertex AI */
+const vertexConfigSchema = z.object({
+  encryptedGoogleCredentials: z.string().optional(),
+  projectId: z.string().optional(),
+  location: z.string().optional(),
+  modelIdMapping: z.record(z.string(), z.string()).optional(),
+});
+
+/** Common fields shared by every provider instance variant. */
+const providerInstanceBaseSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  enabledModelIds: z.array(z.string()).default([]),
+  discoveredModels: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+
+/**
+ * A provider instance: a stateful, user-configured provider connection.
+ * Discriminated on `typeId` so that narrowing the type narrows the `config`
+ * shape available in routing/UI code.
+ */
+export const providerInstanceSchema = z.discriminatedUnion('typeId', [
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('stagewise'),
+    config: stagewiseConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('anthropic-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('openai-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('google-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('moonshotai-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('alibaba-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('deepseek-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('z-ai-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('minimax-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('xiaomi-mimo-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('mistral-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('coding-plan'),
+    config: codingPlanConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('custom-anthropic'),
+    config: customCompatibleConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('custom-openai-chat'),
+    config: customCompatibleConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('custom-openai-responses'),
+    config: customCompatibleConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('custom-google'),
+    config: customCompatibleConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('azure'),
+    config: azureConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('bedrock'),
+    config: bedrockConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('vertex'),
+    config: vertexConfigSchema,
+  }),
+]);
+export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
 
 /** Official API base URLs for each provider (for UI display) */
 export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> = {
@@ -593,6 +777,11 @@ export const userPreferencesSchema = z.object({
   customEndpoints: z.array(customEndpointSchema).default([]),
   /** User-defined models */
   customModels: z.array(customModelSchema).default([]),
+  /**
+   * Provider instances — the single source of truth for provider routing.
+   * Migrated from `providerConfigs` / `customEndpoints` on first load.
+   */
+  providerInstances: z.array(providerInstanceSchema).default([]),
   /** Preferred update channel for prerelease builds (alpha or beta). If not set, inferred from the installed version. */
   updateChannel: updateChannelSchema.optional(),
 });
@@ -707,6 +896,7 @@ export const defaultUserPreferences: UserPreferences = {
   },
   customEndpoints: [],
   customModels: [],
+  providerInstances: [],
 };
 
 /**

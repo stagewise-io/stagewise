@@ -2077,6 +2077,46 @@ export type KartonContract = {
         provider: ModelProvider,
         apiKey: string,
       ) => Promise<{ success: true } | { success: false; error: string }>;
+      /** Add a new provider instance to the flat providerInstances list */
+      addProviderInstance: (args: {
+        typeId: string;
+        name?: string;
+        config: Record<string, unknown>;
+        validateApiKey?: string;
+      }) => Promise<
+        | { success: true; instanceId: string }
+        | { success: false; error: string }
+      >;
+      /** Remove a provider instance by id */
+      removeProviderInstance: (instanceId: string) => Promise<void>;
+      /** Merge a partial config into an existing provider instance, and/or update its name */
+      updateProviderInstance: (
+        instanceId: string,
+        partialConfig: Record<string, unknown>,
+        name?: string,
+      ) => Promise<void>;
+      /** Set an encrypted API key on a provider instance */
+      setProviderInstanceApiKey: (
+        instanceId: string,
+        apiKey: string,
+      ) => Promise<void>;
+      /** Clear the encrypted API key on a provider instance */
+      clearProviderInstanceApiKey: (instanceId: string) => Promise<void>;
+      /** Set an encrypted secret key (Bedrock) on a provider instance */
+      setProviderInstanceSecretKey: (
+        instanceId: string,
+        secretKey: string,
+      ) => Promise<void>;
+      /** Set encrypted Google credentials JSON (Vertex) on a provider instance */
+      setProviderInstanceGoogleCredentials: (
+        instanceId: string,
+        credentials: string,
+      ) => Promise<void>;
+      /** Validate an API key against a provider instance's vendor endpoint */
+      validateProviderInstanceApiKey: (
+        instanceId: string,
+        apiKey: string,
+      ) => Promise<ApiKeyValidationResult>;
     };
     devToolbar: {
       /** Update the global widget order */
