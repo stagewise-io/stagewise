@@ -55,6 +55,7 @@ function toIndexEntry(metadata: AgentMemoryMetadata): AgentMemoryIndexEntry {
     agentInstanceId: metadata.agentInstanceId,
     title: metadata.title,
     activeModelId: metadata.activeModelId,
+    activeProviderInstanceId: metadata.activeProviderInstanceId,
     messageCount: metadata.messageCount,
     firstMessageAt: metadata.firstMessageAt,
     lastMessageAt: metadata.lastMessageAt,

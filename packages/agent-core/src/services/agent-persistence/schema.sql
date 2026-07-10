@@ -1,4 +1,4 @@
--- VERSION: 9
+-- VERSION: 10
 
 CREATE TABLE IF NOT EXISTS meta(
   key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY,
@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS agentInstances(
   created_at INTEGER NOT NULL,
   last_message_at INTEGER NOT NULL,
   active_model_id TEXT NOT NULL,
+  active_provider_instance_id TEXT,
   title TEXT NOT NULL,
   title_locked_by_user INTEGER,
   history TEXT NOT NULL DEFAULT '{"json":[]}',  -- deprecated: kept for rollback safety

@@ -91,6 +91,13 @@ export type AgentState<TMessage = AgentMessage> = {
   /** @persistence persisted-core — column `active_model_id`. Validated against the provider registry on resume; falls back to the last-used chat model if invalid. */
   activeModelId: string;
   /**
+   * @persistence persisted-core — column `active_provider_instance_id` (nullable).
+   * Identifies which provider instance serves `activeModelId`. Optional for
+   * backward compatibility — old agent rows have no value and consumers
+   * default to `'stagewise-default'`.
+   */
+  activeProviderInstanceId?: string;
+  /**
    * Per-agent tool-approval preference.
    *
    * @persistence persisted-core — column `tool_approval_mode`. Store-
@@ -146,6 +153,7 @@ export type StoredAgentPreview<TAgentTypes extends AgentTypes = AgentTypes> = {
   createdAt: Date;
   lastMessageAt: Date;
   activeModelId: string;
+  activeProviderInstanceId?: string;
   messageCount: number;
   mountedWorkspaces: Array<{
     path: string;

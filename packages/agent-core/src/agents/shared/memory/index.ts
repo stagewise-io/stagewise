@@ -41,6 +41,7 @@ export interface WriteAgentMemorySnapshotOptions {
   agentInstanceId: string;
   title: string;
   activeModelId: string;
+  activeProviderInstanceId?: string;
   history: readonly AgentMessage[];
   reason: MemoryWriteReason;
 }
@@ -48,6 +49,7 @@ export interface WriteAgentMemorySnapshotOptions {
 export interface AgentMemoryFlushOptions {
   title: string;
   activeModelId: string;
+  activeProviderInstanceId?: string;
   history: readonly AgentMessage[];
   reason: MemoryWriteReason;
 }
@@ -66,6 +68,7 @@ export interface AgentMemoryMetadata {
   agentInstanceId: string;
   title: string;
   activeModelId: string;
+  activeProviderInstanceId?: string;
   messageCount: number;
   firstMessageAt: string | null;
   lastMessageAt: string | null;
@@ -78,6 +81,7 @@ export interface AgentMemoryIndexEntry {
   agentInstanceId: string;
   title: string;
   activeModelId: string;
+  activeProviderInstanceId?: string;
   messageCount: number;
   firstMessageAt: string | null;
   lastMessageAt: string | null;
@@ -143,6 +147,7 @@ function computeMetadata(
     agentInstanceId,
     title: options.title,
     activeModelId: options.activeModelId,
+    activeProviderInstanceId: options.activeProviderInstanceId,
     messageCount: options.history.length,
     firstMessageAt,
     lastMessageAt,
@@ -157,6 +162,7 @@ function toIndexEntry(metadata: AgentMemoryMetadata): AgentMemoryIndexEntry {
     agentInstanceId: metadata.agentInstanceId,
     title: metadata.title,
     activeModelId: metadata.activeModelId,
+    activeProviderInstanceId: metadata.activeProviderInstanceId,
     messageCount: metadata.messageCount,
     firstMessageAt: metadata.firstMessageAt,
     lastMessageAt: metadata.lastMessageAt,
@@ -459,6 +465,7 @@ export async function writeAgentMemorySnapshot(
       await writer.flush({
         title: options.title,
         activeModelId: options.activeModelId,
+        activeProviderInstanceId: options.activeProviderInstanceId,
         history: options.history,
         reason: options.reason,
       });

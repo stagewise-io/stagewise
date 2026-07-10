@@ -59,6 +59,7 @@ export type StoredAgentPreview = Omit<
   'activeModelId' | 'mountedWorkspaces'
 > & {
   activeModelId: ModelId;
+  activeProviderInstanceId?: string;
   mountedWorkspaces: Array<{
     path: string;
     permissions: MountPermission[];

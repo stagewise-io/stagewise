@@ -32,6 +32,8 @@ export function hydrateInitialState(
       state.queuedMessages = args.initialState?.queuedMessages ?? [];
       state.activeModelId =
         args.initialState?.activeModelId ?? args.defaultModelId;
+      state.activeProviderInstanceId =
+        args.initialState?.activeProviderInstanceId;
       state.toolApprovalMode =
         args.initialState?.toolApprovalMode ?? state.toolApprovalMode;
       state.pendingApprovals = args.initialState?.pendingApprovals ?? {};
