@@ -4,7 +4,6 @@ import type {
   ModelProvider,
   ApiSpec,
   CustomModel,
-  CustomEndpoint,
   ModelThinkingOverride,
   ProviderInstance,
   UserPreferences,
@@ -22,180 +21,31 @@ import {
   getModelAlias,
 } from '@shared/available-models';
 import { CODING_PLANS } from '@shared/coding-plans';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createAzure } from '@ai-sdk/azure';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
-import { fromIni, fromNodeProviderChain } from '@aws-sdk/credential-providers';
-import { createVertex } from '@ai-sdk/google-vertex';
-import { createStagewise } from './stagewise-provider';
 import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
-import type { streamText, LanguageModelMiddleware } from 'ai';
+import type { streamText } from 'ai';
 import { wrapLanguageModel } from 'ai';
 import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
 import { createThinkingProviderOptionsPatch } from '@shared/model-thinking-capabilities';
 
+// ── Provider type registry ──────────────────────────────────────────────────
+import type { ProviderType } from './providers/types';
+import { getProviderType } from './providers/registry';
+import { stagewiseProviderType } from './providers/stagewise';
+import {
+  getCodingPlanVendor,
+  type CodingPlanConfig,
+} from './providers/coding-plan';
+import { VENDOR_API_SPECS } from './providers/official-api';
+
 type ProviderOptions = Parameters<typeof streamText>[0]['providerOptions'];
 type BuiltInModelSettings = (typeof availableModels)[number];
-
-/**
- * Converts an OpenRouter-style Anthropic model ID (dots in version, e.g.
- * `claude-opus-4.8`) to the native Anthropic API format (hyphens, e.g.
- * `claude-opus-4-8`). Idempotent on IDs that already use hyphens.
- */
-function toNativeAnthropicModelId(modelId: string): string {
-  return modelId.replace(/\./g, '-');
-}
-
-function toNativeMiniMaxModelId(modelId: string): string {
-  if (modelId === 'minimax-m3') return 'MiniMax-M3';
-  return modelId;
-}
-
-/**
- * Middleware that tells the SDK all HTTP(S) URLs are natively supported by the
- * stagewise gateway. Without this the SDK downloads every image/file URL and
- * inlines the content as base64, causing "payload too large" errors.
- */
-const stagewiseUrlPassthroughMiddleware: LanguageModelMiddleware = {
-  specificationVersion: 'v3',
-  overrideSupportedUrls: () => ({
-    '*': [/^https?:\/\//i],
-  }),
-};
 
 export type { ProviderMode } from './reasoning-signatures';
 
 // ============================================================================
-// Provider instance helpers
+// Instance resolution helpers
 // ============================================================================
-
-/** Maps a provider instance `typeId` back to the legacy `ApiSpec`. */
-const INSTANCE_TYPE_ID_TO_API_SPEC: Record<string, ApiSpec> = {
-  'custom-anthropic': 'anthropic',
-  'custom-openai-chat': 'openai-chat-completions',
-  'custom-openai-responses': 'openai-responses',
-  'custom-google': 'google',
-  azure: 'azure',
-  bedrock: 'amazon-bedrock',
-  vertex: 'google-vertex',
-};
-
-/** Maps a vendor to the `ApiSpec` used when a custom model routes via that vendor. */
-const VENDOR_TO_API_SPEC: Record<ModelProvider, ApiSpec> = {
-  anthropic: 'anthropic',
-  openai: 'openai-responses',
-  google: 'google',
-  moonshotai: 'openai-chat-completions',
-  alibaba: 'openai-chat-completions',
-  deepseek: 'openai-chat-completions',
-  'z-ai': 'openai-chat-completions',
-  minimax: 'openai-chat-completions',
-  'xiaomi-mimo': 'openai-chat-completions',
-  mistral: 'openai-chat-completions',
-};
-
-/**
- * Build a `CustomEndpoint`-shaped view from a provider instance so that the
- * existing `createModelViaEndpoint` / `buildBedrockProvider` methods can
- * consume it without internal changes. This is a mechanical data-source
- * swap — PR 1 keeps the endpoint-shaped routing surface intact.
- */
-function providerInstanceToCustomEndpoint(
-  instance: ProviderInstance,
-): CustomEndpoint {
-  const apiSpec = INSTANCE_TYPE_ID_TO_API_SPEC[instance.typeId];
-  if (!apiSpec) {
-    throw new Error(
-      `providerInstanceToCustomEndpoint: typeId ${instance.typeId} is not a custom-endpoint type`,
-    );
-  }
-  // Access `instance.config` inside each case so TypeScript narrows the
-  // discriminated union per typeId.
-  switch (instance.typeId) {
-    case 'custom-anthropic':
-    case 'custom-openai-chat':
-    case 'custom-openai-responses':
-    case 'custom-google':
-      return {
-        id: instance.id,
-        name: instance.name,
-        apiSpec,
-        baseUrl: instance.config.baseUrl,
-        encryptedApiKey: instance.config.encryptedApiKey,
-        modelIdMapping: instance.config.modelIdMapping,
-        resourceName: undefined,
-        apiVersion: undefined,
-        region: undefined,
-        encryptedSecretKey: undefined,
-        awsAuthMode: 'access-keys',
-        awsProfileName: undefined,
-        projectId: undefined,
-        location: undefined,
-        encryptedGoogleCredentials: undefined,
-      };
-    case 'azure':
-      return {
-        id: instance.id,
-        name: instance.name,
-        apiSpec,
-        baseUrl: instance.config.baseUrl,
-        encryptedApiKey: instance.config.encryptedApiKey,
-        modelIdMapping: instance.config.modelIdMapping,
-        resourceName: instance.config.resourceName,
-        apiVersion: instance.config.apiVersion,
-        region: undefined,
-        encryptedSecretKey: undefined,
-        awsAuthMode: 'access-keys',
-        awsProfileName: undefined,
-        projectId: undefined,
-        location: undefined,
-        encryptedGoogleCredentials: undefined,
-      };
-    case 'bedrock':
-      return {
-        id: instance.id,
-        name: instance.name,
-        apiSpec,
-        baseUrl: '',
-        encryptedApiKey: instance.config.encryptedApiKey,
-        modelIdMapping: instance.config.modelIdMapping,
-        resourceName: undefined,
-        apiVersion: undefined,
-        region: instance.config.region,
-        encryptedSecretKey: instance.config.encryptedSecretKey,
-        awsAuthMode: instance.config.awsAuthMode,
-        awsProfileName: instance.config.awsProfileName,
-        projectId: undefined,
-        location: undefined,
-        encryptedGoogleCredentials: undefined,
-      };
-    case 'vertex':
-      return {
-        id: instance.id,
-        name: instance.name,
-        apiSpec,
-        baseUrl: '',
-        encryptedApiKey: undefined,
-        modelIdMapping: instance.config.modelIdMapping,
-        resourceName: undefined,
-        apiVersion: undefined,
-        region: undefined,
-        encryptedSecretKey: undefined,
-        awsAuthMode: 'access-keys',
-        awsProfileName: undefined,
-        projectId: instance.config.projectId,
-        location: instance.config.location,
-        encryptedGoogleCredentials: instance.config.encryptedGoogleCredentials,
-      };
-    default:
-      throw new Error(
-        `providerInstanceToCustomEndpoint: unsupported typeId ${instance.typeId}`,
-      );
-  }
-}
 
 /**
  * Resolve which provider instance serves a given vendor.
@@ -247,6 +97,23 @@ function findInstanceForVendor(
   return undefined;
 }
 
+/**
+ * Resolve the effective `ApiSpec` for a provider type + instance config.
+ * Most types declare `apiSpec` directly. The `coding-plan` type resolves
+ * it dynamically via the vendor's api type.
+ */
+function getEffectiveApiSpec(
+  type: ProviderType,
+  config: unknown,
+): ApiSpec | undefined {
+  if (type.apiSpec) return type.apiSpec;
+  if (type.id === 'coding-plan') {
+    const vendor = getCodingPlanVendor(config as CodingPlanConfig);
+    return VENDOR_API_SPECS[vendor];
+  }
+  return undefined;
+}
+
 export type ModelWithOptions = {
   model: LanguageModelV3;
   providerOptions: Parameters<typeof streamText>[0]['providerOptions'];
@@ -271,7 +138,7 @@ export type ModelWithOptions = {
  * Routing logic:
  *   - Built-in models default to the **stagewise gateway** unless the user has
  *     configured the model's `officialProvider` to use `official` or `custom` mode.
- *   - Custom models route through their configured endpoint.
+ *   - Custom models route through their configured provider instance.
  *   - Provider options on each model definition already use per-provider keys
  *     (e.g. `{ anthropic: { … }, stagewise: { … } }`) and are passed through as-is.
  */
@@ -303,16 +170,54 @@ export class ModelProviderService {
   }
 
   /**
-   * Resolve credentials and base URL for a given provider by looking up
-   * the provider instance assigned to that vendor. Falls back to the
-   * shared stagewise instance when no vendor-specific instance exists.
+   * Decrypt all `sensitiveFields` declared by a provider type from the
+   * instance config, returning a map of field-name → decrypted-value.
    */
-  private resolveProviderEndpoint(provider: ModelProvider): {
+  private decryptSensitiveFields(
+    instance: ProviderInstance,
+    type: ProviderType,
+  ): Record<string, string> {
+    const result: Record<string, string> = {};
+    const config = instance.config as Record<string, unknown>;
+    for (const field of type.sensitiveFields) {
+      const encrypted = config[field] as string | undefined;
+      if (encrypted) {
+        result[field] =
+          this.preferencesService.decryptProviderApiKey(encrypted);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Resolve the base URL for a provider instance, preferring the user's
+   * config and falling back to the type's `defaultBaseUrl`.
+   */
+  private static resolveBaseURL(
+    config: Record<string, unknown>,
+    type: ProviderType,
+  ): string | undefined {
+    const baseUrl = config.baseUrl as string | undefined;
+    if (baseUrl) return baseUrl;
+    return type.defaultBaseUrl;
+  }
+
+  // ===========================================================================
+  // Vendor endpoint resolution (built-in models)
+  // ===========================================================================
+
+  /**
+   * Resolve credentials, base URL, and provider type for a given vendor.
+   * Falls back to the shared stagewise instance when no vendor-specific
+   * instance exists.
+   */
+  private resolveVendorEndpoint(provider: ModelProvider): {
+    instance: ProviderInstance | undefined;
+    type: ProviderType;
     apiKey: string;
     baseURL: string | undefined;
-    mode: 'stagewise' | 'official' | 'custom';
+    decryptedConfig: Record<string, string>;
     connectedCodingPlanId?: string;
-    customEndpoint?: CustomEndpoint;
   } {
     const prefs = this.preferencesService.get();
     const proxyBaseUrl =
@@ -321,62 +226,56 @@ export class ModelProviderService {
     const instance = findInstanceForVendor(prefs, provider);
     if (!instance || instance.typeId === 'stagewise') {
       return {
+        instance: undefined,
+        type: stagewiseProviderType,
         apiKey: this.authService.accessToken ?? '',
         baseURL: proxyBaseUrl,
-        mode: 'stagewise',
+        decryptedConfig: {},
       };
     }
+
+    const type = getProviderType(instance.typeId);
+    const config = instance.config as Record<string, unknown>;
+    const decryptedConfig = this.decryptSensitiveFields(instance, type);
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    const baseURL = ModelProviderService.resolveBaseURL(config, type);
 
     if (instance.typeId === 'coding-plan') {
-      const cfg = instance.config;
       return {
-        apiKey: this.preferencesService.decryptProviderApiKey(
-          cfg.encryptedApiKey,
-        ),
-        baseURL: cfg.baseUrl,
-        mode: 'official',
-        connectedCodingPlanId: cfg.planId,
+        instance,
+        type,
+        apiKey,
+        baseURL,
+        decryptedConfig,
+        connectedCodingPlanId: (config as CodingPlanConfig).planId,
       };
     }
 
-    if (instance.typeId.endsWith('-api')) {
-      // `-api` is a suffix match, so TS cannot narrow the discriminated
-      // union. All vendor-api configs share the `officialApiConfig` shape.
-      const cfg = instance.config as {
-        encryptedApiKey?: string;
-        baseUrl?: string;
-      };
-      return {
-        apiKey: this.preferencesService.decryptProviderApiKey(
-          cfg.encryptedApiKey,
-        ),
-        baseURL: cfg.baseUrl,
-        mode: 'official',
-      };
-    }
-
-    // Custom-type instance serving this vendor.
-    const endpoint = providerInstanceToCustomEndpoint(instance);
     return {
-      apiKey: this.preferencesService.decryptProviderApiKey(
-        endpoint.encryptedApiKey,
-      ),
-      baseURL: endpoint.baseUrl || undefined,
-      mode: 'custom',
-      customEndpoint: endpoint,
+      instance,
+      type,
+      apiKey,
+      baseURL,
+      decryptedConfig,
     };
   }
+
+  // ===========================================================================
+  // Custom model instance resolution
+  // ===========================================================================
 
   /**
    * Resolve credentials for a custom model's provider instance reference.
    * The `providerInstanceId` can be a vendor-backed instance id (e.g.
    * `anthropic-api-default`) or a custom-type instance id.
    */
-  private resolveProviderInstance(providerInstanceId: string): {
+  private resolveCustomModelInstance(providerInstanceId: string): {
+    instance: ProviderInstance;
+    type: ProviderType;
     apiKey: string;
     baseURL: string | undefined;
-    apiSpec: ApiSpec;
-    endpoint?: CustomEndpoint;
+    decryptedConfig: Record<string, string>;
+    apiSpec: ApiSpec | undefined;
   } {
     const prefs = this.preferencesService.get();
     const instance = prefs.providerInstances.find(
@@ -393,95 +292,55 @@ export class ModelProviderService {
         `Provider instance ${providerInstanceId} is a stagewise instance with no resolvable vendor`,
       );
     }
+
+    const type = getProviderType(instance.typeId);
+    const config = instance.config as Record<string, unknown>;
+
+    // For coding-plan and vendor-api instances, resolve via the vendor
+    // endpoint to pick up default base URLs and apiSpec.
     if (instance.typeId === 'coding-plan') {
-      const vendor =
-        CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS]
-          ?.provider;
-      if (!vendor) {
-        throw new Error(
-          `Provider instance ${providerInstanceId} has no resolvable vendor`,
-        );
-      }
-      const { apiKey, baseURL } = this.resolveProviderEndpoint(vendor);
-      return { apiKey, baseURL, apiSpec: VENDOR_TO_API_SPEC[vendor] };
+      const vendor = getCodingPlanVendor(config as CodingPlanConfig);
+      const resolved = this.resolveVendorEndpoint(vendor);
+      // Use the coding-plan instance's own config for decryption, but
+      // adopt the vendor resolver's baseURL fallback.
+      return {
+        instance,
+        type,
+        apiKey: resolved.apiKey,
+        baseURL: config.baseUrl as string | undefined,
+        decryptedConfig: this.decryptSensitiveFields(instance, type),
+        apiSpec: VENDOR_API_SPECS[vendor],
+      };
     }
+
     if (instance.typeId.endsWith('-api')) {
       const vendor = instance.typeId.slice(0, -4) as ModelProvider;
-      const { apiKey, baseURL } = this.resolveProviderEndpoint(vendor);
-      return { apiKey, baseURL, apiSpec: VENDOR_TO_API_SPEC[vendor] };
+      const resolved = this.resolveVendorEndpoint(vendor);
+      return {
+        instance,
+        type,
+        apiKey: resolved.apiKey,
+        baseURL: resolved.baseURL,
+        decryptedConfig: resolved.decryptedConfig,
+        apiSpec: VENDOR_API_SPECS[vendor],
+      };
     }
 
     // Custom-type instance.
-    const endpoint = providerInstanceToCustomEndpoint(instance);
+    const decryptedConfig = this.decryptSensitiveFields(instance, type);
     return {
-      apiKey: this.preferencesService.decryptProviderApiKey(
-        endpoint.encryptedApiKey,
-      ),
-      baseURL: endpoint.baseUrl || undefined,
-      apiSpec: endpoint.apiSpec,
-      endpoint,
+      instance,
+      type,
+      apiKey: decryptedConfig.encryptedApiKey ?? '',
+      baseURL: ModelProviderService.resolveBaseURL(config, type),
+      decryptedConfig,
+      apiSpec: type.apiSpec,
     };
   }
 
-  /**
-   * Build an Amazon Bedrock provider for a custom endpoint based on its
-   * configured auth mode:
-   *
-   * - `access-keys` (default, back-compat): static access key + secret.
-   * - `profile`: named profile from `~/.aws/config` / `~/.aws/credentials`.
-   *   Handles static, session-token, assume-role, and SSO profiles via the
-   *   AWS SDK's standard refresh machinery. SSO profiles whose token has
-   *   expired will surface an error at signing time — users must re-run
-   *   `aws sso login --profile <name>`.
-   * - `default-chain`: Node provider chain (env vars, shared credentials,
-   *   EC2/ECS instance roles, IMDS).
-   *
-   * Region resolution: UI-entered `region` always wins. When empty:
-   *   - `access-keys` falls back to `us-east-1` (preserves pre-feature
-   *     behaviour for static-credential setups with no other region
-   *     source).
-   *   - `profile` and `default-chain` pass `undefined`, letting the AWS
-   *     SDK resolve the region from the profile's `region` entry or the
-   *     `AWS_REGION` / `AWS_DEFAULT_REGION` env vars.
-   */
-  private buildBedrockProvider(endpoint: CustomEndpoint, apiKey: string) {
-    const mode = endpoint.awsAuthMode ?? 'access-keys';
-    const overrideRegion = endpoint.region?.trim() || undefined;
-
-    if (mode === 'profile') {
-      if (!endpoint.awsProfileName) {
-        throw new Error(
-          'AWS profile name is required when awsAuthMode is "profile".',
-        );
-      }
-      return createAmazonBedrock({
-        // `region` intentionally undefined when the user did not override
-        // it — `createAmazonBedrock` + the AWS SDK will resolve from the
-        // profile's `region` entry or the `AWS_REGION` env var.
-        region: overrideRegion,
-        credentialProvider: fromIni({ profile: endpoint.awsProfileName }),
-      });
-    }
-
-    if (mode === 'default-chain') {
-      return createAmazonBedrock({
-        region: overrideRegion,
-        credentialProvider: fromNodeProviderChain(),
-      });
-    }
-
-    // access-keys: no profile / env to fall back on, so keep the
-    // historical `us-east-1` default to preserve behaviour for existing
-    // setups.
-    const secretAccessKey = this.preferencesService.decryptProviderApiKey(
-      endpoint.encryptedSecretKey,
-    );
-    return createAmazonBedrock({
-      region: overrideRegion ?? 'us-east-1',
-      accessKeyId: apiKey,
-      secretAccessKey,
-    });
-  }
+  // ===========================================================================
+  // Public API
+  // ===========================================================================
 
   /**
    * Check whether a model ID exists (built-in or custom).
@@ -552,6 +411,10 @@ export class ModelProviderService {
     throw new Error(`Model ${modelId} not found`);
   }
 
+  // ===========================================================================
+  // Built-in model creation
+  // ===========================================================================
+
   private createBuiltInModelWithOptions(
     modelSettings: BuiltInModelSettings,
     traceId: string,
@@ -561,10 +424,19 @@ export class ModelProviderService {
     const officialProvider = modelSettings.officialProvider as
       | ModelProvider
       | undefined;
+
+    // Resolve the vendor endpoint (or stagewise fallback).
     const resolved = officialProvider
-      ? this.resolveProviderEndpoint(officialProvider)
-      : { apiKey: '', baseURL: undefined, mode: 'stagewise' as const };
-    const { apiKey, baseURL, mode, connectedCodingPlanId } = resolved;
+      ? this.resolveVendorEndpoint(officialProvider)
+      : {
+          instance: undefined,
+          type: stagewiseProviderType,
+          apiKey: this.authService.accessToken ?? '',
+          baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+          decryptedConfig: {} as Record<string, string>,
+        };
+
+    const { type, apiKey, baseURL, decryptedConfig, instance } = resolved;
     const headers = modelSettings.headers ?? {};
     const baseProviderOptions = modelSettings.providerOptions as Record<
       string,
@@ -586,489 +458,112 @@ export class ModelProviderService {
       },
     };
 
-    if (mode === 'stagewise') {
-      if (!officialProvider) {
-        throw new Error(
-          `Model ${modelSettings.modelId} has no officialProvider set`,
-        );
-      }
-      const proxyBaseUrl =
-        process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
-      // OpenRouter uses different provider prefixes for some vendors
-      const OPENROUTER_PROVIDER_MAP: Partial<Record<ModelProvider, string>> = {
-        alibaba: 'qwen',
-        'xiaomi-mimo': 'xiaomi',
-        mistral: 'mistralai',
-      };
-      const routerProvider =
-        OPENROUTER_PROVIDER_MAP[officialProvider] ?? officialProvider;
-      const prefixedModelId = `${routerProvider}/${modelSettings.modelId}`;
-      const stagewiseProvider = createStagewise({
-        apiKey: this.authService.accessToken ?? '',
-        baseURL: proxyBaseUrl,
-      });
+    // ── Resolve effective apiSpec for thinking + reasoning signatures ───────
+    const instanceConfig = instance?.config ?? {};
+    const effectiveApiSpec = getEffectiveApiSpec(type, instanceConfig);
 
-      const model = wrapLanguageModel({
-        model: stagewiseProvider.chatModel(prefixedModelId),
-        middleware: stagewiseUrlPassthroughMiddleware,
-      });
+    // ── Apply model ID mapping from instance config (if any) ────────────────
+    const modelIdMapping = (instanceConfig as Record<string, unknown>)
+      .modelIdMapping as Record<string, string> | undefined;
+    const mappedModelId =
+      modelIdMapping?.[modelSettings.modelId] ?? modelSettings.modelId;
 
-      return {
-        model: this.telemetryService.withTracing(model, posthogConfig),
-        headers,
-        providerOptions: resolveThinkingProviderOptions({
-          baseProviderOptions,
-          modelSettings,
-          override: thinkingOverride,
-          providerMode: 'stagewise',
-          semanticProvider: officialProvider,
-          requestMetadata: otherPostHogProperties,
-        }),
-        contextWindowSize: modelSettings.modelContextRaw,
-        providerMode: 'stagewise',
-        reasoningSignatureSource: createReasoningSignatureSource(
-          'stagewise',
-          officialProvider,
-          prefixedModelId,
-        ),
-      };
-    }
-
-    if (mode === 'custom' && resolved.customEndpoint) {
-      const incompatibleSpecs = new Set([
-        'azure',
-        'amazon-bedrock',
-        'google-vertex',
-      ]);
-      const defaultModelId =
-        officialProvider === 'minimax'
-          ? toNativeMiniMaxModelId(modelSettings.modelId)
-          : modelSettings.modelId;
-      const remappedModelId =
-        resolved.customEndpoint.modelIdMapping?.[modelSettings.modelId] ??
-        defaultModelId;
-      if (
-        incompatibleSpecs.has(resolved.customEndpoint.apiSpec) &&
-        remappedModelId === modelSettings.modelId
-      ) {
-        throw new Error(
-          `Built-in model "${modelSettings.modelId}" cannot be routed through a ${resolved.customEndpoint.apiSpec} endpoint because it requires provider-specific model IDs. ` +
-            `Add a model ID mapping on the custom endpoint, or create a custom model with the correct ${resolved.customEndpoint.apiSpec} model identifier instead.`,
-        );
-      }
-      return {
-        ...this.createModelViaEndpoint(
-          resolved.customEndpoint,
-          remappedModelId,
-          resolveThinkingProviderOptions({
-            baseProviderOptions,
-            modelSettings,
-            override: thinkingOverride,
-            providerMode: 'custom',
-            semanticProvider: getSemanticProviderForApiSpec(
-              resolved.customEndpoint.apiSpec,
-            ),
-            customEndpointApiSpec: resolved.customEndpoint.apiSpec,
-            requestMetadata: otherPostHogProperties,
-          }) as Record<string, unknown>,
-          headers,
-          modelSettings.modelContextRaw,
-          posthogConfig,
-        ),
-        providerMode: 'custom',
-      };
-    }
-
-    // Official mode — use native AI-SDK provider with the officialProvider
-    if (!officialProvider) {
+    // ── Incompatible-specs guard ────────────────────────────────────────────
+    // Built-in models routed through cloud endpoints (azure/bedrock/vertex)
+    // require a model ID mapping — the native IDs are provider-specific.
+    const incompatibleSpecs = new Set<ApiSpec>([
+      'azure',
+      'amazon-bedrock',
+      'google-vertex',
+    ]);
+    if (
+      effectiveApiSpec &&
+      incompatibleSpecs.has(effectiveApiSpec) &&
+      mappedModelId === modelSettings.modelId
+    ) {
       throw new Error(
-        `Model ${modelSettings.modelId} has no officialProvider set`,
+        `Built-in model "${modelSettings.modelId}" cannot be routed through a ${effectiveApiSpec} endpoint because it requires provider-specific model IDs. ` +
+          `Add a model ID mapping on the custom endpoint, or create a custom model with the correct ${effectiveApiSpec} model identifier instead.`,
       );
     }
 
+    // ── Apply wire-format model ID transform ────────────────────────────────
+    const wireModelId =
+      type.toWireModelId?.(mappedModelId, officialProvider) ?? mappedModelId;
+
+    // ── Create the language model via the provider type ─────────────────────
+    const { model: rawModel, middleware } = type.createLanguageModel({
+      modelId: wireModelId,
+      apiKey,
+      baseURL,
+      config: instanceConfig as never,
+      decryptedConfig,
+      vendor: officialProvider,
+    });
+
+    // Apply middleware wrapping (stagewise URL passthrough, etc.)
+    let model = rawModel;
+    if (middleware?.length) {
+      for (const mw of middleware) {
+        model = wrapLanguageModel({ model, middleware: mw });
+      }
+    }
+
+    // ── Reasoning signature source ──────────────────────────────────────────
+    // Stagewise uses the wire-format (prefixed) model ID; official/custom
+    // use the mapped (pre-wire) model ID — preserving the prior convention.
+    const semanticProvider =
+      type.providerMode === 'stagewise'
+        ? (officialProvider as ModelProvider)
+        : effectiveApiSpec
+          ? getSemanticProviderForApiSpec(effectiveApiSpec)
+          : (officialProvider as ModelProvider);
+
+    const reasoningModelId =
+      type.providerMode === 'stagewise' ? wireModelId : mappedModelId;
+
+    const reasoningSignatureSource =
+      type.providerMode === 'custom'
+        ? createReasoningSignatureSource(
+            'custom',
+            semanticProvider,
+            reasoningModelId,
+            {
+              apiSpec: effectiveApiSpec as ApiSpec,
+              endpointId: instance?.id ?? '',
+            },
+          )
+        : createReasoningSignatureSource(
+            type.providerMode as 'stagewise' | 'official',
+            semanticProvider,
+            reasoningModelId,
+          );
+
     return {
-      ...this.createOfficialModel(
-        officialProvider,
-        apiKey,
-        baseURL,
-        modelSettings.modelId,
-        resolveThinkingProviderOptions({
-          baseProviderOptions,
-          modelSettings,
-          override: thinkingOverride,
-          providerMode: 'official',
-          semanticProvider: officialProvider,
-          requestMetadata: otherPostHogProperties,
-        }) as Record<string, unknown>,
-        headers,
-        modelSettings.modelContextRaw,
-        posthogConfig,
-      ),
-      providerMode: 'official',
-      connectedCodingPlanId,
+      model: this.telemetryService.withTracing(model, posthogConfig),
+      headers,
+      providerOptions: resolveThinkingProviderOptions({
+        baseProviderOptions,
+        modelSettings,
+        override: thinkingOverride,
+        providerMode: type.providerMode,
+        semanticProvider,
+        customEndpointApiSpec: effectiveApiSpec,
+        requestMetadata: otherPostHogProperties,
+      }),
+      contextWindowSize: modelSettings.modelContextRaw,
+      providerMode: type.providerMode,
+      ...(resolved.connectedCodingPlanId
+        ? { connectedCodingPlanId: resolved.connectedCodingPlanId }
+        : {}),
+      reasoningSignatureSource,
+      ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
     };
   }
 
-  /**
-   * Create a model using the official AI-SDK provider for the given provider key.
-   */
-  private createOfficialModel(
-    provider: ModelProvider,
-    apiKey: string,
-    baseURL: string | undefined,
-    modelId: string,
-    providerOptions: Record<string, unknown>,
-    headers: Record<string, string>,
-    contextWindowSize: number,
-    posthogConfig: {
-      posthogTraceId: string;
-      posthogProperties: Record<string, unknown>;
-    },
-  ): Omit<ModelWithOptions, 'providerMode'> {
-    const reasoningSignatureSource = createReasoningSignatureSource(
-      'official',
-      provider,
-      modelId,
-    );
-
-    switch (provider) {
-      case 'anthropic': {
-        const p = createAnthropic({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            p(toNativeAnthropicModelId(modelId) as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'openai': {
-        const p = createOpenAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            p(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'google': {
-        const p = createGoogleGenerativeAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            p(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'moonshotai': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL: baseURL ?? 'https://api.moonshot.ai/v1',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // Moonshot's native API speaks Chat Completions, not Responses.
-            // `createOpenAI()(id)` defaults to Responses — must use `.chat()`.
-            p.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'alibaba': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL:
-            baseURL ?? 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // Alibaba's DashScope speaks Chat Completions — use `.chat()`.
-            p.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'deepseek': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL: baseURL ?? 'https://api.deepseek.com/v1',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // DeepSeek's native API speaks Chat Completions — use `.chat()`.
-            p.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'z-ai': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL: baseURL ?? 'https://api.z.ai/api/paas/v4',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // Z.AI's OpenAI-compatible endpoint speaks Chat Completions.
-            p.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'minimax': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL: baseURL ?? 'https://api.minimax.io/v1',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // MiniMax's OpenAI-compatible endpoint speaks Chat Completions.
-            p.chat(toNativeMiniMaxModelId(modelId) as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'xiaomi-mimo': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL: baseURL ?? 'https://api.xiaomimimo.com/v1',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // Xiaomi MiMo's OpenAI-compatible endpoint speaks Chat
-            // Completions. Internal model IDs already match native API IDs.
-            p.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      case 'mistral': {
-        const p = createOpenAI({
-          apiKey,
-          baseURL: baseURL ?? 'https://api.mistral.ai/v1',
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            // Mistral's OpenAI-compatible endpoint speaks Chat
-            // Completions. Internal model IDs already match native API IDs.
-            p.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: providerOptions as Parameters<
-            typeof streamText
-          >[0]['providerOptions'],
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      default: {
-        const _exhaustive: never = provider;
-        throw new Error(`Unsupported official provider: ${_exhaustive}`);
-      }
-    }
-  }
-
-  /**
-   * Create a model routed through a specific custom endpoint config.
-   */
-  private createModelViaEndpoint(
-    endpoint: CustomEndpoint,
-    modelId: string,
-    modelProviderOptions: Record<string, unknown>,
-    headers: Record<string, string>,
-    contextWindowSize: number,
-    posthogConfig: {
-      posthogTraceId: string;
-      posthogProperties: Record<string, unknown>;
-    },
-  ): Omit<ModelWithOptions, 'providerMode'> {
-    const apiKey = this.preferencesService.decryptProviderApiKey(
-      endpoint.encryptedApiKey,
-    );
-    const baseURL = endpoint.baseUrl || undefined;
-    const { apiSpec } = endpoint;
-    const reasoningSignatureSource = createReasoningSignatureSource(
-      'custom',
-      getSemanticProviderForApiSpec(apiSpec),
-      modelId,
-      { apiSpec, endpointId: endpoint.id },
-    );
-
-    switch (apiSpec) {
-      case 'anthropic': {
-        const provider = createAnthropic({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider(toNativeAnthropicModelId(modelId) as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'openai-chat-completions': {
-        const provider = createOpenAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider.chat(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'openai-responses': {
-        const provider = createOpenAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider.responses(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'google': {
-        const provider = createGoogleGenerativeAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'azure': {
-        const azureProvider = createAzure({
-          apiKey,
-          baseURL,
-          resourceName: endpoint.resourceName,
-          apiVersion: endpoint.apiVersion,
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            azureProvider(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'amazon-bedrock': {
-        const bedrockProvider = this.buildBedrockProvider(endpoint, apiKey);
-        return {
-          model: this.telemetryService.withTracing(
-            bedrockProvider(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-          stripStrictFromTools: true,
-        };
-      }
-
-      case 'google-vertex': {
-        const vertexProvider = createVertex({
-          project: endpoint.projectId ?? '',
-          location: endpoint.location ?? 'us-central1',
-          googleAuthOptions: endpoint.encryptedGoogleCredentials
-            ? {
-                credentials: JSON.parse(
-                  this.preferencesService.decryptProviderApiKey(
-                    endpoint.encryptedGoogleCredentials,
-                  ),
-                ),
-              }
-            : undefined,
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            vertexProvider(modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions: modelProviderOptions as any,
-          contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-      default: {
-        const _exhaustive: never = apiSpec;
-        throw new Error(`Unsupported API spec: ${_exhaustive}`);
-      }
-    }
-  }
+  // ===========================================================================
+  // Custom model creation
+  // ===========================================================================
 
   private createCustomModelWithOptions(
     customModel: CustomModel,
@@ -1088,9 +583,12 @@ export class ModelProviderService {
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
   ): Omit<ModelWithOptions, 'providerMode'> {
-    const { apiKey, baseURL, apiSpec, endpoint } = this.resolveProviderInstance(
+    const resolved = this.resolveCustomModelInstance(
       customModel.providerInstanceId ?? '',
     );
+    const { type, apiKey, baseURL, decryptedConfig, apiSpec, instance } =
+      resolved;
+
     const headers = customModel.headers ?? {};
     const posthogProperties = omitModelRequestMetadata(otherPostHogProperties);
 
@@ -1104,157 +602,61 @@ export class ModelProviderService {
       },
     };
 
-    if (
-      endpoint &&
-      (apiSpec === 'azure' ||
-        apiSpec === 'amazon-bedrock' ||
-        apiSpec === 'google-vertex')
-    ) {
-      return this.createModelViaEndpoint(
-        endpoint,
-        customModel.modelId,
-        customModel.providerOptions,
-        headers,
-        customModel.contextWindowSize,
-        posthogConfig,
-      );
+    // ── Wire-format model ID ────────────────────────────────────────────────
+    const wireModelId =
+      type.toWireModelId?.(customModel.modelId) ?? customModel.modelId;
+
+    // ── Create the language model via the provider type ─────────────────────
+    const { model: rawModel, middleware } = type.createLanguageModel({
+      modelId: wireModelId,
+      apiKey,
+      baseURL,
+      config: instance.config as never,
+      decryptedConfig,
+    });
+
+    let model = rawModel;
+    if (middleware?.length) {
+      for (const mw of middleware) {
+        model = wrapLanguageModel({ model, middleware: mw });
+      }
     }
 
-    const providerKey = apiSpec.startsWith('openai-') ? 'openai' : apiSpec;
-    const reasoningSignatureSource = createReasoningSignatureSource(
-      'custom',
-      getSemanticProviderForApiSpec(apiSpec),
-      customModel.modelId,
-      {
-        apiSpec,
-        endpointId: endpoint?.id ?? customModel.providerInstanceId ?? '',
-      },
-    );
+    // ── Provider options wrapping ───────────────────────────────────────────
+    const providerKey = apiSpec?.startsWith('openai-') ? 'openai' : apiSpec;
     const providerOptions =
       Object.keys(customModel.providerOptions).length > 0
-        ? ({ [providerKey]: customModel.providerOptions } as any)
+        ? ({ [providerKey as string]: customModel.providerOptions } as Record<
+            string,
+            unknown
+          >)
         : {};
 
-    switch (apiSpec) {
-      case 'anthropic': {
-        const provider = createAnthropic({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider(toNativeAnthropicModelId(customModel.modelId) as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
+    // ── Reasoning signature source ──────────────────────────────────────────
+    const semanticProvider = apiSpec
+      ? getSemanticProviderForApiSpec(apiSpec)
+      : ('openai' as ModelProvider);
 
-      case 'openai-chat-completions': {
-        const provider = createOpenAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider.chat(customModel.modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
+    const reasoningSignatureSource = createReasoningSignatureSource(
+      'custom',
+      semanticProvider,
+      customModel.modelId,
+      {
+        apiSpec: apiSpec as ApiSpec,
+        endpointId: instance.id,
+      },
+    );
 
-      case 'openai-responses': {
-        const provider = createOpenAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider.responses(customModel.modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'google': {
-        const provider = createGoogleGenerativeAI({ apiKey, baseURL });
-        return {
-          model: this.telemetryService.withTracing(
-            provider(customModel.modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'azure': {
-        const ep = endpoint ?? ({} as CustomEndpoint);
-        const azureProvider = createAzure({
-          apiKey,
-          baseURL,
-          resourceName: ep.resourceName,
-          apiVersion: ep.apiVersion,
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            azureProvider(customModel.modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-
-      case 'amazon-bedrock': {
-        const ep = endpoint ?? ({} as CustomEndpoint);
-        const bedrockProvider = this.buildBedrockProvider(ep, apiKey);
-        return {
-          model: this.telemetryService.withTracing(
-            bedrockProvider(customModel.modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-          stripStrictFromTools: true,
-        };
-      }
-
-      case 'google-vertex': {
-        const ep = endpoint ?? ({} as CustomEndpoint);
-        const vertexProvider = createVertex({
-          project: ep.projectId ?? '',
-          location: ep.location ?? 'us-central1',
-          googleAuthOptions: ep.encryptedGoogleCredentials
-            ? {
-                credentials: JSON.parse(
-                  this.preferencesService.decryptProviderApiKey(
-                    ep.encryptedGoogleCredentials,
-                  ),
-                ),
-              }
-            : undefined,
-        });
-        return {
-          model: this.telemetryService.withTracing(
-            vertexProvider(customModel.modelId as any),
-            posthogConfig,
-          ),
-          headers,
-          providerOptions,
-          contextWindowSize: customModel.contextWindowSize,
-          reasoningSignatureSource,
-        };
-      }
-    }
+    return {
+      model: this.telemetryService.withTracing(model, posthogConfig),
+      headers,
+      providerOptions: providerOptions as Parameters<
+        typeof streamText
+      >[0]['providerOptions'],
+      contextWindowSize: customModel.contextWindowSize,
+      reasoningSignatureSource,
+      ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
+    };
   }
 }
 
