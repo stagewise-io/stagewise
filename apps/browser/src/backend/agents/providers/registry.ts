@@ -1,0 +1,101 @@
+import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
+import type { ProviderInstanceTypeId } from '@shared/karton-contracts/ui/shared-types';
+import type { ProviderType } from './types';
+import { stagewiseProviderType } from './stagewise';
+import {
+  anthropicApiType,
+  openaiApiType,
+  googleApiType,
+  moonshotaiApiType,
+  alibabaApiType,
+  deepseekApiType,
+  zAiApiType,
+  minimaxApiType,
+  xiaomiMimoApiType,
+  mistralApiType,
+  OFFICIAL_API_TYPES,
+} from './official-api';
+import { codingPlanProviderType } from './coding-plan';
+import {
+  customAnthropicType,
+  customOpenAIChatType,
+  customOpenAIResponsesType,
+  customGoogleType,
+} from './custom-compatible';
+import {
+  azureProviderType,
+  bedrockProviderType,
+  vertexProviderType,
+} from './cloud';
+
+// ============================================================================
+// Registry — maps every ProviderInstanceTypeId to its ProviderType impl
+// ============================================================================
+
+export const PROVIDER_TYPE_REGISTRY: Record<
+  ProviderInstanceTypeId,
+  ProviderType
+> = {
+  stagewise: stagewiseProviderType,
+  'anthropic-api': anthropicApiType,
+  'openai-api': openaiApiType,
+  'google-api': googleApiType,
+  'moonshotai-api': moonshotaiApiType,
+  'alibaba-api': alibabaApiType,
+  'deepseek-api': deepseekApiType,
+  'z-ai-api': zAiApiType,
+  'minimax-api': minimaxApiType,
+  'xiaomi-mimo-api': xiaomiMimoApiType,
+  'mistral-api': mistralApiType,
+  'coding-plan': codingPlanProviderType,
+  'custom-anthropic': customAnthropicType,
+  'custom-openai-chat': customOpenAIChatType,
+  'custom-openai-responses': customOpenAIResponsesType,
+  'custom-google': customGoogleType,
+  azure: azureProviderType,
+  bedrock: bedrockProviderType,
+  vertex: vertexProviderType,
+};
+
+/**
+ * Look up a provider type by its typeId. Throws if unknown.
+ */
+export function getProviderType(typeId: string): ProviderType {
+  const type = PROVIDER_TYPE_REGISTRY[typeId as ProviderInstanceTypeId];
+  if (!type) {
+    throw new Error(`Unknown provider type ID: ${typeId}`);
+  }
+  return type;
+}
+
+/**
+ * Look up the official-api provider type for a vendor.
+ * Returns the `${vendor}-api` type (e.g. `'anthropic'` → `anthropicApiType`).
+ */
+export function getProviderTypeByVendor(vendor: ModelProvider): ProviderType {
+  return OFFICIAL_API_TYPES[vendor];
+}
+
+// ============================================================================
+// Compatibility shims — computed from the registry so existing UI imports
+// don't break. These replace the scattered PROVIDER_DISPLAY_INFO and
+// PROVIDER_OFFICIAL_URLS constants.
+// ============================================================================
+
+export const PROVIDER_DISPLAY_INFO: Record<
+  ModelProvider,
+  { name: string; description: string }
+> = Object.fromEntries(
+  Object.values(OFFICIAL_API_TYPES).map((t) => [
+    t.vendor,
+    { name: t.displayName, description: t.description },
+  ]),
+) as Record<ModelProvider, { name: string; description: string }>;
+
+export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> =
+  Object.fromEntries(
+    Object.values(OFFICIAL_API_TYPES).map((t) => [
+      t.vendor,
+      t.defaultBaseUrl ?? '',
+    ]),
+  ) as Record<ModelProvider, string>;
