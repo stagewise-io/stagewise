@@ -99,7 +99,7 @@ function extractReasoningDetailsFromMessage(
 }
 
 /**
- * Metadata extractor for the stagewise / OpenRouter gateway.
+ * Metadata extractor for Stagewise Inference / OpenRouter.
  *
  * Captures two things:
  *
@@ -230,11 +230,11 @@ export type StagewiseProviderSettings = {
 };
 
 /**
- * Create a stagewise gateway provider that uses OpenAI-compatible
+ * Create a Stagewise Inference provider that uses OpenAI-compatible
  * chat completions endpoints.
  *
  * Provider options are forwarded under the `stagewise` key and
- * response metadata is extracted from gateway responses.
+ * response metadata is extracted from inference responses.
  *
  * Message-level metadata (e.g. `cache_control`, signed
  * `reasoning_details`) is forwarded via the built-in

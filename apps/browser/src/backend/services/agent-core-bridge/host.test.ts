@@ -129,6 +129,7 @@ describe('createBrowserHostModels', () => {
       'claude-x',
       'trace-1',
       undefined,
+      undefined,
     );
     expect(result).toBe(fakeModel);
   });
@@ -155,9 +156,14 @@ describe('createBrowserHostModels', () => {
       extra: 'metadata',
     });
 
-    expect(mp.getModelWithOptions).toHaveBeenCalledWith('claude-x', 'trace-1', {
-      extra: 'metadata',
-    });
+    expect(mp.getModelWithOptions).toHaveBeenCalledWith(
+      'claude-x',
+      'trace-1',
+      {
+        extra: 'metadata',
+      },
+      undefined,
+    );
     expect(result).toBe(full);
   });
 

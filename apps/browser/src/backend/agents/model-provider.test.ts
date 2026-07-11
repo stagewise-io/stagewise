@@ -37,6 +37,7 @@ function customEndpointToInstance(ep: CustomEndpoint): ProviderInstance {
     id: ep.id,
     name: ep.name,
     enabledModelIds: [] as string[],
+    disabledModelIds: [] as string[],
     discoveredModels: [] as Record<string, unknown>[],
   };
   switch (typeId) {
@@ -108,11 +109,15 @@ function createTestModelProviderService({
       enabled?: boolean;
       value?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
     }
-  >;
+  >; // Flat format — wrapped under 'stagewise-default' below.
   customEndpoints?: typeof defaultUserPreferences.customEndpoints;
 } = {}) {
   const preferences = structuredClone(defaultUserPreferences);
-  preferences.agent.modelThinkingOverrides = modelThinkingOverrides;
+  // Wrap flat overrides under the stagewise-default instance key.
+  preferences.agent.modelThinkingOverrides =
+    Object.keys(modelThinkingOverrides).length > 0
+      ? { 'stagewise-default': modelThinkingOverrides as any }
+      : {};
 
   const instances: ProviderInstance[] = [];
 
@@ -139,6 +144,7 @@ function createTestModelProviderService({
             baseUrl: plan?.baseUrl,
           },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         });
       } else {
@@ -148,6 +154,7 @@ function createTestModelProviderService({
           name: provider,
           config: { encryptedApiKey: 'encrypted' },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         } as unknown as ProviderInstance);
       }
@@ -170,6 +177,7 @@ function createTestModelProviderService({
           name: `${provider} custom`,
           config: { baseUrl: 'https://example.com/v1' },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         });
       }

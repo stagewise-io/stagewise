@@ -23,6 +23,7 @@ export type {
 export type { Logger } from './logger';
 export {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
   type HostModels,
   type ModelRequestPurpose,
   type ModelWithOptions,

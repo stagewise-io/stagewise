@@ -30,7 +30,7 @@ import { createThinkingProviderOptionsPatch } from '@shared/model-thinking-capab
 
 // ── Provider type registry ──────────────────────────────────────────────────
 import type { ProviderType } from './providers/types';
-import { getProviderType } from './providers/registry';
+import { getProviderType, getProviderTypeByVendor } from './providers/registry';
 import { stagewiseProviderType } from './providers/stagewise';
 import {
   getCodingPlanVendor,
@@ -136,7 +136,7 @@ export type ModelWithOptions = {
  * This class offers a getter for a model that is traced with the telemetry service.
  *
  * Routing logic:
- *   - Built-in models default to the **stagewise gateway** unless the user has
+ *   - Built-in models default to **Stagewise Inference** unless the user has
  *     configured the model's `officialProvider` to use `official` or `custom` mode.
  *   - Custom models route through their configured provider instance.
  *   - Provider options on each model definition already use per-provider keys
@@ -261,6 +261,86 @@ export class ModelProviderService {
   }
 
   // ===========================================================================
+  // Instance-by-ID resolution (PR 3 model × instance path)
+  // ===========================================================================
+
+  /**
+   * Resolve a built-in model's credentials by a specific provider instance ID.
+   *
+   * This is the PR 3 path: the UI selects a `(instanceId, modelId)` pair, and
+   * the routing layer resolves the instance directly rather than via
+   * vendor-based routing.
+   *
+   * - `stagewise` instance → Stagewise Inference (same as vendor fallback).
+   * - `coding-plan` / `*-api` instance → delegate to `resolveVendorEndpoint`
+   *   using the vendor derived from the instance type, but use the instance's
+   *   own config for decryption.
+   * - Custom-type instances (custom-anthropic, bedrock, etc.) → resolve
+   *   credentials directly from the instance config.
+   */
+  private resolveInstanceById(
+    instanceId: string,
+    officialProvider: ModelProvider | undefined,
+  ): {
+    instance: ProviderInstance | undefined;
+    type: ProviderType;
+    apiKey: string;
+    baseURL: string | undefined;
+    decryptedConfig: Record<string, string>;
+    connectedCodingPlanId?: string;
+  } {
+    const prefs = this.preferencesService.get();
+    const instance = prefs.providerInstances.find((i) => i.id === instanceId);
+    if (!instance) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+
+    // Stagewise instance → inference path (same as no-vendor fallback).
+    if (instance.typeId === 'stagewise') {
+      return {
+        instance: undefined,
+        type: stagewiseProviderType,
+        apiKey: this.authService.accessToken ?? '',
+        baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+        decryptedConfig: {} as Record<string, string>,
+      };
+    }
+
+    const type = getProviderType(instance.typeId);
+    const config = instance.config as Record<string, unknown>;
+    const decryptedConfig = this.decryptSensitiveFields(instance, type);
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    const baseURL = ModelProviderService.resolveBaseURL(config, type);
+
+    if (instance.typeId === 'coding-plan') {
+      return {
+        instance,
+        type,
+        apiKey,
+        baseURL,
+        decryptedConfig,
+        connectedCodingPlanId: (config as CodingPlanConfig).planId,
+      };
+    }
+
+    // For vendor-api instances, use the vendor's official base URL as
+    // fallback when the instance config doesn't set one.
+    if (instance.typeId.endsWith('-api') && officialProvider) {
+      const vendorType = getProviderTypeByVendor(officialProvider);
+      const effectiveBaseURL = baseURL ?? vendorType.defaultBaseUrl;
+      return {
+        instance,
+        type,
+        apiKey,
+        baseURL: effectiveBaseURL,
+        decryptedConfig,
+      };
+    }
+
+    return { instance, type, apiKey, baseURL, decryptedConfig };
+  }
+
+  // ===========================================================================
   // Custom model instance resolution
   // ===========================================================================
 
@@ -363,23 +443,49 @@ export class ModelProviderService {
     modelId: ModelId,
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
+    providerInstanceId?: string,
   ): ModelWithOptions {
     try {
       return this.createModelWithOptions(
         modelId,
         traceId,
         otherPostHogProperties,
+        providerInstanceId,
       );
     } catch (error) {
-      this.report(error as Error, 'getModelWithOptions', { modelId });
+      this.report(error as Error, 'getModelWithOptions', {
+        modelId,
+        providerInstanceId,
+      });
       throw error;
     }
+  }
+
+  /**
+   * Instance-aware variant: resolves the model through the specified
+   * provider instance rather than the legacy vendor-based routing.
+   * Falls back to `getModelWithOptions` when `providerInstanceId` is
+   * undefined (backward compatibility).
+   */
+  public getModelWithOptionsForInstance(
+    modelId: ModelId,
+    providerInstanceId: string | undefined,
+    traceId: string,
+    otherPostHogProperties?: Record<string, unknown>,
+  ): ModelWithOptions {
+    return this.getModelWithOptions(
+      modelId,
+      traceId,
+      otherPostHogProperties,
+      providerInstanceId,
+    );
   }
 
   private createModelWithOptions(
     modelId: ModelId,
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
+    providerInstanceId?: string,
   ): ModelWithOptions {
     const builtIn = getAvailableModel(modelId);
     if (builtIn) {
@@ -394,6 +500,7 @@ export class ModelProviderService {
               requestedModelId: alias.modelId,
             }
           : otherPostHogProperties,
+        providerInstanceId,
       );
     }
 
@@ -418,23 +525,35 @@ export class ModelProviderService {
   private createBuiltInModelWithOptions(
     modelSettings: BuiltInModelSettings,
     traceId: string,
-    alias?: ModelAlias,
-    otherPostHogProperties?: Record<string, unknown>,
+    alias: ModelAlias | undefined,
+    otherPostHogProperties: Record<string, unknown> | undefined,
+    providerInstanceId?: string,
   ): ModelWithOptions {
     const officialProvider = modelSettings.officialProvider as
       | ModelProvider
       | undefined;
 
-    // Resolve the vendor endpoint (or stagewise fallback).
-    const resolved = officialProvider
-      ? this.resolveVendorEndpoint(officialProvider)
-      : {
-          instance: undefined,
-          type: stagewiseProviderType,
-          apiKey: this.authService.accessToken ?? '',
-          baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
-          decryptedConfig: {} as Record<string, string>,
-        };
+    // ── Instance resolution ───────────────────────────────────────────────
+    // When a providerInstanceId is given, resolve directly by ID. This is
+    // the PR 3 model × instance path: the UI selected a specific instance.
+    // Otherwise fall back to vendor-based routing for backward compat.
+    let resolved: ReturnType<typeof this.resolveVendorEndpoint> & {
+      instance: ProviderInstance | undefined;
+    };
+
+    if (providerInstanceId) {
+      resolved = this.resolveInstanceById(providerInstanceId, officialProvider);
+    } else {
+      resolved = officialProvider
+        ? this.resolveVendorEndpoint(officialProvider)
+        : {
+            instance: undefined,
+            type: stagewiseProviderType,
+            apiKey: this.authService.accessToken ?? '',
+            baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+            decryptedConfig: {} as Record<string, string>,
+          };
+    }
 
     const { type, apiKey, baseURL, decryptedConfig, instance } = resolved;
     const headers = modelSettings.headers ?? {};
@@ -443,11 +562,18 @@ export class ModelProviderService {
       unknown
     >;
     const posthogProperties = omitModelRequestMetadata(otherPostHogProperties);
+
+    // ── Thinking override lookup (instance-aware) ─────────────────────────
+    // Look up the override by the instance that serves this model. Fall back
+    // to the stagewise-default instance key for legacy data, then to the
+    // alias preset.
+    const thinkingOverrides =
+      this.preferencesService.get().agent.modelThinkingOverrides;
+    const instanceKey = instance?.id ?? 'stagewise-default';
     const thinkingOverride =
       alias?.thinkingPreset ??
-      this.preferencesService.get().agent.modelThinkingOverrides[
-        modelSettings.modelId
-      ];
+      thinkingOverrides[instanceKey]?.[modelSettings.modelId] ??
+      thinkingOverrides['stagewise-default']?.[modelSettings.modelId];
 
     const posthogConfig = {
       posthogTraceId: traceId,

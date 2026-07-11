@@ -5,7 +5,7 @@ import type { ReasoningSignatureSource } from '../types/metadata';
 /**
  * The host-specific provider routing mode for a resolved model.
  *
- * - `stagewise` — routed through the stagewise LLM gateway.
+ * - `stagewise` — routed through Stagewise Inference.
  * - `official` — routed through the vendor's official API using user-
  *   supplied credentials.
  * - `custom` — routed through a user-configured custom endpoint.
@@ -22,6 +22,17 @@ export type ProviderMode = 'stagewise' | 'official' | 'custom';
 export type ModelRequestPurpose = 'agent-step' | 'internal';
 
 export const MODEL_REQUEST_PURPOSE_METADATA_KEY = '$model_request_purpose';
+
+/**
+ * Reserved metadata key for passing the active provider instance ID
+ * through `HostModels.getWithOptions`. The host reads this to resolve
+ * the correct provider instance for the model, enabling the
+ * model × instance architecture where the same modelId can be served
+ * by different provider instances.
+ *
+ * When absent, the host falls back to its legacy vendor-based routing.
+ */
+export const PROVIDER_INSTANCE_ID_METADATA_KEY = '$provider_instance_id';
 
 /**
  * Fully-resolved model with all the options `BaseAgent` needs to
@@ -104,6 +115,23 @@ export interface HostModels {
    */
   getWithOptions(
     modelId: string,
+    traceId: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<ModelWithOptions>;
+
+  /**
+   * Variant of {@link getWithOptions} that explicitly carries the
+   * provider instance ID selected by the user. Used by hosts that
+   * support the model × instance architecture (PR 3).
+   *
+   * When `providerInstanceId` is provided, the host resolves the
+   * provider instance directly by ID instead of falling back to
+   * vendor-based routing. When omitted or undefined, behavior is
+   * identical to {@link getWithOptions} for backward compatibility.
+   */
+  getModelWithOptionsForInstance?(
+    modelId: string,
+    providerInstanceId: string | undefined,
     traceId: string,
     metadata?: Record<string, unknown>,
   ): Promise<ModelWithOptions>;

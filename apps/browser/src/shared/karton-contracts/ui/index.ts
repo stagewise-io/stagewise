@@ -341,10 +341,7 @@ export type {
   ProviderConfig,
   ProviderConfigs,
 } from './shared-types';
-export {
-  PROVIDER_OFFICIAL_URLS,
-  PROVIDER_DISPLAY_INFO,
-} from './shared-types';
+export { PROVIDER_TYPE_DISPLAY_INFO } from './shared-types';
 
 // Custom endpoint & model types
 export type {
@@ -1517,6 +1514,8 @@ export type KartonContract = {
       ) => Promise<{ error?: string }>;
       signInEmail: () => Promise<{ error?: string }>;
       refreshStatus: () => Promise<void>;
+      /** Re-fetch subscription/plan info from the server. */
+      refreshSubscription: () => Promise<void>;
       logout: () => Promise<void>;
       /** Get current usage stats */
       getUsageCurrent: () => Promise<CurrentUsageResponse>;

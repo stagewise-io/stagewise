@@ -10,7 +10,7 @@ import type { Logger } from '../../host/logger';
  * breakpoint by either of the two provider-option shapes used in the codebase:
  *
  *   anthropic.cacheControl    — Anthropic-native SDK key
- *   openaiCompatible.cache_control — OpenAI-compatible/stagewise gateway key
+ *   openaiCompatible.cache_control — OpenAI-compatible/Stagewise Inference key
  */
 function hasCacheControl(message: ModelMessage): boolean {
   const opts = (message as Record<string, unknown>).providerOptions as

@@ -12,11 +12,57 @@ import type {
   ApiSpec,
   CustomEndpoint,
   ModelProvider,
+  ModelThinkingOverride,
   ProviderEndpointMode,
   ProviderInstance,
+  ProviderInstanceTypeId,
   UserPreferences,
 } from './karton-contracts/ui/shared-types';
+import { PROVIDER_TYPE_DISPLAY_INFO } from './karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from './coding-plans';
+import {
+  availableModels,
+  availableModelAliases,
+  getAvailableModel,
+  type BuiltInModel,
+} from './available-models';
+
+/**
+ * Get display info for a vendor by looking up its `-api` provider type.
+ * This is the UI-facing replacement for the removed PROVIDER_DISPLAY_INFO
+ * vendor-keyed constant.
+ */
+export function getVendorDisplayInfo(vendor: ModelProvider): {
+  displayName: string;
+  description: string;
+  helpText?: string;
+  getApiKeyUrl?: string;
+  defaultBaseUrl?: string;
+} {
+  const typeId = `${vendor}-api` as ProviderInstanceTypeId;
+  return PROVIDER_TYPE_DISPLAY_INFO[typeId];
+}
+
+/**
+ * Get the default base URL for a vendor's official API.
+ * Replacement for the removed PROVIDER_OFFICIAL_URLS vendor-keyed constant.
+ */
+export function getVendorOfficialUrl(vendor: ModelProvider): string {
+  return getVendorDisplayInfo(vendor)?.defaultBaseUrl ?? '';
+}
+
+/**
+ * Get display info for a provider instance type by its typeId.
+ */
+export function getTypeDisplayInfo(typeId: ProviderInstanceTypeId): {
+  displayName: string;
+  description: string;
+  helpText?: string;
+  getApiKeyUrl?: string;
+  defaultBaseUrl?: string;
+} {
+  return PROVIDER_TYPE_DISPLAY_INFO[typeId];
+}
 
 /** Maps a provider instance `typeId` back to the legacy `ApiSpec`. */
 export const INSTANCE_TYPE_ID_TO_API_SPEC: Record<string, ApiSpec> = {
@@ -328,5 +374,330 @@ export function findCodingPlanInstance(
 ): ProviderInstance | undefined {
   return getCodingPlanInstances(preferences).find(
     (i) => (i.config as { planId: string }).planId === planId,
+  );
+}
+
+/**
+ * The default stagewise instance ID. Vendors not assigned to a
+ * specific instance fall back to this one at routing time.
+ */
+export const DEFAULT_INSTANCE_ID = 'stagewise-default';
+
+/**
+ * Resolve thinking default options for a specific provider instance.
+ * This replaces the vendor-based `getThinkingDefaultOptionsForModel`
+ * with instance-aware resolution: given the instance serving a model,
+ * determine whether thinking defaults come from stagewise, official API,
+ * or a custom endpoint.
+ */
+export function getInstanceThinkingDefaultOptions(instance: ProviderInstance): {
+  providerMode: ProviderEndpointMode;
+  customEndpointApiSpec?: ApiSpec;
+} {
+  if (instance.typeId === 'stagewise') {
+    return { providerMode: 'stagewise' };
+  }
+  if (instance.typeId === 'coding-plan') {
+    // Coding plans route through the plan vendor's official API.
+    return { providerMode: 'official' };
+  }
+  if (instance.typeId.endsWith('-api')) {
+    return { providerMode: 'official' };
+  }
+  // Custom-type instance (custom-*, azure, bedrock, vertex).
+  const apiSpec = instanceTypeIdToApiSpec(instance.typeId);
+  if (apiSpec) {
+    return { providerMode: 'custom', customEndpointApiSpec: apiSpec };
+  }
+  return { providerMode: 'stagewise' };
+}
+
+/**
+ * Get the `disabledModelIds` for a specific provider instance.
+ * Returns an empty array if the instance is not found.
+ */
+export function getInstanceDisabledModelIds(
+  preferences: UserPreferences,
+  instanceId: string,
+): string[] {
+  const instances = preferences.providerInstances ?? [];
+  const instance = instances.find((i) => i.id === instanceId);
+  return instance?.disabledModelIds ?? [];
+}
+
+/**
+ * Get the `disabledModelIds` for the default stagewise instance.
+ * Used by the model selector and settings as the interim source of
+ * truth until the full per-instance selector rewrite (PR 3 Phase 3).
+ */
+export function getDefaultInstanceDisabledModelIds(
+  preferences: UserPreferences,
+): string[] {
+  return getInstanceDisabledModelIds(preferences, DEFAULT_INSTANCE_ID);
+}
+
+/**
+ * Toggle a model's disabled state on a specific provider instance.
+ * Returns the updated `disabledModelIds` array for that instance.
+ */
+export function toggleInstanceDisabledModelId(
+  preferences: UserPreferences,
+  instanceId: string,
+  modelId: string,
+): string[] {
+  const current = getInstanceDisabledModelIds(preferences, instanceId);
+  const idx = current.indexOf(modelId);
+  if (idx === -1) {
+    return [...current, modelId];
+  }
+  return current.filter((id) => id !== modelId);
+}
+
+/**
+ * Resolve the thinking overrides for a specific provider instance + model.
+ * Returns `undefined` if no override is set.
+ */
+export function getInstanceModelThinkingOverride(
+  preferences: UserPreferences,
+  instanceId: string,
+  modelId: string,
+): ModelThinkingOverride | undefined {
+  const overrides =
+    preferences.agent.modelThinkingOverrides?.[instanceId] ?? {};
+  return overrides[modelId];
+}
+
+// ===========================================================================
+// Model Selector Aggregation
+// ===========================================================================
+
+/**
+ * A single selectable entry in the model selector, representing a
+ * `(instanceId, modelId)` pair. The selector groups these by instance.
+ */
+export interface ModelSelectorEntry {
+  instanceId: string;
+  instanceName: string;
+  typeId: ProviderInstanceTypeId;
+  modelId: string;
+  displayName: string;
+  description: string;
+  /** Display label, e.g. "1M context". */
+  contextLabel: string;
+  /** Raw context window size in tokens (for the footer token bar). */
+  contextWindowRaw: number;
+  thinkingEnabled: boolean;
+  pricingMultiplier?: number;
+  isAlias: boolean;
+  /** The catalog model, if this entry is a built-in model or alias. */
+  catalogModel?: BuiltInModel;
+  /** The concrete model ID that this entry routes to. */
+  targetModelId: string;
+}
+
+/**
+ * Determine which vendor a provider instance type serves.
+ * Returns `undefined` for stagewise (serves all), custom/cloud types
+ * (serve only custom models), and coding plans (resolved separately).
+ */
+function getVendorForTypeId(
+  typeId: ProviderInstanceTypeId,
+): ModelProvider | undefined {
+  if (typeId.endsWith('-api')) {
+    return typeId.slice(0, -4) as ModelProvider;
+  }
+  return undefined;
+}
+
+/**
+ * Build a `ModelSelectorEntry` from a built-in catalog model.
+ */
+function makeBuiltInEntry(
+  instance: ProviderInstance,
+  modelId: string,
+  displayName: string,
+  description: string,
+  catalogModel: BuiltInModel,
+  isAlias: boolean,
+  targetModelId: string,
+): ModelSelectorEntry {
+  return {
+    instanceId: instance.id,
+    instanceName: instance.name,
+    typeId: instance.typeId,
+    modelId,
+    displayName,
+    description,
+    contextLabel: catalogModel.modelContext,
+    contextWindowRaw: catalogModel.modelContextRaw,
+    thinkingEnabled: catalogModel.thinkingEnabled,
+    pricingMultiplier: catalogModel.pricing?.relativeMultiplier,
+    isAlias,
+    catalogModel,
+    targetModelId,
+  };
+}
+
+/**
+ * Build a `ModelSelectorEntry` from a custom model.
+ */
+function makeCustomEntry(
+  instance: ProviderInstance,
+  model: {
+    modelId: string;
+    displayName: string;
+    description: string;
+    contextWindowSize: number;
+    thinkingEnabled: boolean;
+  },
+): ModelSelectorEntry {
+  return {
+    instanceId: instance.id,
+    instanceName: instance.name,
+    typeId: instance.typeId,
+    modelId: model.modelId,
+    displayName: model.displayName,
+    description: model.description,
+    contextLabel: `${Math.round(model.contextWindowSize / 1000)}k context`,
+    contextWindowRaw: model.contextWindowSize,
+    thinkingEnabled: !!model.thinkingEnabled,
+    isAlias: false,
+    targetModelId: model.modelId,
+  };
+}
+
+/**
+ * Produce the flat list of `(instanceId, modelId)` pairs for the model
+ * selector. Each entry represents one model as served by one provider
+ * instance.
+ *
+ * - **stagewise** instance: all catalog models (aliases + concrete) +
+ *   custom models whose `providerInstanceId` matches.
+ * - **vendor-api** instances (e.g. `anthropic-api`): that vendor's
+ *   catalog models + matching custom models.
+ * - **coding-plan** instances: the plan's vendor's catalog models +
+ *   matching custom models.
+ * - **custom/cloud** types (custom-*, azure, bedrock, vertex): only
+ *   matching custom models (discovered models are PR 4).
+ *
+ * Models in an instance's `disabledModelIds` are excluded.
+ */
+export function getSelectableModelEntries(
+  prefs: UserPreferences,
+  options?: { includeDisabled?: boolean },
+): ModelSelectorEntry[] {
+  const includeDisabled = options?.includeDisabled ?? false;
+  const instances = prefs.providerInstances ?? [];
+  const customModels = prefs.customModels ?? [];
+  const entries: ModelSelectorEntry[] = [];
+
+  for (const instance of instances) {
+    const disabled = new Set(instance.disabledModelIds ?? []);
+    const isDisabled = (id: string) => !includeDisabled && disabled.has(id);
+
+    // --- Catalog models for this instance ---
+
+    if (instance.typeId === 'stagewise') {
+      // Aliases (stagewise-curated recommendations)
+      for (const alias of availableModelAliases) {
+        if (isDisabled(alias.modelId)) continue;
+        const targetModel = getAvailableModel(alias.targetModelId);
+        if (!targetModel) continue;
+        entries.push(
+          makeBuiltInEntry(
+            instance,
+            alias.modelId,
+            alias.modelDisplayName,
+            alias.modelDescription,
+            targetModel,
+            true,
+            alias.targetModelId,
+          ),
+        );
+      }
+      // All concrete catalog models
+      for (const model of availableModels) {
+        if (isDisabled(model.modelId)) continue;
+        entries.push(
+          makeBuiltInEntry(
+            instance,
+            model.modelId,
+            model.modelDisplayName,
+            model.modelDescription,
+            model,
+            false,
+            model.modelId,
+          ),
+        );
+      }
+    } else if (instance.typeId === 'coding-plan') {
+      // Serve the plan vendor's catalog models
+      const planId = (instance.config as { planId: string })
+        .planId as CodingPlanId;
+      const plan = CODING_PLANS[planId];
+      if (plan) {
+        for (const model of availableModels) {
+          if (model.officialProvider !== plan.provider) continue;
+          if (isDisabled(model.modelId)) continue;
+          entries.push(
+            makeBuiltInEntry(
+              instance,
+              model.modelId,
+              model.modelDisplayName,
+              model.modelDescription,
+              model,
+              false,
+              model.modelId,
+            ),
+          );
+        }
+      }
+    } else {
+      const vendor = getVendorForTypeId(instance.typeId);
+      if (vendor) {
+        // Vendor API: serve that vendor's catalog models
+        for (const model of availableModels) {
+          if (model.officialProvider !== vendor) continue;
+          if (isDisabled(model.modelId)) continue;
+          entries.push(
+            makeBuiltInEntry(
+              instance,
+              model.modelId,
+              model.modelDisplayName,
+              model.modelDescription,
+              model,
+              false,
+              model.modelId,
+            ),
+          );
+        }
+      }
+      // Custom/cloud types (no vendor): only custom models below
+    }
+
+    // --- Custom models for this instance ---
+
+    for (const cm of customModels) {
+      const assignedInstanceId = cm.providerInstanceId ?? cm.endpointId;
+      if (assignedInstanceId !== instance.id) continue;
+      if (isDisabled(cm.modelId)) continue;
+      entries.push(makeCustomEntry(instance, cm));
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Find a specific `ModelSelectorEntry` by `(instanceId, modelId)`.
+ * Returns `undefined` if no entry matches.
+ */
+export function findModelSelectorEntry(
+  prefs: UserPreferences,
+  instanceId: string,
+  modelId: string,
+): ModelSelectorEntry | undefined {
+  return getSelectableModelEntries(prefs).find(
+    (e) => e.instanceId === instanceId && e.modelId === modelId,
   );
 }

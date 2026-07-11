@@ -16,11 +16,13 @@ import {
   PermissionSetting,
   configurablePermissionTypes,
   modelProviderSchema,
-  PROVIDER_DISPLAY_INFO,
+  PROVIDER_TYPE_DISPLAY_INFO,
+  type ProviderInstanceTypeId,
   DEFAULT_WIDGET_ORDER,
   DEV_TOOLBAR_MAX_ORIGINS,
 } from '@shared/karton-contracts/ui/shared-types';
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
+import { getJsonPath } from '../utils/paths';
 import { DisposableService } from './disposable';
 import { safeStorage } from 'electron';
 import {
@@ -236,9 +238,10 @@ export class PreferencesService extends DisposableService {
     instances.push({
       id: 'stagewise-default',
       typeId: 'stagewise',
-      name: 'Stagewise',
+      name: 'Stagewise Inference',
       config: {},
       enabledModelIds: [],
+      disabledModelIds: [],
       discoveredModels: [],
     });
 
@@ -267,6 +270,7 @@ export class PreferencesService extends DisposableService {
                 baseUrl: plan.baseUrl,
               },
               enabledModelIds: [],
+              disabledModelIds: [],
               discoveredModels: [],
             });
             vendorToInstanceId.set(vendor, id);
@@ -278,12 +282,15 @@ export class PreferencesService extends DisposableService {
         instances.push({
           id,
           typeId: `${vendor}-api`,
-          name: PROVIDER_DISPLAY_INFO[vendor].name,
+          name: PROVIDER_TYPE_DISPLAY_INFO[
+            `${vendor}-api` as ProviderInstanceTypeId
+          ].displayName,
           config: {
             encryptedApiKey: cfg.encryptedApiKey,
             baseUrl: undefined,
           },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         });
         vendorToInstanceId.set(vendor, id);
@@ -323,6 +330,37 @@ export class PreferencesService extends DisposableService {
         }
       }
       model.endpointId = undefined;
+    }
+
+    // 4. Migrate global disabledModelIds → stagewise-default instance.
+    //    All previously disabled models were implicitly on the stagewise
+    //    route, so they map to the stagewise-default instance.
+    //
+    //    The global field was removed from the Zod schema, so we read
+    //    it from the raw on-disk JSON instead of the parsed preferences.
+    let legacyDisabled: string[] = [];
+    try {
+      const raw = JSON.parse(
+        await import('node:fs/promises').then((fs) =>
+          fs.readFile(getJsonPath('preferences'), 'utf-8'),
+        ),
+      ) as { agent?: { disabledModelIds?: string[] } };
+      legacyDisabled = raw.agent?.disabledModelIds ?? [];
+    } catch {
+      // File doesn't exist or isn't valid JSON — nothing to migrate.
+    }
+    if (legacyDisabled.length > 0) {
+      const stagewiseInstance = instances.find(
+        (i) => i.id === 'stagewise-default',
+      );
+      if (stagewiseInstance) {
+        stagewiseInstance.disabledModelIds = [
+          ...new Set([
+            ...stagewiseInstance.disabledModelIds,
+            ...legacyDisabled,
+          ]),
+        ];
+      }
     }
 
     this.preferences = {
@@ -372,6 +410,7 @@ export class PreferencesService extends DisposableService {
             modelIdMapping: endpoint.modelIdMapping,
           },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         };
       case 'azure':
@@ -387,6 +426,7 @@ export class PreferencesService extends DisposableService {
             modelIdMapping: endpoint.modelIdMapping,
           },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         };
       case 'bedrock':
@@ -403,6 +443,7 @@ export class PreferencesService extends DisposableService {
             modelIdMapping: endpoint.modelIdMapping,
           },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         };
       case 'vertex':
@@ -417,6 +458,7 @@ export class PreferencesService extends DisposableService {
             modelIdMapping: endpoint.modelIdMapping,
           },
           enabledModelIds: [],
+          disabledModelIds: [],
           discoveredModels: [],
         };
       default:
@@ -1243,6 +1285,9 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
     modelProviderSchema.parse(provider);
 
+    const cfg = this.preferences.providerConfigs[provider];
+    const connectedPlanId = cfg?.connectedCodingPlanId;
+
     const patches: Patch[] = [
       {
         op: 'replace',
@@ -1260,6 +1305,18 @@ export class PreferencesService extends DisposableService {
         value: undefined,
       },
     ];
+
+    // Remove the corresponding coding-plan instance so the UI updates.
+    if (connectedPlanId) {
+      const idx = this.preferences.providerInstances.findIndex(
+        (i) =>
+          i.typeId === 'coding-plan' &&
+          (i.config as { planId?: string }).planId === connectedPlanId,
+      );
+      if (idx !== -1) {
+        patches.push({ op: 'remove', path: ['providerInstances', idx] });
+      }
+    }
 
     await this.update(patches);
     this.logger.debug(
@@ -1361,10 +1418,12 @@ export class PreferencesService extends DisposableService {
       return result;
     }
 
-    // 2 + 3. Encrypt+store key and flip mode in one patch batch.
+    // 2 + 3. Encrypt+store key, flip mode, and create/update the
+    // provider instance in one patch batch.
     const encryptedBase64 = safeStorage
       .encryptString(apiKey)
       .toString('base64');
+    const instanceId = `coding-plan:${planId}`;
     const patches: Patch[] = [
       {
         op: 'replace',
@@ -1382,6 +1441,40 @@ export class PreferencesService extends DisposableService {
         value: plan.id,
       },
     ];
+
+    // Ensure a matching providerInstances entry so the UI picks it up.
+    const existingIdx = this.preferences.providerInstances.findIndex(
+      (i) =>
+        i.typeId === 'coding-plan' &&
+        (i.config as { planId?: string }).planId === planId,
+    );
+    if (existingIdx !== -1) {
+      patches.push({
+        op: 'replace',
+        path: ['providerInstances', existingIdx, 'config', 'encryptedApiKey'],
+        value: encryptedBase64,
+      });
+    } else {
+      const instance = {
+        id: instanceId,
+        typeId: 'coding-plan' as ProviderInstance['typeId'],
+        name: plan.displayName,
+        config: {
+          encryptedApiKey: encryptedBase64,
+          planId: plan.id,
+          baseUrl: plan.baseUrl,
+        } as ProviderInstance['config'],
+        enabledModelIds: [] as string[],
+        disabledModelIds: [] as string[],
+        discoveredModels: [] as Record<string, unknown>[],
+      };
+      patches.push({
+        op: 'add',
+        path: ['providerInstances', this.preferences.providerInstances.length],
+        value: instance,
+      });
+    }
+
     await this.update(patches);
 
     this.logger.debug(
@@ -1594,8 +1687,8 @@ export class PreferencesService extends DisposableService {
     const name =
       args.name ??
       (typeId.endsWith('-api')
-        ? (PROVIDER_DISPLAY_INFO[typeId.slice(0, -4) as ModelProvider]?.name ??
-          typeId)
+        ? (PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]
+            ?.displayName ?? typeId)
         : typeId === 'coding-plan'
           ? (CODING_PLANS[finalConfig.planId as CodingPlanId]?.displayName ??
             'Coding Plan')
@@ -1607,6 +1700,7 @@ export class PreferencesService extends DisposableService {
       name,
       config: finalConfig as ProviderInstance['config'],
       enabledModelIds: [] as string[],
+      disabledModelIds: [] as string[],
       discoveredModels: [] as Record<string, unknown>[],
     };
 

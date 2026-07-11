@@ -1,6 +1,7 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { LanguageModelMiddleware } from 'ai';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
+import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
 import type { ProviderType } from './types';
 import { OFFICIAL_API_TYPES } from './official-api';
@@ -24,8 +25,7 @@ export function getCodingPlanVendor(config: CodingPlanConfig): ModelProvider {
 
 export const codingPlanProviderType: ProviderType<CodingPlanConfig> = {
   id: 'coding-plan',
-  displayName: 'Coding Plan',
-  description: 'Bring-your-own-subscription coding plan',
+  ...PROVIDER_TYPE_DISPLAY_INFO['coding-plan'],
   category: 'official-api',
   providerMode: 'official',
   sensitiveFields: ['encryptedApiKey'],

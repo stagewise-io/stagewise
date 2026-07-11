@@ -28,6 +28,7 @@ import type { AgentStateMutations } from '../services/agent-manager/state-mutati
 import type { AgentHost } from '../host/host';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
   type ModelWithOptions,
 } from '../host/models';
 import type { AgentCtor, AgentTypeRegistry } from './agents-registry';
@@ -1613,11 +1614,13 @@ export abstract class BaseAgent<
     }
     const queueFlushIndex = flushedIndex ?? -1;
 
-    // Snapshot the model id used for THIS step. `updateActiveModelId` accepts
-    // writes even while a step is running, so any later read of
-    // `state.activeModelId` from async callbacks (telemetry, onError) could
+    // Snapshot the model id + provider instance used for THIS step.
+    // `updateActiveModelId` accepts writes even while a step is running,
+    // so any later read from async callbacks (telemetry, onError) could
     // attribute the outcome to a model the user switched to mid-flight.
-    const stepModelId = this.state.get().activeModelId;
+    const stepState = this.state.get();
+    const stepModelId = stepState.activeModelId;
+    const stepProviderInstanceId = stepState.activeProviderInstanceId;
 
     // Get the current model — wrapped in try-catch so a deleted custom model
     // or endpoint doesn't wedge the agent with isWorking=true and no error.
@@ -1630,6 +1633,7 @@ export abstract class BaseAgent<
           $ai_span_name: `${this.agentType}-history`,
           $ai_parent_id: this.instanceId,
           [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
+          [PROVIDER_INSTANCE_ID_METADATA_KEY]: stepProviderInstanceId,
         },
       );
       this._stepProviderMode = modelWithOptions.providerMode;

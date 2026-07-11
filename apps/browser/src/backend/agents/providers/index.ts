@@ -4,7 +4,6 @@ export {
   getProviderType,
   getProviderTypeByVendor,
 } from './registry';
-export { PROVIDER_DISPLAY_INFO, PROVIDER_OFFICIAL_URLS } from './registry';
 export { stagewiseProviderType } from './stagewise';
 export type { StagewiseConfig } from './stagewise';
 export {

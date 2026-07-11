@@ -951,7 +951,7 @@ function countReasoningPartsPerStep(
 
 /**
  * Legacy flat `reasoningDetails` predate source ownership and were only
- * captured from the stagewise OpenAI-compatible gateway. Replay them only
+ * captured from the Stagewise Inference OpenAI-compatible endpoint. Replay them only
  * when their signature shape clearly identifies the current stagewise
  * provider; unknown or mixed shapes are unsafe and must be dropped.
  */
@@ -1345,7 +1345,7 @@ function capUserMessageTextParts(
  * The `openaiCompatible` key is hardcoded in the SDK's message converter
  * (`getOpenAIMetadata`) and spread directly onto each message in the
  * request body — it does NOT use the custom provider name. This is how
- * `cache_control` reaches the stagewise gateway without any extra
+ * `cache_control` reaches Stagewise Inference without any extra
  * transform logic.
  */
 const CACHE_CONTROL_PROVIDER_OPTIONS = {

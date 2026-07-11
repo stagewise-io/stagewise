@@ -185,15 +185,19 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {
         modelThinkingOverrides: {
-          'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
-          'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
+          'stagewise-default': {
+            'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+            'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
+          },
         },
       },
     });
 
     expect(parsed.agent.modelThinkingOverrides).toEqual({
-      'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
-      'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
+      'stagewise-default': {
+        'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+        'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
+      },
     });
   });
 
@@ -201,17 +205,39 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {
         modelThinkingOverrides: {
-          'gpt-5.5': { enabled: true, provider: 'invalid', value: 'high' },
-          'claude-opus-4.8': { enabled: 'nope', provider: 'anthropic' },
-          'gemini-3.1-pro-preview': null,
+          'stagewise-default': {
+            'gpt-5.5': { enabled: true, provider: 'invalid', value: 'high' },
+            'claude-opus-4.8': { enabled: 'nope', provider: 'anthropic' },
+            'gemini-3.1-pro-preview': null,
+          },
         },
       },
     });
 
     expect(parsed.agent.modelThinkingOverrides).toEqual({
-      'gpt-5.5': { enabled: true, value: 'high' },
-      'claude-opus-4.8': { provider: 'anthropic' },
-      'gemini-3.1-pro-preview': {},
+      'stagewise-default': {
+        'gpt-5.5': { enabled: true, value: 'high' },
+        'claude-opus-4.8': { provider: 'anthropic' },
+        'gemini-3.1-pro-preview': {},
+      },
+    });
+  });
+
+  it('wraps legacy flat modelThinkingOverrides under stagewise-default', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+          'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'stagewise-default': {
+        'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+        'claude-opus-4.8': { enabled: false, provider: 'anthropic' },
+      },
     });
   });
 });
@@ -288,7 +314,7 @@ describe('providerInstanceSchema validation', () => {
     const parsed = providerInstanceSchema.parse({
       id: 'stagewise-default',
       typeId: 'stagewise',
-      name: 'Stagewise',
+      name: 'Stagewise Inference',
       config: {},
     });
     expect(parsed.typeId).toBe('stagewise');
@@ -462,7 +488,7 @@ describe('userPreferencesSchema providerInstances', () => {
         {
           id: 'stagewise-default',
           typeId: 'stagewise',
-          name: 'Stagewise',
+          name: 'Stagewise Inference',
           config: {},
         },
         {

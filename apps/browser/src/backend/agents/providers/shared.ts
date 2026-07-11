@@ -24,7 +24,7 @@ export function toNativeMiniMaxModelId(modelId: string): string {
 }
 
 // ============================================================================
-// OpenRouter provider prefix mapping (stagewise gateway)
+// OpenRouter provider prefix mapping (Stagewise Inference)
 // ============================================================================
 
 /**
@@ -43,7 +43,7 @@ export const OPENROUTER_PROVIDER_MAP: Partial<Record<ModelProvider, string>> = {
 
 /**
  * Middleware that tells the SDK all HTTP(S) URLs are natively supported by the
- * stagewise gateway. Without this the SDK downloads every image/file URL and
+ * Stagewise Inference. Without this the SDK downloads every image/file URL and
  * inlines the content as base64, causing "payload too large" errors.
  */
 export const stagewiseUrlPassthroughMiddleware: LanguageModelMiddleware = {

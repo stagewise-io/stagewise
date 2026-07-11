@@ -1,5 +1,6 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { ApiSpec } from '@shared/karton-contracts/ui/shared-types';
+import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
 import {
   toNativeAnthropicModelId,
@@ -25,8 +26,7 @@ export type CustomCompatibleConfig = {
 
 export const customAnthropicType: ProviderType<CustomCompatibleConfig> = {
   id: 'custom-anthropic',
-  displayName: 'Custom Anthropic',
-  description: 'Anthropic-compatible custom endpoint',
+  ...PROVIDER_TYPE_DISPLAY_INFO['custom-anthropic'],
   category: 'custom-compatible',
   providerMode: 'custom',
   apiSpec: 'anthropic' satisfies ApiSpec,
@@ -49,8 +49,7 @@ export const customAnthropicType: ProviderType<CustomCompatibleConfig> = {
 
 export const customOpenAIChatType: ProviderType<CustomCompatibleConfig> = {
   id: 'custom-openai-chat',
-  displayName: 'Custom OpenAI (Chat)',
-  description: 'OpenAI Chat Completions-compatible custom endpoint',
+  ...PROVIDER_TYPE_DISPLAY_INFO['custom-openai-chat'],
   category: 'custom-compatible',
   providerMode: 'custom',
   apiSpec: 'openai-chat-completions' satisfies ApiSpec,
@@ -69,8 +68,7 @@ export const customOpenAIChatType: ProviderType<CustomCompatibleConfig> = {
 
 export const customOpenAIResponsesType: ProviderType<CustomCompatibleConfig> = {
   id: 'custom-openai-responses',
-  displayName: 'Custom OpenAI (Responses)',
-  description: 'OpenAI Responses API-compatible custom endpoint',
+  ...PROVIDER_TYPE_DISPLAY_INFO['custom-openai-responses'],
   category: 'custom-compatible',
   providerMode: 'custom',
   apiSpec: 'openai-responses' satisfies ApiSpec,
@@ -89,8 +87,7 @@ export const customOpenAIResponsesType: ProviderType<CustomCompatibleConfig> = {
 
 export const customGoogleType: ProviderType<CustomCompatibleConfig> = {
   id: 'custom-google',
-  displayName: 'Custom Google',
-  description: 'Google Generative AI-compatible custom endpoint',
+  ...PROVIDER_TYPE_DISPLAY_INFO['custom-google'],
   category: 'custom-compatible',
   providerMode: 'custom',
   apiSpec: 'google' satisfies ApiSpec,

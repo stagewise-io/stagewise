@@ -339,7 +339,7 @@ function ModelRestrictedError({
 
 /**
  * Shows a card when a user without a subscription tries to use AI models
- * through the stagewise gateway. Offers CTAs to upgrade, configure BYOK,
+ * through Stagewise Inference. Offers CTAs to upgrade, configure BYOK,
  * or connect a coding plan.
  */
 function SubscriptionRequiredError({
@@ -365,7 +365,7 @@ function SubscriptionRequiredError({
       </div>
 
       <div className="text-foreground">
-        AI model access through the stagewise gateway requires a subscription.
+        AI model access through Stagewise Inference requires a subscription.
         Upgrade your plan, configure your own API keys, or connect a coding plan
         to continue.
       </div>

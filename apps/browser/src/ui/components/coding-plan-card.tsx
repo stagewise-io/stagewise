@@ -13,7 +13,7 @@ import {
   type CodingPlan,
   type CodingPlanId,
 } from '@shared/coding-plans';
-import type { ProviderEndpointMode } from '@shared/karton-contracts/ui/shared-types';
+import type { ProviderInstance } from '@shared/karton-contracts/ui/shared-types';
 
 export { CODING_PLANS };
 export type { CodingPlan, CodingPlanId };
@@ -22,12 +22,8 @@ type ConnectResult = { success: true } | { success: false; error: string };
 
 export type CodingPlanCardProps = {
   plan: CodingPlan;
-  /** Provider config derived from preferences.providerConfigs[plan.provider]. */
-  config: {
-    mode: ProviderEndpointMode;
-    encryptedApiKey?: string | null;
-    connectedCodingPlanId?: CodingPlanId | null;
-  };
+  /** The coding-plan provider instance, if one exists for this plan. */
+  instance?: ProviderInstance;
   /**
    * Validate + store + flip the provider to `official` mode. Callers are
    * expected to mirror the `connectCodingPlan` semantics from the backend.
@@ -62,7 +58,7 @@ export type CodingPlanCardProps = {
 
 export function CodingPlanCard({
   plan,
-  config,
+  instance,
   onConnect,
   onDisconnect,
   onGetApiKey,
@@ -75,9 +71,9 @@ export function CodingPlanCard({
   const errorId = `${inputId}-error`;
 
   const isConnected =
-    !!config.encryptedApiKey &&
-    config.mode === 'official' &&
-    config.connectedCodingPlanId === plan.id;
+    !!instance &&
+    instance.typeId === 'coding-plan' &&
+    !!(instance.config as { encryptedApiKey?: string }).encryptedApiKey;
 
   const [localInput, setLocalInput] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -230,49 +226,40 @@ export function CodingPlanCard({
           )}
         </div>
         {localError && <TruncatedErrorText id={errorId} text={localError} />}
-        {!localError && !isConnected && config.mode === 'custom' && (
-          <p className="text-2xs text-subtle-foreground">
-            This provider is currently set to Custom. Connecting will switch it
-            to Official.
+        {!localError && !isConnected && plan.helpText && (
+          <p className="text-subtle-foreground text-xs">
+            <span className="inline-flex items-center gap-0">
+              {plan.helpText}
+              <Tooltip>
+                <TooltipTrigger>
+                  <a
+                    href={plan.apiKeyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (onGetApiKey) {
+                        e.preventDefault();
+                        onGetApiKey(plan.apiKeyUrl);
+                      }
+                    }}
+                    className={cn(
+                      buttonVariants({ variant: 'link', size: 'xs' }),
+                      'shrink-0',
+                    )}
+                  >
+                    Create key
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>{plan.apiKeyUrl}</TooltipContent>
+              </Tooltip>
+            </span>
+            {plan.endpointHelpText && (
+              <span className="block text-2xs text-subtle-foreground">
+                {plan.endpointHelpText}
+              </span>
+            )}
           </p>
         )}
-        {!localError &&
-          !isConnected &&
-          config.mode !== 'custom' &&
-          plan.helpText && (
-            <p className="text-subtle-foreground text-xs">
-              <span className="inline-flex items-center gap-0">
-                {plan.helpText}
-                <Tooltip>
-                  <TooltipTrigger>
-                    <a
-                      href={plan.apiKeyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        if (onGetApiKey) {
-                          e.preventDefault();
-                          onGetApiKey(plan.apiKeyUrl);
-                        }
-                      }}
-                      className={cn(
-                        buttonVariants({ variant: 'link', size: 'xs' }),
-                        'shrink-0',
-                      )}
-                    >
-                      Create key
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent>{plan.apiKeyUrl}</TooltipContent>
-                </Tooltip>
-              </span>
-              {plan.endpointHelpText && (
-                <span className="block text-2xs text-subtle-foreground">
-                  {plan.endpointHelpText}
-                </span>
-              )}
-            </p>
-          )}
         {plan.disclaimer && (
           <p className="text-2xs text-warning-foreground">{plan.disclaimer}</p>
         )}

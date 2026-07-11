@@ -1,6 +1,7 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { createStagewise } from '../stagewise-provider';
 import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
+import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
 import {
   OPENROUTER_PROVIDER_MAP,
@@ -11,12 +12,10 @@ export type StagewiseConfig = Record<string, never>;
 
 export const stagewiseProviderType: ProviderType<StagewiseConfig> = {
   id: 'stagewise',
-  displayName: 'Stagewise',
-  description: 'Stagewise gateway (OpenRouter-compatible)',
+  ...PROVIDER_TYPE_DISPLAY_INFO.stagewise,
   category: 'default',
   providerMode: 'stagewise',
   sensitiveFields: [],
-  defaultBaseUrl: 'https://llm.stagewise.io',
 
   toRouterProviderId(vendor: ModelProvider): string {
     return OPENROUTER_PROVIDER_MAP[vendor] ?? vendor;

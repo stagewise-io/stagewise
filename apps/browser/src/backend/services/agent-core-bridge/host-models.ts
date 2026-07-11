@@ -2,6 +2,7 @@ import type { HostModels, ModelWithOptions } from '@stagewise/agent-core';
 import type { ModelCapabilities } from '@stagewise/agent-core/types';
 import type { ModelProviderService } from '@/agents/model-provider';
 import { getModelCapabilities, type ModelId } from '@shared/available-models';
+import { PROVIDER_INSTANCE_ID_METADATA_KEY } from '@stagewise/agent-core/host';
 
 /**
  * Thin `HostModels` adapter over the browser's `ModelProviderService`.
@@ -33,10 +34,18 @@ export function createBrowserHostModels(
     metadata?: Record<string, unknown>,
   ): Promise<ModelWithOptions> {
     try {
+      // Extract providerInstanceId from metadata when present (PR 3
+      // model × instance architecture). agent-core passes it via the
+      // reserved metadata key so the routing layer can resolve the
+      // correct instance.
+      const providerInstanceId = metadata?.[
+        PROVIDER_INSTANCE_ID_METADATA_KEY
+      ] as string | undefined;
       const result = modelProviderService.getModelWithOptions(
         modelId as ModelId,
         traceId,
         metadata,
+        providerInstanceId,
       );
       return result as ModelWithOptions;
     } catch (error) {
@@ -47,6 +56,25 @@ export function createBrowserHostModels(
 
   return {
     getWithOptions,
+    async getModelWithOptionsForInstance(
+      modelId: string,
+      providerInstanceId: string | undefined,
+      traceId: string,
+      metadata?: Record<string, unknown>,
+    ): Promise<ModelWithOptions> {
+      try {
+        const result = modelProviderService.getModelWithOptionsForInstance(
+          modelId as ModelId,
+          providerInstanceId,
+          traceId,
+          metadata,
+        );
+        return result as ModelWithOptions;
+      } catch (error) {
+        if (error instanceof Error) throw error;
+        throw new Error(String(error));
+      }
+    },
     async get(modelId, traceId) {
       const { model } = await getWithOptions(modelId, traceId);
       return model;
@@ -93,6 +121,24 @@ export function createLazyBrowserHostModels(): LazyBrowserHostModels {
         );
       }
       return inner.getWithOptions(modelId, traceId, metadata);
+    },
+    async getModelWithOptionsForInstance(
+      modelId,
+      providerInstanceId,
+      traceId,
+      metadata,
+    ) {
+      if (!inner?.getModelWithOptionsForInstance) {
+        throw new Error(
+          `[BrowserHostModels] ModelProviderService not initialized yet; cannot resolve model ${modelId}`,
+        );
+      }
+      return inner.getModelWithOptionsForInstance(
+        modelId,
+        providerInstanceId,
+        traceId,
+        metadata,
+      );
     },
     async get(modelId, traceId) {
       if (!inner) {
