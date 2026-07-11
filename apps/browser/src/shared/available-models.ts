@@ -1871,6 +1871,45 @@ export const availableModels = [
       toolCalling: true,
     },
   },
+  {
+    officialProvider: 'x-ai',
+    modelId: 'grok-4.5',
+    modelDisplayName: 'Grok 4.5',
+    modelDescription:
+      "xAI's smartest model with frontier performance on coding, knowledge work, and STEM. 500K token context window with strong reasoning and low cost.",
+    modelContext: '500K context',
+    modelContextRaw: 500_000,
+    headers: {},
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: {
+        reasoningEffort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 2.0,
+      outputPerMillion: 6.0,
+      relativeMultiplier: 1.4,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
 ] as const satisfies ModelSettings[];
 
 export type BuiltInModel = (typeof availableModels)[number];

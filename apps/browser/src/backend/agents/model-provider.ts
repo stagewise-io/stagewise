@@ -203,7 +203,8 @@ export class ModelProviderService {
       endpointId === 'z-ai' ||
       endpointId === 'minimax' ||
       endpointId === 'xiaomi-mimo' ||
-      endpointId === 'mistral'
+      endpointId === 'mistral' ||
+      endpointId === 'x-ai'
     ) {
       const { apiKey, baseURL } = this.resolveProviderEndpoint(endpointId);
       const apiSpecMap: Record<ModelProvider, ApiSpec> = {
@@ -217,6 +218,7 @@ export class ModelProviderService {
         minimax: 'openai-chat-completions',
         'xiaomi-mimo': 'openai-chat-completions',
         mistral: 'openai-chat-completions',
+        'x-ai': 'openai-chat-completions',
       };
       return { apiKey, baseURL, apiSpec: apiSpecMap[endpointId] };
     }
@@ -716,6 +718,26 @@ export class ModelProviderService {
           model: this.telemetryService.withTracing(
             // Mistral's OpenAI-compatible endpoint speaks Chat
             // Completions. Internal model IDs already match native API IDs.
+            p.chat(modelId as any),
+            posthogConfig,
+          ),
+          headers,
+          providerOptions: providerOptions as Parameters<
+            typeof streamText
+          >[0]['providerOptions'],
+          contextWindowSize,
+          reasoningSignatureSource,
+        };
+      }
+      case 'x-ai': {
+        const p = createOpenAI({
+          apiKey,
+          baseURL: baseURL ?? 'https://api.x.ai/v1',
+        });
+        return {
+          model: this.telemetryService.withTracing(
+            // xAI's API speaks Chat Completions for OpenAI
+            // compatibility. Internal model IDs match native API IDs.
             p.chat(modelId as any),
             posthogConfig,
           ),

@@ -104,6 +104,7 @@ const PROVIDERS: ModelProvider[] = [
   'minimax',
   'xiaomi-mimo',
   'mistral',
+  'x-ai',
 ];
 
 function getThinkingDefaultOptionsForModel(

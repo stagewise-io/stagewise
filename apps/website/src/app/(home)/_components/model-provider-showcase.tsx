@@ -159,6 +159,15 @@ const PROVIDERS: ProviderInfo[] = [
       { name: 'Codestral', tier: 'general' },
     ],
   },
+  {
+    id: 'x-ai',
+    name: 'xAI',
+    logo: '/provider-logos/xai.svg',
+    monoInDark: true,
+    description:
+      'Frontier reasoning models for coding, knowledge work, and STEM at competitive prices.',
+    models: [{ name: 'Grok 4.5', tier: 'frontier' }],
+  },
 ];
 
 export function ModelProviderShowcase() {
