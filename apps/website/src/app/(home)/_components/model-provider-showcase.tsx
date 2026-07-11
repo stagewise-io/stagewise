@@ -158,6 +158,15 @@ const PROVIDERS: ProviderInfo[] = [
     ],
   },
   {
+    id: 'x-ai',
+    name: 'xAI',
+    logo: '/provider-logos/xai.svg',
+    monoInDark: true,
+    description:
+      'Frontier reasoning models for coding, knowledge work, and STEM at competitive prices.',
+    models: [{ name: 'Grok 4.5', tier: 'frontier' }],
+  },
+  {
     id: 'openrouter',
     name: 'OpenRouter',
     logo: '/provider-logos/openrouter.svg',

@@ -13,6 +13,7 @@ import {
   minimaxApiType,
   xiaomiMimoApiType,
   mistralApiType,
+  xAiApiType,
   OFFICIAL_API_TYPES,
 } from './official-api';
 import { codingPlanProviderType } from './coding-plan';
@@ -49,6 +50,7 @@ export const PROVIDER_TYPE_REGISTRY: Record<
   'minimax-api': minimaxApiType,
   'xiaomi-mimo-api': xiaomiMimoApiType,
   'mistral-api': mistralApiType,
+  'x-ai-api': xAiApiType,
   'coding-plan': codingPlanProviderType,
   'custom-anthropic': customAnthropicType,
   'custom-openai-chat': customOpenAIChatType,
