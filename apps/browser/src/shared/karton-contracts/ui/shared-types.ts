@@ -274,6 +274,8 @@ const providerInstanceBaseSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   enabledModelIds: z.array(z.string()).default([]),
+  /** Per-instance blacklist of catalog modelIds. Empty = all catalog models visible. */
+  disabledModelIds: z.array(z.string()).default([]),
   discoveredModels: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
@@ -362,64 +364,134 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
 ]);
 export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
 
-/** Official API base URLs for each provider (for UI display) */
-export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> = {
-  anthropic: 'https://api.anthropic.com/v1',
-  openai: 'https://api.openai.com/v1',
-  google: 'https://generativelanguage.googleapis.com/v1beta',
-  moonshotai: 'https://api.moonshot.ai/v1',
-  alibaba: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-  deepseek: 'https://api.deepseek.com/v1',
-  'z-ai': 'https://api.z.ai/api/paas/v4',
-  minimax: 'https://api.minimax.io/v1',
-  'xiaomi-mimo': 'https://api.xiaomimimo.com/v1',
-  mistral: 'https://api.mistral.ai/v1',
-};
-
-/** Display info for each provider (for UI) */
-export const PROVIDER_DISPLAY_INFO: Record<
-  ModelProvider,
-  { name: string; description: string }
+/**
+ * Display metadata for each provider instance type, keyed by
+ * `ProviderInstanceTypeId`. This is the single source of truth for UI
+ * display names, descriptions, API key URLs, and default base URLs.
+ *
+ * Backend provider type implementations spread from this record to
+ * populate their `displayName`, `description`, `getApiKeyUrl`, and
+ * `defaultBaseUrl` fields, eliminating duplication.
+ */
+export const PROVIDER_TYPE_DISPLAY_INFO: Record<
+  ProviderInstanceTypeId,
+  {
+    displayName: string;
+    description: string;
+    /** Short instruction shown next to the "Create key" link. */
+    helpText?: string;
+    getApiKeyUrl?: string;
+    defaultBaseUrl?: string;
+  }
 > = {
-  anthropic: {
-    name: 'Anthropic',
+  stagewise: {
+    displayName: 'Stagewise Inference',
+    description: 'OpenRouter-compatible managed inference',
+    defaultBaseUrl: 'https://llm.stagewise.io',
+  },
+  'anthropic-api': {
+    displayName: 'Anthropic API',
     description: 'Claude models (Opus, Sonnet, Haiku)',
+    helpText: 'Create one at console.anthropic.com → Settings → API Keys',
+    getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
+    defaultBaseUrl: 'https://api.anthropic.com/v1',
   },
-  openai: {
-    name: 'OpenAI',
+  'openai-api': {
+    displayName: 'OpenAI API',
     description: 'GPT and Codex models',
+    helpText: 'Create one at platform.openai.com → API keys',
+    getApiKeyUrl: 'https://platform.openai.com/api-keys',
+    defaultBaseUrl: 'https://api.openai.com/v1',
   },
-  google: {
-    name: 'Google',
+  'google-api': {
+    displayName: 'Google API',
     description: 'Gemini models',
+    helpText: 'Create one at Google AI Studio → Get API key',
+    getApiKeyUrl: 'https://aistudio.google.com/app/apikey',
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
   },
-  moonshotai: {
-    name: 'Moonshot AI',
+  'moonshotai-api': {
+    displayName: 'Moonshot AI API',
     description: 'Kimi models',
+    helpText: 'Create one at platform.moonshot.ai → Console → API keys',
+    getApiKeyUrl: 'https://platform.moonshot.ai/console/api-keys',
+    defaultBaseUrl: 'https://api.moonshot.ai/v1',
   },
-  alibaba: {
-    name: 'Alibaba Cloud',
+  'alibaba-api': {
+    displayName: 'Alibaba Cloud API',
     description: 'Qwen models',
+    helpText: 'Create one at dashscope.console.aliyuncs.com → API-KEY',
+    getApiKeyUrl: 'https://dashscope.console.aliyuncs.com/apiKey',
+    defaultBaseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
   },
-  deepseek: {
-    name: 'DeepSeek',
+  'deepseek-api': {
+    displayName: 'DeepSeek API',
     description: 'DeepSeek V-series models',
+    helpText: 'Create one at platform.deepseek.com → API keys',
+    getApiKeyUrl: 'https://platform.deepseek.com/api_keys',
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
   },
-  'z-ai': {
-    name: 'Z.ai',
+  'z-ai-api': {
+    displayName: 'Z.ai API',
     description: 'GLM models',
+    helpText: 'Get your key at z.ai → Manage API keys',
+    getApiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
+    defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
   },
-  minimax: {
-    name: 'MiniMax',
+  'minimax-api': {
+    displayName: 'MiniMax API',
     description: 'MiniMax M-series models',
+    helpText:
+      'Create one at platform.minimax.io → Basic Information → Interface Key',
+    getApiKeyUrl:
+      'https://platform.minimax.io/user-center/basic-information/interface-key',
+    defaultBaseUrl: 'https://api.minimax.io/v1',
   },
-  'xiaomi-mimo': {
-    name: 'Xiaomi MiMo',
+  'xiaomi-mimo-api': {
+    displayName: 'Xiaomi MiMo API',
     description: 'MiMo V2.5-series models',
+    helpText: 'Get your tp- key at platform.xiaomimimo.com → Subscription',
+    getApiKeyUrl: 'https://platform.xiaomimimo.com/#/console/plan-manage',
+    defaultBaseUrl: 'https://api.xiaomimimo.com/v1',
   },
-  mistral: {
-    name: 'Mistral',
+  'mistral-api': {
+    displayName: 'Mistral API',
     description: 'Mistral AI models',
+    helpText: 'Create one at console.mistral.ai → API Keys',
+    getApiKeyUrl: 'https://console.mistral.ai/api-keys',
+    defaultBaseUrl: 'https://api.mistral.ai/v1',
+  },
+  'coding-plan': {
+    displayName: 'Coding Plan',
+    description: 'Bring-your-own-subscription coding plan',
+  },
+  'custom-anthropic': {
+    displayName: 'Custom Anthropic',
+    description: 'Anthropic-compatible custom endpoint',
+  },
+  'custom-openai-chat': {
+    displayName: 'Custom OpenAI (Chat)',
+    description: 'OpenAI Chat Completions-compatible custom endpoint',
+  },
+  'custom-openai-responses': {
+    displayName: 'Custom OpenAI (Responses)',
+    description: 'OpenAI Responses API-compatible custom endpoint',
+  },
+  'custom-google': {
+    displayName: 'Custom Google',
+    description: 'Google Generative AI-compatible custom endpoint',
+  },
+  azure: {
+    displayName: 'Azure OpenAI',
+    description: 'Azure-hosted OpenAI models',
+  },
+  bedrock: {
+    displayName: 'Amazon Bedrock',
+    description: 'AWS-hosted models via Bedrock',
+  },
+  vertex: {
+    displayName: 'Google Vertex AI',
+    description: 'Google Cloud-hosted models via Vertex AI',
   },
 };
 
@@ -722,17 +794,49 @@ export const userPreferencesSchema = z.object({
       workspaceSettings: z
         .record(z.string(), workspaceAgentSettingsSchema)
         .default({}),
-      /** Model IDs the user has chosen to hide from the model selector */
-      disabledModelIds: z.array(z.string()).default([]),
       /** Plugin IDs the user has chosen to disable */
       disabledPluginIds: z.array(z.string()).default([]),
       /** Last workspace Git action choices used to seed future selectors */
       workspaceGitActionPreferences: workspaceGitActionPreferencesSchema,
       /** Snoozed worktree cleanup candidates keyed by worktree path */
       workspaceGitCleanup: workspaceGitCleanupPreferencesSchema,
-      /** Per-built-in-model thinking overrides keyed by model ID */
+      /**
+       * Per-model thinking overrides keyed by instance ID, then model ID.
+       * Outer key = providerInstanceId, inner key = modelId.
+       *
+       * A preprocess step normalizes the legacy flat format
+       * (`Record<modelId, override>`) by wrapping it under the
+       * `stagewise-default` instance key.
+       */
       modelThinkingOverrides: z
-        .record(z.string(), modelThinkingOverrideSchema)
+        .preprocess(
+          (val) => {
+            if (typeof val !== 'object' || val === null || Array.isArray(val))
+              return {};
+            const record = val as Record<string, unknown>;
+            const entries = Object.entries(record);
+            if (entries.length === 0) return {};
+            // Detect old flat format: at least one value looks like an
+            // override object (has enabled/provider/value keys) rather
+            // than a nested Record<modelId, override>.
+            const looksLikeOldFormat = entries.some(([, v]) => {
+              if (typeof v !== 'object' || v === null || Array.isArray(v))
+                return false;
+              const keys = Object.keys(v);
+              return keys.some(
+                (k) => k === 'enabled' || k === 'provider' || k === 'value',
+              );
+            });
+            if (looksLikeOldFormat) {
+              return { 'stagewise-default': record };
+            }
+            return val;
+          },
+          z.record(
+            z.string(),
+            z.record(z.string(), modelThinkingOverrideSchema),
+          ),
+        )
         .default({})
         .catch({}),
       /**
@@ -752,7 +856,6 @@ export const userPreferencesSchema = z.object({
     })
     .default({
       workspaceSettings: {},
-      disabledModelIds: [],
       disabledPluginIds: [],
       workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
       workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
@@ -866,15 +969,6 @@ export const defaultUserPreferences: UserPreferences = {
   sidebar: defaultSidebarPreferences,
   agent: {
     workspaceSettings: {},
-    disabledModelIds: [
-      'claude-opus-4.7',
-      'claude-opus-4.6',
-      'claude-sonnet-4.6',
-      'kimi-k2.5',
-      'gpt-5.4',
-      'MiniMax-M2',
-      'gemini-3-flash-preview',
-    ],
     disabledPluginIds: [],
     workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
     workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,

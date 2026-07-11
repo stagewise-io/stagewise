@@ -75,27 +75,3 @@ export function getProviderType(typeId: string): ProviderType {
 export function getProviderTypeByVendor(vendor: ModelProvider): ProviderType {
   return OFFICIAL_API_TYPES[vendor];
 }
-
-// ============================================================================
-// Compatibility shims — computed from the registry so existing UI imports
-// don't break. These replace the scattered PROVIDER_DISPLAY_INFO and
-// PROVIDER_OFFICIAL_URLS constants.
-// ============================================================================
-
-export const PROVIDER_DISPLAY_INFO: Record<
-  ModelProvider,
-  { name: string; description: string }
-> = Object.fromEntries(
-  Object.values(OFFICIAL_API_TYPES).map((t) => [
-    t.vendor,
-    { name: t.displayName, description: t.description },
-  ]),
-) as Record<ModelProvider, { name: string; description: string }>;
-
-export const PROVIDER_OFFICIAL_URLS: Record<ModelProvider, string> =
-  Object.fromEntries(
-    Object.values(OFFICIAL_API_TYPES).map((t) => [
-      t.vendor,
-      t.defaultBaseUrl ?? '',
-    ]),
-  ) as Record<ModelProvider, string>;

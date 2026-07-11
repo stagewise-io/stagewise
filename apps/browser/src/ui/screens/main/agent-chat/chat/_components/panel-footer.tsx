@@ -67,6 +67,10 @@ import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import { getAvailableModel } from '@shared/available-models';
+import {
+  DEFAULT_INSTANCE_ID,
+  findModelSelectorEntry,
+} from '@shared/provider-instance-helpers';
 import { useChatDraft } from '@ui/hooks/use-chat-draft';
 import type { Content } from '@tiptap/core';
 import {
@@ -1106,15 +1110,27 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const activeModelId = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
   );
-  const customModels = useKartonState((s) => s.preferences.customModels);
+  const activeProviderInstanceId = useKartonState((s) =>
+    openAgent
+      ? s.agents.instances[openAgent]?.state.activeProviderInstanceId
+      : null,
+  );
+  const preferences = useKartonState((s) => s.preferences);
   const maxTokens = useMemo(() => {
     if (!activeModelId) return 200000;
+    // Use the instance-aware selector entry to resolve context window.
+    const instanceId = activeProviderInstanceId ?? DEFAULT_INSTANCE_ID;
+    const entry = findModelSelectorEntry(
+      preferences,
+      instanceId,
+      activeModelId,
+    );
+    if (entry) return entry.contextWindowRaw;
+    // Fallback to catalog lookup (e.g. for models not yet in selector entries).
     const builtIn = getAvailableModel(activeModelId);
     if (builtIn) return builtIn.modelContextRaw;
-    const custom = customModels.find((m) => m.modelId === activeModelId);
-    if (custom) return custom.contextWindowSize;
     return 200000;
-  }, [activeModelId, customModels]);
+  }, [activeModelId, activeProviderInstanceId, preferences]);
 
   const contextUsed = useMemo(() => {
     const used = usedTokens ?? 0;

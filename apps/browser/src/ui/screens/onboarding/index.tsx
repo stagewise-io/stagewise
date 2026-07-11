@@ -10,23 +10,14 @@ import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { StepLogin } from './steps/01-login';
 import type { OnboardingAuthCompletion } from './steps/01-login';
-import { StepModelAccess } from './steps/02-model-access';
-import { StepExistingSubscriptions } from './steps/03-existing-subscriptions';
-import { StepCustomEndpoints } from './steps/04-custom-endpoints';
-import { StepCustomModels } from './steps/05-custom-models';
+import { StepConfigureProviders } from './steps/06-configure-providers';
 import { StepTheme } from './steps/07-theme';
 
-type ScreenId =
-  | 'login'
-  | 'model-access'
-  | 'existing-subscriptions'
-  | 'custom-endpoints'
-  | 'custom-models'
-  | 'theme';
+type ScreenId = 'login' | 'configure-providers' | 'theme';
 
 export function OnboardingWizard() {
   const [screen, setScreen] = useState<ScreenId>('login');
-  const [prevScreen, setPrevScreen] = useState<ScreenId>('model-access');
+  const [prevScreen, setPrevScreen] = useState<ScreenId>('configure-providers');
   const [authCompletion, setAuthCompletion] =
     useState<OnboardingAuthCompletion | null>(null);
   const setHasSeenOnboardingFlow = useKartonProcedure(
@@ -60,39 +51,17 @@ export function OnboardingWizard() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {screen === 'login' && (
           <StepLogin
-            onSkip={() => navigate('model-access')}
+            onSkip={() => navigate('configure-providers')}
             onAuthenticated={(completion) => {
               setAuthCompletion(completion);
-              navigate('model-access');
+              navigate('configure-providers');
             }}
           />
         )}
-        {screen === 'model-access' && (
-          <StepModelAccess
-            onSelectStagewise={() => navigate('theme')}
-            onSelectExistingSubscriptions={() =>
-              navigate('existing-subscriptions')
-            }
-            onSelectCustomEndpoints={() => navigate('custom-endpoints')}
+        {screen === 'configure-providers' && (
+          <StepConfigureProviders
+            onNext={() => navigate('theme')}
             onBack={() => navigate('login')}
-          />
-        )}
-        {screen === 'existing-subscriptions' && (
-          <StepExistingSubscriptions
-            onNext={() => navigate('theme')}
-            onBack={() => navigate('model-access')}
-          />
-        )}
-        {screen === 'custom-endpoints' && (
-          <StepCustomEndpoints
-            onNext={() => navigate('custom-models')}
-            onBack={() => navigate('model-access')}
-          />
-        )}
-        {screen === 'custom-models' && (
-          <StepCustomModels
-            onNext={() => navigate('theme')}
-            onBack={() => navigate('custom-endpoints')}
           />
         )}
         {screen === 'theme' && (

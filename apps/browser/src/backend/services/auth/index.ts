@@ -184,6 +184,13 @@ export class AuthService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'userAccount.refreshSubscription',
+      async (_callingClientId: string) => {
+        await this.refreshSubscription();
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'userAccount.validateApiKeys',
       async (_callingClientId: string, keys: ApiKeysInput) => {
         this.logger.debug('[AuthService] Validating API keys');
@@ -226,6 +233,9 @@ export class AuthService extends DisposableService {
     this.uiKarton.removeServerProcedureHandler('userAccount.signInEmail');
     this.uiKarton.removeServerProcedureHandler('userAccount.logout');
     this.uiKarton.removeServerProcedureHandler('userAccount.refreshStatus');
+    this.uiKarton.removeServerProcedureHandler(
+      'userAccount.refreshSubscription',
+    );
     this.uiKarton.removeServerProcedureHandler('userAccount.validateApiKeys');
     this.authChangeCallbacks = [];
 
@@ -642,6 +652,12 @@ export class AuthService extends DisposableService {
         draft.userAccount.status = 'server_unreachable';
       });
     }
+  }
+
+  public async refreshSubscription(): Promise<void> {
+    const token = this._credentials?.token;
+    if (!token) return;
+    await this.fetchSubscription(token);
   }
 
   private async fetchSubscription(accessToken: string): Promise<void> {

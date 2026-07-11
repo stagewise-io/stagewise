@@ -9,45 +9,33 @@ import { useTrack } from '@ui/hooks/use-track';
 import type {
   CustomModel,
   ModelCapabilities,
-  ModelProvider,
-  ProviderEndpointMode,
   ProviderInstance,
+  ProviderInstanceTypeId,
   UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
-  PROVIDER_DISPLAY_INFO,
-  PROVIDER_OFFICIAL_URLS,
-} from '@shared/karton-contracts/ui/shared-types';
-import {
-  findCodingPlanInstance,
-  findInstanceForVendor,
-  getCustomTypeInstances,
-  getVendorMode,
-  instanceTypeIdToApiSpec,
+  getInstanceDisabledModelIds,
+  getInstanceModelThinkingOverride,
+  getInstanceThinkingDefaultOptions,
+  getSelectableModelEntries,
+  getTypeDisplayInfo,
   resolveCustomModelInstanceName,
+  type ModelSelectorEntry,
 } from '@shared/provider-instance-helpers';
-import type {
-  BuiltInModel,
-  SelectableBuiltInModel,
-} from '@shared/available-models';
 import {
   availableModelAliases,
   getAvailableModel,
-  getSelectableBuiltInModels,
 } from '@shared/available-models';
 import {
   getEnabledModelThinkingOption,
   getModelThinkingDisplayState,
   getModelThinkingOptions,
   type ModelThinkingDisplayState,
+  type ModelThinkingDefaultOptions,
 } from '@ui/utils/model-thinking';
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
-import {
-  CODING_PLANS,
-  type CodingPlan,
-  type CodingPlanId,
-} from '@shared/coding-plans';
-import { CodingPlanCard } from '@ui/components/coding-plan-card';
+import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
+import { ProviderLogo } from '@ui/components/provider-logos';
 import {
   useEffect,
   useState,
@@ -60,14 +48,8 @@ import {
 import { cn } from '@ui/utils';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
-import {
-  RadioGroup,
-  Radio,
-  RadioLabel,
-} from '@stagewise/stage-ui/components/radio';
 import { Input } from '@stagewise/stage-ui/components/input';
-import { Button } from '@stagewise/stage-ui/components/button';
-import { Select } from '@stagewise/stage-ui/components/select';
+import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import {
   Dialog,
@@ -78,69 +60,99 @@ import {
   DialogHeader,
   DialogFooter,
 } from '@stagewise/stage-ui/components/dialog';
+import {
+  Menu,
+  MenuTrigger,
+  MenuContent,
+  MenuItem,
+  MenuSeparator,
+} from '@stagewise/stage-ui/components/menu';
 import { produceWithPatches, enablePatches } from 'immer';
 import {
+  IconChevronLeftOutline18,
   IconChevronRightOutline18,
   IconChevronDownOutline18,
   IconPlusOutline18,
   IconPenOutline18,
   IconTrashOutline18,
+  IconDotsOutline18,
+  IconCheck2Outline18,
+  IconFolderCloudOutline18,
+  IconServerOutline18,
+  IconArrowUpRightOutline18,
 } from '@stagewise/icons';
+import { Logo } from '@stagewise/stage-ui/components/logo';
+
+const consoleUrl =
+  import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 
 enablePatches();
 
 const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
-const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
-  {};
-const RECOMMENDED_MODEL_IDS = availableModelAliases.map(
+const _RECOMMENDED_MODEL_IDS = availableModelAliases.map(
   (alias) => alias.modelId,
 );
 
 // =============================================================================
-// Model Provider Configuration
+// Provider Instance Logo
 // =============================================================================
 
-const PROVIDERS: ModelProvider[] = [
-  'anthropic',
-  'openai',
-  'google',
-  'moonshotai',
-  'alibaba',
-  'deepseek',
-  'z-ai',
-  'minimax',
-  'xiaomi-mimo',
-  'mistral',
-];
-
-function getThinkingDefaultOptionsForModel(
-  model: BuiltInModel,
-  preferences: UserPreferences,
-): Parameters<typeof getModelThinkingDisplayState>[2] {
-  const provider = model.officialProvider;
-  if (!provider) return { providerMode: 'stagewise' };
-
-  const mode = getVendorMode(preferences, provider);
-  if (mode !== 'custom') return { providerMode: mode };
-
-  const instance = findInstanceForVendor(preferences, provider);
-  if (!instance) return { providerMode: 'stagewise' };
-
-  const apiSpec = instanceTypeIdToApiSpec(instance.typeId);
-  if (!apiSpec) return { providerMode: 'stagewise' };
-
-  return {
-    providerMode: 'custom',
-    customEndpointApiSpec: apiSpec,
-  };
+function InstanceLogo({
+  typeId,
+  instance,
+  className,
+}: {
+  typeId: ProviderInstanceTypeId;
+  instance?: ProviderInstance;
+  className?: string;
+}) {
+  // Vendor API types → brand logo
+  if (typeId.endsWith('-api')) {
+    const vendor = typeId.slice(0, -4);
+    return (
+      <ProviderLogo
+        provider={vendor as Parameters<typeof ProviderLogo>[0]['provider']}
+        className={className}
+      />
+    );
+  }
+  // Stagewise → stagewise logo
+  if (typeId === 'stagewise') {
+    return <Logo className={className} />;
+  }
+  // Coding plan → resolve the plan's provider logo
+  if (typeId === 'coding-plan') {
+    const planId = (instance?.config as { planId?: string })?.planId as
+      | CodingPlanId
+      | undefined;
+    const plan = planId ? CODING_PLANS[planId] : undefined;
+    if (plan) {
+      return <ProviderLogo provider={plan.provider} className={className} />;
+    }
+    return (
+      <IconServerOutline18 className={cn(className, 'text-muted-foreground')} />
+    );
+  }
+  // Cloud/custom types → cloud icon
+  return (
+    <IconFolderCloudOutline18
+      className={cn(className, 'text-muted-foreground')}
+    />
+  );
 }
 
-function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
-  const setSettingsRoute = useKartonProcedure(
-    (p) => p.appScreen.setSettingsRoute,
-  );
-  const preferences = useKartonState((s) => s.preferences);
-  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+// =============================================================================
+// Vendor API Key Input (inline)
+// =============================================================================
+
+function VendorApiKeyInput({
+  instance,
+  onSaved,
+}: {
+  instance: ProviderInstance;
+  onSaved?: () => void;
+}) {
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const setProviderInstanceApiKey = useKartonProcedure(
     (p) => p.preferences.setProviderInstanceApiKey,
   );
@@ -150,32 +162,15 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
   const validateProviderInstanceApiKey = useKartonProcedure(
     (p) => p.preferences.validateProviderInstanceApiKey,
   );
-  const addProviderInstance = useKartonProcedure(
-    (p) => p.preferences.addProviderInstance,
-  );
 
-  const instance = findInstanceForVendor(preferences, provider);
-  const mode = getVendorMode(preferences, provider);
-  const instanceId = instance?.id;
-  const displayInfo = PROVIDER_DISPLAY_INFO[provider];
-  const officialUrl = PROVIDER_OFFICIAL_URLS[provider];
-  const customInstances = getCustomTypeInstances(preferences);
-
+  const hasKey = !!(instance.config as { encryptedApiKey?: string })
+    .encryptedApiKey;
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validated, setValidated] = useState<
     null | { success: true } | { success: false; error: string }
   >(null);
-  const hasKey =
-    !!instance &&
-    !!(instance.config as { encryptedApiKey?: string }).encryptedApiKey;
-  const connectedCodingPlan =
-    instance?.typeId === 'coding-plan'
-      ? CODING_PLANS[instance.config.planId as CodingPlanId]
-      : undefined;
-  const hasActiveCodingPlanConnection =
-    mode === 'official' && hasKey && connectedCodingPlan?.provider === provider;
 
   useEffect(() => {
     if (validated?.success) {
@@ -184,266 +179,280 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
     }
   }, [validated]);
 
-  const handleModeChange = useCallback(
-    async (newMode: unknown) => {
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.providerConfigs[provider].mode = newMode as ProviderEndpointMode;
-      });
-      await updatePreferences(patches);
-    },
-    [preferences, provider, updatePreferences],
-  );
-
-  const handleCustomProviderChange = useCallback(
-    async (endpointId: string) => {
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.providerConfigs[provider].customProviderId = endpointId;
-      });
-      await updatePreferences(patches);
-    },
-    [preferences, provider, updatePreferences],
-  );
-
-  const handleSaveAndValidate = useCallback(
+  const handleSave = useCallback(
     async (key: string) => {
       if (!key.trim()) return;
       const trimmedKey = key.trim();
-
-      if (mode === 'official') {
-        setIsValidating(true);
-        setValidated(null);
-        try {
-          // If no instance exists yet, validate via addProviderInstance
-          // (which validates + creates + stores the key atomically).
-          // Otherwise validate against the existing instance.
-          if (!instanceId) {
-            const result = await addProviderInstance({
-              typeId: `${provider}-api`,
-              config: {},
-              validateApiKey: trimmedKey,
-            });
-            if (!result.success) {
-              setValidated({ success: false, error: result.error });
-              return;
-            }
-            // Instance created with key — also flip the legacy mode.
-            const [, patches] = produceWithPatches(preferences, (draft) => {
-              draft.providerConfigs[provider].mode = 'official';
-            });
-            await updatePreferences(patches);
-            setApiKeyInput('');
-            setValidated({ success: true });
-            return;
-          }
-
-          const result = await validateProviderInstanceApiKey(
-            instanceId,
-            trimmedKey,
-          );
-          if (result && !result.success) {
-            setValidated({ success: false, error: result.error });
-            return;
-          }
-        } catch {
-          setValidated({
-            success: false,
-            error: 'Validation request failed. Please try again.',
-          });
+      setIsValidating(true);
+      setValidated(null);
+      try {
+        const result = await validateProviderInstanceApiKey(
+          instance.id,
+          trimmedKey,
+        );
+        if (result && !result.success) {
+          setValidated({ success: false, error: result.error });
           return;
-        } finally {
-          setIsValidating(false);
         }
+      } catch {
+        setValidated({
+          success: false,
+          error: 'Validation request failed. Please try again.',
+        });
+        return;
+      } finally {
+        setIsValidating(false);
       }
 
-      // Instance already exists — just update the key.
-      if (instanceId) {
-        setIsSavingKey(true);
-        try {
-          await setProviderInstanceApiKey(instanceId, trimmedKey);
-          setApiKeyInput('');
-          setValidated({ success: true });
-        } finally {
-          setIsSavingKey(false);
-        }
+      setIsSaving(true);
+      try {
+        await setProviderInstanceApiKey(instance.id, trimmedKey);
+        setApiKeyInput('');
+        setValidated({ success: true });
+        onSaved?.();
+      } finally {
+        setIsSaving(false);
       }
     },
     [
-      mode,
-      instanceId,
-      provider,
-      addProviderInstance,
+      instance.id,
       validateProviderInstanceApiKey,
       setProviderInstanceApiKey,
-      preferences,
-      updatePreferences,
+      onSaved,
     ],
   );
 
-  const handleClearApiKey = useCallback(async () => {
-    if (!instanceId) return;
-    await clearProviderInstanceApiKey(instanceId);
+  const handleClear = useCallback(async () => {
+    await clearProviderInstanceApiKey(instance.id);
     setValidated(null);
-  }, [instanceId, clearProviderInstanceApiKey]);
+  }, [instance.id, clearProviderInstanceApiKey]);
 
-  const customProviderItems = customInstances.map((inst) => ({
-    value: inst.id,
-    label: inst.name,
-  }));
+  const displayInfo = getTypeDisplayInfo(instance.typeId);
+  const isCodingPlan = instance.typeId === 'coding-plan';
+  const codingPlanId = isCodingPlan
+    ? ((instance.config as { planId?: string })?.planId as
+        | CodingPlanId
+        | undefined)
+    : undefined;
+  const codingPlan = codingPlanId ? CODING_PLANS[codingPlanId] : undefined;
+  const getApiKeyUrl = codingPlan?.apiKeyUrl ?? displayInfo?.getApiKeyUrl;
+  const helpText = codingPlan?.helpText ?? displayInfo?.helpText;
+
+  return (
+    <div className="space-y-1">
+      <p className="flex items-center font-medium text-muted-foreground text-xs">
+        API Key
+        {isValidating && (
+          <span className="ml-1.5 font-normal text-subtle-foreground">
+            validating...
+          </span>
+        )}
+        {!isValidating && validated?.success && (
+          <span className="ml-1.5 font-normal text-success-foreground">
+            Updated
+          </span>
+        )}
+      </p>
+      <div className="flex gap-1.5">
+        <Input
+          type="password"
+          value={apiKeyInput}
+          placeholder={
+            hasKey || validated
+              ? '••••••••••••••••••••••••••••••••'
+              : 'Enter API key...'
+          }
+          onValueChange={(v) => {
+            setApiKeyInput(v);
+            setValidated(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && apiKeyInput.trim()) {
+              void handleSave(apiKeyInput);
+            }
+          }}
+          onBlur={() => {
+            if (apiKeyInput.trim()) {
+              void handleSave(apiKeyInput);
+            }
+          }}
+          disabled={isValidating || isSaving}
+          size="sm"
+          style={{ maxWidth: 'none' }}
+          className="min-w-0 flex-1"
+        />
+        {apiKeyInput ? (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void handleSave(apiKeyInput)}
+            disabled={isValidating || isSaving}
+          >
+            Save
+          </Button>
+        ) : hasKey ? (
+          <Button variant="ghost" size="sm" onClick={handleClear}>
+            Clear
+          </Button>
+        ) : null}
+      </div>
+      {validated && !validated.success && (
+        <TruncatedErrorText text={validated.error} />
+      )}
+      {!hasKey && !(validated && !validated.success) && getApiKeyUrl && (
+        <p className="text-subtle-foreground text-xs">
+          <span className="inline-flex items-center gap-1">
+            {helpText ?? `Get your ${displayInfo.displayName} API key`}
+            <button
+              type="button"
+              onClick={() => void openExternalUrl(getApiKeyUrl)}
+              className={cn(
+                buttonVariants({ variant: 'link', size: 'xs' }),
+                'shrink-0',
+              )}
+            >
+              Create key
+            </button>
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Provider Instance Card
+// =============================================================================
+
+function ProviderInstanceCard({
+  instance,
+  onEdit,
+  onDelete,
+  onEditCustom,
+}: {
+  instance: ProviderInstance;
+  onEdit?: () => void;
+  onDelete: () => void;
+  onEditCustom?: () => void;
+}) {
+  const _preferences = useKartonState((s) => s.preferences);
+  const subscription = useKartonState((s) => s.userAccount.subscription);
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
+  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+
+  const displayInfo = getTypeDisplayInfo(instance.typeId);
+  const isStagewise = instance.typeId === 'stagewise';
+  const plan = subscription?.plan;
+  const isFreePlan = !plan || plan === 'free';
+  const isKeyBasedProvider =
+    instance.typeId.endsWith('-api') || instance.typeId === 'coding-plan';
+  const isCustomType = !isStagewise && !isKeyBasedProvider;
+
+  // Determine subtitle
+  const subtitle = isCustomType
+    ? (displayInfo?.description ?? '')
+    : (displayInfo?.description ?? '');
 
   return (
     <div className="space-y-3 rounded-lg border border-derived p-3">
-      <div className="-mt-1">
-        <h3 className="font-medium text-foreground text-sm">
-          {displayInfo.name}
-        </h3>
-        <p className="text-muted-foreground text-xs">
-          {displayInfo.description}
-        </p>
-      </div>
-
-      {hasActiveCodingPlanConnection && (
-        <p className="rounded-md border border-derived bg-surface-1 px-2 py-1.5 text-muted-foreground text-xs">
-          Connected via {connectedCodingPlan.displayName}.
-        </p>
-      )}
-
-      <RadioGroup value={mode} onValueChange={handleModeChange}>
-        <RadioLabel>
-          <Radio value="stagewise" />
-          <span>Use my stagewise account</span>
-        </RadioLabel>
-
-        <RadioLabel>
-          <Radio value="official" />
-          <span>Use own API key with {displayInfo.name} API</span>
-        </RadioLabel>
-
-        <RadioLabel>
-          <Radio value="custom" />
-          <span>Use custom provider</span>
-        </RadioLabel>
-      </RadioGroup>
-
-      {/* Official mode: API key fields */}
-      {mode === 'official' && (
-        <div className="grid grid-cols-1 gap-3 border-derived border-t pt-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-xs">
-              Endpoint URL
-            </p>
-            <Input
-              value={
-                connectedCodingPlan?.provider === provider &&
-                connectedCodingPlan.baseUrl
-                  ? connectedCodingPlan.baseUrl
-                  : officialUrl
-              }
-              disabled
-              size="sm"
-              style={{ maxWidth: 'none' }}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-1">
+            <InstanceLogo
+              typeId={instance.typeId}
+              instance={instance}
+              className="size-5 text-foreground"
             />
           </div>
-
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-xs">
-              API Key
-              {isValidating && (
-                <span className="ml-1.5 font-normal text-subtle-foreground">
-                  validating...
-                </span>
-              )}
-              {!isValidating && validated?.success && (
-                <span className="ml-1.5 font-normal text-success-foreground">
-                  Updated
-                </span>
-              )}
-            </p>
-            <div className="flex gap-1.5">
-              <Input
-                type="password"
-                value={apiKeyInput}
-                placeholder={
-                  hasKey || validated
-                    ? '••••••••••••••••••••••••••••••••'
-                    : 'Enter API key...'
-                }
-                onValueChange={(v) => {
-                  setApiKeyInput(v);
-                  setValidated(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && apiKeyInput.trim()) {
-                    void handleSaveAndValidate(apiKeyInput);
-                  }
-                }}
-                onBlur={() => {
-                  if (apiKeyInput.trim()) {
-                    void handleSaveAndValidate(apiKeyInput);
-                  }
-                }}
-                disabled={isValidating || isSavingKey}
-                size="sm"
-                style={{ maxWidth: 'none' }}
-                className="min-w-0 flex-1"
-              />
-              {apiKeyInput ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => void handleSaveAndValidate(apiKeyInput)}
-                  disabled={isValidating || isSavingKey}
-                >
-                  Save
-                </Button>
-              ) : hasKey ? (
-                <Button variant="ghost" size="sm" onClick={handleClearApiKey}>
-                  Clear
-                </Button>
-              ) : null}
-            </div>
-            {validated && !validated.success && (
-              <TruncatedErrorText text={validated.error} />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium text-foreground text-sm">
+              {instance.name}
+            </h3>
+            {subtitle && (
+              <p className="mt-0.5 truncate text-muted-foreground text-xs">
+                {subtitle}
+              </p>
             )}
           </div>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {!isStagewise && (
+            <Menu>
+              <MenuTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-5"
+                  aria-label="Instance actions"
+                >
+                  <IconDotsOutline18 className="size-3.5" />
+                </Button>
+              </MenuTrigger>
+              <MenuContent align="end">
+                {onEdit && (
+                  <MenuItem onClick={onEdit}>
+                    <IconPenOutline18 className="size-3.5 text-muted-foreground" />
+                    Edit
+                  </MenuItem>
+                )}
+                {onEditCustom && (
+                  <MenuItem onClick={onEditCustom}>
+                    <IconPenOutline18 className="size-3.5 text-muted-foreground" />
+                    Edit configuration
+                  </MenuItem>
+                )}
+                {(onEdit || onEditCustom) && <MenuSeparator />}
+                <MenuItem onClick={onDelete} className="text-error-foreground">
+                  <IconTrashOutline18 className="size-3.5" />
+                  Delete
+                </MenuItem>
+              </MenuContent>
+            </Menu>
+          )}
+        </div>
+      </div>
+
+      {/* API key input for vendor APIs and coding plans */}
+      {isKeyBasedProvider && <VendorApiKeyInput instance={instance} />}
+
+      {/* Custom type: show config summary + configure button */}
+      {isCustomType && (
+        <div className="flex items-center justify-between gap-2 border-derived border-t pt-2">
+          <p className="truncate text-muted-foreground text-xs">
+            {displayInfo?.defaultBaseUrl
+              ? displayInfo.defaultBaseUrl
+              : 'Custom endpoint configured'}
+          </p>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setSettingsRoute({ section: 'custom-providers' })}
+          >
+            Configure
+            <IconChevronRightOutline18 className="size-3" />
+          </Button>
+        </div>
       )}
 
-      {/* Custom provider mode: select from configured providers */}
-      {mode === 'custom' && (
-        <div className="border-derived border-t pt-3">
-          {customInstances.length === 0 ? (
-            <div className="space-y-2">
-              <p className="text-muted-foreground text-xs">
-                No custom providers configured yet.
-              </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  setSettingsRoute({ section: 'custom-providers' })
-                }
-              >
-                Configure Providers
-                <IconChevronRightOutline18 className="size-3" />
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-xs">
-                Provider
-              </p>
-              <Select
-                value={
-                  preferences.providerConfigs?.[provider]?.customProviderId ??
-                  ''
-                }
-                onValueChange={handleCustomProviderChange}
-                items={customProviderItems}
-                placeholder="Select a provider..."
-                size="md"
-                triggerClassName="w-full"
-              />
-            </div>
+      {/* Stagewise: informational or upgrade CTA */}
+      {isStagewise && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-warning-foreground text-xs">
+            {isFreePlan
+              ? 'Requires Pro or Ultra plan'
+              : 'Uses your stagewise account. All built-in models are available through Stagewise Inference by default.'}
+          </p>
+          {isFreePlan && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => void openExternalUrl(consoleUrl)}
+            >
+              Upgrade to Pro
+              <IconArrowUpRightOutline18 className="size-3" />
+            </Button>
           )}
         </div>
       )}
@@ -452,120 +461,468 @@ function ProviderConfigCard({ provider }: { provider: ModelProvider }) {
 }
 
 // =============================================================================
-// Coding Plans Section
+// Add Provider Type Grid
 // =============================================================================
 
-function SettingsCodingPlanCard({ plan }: { plan: CodingPlan }) {
-  const preferences = useKartonState((s) => s.preferences);
+const ADDABLE_VENDOR_TYPES: ProviderInstanceTypeId[] = [
+  'anthropic-api',
+  'openai-api',
+  'google-api',
+  'deepseek-api',
+  'z-ai-api',
+  'moonshotai-api',
+  'alibaba-api',
+  'minimax-api',
+  'xiaomi-mimo-api',
+  'mistral-api',
+];
+
+/** Unified selection key — either a vendor typeId or `plan:<planId>`. */
+type SelectionKey = ProviderInstanceTypeId | `plan:${string}`;
+
+function AddProviderGrid({ onClose }: { onClose: () => void }) {
+  const addProviderInstance = useKartonProcedure(
+    (p) => p.preferences.addProviderInstance,
+  );
   const connectCodingPlan = useKartonProcedure(
     (p) => p.preferences.connectCodingPlan,
   );
-  const disconnectProvider = useKartonProcedure(
-    (p) => p.preferences.disconnectProvider,
-  );
+  const preferences = useKartonState((s) => s.preferences);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+  const [selected, setSelected] = useState<SelectionKey | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Derive the card config from the coding-plan instance (if connected)
-  // or fall back to the legacy providerConfigs entry.
-  const instance = findCodingPlanInstance(preferences, plan.id);
-  const legacyConfig = preferences.providerConfigs?.[plan.provider] ?? {
-    mode: 'stagewise' as const,
-  };
-  const config = instance
-    ? {
-        mode: 'official' as const,
-        encryptedApiKey: (instance.config as { encryptedApiKey?: string })
-          .encryptedApiKey,
-        connectedCodingPlanId: plan.id,
-      }
-    : legacyConfig;
+  // Auto-focus the search input when the dialog opens.
+  useEffect(() => {
+    const timer = setTimeout(() => searchInputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const existingInstances = preferences.providerInstances ?? [];
+
+  // Check which vendor types already have an instance
+  const existingVendorTypes = new Set(
+    existingInstances
+      .filter((i) => i.typeId.endsWith('-api'))
+      .map((i) => i.typeId),
+  );
+
+  const codingPlans = useMemo(() => Object.values(CODING_PLANS), []);
+  const existingPlanIds = new Set(
+    existingInstances
+      .filter((i) => i.typeId === 'coding-plan')
+      .map((i) => (i.config as { planId?: string }).planId),
+  );
 
   const handleConnect = useCallback(
-    (planId: typeof plan.id, apiKey: string) =>
-      connectCodingPlan(planId, apiKey),
-    [connectCodingPlan],
-  );
-
-  const handleDisconnect = useCallback(async () => {
-    // Atomic: flips mode back to 'stagewise' AND clears the encrypted key in
-    // a single patch update on the backend. No partial-state window.
-    await disconnectProvider(plan.provider);
-  }, [plan.provider, disconnectProvider]);
-
-  const handleGetApiKey = useCallback(
-    (url: string) => {
-      void openExternalUrl(url);
+    async (key: SelectionKey, apiKeyValue: string) => {
+      if (!apiKeyValue.trim()) return;
+      setIsConnecting(true);
+      setError(null);
+      try {
+        if (key.startsWith('plan:')) {
+          const planId = key.slice(5) as CodingPlanId;
+          const result = await connectCodingPlan(planId, apiKeyValue.trim());
+          if (!result.success) {
+            setError(result.error);
+            return;
+          }
+        } else {
+          const result = await addProviderInstance({
+            typeId: key,
+            config: {},
+            validateApiKey: apiKeyValue.trim(),
+          });
+          if (!result.success) {
+            setError(result.error);
+            return;
+          }
+        }
+        onClose();
+      } catch {
+        setError('Connection failed. Please try again.');
+      } finally {
+        setIsConnecting(false);
+      }
     },
-    [openExternalUrl],
+    [addProviderInstance, connectCodingPlan, onClose],
   );
 
-  return (
-    <CodingPlanCard
-      plan={plan}
-      config={config}
-      onConnect={handleConnect}
-      onDisconnect={handleDisconnect}
-      onGetApiKey={handleGetApiKey}
-    />
-  );
-}
+  // Resolve display info for the current selection
+  const selectedVendorType =
+    selected && !selected.startsWith('plan:')
+      ? (selected as ProviderInstanceTypeId)
+      : null;
+  const selectedPlanId = selected?.startsWith('plan:')
+    ? (selected.slice(5) as CodingPlanId)
+    : null;
+  const selectedPlan = selectedPlanId
+    ? CODING_PLANS[selectedPlanId]
+    : undefined;
+  const selectedVendorInfo = selectedVendorType
+    ? getTypeDisplayInfo(selectedVendorType)
+    : undefined;
+  const selectedDisplayName =
+    selectedVendorInfo?.displayName ?? selectedPlan?.displayName ?? '';
+  const selectedTagline =
+    selectedPlan?.tagline ?? selectedVendorInfo?.description ?? '';
+  const selectedGetApiKeyUrl =
+    selectedVendorInfo?.getApiKeyUrl ?? selectedPlan?.apiKeyUrl;
+  const selectedHelpText =
+    selectedPlan?.helpText ??
+    selectedVendorInfo?.helpText ??
+    (selectedGetApiKeyUrl
+      ? `Get your ${selectedDisplayName} API key`
+      : undefined);
+  const selectedEndpointHelpText = selectedPlan?.endpointHelpText;
+  const selectedDisclaimer = selectedPlan?.disclaimer;
 
-function CodingPlansSection() {
-  const [showAll, setShowAll] = useState(false);
-  const plans = useMemo(() => Object.values(CODING_PLANS), []);
-  const primary = plans.slice(0, 2);
-  const secondary = plans.slice(2);
+  const handleBack = useCallback(() => {
+    setSelected(null);
+    setApiKey('');
+    setSearchQuery('');
+    setError(null);
+  }, []);
+
+  // Filter providers by search query.
+  const query = searchQuery.trim().toLowerCase();
+  const filteredVendorTypes = query
+    ? ADDABLE_VENDOR_TYPES.filter((typeId) => {
+        const info = getTypeDisplayInfo(typeId);
+        return info.displayName.toLowerCase().includes(query);
+      })
+    : ADDABLE_VENDOR_TYPES;
+  const filteredCodingPlans = query
+    ? codingPlans.filter((plan) =>
+        plan.displayName.toLowerCase().includes(query),
+      )
+    : codingPlans;
+  const noResults =
+    query.length > 0 &&
+    filteredVendorTypes.length === 0 &&
+    filteredCodingPlans.length === 0;
+
   return (
-    <div className="space-y-3">
-      {primary.map((plan) => (
-        <SettingsCodingPlanCard key={plan.id} plan={plan} />
-      ))}
-      {showAll &&
-        secondary.map((plan) => (
-          <SettingsCodingPlanCard key={plan.id} plan={plan} />
-        ))}
-      {secondary.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setShowAll((v) => !v)}
-          >
-            {showAll ? 'Show less' : `Show ${secondary.length} more plans`}
-          </Button>
-        </div>
-      )}
-    </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogClose />
+        <DialogHeader>
+          {selected ? (
+            <DialogTitle className="flex items-center gap-2">
+              <Button variant="ghost" size="icon-sm" onClick={handleBack}>
+                <IconChevronLeftOutline18 className="size-4" />
+              </Button>
+              Connect {selectedDisplayName}
+            </DialogTitle>
+          ) : (
+            <>
+              <DialogTitle>Add Provider</DialogTitle>
+              <DialogDescription>
+                Connect an API key, coding plan, or custom endpoint.
+              </DialogDescription>
+            </>
+          )}
+        </DialogHeader>
+
+        {selected ? (
+          /* Step 2: Connection details for the selected provider */
+          <div className="space-y-4">
+            <div className="space-y-3 pt-1 pb-4">
+              {/* Provider header: logo + name + tagline */}
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-1">
+                  {selectedVendorType ? (
+                    <InstanceLogo
+                      typeId={selectedVendorType}
+                      className="size-5 text-foreground"
+                    />
+                  ) : selectedPlan ? (
+                    <ProviderLogo
+                      provider={selectedPlan.provider}
+                      className="size-5 text-foreground"
+                    />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-foreground text-sm">
+                    {selectedDisplayName}
+                  </h3>
+                  {selectedTagline && (
+                    <p className="mt-0.5 text-muted-foreground text-xs">
+                      {selectedTagline}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <Input
+                autoFocus
+                type="password"
+                placeholder="Enter API key..."
+                value={apiKey}
+                onValueChange={(v) => {
+                  setApiKey(v);
+                  setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && apiKey.trim()) {
+                    void handleConnect(selected, apiKey);
+                  }
+                }}
+                disabled={isConnecting}
+                aria-invalid={error ? true : undefined}
+                size="sm"
+                style={{ maxWidth: 'none' }}
+                className={cn(error && 'border-error-foreground')}
+              />
+
+              {error && <TruncatedErrorText text={error} />}
+
+              {!error && selectedHelpText && (
+                <p className="text-subtle-foreground text-xs">
+                  <span className="inline-flex items-center gap-1">
+                    {selectedHelpText}
+                    {selectedGetApiKeyUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void openExternalUrl(selectedGetApiKeyUrl)
+                        }
+                        className={cn(
+                          buttonVariants({ variant: 'link', size: 'xs' }),
+                          'shrink-0',
+                        )}
+                      >
+                        Create key
+                      </button>
+                    )}
+                  </span>
+                  {selectedEndpointHelpText && (
+                    <span className="mt-0.5 block text-2xs text-subtle-foreground">
+                      {selectedEndpointHelpText}
+                    </span>
+                  )}
+                </p>
+              )}
+
+              {selectedDisclaimer && (
+                <p className="text-2xs text-warning-foreground">
+                  {selectedDisclaimer}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={handleBack}>
+                Back
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!apiKey.trim() || isConnecting}
+                onClick={() => void handleConnect(selected, apiKey)}
+              >
+                {isConnecting ? 'Connecting...' : 'Connect'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Step 1: Provider selection grid */
+          <>
+            <div className="px-0 pb-3">
+              <Input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search providers..."
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+                className="w-full"
+              />
+            </div>
+            <OverlayScrollbar className="h-72">
+              <div className="space-y-4 px-0.5 pr-2">
+                {noResults && (
+                  <p className="py-4 text-center text-muted-foreground text-xs">
+                    No providers match &quot;{query}&quot;
+                  </p>
+                )}
+
+                {/* Vendor API types */}
+                {filteredVendorTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium text-foreground text-xs">
+                      Official API Keys
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {filteredVendorTypes.map((typeId) => {
+                        const info = getTypeDisplayInfo(typeId);
+                        const exists = existingVendorTypes.has(typeId);
+                        return (
+                          <button
+                            key={typeId}
+                            type="button"
+                            disabled={exists}
+                            onClick={() => {
+                              setSelected(typeId);
+                              setApiKey('');
+                              setError(null);
+                            }}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                              'border-derived hover:bg-hover-derived',
+                              exists && 'cursor-not-allowed opacity-50',
+                            )}
+                          >
+                            <InstanceLogo
+                              typeId={typeId}
+                              className="size-4 shrink-0 text-foreground"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                              {info.displayName}
+                            </span>
+                            {exists && (
+                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Coding Plans */}
+                {filteredCodingPlans.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium text-foreground text-xs">
+                      Coding Plans
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {filteredCodingPlans.map((plan) => {
+                        const exists = existingPlanIds.has(plan.id);
+                        const planKey = `plan:${plan.id}` as SelectionKey;
+                        return (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            disabled={exists}
+                            onClick={() => {
+                              setSelected(planKey);
+                              setApiKey('');
+                              setError(null);
+                            }}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                              'border-derived hover:bg-hover-derived',
+                              exists && 'cursor-not-allowed opacity-50',
+                            )}
+                          >
+                            <ProviderLogo
+                              provider={plan.provider}
+                              className="size-4 shrink-0 text-foreground"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                              {plan.displayName}
+                            </span>
+                            {exists && (
+                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </OverlayScrollbar>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // =============================================================================
-// Model Providers Section
+// Provider Instances Section
 // =============================================================================
 
-function ModelProvidersSection() {
-  const [showAll, setShowAll] = useState(false);
-  const primary = PROVIDERS.slice(0, 3);
-  const secondary = PROVIDERS.slice(3);
+function ProviderInstancesSection() {
+  const preferences = useKartonState((s) => s.preferences);
+  const removeProviderInstance = useKartonProcedure(
+    (p) => p.preferences.removeProviderInstance,
+  );
+  const setSettingsRoute = useKartonProcedure(
+    (p) => p.appScreen.setSettingsRoute,
+  );
+
+  const instances = preferences.providerInstances ?? [];
+  const [showAddProvider, setShowAddProvider] = useState(false);
+
+  const handleDelete = useCallback(
+    async (instanceId: string, _instance: ProviderInstance) => {
+      const customModels = preferences.customModels ?? [];
+      const affectedModels = customModels.filter(
+        (m) =>
+          m.providerInstanceId === instanceId || m.endpointId === instanceId,
+      );
+      if (affectedModels.length > 0) {
+        const names = affectedModels.map((m) => m.displayName).join(', ');
+        const confirmed = window.confirm(
+          `The following custom models use this provider and will stop working:\n\n${names}\n\nDelete anyway?`,
+        );
+        if (!confirmed) return;
+      }
+      await removeProviderInstance(instanceId);
+    },
+    [removeProviderInstance, preferences.customModels],
+  );
+
+  // Sort: stagewise first, then coding-plan, then vendor-api, then custom
+  const sortedInstances = useMemo(() => {
+    const getOrder = (typeId: string) => {
+      if (typeId === 'stagewise') return 0;
+      if (typeId === 'coding-plan') return 1;
+      if (typeId.endsWith('-api')) return 2;
+      return 3;
+    };
+    return [...instances].sort(
+      (a, b) => getOrder(a.typeId) - getOrder(b.typeId),
+    );
+  }, [instances]);
+
   return (
     <div className="space-y-3">
-      {primary.map((provider) => (
-        <ProviderConfigCard key={provider} provider={provider} />
+      {sortedInstances.map((instance) => (
+        <ProviderInstanceCard
+          key={instance.id}
+          instance={instance}
+          onDelete={() => void handleDelete(instance.id, instance)}
+          onEditCustom={
+            !instance.typeId.endsWith('-api') &&
+            instance.typeId !== 'stagewise' &&
+            instance.typeId !== 'coding-plan'
+              ? () => setSettingsRoute({ section: 'custom-providers' })
+              : undefined
+          }
+        />
       ))}
-      {showAll &&
-        secondary.map((provider) => (
-          <ProviderConfigCard key={provider} provider={provider} />
-        ))}
-      {secondary.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setShowAll((v) => !v)}
-          >
-            {showAll ? 'Show less' : `Show ${secondary.length} more providers`}
-          </Button>
-        </div>
+
+      <div className="flex justify-end">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowAddProvider(true)}
+        >
+          <IconPlusOutline18 className="size-3.5" />
+          Add Provider
+        </Button>
+      </div>
+
+      {showAddProvider && (
+        <AddProviderGrid onClose={() => setShowAddProvider(false)} />
       )}
     </div>
   );
@@ -576,7 +933,7 @@ function ModelProvidersSection() {
 // =============================================================================
 
 const BUILT_IN_MODEL_IDS = new Set(
-  getSelectableBuiltInModels().map((m) => m.modelId),
+  availableModelAliases.map((a) => a.modelId),
 ) as Set<string>;
 
 function CustomModelDialog({
@@ -599,15 +956,8 @@ function CustomModelDialog({
   existingModelIds: Set<string>;
   providerInstances: ProviderInstance[];
 }) {
-  // Pages run under a different preload than the sidebar UI, so we cannot
-  // import `@ui/hooks/use-track` here (it reaches for `window.electron`).
-  // `useTrack` from the pages hooks routes through the pages-API
-  // `captureTelemetry` bridge and swallows RPC errors so a failed capture
-  // can never crash the page.
   const track = useTrack();
   const isAddMode = !model;
-  // Set to true when onSave() fires; distinguishes a save-initiated close
-  // from a cancel/dismiss close inside the shared `handleDialogOpenChange`.
   const savedRef = useRef(false);
 
   const [modelId, setModelId] = useState(model?.modelId ?? '');
@@ -665,12 +1015,6 @@ function CustomModelDialog({
     fadeDistance: 24,
   });
 
-  // Depend ONLY on `open` so the effect runs exactly on the open/close
-  // transitions. Reading `model`/`isAddMode`/`track` without listing them
-  // as deps is intentional — we want their values at the moment the
-  // dialog opened, not whenever parent re-renders push new references.
-  // Without this scoping, normal parent re-renders would silently reset
-  // the user's in-progress form input and re-emit `*-add-started`.
   useEffect(() => {
     if (!open) return;
     setModelId(model?.modelId ?? '');
@@ -710,8 +1054,6 @@ function CustomModelDialog({
     !isDuplicate &&
     !jsonError;
 
-  // "Touched" = the user changed anything from the initial field values.
-  // Derived from current state so we don't need per-input bookkeeping.
   const anyFieldTouched =
     modelId !== (model?.modelId ?? '') ||
     displayName !== (model?.displayName ?? '') ||
@@ -731,11 +1073,6 @@ function CustomModelDialog({
     JSON.stringify(capabilities) !==
       JSON.stringify(model?.capabilities ?? defaultCaps);
 
-  // A pristine, unmodified form is NOT an error — empty required fields
-  // at initial state mean "not filled in yet", not "validation failed".
-  // `had_validation_errors` should only be true when the user entered
-  // input that triggered a concrete validation rule (duplicate ID, invalid
-  // JSON in provider options / headers).
   const hadValidationErrors = isDuplicate || jsonError !== null;
 
   const handleDialogOpenChange = (next: boolean) => {
@@ -749,7 +1086,6 @@ function CustomModelDialog({
   };
 
   const endpointOptions = useMemo(() => {
-    // List all non-stagewise provider instances as selectable endpoints.
     return providerInstances
       .filter((i) => i.typeId !== 'stagewise')
       .map((inst) => ({
@@ -880,12 +1216,10 @@ function CustomModelDialog({
 
             <div className="space-y-1.5">
               <p className="font-medium text-foreground text-xs">Endpoint</p>
-              <Select
+              <ModelEndpointSelect
                 value={providerInstanceId}
-                onValueChange={(val) => setProviderInstanceId(val as string)}
-                items={endpointOptions}
-                size="md"
-                triggerClassName="w-full"
+                onChange={setProviderInstanceId}
+                options={endpointOptions}
               />
             </div>
 
@@ -1058,6 +1392,55 @@ function CustomModelDialog({
   );
 }
 
+/**
+ * Simple native select for endpoint assignment in the custom model dialog.
+ * Wraps a styled <select> to avoid importing the full stage-ui Select
+ * (which requires an items prop with group support we don't need here).
+ */
+function ModelEndpointSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string; group: string }[];
+}) {
+  // Group options
+  const grouped = useMemo(() => {
+    const groups = new Map<string, typeof options>();
+    for (const opt of options) {
+      const arr = groups.get(opt.group) ?? [];
+      arr.push(opt);
+      groups.set(opt.group, arr);
+    }
+    return Array.from(groups.entries());
+  }, [options]);
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg border border-derived bg-background px-2 py-1.5 text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-muted-foreground/35"
+    >
+      <option value="">Select an endpoint...</option>
+      {grouped.map(([group, opts]) => (
+        <optgroup key={group} label={group}>
+          {opts.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+// =============================================================================
+// Per-Instance Model List
+// =============================================================================
+
 function BuiltInModelCard({
   model,
   isEnabled,
@@ -1065,12 +1448,18 @@ function BuiltInModelCard({
   onToggle,
   onEditThinking,
 }: {
-  model: SelectableBuiltInModel;
+  model: ModelSelectorEntry;
   isEnabled: boolean;
   thinkingDisplay: ModelThinkingDisplayState | null;
   onToggle: () => void;
   onEditThinking: (event: React.MouseEvent<HTMLElement>) => void;
 }) {
+  const vendorLabel = model.catalogModel?.officialProvider
+    ? getTypeDisplayInfo(
+        `${model.catalogModel.officialProvider}-api` as ProviderInstanceTypeId,
+      ).displayName
+    : model.instanceName;
+
   return (
     <div
       data-model-card
@@ -1083,7 +1472,7 @@ function BuiltInModelCard({
       <div className="flex items-start justify-between gap-2">
         <div className="-mt-1 min-w-0 flex-1">
           <h3 className="font-medium text-foreground text-sm">
-            {model.modelDisplayName}
+            {model.displayName}
             {thinkingDisplay && (
               <span className="ml-1.5 font-normal text-subtle-foreground">
                 {thinkingDisplay.label}
@@ -1091,11 +1480,7 @@ function BuiltInModelCard({
             )}
           </h3>
           <p className="text-muted-foreground text-xs">
-            {model.modelId} &middot;{' '}
-            {model.officialProvider
-              ? PROVIDER_DISPLAY_INFO[model.officialProvider].name
-              : 'Unknown'}{' '}
-            &middot; {model.modelContext}
+            {model.modelId} &middot; {vendorLabel} &middot; {model.contextLabel}
           </p>
         </div>
         <div
@@ -1118,7 +1503,7 @@ function BuiltInModelCard({
             checked={isEnabled}
             onCheckedChange={() => onToggle()}
             size="xs"
-            aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${model.modelDisplayName}`}
+            aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${model.displayName}`}
           />
         </div>
       </div>
@@ -1196,18 +1581,149 @@ function CustomModelCard({
   );
 }
 
-function CustomModelsSection() {
+function InstanceModelGroup({
+  instance,
+  entries,
+  preferences,
+  onToggleModel,
+  onEditThinking,
+  onEditCustomModel,
+  onDeleteCustomModel,
+}: {
+  instance: ProviderInstance;
+  entries: ModelSelectorEntry[];
+  preferences: UserPreferences;
+  onToggleModel: (instanceId: string, modelId: string) => void;
+  onEditThinking: (
+    instanceId: string,
+    modelId: string,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+  onEditCustomModel: (model: CustomModel) => void;
+  onDeleteCustomModel: (modelId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const disabledSet = useMemo(
+    () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
+    [preferences, instance.id],
+  );
+
+  const _displayInfo = getTypeDisplayInfo(instance.typeId);
+  const customModels = preferences.customModels ?? EMPTY_CUSTOM_MODELS;
+  const instanceCustomModels = customModels.filter(
+    (m) => (m.providerInstanceId ?? m.endpointId) === instance.id,
+  );
+
+  const thinkingDefaultOptions: ModelThinkingDefaultOptions = useMemo(
+    () => getInstanceThinkingDefaultOptions(instance),
+    [instance],
+  );
+
+  const handleEditThinking = useCallback(
+    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
+      onEditThinking(instance.id, modelId, event);
+    },
+    [instance.id, onEditThinking],
+  );
+
+  return (
+    <div className="space-y-2">
+      {/* Instance header */}
+      <button
+        type="button"
+        className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <InstanceLogo
+          typeId={instance.typeId}
+          instance={instance}
+          className={cn(
+            'size-4 shrink-0 text-muted-foreground transition-all group-hover:text-foreground group-hover:filter-none',
+            'opacity-60 grayscale group-hover:opacity-100',
+          )}
+        />
+        <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground text-xs transition-colors group-hover:text-foreground">
+          {instance.name}
+        </span>
+        <span className="shrink-0 text-2xs text-muted-foreground transition-colors group-hover:text-foreground">
+          {entries.length + instanceCustomModels.length} models
+        </span>
+        <IconChevronDownOutline18
+          className={cn(
+            'size-3.5 shrink-0 text-muted-foreground transition-colors transition-transform group-hover:text-foreground',
+            !expanded && '-rotate-90',
+          )}
+        />
+      </button>
+
+      {/* Model list */}
+      {expanded && (
+        <div className="space-y-2 pl-1">
+          {entries.map((entry) => {
+            const isEnabled = !disabledSet.has(entry.modelId);
+            const override = getInstanceModelThinkingOverride(
+              preferences,
+              instance.id,
+              entry.modelId,
+            );
+            const catalogModel = entry.catalogModel;
+            const thinkingDisplay = catalogModel
+              ? getModelThinkingDisplayState(
+                  catalogModel,
+                  override,
+                  thinkingDefaultOptions,
+                )
+              : null;
+
+            return (
+              <BuiltInModelCard
+                key={entry.modelId}
+                model={entry}
+                isEnabled={isEnabled}
+                thinkingDisplay={thinkingDisplay}
+                onToggle={() => onToggleModel(instance.id, entry.modelId)}
+                onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
+              />
+            );
+          })}
+
+          {/* Custom models for this instance */}
+          {instanceCustomModels.map((model) => (
+            <CustomModelCard
+              key={model.modelId}
+              model={model}
+              endpointName={resolveCustomModelInstanceName(preferences, {
+                providerInstanceId: model.providerInstanceId,
+                endpointId: model.endpointId,
+              })}
+              isEnabled={!disabledSet.has(model.modelId)}
+              onToggle={() => onToggleModel(instance.id, model.modelId)}
+              onEdit={() => onEditCustomModel(model)}
+              onDelete={() => onDeleteCustomModel(model.modelId)}
+            />
+          ))}
+
+          {entries.length === 0 && instanceCustomModels.length === 0 && (
+            <p className="px-3 py-2 text-muted-foreground text-xs">
+              No models available for this instance.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Models Section (per-instance)
+// =============================================================================
+
+function ModelsSection() {
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const customModels = preferences?.customModels ?? EMPTY_CUSTOM_MODELS;
   const providerInstances = preferences?.providerInstances ?? [];
-  const disabledModelIds = useMemo(
-    () => new Set(preferences.agent.disabledModelIds),
-    [preferences.agent.disabledModelIds],
-  );
-  const thinkingOverrides =
-    preferences.agent.modelThinkingOverrides ?? EMPTY_MODEL_THINKING_OVERRIDES;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<CustomModel | undefined>(
@@ -1219,46 +1735,52 @@ function CustomModelsSection() {
     [customModels],
   );
 
-  const resolveEndpointName = useCallback(
-    (endpointId: string) =>
-      resolveCustomModelInstanceName(preferences, {
-        providerInstanceId: endpointId,
-      }),
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Group selectable entries by instance
+  const allEntries = useMemo(
+    () => getSelectableModelEntries(preferences, { includeDisabled: true }),
     [preferences],
   );
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const groupedByInstance = useMemo(() => {
+    const groups = new Map<
+      string,
+      { instance: ProviderInstance; entries: ModelSelectorEntry[] }
+    >();
+    for (const entry of allEntries) {
+      const inst = providerInstances.find((i) => i.id === entry.instanceId);
+      if (!inst) continue;
+      let group = groups.get(entry.instanceId);
+      if (!group) {
+        group = { instance: inst, entries: [] };
+        groups.set(entry.instanceId, group);
+      }
+      group.entries.push(entry);
+    }
+    return Array.from(groups.values());
+  }, [allEntries, providerInstances]);
 
-  const filteredBuiltIn = useMemo(() => {
-    const selectableModels = getSelectableBuiltInModels({
-      disabledModelIds: RECOMMENDED_MODEL_IDS,
-    });
-    if (!searchQuery.trim()) return selectableModels;
-    const q = searchQuery.toLowerCase();
-    return selectableModels.filter(
-      (m) =>
-        m.modelId.toLowerCase().includes(q) ||
-        m.modelDisplayName.toLowerCase().includes(q) ||
-        (m.officialProvider &&
-          PROVIDER_DISPLAY_INFO[m.officialProvider].name
-            .toLowerCase()
-            .includes(q)),
-    );
-  }, [searchQuery]);
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groupedByInstance;
+    return groupedByInstance
+      .map((g) => ({
+        ...g,
+        entries: g.entries.filter(
+          (e) =>
+            e.displayName.toLowerCase().includes(q) ||
+            e.modelId.toLowerCase().includes(q) ||
+            e.instanceName.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((g) => g.entries.length > 0);
+  }, [groupedByInstance, searchQuery]);
 
-  const filteredCustom = useMemo(() => {
-    if (!searchQuery.trim()) return customModels;
-    const q = searchQuery.toLowerCase();
-    return customModels.filter(
-      (m) =>
-        m.modelId.toLowerCase().includes(q) ||
-        m.displayName.toLowerCase().includes(q) ||
-        resolveEndpointName(m.providerInstanceId ?? m.endpointId ?? '')
-          .toLowerCase()
-          .includes(q),
-    );
-  }, [searchQuery, customModels, resolveEndpointName]);
+  const noResults =
+    searchQuery.trim().length > 0 && filteredGroups.length === 0;
 
+  // --- Thinking panel state ---
   const [listScrollViewport, setListScrollViewport] =
     useState<HTMLElement | null>(null);
   const listScrollRef = useRef<HTMLElement | null>(null);
@@ -1274,6 +1796,9 @@ function CustomModelsSection() {
   const [thinkingPanelModelId, setThinkingPanelModelId] = useState<
     string | null
   >(null);
+  const [thinkingPanelInstanceId, setThinkingPanelInstanceId] = useState<
+    string | null
+  >(null);
   const [thinkingPanelCenterY, setThinkingPanelCenterY] = useState(0);
   const [thinkingPanelOffset, setThinkingPanelOffset] = useState(0);
   const [thinkingPanelLeft, setThinkingPanelLeft] = useState(0);
@@ -1287,6 +1812,34 @@ function CustomModelsSection() {
         ? getAvailableModel(thinkingPanelModelId)
         : undefined,
     [thinkingPanelModelId],
+  );
+
+  const thinkingPanelInstance = useMemo(
+    () =>
+      thinkingPanelInstanceId
+        ? providerInstances.find((i) => i.id === thinkingPanelInstanceId)
+        : undefined,
+    [thinkingPanelInstanceId, providerInstances],
+  );
+
+  const thinkingPanelDefaultOptions = useMemo(
+    () =>
+      thinkingPanelInstance
+        ? getInstanceThinkingDefaultOptions(thinkingPanelInstance)
+        : undefined,
+    [thinkingPanelInstance],
+  );
+
+  const thinkingPanelOverride = useMemo(
+    () =>
+      thinkingPanelModelId && thinkingPanelInstanceId
+        ? getInstanceModelThinkingOverride(
+            preferences,
+            thinkingPanelInstanceId,
+            thinkingPanelModelId,
+          )
+        : undefined,
+    [preferences, thinkingPanelInstanceId, thinkingPanelModelId],
   );
 
   const updateThinkingPanelOffset = useCallback(() => {
@@ -1364,16 +1917,19 @@ function CustomModelsSection() {
     };
   }, [listScrollViewport, thinkingPanelModelId, updateThinkingPanelOffset]);
 
+  // Close thinking panel if the model is no longer in filtered results
   useEffect(() => {
     if (!thinkingPanelModelId) return;
-    if (
-      filteredBuiltIn.some((model) => model.modelId === thinkingPanelModelId)
-    ) {
-      return;
+    const stillVisible = filteredGroups.some((g) =>
+      g.entries.some((e) => e.modelId === thinkingPanelModelId),
+    );
+    if (!stillVisible) {
+      setThinkingPanelModelId(null);
+      setThinkingPanelInstanceId(null);
     }
-    setThinkingPanelModelId(null);
-  }, [filteredBuiltIn, thinkingPanelModelId]);
+  }, [filteredGroups, thinkingPanelModelId]);
 
+  // Close thinking panel on outside click
   useEffect(() => {
     if (!thinkingPanelModelId) return;
 
@@ -1388,6 +1944,7 @@ function CustomModelsSection() {
         return;
       }
       setThinkingPanelModelId(null);
+      setThinkingPanelInstanceId(null);
     };
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -1395,6 +1952,8 @@ function CustomModelsSection() {
       document.removeEventListener('pointerdown', handlePointerDown);
     };
   }, [thinkingPanelModelId]);
+
+  // --- Handlers ---
 
   const handleAdd = useCallback(() => {
     setEditingModel(undefined);
@@ -1407,7 +1966,11 @@ function CustomModelsSection() {
   }, []);
 
   const handleEditThinking = useCallback(
-    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
+    (
+      instanceId: string,
+      modelId: string,
+      event: React.MouseEvent<HTMLElement>,
+    ) => {
       event.stopPropagation();
       event.preventDefault();
 
@@ -1425,37 +1988,63 @@ function CustomModelsSection() {
       }
 
       setThinkingPanelModelId((current) => {
-        if (current === modelId) {
+        if (current === modelId && thinkingPanelInstanceId === instanceId) {
           thinkingPanelAnchorRef.current = null;
+          setThinkingPanelInstanceId(null);
           return null;
         }
+        setThinkingPanelInstanceId(instanceId);
         return modelId;
       });
     },
-    [],
+    [thinkingPanelInstanceId],
+  );
+
+  const handleToggleModel = useCallback(
+    async (instanceId: string, modelId: string) => {
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        const inst = draft.providerInstances.find((i) => i.id === instanceId);
+        if (!inst) return;
+        const idx = inst.disabledModelIds.indexOf(modelId);
+        if (idx === -1) {
+          inst.disabledModelIds.push(modelId);
+        } else {
+          inst.disabledModelIds.splice(idx, 1);
+        }
+      });
+      await updatePreferences(patches);
+    },
+    [preferences, updatePreferences],
   );
 
   const handleSetThinkingEnabled = useCallback(
-    async (modelId: string, enabled: boolean) => {
+    async (instanceId: string, modelId: string, enabled: boolean) => {
       const model = getAvailableModel(modelId);
       if (!model) return;
       const targetModelId = model.modelId;
 
-      const route = getThinkingDefaultOptionsForModel(model, preferences);
+      const instance = providerInstances.find((i) => i.id === instanceId);
+      if (!instance) return;
+      const route = getInstanceThinkingDefaultOptions(instance);
+
+      const currentOverride = getInstanceModelThinkingOverride(
+        preferences,
+        instanceId,
+        modelId,
+      );
       const option = enabled
-        ? getEnabledModelThinkingOption(
-            model,
-            thinkingOverrides[targetModelId]?.value,
-            route,
-          )
+        ? getEnabledModelThinkingOption(model, currentOverride?.value, route)
         : (getModelThinkingOptions(model, route).find(
-            (item) => item.value === thinkingOverrides[targetModelId]?.value,
+            (item) => item.value === currentOverride?.value,
           ) ?? getModelThinkingOptions(model, route)[0]);
       if (!option) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.modelThinkingOverrides[targetModelId] = {
-          ...draft.agent.modelThinkingOverrides[targetModelId],
+        if (!draft.agent.modelThinkingOverrides[instanceId]) {
+          draft.agent.modelThinkingOverrides[instanceId] = {};
+        }
+        draft.agent.modelThinkingOverrides[instanceId][targetModelId] = {
+          ...draft.agent.modelThinkingOverrides[instanceId][targetModelId],
           enabled,
           provider: option.provider,
           value: option.value,
@@ -1463,23 +2052,29 @@ function CustomModelsSection() {
       });
       await updatePreferences(patches);
     },
-    [preferences, thinkingOverrides, updatePreferences],
+    [preferences, providerInstances, updatePreferences],
   );
 
   const handleSetThinkingValue = useCallback(
-    async (modelId: string, value: string) => {
+    async (instanceId: string, modelId: string, value: string) => {
       const model = getAvailableModel(modelId);
       if (!model) return;
       const targetModelId = model.modelId;
 
-      const route = getThinkingDefaultOptionsForModel(model, preferences);
+      const instance = providerInstances.find((i) => i.id === instanceId);
+      if (!instance) return;
+      const route = getInstanceThinkingDefaultOptions(instance);
+
       const option = getModelThinkingOptions(model, route).find(
         (item) => item.value === value,
       );
       if (!option) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.modelThinkingOverrides[targetModelId] = {
+        if (!draft.agent.modelThinkingOverrides[instanceId]) {
+          draft.agent.modelThinkingOverrides[instanceId] = {};
+        }
+        draft.agent.modelThinkingOverrides[instanceId][targetModelId] = {
           enabled: true,
           provider: option.provider,
           value: option.value,
@@ -1487,14 +2082,14 @@ function CustomModelsSection() {
       });
       await updatePreferences(patches);
     },
-    [preferences, updatePreferences],
+    [preferences, providerInstances, updatePreferences],
   );
 
   const handleResetThinkingOverride = useCallback(
-    async (modelId: string) => {
+    async (instanceId: string, modelId: string) => {
       const targetModelId = getAvailableModel(modelId)?.modelId ?? modelId;
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        delete draft.agent.modelThinkingOverrides[targetModelId];
+        delete draft.agent.modelThinkingOverrides[instanceId]?.[targetModelId];
       });
       await updatePreferences(patches);
     },
@@ -1540,26 +2135,6 @@ function CustomModelsSection() {
     [preferences, updatePreferences],
   );
 
-  const handleToggleModel = useCallback(
-    async (modelId: string) => {
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        const idx = draft.agent.disabledModelIds.indexOf(modelId);
-        if (idx === -1) {
-          draft.agent.disabledModelIds.push(modelId);
-        } else {
-          draft.agent.disabledModelIds.splice(idx, 1);
-        }
-      });
-      await updatePreferences(patches);
-    },
-    [preferences, updatePreferences],
-  );
-
-  const noResults =
-    searchQuery.trim().length > 0 &&
-    filteredBuiltIn.length === 0 &&
-    filteredCustom.length === 0;
-
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
@@ -1584,37 +2159,16 @@ function CustomModelsSection() {
           onViewportRef={setListScrollViewport}
           contentClassName="space-y-3"
         >
-          {filteredBuiltIn.map((model) => (
-            <BuiltInModelCard
-              key={model.modelId}
-              model={model}
-              isEnabled={!disabledModelIds.has(model.modelId)}
-              thinkingDisplay={getModelThinkingDisplayState(
-                model.targetModel,
-                thinkingOverrides[model.modelId],
-                getThinkingDefaultOptionsForModel(
-                  model.targetModel,
-                  preferences,
-                ),
-              )}
-              onToggle={() => handleToggleModel(model.modelId)}
-              onEditThinking={(event) =>
-                handleEditThinking(model.modelId, event)
-              }
-            />
-          ))}
-
-          {filteredCustom.map((model) => (
-            <CustomModelCard
-              key={model.modelId}
-              model={model}
-              endpointName={resolveEndpointName(
-                model.providerInstanceId ?? model.endpointId ?? '',
-              )}
-              isEnabled={!disabledModelIds.has(model.modelId)}
-              onToggle={() => handleToggleModel(model.modelId)}
-              onEdit={() => handleEdit(model)}
-              onDelete={() => handleDelete(model.modelId)}
+          {filteredGroups.map(({ instance, entries }) => (
+            <InstanceModelGroup
+              key={instance.id}
+              instance={instance}
+              entries={entries}
+              preferences={preferences}
+              onToggleModel={handleToggleModel}
+              onEditThinking={handleEditThinking}
+              onEditCustomModel={handleEdit}
+              onDeleteCustomModel={handleDelete}
             />
           ))}
 
@@ -1627,7 +2181,7 @@ function CustomModelsSection() {
           )}
         </OverlayScrollbar>
 
-        {thinkingPanelModel && (
+        {thinkingPanelModel && thinkingPanelInstance && (
           <div
             ref={thinkingPanelRef}
             className={cn(
@@ -1640,19 +2194,30 @@ function CustomModelsSection() {
           >
             <ModelThinkingPanel
               model={thinkingPanelModel}
-              override={thinkingOverrides[thinkingPanelModel.modelId]}
-              defaultOptions={getThinkingDefaultOptionsForModel(
-                thinkingPanelModel,
-                preferences,
-              )}
+              override={thinkingPanelOverride}
+              defaultOptions={thinkingPanelDefaultOptions}
               onEnabledChange={(enabled) =>
-                handleSetThinkingEnabled(thinkingPanelModel.modelId, enabled)
+                thinkingPanelInstanceId &&
+                handleSetThinkingEnabled(
+                  thinkingPanelInstanceId,
+                  thinkingPanelModel.modelId,
+                  enabled,
+                )
               }
               onValueChange={(value) =>
-                handleSetThinkingValue(thinkingPanelModel.modelId, value)
+                thinkingPanelInstanceId &&
+                handleSetThinkingValue(
+                  thinkingPanelInstanceId,
+                  thinkingPanelModel.modelId,
+                  value,
+                )
               }
               onReset={() =>
-                handleResetThinkingOverride(thinkingPanelModel.modelId)
+                thinkingPanelInstanceId &&
+                handleResetThinkingOverride(
+                  thinkingPanelInstanceId,
+                  thinkingPanelModel.modelId,
+                )
               }
             />
           </div>
@@ -1676,13 +2241,8 @@ function CustomModelsSection() {
 // =============================================================================
 
 export function ModelsProvidersSection() {
-  const setSettingsRoute = useKartonProcedure(
-    (p) => p.appScreen.setSettingsRoute,
-  );
-
   return (
     <div className="h-full w-full">
-      {/* Content */}
       <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
         <div className="mx-auto max-w-3xl space-y-8">
           {/* Header */}
@@ -1691,69 +2251,43 @@ export function ModelsProvidersSection() {
               Models & Providers
             </h1>
           </div>
-          {/* Coding Plans Section */}
+
+          {/* Provider Instances Section */}
           <section className="space-y-6">
             <div>
-              <h2 className="font-medium text-foreground text-lg">
-                Coding Plans
-              </h2>
+              <h2 className="font-medium text-foreground text-lg">Providers</h2>
               <p className="text-muted-foreground text-sm">
-                Connect a subscription you already pay for. We validate your
-                key, then route built-in models through the provider directly.
+                Configure how the agent connects to LLM providers. Add API keys,
+                connect coding plans, or set up custom endpoints.
               </p>
             </div>
 
-            <CodingPlansSection />
-          </section>
-
-          <hr className="border-derived-subtle border-t" />
-
-          {/* API Keys Section */}
-          <section className="space-y-6">
-            <div>
-              <h2 className="font-medium text-foreground text-lg">API Keys</h2>
-              <p className="text-muted-foreground text-sm">
-                Configure how the agent connects to LLM providers. Use your
-                stagewise account, official provider endpoints, or custom URLs.
-              </p>
-            </div>
-
-            <ModelProvidersSection />
+            <ProviderInstancesSection />
           </section>
 
           <hr className="border-derived-subtle border-t" />
 
           {/* Models Section */}
           <section className="space-y-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-medium text-foreground text-lg">Models</h2>
-                <p className="text-muted-foreground text-sm">
-                  Built-in models are shown for reference. Define additional
-                  models that use built-in providers or custom endpoints.
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    setSettingsRoute({ section: 'custom-providers' })
-                  }
-                >
-                  Custom Providers
-                  <IconChevronRightOutline18 className="size-3" />
-                </Button>
-              </div>
+            <div>
+              <h2 className="font-medium text-foreground text-lg">Models</h2>
+              <p className="text-muted-foreground text-sm">
+                Enable or disable models per provider instance. Define
+                additional custom models that use any configured provider.
+              </p>
             </div>
 
-            <CustomModelsSection />
+            <ModelsSection />
           </section>
         </div>
       </OverlayScrollbar>
     </div>
   );
 }
+
+// =============================================================================
+// Shared Utilities
+// =============================================================================
 
 function TruncatedErrorText({ text }: { text: string }) {
   const ref = useRef<HTMLParagraphElement>(null);

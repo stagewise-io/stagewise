@@ -4,6 +4,7 @@ import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { fromIni, fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { createVertex } from '@ai-sdk/google-vertex';
 import type { ApiSpec } from '@shared/karton-contracts/ui/shared-types';
+import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
 
 // ============================================================================
@@ -20,8 +21,7 @@ export type AzureConfig = {
 
 export const azureProviderType: ProviderType<AzureConfig> = {
   id: 'azure',
-  displayName: 'Azure OpenAI',
-  description: 'Azure-hosted OpenAI models',
+  ...PROVIDER_TYPE_DISPLAY_INFO.azure,
   category: 'cloud',
   providerMode: 'custom',
   apiSpec: 'azure' satisfies ApiSpec,
@@ -101,8 +101,7 @@ function buildBedrockProvider(
 
 export const bedrockProviderType: ProviderType<BedrockConfig> = {
   id: 'bedrock',
-  displayName: 'Amazon Bedrock',
-  description: 'AWS-hosted models via Bedrock',
+  ...PROVIDER_TYPE_DISPLAY_INFO.bedrock,
   category: 'cloud',
   providerMode: 'custom',
   apiSpec: 'amazon-bedrock' satisfies ApiSpec,
@@ -131,8 +130,7 @@ export type VertexConfig = {
 
 export const vertexProviderType: ProviderType<VertexConfig> = {
   id: 'vertex',
-  displayName: 'Google Vertex AI',
-  description: 'Google Cloud-hosted models via Vertex AI',
+  ...PROVIDER_TYPE_DISPLAY_INFO.vertex,
   category: 'cloud',
   providerMode: 'custom',
   apiSpec: 'google-vertex' satisfies ApiSpec,
