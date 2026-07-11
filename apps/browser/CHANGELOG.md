@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.0 (2026-07-11)
+
+### Features
+
+* add GPT-5.6 Sol, Terra, and Luna models (2e6090b)
+
 ## 1.19.0 (2026-07-09)
 
 ### Features
