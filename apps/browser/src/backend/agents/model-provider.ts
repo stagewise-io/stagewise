@@ -4,6 +4,7 @@ import type {
   ModelProvider,
   ApiSpec,
   CustomModel,
+  DiscoveredModel,
   ModelThinkingOverride,
   ProviderInstance,
   UserPreferences,
@@ -427,9 +428,11 @@ export class ModelProviderService {
    */
   public modelExists(modelId: ModelId): boolean {
     if (getAvailableModel(modelId)) return true;
-    return this.preferencesService
-      .get()
-      .customModels.some((m) => m.modelId === modelId);
+    const prefs = this.preferencesService.get();
+    if (prefs.customModels.some((m) => m.modelId === modelId)) return true;
+    return (prefs.providerInstances ?? []).some((inst) =>
+      (inst.discoveredModels ?? []).some((dm) => dm.modelId === modelId),
+    );
   }
 
   /**
@@ -513,6 +516,26 @@ export class ModelProviderService {
         traceId,
         otherPostHogProperties,
       );
+    }
+
+    // Discovered models (self-hosted providers) — require providerInstanceId
+    if (providerInstanceId) {
+      const instance = this.preferencesService
+        .get()
+        .providerInstances?.find((i) => i.id === providerInstanceId);
+      if (instance) {
+        const discovered = (instance.discoveredModels ?? []).find(
+          (dm) => dm.modelId === modelId,
+        );
+        if (discovered) {
+          return this.createDiscoveredModelWithOptions(
+            instance,
+            discovered,
+            traceId,
+            otherPostHogProperties,
+          );
+        }
+      }
     }
 
     throw new Error(`Model ${modelId} not found`);
@@ -780,6 +803,80 @@ export class ModelProviderService {
         typeof streamText
       >[0]['providerOptions'],
       contextWindowSize: customModel.contextWindowSize,
+      reasoningSignatureSource,
+      ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
+    };
+  }
+
+  // ===========================================================================
+  // Discovered model creation (self-hosted providers)
+  // ===========================================================================
+
+  private createDiscoveredModelWithOptions(
+    instance: ProviderInstance,
+    discovered: DiscoveredModel,
+    traceId: string,
+    otherPostHogProperties?: Record<string, unknown>,
+  ): ModelWithOptions {
+    const type = getProviderType(instance.typeId);
+    const baseURL =
+      ((instance.config as Record<string, unknown>).baseUrl as
+        | string
+        | undefined) ?? type.defaultBaseUrl;
+
+    const decryptedConfig = this.decryptSensitiveFields(instance, type);
+
+    const { model: rawModel, middleware } = type.createLanguageModel({
+      modelId: discovered.modelId,
+      apiKey: '',
+      baseURL,
+      config: instance.config as never,
+      decryptedConfig,
+    });
+
+    let model = rawModel;
+    if (middleware?.length) {
+      for (const mw of middleware) {
+        model = wrapLanguageModel({ model, middleware: mw });
+      }
+    }
+
+    const posthogConfig = {
+      posthogTraceId: traceId,
+      posthogProperties: {
+        posthogTraceId: traceId,
+        modelId: discovered.modelId,
+        isDiscoveredModel: true,
+        providerType: instance.typeId,
+        ...otherPostHogProperties,
+      },
+    };
+
+    // Discovered models rarely report context windows. Default to 8k as a
+    // conservative safe floor for local/self-hosted models.
+    const contextWindow = discovered.contextWindow ?? 8_192;
+
+    // ── Reasoning signature source ──────────────────────────────────────────
+    const apiSpec = type.apiSpec;
+    const semanticProvider = apiSpec
+      ? getSemanticProviderForApiSpec(apiSpec)
+      : ('openai' as ModelProvider);
+    const reasoningSignatureSource = createReasoningSignatureSource(
+      'custom',
+      semanticProvider,
+      discovered.modelId,
+      {
+        apiSpec: apiSpec as ApiSpec,
+        endpointId: instance.id,
+      },
+    );
+
+    return {
+      model: this.telemetryService.withTracing(model, posthogConfig),
+      headers: {},
+      providerOptions: {},
+      contextWindowSize: contextWindow,
+      providerMode: type.providerMode,
       reasoningSignatureSource,
       ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
     };

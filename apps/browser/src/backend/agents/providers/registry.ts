@@ -27,6 +27,7 @@ import {
   bedrockProviderType,
   vertexProviderType,
 } from './cloud';
+import { ollamaProviderType } from './ollama';
 
 // ============================================================================
 // Registry — maps every ProviderInstanceTypeId to its ProviderType impl
@@ -55,6 +56,7 @@ export const PROVIDER_TYPE_REGISTRY: Record<
   azure: azureProviderType,
   bedrock: bedrockProviderType,
   vertex: vertexProviderType,
+  ollama: ollamaProviderType,
 };
 
 /**

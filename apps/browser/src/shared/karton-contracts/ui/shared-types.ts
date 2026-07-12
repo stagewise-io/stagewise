@@ -214,6 +214,7 @@ export const providerInstanceTypeIds = [
   'azure',
   'bedrock',
   'vertex',
+  'ollama',
 ] as const;
 export type ProviderInstanceTypeId = (typeof providerInstanceTypeIds)[number];
 
@@ -269,6 +270,33 @@ const vertexConfigSchema = z.object({
   modelIdMapping: z.record(z.string(), z.string()).optional(),
 });
 
+/** Ollama self-hosted — baseUrl only, no auth */
+const ollamaConfigSchema = z.object({
+  baseUrl: z.string(),
+});
+
+// ============================================================================
+// Discovered Model
+// ============================================================================
+
+/** A model discovered from a provider's API (not in the static catalog). */
+export const discoveredModelSchema = z.object({
+  modelId: z.string(),
+  displayName: z.string(),
+  description: z.string().optional(),
+  contextWindow: z.number().int().positive().optional(),
+  pricing: z
+    .object({
+      inputPerMillion: z.number(),
+      outputPerMillion: z.number(),
+    })
+    .optional(),
+  capabilities: modelCapabilitiesSchema.optional(),
+  thinkingEnabled: z.boolean().optional(),
+  recommended: z.boolean().optional(),
+});
+export type DiscoveredModel = z.infer<typeof discoveredModelSchema>;
+
 /** Common fields shared by every provider instance variant. */
 const providerInstanceBaseSchema = z.object({
   id: z.string(),
@@ -276,7 +304,8 @@ const providerInstanceBaseSchema = z.object({
   enabledModelIds: z.array(z.string()).default([]),
   /** Per-instance blacklist of catalog modelIds. Empty = all catalog models visible. */
   disabledModelIds: z.array(z.string()).default([]),
-  discoveredModels: z.array(z.record(z.string(), z.unknown())).default([]),
+  /** Cached model list from discovery providers. Empty for catalog-only types. */
+  discoveredModels: z.array(discoveredModelSchema).default([]),
 });
 
 /**
@@ -360,6 +389,10 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
   providerInstanceBaseSchema.extend({
     typeId: z.literal('vertex'),
     config: vertexConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('ollama'),
+    config: ollamaConfigSchema,
   }),
 ]);
 export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
@@ -492,6 +525,11 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
   vertex: {
     displayName: 'Google Vertex AI',
     description: 'Google Cloud-hosted models via Vertex AI',
+  },
+  ollama: {
+    displayName: 'Ollama',
+    description: 'Self-hosted local models via Ollama',
+    defaultBaseUrl: 'http://localhost:11434',
   },
 };
 

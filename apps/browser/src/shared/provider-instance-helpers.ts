@@ -11,6 +11,7 @@
 import type {
   ApiSpec,
   CustomEndpoint,
+  DiscoveredModel,
   ModelProvider,
   ModelThinkingOverride,
   ProviderEndpointMode,
@@ -336,12 +337,7 @@ export function getCustomTypeInstances(
   preferences: UserPreferences,
 ): ProviderInstance[] {
   const instances = preferences.providerInstances ?? [];
-  return instances.filter((i) => {
-    if (i.typeId === 'stagewise') return false;
-    if (i.typeId === 'coding-plan') return false;
-    if (i.typeId.endsWith('-api')) return false;
-    return true;
-  });
+  return instances.filter((i) => i.typeId in INSTANCE_TYPE_ID_TO_API_SPEC);
 }
 
 /**
@@ -567,6 +563,31 @@ function makeCustomEntry(
 }
 
 /**
+ * Build a `ModelSelectorEntry` from a discovered model (self-hosted providers).
+ */
+function makeDiscoveredEntry(
+  instance: ProviderInstance,
+  model: DiscoveredModel,
+): ModelSelectorEntry {
+  // Default to 8k context for discovered models that don't report it
+  // (most local/self-hosted models don't).
+  const contextWindow = model.contextWindow ?? 8_192;
+  return {
+    instanceId: instance.id,
+    instanceName: instance.name,
+    typeId: instance.typeId,
+    modelId: model.modelId,
+    displayName: model.displayName,
+    description: model.description ?? '',
+    contextLabel: `${Math.round(contextWindow / 1000)}k context`,
+    contextWindowRaw: contextWindow,
+    thinkingEnabled: !!model.thinkingEnabled,
+    isAlias: false,
+    targetModelId: model.modelId,
+  };
+}
+
+/**
  * Produce the flat list of `(instanceId, modelId)` pairs for the model
  * selector. Each entry represents one model as served by one provider
  * instance.
@@ -577,8 +598,10 @@ function makeCustomEntry(
  *   catalog models + matching custom models.
  * - **coding-plan** instances: the plan's vendor's catalog models +
  *   matching custom models.
+ * - **self-hosted** types (e.g. ollama): discovered models filtered by
+ *   `enabledModelIds` + matching custom models.
  * - **custom/cloud** types (custom-*, azure, bedrock, vertex): only
- *   matching custom models (discovered models are PR 4).
+ *   matching custom models.
  *
  * Models in an instance's `disabledModelIds` are excluded.
  */
@@ -675,6 +698,19 @@ export function getSelectableModelEntries(
       // Custom/cloud types (no vendor): only custom models below
     }
 
+    // --- Discovered models for self-hosted types ---
+
+    if (instance.discoveredModels && instance.discoveredModels.length > 0) {
+      const enabled = new Set(instance.enabledModelIds ?? []);
+      const hasEnabledList =
+        instance.enabledModelIds && instance.enabledModelIds.length > 0;
+      for (const dm of instance.discoveredModels) {
+        if (isDisabled(dm.modelId)) continue;
+        if (hasEnabledList && !enabled.has(dm.modelId)) continue;
+        entries.push(makeDiscoveredEntry(instance, dm));
+      }
+    }
+
     // --- Custom models for this instance ---
 
     for (const cm of customModels) {
@@ -700,4 +736,50 @@ export function findModelSelectorEntry(
   return getSelectableModelEntries(prefs).find(
     (e) => e.instanceId === instanceId && e.modelId === modelId,
   );
+}
+
+/**
+ * Count the enabled models for a single provider instance.
+ * Excludes disabled models and respects the instance type's model set.
+ */
+export function getInstanceModelCount(instance: ProviderInstance): number {
+  const disabled = new Set(instance.disabledModelIds ?? []);
+  let count = 0;
+
+  if (instance.typeId === 'stagewise') {
+    count += availableModelAliases.filter(
+      (a) => !disabled.has(a.modelId),
+    ).length;
+    count += availableModels.filter((m) => !disabled.has(m.modelId)).length;
+  } else if (instance.typeId === 'coding-plan') {
+    const planId = (instance.config as { planId: string })
+      .planId as CodingPlanId;
+    const plan = CODING_PLANS[planId];
+    if (plan) {
+      count += availableModels.filter(
+        (m) => m.officialProvider === plan.provider && !disabled.has(m.modelId),
+      ).length;
+    }
+  } else {
+    const vendor = getVendorForTypeId(instance.typeId);
+    if (vendor) {
+      count += availableModels.filter(
+        (m) => m.officialProvider === vendor && !disabled.has(m.modelId),
+      ).length;
+    }
+
+    // Discovered models for self-hosted instances
+    if (instance.discoveredModels && instance.discoveredModels.length > 0) {
+      const enabled = new Set(instance.enabledModelIds ?? []);
+      const hasEnabledList =
+        instance.enabledModelIds && instance.enabledModelIds.length > 0;
+      for (const dm of instance.discoveredModels) {
+        if (disabled.has(dm.modelId)) continue;
+        if (hasEnabledList && !enabled.has(dm.modelId)) continue;
+        count++;
+      }
+    }
+  }
+
+  return count;
 }

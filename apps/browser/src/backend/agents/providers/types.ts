@@ -2,6 +2,7 @@ import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type { LanguageModelMiddleware } from 'ai';
 import type {
   ApiSpec,
+  DiscoveredModel,
   ModelProvider,
   ProviderEndpointMode,
 } from '@shared/karton-contracts/ui/shared-types';
@@ -14,7 +15,8 @@ export type ProviderCategory =
   | 'default'
   | 'official-api'
   | 'cloud'
-  | 'custom-compatible';
+  | 'custom-compatible'
+  | 'self-hosted';
 
 /**
  * Stateless definition of a provider type. One folder = one provider.
@@ -70,6 +72,37 @@ export interface ProviderType<C = Record<string, unknown>> {
 
   /** Config field names that should be decrypted before being passed to `createLanguageModel`. */
   readonly sensitiveFields: readonly string[];
+
+  // ── Discovery ─────────────────────────────────────────────────────────
+
+  /**
+   * Validate the full config (not just an API key). Returns success/failure.
+   * Optional — only discovery providers need this.
+   */
+  validateCredentials?(
+    config: C,
+    decryptedConfig: Record<string, string>,
+  ): Promise<{ success: true } | { success: false; error: string }>;
+
+  /**
+   * Fetch the initial set of models available from this provider.
+   * Called after instance creation to populate `discoveredModels`.
+   * `decryptedConfig` contains decrypted values for every field in
+   * `sensitiveFields`, keyed by field name.
+   */
+  getInitialModels?(
+    config: C,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]>;
+
+  /**
+   * Re-fetch available models. Defaults to calling `getInitialModels`.
+   * Called by the `refreshInstanceModels` Karton procedure.
+   */
+  refreshModels?(
+    config: C,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]>;
 
   // ── Model ID transforms ───────────────────────────────────────────────
 

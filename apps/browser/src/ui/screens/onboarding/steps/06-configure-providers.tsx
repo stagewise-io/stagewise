@@ -25,6 +25,7 @@ import {
 } from '@shared/provider-instance-helpers';
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
+import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
 
 const consoleUrl =
@@ -34,7 +35,7 @@ const consoleUrl =
 
 type ProviderEntry = {
   key: string;
-  kind: 'vendor-api' | 'coding-plan';
+  kind: 'vendor-api' | 'coding-plan' | 'self-hosted';
   typeId: ProviderInstanceTypeId;
   displayName: string;
   tagline: string;
@@ -45,6 +46,7 @@ type ProviderEntry = {
   disclaimer?: string;
   /** Extra endpoint routing info shown below the help text. */
   endpointHelpText?: string;
+  defaultBaseUrl?: string;
 };
 
 /** All vendor API types shown in the unified provider list. */
@@ -60,6 +62,8 @@ const VENDOR_API_TYPES: ProviderInstanceTypeId[] = [
   'xiaomi-mimo-api',
   'mistral-api',
 ];
+
+const SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
 
 function buildUnifiedEntries(): ProviderEntry[] {
   const entries: ProviderEntry[] = [];
@@ -92,6 +96,18 @@ function buildUnifiedEntries(): ProviderEntry[] {
     });
   }
 
+  for (const typeId of SELF_HOSTED_TYPES) {
+    const info = getTypeDisplayInfo(typeId);
+    entries.push({
+      key: typeId,
+      kind: 'self-hosted',
+      typeId,
+      displayName: info.displayName,
+      tagline: info.description,
+      defaultBaseUrl: info.defaultBaseUrl,
+    });
+  }
+
   return entries;
 }
 
@@ -99,6 +115,9 @@ const UNIFIED_ENTRIES = buildUnifiedEntries();
 const VENDOR_ENTRIES = UNIFIED_ENTRIES.filter((e) => e.kind === 'vendor-api');
 const CODING_PLAN_ENTRIES = UNIFIED_ENTRIES.filter(
   (e) => e.kind === 'coding-plan',
+);
+const SELF_HOSTED_ENTRIES = UNIFIED_ENTRIES.filter(
+  (e) => e.kind === 'self-hosted',
 );
 
 // ─── Truncated Error Text ──────────────────────────────────────────────────
@@ -220,6 +239,9 @@ function EntryLogo({
       />
     );
   }
+  if (entry.kind === 'self-hosted' && entry.typeId === 'ollama') {
+    return <OllamaLogo className={className ?? 'size-5'} />;
+  }
   const vendor = entry.typeId.slice(0, -4) as Parameters<
     typeof ProviderLogo
   >[0]['provider'];
@@ -291,7 +313,9 @@ function ConnectionDetailView({
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const track = useTrack();
 
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(
+    entry.kind === 'self-hosted' ? (entry.defaultBaseUrl ?? '') : '',
+  );
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -305,6 +329,19 @@ function ConnectionDetailView({
           typeId: entry.typeId,
           config: {},
           validateApiKey: apiKey.trim(),
+        });
+        if (!result.success) {
+          setError(result.error);
+          void track('onboarding-provider-connect-failed', {
+            key: entry.key,
+            error_kind: 'validation-error',
+          });
+          return;
+        }
+      } else if (entry.kind === 'self-hosted') {
+        const result = await addProviderInstance({
+          typeId: entry.typeId,
+          config: { baseUrl: apiKey.trim() },
         });
         if (!result.success) {
           setError(result.error);
@@ -360,8 +397,12 @@ function ConnectionDetailView({
 
         <Input
           autoFocus
-          type="password"
-          placeholder="Enter API key..."
+          type={entry.kind === 'self-hosted' ? 'text' : 'password'}
+          placeholder={
+            entry.kind === 'self-hosted'
+              ? 'Enter base URL...'
+              : 'Enter API key...'
+          }
           value={apiKey}
           onValueChange={(v) => {
             setApiKey(v);
@@ -380,6 +421,13 @@ function ConnectionDetailView({
         />
 
         {error && <TruncatedErrorText text={error} />}
+
+        {!error && entry.kind === 'self-hosted' && (
+          <p className="text-subtle-foreground text-xs">
+            Enter the base URL of your {entry.displayName} instance. Default is{' '}
+            {entry.defaultBaseUrl}.
+          </p>
+        )}
 
         {!error && entry.helpText && (
           <p className="text-subtle-foreground text-xs">
@@ -455,6 +503,16 @@ function ScrollableProviderList({
     [query],
   );
 
+  const filteredSelfHostedEntries = useMemo(
+    () =>
+      query
+        ? SELF_HOSTED_ENTRIES.filter((e) =>
+            e.displayName.toLowerCase().includes(query),
+          )
+        : SELF_HOSTED_ENTRIES,
+    [query],
+  );
+
   const filteredCodingPlanEntries = useMemo(
     () =>
       query
@@ -463,6 +521,41 @@ function ScrollableProviderList({
           )
         : CODING_PLAN_ENTRIES,
     [query],
+  );
+
+  // Split all entries into connected vs unconnected.
+  // Connected entries are shown in a single section right after Builtin.
+  const allFilteredEntries = useMemo(
+    () => [
+      ...filteredCodingPlanEntries,
+      ...filteredSelfHostedEntries,
+      ...filteredVendorEntries,
+    ],
+    [
+      filteredCodingPlanEntries,
+      filteredSelfHostedEntries,
+      filteredVendorEntries,
+    ],
+  );
+
+  const connectedEntries = useMemo(
+    () => allFilteredEntries.filter((e) => isEntryConnected(e)),
+    [allFilteredEntries, isEntryConnected],
+  );
+
+  const unconnectedCodingPlanEntries = useMemo(
+    () => filteredCodingPlanEntries.filter((e) => !isEntryConnected(e)),
+    [filteredCodingPlanEntries, isEntryConnected],
+  );
+
+  const unconnectedSelfHostedEntries = useMemo(
+    () => filteredSelfHostedEntries.filter((e) => !isEntryConnected(e)),
+    [filteredSelfHostedEntries, isEntryConnected],
+  );
+
+  const unconnectedVendorEntries = useMemo(
+    () => filteredVendorEntries.filter((e) => !isEntryConnected(e)),
+    [filteredVendorEntries, isEntryConnected],
   );
 
   // Scroll fade mask
@@ -478,8 +571,10 @@ function ScrollableProviderList({
 
   const noResults =
     query.length > 0 &&
-    filteredVendorEntries.length === 0 &&
-    filteredCodingPlanEntries.length === 0;
+    connectedEntries.length === 0 &&
+    unconnectedCodingPlanEntries.length === 0 &&
+    unconnectedSelfHostedEntries.length === 0 &&
+    unconnectedVendorEntries.length === 0;
 
   return (
     <div className="min-h-0 pb-4">
@@ -506,12 +601,46 @@ function ScrollableProviderList({
           </div>
         )}
 
+        {/* Connected — all connected entries across categories */}
+        {connectedEntries.length > 0 && (
+          <div className="space-y-2">
+            <p className="font-medium text-foreground text-xs">Connected</p>
+            <div className="flex flex-col gap-2">
+              {connectedEntries.map((entry) => (
+                <ProviderListCard
+                  key={entry.key}
+                  entry={entry}
+                  isConnected={isEntryConnected(entry)}
+                  onClick={() => onSelectEntry(entry)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Coding Plans */}
-        {filteredCodingPlanEntries.length > 0 && (
+        {unconnectedCodingPlanEntries.length > 0 && (
           <div className="space-y-2">
             <p className="font-medium text-foreground text-xs">Coding Plans</p>
             <div className="flex flex-col gap-2">
-              {filteredCodingPlanEntries.map((entry) => (
+              {unconnectedCodingPlanEntries.map((entry) => (
+                <ProviderListCard
+                  key={entry.key}
+                  entry={entry}
+                  isConnected={isEntryConnected(entry)}
+                  onClick={() => onSelectEntry(entry)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Self-Hosted */}
+        {unconnectedSelfHostedEntries.length > 0 && (
+          <div className="space-y-2">
+            <p className="font-medium text-foreground text-xs">Self-Hosted</p>
+            <div className="flex flex-col gap-2">
+              {unconnectedSelfHostedEntries.map((entry) => (
                 <ProviderListCard
                   key={entry.key}
                   entry={entry}
@@ -524,13 +653,13 @@ function ScrollableProviderList({
         )}
 
         {/* Official API Keys */}
-        {filteredVendorEntries.length > 0 && (
+        {unconnectedVendorEntries.length > 0 && (
           <div className="space-y-2">
             <p className="font-medium text-foreground text-xs">
               Official API Keys
             </p>
             <div className="flex flex-col gap-2">
-              {filteredVendorEntries.map((entry) => (
+              {unconnectedVendorEntries.map((entry) => (
                 <ProviderListCard
                   key={entry.key}
                   entry={entry}
@@ -574,6 +703,11 @@ export function StepConfigureProviders({
         return (
           !!inst &&
           !!(inst.config as { encryptedApiKey?: string }).encryptedApiKey
+        );
+      }
+      if (entry.kind === 'self-hosted') {
+        return !!preferences.providerInstances?.find(
+          (i) => i.typeId === entry.typeId,
         );
       }
       const inst = preferences.providerInstances?.find(

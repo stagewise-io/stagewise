@@ -36,6 +36,7 @@ import type {
   DevToolbarOriginSettings,
   ToolApprovalMode,
   SocialAuthProvider,
+  DiscoveredModel,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -2087,7 +2088,11 @@ export type KartonContract = {
         config: Record<string, unknown>;
         validateApiKey?: string;
       }) => Promise<
-        | { success: true; instanceId: string }
+        | {
+            success: true;
+            instanceId: string;
+            discoveredModels: DiscoveredModel[];
+          }
         | { success: false; error: string }
       >;
       /** Remove a provider instance by id */
@@ -2120,6 +2125,13 @@ export type KartonContract = {
         instanceId: string,
         apiKey: string,
       ) => Promise<ApiKeyValidationResult>;
+      /** Set the enabled model IDs for a provider instance (post-discovery selection). */
+      setInstanceEnabledModels: (
+        instanceId: string,
+        enabledModelIds: string[],
+      ) => Promise<void>;
+      /** Re-discover models for a provider instance. Returns the updated list. */
+      refreshInstanceModels: (instanceId: string) => Promise<DiscoveredModel[]>;
     };
     devToolbar: {
       /** Update the global widget order */

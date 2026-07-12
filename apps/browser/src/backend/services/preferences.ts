@@ -11,6 +11,7 @@ import {
   type ProviderInstance,
   type CustomEndpoint,
   type ApiSpec,
+  type DiscoveredModel,
   userPreferencesSchema,
   defaultUserPreferences,
   PermissionSetting,
@@ -35,6 +36,7 @@ import {
   validateCodingPlanApiKey,
   type ApiKeyValidationResult,
 } from '../utils/validate-api-keys';
+import { getProviderType } from '../agents/providers/registry';
 
 // Enable Immer patches support
 enablePatches();
@@ -688,6 +690,24 @@ export class PreferencesService extends DisposableService {
       'preferences.validateProviderInstanceApiKey',
       async (_callingClientId: string, instanceId: string, apiKey: string) => {
         return this.validateProviderInstanceApiKey(instanceId, apiKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.setInstanceEnabledModels',
+      async (
+        _callingClientId: string,
+        instanceId: string,
+        enabledModelIds: string[],
+      ) => {
+        await this.setInstanceEnabledModels(instanceId, enabledModelIds);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.refreshInstanceModels',
+      async (_callingClientId: string, instanceId: string) => {
+        return this.refreshInstanceModels(instanceId);
       },
     );
 
@@ -1466,7 +1486,7 @@ export class PreferencesService extends DisposableService {
         } as ProviderInstance['config'],
         enabledModelIds: [] as string[],
         disabledModelIds: [] as string[],
-        discoveredModels: [] as Record<string, unknown>[],
+        discoveredModels: [],
       };
       patches.push({
         op: 'add',
@@ -1640,7 +1660,8 @@ export class PreferencesService extends DisposableService {
     config: Record<string, unknown>;
     validateApiKey?: string;
   }): Promise<
-    { success: true; instanceId: string } | { success: false; error: string }
+    | { success: true; instanceId: string; discoveredModels: DiscoveredModel[] }
+    | { success: false; error: string }
   > {
     this.assertNotDisposed();
 
@@ -1694,6 +1715,26 @@ export class PreferencesService extends DisposableService {
             'Coding Plan')
           : typeId);
 
+    // Run model discovery if the provider type supports it.
+    let discovered: DiscoveredModel[] = [];
+    const providerType = getProviderType(typeId);
+    if (providerType.getInitialModels) {
+      const sensitiveValues: Record<string, string> = {};
+      if (validateApiKey) {
+        sensitiveValues.encryptedApiKey = validateApiKey;
+      }
+      try {
+        discovered = await providerType.getInitialModels(
+          finalConfig as never,
+          sensitiveValues,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `[PreferencesService] Model discovery failed for ${typeId}: ${String(err)}`,
+        );
+      }
+    }
+
     const instance = {
       id: instanceId,
       typeId: typeId as ProviderInstance['typeId'],
@@ -1701,7 +1742,7 @@ export class PreferencesService extends DisposableService {
       config: finalConfig as ProviderInstance['config'],
       enabledModelIds: [] as string[],
       disabledModelIds: [] as string[],
-      discoveredModels: [] as Record<string, unknown>[],
+      discoveredModels: discovered,
     };
 
     const patches: Patch[] = [
@@ -1714,9 +1755,9 @@ export class PreferencesService extends DisposableService {
     await this.update(patches);
 
     this.logger.debug(
-      `[PreferencesService] Added provider instance: ${instanceId}`,
+      `[PreferencesService] Added provider instance: ${instanceId} (${discovered.length} models discovered)`,
     );
-    return { success: true, instanceId };
+    return { success: true, instanceId, discoveredModels: discovered };
   }
 
   /**
@@ -1914,6 +1955,78 @@ export class PreferencesService extends DisposableService {
     return null;
   }
 
+  /**
+   * Set the enabled model IDs for a provider instance.
+   * This is used after discovery to select which discovered models to expose.
+   */
+  public async setInstanceEnabledModels(
+    instanceId: string,
+    enabledModelIds: string[],
+  ): Promise<void> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'enabledModelIds'],
+        value: enabledModelIds,
+      },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Set enabled models for instance: ${instanceId}`,
+    );
+  }
+
+  /**
+   * Re-discover models for a provider instance. Calls the provider type's
+   * `getInitialModels` (or `refreshModels` if defined), caches the result
+   * in `discoveredModels`, and returns the updated list.
+   */
+  public async refreshInstanceModels(
+    instanceId: string,
+  ): Promise<DiscoveredModel[]> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const instance = this.preferences.providerInstances[idx];
+    const type = getProviderType(instance.typeId);
+
+    // Decrypt sensitive fields from the instance config
+    const config = instance.config as Record<string, unknown>;
+    const decryptedConfig: Record<string, string> = {};
+    for (const field of type.sensitiveFields) {
+      const encrypted = config[field] as string | undefined;
+      if (encrypted) {
+        decryptedConfig[field] = this.decryptProviderApiKey(encrypted);
+      }
+    }
+
+    const refreshFn = type.refreshModels ?? type.getInitialModels;
+    if (!refreshFn) {
+      return [];
+    }
+    const models = await refreshFn(instance.config as never, decryptedConfig);
+
+    const patches: Patch[] = [
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'discoveredModels'],
+        value: models,
+      },
+    ];
+    await this.update(patches);
+    this.logger.debug(
+      `[PreferencesService] Refreshed models for instance: ${instanceId} (${models.length} models)`,
+    );
+    return models;
+  }
+
   private notifyListeners(
     newPrefs: UserPreferences,
     oldPrefs: UserPreferences,
@@ -1986,6 +2099,12 @@ export class PreferencesService extends DisposableService {
       );
       this.uiKarton.removeServerProcedureHandler(
         'preferences.validateProviderInstanceApiKey',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.setInstanceEnabledModels',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.refreshInstanceModels',
       );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',
