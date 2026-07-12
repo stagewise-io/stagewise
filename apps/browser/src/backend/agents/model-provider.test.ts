@@ -38,7 +38,7 @@ function customEndpointToInstance(ep: CustomEndpoint): ProviderInstance {
     name: ep.name,
     enabledModelIds: [] as string[],
     disabledModelIds: [] as string[],
-    discoveredModels: [] as Record<string, unknown>[],
+    discoveredModels: [],
   };
   switch (typeId) {
     case 'custom-anthropic':

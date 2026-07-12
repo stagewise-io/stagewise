@@ -14,7 +14,10 @@ import type {
   UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
+  DEFAULT_INSTANCE_ID,
+  INSTANCE_TYPE_ID_TO_API_SPEC,
   getInstanceDisabledModelIds,
+  getInstanceModelCount,
   getInstanceModelThinkingOverride,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
@@ -36,6 +39,7 @@ import {
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
+import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import {
   useEffect,
   useState,
@@ -60,28 +64,31 @@ import {
   DialogHeader,
   DialogFooter,
 } from '@stagewise/stage-ui/components/dialog';
+
+import { produceWithPatches, enablePatches } from 'immer';
+import {
+  IconChevronLeftOutline18,
+  IconChevronDownOutline18,
+  IconPlusOutline18,
+  IconPenOutline18,
+  IconTrashOutline18,
+  IconCheck2Outline18,
+  IconChevronRightOutline18,
+  IconFolderCloudOutline18,
+  IconServerOutline18,
+  IconArrowUpRightOutline18,
+  IconDotsOutline18,
+  IconRefreshAnticlockwiseOutline18,
+} from '@stagewise/icons';
+import { Logo } from '@stagewise/stage-ui/components/logo';
 import {
   Menu,
   MenuTrigger,
   MenuContent,
   MenuItem,
-  MenuSeparator,
 } from '@stagewise/stage-ui/components/menu';
-import { produceWithPatches, enablePatches } from 'immer';
-import {
-  IconChevronLeftOutline18,
-  IconChevronRightOutline18,
-  IconChevronDownOutline18,
-  IconPlusOutline18,
-  IconPenOutline18,
-  IconTrashOutline18,
-  IconDotsOutline18,
-  IconCheck2Outline18,
-  IconFolderCloudOutline18,
-  IconServerOutline18,
-  IconArrowUpRightOutline18,
-} from '@stagewise/icons';
-import { Logo } from '@stagewise/stage-ui/components/logo';
+import { ContextMenu } from '@base-ui/react/context-menu';
+import { Menu as MenuBase } from '@base-ui/react/menu';
 
 const consoleUrl =
   import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
@@ -89,9 +96,6 @@ const consoleUrl =
 enablePatches();
 
 const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
-const _RECOMMENDED_MODEL_IDS = availableModelAliases.map(
-  (alias) => alias.modelId,
-);
 
 // =============================================================================
 // Provider Instance Logo
@@ -132,6 +136,10 @@ function InstanceLogo({
     return (
       <IconServerOutline18 className={cn(className, 'text-muted-foreground')} />
     );
+  }
+  // Ollama self-hosted
+  if (typeId === 'ollama') {
+    return <OllamaLogo className={className} />;
   }
   // Cloud/custom types → cloud icon
   return (
@@ -326,37 +334,25 @@ function VendorApiKeyInput({
 
 function ProviderInstanceCard({
   instance,
-  onEdit,
+  onConfigure,
   onDelete,
-  onEditCustom,
 }: {
   instance: ProviderInstance;
-  onEdit?: () => void;
-  onDelete: () => void;
-  onEditCustom?: () => void;
+  onConfigure?: () => void;
+  onDelete?: () => void;
 }) {
-  const _preferences = useKartonState((s) => s.preferences);
   const subscription = useKartonState((s) => s.userAccount.subscription);
-  const setSettingsRoute = useKartonProcedure(
-    (p) => p.appScreen.setSettingsRoute,
-  );
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
 
   const displayInfo = getTypeDisplayInfo(instance.typeId);
   const isStagewise = instance.typeId === 'stagewise';
   const plan = subscription?.plan;
   const isFreePlan = !plan || plan === 'free';
-  const isKeyBasedProvider =
-    instance.typeId.endsWith('-api') || instance.typeId === 'coding-plan';
-  const isCustomType = !isStagewise && !isKeyBasedProvider;
-
-  // Determine subtitle
-  const subtitle = isCustomType
-    ? (displayInfo?.description ?? '')
-    : (displayInfo?.description ?? '');
-
-  return (
-    <div className="space-y-3 rounded-lg border border-derived p-3">
+  const card = (
+    <div
+      className="cursor-pointer space-y-3 rounded-lg border border-derived bg-surface-1 p-3"
+      onClick={onConfigure}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-1">
@@ -370,71 +366,20 @@ function ProviderInstanceCard({
             <h3 className="font-medium text-foreground text-sm">
               {instance.name}
             </h3>
-            {subtitle && (
+            {displayInfo?.description && (
               <p className="mt-0.5 truncate text-muted-foreground text-xs">
-                {subtitle}
+                {displayInfo.description}
               </p>
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {!isStagewise && (
-            <Menu>
-              <MenuTrigger>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="size-5"
-                  aria-label="Instance actions"
-                >
-                  <IconDotsOutline18 className="size-3.5" />
-                </Button>
-              </MenuTrigger>
-              <MenuContent align="end">
-                {onEdit && (
-                  <MenuItem onClick={onEdit}>
-                    <IconPenOutline18 className="size-3.5 text-muted-foreground" />
-                    Edit
-                  </MenuItem>
-                )}
-                {onEditCustom && (
-                  <MenuItem onClick={onEditCustom}>
-                    <IconPenOutline18 className="size-3.5 text-muted-foreground" />
-                    Edit configuration
-                  </MenuItem>
-                )}
-                {(onEdit || onEditCustom) && <MenuSeparator />}
-                <MenuItem onClick={onDelete} className="text-error-foreground">
-                  <IconTrashOutline18 className="size-3.5" />
-                  Delete
-                </MenuItem>
-              </MenuContent>
-            </Menu>
-          )}
+        <div
+          className="flex shrink-0 items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <IconChevronRightOutline18 className="size-3.5 text-muted-foreground" />
         </div>
       </div>
-
-      {/* API key input for vendor APIs and coding plans */}
-      {isKeyBasedProvider && <VendorApiKeyInput instance={instance} />}
-
-      {/* Custom type: show config summary + configure button */}
-      {isCustomType && (
-        <div className="flex items-center justify-between gap-2 border-derived border-t pt-2">
-          <p className="truncate text-muted-foreground text-xs">
-            {displayInfo?.defaultBaseUrl
-              ? displayInfo.defaultBaseUrl
-              : 'Custom endpoint configured'}
-          </p>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setSettingsRoute({ section: 'custom-providers' })}
-          >
-            Configure
-            <IconChevronRightOutline18 className="size-3" />
-          </Button>
-        </div>
-      )}
 
       {/* Stagewise: informational or upgrade CTA */}
       {isStagewise && (
@@ -458,6 +403,48 @@ function ProviderInstanceCard({
       )}
     </div>
   );
+
+  if (!onDelete) return card;
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger render={card} />
+      <MenuBase.Portal>
+        <MenuBase.Positioner
+          className="z-50"
+          sideOffset={4}
+          align="start"
+          side="bottom"
+        >
+          <MenuBase.Popup
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'flex origin-(--transform-origin) flex-col items-stretch gap-0.5',
+              'rounded-lg border border-border-subtle bg-background p-1',
+              'text-xs shadow-lg',
+              'transition-[transform,scale,opacity] duration-150 ease-out',
+              'data-ending-style:scale-90 data-starting-style:scale-90',
+              'data-ending-style:opacity-0 data-starting-style:opacity-0',
+            )}
+          >
+            <MenuBase.Item
+              className={cn(
+                'flex w-full cursor-default flex-row items-center justify-start gap-2',
+                'rounded-md px-2 py-1 text-foreground text-xs outline-none',
+                'transition-colors duration-150 ease-out',
+                'hover:bg-surface-1 data-highlighted:bg-surface-1',
+              )}
+              onClick={onDelete}
+            >
+              <IconTrashOutline18 className="size-3.5 shrink-0" />
+              <span>Delete provider</span>
+            </MenuBase.Item>
+          </MenuBase.Popup>
+        </MenuBase.Positioner>
+      </MenuBase.Portal>
+    </ContextMenu.Root>
+  );
 }
 
 // =============================================================================
@@ -477,10 +464,18 @@ const ADDABLE_VENDOR_TYPES: ProviderInstanceTypeId[] = [
   'mistral-api',
 ];
 
+const ADDABLE_SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
+
 /** Unified selection key — either a vendor typeId or `plan:<planId>`. */
 type SelectionKey = ProviderInstanceTypeId | `plan:${string}`;
 
-function AddProviderGrid({ onClose }: { onClose: () => void }) {
+function AddProviderGrid({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: (instanceId: string) => void;
+}) {
   const addProviderInstance = useKartonProcedure(
     (p) => p.preferences.addProviderInstance,
   );
@@ -510,6 +505,13 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
       .filter((i) => i.typeId.endsWith('-api'))
       .map((i) => i.typeId),
   );
+  const existingSelfHostedTypes = new Set(
+    existingInstances
+      .filter((i) =>
+        ADDABLE_SELF_HOSTED_TYPES.includes(i.typeId as ProviderInstanceTypeId),
+      )
+      .map((i) => i.typeId),
+  );
 
   const codingPlans = useMemo(() => Object.values(CODING_PLANS), []);
   const existingPlanIds = new Set(
@@ -519,37 +521,58 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
   );
 
   const handleConnect = useCallback(
-    async (key: SelectionKey, apiKeyValue: string) => {
-      if (!apiKeyValue.trim()) return;
+    async (key: SelectionKey, value: string) => {
+      if (!value.trim()) return;
       setIsConnecting(true);
       setError(null);
       try {
         if (key.startsWith('plan:')) {
           const planId = key.slice(5) as CodingPlanId;
-          const result = await connectCodingPlan(planId, apiKeyValue.trim());
+          const result = await connectCodingPlan(planId, value.trim());
           if (!result.success) {
             setError(result.error);
             return;
           }
-        } else {
+          onClose();
+          return;
+        }
+
+        const isSelfHosted = ADDABLE_SELF_HOSTED_TYPES.includes(
+          key as ProviderInstanceTypeId,
+        );
+
+        if (isSelfHosted) {
+          // Create the instance with the base URL — backend discovers models.
+          // Then open the details page so the user can select models there.
           const result = await addProviderInstance({
             typeId: key,
-            config: {},
-            validateApiKey: apiKeyValue.trim(),
+            config: { baseUrl: value.trim() },
           });
           if (!result.success) {
             setError(result.error);
             return;
           }
+          onConnected(result.instanceId);
+          return;
+        } else {
+          const result = await addProviderInstance({
+            typeId: key,
+            config: {},
+            validateApiKey: value.trim(),
+          });
+          if (!result.success) {
+            setError(result.error);
+            return;
+          }
+          onClose();
         }
-        onClose();
       } catch {
         setError('Connection failed. Please try again.');
       } finally {
         setIsConnecting(false);
       }
     },
-    [addProviderInstance, connectCodingPlan, onClose],
+    [addProviderInstance, connectCodingPlan, onClose, onConnected],
   );
 
   // Resolve display info for the current selection
@@ -581,6 +604,10 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
   const selectedEndpointHelpText = selectedPlan?.endpointHelpText;
   const selectedDisclaimer = selectedPlan?.disclaimer;
 
+  const isSelfHosted =
+    selectedVendorType &&
+    ADDABLE_SELF_HOSTED_TYPES.includes(selectedVendorType);
+
   const handleBack = useCallback(() => {
     setSelected(null);
     setApiKey('');
@@ -601,10 +628,17 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
         plan.displayName.toLowerCase().includes(query),
       )
     : codingPlans;
+  const filteredSelfHostedTypes = query
+    ? ADDABLE_SELF_HOSTED_TYPES.filter((typeId) => {
+        const info = getTypeDisplayInfo(typeId);
+        return info.displayName.toLowerCase().includes(query);
+      })
+    : ADDABLE_SELF_HOSTED_TYPES;
   const noResults =
     query.length > 0 &&
     filteredVendorTypes.length === 0 &&
-    filteredCodingPlans.length === 0;
+    filteredCodingPlans.length === 0 &&
+    filteredSelfHostedTypes.length === 0;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -661,8 +695,10 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
 
               <Input
                 autoFocus
-                type="password"
-                placeholder="Enter API key..."
+                type={isSelfHosted ? 'text' : 'password'}
+                placeholder={
+                  isSelfHosted ? 'Enter base URL...' : 'Enter API key...'
+                }
                 value={apiKey}
                 onValueChange={(v) => {
                   setApiKey(v);
@@ -682,7 +718,7 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
 
               {error && <TruncatedErrorText text={error} />}
 
-              {!error && selectedHelpText && (
+              {!error && !isSelfHosted && selectedHelpText && (
                 <p className="text-subtle-foreground text-xs">
                   <span className="inline-flex items-center gap-1">
                     {selectedHelpText}
@@ -709,6 +745,13 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
                 </p>
               )}
 
+              {!error && isSelfHosted && (
+                <p className="text-subtle-foreground text-xs">
+                  Enter the base URL of your Ollama instance. Default is
+                  http://localhost:11434.
+                </p>
+              )}
+
               {selectedDisclaimer && (
                 <p className="text-2xs text-warning-foreground">
                   {selectedDisclaimer}
@@ -726,7 +769,11 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
                 disabled={!apiKey.trim() || isConnecting}
                 onClick={() => void handleConnect(selected, apiKey)}
               >
-                {isConnecting ? 'Connecting...' : 'Connect'}
+                {isConnecting
+                  ? 'Connecting...'
+                  : isSelfHosted
+                    ? 'Discover'
+                    : 'Connect'}
               </Button>
             </div>
           </div>
@@ -749,49 +796,6 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
                   <p className="py-4 text-center text-muted-foreground text-xs">
                     No providers match &quot;{query}&quot;
                   </p>
-                )}
-
-                {/* Vendor API types */}
-                {filteredVendorTypes.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-medium text-foreground text-xs">
-                      Official API Keys
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {filteredVendorTypes.map((typeId) => {
-                        const info = getTypeDisplayInfo(typeId);
-                        const exists = existingVendorTypes.has(typeId);
-                        return (
-                          <button
-                            key={typeId}
-                            type="button"
-                            disabled={exists}
-                            onClick={() => {
-                              setSelected(typeId);
-                              setApiKey('');
-                              setError(null);
-                            }}
-                            className={cn(
-                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived',
-                              exists && 'cursor-not-allowed opacity-50',
-                            )}
-                          >
-                            <InstanceLogo
-                              typeId={typeId}
-                              className="size-4 shrink-0 text-foreground"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
-                              {info.displayName}
-                            </span>
-                            {exists && (
-                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 )}
 
                 {/* Coding Plans */}
@@ -836,6 +840,92 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                 )}
+
+                {/* Self-Hosted */}
+                {filteredSelfHostedTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium text-foreground text-xs">
+                      Self-Hosted
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {filteredSelfHostedTypes.map((typeId) => {
+                        const info = getTypeDisplayInfo(typeId);
+                        const exists = existingSelfHostedTypes.has(typeId);
+                        return (
+                          <button
+                            key={typeId}
+                            type="button"
+                            disabled={exists}
+                            onClick={() => {
+                              setSelected(typeId);
+                              setApiKey(info.defaultBaseUrl ?? '');
+                              setError(null);
+                            }}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                              'border-derived hover:bg-hover-derived',
+                              exists && 'cursor-not-allowed opacity-50',
+                            )}
+                          >
+                            <InstanceLogo
+                              typeId={typeId}
+                              className="size-4 shrink-0 text-foreground"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                              {info.displayName}
+                            </span>
+                            {exists && (
+                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Vendor API types */}
+                {filteredVendorTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium text-foreground text-xs">
+                      Official API Keys
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {filteredVendorTypes.map((typeId) => {
+                        const info = getTypeDisplayInfo(typeId);
+                        const exists = existingVendorTypes.has(typeId);
+                        return (
+                          <button
+                            key={typeId}
+                            type="button"
+                            disabled={exists}
+                            onClick={() => {
+                              setSelected(typeId);
+                              setApiKey('');
+                              setError(null);
+                            }}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                              'border-derived hover:bg-hover-derived',
+                              exists && 'cursor-not-allowed opacity-50',
+                            )}
+                          >
+                            <InstanceLogo
+                              typeId={typeId}
+                              className="size-4 shrink-0 text-foreground"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                              {info.displayName}
+                            </span>
+                            {exists && (
+                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </OverlayScrollbar>
           </>
@@ -849,36 +939,16 @@ function AddProviderGrid({ onClose }: { onClose: () => void }) {
 // Provider Instances Section
 // =============================================================================
 
-function ProviderInstancesSection() {
+function ProviderInstancesSection({
+  onConfigure,
+  onDelete,
+}: {
+  onConfigure: (instanceId: string) => void;
+  onDelete: (instanceId: string) => void;
+}) {
   const preferences = useKartonState((s) => s.preferences);
-  const removeProviderInstance = useKartonProcedure(
-    (p) => p.preferences.removeProviderInstance,
-  );
-  const setSettingsRoute = useKartonProcedure(
-    (p) => p.appScreen.setSettingsRoute,
-  );
-
   const instances = preferences.providerInstances ?? [];
   const [showAddProvider, setShowAddProvider] = useState(false);
-
-  const handleDelete = useCallback(
-    async (instanceId: string, _instance: ProviderInstance) => {
-      const customModels = preferences.customModels ?? [];
-      const affectedModels = customModels.filter(
-        (m) =>
-          m.providerInstanceId === instanceId || m.endpointId === instanceId,
-      );
-      if (affectedModels.length > 0) {
-        const names = affectedModels.map((m) => m.displayName).join(', ');
-        const confirmed = window.confirm(
-          `The following custom models use this provider and will stop working:\n\n${names}\n\nDelete anyway?`,
-        );
-        if (!confirmed) return;
-      }
-      await removeProviderInstance(instanceId);
-    },
-    [removeProviderInstance, preferences.customModels],
-  );
 
   // Sort: stagewise first, then coding-plan, then vendor-api, then custom
   const sortedInstances = useMemo(() => {
@@ -899,12 +969,10 @@ function ProviderInstancesSection() {
         <ProviderInstanceCard
           key={instance.id}
           instance={instance}
-          onDelete={() => void handleDelete(instance.id, instance)}
-          onEditCustom={
-            !instance.typeId.endsWith('-api') &&
-            instance.typeId !== 'stagewise' &&
-            instance.typeId !== 'coding-plan'
-              ? () => setSettingsRoute({ section: 'custom-providers' })
+          onConfigure={() => onConfigure(instance.id)}
+          onDelete={
+            instance.id !== DEFAULT_INSTANCE_ID
+              ? () => onDelete(instance.id)
               : undefined
           }
         />
@@ -922,7 +990,13 @@ function ProviderInstancesSection() {
       </div>
 
       {showAddProvider && (
-        <AddProviderGrid onClose={() => setShowAddProvider(false)} />
+        <AddProviderGrid
+          onClose={() => setShowAddProvider(false)}
+          onConnected={(instanceId) => {
+            setShowAddProvider(false);
+            onConfigure(instanceId);
+          }}
+        />
       )}
     </div>
   );
@@ -1608,7 +1682,6 @@ function InstanceModelGroup({
     [preferences, instance.id],
   );
 
-  const _displayInfo = getTypeDisplayInfo(instance.typeId);
   const customModels = preferences.customModels ?? EMPTY_CUSTOM_MODELS;
   const instanceCustomModels = customModels.filter(
     (m) => (m.providerInstanceId ?? m.endpointId) === instance.id,
@@ -1718,9 +1791,34 @@ function InstanceModelGroup({
 // Models Section (per-instance)
 // =============================================================================
 
-function ModelsSection() {
+function ModelsSection({
+  filterInstanceId,
+  filterInstance,
+}: {
+  filterInstanceId?: string;
+  filterInstance?: ProviderInstance;
+}) {
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const refreshInstanceModels = useKartonProcedure(
+    (p) => p.preferences.refreshInstanceModels,
+  );
+
+  const isTrulyCustom =
+    !!filterInstance && filterInstance.typeId in INSTANCE_TYPE_ID_TO_API_SPEC;
+  const [isReloading, setIsReloading] = useState(false);
+
+  const handleReloadModels = useCallback(async () => {
+    if (!filterInstance) return;
+    setIsReloading(true);
+    try {
+      await refreshInstanceModels(filterInstance.id);
+    } catch {
+      // ignore — models just won't update
+    } finally {
+      setIsReloading(false);
+    }
+  }, [filterInstance, refreshInstanceModels]);
 
   const customModels = preferences?.customModels ?? EMPTY_CUSTOM_MODELS;
   const providerInstances = preferences?.providerInstances ?? [];
@@ -1762,9 +1860,12 @@ function ModelsSection() {
   }, [allEntries, providerInstances]);
 
   const filteredGroups = useMemo(() => {
+    const groups = filterInstanceId
+      ? groupedByInstance.filter((g) => g.instance.id === filterInstanceId)
+      : groupedByInstance;
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return groupedByInstance;
-    return groupedByInstance
+    if (!q) return groups;
+    return groups
       .map((g) => ({
         ...g,
         entries: g.entries.filter(
@@ -1775,7 +1876,7 @@ function ModelsSection() {
         ),
       }))
       .filter((g) => g.entries.length > 0);
-  }, [groupedByInstance, searchQuery]);
+  }, [groupedByInstance, searchQuery, filterInstanceId]);
 
   const noResults =
     searchQuery.trim().length > 0 && filteredGroups.length === 0;
@@ -2146,10 +2247,24 @@ function ModelsSection() {
           className="flex-1"
           style={{ maxWidth: 'none' }}
         />
-        <Button variant="secondary" size="sm" onClick={handleAdd}>
-          <IconPlusOutline18 className="size-3.5" />
-          Add Model
-        </Button>
+        {isTrulyCustom ? (
+          <Button variant="secondary" size="sm" onClick={handleAdd}>
+            <IconPlusOutline18 className="size-3.5" />
+            Add Model
+          </Button>
+        ) : filterInstance ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={isReloading}
+            onClick={() => void handleReloadModels()}
+          >
+            <IconRefreshAnticlockwiseOutline18
+              className={cn('size-3.5', isReloading && 'animate-spin')}
+            />
+            {isReloading ? 'Reloading...' : 'Reload models'}
+          </Button>
+        ) : null}
       </div>
 
       <div ref={listContainerRef} className="relative">
@@ -2237,10 +2352,283 @@ function ModelsSection() {
 }
 
 // =============================================================================
+// Self-Hosted Connection (detail page)
+// =============================================================================
+
+function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
+  const preferences = useKartonState((s) => s.preferences);
+  const updateProviderInstance = useKartonProcedure(
+    (p) => p.preferences.updateProviderInstance,
+  );
+  const refreshInstanceModels = useKartonProcedure(
+    (p) => p.preferences.refreshInstanceModels,
+  );
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+
+  const displayInfo = getTypeDisplayInfo(instance.typeId);
+  const config = instance.config as { baseUrl?: string };
+  const savedBaseUrl = config.baseUrl ?? displayInfo?.defaultBaseUrl ?? '';
+  const [baseUrl, setBaseUrl] = useState(savedBaseUrl);
+  const isDirty = baseUrl.trim() !== savedBaseUrl.trim();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRefresh = useCallback(async () => {
+    if (!baseUrl.trim()) return;
+    setIsRefreshing(true);
+    setError(null);
+    try {
+      await updateProviderInstance(instance.id, { baseUrl: baseUrl.trim() });
+      const discovered = await refreshInstanceModels(instance.id);
+
+      // Prune stale disabledModelIds: keep only IDs still in discovered list
+      const newIds = new Set(discovered.map((m) => m.modelId));
+      const currentDisabled = instance.disabledModelIds ?? [];
+      const pruned = currentDisabled.filter((id) => newIds.has(id));
+
+      if (pruned.length < currentDisabled.length) {
+        const [, patches] = produceWithPatches(preferences, (draft) => {
+          const inst = draft.providerInstances.find(
+            (i) => i.id === instance.id,
+          );
+          if (inst) {
+            inst.disabledModelIds = pruned;
+          }
+        });
+        await updatePreferences(patches);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to refresh models.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [
+    baseUrl,
+    instance.id,
+    instance.disabledModelIds,
+    preferences,
+    updateProviderInstance,
+    refreshInstanceModels,
+    updatePreferences,
+  ]);
+
+  return (
+    <div className="space-y-3 rounded-lg border border-derived p-3">
+      <div className="flex gap-2">
+        <Input
+          value={baseUrl}
+          onValueChange={(v) => {
+            setBaseUrl(v);
+            setError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && isDirty && baseUrl.trim()) {
+              void handleRefresh();
+            }
+          }}
+          placeholder={displayInfo?.defaultBaseUrl ?? 'Enter base URL...'}
+          disabled={isRefreshing}
+          size="sm"
+          style={{ maxWidth: 'none' }}
+          className="flex-1"
+        />
+        {isDirty && (
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!baseUrl.trim() || isRefreshing}
+            onClick={() => void handleRefresh()}
+          >
+            {isRefreshing ? 'Saving...' : 'Save'}
+          </Button>
+        )}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Edit the base URL and click Save to re-discover available models.
+      </p>
+      {error && <TruncatedErrorText text={error} />}
+    </div>
+  );
+}
+
+// =============================================================================
 // Main Page Component
 // =============================================================================
 
 export function ModelsProvidersSection() {
+  const preferences = useKartonState((s) => s.preferences);
+  const [detailInstanceId, setDetailInstanceId] = useState<string | null>(null);
+  const removeProviderInstance = useKartonProcedure(
+    (p) => p.preferences.removeProviderInstance,
+  );
+
+  const detailInstance = detailInstanceId
+    ? (preferences?.providerInstances ?? []).find(
+        (i) => i.id === detailInstanceId,
+      )
+    : undefined;
+
+  // Intercept Escape on the capture phase when a detail page is open.
+  // This fires before the global bubble-phase handler in
+  // global-hotkey-bindings, so pressing Esc goes back to the list first.
+  // The second Esc (on the list view) hits the global handler and exits settings.
+  useEffect(() => {
+    if (!detailInstanceId) return;
+    const handleDetailEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setDetailInstanceId(null);
+    };
+    window.addEventListener('keydown', handleDetailEscape, true);
+    return () =>
+      window.removeEventListener('keydown', handleDetailEscape, true);
+  }, [detailInstanceId]);
+
+  const handleDeleteInstance = useCallback(
+    async (instanceId: string) => {
+      await removeProviderInstance(instanceId);
+      setDetailInstanceId(null);
+    },
+    [removeProviderInstance],
+  );
+
+  // Detail view for a single provider
+  if (detailInstance) {
+    const displayInfo = getTypeDisplayInfo(detailInstance.typeId);
+    const isKeyBased =
+      detailInstance.typeId.endsWith('-api') ||
+      detailInstance.typeId === 'coding-plan';
+    const modelCount = getInstanceModelCount(detailInstance);
+    const canDelete = detailInstance.id !== DEFAULT_INSTANCE_ID;
+
+    return (
+      <div className="h-full w-full">
+        <OverlayScrollbar
+          className="h-full"
+          contentClassName="px-6 pt-24 pb-24"
+        >
+          <div className="mx-auto max-w-3xl space-y-8">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setDetailInstanceId(null)}
+              >
+                <IconChevronLeftOutline18 className="size-4" />
+              </Button>
+              <h1 className="font-semibold text-foreground text-xl">
+                {detailInstance.name}
+              </h1>
+            </div>
+
+            {/* Provider info */}
+            <div className="flex items-start gap-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-surface-1">
+                <InstanceLogo
+                  typeId={detailInstance.typeId}
+                  instance={detailInstance}
+                  className="size-6 text-foreground"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                {displayInfo?.description && (
+                  <p className="text-foreground text-sm">
+                    {displayInfo.description}
+                  </p>
+                )}
+                {modelCount > 0 && (
+                  <p className="mt-1.5 text-muted-foreground text-xs">
+                    {modelCount} {modelCount === 1 ? 'model' : 'models'}
+                  </p>
+                )}
+              </div>
+              {canDelete && (
+                <Menu>
+                  <MenuTrigger>
+                    <Button variant="ghost" size="icon-sm">
+                      <IconDotsOutline18 className="size-4 text-muted-foreground" />
+                    </Button>
+                  </MenuTrigger>
+                  <MenuContent
+                    side="bottom"
+                    align="end"
+                    sideOffset={2}
+                    size="xs"
+                  >
+                    <MenuItem
+                      size="xs"
+                      onClick={() =>
+                        void handleDeleteInstance(detailInstance.id)
+                      }
+                    >
+                      <IconTrashOutline18 className="size-3.5" />
+                      Delete provider
+                    </MenuItem>
+                  </MenuContent>
+                </Menu>
+              )}
+            </div>
+
+            {/* Connection Section */}
+            <section className="space-y-6">
+              <div>
+                <h2 className="font-medium text-foreground text-lg">
+                  Connection
+                </h2>
+              </div>
+
+              {isKeyBased && (
+                <div className="rounded-lg border border-derived p-3">
+                  <VendorApiKeyInput instance={detailInstance} />
+                </div>
+              )}
+
+              {ADDABLE_SELF_HOSTED_TYPES.includes(
+                detailInstance.typeId as ProviderInstanceTypeId,
+              ) && <SelfHostedConnection instance={detailInstance} />}
+
+              {!isKeyBased &&
+                detailInstance.typeId !== 'stagewise' &&
+                !ADDABLE_SELF_HOSTED_TYPES.includes(
+                  detailInstance.typeId as ProviderInstanceTypeId,
+                ) && (
+                  <div className="rounded-lg border border-derived p-3">
+                    <p className="text-muted-foreground text-xs">
+                      {displayInfo?.defaultBaseUrl ?? 'Custom endpoint'}
+                    </p>
+                  </div>
+                )}
+
+              {detailInstance.typeId === 'stagewise' && (
+                <div className="rounded-lg border border-derived p-3">
+                  <p className="text-muted-foreground text-xs">
+                    Uses your stagewise account. All built-in models are
+                    available through Stagewise Inference by default.
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* Models Section */}
+            <section className="space-y-6">
+              <div>
+                <h2 className="font-medium text-foreground text-lg">Models</h2>
+              </div>
+
+              <ModelsSection
+                filterInstanceId={detailInstanceId ?? undefined}
+                filterInstance={detailInstance}
+              />
+            </section>
+          </div>
+        </OverlayScrollbar>
+      </div>
+    );
+  }
+
+  // Main provider list view
   return (
     <div className="h-full w-full">
       <OverlayScrollbar className="h-full" contentClassName="px-6 pt-24 pb-24">
@@ -2262,22 +2650,10 @@ export function ModelsProvidersSection() {
               </p>
             </div>
 
-            <ProviderInstancesSection />
-          </section>
-
-          <hr className="border-derived-subtle border-t" />
-
-          {/* Models Section */}
-          <section className="space-y-6">
-            <div>
-              <h2 className="font-medium text-foreground text-lg">Models</h2>
-              <p className="text-muted-foreground text-sm">
-                Enable or disable models per provider instance. Define
-                additional custom models that use any configured provider.
-              </p>
-            </div>
-
-            <ModelsSection />
+            <ProviderInstancesSection
+              onConfigure={setDetailInstanceId}
+              onDelete={(id) => void handleDeleteInstance(id)}
+            />
           </section>
         </div>
       </OverlayScrollbar>
