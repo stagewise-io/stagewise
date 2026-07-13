@@ -126,11 +126,8 @@ const VENDOR_REASONING_MODEL_IDS: Partial<Record<ModelProvider, Set<string>>> =
     openai: new Set([
       // Catalog reasoning models (safety net for catalog-wins dedup)
       'gpt-5.6-sol',
-      'gpt-5.6-sol-pro',
       'gpt-5.6-terra',
-      'gpt-5.6-terra-pro',
       'gpt-5.6-luna',
-      'gpt-5.6-luna-pro',
       'gpt-5.5',
       'gpt-5.4',
       'gpt-5.4-mini',
