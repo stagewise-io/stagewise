@@ -5,7 +5,6 @@ import {
   RadioLabel,
 } from '@stagewise/stage-ui/components/radio';
 import { Switch } from '@stagewise/stage-ui/components/switch';
-import type { availableModels } from '@shared/available-models';
 import type { ModelThinkingOverride } from '@shared/karton-contracts/ui/shared-types';
 import { useId } from 'react';
 import { cn } from '@ui/utils';
@@ -14,6 +13,7 @@ import {
   getModelThinkingDisplayState,
   getModelThinkingOptions,
   type ModelThinkingDefaultOptions,
+  type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 
 export function ModelThinkingPanel({
@@ -25,7 +25,7 @@ export function ModelThinkingPanel({
   onValueChange,
   onReset,
 }: {
-  model: (typeof availableModels)[number];
+  model: ThinkingPanelModel;
   override: ModelThinkingOverride | undefined;
   defaultOptions?: ModelThinkingDefaultOptions;
   onClose?: () => void;

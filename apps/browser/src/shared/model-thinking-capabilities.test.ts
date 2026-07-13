@@ -78,7 +78,9 @@ describe('model thinking capabilities', () => {
         route: { providerMode: 'official', modelProvider: 'openai' },
         override: { enabled: true, provider: 'openai', value: 'minimal' },
       }),
-    ).toEqual({ openai: { reasoningEffort: 'medium' } });
+    ).toEqual({
+      openai: { reasoningEffort: 'medium', reasoningSummary: 'auto' },
+    });
   });
 
   it('emits OpenAI none when gpt-5.5 thinking is disabled', () => {
@@ -100,7 +102,9 @@ describe('model thinking capabilities', () => {
         route: { providerMode: 'official', modelProvider: 'openai' },
         override: { enabled: true, provider: 'openai', value: 'xhigh' },
       }),
-    ).toEqual({ openai: { reasoningEffort: 'xhigh' } });
+    ).toEqual({
+      openai: { reasoningEffort: 'xhigh', reasoningSummary: 'auto' },
+    });
   });
 
   it('uses model-specific Google thinking option sets', () => {
@@ -258,5 +262,23 @@ describe('model thinking capabilities', () => {
         customEndpointApiSpec: 'openai-chat-completions',
       }).map((option) => option.value),
     ).toEqual(['low', 'medium', 'high']);
+  });
+
+  it('recognises GPT-5.6 models as known GPT-5 reasoning models', () => {
+    // The regex must match version 6+ — not just 1-5.
+    // GPT-5.6 models should get the full GPT-5 option set (including 'none').
+    for (const id of [
+      'gpt-5.6',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+    ]) {
+      expect(
+        getSupportedThinkingOptions(id, {
+          providerMode: 'official',
+          modelProvider: 'openai',
+        }).map((option) => option.value),
+      ).toEqual(['none', 'low', 'medium', 'high', 'xhigh']);
+    }
   });
 });

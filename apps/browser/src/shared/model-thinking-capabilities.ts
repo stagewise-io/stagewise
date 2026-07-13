@@ -329,7 +329,7 @@ export function createThinkingProviderOptionsPatch({
     case 'openai':
       return {
         openai: selection.enabled
-          ? { reasoningEffort: selection.value }
+          ? { reasoningEffort: selection.value, reasoningSummary: 'auto' }
           : { reasoningEffort: 'none', reasoningSummary: undefined },
       };
     case 'openai-compatible':
@@ -417,7 +417,7 @@ function getAnthropicOptions(modelId: string): ThinkingOption[] {
 }
 
 function isKnownOpenAiGpt5Model(modelId: string): boolean {
-  return /^gpt-5\.[1-6](?:$|-)/.test(modelId) || modelId === 'gpt-5';
+  return /^gpt-5\.\d+(?:$|-)/.test(modelId) || modelId === 'gpt-5';
 }
 
 function findSupportedOption(

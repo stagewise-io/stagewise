@@ -45,4 +45,6 @@ export {
   createOpenAIChatModel,
   createOpenAIResponsesModel,
   createGoogleModel,
+  discoverOpenAICompatibleModels,
+  discoverGoogleModels,
 } from './shared';

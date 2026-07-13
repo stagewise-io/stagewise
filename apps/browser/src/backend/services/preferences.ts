@@ -1666,31 +1666,23 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
 
     const { typeId, config, validateApiKey } = args;
+    const providerType = getProviderType(typeId);
 
-    // For vendor-api instances, validate the key first.
-    if (validateApiKey && typeId.endsWith('-api')) {
-      const vendor = typeId.slice(0, -4) as ModelProvider;
-      const results = await validateApiKeys({ [vendor]: validateApiKey });
-      const result = results[vendor];
-      if (!result) {
-        return { success: false, error: 'Validation was skipped' };
-      }
-      if (result.success === false) {
-        return result;
-      }
+    // Build the decrypted sensitive-values map up front so it can be used
+    // for both validation and discovery.
+    const sensitiveValues: Record<string, string> = {};
+    if (validateApiKey) {
+      sensitiveValues.encryptedApiKey = validateApiKey;
     }
 
-    // For coding-plan instances, validate against the plan.
-    if (validateApiKey && typeId === 'coding-plan') {
-      const planId = config.planId as CodingPlanId;
-      if (!isCodingPlanId(planId)) {
-        return { success: false, error: `Unknown coding plan: ${planId}` };
-      }
-      const plan = CODING_PLANS[planId];
-      const result = await validateCodingPlanApiKey(plan, validateApiKey);
-      if (!result) {
-        return { success: false, error: 'Validation was skipped' };
-      }
+    // ── Credential validation ────────────────────────────────────────────────
+    // Delegates to the provider type's `validateCredentials` method when
+    // available, replacing the previous hardcoded if-branches per typeId.
+    if (validateApiKey && providerType.validateCredentials) {
+      const result = await providerType.validateCredentials(
+        { ...config, encryptedApiKey: validateApiKey } as never,
+        sensitiveValues,
+      );
       if (result.success === false) {
         return result;
       }
@@ -1715,14 +1707,9 @@ export class PreferencesService extends DisposableService {
             'Coding Plan')
           : typeId);
 
-    // Run model discovery if the provider type supports it.
+    // ── Model discovery ───────────────────────────────────────────────────────
     let discovered: DiscoveredModel[] = [];
-    const providerType = getProviderType(typeId);
     if (providerType.getInitialModels) {
-      const sensitiveValues: Record<string, string> = {};
-      if (validateApiKey) {
-        sensitiveValues.encryptedApiKey = validateApiKey;
-      }
       try {
         discovered = await providerType.getInitialModels(
           finalConfig as never,

@@ -1,11 +1,13 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import type {
   ApiSpec,
+  DiscoveredModel,
   ModelProvider,
   ProviderInstanceTypeId,
 } from '@shared/karton-contracts/ui/shared-types';
 import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
+import { generateText } from 'ai';
 import {
   toNativeAnthropicModelId,
   toNativeMiniMaxModelId,
@@ -13,6 +15,8 @@ import {
   createOpenAIChatModel,
   createOpenAIResponsesModel,
   createGoogleModel,
+  discoverOpenAICompatibleModels,
+  discoverGoogleModels,
 } from './shared';
 
 // ============================================================================
@@ -49,6 +53,22 @@ const VENDOR_TO_API_SPEC: Record<ModelProvider, ApiSpec> = {
   minimax: 'openai-chat-completions',
   'xiaomi-mimo': 'openai-chat-completions',
   mistral: 'openai-chat-completions',
+};
+
+/**
+ * Per-vendor model ID used for the lightweight validation probe.
+ * Must be a small/cheap model that every key can access.
+ */
+const VENDOR_VALIDATION_MODEL: Partial<Record<ModelProvider, string>> = {
+  deepseek: 'deepseek-chat',
+  moonshotai: 'kimi-k2.6',
+  alibaba: 'qwen-turbo',
+  'z-ai': 'glm-4.5-flash',
+  minimax: 'minimax-m2.7',
+  'xiaomi-mimo': 'mimo-v2.5',
+  mistral: 'mistral-small-latest',
+  openai: 'gpt-4o-mini',
+  google: 'gemini-2.0-flash',
 };
 
 // ============================================================================
@@ -90,6 +110,63 @@ export const openaiApiType: ProviderType<OfficialApiConfig> = {
   apiSpec: VENDOR_TO_API_SPEC.openai,
   sensitiveFields: ['encryptedApiKey'],
 
+  // ── Discovery ──────────────────────────────────────────────────────────
+
+  async getInitialModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    const baseUrl = config.baseUrl ?? vendorMeta('openai').defaultBaseUrl;
+    if (!baseUrl) return [];
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    return discoverOpenAICompatibleModels(baseUrl, apiKey, 'openai');
+  },
+
+  async refreshModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    const baseUrl = config.baseUrl ?? vendorMeta('openai').defaultBaseUrl;
+    if (!baseUrl) return [];
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    return discoverOpenAICompatibleModels(baseUrl, apiKey, 'openai');
+  },
+
+  // ── Validation ─────────────────────────────────────────────────────────
+
+  async validateCredentials(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    const baseUrl = config.baseUrl ?? vendorMeta('openai').defaultBaseUrl;
+    if (!baseUrl) {
+      return { success: false, error: 'No base URL configured for OpenAI API' };
+    }
+    const validationModelId = VENDOR_VALIDATION_MODEL.openai!;
+    try {
+      await generateText({
+        model: createOpenAIResponsesModel(apiKey, baseUrl, validationModelId),
+        messages: [
+          {
+            role: 'user',
+            content: 'What is the capital of France? Respond with one word.',
+          },
+        ],
+      });
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Invalid OpenAI API key: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
+  },
+
+  // ── Model creation ─────────────────────────────────────────────────────
+
   createLanguageModel({ modelId, apiKey, baseURL }): {
     model: LanguageModelV3;
   } {
@@ -111,6 +188,63 @@ export const googleApiType: ProviderType<OfficialApiConfig> = {
   providerMode: 'official',
   apiSpec: VENDOR_TO_API_SPEC.google,
   sensitiveFields: ['encryptedApiKey'],
+
+  // ── Discovery ──────────────────────────────────────────────────────────
+
+  async getInitialModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    const baseUrl = config.baseUrl ?? vendorMeta('google').defaultBaseUrl;
+    if (!baseUrl) return [];
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    return discoverGoogleModels(baseUrl, apiKey);
+  },
+
+  async refreshModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    const baseUrl = config.baseUrl ?? vendorMeta('google').defaultBaseUrl;
+    if (!baseUrl) return [];
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    return discoverGoogleModels(baseUrl, apiKey);
+  },
+
+  // ── Validation ─────────────────────────────────────────────────────────
+
+  async validateCredentials(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    const baseUrl = config.baseUrl ?? vendorMeta('google').defaultBaseUrl;
+    if (!baseUrl) {
+      return { success: false, error: 'No base URL configured for Google API' };
+    }
+    const validationModelId = VENDOR_VALIDATION_MODEL.google!;
+    try {
+      await generateText({
+        model: createGoogleModel(apiKey, baseUrl, validationModelId),
+        messages: [
+          {
+            role: 'user',
+            content: 'What is the capital of France? Respond with one word.',
+          },
+        ],
+      });
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Invalid Google API key: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
+  },
+
+  // ── Model creation ─────────────────────────────────────────────────────
 
   createLanguageModel({ modelId, apiKey, baseURL }): {
     model: LanguageModelV3;
@@ -134,9 +268,71 @@ export const minimaxApiType: ProviderType<OfficialApiConfig> = {
   apiSpec: VENDOR_TO_API_SPEC.minimax,
   sensitiveFields: ['encryptedApiKey'],
 
+  // ── Discovery ──────────────────────────────────────────────────────────
+
+  async getInitialModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    const baseUrl = config.baseUrl ?? vendorMeta('minimax').defaultBaseUrl;
+    if (!baseUrl) return [];
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    return discoverOpenAICompatibleModels(baseUrl, apiKey, 'minimax');
+  },
+
+  async refreshModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    const baseUrl = config.baseUrl ?? vendorMeta('minimax').defaultBaseUrl;
+    if (!baseUrl) return [];
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    return discoverOpenAICompatibleModels(baseUrl, apiKey, 'minimax');
+  },
+
+  // ── Validation ─────────────────────────────────────────────────────────
+
+  async validateCredentials(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    const baseUrl = config.baseUrl ?? vendorMeta('minimax').defaultBaseUrl;
+    if (!baseUrl) {
+      return {
+        success: false,
+        error: 'No base URL configured for MiniMax API',
+      };
+    }
+    const validationModelId = VENDOR_VALIDATION_MODEL.minimax!;
+    try {
+      await generateText({
+        model: createOpenAIChatModel(apiKey, baseUrl, validationModelId),
+        messages: [
+          {
+            role: 'user',
+            content: 'What is the capital of France? Respond with one word.',
+          },
+        ],
+      });
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Invalid MiniMax API key: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
+  },
+
+  // ── Model ID transforms ────────────────────────────────────────────────
+
   toWireModelId(modelId: string): string {
     return toNativeMiniMaxModelId(modelId);
   },
+
+  // ── Model creation ─────────────────────────────────────────────────────
 
   createLanguageModel({ modelId, apiKey, baseURL }): {
     model: LanguageModelV3;
@@ -165,6 +361,73 @@ function createOpenAICompatibleApiType(
     providerMode: 'official',
     apiSpec: VENDOR_TO_API_SPEC[vendor],
     sensitiveFields: ['encryptedApiKey'],
+
+    // ── Discovery ──────────────────────────────────────────────────────────
+
+    async getInitialModels(
+      config: OfficialApiConfig,
+      decryptedConfig: Record<string, string>,
+    ): Promise<DiscoveredModel[]> {
+      const baseUrl = config.baseUrl ?? meta.defaultBaseUrl;
+      if (!baseUrl) return [];
+      const apiKey = decryptedConfig.encryptedApiKey ?? '';
+      return discoverOpenAICompatibleModels(baseUrl, apiKey, vendor);
+    },
+
+    async refreshModels(
+      config: OfficialApiConfig,
+      decryptedConfig: Record<string, string>,
+    ): Promise<DiscoveredModel[]> {
+      const baseUrl = config.baseUrl ?? meta.defaultBaseUrl;
+      if (!baseUrl) return [];
+      const apiKey = decryptedConfig.encryptedApiKey ?? '';
+      return discoverOpenAICompatibleModels(baseUrl, apiKey, vendor);
+    },
+
+    // ── Validation ─────────────────────────────────────────────────────────
+
+    async validateCredentials(
+      _config: OfficialApiConfig,
+      decryptedConfig: Record<string, string>,
+    ): Promise<{ success: true } | { success: false; error: string }> {
+      const apiKey = decryptedConfig.encryptedApiKey ?? '';
+      const baseUrl = _config.baseUrl ?? meta.defaultBaseUrl;
+      if (!baseUrl) {
+        return {
+          success: false,
+          error: `No base URL configured for ${vendor} API`,
+        };
+      }
+      const validationModelId = VENDOR_VALIDATION_MODEL[vendor];
+      if (!validationModelId) {
+        // Should not happen for factory-created types, but guard anyway
+        return {
+          success: false,
+          error: `No validation model configured for ${vendor} API`,
+        };
+      }
+      try {
+        await generateText({
+          model: createOpenAIChatModel(apiKey, baseUrl, validationModelId),
+          messages: [
+            {
+              role: 'user',
+              content: 'What is the capital of France? Respond with one word.',
+            },
+          ],
+        });
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          error: `Invalid ${vendor} API key: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        };
+      }
+    },
+
+    // ── Model creation ─────────────────────────────────────────────────────
 
     createLanguageModel({ modelId, apiKey, baseURL }): {
       model: LanguageModelV3;

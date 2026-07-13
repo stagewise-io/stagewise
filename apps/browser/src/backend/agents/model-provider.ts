@@ -27,7 +27,11 @@ import type { PreferencesService } from '@/services/preferences';
 import type { streamText } from 'ai';
 import { wrapLanguageModel } from 'ai';
 import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
-import { createThinkingProviderOptionsPatch } from '@shared/model-thinking-capabilities';
+import {
+  createThinkingProviderOptionsPatch,
+  getDefaultThinkingSelection,
+  type ThinkingCapableModel,
+} from '@shared/model-thinking-capabilities';
 
 // ── Provider type registry ──────────────────────────────────────────────────
 import type { ProviderType } from './providers/types';
@@ -828,7 +832,7 @@ export class ModelProviderService {
 
     const { model: rawModel, middleware } = type.createLanguageModel({
       modelId: discovered.modelId,
-      apiKey: '',
+      apiKey: decryptedConfig.encryptedApiKey ?? '',
       baseURL,
       config: instance.config as never,
       decryptedConfig,
@@ -852,15 +856,26 @@ export class ModelProviderService {
       },
     };
 
-    // Discovered models rarely report context windows. Default to 8k as a
-    // conservative safe floor for local/self-hosted models.
-    const contextWindow = discovered.contextWindow ?? 8_192;
+    // Discovered models rarely report context windows (the OpenAI-compatible
+    // /v1/models endpoint doesn't include this field). Default to 128k — a
+    // realistic floor for modern cloud models used in an agentic IDE.
+    const contextWindow = discovered.contextWindow ?? 128_000;
 
     // ── Reasoning signature source ──────────────────────────────────────────
-    const apiSpec = type.apiSpec;
-    const semanticProvider = apiSpec
-      ? getSemanticProviderForApiSpec(apiSpec)
-      : ('openai' as ModelProvider);
+    // Coding-plan intentionally omits apiSpec (resolved dynamically per
+    // instance), so resolve it via the vendor — same pattern as
+    // resolveInstance at line ~382.
+    let apiSpec = type.apiSpec;
+    if (!apiSpec && instance.typeId === 'coding-plan') {
+      const vendor = getCodingPlanVendor(instance.config as CodingPlanConfig);
+      apiSpec = VENDOR_API_SPECS[vendor];
+    }
+    if (!apiSpec) {
+      throw new Error(
+        `Cannot resolve apiSpec for discovered model on instance ${instance.id} (type: ${instance.typeId})`,
+      );
+    }
+    const semanticProvider = getSemanticProviderForApiSpec(apiSpec);
     const reasoningSignatureSource = createReasoningSignatureSource(
       'custom',
       semanticProvider,
@@ -871,10 +886,44 @@ export class ModelProviderService {
       },
     );
 
+    // ── Thinking override lookup (instance-aware) ─────────────────────────
+    // Same pattern as the catalog path — look up the override by the
+    // instance that serves this discovered model.
+    const thinkingOverrides =
+      this.preferencesService.get().agent.modelThinkingOverrides;
+    const thinkingOverride =
+      thinkingOverrides[instance.id]?.[discovered.modelId];
+
+    // Resolve the vendor for officialProvider on the ThinkingCapableModel.
+    // For official-api types, type.vendor is set. For coding-plan, use the
+    // vendor already resolved above.
+    const vendor =
+      type.vendor ??
+      (instance.typeId === 'coding-plan'
+        ? getCodingPlanVendor(instance.config as CodingPlanConfig)
+        : undefined);
+
+    const thinkingModel: ThinkingCapableModel = {
+      modelId: discovered.modelId,
+      providerOptions: {},
+      officialProvider: vendor,
+      thinkingEnabled: discovered.thinkingEnabled,
+    };
+
+    const resolvedProviderOptions = resolveThinkingProviderOptions({
+      baseProviderOptions: {},
+      modelSettings: thinkingModel,
+      override: thinkingOverride,
+      providerMode: type.providerMode,
+      semanticProvider,
+      customEndpointApiSpec: apiSpec as ApiSpec,
+      requestMetadata: otherPostHogProperties,
+    });
+
     return {
       model: this.telemetryService.withTracing(model, posthogConfig),
       headers: {},
-      providerOptions: {},
+      providerOptions: resolvedProviderOptions,
       contextWindowSize: contextWindow,
       providerMode: type.providerMode,
       reasoningSignatureSource,
@@ -889,7 +938,7 @@ export class ModelProviderService {
 
 type ThinkingProviderOptionsInput = {
   baseProviderOptions: Record<string, unknown>;
-  modelSettings: BuiltInModelSettings;
+  modelSettings: ThinkingCapableModel;
   override?: ModelThinkingOverride;
   providerMode: ProviderMode;
   semanticProvider: ModelProvider;
@@ -910,8 +959,42 @@ function resolveThinkingProviderOptions({
     return baseProviderOptions as ProviderOptions;
   }
 
-  if (!modelSettings.thinkingEnabled || !override) {
+  if (!modelSettings.thinkingEnabled) {
     return baseProviderOptions as ProviderOptions;
+  }
+
+  // When thinking is enabled but no explicit override exists, emit a
+  // default thinking patch so that models whose base providerOptions are
+  // sparse (e.g. discovered models, which start with {}) still receive
+  // reasoning configuration. Catalog models already carry reasoning
+  // settings in their base providerOptions, so for them this patch is
+  // redundant — the deep-merge simply overwrites with the same values.
+  if (!override) {
+    const defaultSelection = getDefaultThinkingSelection(modelSettings, {
+      providerMode,
+      modelProvider: semanticProvider,
+      customEndpointApiSpec,
+    });
+    if (!defaultSelection?.enabled) {
+      return baseProviderOptions as ProviderOptions;
+    }
+
+    const defaultPatch = createThinkingProviderOptionsPatch({
+      model: modelSettings,
+      route: {
+        providerMode,
+        modelProvider: semanticProvider,
+        customEndpointApiSpec,
+      },
+      override: {
+        enabled: true,
+        provider: defaultSelection.provider,
+        value: defaultSelection.value,
+      },
+    });
+
+    if (!defaultPatch) return baseProviderOptions as ProviderOptions;
+    return deepMergeProviderOptions(baseProviderOptions, defaultPatch);
   }
 
   const patch = createThinkingProviderOptionsPatch({
