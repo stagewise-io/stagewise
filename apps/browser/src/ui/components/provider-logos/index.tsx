@@ -10,6 +10,7 @@ import { OpenAiLogo } from './openai';
 import { XiaomiMiMoLogo } from './xiaomi-mimo';
 import { ZAiLogo } from './z-ai';
 import { MistralLogo } from './mistral';
+import { OpenRouterLogo } from './openrouter';
 
 export type ProviderLogoComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -55,4 +56,5 @@ export {
   XiaomiMiMoLogo,
   ZAiLogo,
   MistralLogo,
+  OpenRouterLogo,
 };

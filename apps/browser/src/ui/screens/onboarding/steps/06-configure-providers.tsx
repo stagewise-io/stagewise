@@ -26,6 +26,7 @@ import {
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
+import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
 
 const consoleUrl =
@@ -61,6 +62,7 @@ const VENDOR_API_TYPES: ProviderInstanceTypeId[] = [
   'minimax-api',
   'xiaomi-mimo-api',
   'mistral-api',
+  'openrouter',
 ];
 
 const SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
@@ -241,6 +243,9 @@ function EntryLogo({
   }
   if (entry.kind === 'self-hosted' && entry.typeId === 'ollama') {
     return <OllamaLogo className={className ?? 'size-5'} />;
+  }
+  if (entry.typeId === 'openrouter') {
+    return <OpenRouterLogo className={className ?? 'size-5'} />;
   }
   const vendor = entry.typeId.slice(0, -4) as Parameters<
     typeof ProviderLogo

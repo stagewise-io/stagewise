@@ -44,6 +44,14 @@ Connect any of the following subscriptions with a single API key to unlock all m
 | Xiaomi MiMo      | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5               | [Get API key](https://platform.xiaomimimo.com/#/console/plan-manage) |
 | Mistral          | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral | [Get API key](https://console.mistral.ai/api-keys) |
 
+### Bring Your Own API Key
+
+Connect directly to any of the following API providers with your own key. For maximum flexibility, [OpenRouter](https://openrouter.ai) gives you access to 345+ models from all major vendors through a single API key.
+
+| **Provider** | **Featured Models** | **Dashboard** |
+| ------------- | ------------------- | ------------- |
+| OpenRouter    | Claude Opus 4.8, GPT-5.6 Sol, Gemini 3.1 Pro, DeepSeek V4 Pro | [Get API key](https://openrouter.ai/keys) |
+
 ### stagewise Account
 
 For ease of use and immediate access to a large library of models, you can simply create a stagewise Account.

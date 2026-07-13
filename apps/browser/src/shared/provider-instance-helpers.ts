@@ -19,7 +19,10 @@ import type {
   ProviderInstanceTypeId,
   UserPreferences,
 } from './karton-contracts/ui/shared-types';
-import { PROVIDER_TYPE_DISPLAY_INFO } from './karton-contracts/ui/shared-types';
+import {
+  PROVIDER_TYPE_DISPLAY_INFO,
+  type CredentialType,
+} from './karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from './coding-plans';
 import {
   availableModels,
@@ -39,6 +42,7 @@ export function getVendorDisplayInfo(vendor: ModelProvider): {
   helpText?: string;
   getApiKeyUrl?: string;
   defaultBaseUrl?: string;
+  credentialType: CredentialType;
 } {
   const typeId = `${vendor}-api` as ProviderInstanceTypeId;
   return PROVIDER_TYPE_DISPLAY_INFO[typeId];
@@ -61,6 +65,7 @@ export function getTypeDisplayInfo(typeId: ProviderInstanceTypeId): {
   helpText?: string;
   getApiKeyUrl?: string;
   defaultBaseUrl?: string;
+  credentialType: CredentialType;
 } {
   return PROVIDER_TYPE_DISPLAY_INFO[typeId];
 }
@@ -397,7 +402,7 @@ export function getInstanceThinkingDefaultOptions(instance: ProviderInstance): {
     // Coding plans route through the plan vendor's official API.
     return { providerMode: 'official' };
   }
-  if (instance.typeId.endsWith('-api')) {
+  if (instance.typeId.endsWith('-api') || instance.typeId === 'openrouter') {
     return { providerMode: 'official' };
   }
   // Custom-type instance (custom-*, azure, bedrock, vertex).

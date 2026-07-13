@@ -215,6 +215,7 @@ export const providerInstanceTypeIds = [
   'bedrock',
   'vertex',
   'ollama',
+  'openrouter',
 ] as const;
 export type ProviderInstanceTypeId = (typeof providerInstanceTypeIds)[number];
 
@@ -273,6 +274,12 @@ const vertexConfigSchema = z.object({
 /** Ollama self-hosted — baseUrl only, no auth */
 const ollamaConfigSchema = z.object({
   baseUrl: z.string(),
+});
+
+/** OpenRouter — encrypted key + optional base URL override */
+const openrouterConfigSchema = z.object({
+  encryptedApiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
 });
 
 // ============================================================================
@@ -394,13 +401,30 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
     typeId: z.literal('ollama'),
     config: ollamaConfigSchema,
   }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('openrouter'),
+    config: openrouterConfigSchema,
+  }),
 ]);
 export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
 
 /**
+ * The kind of credential input the settings detail page should render
+ * for a provider instance type. This drives the declarative UI — the
+ * detail page reads `credentialType` from `PROVIDER_TYPE_DISPLAY_INFO`
+ * instead of pattern-matching on `typeId` strings.
+ */
+export type CredentialType =
+  | 'none' // No credentials needed (stagewise)
+  | 'api-key' // API key input + validation (vendor APIs, coding plans, openrouter)
+  | 'base-url' // Base URL input + model discovery (ollama)
+  | 'custom-endpoint'; // Full custom endpoint form (custom-*, azure, bedrock, vertex)
+
+/**
  * Display metadata for each provider instance type, keyed by
  * `ProviderInstanceTypeId`. This is the single source of truth for UI
- * display names, descriptions, API key URLs, and default base URLs.
+ * display names, descriptions, API key URLs, default base URLs, and
+ * credential input type.
  *
  * Backend provider type implementations spread from this record to
  * populate their `displayName`, `description`, `getApiKeyUrl`, and
@@ -415,12 +439,15 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText?: string;
     getApiKeyUrl?: string;
     defaultBaseUrl?: string;
+    /** Which credential input UI to render on the detail page. */
+    credentialType: CredentialType;
   }
 > = {
   stagewise: {
     displayName: 'Stagewise Inference',
     description: 'OpenRouter-compatible managed inference',
     defaultBaseUrl: 'https://llm.stagewise.io',
+    credentialType: 'none',
   },
   'anthropic-api': {
     displayName: 'Anthropic API',
@@ -428,6 +455,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at console.anthropic.com → Settings → API Keys',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     defaultBaseUrl: 'https://api.anthropic.com/v1',
+    credentialType: 'api-key',
   },
   'openai-api': {
     displayName: 'OpenAI API',
@@ -435,6 +463,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at platform.openai.com → API keys',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     defaultBaseUrl: 'https://api.openai.com/v1',
+    credentialType: 'api-key',
   },
   'google-api': {
     displayName: 'Google API',
@@ -442,6 +471,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at Google AI Studio → Get API key',
     getApiKeyUrl: 'https://aistudio.google.com/app/apikey',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    credentialType: 'api-key',
   },
   'moonshotai-api': {
     displayName: 'Moonshot AI API',
@@ -449,6 +479,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at platform.moonshot.ai → Console → API keys',
     getApiKeyUrl: 'https://platform.moonshot.ai/console/api-keys',
     defaultBaseUrl: 'https://api.moonshot.ai/v1',
+    credentialType: 'api-key',
   },
   'alibaba-api': {
     displayName: 'Alibaba Cloud API',
@@ -456,6 +487,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at dashscope.console.aliyuncs.com → API-KEY',
     getApiKeyUrl: 'https://dashscope.console.aliyuncs.com/apiKey',
     defaultBaseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    credentialType: 'api-key',
   },
   'deepseek-api': {
     displayName: 'DeepSeek API',
@@ -463,6 +495,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at platform.deepseek.com → API keys',
     getApiKeyUrl: 'https://platform.deepseek.com/api_keys',
     defaultBaseUrl: 'https://api.deepseek.com/v1',
+    credentialType: 'api-key',
   },
   'z-ai-api': {
     displayName: 'Z.ai API',
@@ -470,6 +503,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Get your key at z.ai → Manage API keys',
     getApiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
     defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
+    credentialType: 'api-key',
   },
   'minimax-api': {
     displayName: 'MiniMax API',
@@ -479,6 +513,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     getApiKeyUrl:
       'https://platform.minimax.io/user-center/basic-information/interface-key',
     defaultBaseUrl: 'https://api.minimax.io/v1',
+    credentialType: 'api-key',
   },
   'xiaomi-mimo-api': {
     displayName: 'Xiaomi MiMo API',
@@ -486,6 +521,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Get your tp- key at platform.xiaomimimo.com → Subscription',
     getApiKeyUrl: 'https://platform.xiaomimimo.com/#/console/plan-manage',
     defaultBaseUrl: 'https://api.xiaomimimo.com/v1',
+    credentialType: 'api-key',
   },
   'mistral-api': {
     displayName: 'Mistral API',
@@ -493,43 +529,61 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at console.mistral.ai → API Keys',
     getApiKeyUrl: 'https://console.mistral.ai/api-keys',
     defaultBaseUrl: 'https://api.mistral.ai/v1',
+    credentialType: 'api-key',
   },
   'coding-plan': {
     displayName: 'Coding Plan',
     description: 'Bring-your-own-subscription coding plan',
+    credentialType: 'api-key',
   },
   'custom-anthropic': {
     displayName: 'Custom Anthropic',
     description: 'Anthropic-compatible custom endpoint',
+    credentialType: 'custom-endpoint',
   },
   'custom-openai-chat': {
     displayName: 'Custom OpenAI (Chat)',
     description: 'OpenAI Chat Completions-compatible custom endpoint',
+    credentialType: 'custom-endpoint',
   },
   'custom-openai-responses': {
     displayName: 'Custom OpenAI (Responses)',
     description: 'OpenAI Responses API-compatible custom endpoint',
+    credentialType: 'custom-endpoint',
   },
   'custom-google': {
     displayName: 'Custom Google',
     description: 'Google Generative AI-compatible custom endpoint',
+    credentialType: 'custom-endpoint',
   },
   azure: {
     displayName: 'Azure OpenAI',
     description: 'Azure-hosted OpenAI models',
+    credentialType: 'custom-endpoint',
   },
   bedrock: {
     displayName: 'Amazon Bedrock',
     description: 'AWS-hosted models via Bedrock',
+    credentialType: 'custom-endpoint',
   },
   vertex: {
     displayName: 'Google Vertex AI',
     description: 'Google Cloud-hosted models via Vertex AI',
+    credentialType: 'custom-endpoint',
   },
   ollama: {
     displayName: 'Ollama',
     description: 'Self-hosted local models via Ollama',
     defaultBaseUrl: 'http://localhost:11434',
+    credentialType: 'base-url',
+  },
+  openrouter: {
+    displayName: 'OpenRouter',
+    description: 'Access 345+ models from all major vendors',
+    helpText: 'Get your API key at openrouter.ai → Keys',
+    getApiKeyUrl: 'https://openrouter.ai/keys',
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+    credentialType: 'api-key',
   },
 };
 

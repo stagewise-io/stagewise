@@ -157,6 +157,21 @@ const PROVIDERS: ProviderInfo[] = [
       { name: 'Codestral', tier: 'general' },
     ],
   },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    logo: '/provider-logos/openrouter.svg',
+    monoInDark: true,
+    description:
+      'Access 345+ models from all major vendors through a single API key.',
+    models: [
+      { name: 'Claude Opus 4.8', tier: 'frontier' },
+      { name: 'GPT-5.6 Sol', tier: 'frontier' },
+      { name: 'Gemini 3.1 Pro', tier: 'frontier' },
+      { name: 'DeepSeek V4 Pro', tier: 'general' },
+      { name: 'GLM 5.2', tier: 'general' },
+    ],
+  },
 ];
 
 export function ModelProviderShowcase() {
