@@ -5,6 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type {
   DiscoveredModel,
+  ModelCapabilities,
   ModelProvider,
 } from '@shared/karton-contracts/ui/shared-types';
 
@@ -337,6 +338,189 @@ export async function discoverGoogleModels(
       capabilities: DEFAULT_DISCOVERED_CAPABILITIES,
       ...(m.inputTokenLimit ? { contextWindow: m.inputTokenLimit } : {}),
       ...(thinkingEnabled ? { thinkingEnabled: true } : {}),
+    };
+  });
+}
+
+// ============================================================================
+// OpenRouter model discovery
+// ============================================================================
+
+/**
+ * Shape of a single model entry in the OpenRouter `/v1/models` response.
+ * Only the fields we consume are typed; the full response includes more.
+ */
+type OpenRouterModelEntry = {
+  id: string;
+  name?: string;
+  context_length?: number;
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+  };
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+  };
+  supported_parameters?: string[];
+};
+
+/**
+ * Map an OpenRouter modality string to the internal capability field name.
+ */
+function mapOpenRouterModality(modality: string): string | undefined {
+  switch (modality) {
+    case 'text':
+      return 'text';
+    case 'audio':
+      return 'audio';
+    case 'image':
+      return 'image';
+    case 'video':
+      return 'video';
+    case 'file':
+      return 'file';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Build a `ModelCapabilities` object from OpenRouter architecture fields.
+ * Falls back to the default capabilities when architecture data is missing.
+ */
+function mapOpenRouterCapabilities(
+  entry: OpenRouterModelEntry,
+): ModelCapabilities | undefined {
+  const { input_modalities, output_modalities } = entry.architecture ?? {};
+  if (!input_modalities && !output_modalities) return undefined;
+
+  const input: ModelCapabilities['inputModalities'] = {
+    text: false,
+    audio: false,
+    image: false,
+    video: false,
+    file: false,
+  };
+  const output: ModelCapabilities['outputModalities'] = {
+    text: false,
+    audio: false,
+    image: false,
+    video: false,
+    file: false,
+  };
+
+  for (const m of input_modalities ?? []) {
+    const key = mapOpenRouterModality(m);
+    if (key) (input as Record<string, boolean>)[key] = true;
+  }
+  // OpenRouter rarely lists 'text' explicitly in input_modalities but
+  // all chat models accept text.
+  input.text = true;
+
+  for (const m of output_modalities ?? []) {
+    const key = mapOpenRouterModality(m);
+    if (key) (output as Record<string, boolean>)[key] = true;
+  }
+  // Output text is implied for chat models.
+  output.text = true;
+
+  return {
+    inputModalities: input,
+    outputModalities: output,
+    toolCalling: entry.supported_parameters?.includes('tools') ?? true,
+  };
+}
+
+/**
+ * Discover models from the OpenRouter API.
+ *
+ * OpenRouter's public `GET /v1/models` endpoint returns rich metadata
+ * including explicit `supported_parameters` (with `'reasoning'` for
+ * reasoning-capable models), per-token pricing, context length, and
+ * input/output modalities — eliminating the need for heuristic-based
+ * reasoning detection.
+ *
+ * Tilde-prefixed meta-models (e.g. `~anthropic/claude-haiku-latest`) and
+ * `openrouter/`-prefixed router models (e.g. `openrouter/auto`) are
+ * included but marked `recommended: false` so users must explicitly opt in.
+ *
+ * The `apiKey` is optional for listing but helps with rate limits.
+ */
+export async function discoverOpenRouterModels(
+  apiKey: string,
+  baseUrl = 'https://openrouter.ai/api/v1',
+): Promise<DiscoveredModel[]> {
+  const url = `${baseUrl.replace(/\/$/, '')}/models`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
+  const headers: Record<string, string> = {};
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(
+        `Model discovery timed out after ${DISCOVERY_TIMEOUT_MS / 1000}s at ${url}`,
+      );
+    }
+    throw err;
+  }
+  clearTimeout(timeout);
+  if (!response.ok) {
+    throw new Error(`Model discovery at ${url} returned ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    data?: OpenRouterModelEntry[];
+  };
+  const models = data.data ?? [];
+
+  return models.map((m) => {
+    const isMetaModel = m.id.startsWith('~') || m.id.startsWith('openrouter/');
+
+    const thinkingEnabled =
+      m.supported_parameters?.includes('reasoning') ?? false;
+
+    const capabilities = mapOpenRouterCapabilities(m);
+
+    // Convert per-token pricing to per-million. OpenRouter returns
+    // prices as decimal strings (e.g. "0.000001" = $0.000001/token).
+    let pricing: DiscoveredModel['pricing'];
+    const promptStr = m.pricing?.prompt;
+    const completionStr = m.pricing?.completion;
+    if (
+      promptStr &&
+      completionStr &&
+      promptStr !== '0' &&
+      completionStr !== '0'
+    ) {
+      const promptPerToken = Number.parseFloat(promptStr);
+      const completionPerToken = Number.parseFloat(completionStr);
+      if (!Number.isNaN(promptPerToken) && !Number.isNaN(completionPerToken)) {
+        pricing = {
+          inputPerMillion: promptPerToken * 1_000_000,
+          outputPerMillion: completionPerToken * 1_000_000,
+        };
+      }
+    }
+
+    return {
+      modelId: m.id,
+      displayName: m.name ?? m.id,
+      ...(m.context_length && m.context_length > 0
+        ? { contextWindow: m.context_length }
+        : {}),
+      ...(capabilities ? { capabilities } : {}),
+      ...(thinkingEnabled ? { thinkingEnabled: true } : {}),
+      ...(isMetaModel ? { recommended: false } : {}),
+      ...(pricing ? { pricing } : {}),
     };
   });
 }

@@ -42,6 +42,11 @@ import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
+import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
+import {
+  groupEntriesByVendor,
+  type VendorGroup,
+} from '@ui/utils/vendor-grouping';
 import {
   useEffect,
   useState,
@@ -142,6 +147,10 @@ function InstanceLogo({
   // Ollama self-hosted
   if (typeId === 'ollama') {
     return <OllamaLogo className={className} />;
+  }
+  // OpenRouter meta-provider
+  if (typeId === 'openrouter') {
+    return <OpenRouterLogo className={className} />;
   }
   // Cloud/custom types → cloud icon
   return (
@@ -464,6 +473,7 @@ const ADDABLE_VENDOR_TYPES: ProviderInstanceTypeId[] = [
   'minimax-api',
   'xiaomi-mimo-api',
   'mistral-api',
+  'openrouter',
 ];
 
 const ADDABLE_SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
@@ -504,7 +514,11 @@ function AddProviderGrid({
   // Check which vendor types already have an instance
   const existingVendorTypes = new Set(
     existingInstances
-      .filter((i) => i.typeId.endsWith('-api'))
+      .filter(
+        (i) =>
+          i.typeId.endsWith('-api') ||
+          ADDABLE_VENDOR_TYPES.includes(i.typeId as ProviderInstanceTypeId),
+      )
       .map((i) => i.typeId),
   );
   const existingSelfHostedTypes = new Set(
@@ -1517,24 +1531,68 @@ function ModelEndpointSelect({
 // Per-Instance Model List
 // =============================================================================
 
+/**
+ * Compute the thinking display state for a model-selector entry.
+ * Shared by `InstanceModelGroup` and `VendorModelGroup` to avoid
+ * duplicating the catalog-vs-discovered branching logic.
+ */
+function computeEntryThinkingDisplay(
+  entry: ModelSelectorEntry,
+  instance: ProviderInstance,
+  preferences: UserPreferences,
+  thinkingDefaultOptions: ModelThinkingDefaultOptions,
+): ModelThinkingDisplayState | null {
+  const override = getInstanceModelThinkingOverride(
+    preferences,
+    instance.id,
+    entry.modelId,
+  );
+  const catalogModel = entry.catalogModel;
+  if (catalogModel) {
+    return getModelThinkingDisplayState(
+      catalogModel,
+      override,
+      thinkingDefaultOptions,
+    );
+  }
+  if (entry.thinkingEnabled) {
+    return getModelThinkingDisplayState(
+      {
+        modelId: entry.targetModelId,
+        modelDisplayName: entry.displayName,
+        providerOptions: {},
+        officialProvider: getVendorForInstance(instance),
+        thinkingEnabled: true,
+      },
+      override,
+      thinkingDefaultOptions,
+    );
+  }
+  return null;
+}
+
 function BuiltInModelCard({
   model,
   isEnabled,
   thinkingDisplay,
   onToggle,
   onEditThinking,
+  vendorLabelOverride,
 }: {
   model: ModelSelectorEntry;
   isEnabled: boolean;
   thinkingDisplay: ModelThinkingDisplayState | null;
   onToggle: () => void;
   onEditThinking: (event: React.MouseEvent<HTMLElement>) => void;
+  vendorLabelOverride?: string;
 }) {
-  const vendorLabel = model.catalogModel?.officialProvider
-    ? getTypeDisplayInfo(
-        `${model.catalogModel.officialProvider}-api` as ProviderInstanceTypeId,
-      ).displayName
-    : model.instanceName;
+  const vendorLabel =
+    vendorLabelOverride ??
+    (model.catalogModel?.officialProvider
+      ? getTypeDisplayInfo(
+          `${model.catalogModel.officialProvider}-api` as ProviderInstanceTypeId,
+        ).displayName
+      : model.instanceName);
 
   return (
     <div
@@ -1734,45 +1792,62 @@ function InstanceModelGroup({
       {/* Model list */}
       {expanded && (
         <div className="space-y-2 pl-1">
-          {entries.map((entry) => {
-            const isEnabled = !disabledSet.has(entry.modelId);
-            const override = getInstanceModelThinkingOverride(
-              preferences,
-              instance.id,
-              entry.modelId,
-            );
-            const catalogModel = entry.catalogModel;
-            const thinkingDisplay = catalogModel
-              ? getModelThinkingDisplayState(
-                  catalogModel,
-                  override,
-                  thinkingDefaultOptions,
-                )
-              : entry.thinkingEnabled
-                ? getModelThinkingDisplayState(
-                    {
-                      modelId: entry.targetModelId,
-                      modelDisplayName: entry.displayName,
-                      providerOptions: {},
-                      officialProvider: getVendorForInstance(instance),
-                      thinkingEnabled: true,
-                    },
-                    override,
-                    thinkingDefaultOptions,
-                  )
-                : null;
-
-            return (
+          {(() => {
+            const vendorGroups = groupEntriesByVendor(entries, instance);
+            if (vendorGroups) {
+              return vendorGroups.map((vg) => {
+                const VendorLogo = vg.logo;
+                return (
+                  <div key={vg.prefix || 'other'} className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 px-1 py-0.5">
+                      <VendorLogo
+                        aria-label={vg.displayName}
+                        className="size-3 shrink-0 text-muted-foreground"
+                      />
+                      <span className="font-medium text-2xs text-muted-foreground">
+                        {vg.displayName}
+                      </span>
+                    </div>
+                    {vg.entries.map((entry) => (
+                      <BuiltInModelCard
+                        key={entry.modelId}
+                        model={entry}
+                        isEnabled={!disabledSet.has(entry.modelId)}
+                        thinkingDisplay={computeEntryThinkingDisplay(
+                          entry,
+                          instance,
+                          preferences,
+                          thinkingDefaultOptions,
+                        )}
+                        onToggle={() =>
+                          onToggleModel(instance.id, entry.modelId)
+                        }
+                        onEditThinking={(e) =>
+                          handleEditThinking(entry.modelId, e)
+                        }
+                        vendorLabelOverride={vg.displayName}
+                      />
+                    ))}
+                  </div>
+                );
+              });
+            }
+            return entries.map((entry) => (
               <BuiltInModelCard
                 key={entry.modelId}
                 model={entry}
-                isEnabled={isEnabled}
-                thinkingDisplay={thinkingDisplay}
+                isEnabled={!disabledSet.has(entry.modelId)}
+                thinkingDisplay={computeEntryThinkingDisplay(
+                  entry,
+                  instance,
+                  preferences,
+                  thinkingDefaultOptions,
+                )}
                 onToggle={() => onToggleModel(instance.id, entry.modelId)}
                 onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
               />
-            );
-          })}
+            ));
+          })()}
 
           {/* Custom models for this instance */}
           {instanceCustomModels.map((model) => (
@@ -1795,6 +1870,101 @@ function InstanceModelGroup({
               No models available for this instance.
             </p>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Vendor Model Group (OpenRouter detail page)
+// =============================================================================
+
+function VendorModelGroup({
+  instance,
+  group,
+  preferences,
+  onToggleModel,
+  onEditThinking,
+}: {
+  instance: ProviderInstance;
+  group: VendorGroup;
+  preferences: UserPreferences;
+  onToggleModel: (instanceId: string, modelId: string) => void;
+  onEditThinking: (
+    instanceId: string,
+    modelId: string,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const disabledSet = useMemo(
+    () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
+    [preferences, instance.id],
+  );
+
+  const thinkingDefaultOptions = useMemo(
+    () => getInstanceThinkingDefaultOptions(instance),
+    [instance],
+  );
+
+  const handleEditThinking = useCallback(
+    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
+      onEditThinking(instance.id, modelId, event);
+    },
+    [instance.id, onEditThinking],
+  );
+
+  const VendorLogo = group.logo;
+
+  return (
+    <div className="space-y-2">
+      {/* Vendor header */}
+      <button
+        type="button"
+        className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <VendorLogo
+          aria-label={group.displayName}
+          className={cn(
+            'size-4 shrink-0 text-muted-foreground transition-all group-hover:text-foreground group-hover:filter-none',
+            'opacity-60 grayscale group-hover:opacity-100',
+          )}
+        />
+        <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground text-xs transition-colors group-hover:text-foreground">
+          {group.displayName}
+        </span>
+        <span className="shrink-0 text-2xs text-muted-foreground transition-colors group-hover:text-foreground">
+          {group.entries.length} models
+        </span>
+        <IconChevronDownOutline18
+          className={cn(
+            'size-3.5 shrink-0 text-muted-foreground transition-colors transition-transform group-hover:text-foreground',
+            !expanded && '-rotate-90',
+          )}
+        />
+      </button>
+
+      {/* Model list */}
+      {expanded && (
+        <div className="space-y-2 pl-1">
+          {group.entries.map((entry) => (
+            <BuiltInModelCard
+              key={entry.modelId}
+              model={entry}
+              isEnabled={!disabledSet.has(entry.modelId)}
+              thinkingDisplay={computeEntryThinkingDisplay(
+                entry,
+                instance,
+                preferences,
+                thinkingDefaultOptions,
+              )}
+              onToggle={() => onToggleModel(instance.id, entry.modelId)}
+              onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
+              vendorLabelOverride={group.displayName}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -2301,7 +2471,7 @@ function ModelsSection({
   );
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col space-y-3">
       <div className="flex items-center gap-3">
         <Input
           placeholder="Filter models..."
@@ -2333,23 +2503,106 @@ function ModelsSection({
 
       <div ref={listContainerRef} className="relative">
         <OverlayScrollbar
-          className="mask-alpha h-96"
+          className="mask-alpha max-h-[40vh] w-full min-[1800px]:max-h-[55vh]"
           style={listMaskStyle}
           onViewportRef={setListScrollViewport}
           contentClassName="space-y-3"
         >
-          {filteredGroups.map(({ instance, entries }) => (
-            <InstanceModelGroup
-              key={instance.id}
-              instance={instance}
-              entries={entries}
-              preferences={preferences}
-              onToggleModel={handleToggleModel}
-              onEditThinking={handleEditThinking}
-              onEditCustomModel={handleEdit}
-              onDeleteCustomModel={handleDelete}
-            />
-          ))}
+          {filterInstance && filteredGroups.length > 0
+            ? (() => {
+                const filteredGroup = filteredGroups[0];
+                if (!filteredGroup) return null;
+                const vendorGroups = groupEntriesByVendor(
+                  filteredGroup.entries,
+                  filterInstance,
+                );
+                if (!vendorGroups) {
+                  // No vendor grouping for this provider type —
+                  // fall through to the default InstanceModelGroup path.
+                  return filteredGroups.map(({ instance, entries }) => (
+                    <InstanceModelGroup
+                      key={instance.id}
+                      instance={instance}
+                      entries={entries}
+                      preferences={preferences}
+                      onToggleModel={handleToggleModel}
+                      onEditThinking={handleEditThinking}
+                      onEditCustomModel={handleEdit}
+                      onDeleteCustomModel={handleDelete}
+                    />
+                  ));
+                }
+                const instanceCustomModels = (
+                  preferences?.customModels ?? EMPTY_CUSTOM_MODELS
+                ).filter(
+                  (m) =>
+                    (m.providerInstanceId ?? m.endpointId) ===
+                    filteredGroup.instance.id,
+                );
+                const disabledIds = new Set(
+                  getInstanceDisabledModelIds(
+                    preferences,
+                    filteredGroup.instance.id,
+                  ),
+                );
+                return (
+                  <>
+                    {vendorGroups.map((vg) => (
+                      <VendorModelGroup
+                        key={vg.prefix || 'other'}
+                        instance={filteredGroup.instance}
+                        group={vg}
+                        preferences={preferences}
+                        onToggleModel={handleToggleModel}
+                        onEditThinking={handleEditThinking}
+                      />
+                    ))}
+
+                    {/* Custom models for this instance */}
+                    {instanceCustomModels.length > 0 && (
+                      <div className="space-y-2">
+                        <span className="px-3 font-medium text-muted-foreground text-xs">
+                          Custom Models
+                        </span>
+                        {instanceCustomModels.map((model) => (
+                          <CustomModelCard
+                            key={model.modelId}
+                            model={model}
+                            endpointName={resolveCustomModelInstanceName(
+                              preferences,
+                              {
+                                providerInstanceId: model.providerInstanceId,
+                                endpointId: model.endpointId,
+                              },
+                            )}
+                            isEnabled={!disabledIds.has(model.modelId)}
+                            onToggle={() =>
+                              handleToggleModel(
+                                filteredGroup.instance.id,
+                                model.modelId,
+                              )
+                            }
+                            onEdit={() => handleEdit(model)}
+                            onDelete={() => handleDelete(model.modelId)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()
+            : filteredGroups.map(({ instance, entries }) => (
+                <InstanceModelGroup
+                  key={instance.id}
+                  instance={instance}
+                  entries={entries}
+                  preferences={preferences}
+                  onToggleModel={handleToggleModel}
+                  onEditThinking={handleEditThinking}
+                  onEditCustomModel={handleEdit}
+                  onDeleteCustomModel={handleDelete}
+                />
+              ))}
 
           {noResults && (
             <div className="rounded-lg border border-derived-subtle p-4">
@@ -2560,9 +2813,7 @@ export function ModelsProvidersSection() {
   // Detail view for a single provider
   if (detailInstance) {
     const displayInfo = getTypeDisplayInfo(detailInstance.typeId);
-    const isKeyBased =
-      detailInstance.typeId.endsWith('-api') ||
-      detailInstance.typeId === 'coding-plan';
+    const credentialType = displayInfo?.credentialType ?? 'none';
     const modelCount = getInstanceModelCount(detailInstance);
     const canDelete = detailInstance.id !== DEFAULT_INSTANCE_ID;
 
@@ -2643,27 +2894,23 @@ export function ModelsProvidersSection() {
                 </h2>
               </div>
 
-              {isKeyBased && (
+              {credentialType === 'api-key' && (
                 <div className="rounded-lg border border-derived p-3">
                   <VendorApiKeyInput instance={detailInstance} />
                 </div>
               )}
 
-              {ADDABLE_SELF_HOSTED_TYPES.includes(
-                detailInstance.typeId as ProviderInstanceTypeId,
-              ) && <SelfHostedConnection instance={detailInstance} />}
+              {credentialType === 'base-url' && (
+                <SelfHostedConnection instance={detailInstance} />
+              )}
 
-              {!isKeyBased &&
-                detailInstance.typeId !== 'stagewise' &&
-                !ADDABLE_SELF_HOSTED_TYPES.includes(
-                  detailInstance.typeId as ProviderInstanceTypeId,
-                ) && (
-                  <div className="rounded-lg border border-derived p-3">
-                    <p className="text-muted-foreground text-xs">
-                      {displayInfo?.defaultBaseUrl ?? 'Custom endpoint'}
-                    </p>
-                  </div>
-                )}
+              {credentialType === 'custom-endpoint' && (
+                <div className="rounded-lg border border-derived p-3">
+                  <p className="text-muted-foreground text-xs">
+                    {displayInfo?.defaultBaseUrl ?? 'Custom endpoint'}
+                  </p>
+                </div>
+              )}
 
               {detailInstance.typeId === 'stagewise' && (
                 <div className="rounded-lg border border-derived p-3">
@@ -2676,7 +2923,7 @@ export function ModelsProvidersSection() {
             </section>
 
             {/* Models Section */}
-            <section className="space-y-6">
+            <section className="flex flex-col space-y-6">
               <div>
                 <h2 className="font-medium text-foreground text-lg">Models</h2>
               </div>

@@ -37,6 +37,7 @@ import {
   type ApiKeyValidationResult,
 } from '../utils/validate-api-keys';
 import { getProviderType } from '../agents/providers/registry';
+import { computeDisabledModelIdsAfterDiscovery } from '@shared/flagship-models';
 
 // Enable Immer patches support
 enablePatches();
@@ -1722,13 +1723,24 @@ export class PreferencesService extends DisposableService {
       }
     }
 
+    // Auto-disable non-flagship discovered models so the chat model
+    // selector stays clean. Flagship models + catalog models stay enabled.
+    // Users can re-enable any model from the settings page.
+    const disabledModelIds = computeDisabledModelIdsAfterDiscovery({
+      typeId,
+      config: finalConfig,
+      discoveredModels: discovered,
+      existingDisabledModelIds: [],
+      existingDiscoveredModelIds: new Set(),
+    });
+
     const instance = {
       id: instanceId,
       typeId: typeId as ProviderInstance['typeId'],
       name,
       config: finalConfig as ProviderInstance['config'],
       enabledModelIds: [] as string[],
-      disabledModelIds: [] as string[],
+      disabledModelIds,
       discoveredModels: discovered,
     };
 
@@ -2000,11 +2012,32 @@ export class PreferencesService extends DisposableService {
     }
     const models = await refreshFn(instance.config as never, decryptedConfig);
 
+    // Capture the previous discovered model IDs and disabled list so we
+    // can preserve user choices for previously-known models while
+    // auto-disabling newly-discovered non-flagship models.
+    const oldDiscoveredIds = new Set(
+      (instance.discoveredModels ?? []).map((dm) => dm.modelId),
+    );
+    const oldDisabledModelIds = instance.disabledModelIds ?? [];
+
+    const newDisabledModelIds = computeDisabledModelIdsAfterDiscovery({
+      typeId: instance.typeId,
+      config,
+      discoveredModels: models,
+      existingDisabledModelIds: oldDisabledModelIds,
+      existingDiscoveredModelIds: oldDiscoveredIds,
+    });
+
     const patches: Patch[] = [
       {
         op: 'replace',
         path: ['providerInstances', idx, 'discoveredModels'],
         value: models,
+      },
+      {
+        op: 'replace',
+        path: ['providerInstances', idx, 'disabledModelIds'],
+        value: newDisabledModelIds,
       },
     ];
     await this.update(patches);
