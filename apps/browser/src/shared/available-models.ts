@@ -360,49 +360,6 @@ export const availableModels = [
   },
   {
     officialProvider: 'openai',
-    modelId: 'gpt-5.6-sol-pro',
-    modelDisplayName: 'GPT-5.6 Sol Pro',
-    modelDescription:
-      "GPT-5.6 Sol served with reasoning mode set to 'pro' for higher-quality responses on complex tasks.",
-    modelContext: '1.05M context',
-    modelContextRaw: 1050000,
-    headers: openaiHeaders,
-    providerOptions: {
-      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
-      openai: {
-        reasoningEffort: 'medium',
-        reasoningSummary: 'auto',
-        parallelToolCalls: true,
-        strictJsonSchema: true,
-      },
-    },
-    thinkingEnabled: true,
-    pricing: {
-      inputPerMillion: 5.0,
-      outputPerMillion: 30.0,
-      relativeMultiplier: 5.9,
-    },
-    capabilities: {
-      inputModalities: {
-        text: true,
-        audio: false,
-        image: true,
-        video: false,
-        file: true,
-      },
-      outputModalities: {
-        text: true,
-        audio: false,
-        image: false,
-        video: false,
-        file: false,
-      },
-      inputConstraints: GPT54_INPUT_CONSTRAINTS,
-      toolCalling: true,
-    },
-  },
-  {
-    officialProvider: 'openai',
     modelId: 'gpt-5.6-terra',
     modelDisplayName: 'GPT-5.6 Terra',
     modelDescription:
@@ -446,96 +403,10 @@ export const availableModels = [
   },
   {
     officialProvider: 'openai',
-    modelId: 'gpt-5.6-terra-pro',
-    modelDisplayName: 'GPT-5.6 Terra Pro',
-    modelDescription:
-      "GPT-5.6 Terra served with reasoning mode set to 'pro' for higher-quality responses on complex tasks.",
-    modelContext: '1.05M context',
-    modelContextRaw: 1050000,
-    headers: openaiHeaders,
-    providerOptions: {
-      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
-      openai: {
-        reasoningEffort: 'medium',
-        reasoningSummary: 'auto',
-        parallelToolCalls: true,
-        strictJsonSchema: true,
-      },
-    },
-    thinkingEnabled: true,
-    pricing: {
-      inputPerMillion: 2.5,
-      outputPerMillion: 15.0,
-      relativeMultiplier: 3.1,
-    },
-    capabilities: {
-      inputModalities: {
-        text: true,
-        audio: false,
-        image: true,
-        video: false,
-        file: true,
-      },
-      outputModalities: {
-        text: true,
-        audio: false,
-        image: false,
-        video: false,
-        file: false,
-      },
-      inputConstraints: GPT54_INPUT_CONSTRAINTS,
-      toolCalling: true,
-    },
-  },
-  {
-    officialProvider: 'openai',
     modelId: 'gpt-5.6-luna',
     modelDisplayName: 'GPT-5.6 Luna',
     modelDescription:
       "OpenAI's fast, cost-efficient GPT-5.6 model. Suited for high-volume, latency-sensitive tasks such as chat, classification, and lightweight agentic workflows.",
-    modelContext: '1.05M context',
-    modelContextRaw: 1050000,
-    headers: openaiHeaders,
-    providerOptions: {
-      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
-      openai: {
-        reasoningEffort: 'medium',
-        reasoningSummary: 'auto',
-        parallelToolCalls: true,
-        strictJsonSchema: true,
-      },
-    },
-    thinkingEnabled: true,
-    pricing: {
-      inputPerMillion: 1.0,
-      outputPerMillion: 6.0,
-      relativeMultiplier: 1.2,
-    },
-    capabilities: {
-      inputModalities: {
-        text: true,
-        audio: false,
-        image: true,
-        video: false,
-        file: true,
-      },
-      outputModalities: {
-        text: true,
-        audio: false,
-        image: false,
-        video: false,
-        file: false,
-      },
-      inputConstraints: GPT54_INPUT_CONSTRAINTS,
-      toolCalling: true,
-    },
-  },
-  {
-    officialProvider: 'openai',
-    modelId: 'gpt-5.6-luna-pro',
-    modelDisplayName: 'GPT-5.6 Luna Pro',
-    modelDescription:
-      "GPT-5.6 Luna served with reasoning mode set to 'pro' for higher-quality responses on complex tasks.",
     modelContext: '1.05M context',
     modelContextRaw: 1050000,
     headers: openaiHeaders,
