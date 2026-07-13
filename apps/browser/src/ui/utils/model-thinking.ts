@@ -15,6 +15,14 @@ import type {
 
 export type BuiltInModelForThinking = (typeof availableModels)[number];
 
+export type ThinkingPanelModel = {
+  modelId: string;
+  modelDisplayName: string;
+  providerOptions: unknown;
+  officialProvider?: import('@shared/karton-contracts/ui/shared-types').ModelProvider;
+  thinkingEnabled?: boolean;
+};
+
 export type ModelThinkingDisplayState = {
   enabled: boolean;
   provider: ThinkingOption['provider'];
@@ -29,7 +37,7 @@ export type ModelThinkingDefaultOptions = {
 };
 
 export function getModelThinkingDisplayState(
-  model: BuiltInModelForThinking,
+  model: ThinkingPanelModel,
   override?: ModelThinkingOverride,
   options?: ModelThinkingDefaultOptions,
 ): ModelThinkingDisplayState | null {
@@ -49,7 +57,7 @@ export function getModelThinkingDisplayState(
 }
 
 export function getDefaultThinkingOption(
-  model: BuiltInModelForThinking,
+  model: ThinkingPanelModel,
   options?: ModelThinkingDefaultOptions,
 ): ThinkingOption {
   return getDefaultThinkingSelection(model, {
@@ -59,7 +67,7 @@ export function getDefaultThinkingOption(
 }
 
 export function getModelThinkingOptions(
-  model: BuiltInModelForThinking,
+  model: ThinkingPanelModel,
   options?: ModelThinkingDefaultOptions,
 ): ThinkingOption[] {
   return getSupportedThinkingOptions(model, {
@@ -69,7 +77,7 @@ export function getModelThinkingOptions(
 }
 
 export function getEnabledModelThinkingOption(
-  model: BuiltInModelForThinking,
+  model: ThinkingPanelModel,
   currentValue: string | undefined,
   options?: ModelThinkingDefaultOptions,
 ): ThinkingOption | undefined {
@@ -86,7 +94,7 @@ export function getEnabledModelThinkingOption(
 }
 
 export function getNextModelThinkingOption(
-  model: BuiltInModelForThinking,
+  model: ThinkingPanelModel,
   currentValue: string,
   options?: ModelThinkingDefaultOptions,
 ): ThinkingOption {

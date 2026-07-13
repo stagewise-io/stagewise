@@ -143,7 +143,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.76",
     "@ai-sdk/google": "3.0.71",
-    "@ai-sdk/openai": "3.0.63",
+    "@ai-sdk/openai": "3.0.84",
     "@libsql/client": "^0.15.15",
     "@stagewise/agent-runtime-node": "workspace:*",
     "@vscode/tree-sitter-wasm": "^0.3.0",

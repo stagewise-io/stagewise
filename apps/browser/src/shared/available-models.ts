@@ -578,7 +578,7 @@ export const availableModels = [
     modelId: 'gpt-5.5',
     modelDisplayName: 'GPT-5.5',
     modelDescription:
-      "OpenAI's smartest and most intuitive model yet, excelling at agentic coding, computer use, and long-horizon knowledge work.",
+      "OpenAI's previous-generation frontier model, excelling at agentic coding, computer use, and long-horizon knowledge work.",
     modelContext: '1M context',
     modelContextRaw: 1000000,
     headers: openaiHeaders,

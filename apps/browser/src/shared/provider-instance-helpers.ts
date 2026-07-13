@@ -506,6 +506,24 @@ function getVendorForTypeId(
 }
 
 /**
+ * Resolve the vendor for any provider instance, including coding plans.
+ * Returns `undefined` for stagewise, custom/cloud, and self-hosted types.
+ */
+export function getVendorForInstance(
+  instance: ProviderInstance,
+): ModelProvider | undefined {
+  if (instance.typeId.endsWith('-api')) {
+    return instance.typeId.slice(0, -4) as ModelProvider;
+  }
+  if (instance.typeId === 'coding-plan') {
+    const planId = (instance.config as { planId: string })
+      .planId as CodingPlanId;
+    return CODING_PLANS[planId]?.provider;
+  }
+  return undefined;
+}
+
+/**
  * Build a `ModelSelectorEntry` from a built-in catalog model.
  */
 function makeBuiltInEntry(
@@ -569,9 +587,9 @@ function makeDiscoveredEntry(
   instance: ProviderInstance,
   model: DiscoveredModel,
 ): ModelSelectorEntry {
-  // Default to 8k context for discovered models that don't report it
-  // (most local/self-hosted models don't).
-  const contextWindow = model.contextWindow ?? 8_192;
+  // Discovered models rarely report context windows. Default to 128k —
+  // a realistic floor for modern cloud models in an agentic IDE.
+  const contextWindow = model.contextWindow ?? 128_000;
   return {
     instanceId: instance.id,
     instanceName: instance.name,
@@ -617,6 +635,12 @@ export function getSelectableModelEntries(
   for (const instance of instances) {
     const disabled = new Set(instance.disabledModelIds ?? []);
     const isDisabled = (id: string) => !includeDisabled && disabled.has(id);
+    // Track catalog model IDs pushed for this instance so discovered
+    // models that duplicate a catalog entry are skipped (catalog wins).
+    // Stored lowercase for case-insensitive matching — some APIs return
+    // native casing (e.g. MiniMax `MiniMax-M3`) while the catalog uses
+    // lowercase (`minimax-m3`).
+    const catalogModelIds = new Set<string>();
 
     // --- Catalog models for this instance ---
 
@@ -637,6 +661,7 @@ export function getSelectableModelEntries(
             alias.targetModelId,
           ),
         );
+        catalogModelIds.add(alias.modelId.toLowerCase());
       }
       // All concrete catalog models
       for (const model of availableModels) {
@@ -652,6 +677,7 @@ export function getSelectableModelEntries(
             model.modelId,
           ),
         );
+        catalogModelIds.add(model.modelId.toLowerCase());
       }
     } else if (instance.typeId === 'coding-plan') {
       // Serve the plan vendor's catalog models
@@ -673,6 +699,7 @@ export function getSelectableModelEntries(
               model.modelId,
             ),
           );
+          catalogModelIds.add(model.modelId.toLowerCase());
         }
       }
     } else {
@@ -693,18 +720,22 @@ export function getSelectableModelEntries(
               model.modelId,
             ),
           );
+          catalogModelIds.add(model.modelId.toLowerCase());
         }
       }
       // Custom/cloud types (no vendor): only custom models below
     }
 
-    // --- Discovered models for self-hosted types ---
+    // --- Discovered models (self-hosted + vendor API discovery) ---
+    // Skip models whose ID matches a catalog entry — catalog wins to
+    // preserve rich metadata (pricing, thinking, input constraints).
 
     if (instance.discoveredModels && instance.discoveredModels.length > 0) {
       const enabled = new Set(instance.enabledModelIds ?? []);
       const hasEnabledList =
         instance.enabledModelIds && instance.enabledModelIds.length > 0;
       for (const dm of instance.discoveredModels) {
+        if (catalogModelIds.has(dm.modelId.toLowerCase())) continue;
         if (isDisabled(dm.modelId)) continue;
         if (hasEnabledList && !enabled.has(dm.modelId)) continue;
         entries.push(makeDiscoveredEntry(instance, dm));
@@ -745,35 +776,54 @@ export function findModelSelectorEntry(
 export function getInstanceModelCount(instance: ProviderInstance): number {
   const disabled = new Set(instance.disabledModelIds ?? []);
   let count = 0;
+  // Track catalog model IDs counted for this instance so discovered
+  // models that duplicate a catalog entry are not double-counted.
+  // Stored lowercase for case-insensitive matching.
+  const catalogModelIds = new Set<string>();
 
   if (instance.typeId === 'stagewise') {
     count += availableModelAliases.filter(
       (a) => !disabled.has(a.modelId),
     ).length;
+    for (const a of availableModelAliases) {
+      if (!disabled.has(a.modelId))
+        catalogModelIds.add(a.modelId.toLowerCase());
+    }
     count += availableModels.filter((m) => !disabled.has(m.modelId)).length;
+    for (const m of availableModels) {
+      if (!disabled.has(m.modelId))
+        catalogModelIds.add(m.modelId.toLowerCase());
+    }
   } else if (instance.typeId === 'coding-plan') {
     const planId = (instance.config as { planId: string })
       .planId as CodingPlanId;
     const plan = CODING_PLANS[planId];
     if (plan) {
-      count += availableModels.filter(
+      const vendorModels = availableModels.filter(
         (m) => m.officialProvider === plan.provider && !disabled.has(m.modelId),
-      ).length;
+      );
+      count += vendorModels.length;
+      for (const m of vendorModels)
+        catalogModelIds.add(m.modelId.toLowerCase());
     }
   } else {
     const vendor = getVendorForTypeId(instance.typeId);
     if (vendor) {
-      count += availableModels.filter(
+      const vendorModels = availableModels.filter(
         (m) => m.officialProvider === vendor && !disabled.has(m.modelId),
-      ).length;
+      );
+      count += vendorModels.length;
+      for (const m of vendorModels)
+        catalogModelIds.add(m.modelId.toLowerCase());
     }
 
-    // Discovered models for self-hosted instances
+    // Discovered models (self-hosted + vendor API discovery)
     if (instance.discoveredModels && instance.discoveredModels.length > 0) {
       const enabled = new Set(instance.enabledModelIds ?? []);
       const hasEnabledList =
         instance.enabledModelIds && instance.enabledModelIds.length > 0;
       for (const dm of instance.discoveredModels) {
+        if (catalogModelIds.has(dm.modelId.toLowerCase())) continue;
         if (disabled.has(dm.modelId)) continue;
         if (hasEnabledList && !enabled.has(dm.modelId)) continue;
         count++;

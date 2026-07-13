@@ -283,14 +283,14 @@ importers:
         specifier: ^4.0.125
         version: 4.0.125(zod@4.3.5)
       '@ai-sdk/openai':
-        specifier: 3.0.63
-        version: 3.0.63(zod@4.3.5)
+        specifier: 3.0.84
+        version: 3.0.84(zod@4.3.5)
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.47
         version: 2.0.47(zod@4.3.5)
       '@ai-sdk/provider':
-        specifier: 3.0.10
-        version: 3.0.10
+        specifier: 3.0.14
+        version: 3.0.14
       '@aws-sdk/credential-providers':
         specifier: ^3.908.0
         version: 3.1041.0
@@ -338,7 +338,7 @@ importers:
         version: 1.8.0
       '@posthog/ai':
         specifier: 7.18.1
-        version: 7.18.1(@ai-sdk/provider@3.0.10)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(bufferutil@4.1.0)(posthog-node@4.18.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(utf-8-validate@6.0.6)(ws@8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod-to-json-schema@3.25.1(zod@4.3.5))
+        version: 7.18.1(@ai-sdk/provider@3.0.14)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(bufferutil@4.1.0)(posthog-node@4.18.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(utf-8-validate@6.0.6)(ws@8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod-to-json-schema@3.25.1(zod@4.3.5))
       '@posthog/cli':
         specifier: ^0.7.11
         version: 0.7.11
@@ -781,8 +781,8 @@ importers:
         specifier: 3.0.71
         version: 3.0.71(zod@4.3.5)
       '@ai-sdk/openai':
-        specifier: 3.0.63
-        version: 3.0.63(zod@4.3.5)
+        specifier: 3.0.84
+        version: 3.0.84(zod@4.3.5)
       '@libsql/client':
         specifier: ^0.15.15
         version: 0.15.15(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -1222,6 +1222,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/openai@3.0.84':
+    resolution: {integrity: sha512-cmgbeJL0bbY0yTJH4/AdmP5E7MjWRL9G8UdhIi0JlV/So03o82ORJofW8OzwCZPTORVQblFbpZXYGDcUd9NdUQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider-utils@4.0.19':
     resolution: {integrity: sha512-3eG55CrSWCu2SXlqq2QCsFjo3+E7+Gmg7i/oRVoSZzIodTuDSfLb3MRje67xE9RFea73Zao7Lm4mADIfUETKGg==}
     engines: {node: '>=18'}
@@ -1234,8 +1240,18 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@4.0.38':
+    resolution: {integrity: sha512-/HHGmtKllqjg1OLc023v9w9kK3laW7Z6TzfZukYQWCsGBbzB9p60zTvvpXFVcs44NZBVXL3viOa1HRKUbeee8g==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@3.0.10':
     resolution: {integrity: sha512-Q3BZ27qfpYqnCYGvE3vt+Qi6LGOF9R5Nmzn+9JoM1lCRsD9mYaIhfJLkSunN48nfGXJ6n+XNV0J/XVpqGQl7Dw==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@3.0.14':
+    resolution: {integrity: sha512-5X1k57JBJ4H7H1QjX7CnJYAB1I19r/trVZTMcSms7/kLNZ8RaU4Nt2agcwZzv82Hfx6Q7/TOLU7agAKeFfc8cA==}
     engines: {node: '>=18'}
 
   '@ai-sdk/provider@3.0.8':
@@ -11658,6 +11674,12 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.27(zod@4.3.5)
       zod: 4.3.5
 
+  '@ai-sdk/openai@3.0.84(zod@4.3.5)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.14
+      '@ai-sdk/provider-utils': 4.0.38(zod@4.3.5)
+      zod: 4.3.5
+
   '@ai-sdk/provider-utils@4.0.19(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
@@ -11672,7 +11694,18 @@ snapshots:
       eventsource-parser: 3.0.8
       zod: 4.3.5
 
+  '@ai-sdk/provider-utils@4.0.38(zod@4.3.5)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.14
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.8
+      zod: 4.3.5
+
   '@ai-sdk/provider@3.0.10':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@3.0.14':
     dependencies:
       json-schema: 0.4.0
 
@@ -14322,7 +14355,7 @@ snapshots:
       write-file-atomic: 5.0.1
       write-yaml-file: 5.0.0
 
-  '@posthog/ai@7.18.1(@ai-sdk/provider@3.0.10)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(bufferutil@4.1.0)(posthog-node@4.18.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(utf-8-validate@6.0.6)(ws@8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod-to-json-schema@3.25.1(zod@4.3.5))':
+  '@posthog/ai@7.18.1(@ai-sdk/provider@3.0.14)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(bufferutil@4.1.0)(posthog-node@4.18.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(utf-8-validate@6.0.6)(ws@8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod-to-json-schema@3.25.1(zod@4.3.5))':
     dependencies:
       '@anthropic-ai/sdk': 0.78.0(zod@4.3.5)
       '@google/genai': 1.51.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -14334,7 +14367,7 @@ snapshots:
       uuid: 11.1.0
       zod: 4.3.5
     optionalDependencies:
-      '@ai-sdk/provider': 3.0.10
+      '@ai-sdk/provider': 3.0.14
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/sdk-trace-base': 2.2.0(@opentelemetry/api@1.9.0)
     transitivePeerDependencies:

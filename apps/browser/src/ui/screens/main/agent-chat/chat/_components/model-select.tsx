@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import type { BuiltInModel, ModelId } from '@shared/available-models';
+import type { ModelId } from '@shared/available-models';
 import { IconChevronDownFill18 } from '@stagewise/icons';
 import { getAvailableModel, getModelAlias } from '@shared/available-models';
 import { HotkeyActions } from '@shared/hotkeys';
@@ -41,6 +41,7 @@ import {
   getNextModelThinkingOption,
   getModelThinkingOptions,
   type ModelThinkingDefaultOptions,
+  type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 import type {
   ModelThinkingOverride,
@@ -51,6 +52,7 @@ import {
   DEFAULT_INSTANCE_ID,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
+  getVendorForInstance,
   type ModelSelectorEntry,
 } from '@shared/provider-instance-helpers';
 import { enablePatches, produceWithPatches } from 'immer';
@@ -198,7 +200,25 @@ export const ModelSelect = memo(function ModelSelect({
         );
         thinkingLabel = display?.label;
       } else if (entry.thinkingEnabled) {
-        thinkingLabel = 'Thinking';
+        const instance = instanceMap.get(entry.instanceId);
+        const vendor = instance ? getVendorForInstance(instance) : undefined;
+        const defaultOptions: ModelThinkingDefaultOptions | undefined = instance
+          ? getInstanceThinkingDefaultOptions(instance)
+          : undefined;
+        const override: ModelThinkingOverride | undefined =
+          modelThinkingOverrides[entry.instanceId]?.[entry.targetModelId];
+        const display = getModelThinkingDisplayState(
+          {
+            modelId: entry.targetModelId,
+            modelDisplayName: entry.displayName,
+            providerOptions: {},
+            officialProvider: vendor,
+            thinkingEnabled: true,
+          },
+          override,
+          defaultOptions,
+        );
+        thinkingLabel = display?.label ?? 'Thinking';
       }
 
       return { ...entry, thinkingLabel };
@@ -304,11 +324,9 @@ export const ModelSelect = memo(function ModelSelect({
   const [hoveredEntry, setHoveredEntry] = useState<SelectableEntry | null>(
     null,
   );
-  const [editingEntry, setEditingEntry] = useState<{
-    instanceId: string;
-    modelId: string;
-    targetModelId: string;
-  } | null>(null);
+  const [editingEntry, setEditingEntry] = useState<SelectableEntry | null>(
+    null,
+  );
   const [itemCenterY, setItemCenterY] = useState(0);
   const [sidePanelOffset, setSidePanelOffset] = useState(0);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -337,11 +355,24 @@ export const ModelSelect = memo(function ModelSelect({
     fadeDistance: 16,
   });
 
-  const editingThinkingModel = useMemo<BuiltInModel | undefined>(
-    () =>
-      editingEntry ? getAvailableModel(editingEntry.targetModelId) : undefined,
-    [editingEntry],
-  );
+  const editingThinkingModel = useMemo<ThinkingPanelModel | undefined>(() => {
+    if (!editingEntry) return undefined;
+    const catalogModel = getAvailableModel(editingEntry.targetModelId);
+    if (catalogModel) return catalogModel;
+    // Discovered model — build a ThinkingPanelModel from the entry
+    if (editingEntry.thinkingEnabled) {
+      const instance = instanceMap.get(editingEntry.instanceId);
+      const vendor = instance ? getVendorForInstance(instance) : undefined;
+      return {
+        modelId: editingEntry.targetModelId,
+        modelDisplayName: editingEntry.displayName,
+        providerOptions: {},
+        officialProvider: vendor,
+        thinkingEnabled: true,
+      };
+    }
+    return undefined;
+  }, [editingEntry, instanceMap]);
 
   const editingThinkingOverride = useMemo<
     ModelThinkingOverride | undefined
@@ -444,19 +475,39 @@ export const ModelSelect = memo(function ModelSelect({
         current?.instanceId === entry.instanceId &&
         current?.modelId === entry.modelId
           ? null
-          : {
-              instanceId: entry.instanceId,
-              modelId: entry.modelId,
-              targetModelId: entry.targetModelId,
-            },
+          : entry,
       );
     },
     [],
   );
 
+  // Resolve a ThinkingPanelModel from either the catalog or a discovered entry.
+  const resolveThinkingModel = useCallback(
+    (
+      instanceId: string,
+      targetModelId: string,
+    ): ThinkingPanelModel | undefined => {
+      const catalogModel = getAvailableModel(targetModelId);
+      if (catalogModel) return catalogModel;
+      // Discovered model — construct a ThinkingPanelModel from the entry
+      const entry = entryMap.get(encodeKey(instanceId, targetModelId));
+      if (!entry?.thinkingEnabled) return undefined;
+      const instance = instanceMap.get(instanceId);
+      const vendor = instance ? getVendorForInstance(instance) : undefined;
+      return {
+        modelId: targetModelId,
+        modelDisplayName: entry.displayName,
+        providerOptions: {},
+        officialProvider: vendor,
+        thinkingEnabled: true,
+      };
+    },
+    [entryMap, instanceMap],
+  );
+
   const handleSetThinkingEnabled = useCallback(
     async (instanceId: string, targetModelId: string, enabled: boolean) => {
-      const model = getAvailableModel(targetModelId);
+      const model = resolveThinkingModel(instanceId, targetModelId);
       if (!model) return;
 
       const instance = instanceMap.get(instanceId);
@@ -490,12 +541,18 @@ export const ModelSelect = memo(function ModelSelect({
       });
       await updatePreferences(patches);
     },
-    [modelThinkingOverrides, preferences, updatePreferences, instanceMap],
+    [
+      modelThinkingOverrides,
+      preferences,
+      updatePreferences,
+      instanceMap,
+      resolveThinkingModel,
+    ],
   );
 
   const handleSetThinkingValue = useCallback(
     async (instanceId: string, targetModelId: string, value: string) => {
-      const model = getAvailableModel(targetModelId);
+      const model = resolveThinkingModel(instanceId, targetModelId);
       if (!model) return;
 
       const instance = instanceMap.get(instanceId);
@@ -520,7 +577,7 @@ export const ModelSelect = memo(function ModelSelect({
       });
       await updatePreferences(patches);
     },
-    [preferences, updatePreferences, instanceMap],
+    [preferences, updatePreferences, instanceMap, resolveThinkingModel],
   );
 
   const handleResetThinkingOverride = useCallback(
@@ -822,17 +879,18 @@ const ModelItem = memo(function ModelItem({
               <IconBrainOutline18 className="size-2.75" />
               {!entry.isAlias && entry.thinkingLabel}
             </span>
-            {entry.catalogModel && !entry.isAlias && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="absolute right-0 h-auto px-0 py-0 text-[10px] opacity-0 group-data-[highlighted]/item:opacity-100"
-                onClick={(event) => onEditThinking(entry, event)}
-              >
-                Edit
-              </Button>
-            )}
+            {(entry.catalogModel || entry.thinkingEnabled) &&
+              !entry.isAlias && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="absolute right-0 h-auto px-0 py-0 text-[10px] opacity-0 group-data-[highlighted]/item:opacity-100"
+                  onClick={(event) => onEditThinking(entry, event)}
+                >
+                  Edit
+                </Button>
+              )}
           </span>
         )}
       </span>

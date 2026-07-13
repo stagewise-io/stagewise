@@ -22,6 +22,7 @@ import {
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
   getTypeDisplayInfo,
+  getVendorForInstance,
   resolveCustomModelInstanceName,
   type ModelSelectorEntry,
 } from '@shared/provider-instance-helpers';
@@ -35,6 +36,7 @@ import {
   getModelThinkingOptions,
   type ModelThinkingDisplayState,
   type ModelThinkingDefaultOptions,
+  type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
@@ -1746,7 +1748,19 @@ function InstanceModelGroup({
                   override,
                   thinkingDefaultOptions,
                 )
-              : null;
+              : entry.thinkingEnabled
+                ? getModelThinkingDisplayState(
+                    {
+                      modelId: entry.targetModelId,
+                      modelDisplayName: entry.displayName,
+                      providerOptions: {},
+                      officialProvider: getVendorForInstance(instance),
+                      thinkingEnabled: true,
+                    },
+                    override,
+                    thinkingDefaultOptions,
+                  )
+                : null;
 
             return (
               <BuiltInModelCard
@@ -1907,13 +1921,40 @@ function ModelsSection({
     'right',
   );
 
-  const thinkingPanelModel = useMemo(
-    () =>
-      thinkingPanelModelId
-        ? getAvailableModel(thinkingPanelModelId)
-        : undefined,
-    [thinkingPanelModelId],
-  );
+  const thinkingPanelModel = useMemo<ThinkingPanelModel | undefined>(() => {
+    if (!thinkingPanelModelId) return undefined;
+    const catalogModel = getAvailableModel(thinkingPanelModelId);
+    if (catalogModel) return catalogModel;
+    // Discovered model — construct a ThinkingPanelModel from the instance
+    if (thinkingPanelInstanceId) {
+      const instance = providerInstances.find(
+        (i) => i.id === thinkingPanelInstanceId,
+      );
+      if (instance) {
+        const entries = getSelectableModelEntries(preferences);
+        const entry = entries.find(
+          (e) =>
+            e.instanceId === thinkingPanelInstanceId &&
+            e.modelId === thinkingPanelModelId,
+        );
+        if (entry?.thinkingEnabled) {
+          return {
+            modelId: entry.targetModelId,
+            modelDisplayName: entry.displayName,
+            providerOptions: {},
+            officialProvider: getVendorForInstance(instance),
+            thinkingEnabled: true,
+          };
+        }
+      }
+    }
+    return undefined;
+  }, [
+    thinkingPanelModelId,
+    thinkingPanelInstanceId,
+    providerInstances,
+    preferences,
+  ]);
 
   const thinkingPanelInstance = useMemo(
     () =>
@@ -2118,9 +2159,32 @@ function ModelsSection({
     [preferences, updatePreferences],
   );
 
+  const resolveThinkingModel = useCallback(
+    (instanceId: string, modelId: string): ThinkingPanelModel | undefined => {
+      const catalogModel = getAvailableModel(modelId);
+      if (catalogModel) return catalogModel;
+      // Discovered model — construct a ThinkingPanelModel
+      const instance = providerInstances.find((i) => i.id === instanceId);
+      if (!instance) return undefined;
+      const entries = getSelectableModelEntries(preferences);
+      const entry = entries.find(
+        (e) => e.instanceId === instanceId && e.modelId === modelId,
+      );
+      if (!entry?.thinkingEnabled) return undefined;
+      return {
+        modelId: entry.targetModelId,
+        modelDisplayName: entry.displayName,
+        providerOptions: {},
+        officialProvider: getVendorForInstance(instance),
+        thinkingEnabled: true,
+      };
+    },
+    [providerInstances, preferences],
+  );
+
   const handleSetThinkingEnabled = useCallback(
     async (instanceId: string, modelId: string, enabled: boolean) => {
-      const model = getAvailableModel(modelId);
+      const model = resolveThinkingModel(instanceId, modelId);
       if (!model) return;
       const targetModelId = model.modelId;
 
@@ -2153,12 +2217,12 @@ function ModelsSection({
       });
       await updatePreferences(patches);
     },
-    [preferences, providerInstances, updatePreferences],
+    [preferences, providerInstances, updatePreferences, resolveThinkingModel],
   );
 
   const handleSetThinkingValue = useCallback(
     async (instanceId: string, modelId: string, value: string) => {
-      const model = getAvailableModel(modelId);
+      const model = resolveThinkingModel(instanceId, modelId);
       if (!model) return;
       const targetModelId = model.modelId;
 
@@ -2183,7 +2247,7 @@ function ModelsSection({
       });
       await updatePreferences(patches);
     },
-    [preferences, providerInstances, updatePreferences],
+    [preferences, providerInstances, updatePreferences, resolveThinkingModel],
   );
 
   const handleResetThinkingOverride = useCallback(
