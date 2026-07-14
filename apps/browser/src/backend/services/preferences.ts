@@ -1763,13 +1763,40 @@ export class PreferencesService extends DisposableService {
    */
   public async removeProviderInstance(instanceId: string): Promise<void> {
     this.assertNotDisposed();
+    if (instanceId === 'stagewise-default') {
+      throw new Error(
+        'The built-in Stagewise provider instance cannot be removed',
+      );
+    }
+
     const idx = this.findProviderInstanceIndex(instanceId);
     if (idx === -1) {
       throw new Error(`Provider instance ${instanceId} not found`);
     }
+
     const patches: Patch[] = [
       { op: 'remove', path: ['providerInstances', idx] },
     ];
+    for (
+      let index = this.preferences.customModels.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const model = this.preferences.customModels[index];
+      if (
+        model.providerInstanceId === instanceId ||
+        model.endpointId === instanceId
+      ) {
+        patches.push({ op: 'remove', path: ['customModels', index] });
+      }
+    }
+    if (this.preferences.agent.modelThinkingOverrides[instanceId]) {
+      patches.push({
+        op: 'remove',
+        path: ['agent', 'modelThinkingOverrides', instanceId],
+      });
+    }
+
     await this.update(patches);
     this.logger.debug(
       `[PreferencesService] Removed provider instance: ${instanceId}`,
