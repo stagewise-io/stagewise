@@ -203,7 +203,8 @@ export class ModelProviderService {
       endpointId === 'z-ai' ||
       endpointId === 'minimax' ||
       endpointId === 'xiaomi-mimo' ||
-      endpointId === 'mistral'
+      endpointId === 'mistral' ||
+      endpointId === 'tencent'
     ) {
       const { apiKey, baseURL } = this.resolveProviderEndpoint(endpointId);
       const apiSpecMap: Record<ModelProvider, ApiSpec> = {
@@ -217,6 +218,7 @@ export class ModelProviderService {
         minimax: 'openai-chat-completions',
         'xiaomi-mimo': 'openai-chat-completions',
         mistral: 'openai-chat-completions',
+        tencent: 'openai-chat-completions',
       };
       return { apiKey, baseURL, apiSpec: apiSpecMap[endpointId] };
     }
@@ -715,6 +717,26 @@ export class ModelProviderService {
         return {
           model: this.telemetryService.withTracing(
             // Mistral's OpenAI-compatible endpoint speaks Chat
+            // Completions. Internal model IDs already match native API IDs.
+            p.chat(modelId as any),
+            posthogConfig,
+          ),
+          headers,
+          providerOptions: providerOptions as Parameters<
+            typeof streamText
+          >[0]['providerOptions'],
+          contextWindowSize,
+          reasoningSignatureSource,
+        };
+      }
+      case 'tencent': {
+        const p = createOpenAI({
+          apiKey,
+          baseURL: baseURL ?? 'https://api.hunyuan.cloud.tencent.com/v1',
+        });
+        return {
+          model: this.telemetryService.withTracing(
+            // Tencent Hunyuan's OpenAI-compatible endpoint speaks Chat
             // Completions. Internal model IDs already match native API IDs.
             p.chat(modelId as any),
             posthogConfig,

@@ -14,7 +14,8 @@ export type ApiKeyProvider =
   | 'z-ai'
   | 'minimax'
   | 'xiaomi-mimo'
-  | 'mistral';
+  | 'mistral'
+  | 'tencent';
 
 export type ApiKeyValidationResult =
   | null
@@ -125,6 +126,11 @@ const providerConfigs: Record<
       apiKey,
       baseURL: baseURL ?? 'https://api.mistral.ai/v1',
     }).chat('mistral-small-latest'),
+  tencent: (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://api.hunyuan.cloud.tencent.com/v1',
+    }).chat('hy3'),
 };
 
 async function validateModel(model: ValidationModel): Promise<void> {
@@ -216,6 +222,7 @@ export async function validateApiKeys(
     minimax: null,
     'xiaomi-mimo': null,
     mistral: null,
+    tencent: null,
   };
 
   const promises: Promise<void>[] = [];

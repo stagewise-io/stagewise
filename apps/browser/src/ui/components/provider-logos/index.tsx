@@ -7,6 +7,7 @@ import { GoogleLogo } from './google';
 import { MinimaxLogo } from './minimax';
 import { MoonshotAiLogo } from './moonshotai';
 import { OpenAiLogo } from './openai';
+import { TencentLogo } from './tencent';
 import { XiaomiMiMoLogo } from './xiaomi-mimo';
 import { ZAiLogo } from './z-ai';
 import { MistralLogo } from './mistral';
@@ -30,6 +31,7 @@ export const PROVIDER_LOGOS: Record<ModelProvider, ProviderLogoComponent> = {
   minimax: MinimaxLogo,
   'xiaomi-mimo': XiaomiMiMoLogo,
   mistral: MistralLogo,
+  tencent: TencentLogo,
 };
 
 /**
@@ -52,6 +54,7 @@ export {
   MinimaxLogo,
   MoonshotAiLogo,
   OpenAiLogo,
+  TencentLogo,
   XiaomiMiMoLogo,
   ZAiLogo,
   MistralLogo,
