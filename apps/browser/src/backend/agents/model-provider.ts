@@ -379,8 +379,6 @@ export class ModelProviderService {
       throw new Error(`Provider instance ${providerInstanceId} not found`);
     }
 
-    // Vendor-backed instance — delegate to the vendor resolver to pick up
-    // stagewise fallback / coding-plan base URLs.
     if (instance.typeId === 'stagewise') {
       throw new Error(
         `Provider instance ${providerInstanceId} is a stagewise instance with no resolvable vendor`,
@@ -390,42 +388,45 @@ export class ModelProviderService {
     const type = getProviderType(instance.typeId);
     const config = instance.config as Record<string, unknown>;
 
-    // For coding-plan and vendor-api instances, resolve via the vendor
-    // endpoint to pick up default base URLs and apiSpec.
+    const decryptedConfig = this.decryptSensitiveFields(instance, type);
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+
     if (instance.typeId === 'coding-plan') {
-      const vendor = getCodingPlanVendor(config as CodingPlanConfig);
-      const resolved = this.resolveVendorEndpoint(vendor);
-      // Use the coding-plan instance's own config for decryption, but
-      // adopt the vendor resolver's baseURL fallback.
+      const planConfig = config as CodingPlanConfig;
+      const vendor = getCodingPlanVendor(planConfig);
+      const plan = CODING_PLANS[planConfig.planId as keyof typeof CODING_PLANS];
       return {
         instance,
         type,
-        apiKey: resolved.apiKey,
-        baseURL: config.baseUrl as string | undefined,
-        decryptedConfig: this.decryptSensitiveFields(instance, type),
+        apiKey,
+        baseURL:
+          planConfig.baseUrl ??
+          plan?.baseUrl ??
+          getProviderTypeByVendor(vendor).defaultBaseUrl,
+        decryptedConfig,
         apiSpec: VENDOR_API_SPECS[vendor],
       };
     }
 
     if (instance.typeId.endsWith('-api')) {
       const vendor = instance.typeId.slice(0, -4) as ModelProvider;
-      const resolved = this.resolveVendorEndpoint(vendor);
       return {
         instance,
         type,
-        apiKey: resolved.apiKey,
-        baseURL: resolved.baseURL,
-        decryptedConfig: resolved.decryptedConfig,
+        apiKey,
+        baseURL:
+          ModelProviderService.resolveBaseURL(config, type) ??
+          getProviderTypeByVendor(vendor).defaultBaseUrl,
+        decryptedConfig,
         apiSpec: VENDOR_API_SPECS[vendor],
       };
     }
 
     // Custom-type instance.
-    const decryptedConfig = this.decryptSensitiveFields(instance, type);
     return {
       instance,
       type,
-      apiKey: decryptedConfig.encryptedApiKey ?? '',
+      apiKey,
       baseURL: ModelProviderService.resolveBaseURL(config, type),
       decryptedConfig,
       apiSpec: type.apiSpec,
@@ -475,26 +476,6 @@ export class ModelProviderService {
       });
       throw error;
     }
-  }
-
-  /**
-   * Instance-aware variant: resolves the model through the specified
-   * provider instance rather than the legacy vendor-based routing.
-   * Falls back to `getModelWithOptions` when `providerInstanceId` is
-   * undefined (backward compatibility).
-   */
-  public getModelWithOptionsForInstance(
-    modelId: ModelId,
-    providerInstanceId: string | undefined,
-    traceId: string,
-    otherPostHogProperties?: Record<string, unknown>,
-  ): ModelWithOptions {
-    return this.getModelWithOptions(
-      modelId,
-      traceId,
-      otherPostHogProperties,
-      providerInstanceId,
-    );
   }
 
   private createModelWithOptions(
@@ -765,8 +746,12 @@ export class ModelProviderService {
     };
 
     // ── Wire-format model ID ────────────────────────────────────────────────
+    const vendor =
+      instance.typeId === 'coding-plan'
+        ? getCodingPlanVendor(instance.config as CodingPlanConfig)
+        : undefined;
     const wireModelId =
-      type.toWireModelId?.(customModel.modelId) ?? customModel.modelId;
+      type.toWireModelId?.(customModel.modelId, vendor) ?? customModel.modelId;
 
     // ── Create the language model via the provider type ─────────────────────
     const { model: rawModel, middleware } = type.createLanguageModel({
@@ -775,6 +760,7 @@ export class ModelProviderService {
       baseURL,
       config: instance.config as never,
       decryptedConfig,
+      vendor,
     });
 
     let model = rawModel;
@@ -1024,12 +1010,13 @@ function resolveThinkingProviderOptions({
 function omitModelRequestMetadata(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
-  if (!metadata || !(MODEL_REQUEST_PURPOSE_METADATA_KEY in metadata)) {
-    return metadata;
-  }
+  if (!metadata) return metadata;
 
-  const { [MODEL_REQUEST_PURPOSE_METADATA_KEY]: _purpose, ...telemetry } =
-    metadata;
+  const {
+    [MODEL_REQUEST_PURPOSE_METADATA_KEY]: _purpose,
+    $provider_instance_id: _providerInstanceId,
+    ...telemetry
+  } = metadata;
   return telemetry;
 }
 

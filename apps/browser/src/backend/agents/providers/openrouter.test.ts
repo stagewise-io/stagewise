@@ -103,6 +103,24 @@ describe('openrouterProviderType', () => {
 
   // ── Discovery — getInitialModels / refreshModels ────────────────────────
 
+  it('uses the default URL when a saved URL is blank', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+
+    await openrouterProviderType.getInitialModels!(
+      { baseUrl: '   ', encryptedApiKey: 'test-key' },
+      { encryptedApiKey: 'test-key' },
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/models',
+      expect.anything(),
+    );
+  });
+
   it('discovers models from the OpenRouter /v1/models endpoint', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(SAMPLE_MODELS), {
@@ -130,6 +148,29 @@ describe('openrouterProviderType', () => {
     expect(claude.capabilities?.outputModalities.text).toBe(true);
     expect(claude.pricing?.inputPerMillion).toBe(15);
     expect(claude.pricing?.outputPerMillion).toBe(75);
+  });
+
+  it('omits zero-formatted pricing', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify(
+          makeOpenRouterResponse([
+            {
+              id: 'free-model',
+              pricing: { prompt: '0.0', completion: '0.000' },
+            },
+          ]),
+        ),
+        { status: 200 },
+      ),
+    );
+
+    const [model] = await openrouterProviderType.getInitialModels!(
+      { encryptedApiKey: 'test-key' },
+      { encryptedApiKey: 'test-key' },
+    );
+
+    expect(model?.pricing).toBeUndefined();
   });
 
   it('detects reasoning-capable models via supported_parameters', async () => {

@@ -61,7 +61,7 @@ describe('AgentManager agents.create handler', () => {
     vi.restoreAllMocks();
   });
 
-  it('threads modelId and toolApprovalMode into createAgent initialState', async () => {
+  it('threads modelId, providerInstanceId, and toolApprovalMode into createAgent initialState', async () => {
     const createAgentSpy = vi
       .spyOn(AgentManager.prototype, 'createAgent')
       .mockResolvedValue({ instanceId: 'a1' } as any);
@@ -73,7 +73,14 @@ describe('AgentManager agents.create handler', () => {
     const id = await deps.registry.dispatch<unknown[], string>(
       'agents.create',
       { callerId: 'test' },
-      ['hello', 'claude-sonnet-4.6', 'smart', undefined, undefined],
+      [
+        'hello',
+        'claude-sonnet-4.6',
+        'anthropic-api-work',
+        'smart',
+        undefined,
+        undefined,
+      ],
     );
 
     expect(id).toBe('a1');
@@ -83,6 +90,7 @@ describe('AgentManager agents.create handler', () => {
     expect(args[0]).toBe(AgentTypes.CHAT);
     expect(args[3]).toEqual({
       activeModelId: 'claude-sonnet-4.6',
+      activeProviderInstanceId: 'anthropic-api-work',
       toolApprovalMode: 'smart',
     });
     expect(args[5]).toBe('hello');
@@ -102,7 +110,7 @@ describe('AgentManager agents.create handler', () => {
     await deps.registry.dispatch<unknown[], string>(
       'agents.create',
       { callerId: 'test' },
-      [undefined, undefined, 'alwaysAllow', undefined, undefined],
+      [undefined, undefined, undefined, 'alwaysAllow', undefined, undefined],
     );
 
     expect(createAgentSpy.mock.calls[0]?.[3]).toEqual({
@@ -124,7 +132,14 @@ describe('AgentManager agents.create handler', () => {
     await deps.registry.dispatch<unknown[], void>(
       'agents.create',
       { callerId: 'test' },
-      [undefined, undefined, undefined, ['/repos/linked/feature-x'], undefined],
+      [
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ['/repos/linked/feature-x'],
+        undefined,
+      ],
     );
 
     expect(deps.toolbox.resolveNewAgentMountPath).toHaveBeenCalledWith(
@@ -150,7 +165,14 @@ describe('AgentManager agents.create handler', () => {
     await deps.registry.dispatch<unknown[], void>(
       'agents.create',
       { callerId: 'test' },
-      [undefined, undefined, undefined, ['/repos/linked/feature-x'], true],
+      [
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ['/repos/linked/feature-x'],
+        true,
+      ],
     );
 
     expect(deps.toolbox.resolveNewAgentMountPath).not.toHaveBeenCalled();
@@ -177,7 +199,7 @@ describe('AgentManager agents.create handler', () => {
     await deps.registry.dispatch<unknown[], void>(
       'agents.create',
       { callerId: 'test' },
-      [undefined, undefined, undefined, ['/anywhere'], undefined],
+      [undefined, undefined, undefined, undefined, ['/anywhere'], undefined],
     );
 
     expect(deps.toolbox.handleMountWorkspace).toHaveBeenCalledWith(
@@ -204,7 +226,7 @@ describe('AgentManager agents.create handler', () => {
     await deps.registry.dispatch<unknown[], void>(
       'agents.create',
       { callerId: 'test' },
-      [undefined, undefined, undefined, undefined, undefined],
+      [undefined, undefined, undefined, undefined, undefined, undefined],
     );
 
     expect(deps.toolbox.resolveNewAgentMountPath).toHaveBeenCalledWith(

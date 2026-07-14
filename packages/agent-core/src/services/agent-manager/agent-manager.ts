@@ -427,12 +427,16 @@ export class AgentManager extends DisposableService {
       async (
         initialInputState?: string,
         modelId?: string,
+        providerInstanceId?: string,
         toolApprovalMode?: string,
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,
       ) => {
         const initialState: Partial<AgentState> = {};
         if (modelId) initialState.activeModelId = modelId;
+        if (providerInstanceId) {
+          initialState.activeProviderInstanceId = providerInstanceId;
+        }
         if (toolApprovalMode) initialState.toolApprovalMode = toolApprovalMode;
 
         const agent = await this.createAgent(
@@ -1028,23 +1032,22 @@ export class AgentManager extends DisposableService {
 
     // For new chat agents (not resumed), use the model from the last persisted chat
     // Validate the model still exists (it may have been a deleted custom model)
-    const [lastChatModelId, lastChatProviderInstanceId] =
+    const lastChatSelection =
       type === AgentTypes.CHAT
-        ? await Promise.all([
-            this.persistenceDb.getLastChatModelId(),
-            this.persistenceDb.getLastChatProviderInstanceId(),
-          ])
-        : [null, null];
+        ? await this.persistenceDb.getLastChatModelSelection()
+        : null;
     const lastModelValid =
-      lastChatModelId && this.host.models.has(lastChatModelId);
+      lastChatSelection?.activeModelId &&
+      this.host.models.has(lastChatSelection.activeModelId);
 
     // Build state object outside setState to avoid "Type instantiation is excessively deep" error
     // caused by complex Draft<[]> inference from the 'ai' package's UIMessage type
     const restoredInitialState =
       lastModelValid && type === AgentTypes.CHAT
         ? {
-            activeModelId: lastChatModelId,
-            activeProviderInstanceId: lastChatProviderInstanceId ?? undefined,
+            activeModelId: lastChatSelection.activeModelId,
+            activeProviderInstanceId:
+              lastChatSelection.activeProviderInstanceId ?? undefined,
           }
         : undefined;
     const resolvedInitialState = initialState ?? restoredInitialState;
@@ -1229,6 +1232,9 @@ export class AgentManager extends DisposableService {
           role: 'user';
         })[],
         activeModelId: resumedModelValid ? agent.activeModelId : undefined,
+        activeProviderInstanceId: resumedModelValid
+          ? (agent.activeProviderInstanceId ?? undefined)
+          : undefined,
         toolApprovalMode: agent.toolApprovalMode ?? DEFAULT_TOOL_APPROVAL_MODE,
         inputState: agent.inputState,
         usedTokens: agent.usedTokens,

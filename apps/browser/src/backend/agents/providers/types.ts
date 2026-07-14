@@ -115,12 +115,6 @@ export interface ProviderType<C = Record<string, unknown>> {
    */
   toWireModelId?(modelId: string, vendor?: ModelProvider): string;
 
-  /**
-   * Map a vendor to its OpenRouter provider prefix.
-   * Only meaningful for the `stagewise` type.
-   */
-  toRouterProviderId?(vendor: ModelProvider): string;
-
   // ── Model creation ────────────────────────────────────────────────────
 
   /**

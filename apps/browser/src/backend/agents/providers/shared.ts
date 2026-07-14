@@ -227,6 +227,45 @@ const DEFAULT_DISCOVERED_CAPABILITIES = {
  * timeout and maps the standard `{ data: { id: string }[] }` response to
  * `DiscoveredModel[]`.
  */
+/** Discover models from Anthropic's paginated `/v1/models` API. */
+export async function discoverAnthropicModels(
+  baseUrl: string,
+  apiKey: string,
+): Promise<DiscoveredModel[]> {
+  const url = `${baseUrl.replace(/\/$/, '')}/models`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Model discovery at ${url} returned ${response.status}`);
+    }
+    const data = (await response.json()) as {
+      data?: { id: string; display_name?: string }[];
+    };
+    return (data.data ?? []).map((model) => ({
+      modelId: model.id,
+      displayName: model.display_name ?? model.id,
+      capabilities: DEFAULT_DISCOVERED_CAPABILITIES,
+    }));
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(
+        `Model discovery timed out after ${DISCOVERY_TIMEOUT_MS / 1000}s at ${url}`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function discoverOpenAICompatibleModels(
   baseUrl: string,
   apiKey: string,
@@ -264,12 +303,9 @@ export async function discoverOpenAICompatibleModels(
       // Filter out non-chat/reasoning model types that OpenAI's /v1/models
       // endpoint returns (embeddings, TTS, whisper, realtime, moderation,
       // dall-e). These can't be used with chat completions or responses.
-      if (vendor === 'openai') {
-        return !/\b(embedding|tts|whisper|realtime|moderation|dall-e)\b/i.test(
-          m.id,
-        );
-      }
-      return true;
+      return !/\b(embedding|tts|whisper|realtime|moderation|dall-e)\b/i.test(
+        m.id,
+      );
     })
     .map((m) => {
       const thinkingEnabled = reasoningIds?.has(m.id.toLowerCase()) ?? false;
@@ -296,38 +332,51 @@ export async function discoverGoogleModels(
   baseUrl: string,
   apiKey: string,
 ): Promise<DiscoveredModel[]> {
-  const url = `${baseUrl.replace(/\/$/, '')}/models?key=${encodeURIComponent(apiKey)}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error(
-        `Model discovery timed out after ${DISCOVERY_TIMEOUT_MS / 1000}s at ${url}`,
-      );
-    }
-    throw err;
-  }
-  clearTimeout(timeout);
-  if (!response.ok) {
-    throw new Error(`Model discovery at ${url} returned ${response.status}`);
-  }
-  const data = (await response.json()) as {
+  const endpoint = `${baseUrl.replace(/\/$/, '')}/models`;
+  type GoogleModelsPage = {
     models?: {
       name: string;
       displayName?: string;
       inputTokenLimit?: number;
       supportedGenerationMethods?: string[];
     }[];
+    nextPageToken?: string;
   };
-  const models = (data.models ?? []).filter((m) =>
-    m.supportedGenerationMethods?.includes('generateContent'),
-  );
+  const models: NonNullable<GoogleModelsPage['models']> = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({ key: apiKey });
+    if (pageToken) params.set('pageToken', pageToken);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${endpoint}?${params.toString()}`, {
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error(
+          `Model discovery timed out after ${DISCOVERY_TIMEOUT_MS / 1000}s at ${endpoint}`,
+        );
+      }
+      throw err;
+    }
+    clearTimeout(timeout);
+    if (!response.ok) {
+      throw new Error(
+        `Model discovery at ${endpoint} returned ${response.status}`,
+      );
+    }
+    const page = (await response.json()) as GoogleModelsPage;
+    models.push(
+      ...(page.models ?? []).filter((model) =>
+        model.supportedGenerationMethods?.includes('generateContent'),
+      ),
+    );
+    pageToken = page.nextPageToken;
+  } while (pageToken);
   const reasoningIds = VENDOR_REASONING_MODEL_IDS.google;
   return models.map((m) => {
     const modelId = m.name.replace(/^models\//, '');
@@ -495,15 +544,15 @@ export async function discoverOpenRouterModels(
     let pricing: DiscoveredModel['pricing'];
     const promptStr = m.pricing?.prompt;
     const completionStr = m.pricing?.completion;
-    if (
-      promptStr &&
-      completionStr &&
-      promptStr !== '0' &&
-      completionStr !== '0'
-    ) {
+    if (promptStr && completionStr) {
       const promptPerToken = Number.parseFloat(promptStr);
       const completionPerToken = Number.parseFloat(completionStr);
-      if (!Number.isNaN(promptPerToken) && !Number.isNaN(completionPerToken)) {
+      if (
+        Number.isFinite(promptPerToken) &&
+        Number.isFinite(completionPerToken) &&
+        promptPerToken > 0 &&
+        completionPerToken > 0
+      ) {
         pricing = {
           inputPerMillion: promptPerToken * 1_000_000,
           outputPerMillion: completionPerToken * 1_000_000,

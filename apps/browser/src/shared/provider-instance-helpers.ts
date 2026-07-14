@@ -402,7 +402,13 @@ export function getInstanceThinkingDefaultOptions(instance: ProviderInstance): {
     // Coding plans route through the plan vendor's official API.
     return { providerMode: 'official' };
   }
-  if (instance.typeId.endsWith('-api') || instance.typeId === 'openrouter') {
+  if (instance.typeId === 'openrouter') {
+    return {
+      providerMode: 'custom',
+      customEndpointApiSpec: 'openai-chat-completions',
+    };
+  }
+  if (instance.typeId.endsWith('-api')) {
     return { providerMode: 'official' };
   }
   // Custom-type instance (custom-*, azure, bedrock, vertex).
@@ -629,7 +635,7 @@ function makeDiscoveredEntry(
  * Models in an instance's `disabledModelIds` are excluded.
  */
 export function getSelectableModelEntries(
-  prefs: UserPreferences,
+  prefs: Pick<UserPreferences, 'providerInstances' | 'customModels'>,
   options?: { includeDisabled?: boolean },
 ): ModelSelectorEntry[] {
   const includeDisabled = options?.includeDisabled ?? false;
@@ -765,11 +771,11 @@ export function getSelectableModelEntries(
  * Returns `undefined` if no entry matches.
  */
 export function findModelSelectorEntry(
-  prefs: UserPreferences,
+  prefs: Pick<UserPreferences, 'providerInstances' | 'customModels'>,
   instanceId: string,
   modelId: string,
 ): ModelSelectorEntry | undefined {
-  return getSelectableModelEntries(prefs).find(
+  return getSelectableModelEntries(prefs, { includeDisabled: true }).find(
     (e) => e.instanceId === instanceId && e.modelId === modelId,
   );
 }
@@ -778,7 +784,10 @@ export function findModelSelectorEntry(
  * Count the enabled models for a single provider instance.
  * Excludes disabled models and respects the instance type's model set.
  */
-export function getInstanceModelCount(instance: ProviderInstance): number {
+export function getInstanceModelCount(
+  instance: ProviderInstance,
+  preferences?: Pick<UserPreferences, 'customModels'>,
+): number {
   const disabled = new Set(instance.disabledModelIds ?? []);
   let count = 0;
   // Track catalog model IDs counted for this instance so discovered
@@ -834,6 +843,13 @@ export function getInstanceModelCount(instance: ProviderInstance): number {
         count++;
       }
     }
+  }
+
+  if (preferences) {
+    count += (preferences.customModels ?? []).filter((model) => {
+      const instanceId = model.providerInstanceId ?? model.endpointId;
+      return instanceId === instance.id && !disabled.has(model.modelId);
+    }).length;
   }
 
   return count;

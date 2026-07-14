@@ -37,6 +37,7 @@ import type {
   ToolApprovalMode,
   SocialAuthProvider,
   DiscoveredModel,
+  ProviderInstanceTypeId,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -2097,11 +2098,15 @@ export type KartonContract = {
       >;
       /** Remove a provider instance by id */
       removeProviderInstance: (instanceId: string) => Promise<void>;
-      /** Merge a partial config into an existing provider instance, and/or update its name */
+      /**
+       * Merge a partial config into an existing provider instance, and/or
+       * atomically replace its provider type and config.
+       */
       updateProviderInstance: (
         instanceId: string,
         partialConfig: Record<string, unknown>,
         name?: string,
+        replacementTypeId?: ProviderInstanceTypeId,
       ) => Promise<void>;
       /** Set an encrypted API key on a provider instance */
       setProviderInstanceApiKey: (

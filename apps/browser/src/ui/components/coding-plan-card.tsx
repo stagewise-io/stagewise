@@ -73,6 +73,7 @@ export function CodingPlanCard({
   const isConnected =
     !!instance &&
     instance.typeId === 'coding-plan' &&
+    (instance.config as { planId?: string }).planId === plan.id &&
     !!(instance.config as { encryptedApiKey?: string }).encryptedApiKey;
 
   const [localInput, setLocalInput] = useState('');

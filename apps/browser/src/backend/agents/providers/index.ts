@@ -37,6 +37,7 @@ export {
 } from './cloud';
 export type { AzureConfig, BedrockConfig, VertexConfig } from './cloud';
 export { ollamaProviderType } from './ollama';
+export type { OllamaConfig } from './ollama';
 export { openrouterProviderType } from './openrouter';
 export type { OpenRouterConfig } from './openrouter';
 export {
@@ -50,5 +51,6 @@ export {
   createGoogleModel,
   discoverOpenAICompatibleModels,
   discoverGoogleModels,
+  discoverAnthropicModels,
   discoverOpenRouterModels,
 } from './shared';

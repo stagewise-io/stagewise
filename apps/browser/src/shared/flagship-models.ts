@@ -168,6 +168,10 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
     discoveredModels.map((m) => m.modelId.toLowerCase()),
   );
 
+  const normalizedExistingDiscoveredIds = new Set(
+    Array.from(existingDiscoveredModelIds, (id) => id.toLowerCase()),
+  );
+
   // Start with a copy of existing disabled IDs.
   const disabledSet = new Set(existingDisabledModelIds);
 
@@ -179,7 +183,7 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
     if (catalogIds.has(idLower)) continue;
 
     // Previously known model — preserve user's choice (whether enabled or disabled).
-    if (existingDiscoveredModelIds.has(dm.modelId)) continue;
+    if (normalizedExistingDiscoveredIds.has(idLower)) continue;
 
     // Flagship discovered model — auto-enabled.
     if (flagshipIds.has(idLower)) continue;

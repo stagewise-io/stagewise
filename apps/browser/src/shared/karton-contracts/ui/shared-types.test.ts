@@ -474,6 +474,15 @@ describe('customModelSchema providerInstanceId migration', () => {
     expect(parsed.providerInstanceId).toBe('instance-1');
     expect(parsed.endpointId).toBe('endpoint-1');
   });
+
+  it('rejects a custom model without a routing target', () => {
+    expect(
+      customModelSchema.safeParse({
+        modelId: 'my-model',
+        displayName: 'My Model',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('userPreferencesSchema providerInstances', () => {

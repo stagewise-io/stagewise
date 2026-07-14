@@ -41,10 +41,17 @@ export function createBrowserHostModels(
       const providerInstanceId = metadata?.[
         PROVIDER_INSTANCE_ID_METADATA_KEY
       ] as string | undefined;
+      const telemetryMetadata = metadata
+        ? Object.fromEntries(
+            Object.entries(metadata).filter(
+              ([key]) => key !== PROVIDER_INSTANCE_ID_METADATA_KEY,
+            ),
+          )
+        : undefined;
       const result = modelProviderService.getModelWithOptions(
         modelId as ModelId,
         traceId,
-        metadata,
+        telemetryMetadata,
         providerInstanceId,
       );
       return result as ModelWithOptions;
@@ -56,25 +63,6 @@ export function createBrowserHostModels(
 
   return {
     getWithOptions,
-    async getModelWithOptionsForInstance(
-      modelId: string,
-      providerInstanceId: string | undefined,
-      traceId: string,
-      metadata?: Record<string, unknown>,
-    ): Promise<ModelWithOptions> {
-      try {
-        const result = modelProviderService.getModelWithOptionsForInstance(
-          modelId as ModelId,
-          providerInstanceId,
-          traceId,
-          metadata,
-        );
-        return result as ModelWithOptions;
-      } catch (error) {
-        if (error instanceof Error) throw error;
-        throw new Error(String(error));
-      }
-    },
     async get(modelId, traceId) {
       const { model } = await getWithOptions(modelId, traceId);
       return model;
@@ -121,24 +109,6 @@ export function createLazyBrowserHostModels(): LazyBrowserHostModels {
         );
       }
       return inner.getWithOptions(modelId, traceId, metadata);
-    },
-    async getModelWithOptionsForInstance(
-      modelId,
-      providerInstanceId,
-      traceId,
-      metadata,
-    ) {
-      if (!inner?.getModelWithOptionsForInstance) {
-        throw new Error(
-          `[BrowserHostModels] ModelProviderService not initialized yet; cannot resolve model ${modelId}`,
-        );
-      }
-      return inner.getModelWithOptionsForInstance(
-        modelId,
-        providerInstanceId,
-        traceId,
-        metadata,
-      );
     },
     async get(modelId, traceId) {
       if (!inner) {

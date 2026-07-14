@@ -48,7 +48,11 @@ const OLLAMA_VENDOR_PATTERNS: OllamaVendorPattern[] = [
     logo: PROVIDER_LOGOS.mistral,
   },
   { pattern: /^gemma/, displayName: 'Google', logo: PROVIDER_LOGOS.google },
-  { pattern: /^phi/, displayName: 'Microsoft', logo: MicrosoftLogo },
+  {
+    pattern: /^phi(?:[.:_-]|\d|$)/i,
+    displayName: 'Microsoft',
+    logo: MicrosoftLogo,
+  },
   { pattern: /^gpt-oss/, displayName: 'OpenAI', logo: PROVIDER_LOGOS.openai },
   { pattern: /^command-r/, displayName: 'Cohere', logo: CohereLogo },
   { pattern: /^nomic/, displayName: 'Nomic', logo: VendorMonogramLogo },

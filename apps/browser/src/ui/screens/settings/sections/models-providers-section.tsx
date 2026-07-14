@@ -2154,14 +2154,18 @@ function ModelsSection({
   const isTrulyCustom =
     !!filterInstance && filterInstance.typeId in INSTANCE_TYPE_ID_TO_API_SPEC;
   const [isReloading, setIsReloading] = useState(false);
+  const [reloadError, setReloadError] = useState<string | null>(null);
 
   const handleReloadModels = useCallback(async () => {
     if (!filterInstance) return;
     setIsReloading(true);
+    setReloadError(null);
     try {
       await refreshInstanceModels(filterInstance.id);
-    } catch {
-      // ignore — models just won't update
+    } catch (error) {
+      setReloadError(
+        error instanceof Error ? error.message : 'Failed to reload models.',
+      );
     } finally {
       setIsReloading(false);
     }
@@ -2311,10 +2315,15 @@ function ModelsSection({
         ? getInstanceModelThinkingOverride(
             preferences,
             thinkingPanelInstanceId,
-            thinkingPanelModelId,
+            thinkingPanelModel?.modelId ?? thinkingPanelModelId,
           )
         : undefined,
-    [preferences, thinkingPanelInstanceId, thinkingPanelModelId],
+    [
+      preferences,
+      thinkingPanelInstanceId,
+      thinkingPanelModelId,
+      thinkingPanelModel,
+    ],
   );
 
   const updateThinkingPanelOffset = useCallback(() => {
@@ -2499,7 +2508,9 @@ function ModelsSection({
       // Discovered model — construct a ThinkingPanelModel
       const instance = providerInstances.find((i) => i.id === instanceId);
       if (!instance) return undefined;
-      const entries = getSelectableModelEntries(preferences);
+      const entries = getSelectableModelEntries(preferences, {
+        includeDisabled: true,
+      });
       const entry = entries.find(
         (e) => e.instanceId === instanceId && e.modelId === modelId,
       );
@@ -2528,7 +2539,7 @@ function ModelsSection({
       const currentOverride = getInstanceModelThinkingOverride(
         preferences,
         instanceId,
-        modelId,
+        targetModelId,
       );
       const option = enabled
         ? getEnabledModelThinkingOption(model, currentOverride?.value, route)
@@ -2585,13 +2596,16 @@ function ModelsSection({
 
   const handleResetThinkingOverride = useCallback(
     async (instanceId: string, modelId: string) => {
-      const targetModelId = getAvailableModel(modelId)?.modelId ?? modelId;
+      const targetModelId =
+        resolveThinkingModel(instanceId, modelId)?.modelId ??
+        getAvailableModel(modelId)?.modelId ??
+        modelId;
       const [, patches] = produceWithPatches(preferences, (draft) => {
         delete draft.agent.modelThinkingOverrides[instanceId]?.[targetModelId];
       });
       await updatePreferences(patches);
     },
-    [preferences, updatePreferences],
+    [preferences, updatePreferences, resolveThinkingModel],
   );
 
   const handleSave = useCallback(
@@ -2663,6 +2677,8 @@ function ModelsSection({
           </Button>
         ) : null}
       </div>
+
+      {reloadError && <TruncatedErrorText text={reloadError} />}
 
       <div ref={listContainerRef} className="relative">
         <OverlayScrollbar
@@ -3298,7 +3314,7 @@ export function ModelsProvidersSection() {
   if (detailInstance) {
     const displayInfo = getTypeDisplayInfo(detailInstance.typeId);
     const credentialType = displayInfo?.credentialType ?? 'none';
-    const modelCount = getInstanceModelCount(detailInstance);
+    const modelCount = getInstanceModelCount(detailInstance, preferences);
     const canDelete = detailInstance.id !== DEFAULT_INSTANCE_ID;
     const canRename = detailInstance.typeId !== 'stagewise';
 
