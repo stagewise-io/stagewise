@@ -225,6 +225,43 @@ function getModelRequestUrl(
   return model.config?.url?.({ path: '/chat/completions' }).toString();
 }
 
+describe('deleted provider instance recovery', () => {
+  it('routes built-in models through Stagewise when their instance was deleted', () => {
+    const service = createTestModelProviderService();
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      undefined,
+      'deleted-openai-instance',
+    );
+
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'stagewise',
+      provider: 'openai',
+    });
+  });
+
+  it('keeps custom models unavailable after their provider instance is deleted', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.customModels.push({
+      modelId: 'deleted-custom-model',
+      displayName: 'Deleted Custom Model',
+      providerInstanceId: 'deleted-instance',
+    });
+
+    expect(() =>
+      service.getModelWithOptions(
+        'deleted-custom-model',
+        'trace-1',
+        undefined,
+        'deleted-instance',
+      ),
+    ).toThrow('Provider instance deleted-instance not found');
+  });
+});
+
 describe('model alias routing', () => {
   it('accepts alias IDs as built-in models', () => {
     const service = createTestModelProviderService();

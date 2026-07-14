@@ -1028,12 +1028,27 @@ export class AgentManager extends DisposableService {
 
     // For new chat agents (not resumed), use the model from the last persisted chat
     // Validate the model still exists (it may have been a deleted custom model)
-    const lastChatModelId = await this.persistenceDb.getLastChatModelId();
+    const [lastChatModelId, lastChatProviderInstanceId] =
+      type === AgentTypes.CHAT
+        ? await Promise.all([
+            this.persistenceDb.getLastChatModelId(),
+            this.persistenceDb.getLastChatProviderInstanceId(),
+          ])
+        : [null, null];
     const lastModelValid =
       lastChatModelId && this.host.models.has(lastChatModelId);
 
     // Build state object outside setState to avoid "Type instantiation is excessively deep" error
     // caused by complex Draft<[]> inference from the 'ai' package's UIMessage type
+    const restoredInitialState =
+      lastModelValid && type === AgentTypes.CHAT
+        ? {
+            activeModelId: lastChatModelId,
+            activeProviderInstanceId: lastChatProviderInstanceId ?? undefined,
+          }
+        : undefined;
+    const resolvedInitialState = initialState ?? restoredInitialState;
+
     const defaultState: AgentState = {
       title: '',
       isWorking: false,
@@ -1056,7 +1071,7 @@ export class AgentManager extends DisposableService {
         .requiredCapabilities,
       allowUserInput: (this.agentsMap as any)[type].config.allowUserInput,
       parentAgentInstanceId: parent?.parentInstanceId ?? null,
-      state: { ...defaultState, ...(initialState ?? {}) } as AgentState,
+      state: { ...defaultState, ...(resolvedInitialState ?? {}) } as AgentState,
     } as AgentInstanceEnvelope);
 
     this.logger.info(
@@ -1139,12 +1154,10 @@ export class AgentManager extends DisposableService {
       finishToolHandler: parent?.onFinish,
       finishToolErrorHandler: parent?.onError,
       agentTypeRegistry: this.agentTypeRegistry,
-      initialState: (initialState ?? {
-        activeModelId:
-          lastModelValid && type === AgentTypes.CHAT
-            ? lastChatModelId
-            : undefined,
-      }) as BaseAgentDependencies<any, any>['initialState'],
+      initialState: resolvedInitialState as BaseAgentDependencies<
+        any,
+        any
+      >['initialState'],
       renderExtraMention: this.renderHostMention,
       notificationEventHandler: this.onAgentEvent,
     });

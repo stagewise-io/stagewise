@@ -297,7 +297,16 @@ export class ModelProviderService {
     const prefs = this.preferencesService.get();
     const instance = prefs.providerInstances.find((i) => i.id === instanceId);
     if (!instance) {
-      throw new Error(`Provider instance ${instanceId} not found`);
+      // Persisted chats can outlive a deleted provider instance. Built-in
+      // catalog models remain routable through Stagewise Inference; custom
+      // and discovered models are rejected before reaching this path.
+      return {
+        instance: undefined,
+        type: stagewiseProviderType,
+        apiKey: this.authService.accessToken ?? '',
+        baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+        decryptedConfig: {} as Record<string, string>,
+      };
     }
 
     // Stagewise instance → inference path (same as no-vendor fallback).

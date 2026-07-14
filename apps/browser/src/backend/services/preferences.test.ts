@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultUserPreferences } from '@shared/karton-contracts/ui/shared-types';
 import { PreferencesService } from './preferences';
+import { CODING_PLANS } from '@shared/coding-plans';
 
 vi.hoisted(() => {
   vi.stubGlobal('__APP_BASE_NAME__', 'stagewise-test');
@@ -123,6 +124,218 @@ describe('PreferencesService provider instance names', () => {
       expect.objectContaining({
         typeId: 'openai-api',
         name: 'Production OpenAI',
+      }),
+    );
+  });
+});
+
+describe('PreferencesService provider instance deletion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it('removes dependent custom models and thinking overrides atomically', async () => {
+    const preferences = cloneDefaultPreferences();
+    const result = await createServiceWithPreferences(preferences);
+    const added = await result.addProviderInstance({
+      typeId: 'custom-openai-chat',
+      config: { baseUrl: 'https://example.com/v1' },
+    });
+    const instanceId = (added as { instanceId: string }).instanceId;
+    await result.update([
+      {
+        op: 'add',
+        path: ['customModels', 0],
+        value: {
+          modelId: 'custom-model',
+          displayName: 'Custom Model',
+          providerInstanceId: instanceId,
+        },
+      },
+      {
+        op: 'add',
+        path: ['agent', 'modelThinkingOverrides', instanceId],
+        value: { 'custom-model': { enabled: true } },
+      },
+    ]);
+
+    await result.removeProviderInstance(instanceId);
+
+    expect(result.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({ id: instanceId }),
+    );
+    expect(result.get().customModels).toEqual([]);
+    expect(result.get().agent.modelThinkingOverrides).not.toHaveProperty(
+      instanceId,
+    );
+  });
+
+  it('keeps unrelated preference records when deleting an instance', async () => {
+    const service = await createServiceWithPreferences();
+    const first = await service.addProviderInstance({
+      typeId: 'openai-api',
+      config: {},
+    });
+    const second = await service.addProviderInstance({
+      typeId: 'anthropic-api',
+      config: {},
+    });
+
+    await service.removeProviderInstance(
+      (first as { instanceId: string }).instanceId,
+    );
+
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: (second as { instanceId: string }).instanceId,
+      }),
+    );
+  });
+
+  it('rejects deletion of the built-in Stagewise instance', async () => {
+    const service = await createServiceWithPreferences();
+
+    await expect(
+      service.removeProviderInstance('stagewise-default'),
+    ).rejects.toThrow('cannot be removed');
+  });
+});
+
+describe('PreferencesService legacy provider migration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it('migrates official keys, custom endpoints and models, disabled models, and every coding plan idempotently', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerConfigs.openai = {
+      ...preferences.providerConfigs.openai,
+      mode: 'official',
+      encryptedApiKey: 'openai-key',
+    };
+    preferences.providerConfigs.anthropic = {
+      ...preferences.providerConfigs.anthropic,
+      mode: 'custom',
+      customProviderId: 'custom-anthropic',
+    };
+    preferences.customEndpoints = [
+      {
+        id: 'custom-anthropic',
+        name: 'Custom Anthropic',
+        apiSpec: 'anthropic',
+        baseUrl: 'https://anthropic.example.com',
+        encryptedApiKey: 'custom-key',
+        awsAuthMode: 'access-keys',
+      },
+    ];
+    preferences.customModels = [
+      {
+        modelId: 'custom-model',
+        displayName: 'Custom Model',
+        description: '',
+        contextWindowSize: 128_000,
+        endpointId: 'custom-anthropic',
+        thinkingEnabled: false,
+        capabilities: {
+          inputModalities: {
+            text: true,
+            audio: false,
+            image: false,
+            video: false,
+            file: false,
+          },
+          outputModalities: {
+            text: true,
+            audio: false,
+            image: false,
+            video: false,
+            file: false,
+          },
+          toolCalling: true,
+        },
+        providerOptions: {},
+        headers: {},
+      },
+    ];
+    for (const plan of Object.values(CODING_PLANS)) {
+      preferences.providerConfigs[plan.provider] = {
+        ...preferences.providerConfigs[plan.provider],
+        mode: 'official',
+        connectedCodingPlanId: plan.id,
+        encryptedApiKey: `${plan.id}-key`,
+      };
+    }
+
+    const service = await createServiceWithPreferences(preferences);
+    const instances = service.get().providerInstances;
+
+    expect(instances).toContainEqual(
+      expect.objectContaining({
+        id: 'openai-api-default',
+        typeId: 'openai-api',
+        config: expect.objectContaining({ encryptedApiKey: 'openai-key' }),
+      }),
+    );
+    expect(instances).toContainEqual(
+      expect.objectContaining({
+        id: 'custom-anthropic',
+        typeId: 'custom-anthropic',
+        config: expect.objectContaining({
+          baseUrl: 'https://anthropic.example.com',
+        }),
+      }),
+    );
+    expect(service.get().customModels).toContainEqual(
+      expect.objectContaining({
+        modelId: 'custom-model',
+        providerInstanceId: 'custom-anthropic',
+        endpointId: undefined,
+      }),
+    );
+    for (const plan of Object.values(CODING_PLANS)) {
+      expect(
+        instances.filter(
+          (instance) =>
+            instance.typeId === 'coding-plan' &&
+            instance.config.planId === plan.id,
+        ),
+      ).toHaveLength(1);
+    }
+
+    persistedDataMock.readPersistedData.mockResolvedValueOnce(service.get());
+    const repeated = await PreferencesService.create(logger as any);
+    expect(repeated.get().providerInstances).toHaveLength(instances.length);
+    expect(persistedDataMock.writePersistedData).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles a legacy coding plan when provider instances already exist', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances = [
+      {
+        id: 'stagewise-default',
+        typeId: 'stagewise',
+        name: 'Stagewise Inference',
+        config: {},
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+    preferences.providerConfigs['z-ai'] = {
+      ...preferences.providerConfigs['z-ai'],
+      mode: 'official',
+      encryptedApiKey: 'legacy-key',
+      connectedCodingPlanId: 'glm-coding-plan',
+    };
+
+    const service = await createServiceWithPreferences(preferences);
+
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: 'coding-plan:glm-coding-plan',
+        config: expect.objectContaining({ planId: 'glm-coding-plan' }),
       }),
     );
   });
