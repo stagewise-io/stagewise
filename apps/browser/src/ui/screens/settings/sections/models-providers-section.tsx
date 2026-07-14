@@ -79,7 +79,6 @@ import {
   IconPlusOutline18,
   IconPenOutline18,
   IconTrashOutline18,
-  IconCheck2Outline18,
   IconChevronRightOutline18,
   IconFolderCloudOutline18,
   IconServerOutline18,
@@ -491,9 +490,6 @@ function AddProviderGrid({
   const addProviderInstance = useKartonProcedure(
     (p) => p.preferences.addProviderInstance,
   );
-  const connectCodingPlan = useKartonProcedure(
-    (p) => p.preferences.connectCodingPlan,
-  );
   const preferences = useKartonState((s) => s.preferences);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [selected, setSelected] = useState<SelectionKey | null>(null);
@@ -511,30 +507,24 @@ function AddProviderGrid({
 
   const existingInstances = preferences.providerInstances ?? [];
 
-  // Check which vendor types already have an instance
-  const existingVendorTypes = new Set(
-    existingInstances
-      .filter(
-        (i) =>
-          i.typeId.endsWith('-api') ||
-          ADDABLE_VENDOR_TYPES.includes(i.typeId as ProviderInstanceTypeId),
-      )
-      .map((i) => i.typeId),
-  );
-  const existingSelfHostedTypes = new Set(
-    existingInstances
-      .filter((i) =>
-        ADDABLE_SELF_HOSTED_TYPES.includes(i.typeId as ProviderInstanceTypeId),
-      )
-      .map((i) => i.typeId),
-  );
+  const instanceCountByType = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const instance of existingInstances) {
+      counts.set(instance.typeId, (counts.get(instance.typeId) ?? 0) + 1);
+    }
+    return counts;
+  }, [existingInstances]);
 
   const codingPlans = useMemo(() => Object.values(CODING_PLANS), []);
-  const existingPlanIds = new Set(
-    existingInstances
-      .filter((i) => i.typeId === 'coding-plan')
-      .map((i) => (i.config as { planId?: string }).planId),
-  );
+  const instanceCountByPlan = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const instance of existingInstances) {
+      if (instance.typeId !== 'coding-plan') continue;
+      const planId = (instance.config as { planId?: string }).planId;
+      if (planId) counts.set(planId, (counts.get(planId) ?? 0) + 1);
+    }
+    return counts;
+  }, [existingInstances]);
 
   const handleConnect = useCallback(
     async (key: SelectionKey, value: string) => {
@@ -542,24 +532,22 @@ function AddProviderGrid({
       setIsConnecting(true);
       setError(null);
       try {
-        if (key.startsWith('plan:')) {
-          const planId = key.slice(5) as CodingPlanId;
-          const result = await connectCodingPlan(planId, value.trim());
-          if (!result.success) {
-            setError(result.error);
-            return;
-          }
-          onClose();
-          return;
-        }
-
+        const planId = key.startsWith('plan:')
+          ? (key.slice(5) as CodingPlanId)
+          : undefined;
+        const plan = planId ? CODING_PLANS[planId] : undefined;
         const isSelfHosted = ADDABLE_SELF_HOSTED_TYPES.includes(
           key as ProviderInstanceTypeId,
         );
 
         const result = await addProviderInstance({
-          typeId: key,
-          config: isSelfHosted ? { baseUrl: value.trim() } : {},
+          typeId: plan ? 'coding-plan' : key,
+          name: plan?.displayName,
+          config: plan
+            ? { planId: plan.id, baseUrl: plan.baseUrl }
+            : isSelfHosted
+              ? { baseUrl: value.trim() }
+              : {},
           validateApiKey: isSelfHosted ? undefined : value.trim(),
         });
         if (!result.success) {
@@ -573,7 +561,7 @@ function AddProviderGrid({
         setIsConnecting(false);
       }
     },
-    [addProviderInstance, connectCodingPlan, onClose, onConnected],
+    [addProviderInstance, onConnected],
   );
 
   // Resolve display info for the current selection
@@ -807,13 +795,13 @@ function AddProviderGrid({
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {filteredCodingPlans.map((plan) => {
-                        const exists = existingPlanIds.has(plan.id);
+                        const instanceCount =
+                          instanceCountByPlan.get(plan.id) ?? 0;
                         const planKey = `plan:${plan.id}` as SelectionKey;
                         return (
                           <button
                             key={plan.id}
                             type="button"
-                            disabled={exists}
                             onClick={() => {
                               setSelected(planKey);
                               setApiKey('');
@@ -822,7 +810,6 @@ function AddProviderGrid({
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
                               'border-derived hover:bg-hover-derived',
-                              exists && 'cursor-not-allowed opacity-50',
                             )}
                           >
                             <ProviderLogo
@@ -832,8 +819,10 @@ function AddProviderGrid({
                             <span className="min-w-0 flex-1 truncate text-foreground text-xs">
                               {plan.displayName}
                             </span>
-                            {exists && (
-                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            {instanceCount > 0 && (
+                              <span className="shrink-0 text-2xs text-subtle-foreground">
+                                {instanceCount} connected
+                              </span>
                             )}
                           </button>
                         );
@@ -851,12 +840,12 @@ function AddProviderGrid({
                     <div className="grid grid-cols-2 gap-2">
                       {filteredSelfHostedTypes.map((typeId) => {
                         const info = getTypeDisplayInfo(typeId);
-                        const exists = existingSelfHostedTypes.has(typeId);
+                        const instanceCount =
+                          instanceCountByType.get(typeId) ?? 0;
                         return (
                           <button
                             key={typeId}
                             type="button"
-                            disabled={exists}
                             onClick={() => {
                               setSelected(typeId);
                               setApiKey(info.defaultBaseUrl ?? '');
@@ -865,7 +854,6 @@ function AddProviderGrid({
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
                               'border-derived hover:bg-hover-derived',
-                              exists && 'cursor-not-allowed opacity-50',
                             )}
                           >
                             <InstanceLogo
@@ -875,8 +863,10 @@ function AddProviderGrid({
                             <span className="min-w-0 flex-1 truncate text-foreground text-xs">
                               {info.displayName}
                             </span>
-                            {exists && (
-                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            {instanceCount > 0 && (
+                              <span className="shrink-0 text-2xs text-subtle-foreground">
+                                {instanceCount} connected
+                              </span>
                             )}
                           </button>
                         );
@@ -894,12 +884,12 @@ function AddProviderGrid({
                     <div className="grid grid-cols-2 gap-2">
                       {filteredVendorTypes.map((typeId) => {
                         const info = getTypeDisplayInfo(typeId);
-                        const exists = existingVendorTypes.has(typeId);
+                        const instanceCount =
+                          instanceCountByType.get(typeId) ?? 0;
                         return (
                           <button
                             key={typeId}
                             type="button"
-                            disabled={exists}
                             onClick={() => {
                               setSelected(typeId);
                               setApiKey('');
@@ -908,7 +898,6 @@ function AddProviderGrid({
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
                               'border-derived hover:bg-hover-derived',
-                              exists && 'cursor-not-allowed opacity-50',
                             )}
                           >
                             <InstanceLogo
@@ -918,8 +907,10 @@ function AddProviderGrid({
                             <span className="min-w-0 flex-1 truncate text-foreground text-xs">
                               {info.displayName}
                             </span>
-                            {exists && (
-                              <IconCheck2Outline18 className="size-3 shrink-0 text-success-foreground" />
+                            {instanceCount > 0 && (
+                              <span className="shrink-0 text-2xs text-subtle-foreground">
+                                {instanceCount} connected
+                              </span>
                             )}
                           </button>
                         );
