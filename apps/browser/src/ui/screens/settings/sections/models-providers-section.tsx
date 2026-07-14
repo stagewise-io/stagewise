@@ -362,12 +362,20 @@ function ProviderInstanceCard({
   const isFreePlan = !plan || plan === 'free';
   const card = (
     <div
-      className="cursor-pointer space-y-3 rounded-lg border border-derived bg-surface-1 p-3"
+      className="cursor-pointer space-y-3 rounded-lg border border-derived bg-surface-1 p-3 transition-colors hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived"
+      role="button"
+      tabIndex={0}
       onClick={onConfigure}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onConfigure?.();
+        }
+      }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-1">
+          <div className="flex size-9 shrink-0 items-center justify-center">
             <InstanceLogo
               typeId={instance.typeId}
               instance={instance}
@@ -490,8 +498,9 @@ const ADDABLE_VENDOR_TYPES: ProviderInstanceTypeId[] = [
   'minimax-api',
   'xiaomi-mimo-api',
   'mistral-api',
-  'openrouter',
 ];
+
+const ADDABLE_GATEWAY_TYPES: ProviderInstanceTypeId[] = ['openrouter'];
 
 const ADDABLE_SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
 
@@ -623,27 +632,26 @@ function AddProviderGrid({
 
   // Filter providers by search query.
   const query = searchQuery.trim().toLowerCase();
-  const filteredVendorTypes = query
-    ? ADDABLE_VENDOR_TYPES.filter((typeId) => {
-        const info = getTypeDisplayInfo(typeId);
-        return info.displayName.toLowerCase().includes(query);
-      })
-    : ADDABLE_VENDOR_TYPES;
+  const filterTypes = (types: ProviderInstanceTypeId[]) =>
+    query
+      ? types.filter((typeId) => {
+          const info = getTypeDisplayInfo(typeId);
+          return info.displayName.toLowerCase().includes(query);
+        })
+      : types;
+  const filteredVendorTypes = filterTypes(ADDABLE_VENDOR_TYPES);
+  const filteredGatewayTypes = filterTypes(ADDABLE_GATEWAY_TYPES);
   const filteredCodingPlans = query
     ? codingPlans.filter((plan) =>
         plan.displayName.toLowerCase().includes(query),
       )
     : codingPlans;
-  const filteredSelfHostedTypes = query
-    ? ADDABLE_SELF_HOSTED_TYPES.filter((typeId) => {
-        const info = getTypeDisplayInfo(typeId);
-        return info.displayName.toLowerCase().includes(query);
-      })
-    : ADDABLE_SELF_HOSTED_TYPES;
+  const filteredSelfHostedTypes = filterTypes(ADDABLE_SELF_HOSTED_TYPES);
   const noResults =
     query.length > 0 &&
     filteredVendorTypes.length === 0 &&
     filteredCodingPlans.length === 0 &&
+    filteredGatewayTypes.length === 0 &&
     filteredSelfHostedTypes.length === 0;
 
   return (
@@ -826,7 +834,7 @@ function AddProviderGrid({
                             }}
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived',
+                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
                             )}
                           >
                             <ProviderLogo
@@ -835,6 +843,50 @@ function AddProviderGrid({
                             />
                             <span className="min-w-0 flex-1 truncate text-foreground text-xs">
                               {plan.displayName}
+                            </span>
+                            {instanceCount > 0 && (
+                              <span className="shrink-0 text-2xs text-subtle-foreground">
+                                {instanceCount} connected
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Gateways */}
+                {filteredGatewayTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium text-foreground text-xs">
+                      Gateways
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {filteredGatewayTypes.map((typeId) => {
+                        const info = getTypeDisplayInfo(typeId);
+                        const instanceCount =
+                          instanceCountByType.get(typeId) ?? 0;
+                        return (
+                          <button
+                            key={typeId}
+                            type="button"
+                            onClick={() => {
+                              setSelected(typeId);
+                              setApiKey('');
+                              setError(null);
+                            }}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
+                            )}
+                          >
+                            <InstanceLogo
+                              typeId={typeId}
+                              className="size-4 shrink-0 text-foreground"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                              {info.displayName}
                             </span>
                             {instanceCount > 0 && (
                               <span className="shrink-0 text-2xs text-subtle-foreground">
@@ -870,7 +922,7 @@ function AddProviderGrid({
                             }}
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived',
+                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
                             )}
                           >
                             <InstanceLogo
@@ -914,7 +966,7 @@ function AddProviderGrid({
                             }}
                             className={cn(
                               'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived',
+                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
                             )}
                           >
                             <InstanceLogo

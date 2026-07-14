@@ -33,7 +33,7 @@ const consoleUrl =
 
 type ProviderEntry = {
   key: string;
-  kind: 'vendor-api' | 'coding-plan' | 'self-hosted';
+  kind: 'vendor-api' | 'coding-plan' | 'gateway' | 'self-hosted';
   typeId: ProviderInstanceTypeId;
   displayName: string;
   tagline: string;
@@ -59,8 +59,9 @@ const VENDOR_API_TYPES: ProviderInstanceTypeId[] = [
   'minimax-api',
   'xiaomi-mimo-api',
   'mistral-api',
-  'openrouter',
 ];
+
+const GATEWAY_TYPES: ProviderInstanceTypeId[] = ['openrouter'];
 
 const SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
 
@@ -72,6 +73,19 @@ function buildUnifiedEntries(): ProviderEntry[] {
     entries.push({
       key: typeId,
       kind: 'vendor-api',
+      typeId,
+      displayName: info.displayName,
+      tagline: info.helpText ?? '',
+      getApiKeyUrl: info.getApiKeyUrl,
+      helpText: info.helpText,
+    });
+  }
+
+  for (const typeId of GATEWAY_TYPES) {
+    const info = getTypeDisplayInfo(typeId);
+    entries.push({
+      key: typeId,
+      kind: 'gateway',
       typeId,
       displayName: info.displayName,
       tagline: info.helpText ?? '',
@@ -115,6 +129,7 @@ const VENDOR_ENTRIES = UNIFIED_ENTRIES.filter((e) => e.kind === 'vendor-api');
 const CODING_PLAN_ENTRIES = UNIFIED_ENTRIES.filter(
   (e) => e.kind === 'coding-plan',
 );
+const GATEWAY_ENTRIES = UNIFIED_ENTRIES.filter((e) => e.kind === 'gateway');
 const SELF_HOSTED_ENTRIES = UNIFIED_ENTRIES.filter(
   (e) => e.kind === 'self-hosted',
 );
@@ -323,7 +338,7 @@ function ConnectionDetailView({
     setIsConnecting(true);
     setError(null);
     try {
-      if (entry.kind === 'vendor-api') {
+      if (entry.kind === 'vendor-api' || entry.kind === 'gateway') {
         const result = await addProviderInstance({
           typeId: entry.typeId,
           config: {},
@@ -507,6 +522,16 @@ function ScrollableProviderList({
     [query],
   );
 
+  const filteredGatewayEntries = useMemo(
+    () =>
+      query
+        ? GATEWAY_ENTRIES.filter((e) =>
+            e.displayName.toLowerCase().includes(query),
+          )
+        : GATEWAY_ENTRIES,
+    [query],
+  );
+
   const filteredSelfHostedEntries = useMemo(
     () =>
       query
@@ -532,11 +557,13 @@ function ScrollableProviderList({
   const allFilteredEntries = useMemo(
     () => [
       ...filteredCodingPlanEntries,
+      ...filteredGatewayEntries,
       ...filteredSelfHostedEntries,
       ...filteredVendorEntries,
     ],
     [
       filteredCodingPlanEntries,
+      filteredGatewayEntries,
       filteredSelfHostedEntries,
       filteredVendorEntries,
     ],
@@ -550,6 +577,11 @@ function ScrollableProviderList({
   const unconnectedCodingPlanEntries = useMemo(
     () => filteredCodingPlanEntries.filter((e) => !isEntryConnected(e)),
     [filteredCodingPlanEntries, isEntryConnected],
+  );
+
+  const unconnectedGatewayEntries = useMemo(
+    () => filteredGatewayEntries.filter((e) => !isEntryConnected(e)),
+    [filteredGatewayEntries, isEntryConnected],
   );
 
   const unconnectedSelfHostedEntries = useMemo(
@@ -577,6 +609,7 @@ function ScrollableProviderList({
     query.length > 0 &&
     connectedEntries.length === 0 &&
     unconnectedCodingPlanEntries.length === 0 &&
+    unconnectedGatewayEntries.length === 0 &&
     unconnectedSelfHostedEntries.length === 0 &&
     unconnectedVendorEntries.length === 0;
 
@@ -628,6 +661,23 @@ function ScrollableProviderList({
             <p className="font-medium text-foreground text-xs">Coding Plans</p>
             <div className="flex flex-col gap-2">
               {unconnectedCodingPlanEntries.map((entry) => (
+                <ProviderListCard
+                  key={entry.key}
+                  entry={entry}
+                  isConnected={isEntryConnected(entry)}
+                  onClick={() => onSelectEntry(entry)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Gateways */}
+        {unconnectedGatewayEntries.length > 0 && (
+          <div className="space-y-2">
+            <p className="font-medium text-foreground text-xs">Gateways</p>
+            <div className="flex flex-col gap-2">
+              {unconnectedGatewayEntries.map((entry) => (
                 <ProviderListCard
                   key={entry.key}
                   entry={entry}
