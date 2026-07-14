@@ -1,33 +1,23 @@
 import type { SVGProps } from 'react';
 
 /**
- * OpenRouter brand mark — a stylized hexagon with a center node,
- * representing the routing/mesh nature of the service.
- *
- * Uses `currentColor` so it inherits the nearest `color` / `text-*` class.
+ * Official OpenRouter brand glyph.
+ * Purple in light mode; neon yellow in dark mode.
+ * Source: https://openrouter.ai/brand/v2/openrouter-glyph-{light,dark}.svg
  */
 export function OpenRouterLogo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 401.4 293.7"
       xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
       role="img"
       aria-label="OpenRouter"
       {...props}
     >
-      <path d="M12 3.5 L20 8 L20 16 L12 20.5 L4 16 L4 8 Z" />
-      <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
-      <path d="M12 9.5 L12 3.5" />
-      <path d="M12 14.5 L12 20.5" />
-      <path d="M14.2 12.8 L19 15.5" opacity="0.5" />
-      <path d="M9.8 12.8 L5 15.5" opacity="0.5" />
-      <path d="M14.2 11.2 L19 8.5" opacity="0.5" />
-      <path d="M9.8 11.2 L5 8.5" opacity="0.5" />
+      <path
+        className="fill-[#7624F4] dark:fill-[#C8FF00]"
+        d="M303.9475,17.19926c42.79734,0,77.48933,34.69327,77.48933,77.48933s-34.69199,77.48933-77.48933,77.48933l76.86166,76.86244c9.76367,9.76313,2.84903,26.45667-10.95697,26.45667h-220.88335c-71.32686,0-129.14889-57.82202-129.14889-129.14889S77.64197,17.19926,148.96884,17.19926h154.97866ZM148.96884,68.85881c-42.79607,0-77.48933,34.69327-77.48933,77.48933s34.69327,77.48933,77.48933,77.48933,77.48933-34.69327,77.48933-77.48933-34.69327-77.48933-77.48933-77.48933Z"
+      />
     </svg>
   );
 }
