@@ -25,6 +25,7 @@ import {
   useKartonProcedure,
   useKartonConnected,
   useKartonReconnectState,
+  useComparingSelector,
 } from '@ui/hooks/use-karton';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useEventListener } from '@ui/hooks/use-event-listener';
@@ -1115,7 +1116,12 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       ? s.agents.instances[openAgent]?.state.activeProviderInstanceId
       : null,
   );
-  const preferences = useKartonState((s) => s.preferences);
+  const preferences = useKartonState(
+    useComparingSelector((s) => ({
+      providerInstances: s.preferences.providerInstances,
+      customModels: s.preferences.customModels,
+    })),
+  );
   const maxTokens = useMemo(() => {
     if (!activeModelId) return 200000;
     // Use the instance-aware selector entry to resolve context window.
@@ -1127,6 +1133,12 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     );
     if (entry) return entry.contextWindowRaw;
     // Fallback to catalog lookup (e.g. for models not yet in selector entries).
+    const customModel = preferences.customModels.find(
+      (model) =>
+        model.modelId === activeModelId &&
+        (model.providerInstanceId ?? model.endpointId) === instanceId,
+    );
+    if (customModel) return customModel.contextWindowSize;
     const builtIn = getAvailableModel(activeModelId);
     if (builtIn) return builtIn.modelContextRaw;
     return 200000;

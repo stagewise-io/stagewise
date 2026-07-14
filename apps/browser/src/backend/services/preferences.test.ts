@@ -202,6 +202,45 @@ describe('PreferencesService provider instance deletion', () => {
   });
 });
 
+describe('PreferencesService provider instance type replacements', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it('atomically replaces the provider type and drops incompatible config fields', async () => {
+    const service = await createServiceWithPreferences();
+    const added = await service.addProviderInstance({
+      typeId: 'custom-openai-chat',
+      config: {
+        baseUrl: 'https://example.com/v1',
+        encryptedApiKey: 'encrypted-api-key',
+      },
+    });
+    const instanceId = (added as { instanceId: string }).instanceId;
+
+    await service.updateProviderInstance(
+      instanceId,
+      { region: 'us-east-1' },
+      'Bedrock endpoint',
+      'bedrock',
+    );
+
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: instanceId,
+        typeId: 'bedrock',
+        name: 'Bedrock endpoint',
+        config: {
+          region: 'us-east-1',
+          encryptedApiKey: 'encrypted-api-key',
+          awsAuthMode: 'access-keys',
+        },
+      }),
+    );
+  });
+});
+
 describe('PreferencesService legacy provider migration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -486,6 +525,23 @@ describe('PreferencesService coding plan connection state', () => {
       ),
       connectedCodingPlanId: undefined,
     });
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: 'z-ai-api-default',
+        typeId: 'z-ai-api',
+        config: expect.objectContaining({
+          encryptedApiKey: Buffer.from('encrypted:normal-zai-key').toString(
+            'base64',
+          ),
+        }),
+      }),
+    );
+    expect(service.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({
+        typeId: 'coding-plan',
+        config: expect.objectContaining({ planId: 'glm-coding-plan' }),
+      }),
+    );
   });
 
   it('setProviderApiKey clears stale coding-plan routing state', async () => {
@@ -505,6 +561,17 @@ describe('PreferencesService coding plan connection state', () => {
       encryptedApiKey: Buffer.from('encrypted:manual-key').toString('base64'),
       connectedCodingPlanId: undefined,
     });
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: 'z-ai-api-default',
+        typeId: 'z-ai-api',
+        config: expect.objectContaining({
+          encryptedApiKey: Buffer.from('encrypted:manual-key').toString(
+            'base64',
+          ),
+        }),
+      }),
+    );
   });
 
   it('disconnectProvider clears stale coding-plan routing state', async () => {
@@ -524,5 +591,36 @@ describe('PreferencesService coding plan connection state', () => {
       encryptedApiKey: undefined,
       connectedCodingPlanId: undefined,
     });
+    expect(service.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({ id: 'z-ai-api-default' }),
+    );
+    expect(service.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({
+        typeId: 'coding-plan',
+        config: expect.objectContaining({ planId: 'glm-coding-plan' }),
+      }),
+    );
+  });
+
+  it('clears only canonical legacy routing instances', async () => {
+    const service = await createServiceWithPreferences();
+    const alternate = await service.addProviderInstance({
+      typeId: 'openai-api',
+      name: 'Alternate OpenAI',
+      config: { encryptedApiKey: 'alternate-key' },
+    });
+
+    await service.setProviderApiKey('openai', 'legacy-key');
+    await service.clearProviderApiKey('openai');
+
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: (alternate as { instanceId: string }).instanceId,
+        name: 'Alternate OpenAI',
+      }),
+    );
+    expect(service.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({ id: 'openai-api-default' }),
+    );
   });
 });

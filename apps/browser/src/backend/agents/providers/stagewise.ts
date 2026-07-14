@@ -17,10 +17,6 @@ export const stagewiseProviderType: ProviderType<StagewiseConfig> = {
   providerMode: 'stagewise',
   sensitiveFields: [],
 
-  toRouterProviderId(vendor: ModelProvider): string {
-    return OPENROUTER_PROVIDER_MAP[vendor] ?? vendor;
-  },
-
   toWireModelId(modelId: string, vendor?: ModelProvider): string {
     if (!vendor) return modelId;
     const prefix = OPENROUTER_PROVIDER_MAP[vendor] ?? vendor;
@@ -33,7 +29,9 @@ export const stagewiseProviderType: ProviderType<StagewiseConfig> = {
   } {
     const provider = createStagewise({ apiKey, baseURL: baseURL ?? '' });
     return {
-      model: provider.chatModel(modelId),
+      // The provider uses the AI SDK v4 interface, while the agent runtime
+      // currently accepts the v3 interface used by the remaining providers.
+      model: provider.chatModel(modelId) as unknown as LanguageModelV3,
       middleware: [stagewiseUrlPassthroughMiddleware],
     };
   },

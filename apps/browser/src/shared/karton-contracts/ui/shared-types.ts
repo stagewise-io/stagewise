@@ -149,40 +149,51 @@ export const customEndpointSchema = z.object({
 export type CustomEndpoint = z.infer<typeof customEndpointSchema>;
 
 /** A user-defined model that routes to a built-in provider or custom endpoint */
-export const customModelSchema = z.object({
-  modelId: z.string().min(1),
-  displayName: z.string().min(1),
-  description: z.string().default(''),
-  contextWindowSize: z.number().int().positive().default(128000),
-  /** @deprecated Use `providerInstanceId`. Kept for migration parsing only. */
-  endpointId: z.string().optional(),
-  /**
-   * ID of the provider instance this model routes to.
-   * Optional in the schema so legacy data (which only has `endpointId`)
-   * parses; the migration backfill makes it required at runtime.
-   */
-  providerInstanceId: z.string().optional(),
-  thinkingEnabled: z.boolean().default(false),
-  capabilities: modelCapabilitiesSchema.default({
-    inputModalities: {
-      text: true,
-      audio: false,
-      image: false,
-      video: false,
-      file: false,
-    },
-    outputModalities: {
-      text: true,
-      audio: false,
-      image: false,
-      video: false,
-      file: false,
-    },
-    toolCalling: true,
-  }),
-  providerOptions: z.record(z.string(), z.unknown()).default({}),
-  headers: z.record(z.string(), z.string()).default({}),
-});
+export const customModelSchema = z
+  .object({
+    modelId: z.string().min(1),
+    displayName: z.string().min(1),
+    description: z.string().default(''),
+    contextWindowSize: z.number().int().positive().default(128000),
+    /** @deprecated Use `providerInstanceId`. Kept for migration parsing only. */
+    endpointId: z.string().optional(),
+    /**
+     * ID of the provider instance this model routes to.
+     * Optional in the schema so legacy data (which only has `endpointId`)
+     * parses; the migration backfill makes it required at runtime.
+     */
+    providerInstanceId: z.string().optional(),
+    thinkingEnabled: z.boolean().default(false),
+    capabilities: modelCapabilitiesSchema.default({
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    }),
+    providerOptions: z.record(z.string(), z.unknown()).default({}),
+    headers: z.record(z.string(), z.string()).default({}),
+  })
+  .superRefine((model, ctx) => {
+    if (!model.providerInstanceId && !model.endpointId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'A custom model requires a provider instance or legacy endpoint',
+        path: ['providerInstanceId'],
+      });
+    }
+  });
 export type CustomModel = z.infer<typeof customModelSchema>;
 
 // ============================================================================
@@ -908,10 +919,9 @@ export const userPreferencesSchema = z.object({
             const record = val as Record<string, unknown>;
             const entries = Object.entries(record);
             if (entries.length === 0) return {};
-            // Detect old flat format: at least one value looks like an
-            // override object (has enabled/provider/value keys) rather
-            // than a nested Record<modelId, override>.
-            const looksLikeOldFormat = entries.some(([, v]) => {
+            // Detect the old flat format only when every top-level value
+            // is an override object rather than a nested instance record.
+            const looksLikeOldFormat = entries.every(([, v]) => {
               if (typeof v !== 'object' || v === null || Array.isArray(v))
                 return false;
               const keys = Object.keys(v);

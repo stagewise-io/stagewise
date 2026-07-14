@@ -50,9 +50,7 @@ export function setActiveModel(
 ): void {
   updateAgentInstanceState(store, agentInstanceId, (state) => {
     state.activeModelId = args.modelId;
-    if (args.providerInstanceId !== undefined) {
-      state.activeProviderInstanceId = args.providerInstanceId;
-    }
+    state.activeProviderInstanceId = args.providerInstanceId;
   });
 }
 

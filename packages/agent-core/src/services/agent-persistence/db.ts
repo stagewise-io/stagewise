@@ -464,42 +464,16 @@ export class AgentPersistenceDB {
   }
 
   /**
-   * Returns the activeModelId of the most recently persisted chat agent,
-   * or null if no chat agents exist.
+   * Returns the model and provider instance from the same most recently
+   * persisted root chat, or null when no chat agents exist.
    */
-  public async getLastChatModelId(): Promise<
-    schema.StoredAgentInstance['activeModelId'] | null
-  > {
-    const results = await this._db
-      .select({ activeModelId: schema.agentInstances.activeModelId })
-      .from(schema.agentInstances)
-      .where(
-        and(
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      )
-      .orderBy(desc(schema.agentInstances.lastMessageAt))
-      .limit(1)
-      .catch((error) => {
-        this._logger.error(
-          `[AgentPersistenceDB] Failed to fetch last chat model id: ${error}`,
-        );
-        return null;
-      });
-
-    return results?.[0]?.activeModelId ?? null;
-  }
-
-  /**
-   * Returns the activeProviderInstanceId of the most recently persisted
-   * chat agent, or null if no chat agents exist (or the column is null).
-   */
-  public async getLastChatProviderInstanceId(): Promise<
-    schema.StoredAgentInstance['activeProviderInstanceId'] | null
-  > {
+  public async getLastChatModelSelection(): Promise<{
+    activeModelId: schema.StoredAgentInstance['activeModelId'];
+    activeProviderInstanceId: schema.StoredAgentInstance['activeProviderInstanceId'];
+  } | null> {
     const results = await this._db
       .select({
+        activeModelId: schema.agentInstances.activeModelId,
         activeProviderInstanceId:
           schema.agentInstances.activeProviderInstanceId,
       })
@@ -514,12 +488,12 @@ export class AgentPersistenceDB {
       .limit(1)
       .catch((error) => {
         this._logger.error(
-          `[AgentPersistenceDB] Failed to fetch last chat provider instance id: ${error}`,
+          `[AgentPersistenceDB] Failed to fetch last chat model selection: ${error}`,
         );
         return null;
       });
 
-    return results?.[0]?.activeProviderInstanceId ?? null;
+    return results?.[0] ?? null;
   }
 
   /**

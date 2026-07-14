@@ -120,23 +120,6 @@ export interface HostModels {
   ): Promise<ModelWithOptions>;
 
   /**
-   * Variant of {@link getWithOptions} that explicitly carries the
-   * provider instance ID selected by the user. Used by hosts that
-   * support the model × instance architecture (PR 3).
-   *
-   * When `providerInstanceId` is provided, the host resolves the
-   * provider instance directly by ID instead of falling back to
-   * vendor-based routing. When omitted or undefined, behavior is
-   * identical to {@link getWithOptions} for backward compatibility.
-   */
-  getModelWithOptionsForInstance?(
-    modelId: string,
-    providerInstanceId: string | undefined,
-    traceId: string,
-    metadata?: Record<string, unknown>,
-  ): Promise<ModelWithOptions>;
-
-  /**
    * Convenience shortcut for `getWithOptions(...).then(r => r.model)`.
    * Intended for sites that only need the `LanguageModel`.
    */

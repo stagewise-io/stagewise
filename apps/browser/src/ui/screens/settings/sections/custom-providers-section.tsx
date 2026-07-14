@@ -1334,7 +1334,7 @@ function CustomEndpointsSection() {
         // updates `name`.  We pass the full config object for the
         // resolved typeId so that fields from a previous apiSpec switch
         // are overwritten rather than lingering.
-        await updateProviderInstance(instanceId, config, name);
+        await updateProviderInstance(instanceId, config, name, typeId);
 
         // Credentials are stored encrypted on the instance.  Only call
         // the setter when the user actually entered a value (secret
@@ -1351,9 +1351,6 @@ function CustomEndpointsSection() {
             data.googleCredentials,
           );
         }
-        // Suppress unused-variable warning for `typeId` — it's part of
-        // the destructured return but not needed on the update path.
-        void typeId;
       } else {
         const { typeId, name, config } = endpointSaveDataToInstanceArgs(data);
         const result = await addProviderInstance({

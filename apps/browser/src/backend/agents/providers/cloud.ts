@@ -3,6 +3,9 @@ import { createAzure } from '@ai-sdk/azure';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { fromIni, fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { createVertex } from '@ai-sdk/google-vertex';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { ApiSpec } from '@shared/karton-contracts/ui/shared-types';
 import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
@@ -64,6 +67,28 @@ export type BedrockConfig = {
  * `decryptedSecretKey` is only needed for `access-keys` mode and is
  * passed in already decrypted by the routing layer.
  */
+function resolveProfileRegion(profileName: string): string | undefined {
+  try {
+    const config = readFileSync(join(homedir(), '.aws', 'config'), 'utf8');
+    const section =
+      profileName === 'default' ? 'default' : `profile ${profileName}`;
+    const header = new RegExp(
+      `^\\s*\\[${section.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\]\\s*$`,
+      'm',
+    );
+    const match = header.exec(config);
+    if (!match) return undefined;
+    const content = config.slice(match.index + match[0].length);
+    const nextHeader = content.search(/^\s*\[/m);
+    const region = /^\s*region\s*=\s*(.+?)\s*$/m
+      .exec(nextHeader === -1 ? content : content.slice(0, nextHeader))?.[1]
+      ?.trim();
+    return region || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildBedrockProvider(
   config: BedrockConfig,
   apiKey: string,
@@ -79,7 +104,7 @@ function buildBedrockProvider(
       );
     }
     return createAmazonBedrock({
-      region: overrideRegion,
+      region: overrideRegion ?? resolveProfileRegion(config.awsProfileName),
       credentialProvider: fromIni({ profile: config.awsProfileName }),
     });
   }
@@ -92,6 +117,11 @@ function buildBedrockProvider(
   }
 
   // access-keys
+  if (!apiKey || !decryptedSecretKey) {
+    throw new Error(
+      'AWS access key ID and secret access key are required when awsAuthMode is "access-keys".',
+    );
+  }
   return createAmazonBedrock({
     region: overrideRegion ?? 'us-east-1',
     accessKeyId: apiKey,
@@ -141,7 +171,7 @@ export const vertexProviderType: ProviderType<VertexConfig> = {
   } {
     const decryptedCredentials = decryptedConfig.encryptedGoogleCredentials;
     const provider = createVertex({
-      project: config.projectId ?? '',
+      project: config.projectId?.trim() || undefined,
       location: config.location ?? 'us-central1',
       googleAuthOptions: decryptedCredentials
         ? { credentials: JSON.parse(decryptedCredentials) }

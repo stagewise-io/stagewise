@@ -10,7 +10,6 @@ import {
   type ModelProvider,
   type ProviderInstance,
   type CustomEndpoint,
-  type ApiSpec,
   type DiscoveredModel,
   userPreferencesSchema,
   defaultUserPreferences,
@@ -38,6 +37,7 @@ import {
 } from '../utils/validate-api-keys';
 import { getProviderType } from '../agents/providers/registry';
 import { computeDisabledModelIdsAfterDiscovery } from '@shared/flagship-models';
+import { apiSpecToTypeId } from '@shared/provider-instance-helpers';
 
 // Enable Immer patches support
 enablePatches();
@@ -130,10 +130,13 @@ export class PreferencesService extends DisposableService {
       defaultUserPreferences,
     );
 
+    // Capture fields removed by schema parsing before any migration can save
+    // preferences and rewrite the raw on-disk data.
+    const legacyDisabledModelIds = await this.readLegacyDisabledModelIds();
     // Migration: convert old customBaseUrl configs to customProviderId
     await this.migrateCustomBaseUrlToProviderId();
     // Migration: convert providerConfigs/customEndpoints into providerInstances
-    await this.migrateToProviderInstances();
+    await this.migrateToProviderInstances(legacyDisabledModelIds);
     // Older builds could populate providerInstances before mirroring a legacy
     // coding-plan connection. Reconcile those records independently so the
     // migration remains safe when the instance array is already non-empty.
@@ -218,7 +221,22 @@ export class PreferencesService extends DisposableService {
    *
    * Idempotent: if `providerInstances` is already populated this is a no-op.
    */
-  private async migrateToProviderInstances(): Promise<void> {
+  private async readLegacyDisabledModelIds(): Promise<string[]> {
+    try {
+      const raw = JSON.parse(
+        await import('node:fs/promises').then((fs) =>
+          fs.readFile(getJsonPath('preferences'), 'utf-8'),
+        ),
+      ) as { agent?: { disabledModelIds?: string[] } };
+      return raw.agent?.disabledModelIds ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async migrateToProviderInstances(
+    legacyDisabled: string[] = [],
+  ): Promise<void> {
     if (this.preferences.providerInstances.length > 0) return;
 
     const VENDORS: ModelProvider[] = [
@@ -340,22 +358,7 @@ export class PreferencesService extends DisposableService {
     }
 
     // 4. Migrate global disabledModelIds → stagewise-default instance.
-    //    All previously disabled models were implicitly on the stagewise
-    //    route, so they map to the stagewise-default instance.
-    //
-    //    The global field was removed from the Zod schema, so we read
-    //    it from the raw on-disk JSON instead of the parsed preferences.
-    let legacyDisabled: string[] = [];
-    try {
-      const raw = JSON.parse(
-        await import('node:fs/promises').then((fs) =>
-          fs.readFile(getJsonPath('preferences'), 'utf-8'),
-        ),
-      ) as { agent?: { disabledModelIds?: string[] } };
-      legacyDisabled = raw.agent?.disabledModelIds ?? [];
-    } catch {
-      // File doesn't exist or isn't valid JSON — nothing to migrate.
-    }
+    // All previously disabled models were implicitly on the stagewise route.
     if (legacyDisabled.length > 0) {
       const stagewiseInstance = instances.find(
         (i) => i.id === 'stagewise-default',
@@ -442,16 +445,7 @@ export class PreferencesService extends DisposableService {
    * references.
    */
   private endpointToInstance(endpoint: CustomEndpoint): ProviderInstance {
-    const apiSpecToTypeId: Record<ApiSpec, ProviderInstance['typeId']> = {
-      anthropic: 'custom-anthropic',
-      'openai-chat-completions': 'custom-openai-chat',
-      'openai-responses': 'custom-openai-responses',
-      google: 'custom-google',
-      azure: 'azure',
-      'amazon-bedrock': 'bedrock',
-      'google-vertex': 'vertex',
-    };
-    const typeId = apiSpecToTypeId[endpoint.apiSpec];
+    const typeId = apiSpecToTypeId(endpoint.apiSpec);
 
     // Build the provider instance per typeId, copying only the fields
     // relevant to it. Each case constructs the full instance object so the
@@ -701,8 +695,14 @@ export class PreferencesService extends DisposableService {
         instanceId: string,
         partialConfig: Record<string, unknown>,
         name?: string,
+        replacementTypeId?: ProviderInstanceTypeId,
       ) => {
-        await this.updateProviderInstance(instanceId, partialConfig, name);
+        await this.updateProviderInstance(
+          instanceId,
+          partialConfig,
+          name,
+          replacementTypeId,
+        );
       },
     );
 
@@ -1287,6 +1287,108 @@ export class PreferencesService extends DisposableService {
   // Provider API Key Methods
   // ===========================================================================
 
+  private getLegacyProviderRoutingInstancePatches(
+    provider: ModelProvider,
+    encryptedApiKey: string | undefined,
+  ): Patch[] {
+    const instanceId = `${provider}-api-default`;
+    const typeId = `${provider}-api` as Exclude<
+      ProviderInstanceTypeId,
+      'stagewise'
+    >;
+    const patches: Patch[] = [];
+    const canonicalIndex = this.preferences.providerInstances.findIndex(
+      (instance) => instance.id === instanceId,
+    );
+
+    if (encryptedApiKey) {
+      if (canonicalIndex === -1) {
+        patches.push({
+          op: 'add',
+          path: [
+            'providerInstances',
+            this.preferences.providerInstances.length,
+          ],
+          value: {
+            id: instanceId,
+            typeId,
+            name: PROVIDER_TYPE_DISPLAY_INFO[typeId].displayName,
+            config: { encryptedApiKey },
+            enabledModelIds: [],
+            disabledModelIds: [],
+            discoveredModels: [],
+          },
+        });
+      } else {
+        patches.push({
+          op: 'replace',
+          path: [
+            'providerInstances',
+            canonicalIndex,
+            'config',
+            'encryptedApiKey',
+          ],
+          value: encryptedApiKey,
+        });
+      }
+    }
+
+    const removalIndexes = this.preferences.providerInstances
+      .map((instance, index) => ({ instance, index }))
+      .filter(({ instance }) => {
+        if (instance.id === instanceId) return !encryptedApiKey;
+        if (instance.typeId !== 'coding-plan') return false;
+        const planId = (instance.config as { planId?: string }).planId;
+        return planId
+          ? CODING_PLANS[planId as CodingPlanId]?.provider === provider
+          : false;
+      })
+      .map(({ index }) => index)
+      .sort((a, b) => b - a);
+    for (const index of removalIndexes) {
+      patches.push({ op: 'remove', path: ['providerInstances', index] });
+    }
+
+    return patches;
+  }
+
+  private getLegacyProviderRoutingCleanupPatches(
+    provider: ModelProvider,
+  ): Patch[] {
+    const removedIds = this.preferences.providerInstances
+      .filter((instance) => {
+        if (instance.typeId !== 'coding-plan') return false;
+        const planId = (instance.config as { planId?: string }).planId;
+        return planId
+          ? CODING_PLANS[planId as CodingPlanId]?.provider === provider
+          : false;
+      })
+      .map((instance) => instance.id);
+    const patches: Patch[] = [];
+    for (
+      let index = this.preferences.customModels.length - 1;
+      index >= 0;
+      index--
+    ) {
+      if (
+        removedIds.includes(
+          this.preferences.customModels[index]!.providerInstanceId ?? '',
+        )
+      ) {
+        patches.push({ op: 'remove', path: ['customModels', index] });
+      }
+    }
+    for (const instanceId of removedIds) {
+      if (this.preferences.agent.modelThinkingOverrides[instanceId]) {
+        patches.push({
+          op: 'remove',
+          path: ['agent', 'modelThinkingOverrides', instanceId],
+        });
+      }
+    }
+    return patches;
+  }
+
   /**
    * Set an API key for a provider, encrypted via Electron's safeStorage.
    * The key is encrypted, base64-encoded, and stored in preferences.
@@ -1314,6 +1416,10 @@ export class PreferencesService extends DisposableService {
         path: ['providerConfigs', provider, 'connectedCodingPlanId'],
         value: undefined,
       },
+      ...this.getLegacyProviderRoutingInstancePatches(
+        provider,
+        encryptedBase64,
+      ),
     ];
 
     await this.update(patches);
@@ -1342,6 +1448,8 @@ export class PreferencesService extends DisposableService {
         path: ['providerConfigs', provider, 'connectedCodingPlanId'],
         value: undefined,
       },
+      ...this.getLegacyProviderRoutingInstancePatches(provider, undefined),
+      ...this.getLegacyProviderRoutingCleanupPatches(provider),
     ];
 
     await this.update(patches);
@@ -1364,9 +1472,6 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
     modelProviderSchema.parse(provider);
 
-    const cfg = this.preferences.providerConfigs[provider];
-    const connectedPlanId = cfg?.connectedCodingPlanId;
-
     const patches: Patch[] = [
       {
         op: 'replace',
@@ -1385,17 +1490,9 @@ export class PreferencesService extends DisposableService {
       },
     ];
 
-    // Remove the corresponding coding-plan instance so the UI updates.
-    if (connectedPlanId) {
-      const idx = this.preferences.providerInstances.findIndex(
-        (i) =>
-          i.typeId === 'coding-plan' &&
-          (i.config as { planId?: string }).planId === connectedPlanId,
-      );
-      if (idx !== -1) {
-        patches.push({ op: 'remove', path: ['providerInstances', idx] });
-      }
-    }
+    patches.push(
+      ...this.getLegacyProviderRoutingInstancePatches(provider, undefined),
+    );
 
     await this.update(patches);
     this.logger.debug(
@@ -1458,6 +1555,10 @@ export class PreferencesService extends DisposableService {
         path: ['providerConfigs', provider, 'connectedCodingPlanId'],
         value: undefined,
       },
+      ...this.getLegacyProviderRoutingInstancePatches(
+        provider,
+        encryptedBase64,
+      ),
     ];
     await this.update(patches);
 
@@ -1811,6 +1912,7 @@ export class PreferencesService extends DisposableService {
     instanceId: string,
     partialConfig: Record<string, unknown>,
     name?: string,
+    replacementTypeId?: ProviderInstanceTypeId,
   ): Promise<void> {
     this.assertNotDisposed();
     const idx = this.findProviderInstanceIndex(instanceId);
@@ -1818,8 +1920,40 @@ export class PreferencesService extends DisposableService {
       throw new Error(`Provider instance ${instanceId} not found`);
     }
     const current = this.preferences.providerInstances[idx];
-    const nextConfig = { ...current.config, ...partialConfig };
+    const typeId = replacementTypeId ?? current.typeId;
+    const isTypeReplacement = typeId !== current.typeId;
+    const nextType = getProviderType(typeId);
+    const currentConfig = current.config as Record<string, unknown>;
+    const nextConfig = isTypeReplacement
+      ? {
+          ...partialConfig,
+          ...Object.fromEntries(
+            nextType.sensitiveFields
+              .filter((field) => field in currentConfig)
+              .map((field) => [field, currentConfig[field]]),
+          ),
+        }
+      : { ...currentConfig, ...partialConfig };
+    // Validate the replacement discriminant and config together before persisting.
+    userPreferencesSchema.parse({
+      ...this.preferences,
+      providerInstances: this.preferences.providerInstances.map(
+        (instance, index) =>
+          index === idx
+            ? { ...instance, typeId, config: nextConfig }
+            : instance,
+      ),
+    });
     const patches: Patch[] = [
+      ...(typeId !== current.typeId
+        ? [
+            {
+              op: 'replace' as const,
+              path: ['providerInstances', idx, 'typeId'],
+              value: typeId,
+            },
+          ]
+        : []),
       {
         op: 'replace',
         path: ['providerInstances', idx, 'config'],

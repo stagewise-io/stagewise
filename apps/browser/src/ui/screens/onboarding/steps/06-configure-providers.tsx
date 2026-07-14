@@ -147,12 +147,12 @@ function TruncatedErrorText({ text }: { text: string }) {
     }
   }, []);
 
-  useState(() => {
+  useEffect(() => {
     checkTruncation();
-  });
+  }, [checkTruncation, text]);
 
   return (
-    <Tooltip open={isTruncated && tooltipOpen}>
+    <Tooltip open={isTruncated && tooltipOpen} onOpenChange={setTooltipOpen}>
       <TooltipTrigger>
         <p
           ref={ref}
@@ -162,6 +162,11 @@ function TruncatedErrorText({ text }: { text: string }) {
             setTooltipOpen(true);
           }}
           onMouseLeave={() => setTooltipOpen(false)}
+          onFocus={() => {
+            checkTruncation();
+            setTooltipOpen(true);
+          }}
+          onBlur={() => setTooltipOpen(false)}
         >
           {text}
         </p>
@@ -753,7 +758,7 @@ export function StepConfigureProviders({
   const isEntryConnected = useCallback(
     (entry: ProviderEntry) => {
       if (entry.kind === 'coding-plan' && entry.planId) {
-        return preferences.providerInstances?.some(
+        return !!preferences.providerInstances?.some(
           (instance) =>
             instance.typeId === 'coding-plan' &&
             (instance.config as { planId?: string }).planId === entry.planId &&

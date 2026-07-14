@@ -17,6 +17,7 @@ import {
   createGoogleModel,
   discoverOpenAICompatibleModels,
   discoverGoogleModels,
+  discoverAnthropicModels,
 } from './shared';
 
 // ============================================================================
@@ -59,7 +60,10 @@ const VENDOR_TO_API_SPEC: Record<ModelProvider, ApiSpec> = {
  * Per-vendor model ID used for the lightweight validation probe.
  * Must be a small/cheap model that every key can access.
  */
+const VALIDATION_TIMEOUT_MS = 10_000;
+
 const VENDOR_VALIDATION_MODEL: Partial<Record<ModelProvider, string>> = {
+  anthropic: 'claude-haiku-4-5',
   deepseek: 'deepseek-chat',
   moonshotai: 'kimi-k2.6',
   alibaba: 'qwen-turbo',
@@ -86,6 +90,59 @@ export const anthropicApiType: ProviderType<OfficialApiConfig> = {
 
   toWireModelId(modelId: string): string {
     return toNativeAnthropicModelId(modelId);
+  },
+
+  async getInitialModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    return discoverAnthropicModels(
+      config.baseUrl ?? vendorMeta('anthropic').defaultBaseUrl ?? '',
+      decryptedConfig.encryptedApiKey ?? '',
+    );
+  },
+
+  async refreshModels(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    return discoverAnthropicModels(
+      config.baseUrl ?? vendorMeta('anthropic').defaultBaseUrl ?? '',
+      decryptedConfig.encryptedApiKey ?? '',
+    );
+  },
+
+  async validateCredentials(
+    config: OfficialApiConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<{ success: true } | { success: false; error: string }> {
+    const apiKey = decryptedConfig.encryptedApiKey ?? '';
+    const baseUrl = config.baseUrl ?? vendorMeta('anthropic').defaultBaseUrl;
+    if (!baseUrl) {
+      return {
+        success: false,
+        error: 'No base URL configured for Anthropic API',
+      };
+    }
+    try {
+      await generateText({
+        model: createAnthropicModel(
+          apiKey,
+          baseUrl,
+          VENDOR_VALIDATION_MODEL.anthropic!,
+        ),
+        messages: [{ role: 'user', content: 'Respond with one word.' }],
+        abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
+      });
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: `Invalid Anthropic API key: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
   },
 
   createLanguageModel({ modelId, apiKey, baseURL }): {
@@ -153,6 +210,7 @@ export const openaiApiType: ProviderType<OfficialApiConfig> = {
             content: 'What is the capital of France? Respond with one word.',
           },
         ],
+        abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
       });
       return { success: true };
     } catch (err) {
@@ -232,6 +290,7 @@ export const googleApiType: ProviderType<OfficialApiConfig> = {
             content: 'What is the capital of France? Respond with one word.',
           },
         ],
+        abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
       });
       return { success: true };
     } catch (err) {
@@ -314,6 +373,7 @@ export const minimaxApiType: ProviderType<OfficialApiConfig> = {
             content: 'What is the capital of France? Respond with one word.',
           },
         ],
+        abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
       });
       return { success: true };
     } catch (err) {

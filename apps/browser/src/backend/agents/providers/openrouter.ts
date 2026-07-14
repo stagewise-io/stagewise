@@ -5,6 +5,8 @@ import type { ProviderType } from './types';
 import { generateText } from 'ai';
 import { createOpenAIChatModel, discoverOpenRouterModels } from './shared';
 
+const VALIDATION_TIMEOUT_MS = 10_000;
+
 // ============================================================================
 // OpenRouter config — encrypted key + optional base URL override
 // (same shape as OfficialApiConfig, re-declared for clarity)
@@ -46,7 +48,8 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]> {
     const baseUrl =
-      config.baseUrl ?? PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
+      config.baseUrl?.trim() ||
+      PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
     return discoverOpenRouterModels(apiKey, baseUrl);
   },
@@ -56,7 +59,8 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]> {
     const baseUrl =
-      config.baseUrl ?? PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
+      config.baseUrl?.trim() ||
+      PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
     return discoverOpenRouterModels(apiKey, baseUrl);
   },
@@ -72,7 +76,8 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
       return { success: false, error: 'OpenRouter API key is required' };
     }
     const baseUrl =
-      config.baseUrl ?? PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
+      config.baseUrl?.trim() ||
+      PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
     // Use a cheap, widely-available model for the validation probe.
     const validationModelId = 'openai/gpt-4o-mini';
     try {
@@ -84,6 +89,7 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
             content: 'What is the capital of France? Respond with one word.',
           },
         ],
+        abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
       });
       return { success: true };
     } catch (err) {

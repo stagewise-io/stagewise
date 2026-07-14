@@ -20,12 +20,10 @@ export type OllamaConfig = {
 // Capability inference from Ollama model names
 // ============================================================================
 
-const EMBED_SUFFIXES = /^all-minilm|^nomic-embed|^bge-|embed/;
 const VISION_SUFFIXES = /llava|bakllava|llama.*vision|minicpm-v/i;
 
 function inferCapabilities(modelName: string): ModelCapabilities {
-  const isEmbedding = EMBED_SUFFIXES.test(modelName);
-  const hasVision = !isEmbedding && VISION_SUFFIXES.test(modelName);
+  const hasVision = VISION_SUFFIXES.test(modelName);
 
   return {
     inputModalities: {
@@ -77,7 +75,7 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
     // provider appends /chat/completions directly to baseURL. Prepend /v1.
     const v1BaseURL = baseURL
       ? `${baseURL.replace(/\/$/, '')}/v1`
-      : 'http://localhost:11434/v1';
+      : `${(PROVIDER_TYPE_DISPLAY_INFO.ollama.defaultBaseUrl ?? 'http://localhost:11434').replace(/\/$/, '')}/v1`;
     const model = createOpenAIChatModel(
       'ollama',
       v1BaseURL,
@@ -92,8 +90,63 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
 // ============================================================================
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
+const METADATA_CONCURRENCY = 4;
 
-async function discoverOllamaModels(
+type OllamaModelMetadata = {
+  capabilities?: string[];
+};
+
+async function getOllamaModelMetadata(
+  endpoint: string,
+  name: string,
+): Promise<OllamaModelMetadata | undefined> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${endpoint}/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return undefined;
+    return (await response.json()) as OllamaModelMetadata;
+  } catch {
+    // The tags response is still useful when an older server does not expose
+    // capabilities. Unknown models remain selectable rather than hidden.
+    return undefined;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isEmbeddingOnly(metadata: OllamaModelMetadata | undefined): boolean {
+  const capabilities = metadata?.capabilities;
+  return (
+    !!capabilities?.includes('embedding') &&
+    !capabilities.includes('completion')
+  );
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  limit: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, values.length) }, async () => {
+      while (nextIndex < values.length) {
+        const index = nextIndex++;
+        results[index] = await mapper(values[index]!);
+      }
+    }),
+  );
+  return results;
+}
+
+export async function discoverOllamaModels(
   baseUrl: string,
 ): Promise<DiscoveredModel[]> {
   const url = `${baseUrl.replace(/\/$/, '')}/api/tags`;
@@ -119,9 +172,22 @@ async function discoverOllamaModels(
     models?: { name: string; modified_at?: string; size?: number }[];
   };
   const models = data.models ?? [];
-  return models.map((m) => ({
-    modelId: m.name,
-    displayName: m.name,
-    capabilities: inferCapabilities(m.name),
-  }));
+  const endpoint = `${baseUrl.replace(/\/$/, '')}/api`;
+  const metadata = await mapWithConcurrency(
+    models,
+    METADATA_CONCURRENCY,
+    (model) => getOllamaModelMetadata(endpoint, model.name),
+  );
+
+  return models.flatMap((model, index) =>
+    isEmbeddingOnly(metadata[index])
+      ? []
+      : [
+          {
+            modelId: model.name,
+            displayName: model.name,
+            capabilities: inferCapabilities(model.name),
+          },
+        ],
+  );
 }

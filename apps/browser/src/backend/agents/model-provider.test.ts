@@ -225,6 +225,121 @@ function getModelRequestUrl(
   return model.config?.url?.({ path: '/chat/completions' }).toString();
 }
 
+describe('custom model provider instance routing', () => {
+  it('uses the referenced vendor API instance credentials and endpoint', () => {
+    const service = createTestModelProviderService({
+      providerModes: { openai: 'official' },
+    });
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openai-api-first',
+        typeId: 'openai-api',
+        name: 'OpenAI first',
+        config: {
+          encryptedApiKey: 'first-key',
+          baseUrl: 'https://first.example.com/v1',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'openai-api-selected',
+        typeId: 'openai-api',
+        name: 'OpenAI selected',
+        config: {
+          encryptedApiKey: 'selected-key',
+          baseUrl: 'https://selected.example.com/v1',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+    preferences.customModels.push({
+      modelId: 'selected-openai-custom',
+      displayName: 'Selected OpenAI custom model',
+      providerInstanceId: 'openai-api-selected',
+      providerOptions: {},
+      headers: {},
+      contextWindowSize: 128_000,
+    });
+    const decryptProviderApiKey = (service as any).preferencesService
+      .decryptProviderApiKey;
+    decryptProviderApiKey.mockImplementation(
+      (encrypted: string) => `decrypted:${encrypted}`,
+    );
+
+    const result = service.getModelWithOptions(
+      'selected-openai-custom',
+      'trace-1',
+    );
+
+    expect(decryptProviderApiKey).toHaveBeenCalledWith('selected-key');
+    expect(decryptProviderApiKey).not.toHaveBeenCalledWith('first-key');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://selected.example.com/v1/chat/completions',
+    );
+  });
+
+  it('uses a coding plan base URL when the selected instance has none', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'coding-plan-first',
+        typeId: 'coding-plan',
+        name: 'Other GLM Coding Plan',
+        config: {
+          encryptedApiKey: 'first-plan-key',
+          planId: 'glm-coding-plan',
+          baseUrl: 'https://wrong.example.com/v4',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'coding-plan-selected',
+        typeId: 'coding-plan',
+        name: 'Selected GLM Coding Plan',
+        config: {
+          encryptedApiKey: 'selected-plan-key',
+          planId: 'glm-coding-plan',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+    preferences.customModels.push({
+      modelId: 'selected-plan-custom',
+      displayName: 'Selected coding plan custom model',
+      providerInstanceId: 'coding-plan-selected',
+      providerOptions: {},
+      headers: {},
+      contextWindowSize: 128_000,
+    });
+    const decryptProviderApiKey = (service as any).preferencesService
+      .decryptProviderApiKey;
+    decryptProviderApiKey.mockImplementation(
+      (encrypted: string) => `decrypted:${encrypted}`,
+    );
+
+    const result = service.getModelWithOptions(
+      'selected-plan-custom',
+      'trace-1',
+    );
+
+    expect(decryptProviderApiKey).toHaveBeenCalledWith('selected-plan-key');
+    expect(decryptProviderApiKey).not.toHaveBeenCalledWith('first-plan-key');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    );
+  });
+});
+
 describe('deleted provider instance recovery', () => {
   it('routes built-in models through Stagewise when their instance was deleted', () => {
     const service = createTestModelProviderService();
