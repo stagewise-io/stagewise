@@ -1483,7 +1483,6 @@ export class PreferencesService extends DisposableService {
     const plan = CODING_PLANS[planId];
     const result = await this.addProviderInstance({
       typeId: 'coding-plan',
-      name: plan.displayName,
       config: { planId, baseUrl: plan.baseUrl },
       validateApiKey: apiKey,
     });
@@ -1635,6 +1634,20 @@ export class PreferencesService extends DisposableService {
     );
   }
 
+  /** Return a unique display name for an automatically named instance. */
+  private getAvailableProviderInstanceName(baseName: string): string {
+    const existingNames = new Set(
+      this.preferences.providerInstances.map((instance) => instance.name),
+    );
+    if (!existingNames.has(baseName)) return baseName;
+
+    let suffix = 2;
+    while (existingNames.has(`${baseName} (${suffix})`)) {
+      suffix += 1;
+    }
+    return `${baseName} (${suffix})`;
+  }
+
   /**
    * Add a new provider instance. When `validateApiKey` is supplied and the
    * typeId is a vendor-api type, the key is validated before the instance is
@@ -1683,15 +1696,15 @@ export class PreferencesService extends DisposableService {
     }
 
     const instanceId = `${typeId}-${crypto.randomUUID()}`;
+    const defaultName = typeId.endsWith('-api')
+      ? (PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]
+          ?.displayName ?? typeId)
+      : typeId === 'coding-plan'
+        ? (CODING_PLANS[finalConfig.planId as CodingPlanId]?.displayName ??
+          'Coding Plan')
+        : typeId;
     const name =
-      args.name ??
-      (typeId.endsWith('-api')
-        ? (PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]
-            ?.displayName ?? typeId)
-        : typeId === 'coding-plan'
-          ? (CODING_PLANS[finalConfig.planId as CodingPlanId]?.displayName ??
-            'Coding Plan')
-          : typeId);
+      args.name ?? this.getAvailableProviderInstanceName(defaultName);
 
     // ── Model discovery ───────────────────────────────────────────────────────
     let discovered: DiscoveredModel[] = [];

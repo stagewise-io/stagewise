@@ -354,7 +354,6 @@ function ConnectionDetailView({
         const plan = CODING_PLANS[entry.planId];
         const result = await addProviderInstance({
           typeId: 'coding-plan',
-          name: plan.displayName,
           config: { planId: plan.id, baseUrl: plan.baseUrl },
           validateApiKey: apiKey.trim(),
         });
