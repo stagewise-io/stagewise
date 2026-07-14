@@ -557,31 +557,16 @@ function AddProviderGrid({
           key as ProviderInstanceTypeId,
         );
 
-        if (isSelfHosted) {
-          // Create the instance with the base URL — backend discovers models.
-          // Then open the details page so the user can select models there.
-          const result = await addProviderInstance({
-            typeId: key,
-            config: { baseUrl: value.trim() },
-          });
-          if (!result.success) {
-            setError(result.error);
-            return;
-          }
-          onConnected(result.instanceId);
+        const result = await addProviderInstance({
+          typeId: key,
+          config: isSelfHosted ? { baseUrl: value.trim() } : {},
+          validateApiKey: isSelfHosted ? undefined : value.trim(),
+        });
+        if (!result.success) {
+          setError(result.error);
           return;
-        } else {
-          const result = await addProviderInstance({
-            typeId: key,
-            config: {},
-            validateApiKey: value.trim(),
-          });
-          if (!result.success) {
-            setError(result.error);
-            return;
-          }
-          onClose();
         }
+        onConnected(result.instanceId);
       } catch {
         setError('Connection failed. Please try again.');
       } finally {
@@ -1877,6 +1862,116 @@ function InstanceModelGroup({
 }
 
 // =============================================================================
+// Collapsible Model Section (reusable for enabled/disabled model groups)
+// =============================================================================
+
+function CollapsibleModelSection({
+  instance,
+  entries,
+  preferences,
+  onToggleModel,
+  onEditThinking,
+  label = 'Enabled',
+  defaultExpanded = true,
+  emptyMessage,
+}: {
+  instance: ProviderInstance;
+  entries: ModelSelectorEntry[];
+  preferences: UserPreferences;
+  onToggleModel: (instanceId: string, modelId: string) => void;
+  onEditThinking: (
+    instanceId: string,
+    modelId: string,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void;
+  label?: string;
+  defaultExpanded?: boolean;
+  emptyMessage?: string;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const disabledSet = useMemo(
+    () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
+    [preferences, instance.id],
+  );
+
+  const thinkingDefaultOptions = useMemo(
+    () => getInstanceThinkingDefaultOptions(instance),
+    [instance],
+  );
+
+  const handleEditThinking = useCallback(
+    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
+      onEditThinking(instance.id, modelId, event);
+    },
+    [instance.id, onEditThinking],
+  );
+
+  if (entries.length === 0) {
+    if (!emptyMessage) return null;
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <span className="font-medium text-muted-foreground text-xs">
+            {label}
+          </span>
+          <span className="text-2xs text-muted-foreground/60">0 models</span>
+        </div>
+        <p className="px-3 py-1 text-2xs text-muted-foreground">
+          {emptyMessage}
+        </p>
+      </div>
+    );
+  }
+
+  // Sort enabled entries alphabetically by display name
+  const sortedEntries = [...entries].sort((a, b) =>
+    a.displayName.localeCompare(b.displayName),
+  );
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground text-xs transition-colors group-hover:text-foreground">
+          {label}
+        </span>
+        <span className="shrink-0 text-2xs text-muted-foreground transition-colors group-hover:text-foreground">
+          {entries.length} models
+        </span>
+        <IconChevronDownOutline18
+          className={cn(
+            'size-3.5 shrink-0 text-muted-foreground transition-colors transition-transform group-hover:text-foreground',
+            !expanded && '-rotate-90',
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="space-y-2 pl-1">
+          {sortedEntries.map((entry) => (
+            <BuiltInModelCard
+              key={entry.modelId}
+              model={entry}
+              isEnabled={!disabledSet.has(entry.modelId)}
+              thinkingDisplay={computeEntryThinkingDisplay(
+                entry,
+                instance,
+                preferences,
+                thinkingDefaultOptions,
+              )}
+              onToggle={() => onToggleModel(instance.id, entry.modelId)}
+              onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // Vendor Model Group (OpenRouter detail page)
 // =============================================================================
 
@@ -1886,6 +1981,7 @@ function VendorModelGroup({
   preferences,
   onToggleModel,
   onEditThinking,
+  defaultExpanded,
 }: {
   instance: ProviderInstance;
   group: VendorGroup;
@@ -1896,8 +1992,9 @@ function VendorModelGroup({
     modelId: string,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  defaultExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded ?? true);
   const disabledSet = useMemo(
     () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
     [preferences, instance.id],
@@ -2512,26 +2609,6 @@ function ModelsSection({
             ? (() => {
                 const filteredGroup = filteredGroups[0];
                 if (!filteredGroup) return null;
-                const vendorGroups = groupEntriesByVendor(
-                  filteredGroup.entries,
-                  filterInstance,
-                );
-                if (!vendorGroups) {
-                  // No vendor grouping for this provider type —
-                  // fall through to the default InstanceModelGroup path.
-                  return filteredGroups.map(({ instance, entries }) => (
-                    <InstanceModelGroup
-                      key={instance.id}
-                      instance={instance}
-                      entries={entries}
-                      preferences={preferences}
-                      onToggleModel={handleToggleModel}
-                      onEditThinking={handleEditThinking}
-                      onEditCustomModel={handleEdit}
-                      onDeleteCustomModel={handleDelete}
-                    />
-                  ));
-                }
                 const instanceCustomModels = (
                   preferences?.customModels ?? EMPTY_CUSTOM_MODELS
                 ).filter(
@@ -2545,6 +2622,171 @@ function ModelsSection({
                     filteredGroup.instance.id,
                   ),
                 );
+
+                // Keep the enabled/disabled overview consistent across every
+                // provider. While searching, show a flat set of matching
+                // results instead of splitting matches across sections.
+                const hasSearch = searchQuery.trim().length > 0;
+                const useEnabledSplit = !hasSearch;
+
+                const vendorGroups = groupEntriesByVendor(
+                  filteredGroup.entries,
+                  filterInstance,
+                );
+                if (!vendorGroups) {
+                  // No vendor grouping for this provider type.
+                  if (useEnabledSplit) {
+                    const enabledEntries = filteredGroup.entries.filter(
+                      (e) => !disabledIds.has(e.modelId),
+                    );
+                    return (
+                      <div className="space-y-2">
+                        <CollapsibleModelSection
+                          instance={filteredGroup.instance}
+                          entries={enabledEntries}
+                          preferences={preferences}
+                          onToggleModel={handleToggleModel}
+                          onEditThinking={handleEditThinking}
+                          emptyMessage="No models enabled — enable models from below."
+                        />
+                        {filteredGroup.entries.length > 0 && (
+                          <CollapsibleModelSection
+                            instance={filteredGroup.instance}
+                            entries={filteredGroup.entries}
+                            preferences={preferences}
+                            onToggleModel={handleToggleModel}
+                            onEditThinking={handleEditThinking}
+                            label="Other models"
+                            defaultExpanded={false}
+                          />
+                        )}
+                        {/* Custom models for this instance */}
+                        {instanceCustomModels.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="px-3 font-medium text-muted-foreground text-xs">
+                              Custom Models
+                            </span>
+                            {instanceCustomModels.map((model) => (
+                              <CustomModelCard
+                                key={model.modelId}
+                                model={model}
+                                endpointName={resolveCustomModelInstanceName(
+                                  preferences,
+                                  {
+                                    providerInstanceId:
+                                      model.providerInstanceId,
+                                    endpointId: model.endpointId,
+                                  },
+                                )}
+                                isEnabled={!disabledIds.has(model.modelId)}
+                                onToggle={() =>
+                                  handleToggleModel(
+                                    filteredGroup.instance.id,
+                                    model.modelId,
+                                  )
+                                }
+                                onEdit={() => handleEdit(model)}
+                                onDelete={() => handleDelete(model.modelId)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  // Fall through to the default InstanceModelGroup path.
+                  return filteredGroups.map(({ instance, entries }) => (
+                    <InstanceModelGroup
+                      key={instance.id}
+                      instance={instance}
+                      entries={entries}
+                      preferences={preferences}
+                      onToggleModel={handleToggleModel}
+                      onEditThinking={handleEditThinking}
+                      onEditCustomModel={handleEdit}
+                      onDeleteCustomModel={handleDelete}
+                    />
+                  ));
+                }
+
+                if (useEnabledSplit) {
+                  const enabledEntries = filteredGroup.entries.filter(
+                    (e) => !disabledIds.has(e.modelId),
+                  );
+                  return (
+                    <div className="space-y-2">
+                      <CollapsibleModelSection
+                        instance={filteredGroup.instance}
+                        entries={enabledEntries}
+                        preferences={preferences}
+                        onToggleModel={handleToggleModel}
+                        onEditThinking={handleEditThinking}
+                        emptyMessage="No models enabled — enable models from below."
+                      />
+
+                      {/* The enabled section is a summary. Keep every model
+                          available in its regular vendor section as well. */}
+                      {vendorGroups ? (
+                        <div className="space-y-2">
+                          {vendorGroups.map((vg) => (
+                            <VendorModelGroup
+                              key={vg.prefix || 'other'}
+                              instance={filteredGroup.instance}
+                              group={vg}
+                              preferences={preferences}
+                              onToggleModel={handleToggleModel}
+                              onEditThinking={handleEditThinking}
+                              defaultExpanded={false}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <CollapsibleModelSection
+                          instance={filteredGroup.instance}
+                          entries={filteredGroup.entries}
+                          preferences={preferences}
+                          onToggleModel={handleToggleModel}
+                          onEditThinking={handleEditThinking}
+                          label="Other models"
+                          defaultExpanded={false}
+                        />
+                      )}
+
+                      {/* Custom models for this instance */}
+                      {instanceCustomModels.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="px-3 font-medium text-muted-foreground text-xs">
+                            Custom Models
+                          </span>
+                          {instanceCustomModels.map((model) => (
+                            <CustomModelCard
+                              key={model.modelId}
+                              model={model}
+                              endpointName={resolveCustomModelInstanceName(
+                                preferences,
+                                {
+                                  providerInstanceId: model.providerInstanceId,
+                                  endpointId: model.endpointId,
+                                },
+                              )}
+                              isEnabled={!disabledIds.has(model.modelId)}
+                              onToggle={() =>
+                                handleToggleModel(
+                                  filteredGroup.instance.id,
+                                  model.modelId,
+                                )
+                              }
+                              onEdit={() => handleEdit(model)}
+                              onDelete={() => handleDelete(model.modelId)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Search results stay grouped by vendor when supported.
                 return (
                   <>
                     {vendorGroups.map((vg) => (
