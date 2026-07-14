@@ -79,7 +79,7 @@ describe('PreferencesService coding plan connection state', () => {
     });
   });
 
-  it('connectCodingPlan validates against the plan and stores the plan id', async () => {
+  it('connectCodingPlan delegates to an instance-backed coding-plan connection', async () => {
     const service = await createServiceWithPreferences();
 
     const result = await service.connectCodingPlan(
@@ -99,12 +99,26 @@ describe('PreferencesService coding plan connection state', () => {
     );
     expect(validationMock.validateApiKeys).not.toHaveBeenCalled();
 
-    const prefs = service.get();
-    expect(prefs.providerConfigs['z-ai']).toMatchObject({
-      mode: 'official',
-      encryptedApiKey: Buffer.from('encrypted:glm-key').toString('base64'),
-      connectedCodingPlanId: 'glm-coding-plan',
+    const instance = service
+      .get()
+      .providerInstances.find(
+        (candidate) =>
+          candidate.typeId === 'coding-plan' &&
+          candidate.config.planId === 'glm-coding-plan',
+      );
+    expect(instance).toMatchObject({
+      typeId: 'coding-plan',
+      name: 'GLM Coding Plan',
+      config: {
+        baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+        encryptedApiKey: Buffer.from('encrypted:glm-key').toString('base64'),
+        planId: 'glm-coding-plan',
+      },
     });
+    expect(instance?.id).toMatch(/^coding-plan-/);
+    expect(service.get().providerConfigs['z-ai']).toEqual(
+      defaultUserPreferences.providerConfigs['z-ai'],
+    );
   });
 
   it('does not mutate preferences when coding-plan validation fails', async () => {
@@ -124,10 +138,48 @@ describe('PreferencesService coding plan connection state', () => {
     );
 
     expect(result).toEqual({ success: false, error: 'invalid key' });
-    expect(service.get().providerConfigs['z-ai']).toEqual(
-      defaultUserPreferences.providerConfigs['z-ai'],
+    expect(service.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({
+        typeId: 'coding-plan',
+        config: expect.objectContaining({ planId: 'glm-coding-plan' }),
+      }),
     );
     expect(persistedDataMock.writePersistedData).not.toHaveBeenCalled();
+  });
+
+  it('migrates legacy coding-plan connections after provider instances exist', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances = [
+      {
+        id: 'stagewise-default',
+        typeId: 'stagewise',
+        name: 'Stagewise Inference',
+        config: {},
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+    preferences.providerConfigs['z-ai'] = {
+      ...preferences.providerConfigs['z-ai'],
+      mode: 'official',
+      encryptedApiKey: 'legacy-encrypted-key',
+      connectedCodingPlanId: 'glm-coding-plan',
+    };
+
+    const service = await createServiceWithPreferences(preferences);
+
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: 'coding-plan:glm-coding-plan',
+        typeId: 'coding-plan',
+        config: expect.objectContaining({
+          encryptedApiKey: 'legacy-encrypted-key',
+          planId: 'glm-coding-plan',
+          baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+        }),
+      }),
+    );
   });
 
   it('connectProvider clears stale coding-plan routing state', async () => {

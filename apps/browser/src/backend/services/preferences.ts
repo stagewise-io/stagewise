@@ -134,6 +134,10 @@ export class PreferencesService extends DisposableService {
     await this.migrateCustomBaseUrlToProviderId();
     // Migration: convert providerConfigs/customEndpoints into providerInstances
     await this.migrateToProviderInstances();
+    // Older builds could populate providerInstances before mirroring a legacy
+    // coding-plan connection. Reconcile those records independently so the
+    // migration remains safe when the instance array is already non-empty.
+    await this.migrateLegacyCodingPlansToProviderInstances();
 
     this.logger.debug('[PreferencesService] Loaded preferences', {
       telemetryLevel: this.preferences.privacy.telemetryLevel,
@@ -376,6 +380,60 @@ export class PreferencesService extends DisposableService {
       vendorMap: Object.fromEntries(vendorToInstanceId),
     });
     await this.save();
+  }
+
+  /**
+   * Ensure every legacy singular coding-plan connection has a corresponding
+   * provider instance. This is intentionally separate from the initial
+   * providerInstances migration because some previous versions could already
+   * have a populated instance array while still relying on providerConfigs.
+   *
+   * Idempotent: an existing coding-plan instance for the plan is preserved.
+   */
+  private async migrateLegacyCodingPlansToProviderInstances(): Promise<void> {
+    const instancesToAdd: ProviderInstance[] = [];
+
+    for (const config of Object.values(this.preferences.providerConfigs)) {
+      const planId = config.connectedCodingPlanId;
+      if (!planId || !isCodingPlanId(planId)) continue;
+
+      const alreadyMigrated = this.preferences.providerInstances.some(
+        (instance) =>
+          instance.typeId === 'coding-plan' &&
+          (instance.config as { planId?: string }).planId === planId,
+      );
+      if (alreadyMigrated) continue;
+
+      const plan = CODING_PLANS[planId];
+      instancesToAdd.push({
+        id: `coding-plan:${planId}`,
+        typeId: 'coding-plan',
+        name: plan.displayName,
+        config: {
+          encryptedApiKey: config.encryptedApiKey,
+          planId,
+          baseUrl: plan.baseUrl,
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      });
+    }
+
+    if (instancesToAdd.length === 0) return;
+
+    this.preferences = {
+      ...this.preferences,
+      providerInstances: [
+        ...this.preferences.providerInstances,
+        ...instancesToAdd,
+      ],
+    };
+    await this.save();
+    this.logger.debug(
+      '[PreferencesService] Migrated legacy coding plans to provider instances',
+      { count: instancesToAdd.length },
+    );
   }
 
   /**
@@ -1408,101 +1466,28 @@ export class PreferencesService extends DisposableService {
   }
 
   /**
-   * Connect a Tier-A coding plan in one shot:
-   *   1. validate the key against the plan's provider,
-   *   2. encrypt+store it,
-   *   3. flip providerConfigs[provider].mode to 'official'.
-   *
-   * Returns without mutating state if validation fails.
+   * @deprecated Use addProviderInstance with typeId `coding-plan`.
+   * Kept for compatibility with older renderer builds during upgrades.
    */
   public async connectCodingPlan(
     planId: CodingPlanId,
     apiKey: string,
   ): Promise<{ success: true } | { success: false; error: string }> {
-    this.assertNotDisposed();
-
     if (!isCodingPlanId(planId)) {
       return { success: false, error: `Unknown coding plan: ${planId}` };
     }
-    const plan = CODING_PLANS[planId];
-
     if (!apiKey) {
       return { success: false, error: 'API key is required' };
     }
 
-    // 1. Validate the key against the plan's provider or dedicated endpoint.
-    const result = await validateCodingPlanApiKey(plan, apiKey);
-    if (!result) {
-      return { success: false, error: 'Validation was skipped' };
-    }
-    if (result.success === false) {
-      return result;
-    }
-
-    // 2 + 3. Encrypt+store key, flip mode, and create/update the
-    // provider instance in one patch batch.
-    const encryptedBase64 = safeStorage
-      .encryptString(apiKey)
-      .toString('base64');
-    const instanceId = `coding-plan:${planId}`;
-    const patches: Patch[] = [
-      {
-        op: 'replace',
-        path: ['providerConfigs', plan.provider, 'encryptedApiKey'],
-        value: encryptedBase64,
-      },
-      {
-        op: 'replace',
-        path: ['providerConfigs', plan.provider, 'mode'],
-        value: 'official',
-      },
-      {
-        op: 'replace',
-        path: ['providerConfigs', plan.provider, 'connectedCodingPlanId'],
-        value: plan.id,
-      },
-    ];
-
-    // Ensure a matching providerInstances entry so the UI picks it up.
-    const existingIdx = this.preferences.providerInstances.findIndex(
-      (i) =>
-        i.typeId === 'coding-plan' &&
-        (i.config as { planId?: string }).planId === planId,
-    );
-    if (existingIdx !== -1) {
-      patches.push({
-        op: 'replace',
-        path: ['providerInstances', existingIdx, 'config', 'encryptedApiKey'],
-        value: encryptedBase64,
-      });
-    } else {
-      const instance = {
-        id: instanceId,
-        typeId: 'coding-plan' as ProviderInstance['typeId'],
-        name: plan.displayName,
-        config: {
-          encryptedApiKey: encryptedBase64,
-          planId: plan.id,
-          baseUrl: plan.baseUrl,
-        } as ProviderInstance['config'],
-        enabledModelIds: [] as string[],
-        disabledModelIds: [] as string[],
-        discoveredModels: [],
-      };
-      patches.push({
-        op: 'add',
-        path: ['providerInstances', this.preferences.providerInstances.length],
-        value: instance,
-      });
-    }
-
-    await this.update(patches);
-
-    this.logger.debug(
-      `[PreferencesService] Connected coding plan ${planId} ` +
-        `(provider=${plan.provider})`,
-    );
-    return { success: true };
+    const plan = CODING_PLANS[planId];
+    const result = await this.addProviderInstance({
+      typeId: 'coding-plan',
+      name: plan.displayName,
+      config: { planId, baseUrl: plan.baseUrl },
+      validateApiKey: apiKey,
+    });
+    return result.success ? { success: true } : result;
   }
 
   // ===========================================================================

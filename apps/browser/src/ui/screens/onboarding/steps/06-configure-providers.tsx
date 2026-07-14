@@ -19,10 +19,7 @@ import {
   IconArrowUpRightOutline18,
 } from '@stagewise/icons';
 import type { ProviderInstanceTypeId } from '@shared/karton-contracts/ui/shared-types';
-import {
-  findCodingPlanInstance,
-  getTypeDisplayInfo,
-} from '@shared/provider-instance-helpers';
+import { getTypeDisplayInfo } from '@shared/provider-instance-helpers';
 import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
@@ -312,9 +309,6 @@ function ConnectionDetailView({
   const addProviderInstance = useKartonProcedure(
     (p) => p.preferences.addProviderInstance,
   );
-  const connectCodingPlan = useKartonProcedure(
-    (p) => p.preferences.connectCodingPlan,
-  );
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const track = useTrack();
 
@@ -357,7 +351,13 @@ function ConnectionDetailView({
           return;
         }
       } else if (entry.planId) {
-        const result = await connectCodingPlan(entry.planId, apiKey.trim());
+        const plan = CODING_PLANS[entry.planId];
+        const result = await addProviderInstance({
+          typeId: 'coding-plan',
+          name: plan.displayName,
+          config: { planId: plan.id, baseUrl: plan.baseUrl },
+          validateApiKey: apiKey.trim(),
+        });
         if (!result.success) {
           setError(result.error);
           void track('onboarding-provider-connect-failed', {
@@ -378,7 +378,7 @@ function ConnectionDetailView({
     } finally {
       setIsConnecting(false);
     }
-  }, [apiKey, entry, addProviderInstance, connectCodingPlan, track, onBack]);
+  }, [apiKey, entry, addProviderInstance, track, onBack]);
 
   return (
     <div className="space-y-4">
@@ -704,10 +704,11 @@ export function StepConfigureProviders({
   const isEntryConnected = useCallback(
     (entry: ProviderEntry) => {
       if (entry.kind === 'coding-plan' && entry.planId) {
-        const inst = findCodingPlanInstance(preferences, entry.planId);
-        return (
-          !!inst &&
-          !!(inst.config as { encryptedApiKey?: string }).encryptedApiKey
+        return preferences.providerInstances?.some(
+          (instance) =>
+            instance.typeId === 'coding-plan' &&
+            (instance.config as { planId?: string }).planId === entry.planId &&
+            !!(instance.config as { encryptedApiKey?: string }).encryptedApiKey,
         );
       }
       if (entry.kind === 'self-hosted') {
