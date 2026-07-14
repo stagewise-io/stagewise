@@ -456,7 +456,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
 > = {
   stagewise: {
     displayName: 'Stagewise Inference',
-    description: 'OpenRouter-compatible managed inference',
+    description: 'Managed inference through stagewise subscription',
     defaultBaseUrl: 'https://llm.stagewise.io',
     credentialType: 'none',
   },
