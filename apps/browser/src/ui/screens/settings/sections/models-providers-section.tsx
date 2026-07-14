@@ -401,24 +401,23 @@ function ProviderInstanceCard({
         </div>
       </div>
 
-      {/* Stagewise: informational or upgrade CTA */}
-      {isStagewise && (
+      {/* Stagewise upgrade CTA for free accounts. */}
+      {isStagewise && isFreePlan && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-warning-foreground text-xs">
-            {isFreePlan
-              ? 'Requires Pro or Ultra plan'
-              : 'Uses your stagewise account. All built-in models are available through Stagewise Inference by default.'}
+            Requires Pro or Ultra plan
           </p>
-          {isFreePlan && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => void openExternalUrl(consoleUrl)}
-            >
-              Upgrade to Pro
-              <IconArrowUpRightOutline18 className="size-3" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openExternalUrl(consoleUrl);
+            }}
+          >
+            Upgrade to Pro
+            <IconArrowUpRightOutline18 className="size-3" />
+          </Button>
         </div>
       )}
     </div>
