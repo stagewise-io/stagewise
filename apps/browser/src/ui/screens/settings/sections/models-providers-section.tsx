@@ -48,6 +48,12 @@ import {
   type VendorGroup,
 } from '@ui/utils/vendor-grouping';
 import {
+  CustomEndpointConnection,
+  CustomEndpointForm,
+  endpointSaveDataToInstanceArgs,
+  type EndpointSaveData,
+} from './custom-providers-section';
+import {
   useEffect,
   useState,
   useMemo,
@@ -503,8 +509,8 @@ const ADDABLE_GATEWAY_TYPES: ProviderInstanceTypeId[] = ['openrouter'];
 
 const ADDABLE_SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
 
-/** Unified selection key — either a vendor typeId or `plan:<planId>`. */
-type SelectionKey = ProviderInstanceTypeId | `plan:${string}`;
+/** Unified selection key — a provider typeId, coding plan, or custom flow. */
+type SelectionKey = ProviderInstanceTypeId | `plan:${string}` | 'custom';
 
 function AddProviderGrid({
   onClose,
@@ -515,6 +521,12 @@ function AddProviderGrid({
 }) {
   const addProviderInstance = useKartonProcedure(
     (p) => p.preferences.addProviderInstance,
+  );
+  const setProviderInstanceSecretKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceSecretKey,
+  );
+  const setProviderInstanceGoogleCredentials = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceGoogleCredentials,
   );
   const preferences = useKartonState((s) => s.preferences);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
@@ -591,7 +603,7 @@ function AddProviderGrid({
 
   // Resolve display info for the current selection
   const selectedVendorType =
-    selected && !selected.startsWith('plan:')
+    selected && selected !== 'custom' && !selected.startsWith('plan:')
       ? (selected as ProviderInstanceTypeId)
       : null;
   const selectedPlanId = selected?.startsWith('plan:')
@@ -646,12 +658,48 @@ function AddProviderGrid({
       )
     : codingPlans;
   const filteredSelfHostedTypes = filterTypes(ADDABLE_SELF_HOSTED_TYPES);
+  const customProviderMatches =
+    !query ||
+    'custom provider'.includes(query) ||
+    'custom endpoint'.includes(query);
   const noResults =
     query.length > 0 &&
     filteredVendorTypes.length === 0 &&
     filteredCodingPlans.length === 0 &&
     filteredGatewayTypes.length === 0 &&
-    filteredSelfHostedTypes.length === 0;
+    filteredSelfHostedTypes.length === 0 &&
+    !customProviderMatches;
+
+  const handleAddCustomProvider = useCallback(
+    async (data: EndpointSaveData) => {
+      const { typeId, name, config } = endpointSaveDataToInstanceArgs(data);
+      const result = await addProviderInstance({
+        typeId,
+        name,
+        config,
+        validateApiKey: data.apiKey || undefined,
+      });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      if (data.secretKey) {
+        await setProviderInstanceSecretKey(result.instanceId, data.secretKey);
+      }
+      if (data.googleCredentials) {
+        await setProviderInstanceGoogleCredentials(
+          result.instanceId,
+          data.googleCredentials,
+        );
+      }
+      onConnected(result.instanceId);
+    },
+    [
+      addProviderInstance,
+      onConnected,
+      setProviderInstanceGoogleCredentials,
+      setProviderInstanceSecretKey,
+    ],
+  );
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -663,7 +711,9 @@ function AddProviderGrid({
               <Button variant="ghost" size="icon-sm" onClick={handleBack}>
                 <IconChevronLeftOutline18 className="size-4" />
               </Button>
-              Connect {selectedDisplayName}
+              {selected === 'custom'
+                ? 'Add Custom Provider'
+                : `Connect ${selectedDisplayName}`}
             </DialogTitle>
           ) : (
             <>
@@ -675,7 +725,13 @@ function AddProviderGrid({
           )}
         </DialogHeader>
 
-        {selected ? (
+        {selected === 'custom' ? (
+          <CustomEndpointForm
+            onSave={handleAddCustomProvider}
+            onCancel={handleBack}
+            showFooterDivider={false}
+          />
+        ) : selected ? (
           /* Step 2: Connection details for the selected provider */
           <div className="space-y-4">
             <div className="space-y-3 pt-1 pb-4">
@@ -984,6 +1040,30 @@ function AddProviderGrid({
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {customProviderMatches && (
+                  <div className="space-y-2">
+                    <p className="font-medium text-foreground text-xs">
+                      Custom endpoint
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelected('custom');
+                        setError(null);
+                      }}
+                      className={cn(
+                        'flex w-full cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                        'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
+                      )}
+                    >
+                      <IconPlusOutline18 className="size-4 shrink-0 text-foreground" />
+                      <span className="min-w-0 flex-1 text-foreground text-xs">
+                        Add custom provider
+                      </span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1937,6 +2017,8 @@ function CollapsibleModelSection({
   preferences,
   onToggleModel,
   onEditThinking,
+  onEditCustomModel,
+  onDeleteCustomModel,
   label = 'Enabled',
   defaultExpanded = true,
   emptyMessage,
@@ -1950,6 +2032,8 @@ function CollapsibleModelSection({
     modelId: string,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  onEditCustomModel?: (model: CustomModel) => void;
+  onDeleteCustomModel?: (modelId: string) => void;
   label?: string;
   defaultExpanded?: boolean;
   emptyMessage?: string;
@@ -2016,21 +2100,41 @@ function CollapsibleModelSection({
       </button>
       {expanded && (
         <div className="space-y-2 pl-1">
-          {sortedEntries.map((entry) => (
-            <BuiltInModelCard
-              key={entry.modelId}
-              model={entry}
-              isEnabled={!disabledSet.has(entry.modelId)}
-              thinkingDisplay={computeEntryThinkingDisplay(
-                entry,
-                instance,
-                preferences,
-                thinkingDefaultOptions,
-              )}
-              onToggle={() => onToggleModel(instance.id, entry.modelId)}
-              onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
-            />
-          ))}
+          {sortedEntries.map((entry) => {
+            const customModel = preferences.customModels?.find(
+              (model) =>
+                (model.providerInstanceId ?? model.endpointId) ===
+                  instance.id && model.modelId === entry.modelId,
+            );
+            return customModel && onEditCustomModel && onDeleteCustomModel ? (
+              <CustomModelCard
+                key={entry.modelId}
+                model={customModel}
+                endpointName={resolveCustomModelInstanceName(preferences, {
+                  providerInstanceId: customModel.providerInstanceId,
+                  endpointId: customModel.endpointId,
+                })}
+                isEnabled={!disabledSet.has(entry.modelId)}
+                onToggle={() => onToggleModel(instance.id, entry.modelId)}
+                onEdit={() => onEditCustomModel(customModel)}
+                onDelete={() => onDeleteCustomModel(customModel.modelId)}
+              />
+            ) : (
+              <BuiltInModelCard
+                key={entry.modelId}
+                model={entry}
+                isEnabled={!disabledSet.has(entry.modelId)}
+                thinkingDisplay={computeEntryThinkingDisplay(
+                  entry,
+                  instance,
+                  preferences,
+                  thinkingDefaultOptions,
+                )}
+                onToggle={() => onToggleModel(instance.id, entry.modelId)}
+                onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -2047,6 +2151,8 @@ function VendorModelGroup({
   preferences,
   onToggleModel,
   onEditThinking,
+  onEditCustomModel,
+  onDeleteCustomModel,
   defaultExpanded,
 }: {
   instance: ProviderInstance;
@@ -2058,6 +2164,8 @@ function VendorModelGroup({
     modelId: string,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
+  onEditCustomModel: (model: CustomModel) => void;
+  onDeleteCustomModel: (modelId: string) => void;
   defaultExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded ?? true);
@@ -2112,22 +2220,42 @@ function VendorModelGroup({
       {/* Model list */}
       {expanded && (
         <div className="space-y-2 pl-1">
-          {group.entries.map((entry) => (
-            <BuiltInModelCard
-              key={entry.modelId}
-              model={entry}
-              isEnabled={!disabledSet.has(entry.modelId)}
-              thinkingDisplay={computeEntryThinkingDisplay(
-                entry,
-                instance,
-                preferences,
-                thinkingDefaultOptions,
-              )}
-              onToggle={() => onToggleModel(instance.id, entry.modelId)}
-              onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
-              vendorLabelOverride={group.displayName}
-            />
-          ))}
+          {group.entries.map((entry) => {
+            const customModel = preferences.customModels?.find(
+              (model) =>
+                (model.providerInstanceId ?? model.endpointId) ===
+                  instance.id && model.modelId === entry.modelId,
+            );
+            return customModel ? (
+              <CustomModelCard
+                key={entry.modelId}
+                model={customModel}
+                endpointName={resolveCustomModelInstanceName(preferences, {
+                  providerInstanceId: customModel.providerInstanceId,
+                  endpointId: customModel.endpointId,
+                })}
+                isEnabled={!disabledSet.has(entry.modelId)}
+                onToggle={() => onToggleModel(instance.id, entry.modelId)}
+                onEdit={() => onEditCustomModel(customModel)}
+                onDelete={() => onDeleteCustomModel(customModel.modelId)}
+              />
+            ) : (
+              <BuiltInModelCard
+                key={entry.modelId}
+                model={entry}
+                isEnabled={!disabledSet.has(entry.modelId)}
+                thinkingDisplay={computeEntryThinkingDisplay(
+                  entry,
+                  instance,
+                  preferences,
+                  thinkingDefaultOptions,
+                )}
+                onToggle={() => onToggleModel(instance.id, entry.modelId)}
+                onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
+                vendorLabelOverride={group.displayName}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -2691,13 +2819,6 @@ function ModelsSection({
             ? (() => {
                 const filteredGroup = filteredGroups[0];
                 if (!filteredGroup) return null;
-                const instanceCustomModels = (
-                  preferences?.customModels ?? EMPTY_CUSTOM_MODELS
-                ).filter(
-                  (m) =>
-                    (m.providerInstanceId ?? m.endpointId) ===
-                    filteredGroup.instance.id,
-                );
                 const disabledIds = new Set(
                   getInstanceDisabledModelIds(
                     preferences,
@@ -2729,6 +2850,8 @@ function ModelsSection({
                           preferences={preferences}
                           onToggleModel={handleToggleModel}
                           onEditThinking={handleEditThinking}
+                          onEditCustomModel={handleEdit}
+                          onDeleteCustomModel={handleDelete}
                           emptyMessage="No models enabled — enable models from below."
                         />
                         {filteredGroup.entries.length > 0 && (
@@ -2738,40 +2861,11 @@ function ModelsSection({
                             preferences={preferences}
                             onToggleModel={handleToggleModel}
                             onEditThinking={handleEditThinking}
+                            onEditCustomModel={handleEdit}
+                            onDeleteCustomModel={handleDelete}
                             label="Other models"
                             defaultExpanded={false}
                           />
-                        )}
-                        {/* Custom models for this instance */}
-                        {instanceCustomModels.length > 0 && (
-                          <div className="space-y-2">
-                            <span className="px-3 font-medium text-muted-foreground text-xs">
-                              Custom Models
-                            </span>
-                            {instanceCustomModels.map((model) => (
-                              <CustomModelCard
-                                key={model.modelId}
-                                model={model}
-                                endpointName={resolveCustomModelInstanceName(
-                                  preferences,
-                                  {
-                                    providerInstanceId:
-                                      model.providerInstanceId,
-                                    endpointId: model.endpointId,
-                                  },
-                                )}
-                                isEnabled={!disabledIds.has(model.modelId)}
-                                onToggle={() =>
-                                  handleToggleModel(
-                                    filteredGroup.instance.id,
-                                    model.modelId,
-                                  )
-                                }
-                                onEdit={() => handleEdit(model)}
-                                onDelete={() => handleDelete(model.modelId)}
-                              />
-                            ))}
-                          </div>
                         )}
                       </div>
                     );
@@ -2803,6 +2897,8 @@ function ModelsSection({
                         preferences={preferences}
                         onToggleModel={handleToggleModel}
                         onEditThinking={handleEditThinking}
+                        onEditCustomModel={handleEdit}
+                        onDeleteCustomModel={handleDelete}
                         emptyMessage="No models enabled — enable models from below."
                       />
 
@@ -2818,6 +2914,8 @@ function ModelsSection({
                               preferences={preferences}
                               onToggleModel={handleToggleModel}
                               onEditThinking={handleEditThinking}
+                              onEditCustomModel={handleEdit}
+                              onDeleteCustomModel={handleDelete}
                               defaultExpanded={false}
                             />
                           ))}
@@ -2829,40 +2927,11 @@ function ModelsSection({
                           preferences={preferences}
                           onToggleModel={handleToggleModel}
                           onEditThinking={handleEditThinking}
+                          onEditCustomModel={handleEdit}
+                          onDeleteCustomModel={handleDelete}
                           label="Other models"
                           defaultExpanded={false}
                         />
-                      )}
-
-                      {/* Custom models for this instance */}
-                      {instanceCustomModels.length > 0 && (
-                        <div className="space-y-2">
-                          <span className="px-3 font-medium text-muted-foreground text-xs">
-                            Custom Models
-                          </span>
-                          {instanceCustomModels.map((model) => (
-                            <CustomModelCard
-                              key={model.modelId}
-                              model={model}
-                              endpointName={resolveCustomModelInstanceName(
-                                preferences,
-                                {
-                                  providerInstanceId: model.providerInstanceId,
-                                  endpointId: model.endpointId,
-                                },
-                              )}
-                              isEnabled={!disabledIds.has(model.modelId)}
-                              onToggle={() =>
-                                handleToggleModel(
-                                  filteredGroup.instance.id,
-                                  model.modelId,
-                                )
-                              }
-                              onEdit={() => handleEdit(model)}
-                              onDelete={() => handleDelete(model.modelId)}
-                            />
-                          ))}
-                        </div>
                       )}
                     </div>
                   );
@@ -2879,39 +2948,10 @@ function ModelsSection({
                         preferences={preferences}
                         onToggleModel={handleToggleModel}
                         onEditThinking={handleEditThinking}
+                        onEditCustomModel={handleEdit}
+                        onDeleteCustomModel={handleDelete}
                       />
                     ))}
-
-                    {/* Custom models for this instance */}
-                    {instanceCustomModels.length > 0 && (
-                      <div className="space-y-2">
-                        <span className="px-3 font-medium text-muted-foreground text-xs">
-                          Custom Models
-                        </span>
-                        {instanceCustomModels.map((model) => (
-                          <CustomModelCard
-                            key={model.modelId}
-                            model={model}
-                            endpointName={resolveCustomModelInstanceName(
-                              preferences,
-                              {
-                                providerInstanceId: model.providerInstanceId,
-                                endpointId: model.endpointId,
-                              },
-                            )}
-                            isEnabled={!disabledIds.has(model.modelId)}
-                            onToggle={() =>
-                              handleToggleModel(
-                                filteredGroup.instance.id,
-                                model.modelId,
-                              )
-                            }
-                            onEdit={() => handleEdit(model)}
-                            onDelete={() => handleDelete(model.modelId)}
-                          />
-                        ))}
-                      </div>
-                    )}
                   </>
                 );
               })()
@@ -3413,11 +3453,7 @@ export function ModelsProvidersSection() {
               )}
 
               {credentialType === 'custom-endpoint' && (
-                <div className="rounded-lg border border-derived p-3">
-                  <p className="text-muted-foreground text-xs">
-                    {displayInfo?.defaultBaseUrl ?? 'Custom endpoint'}
-                  </p>
-                </div>
+                <CustomEndpointConnection instance={detailInstance} />
               )}
 
               {detailInstance.typeId === 'stagewise' && (
