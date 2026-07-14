@@ -615,9 +615,21 @@ export const CustomEndpointForm = forwardRef<
      * surrounding layout already provides visual separation.
      */
     showFooterDivider?: boolean;
+    /**
+     * In inline edit contexts, omit the save control until the form differs
+     * from its persisted endpoint. Add flows always keep their primary action.
+     */
+    hideSaveUntilEdited?: boolean;
   }
 >(function CustomEndpointForm(
-  { endpoint, onSave, onCancel, open, showFooterDivider = true },
+  {
+    endpoint,
+    onSave,
+    onCancel,
+    open,
+    showFooterDivider = true,
+    hideSaveUntilEdited = false,
+  },
   ref,
 ) {
   const track = useTrack();
@@ -695,7 +707,8 @@ export const CustomEndpointForm = forwardRef<
   const [awsProfilesLoading, setAwsProfilesLoading] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    // Inline usage has no dialog-open state, so it is considered active.
+    if (open === false) return;
     if (apiSpec !== 'amazon-bedrock') return;
     // Access-keys mode has nothing useful to do with the profile list
     // or env region, so skip the RPC entirely.
@@ -744,7 +757,8 @@ export const CustomEndpointForm = forwardRef<
   // is on, which is off the moment the user edits the textarea
   // manually, so user overrides are never clobbered.
   useEffect(() => {
-    if (!open) return;
+    // Inline usage has no dialog-open state, so it is considered active.
+    if (open === false) return;
     if (apiSpec !== 'amazon-bedrock') return;
     if (!bedrockSuggestionEnabled) return;
     const next = buildSuggestedBedrockMapping(
@@ -1068,27 +1082,31 @@ export const CustomEndpointForm = forwardRef<
         )}
       </div>
 
-      <div
-        className={
-          showFooterDivider
-            ? 'flex justify-end gap-2 border-derived border-t pt-3'
-            : 'flex justify-end gap-2'
-        }
-      >
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!canSave || isSaving}
-          onClick={handleSave}
+      {(!hideSaveUntilEdited || isAddMode || anyFieldTouched || onCancel) && (
+        <div
+          className={
+            showFooterDivider
+              ? 'flex justify-end gap-2 border-derived border-t pt-3'
+              : 'flex justify-end gap-2'
+          }
         >
-          {endpoint ? 'Save Changes' : 'Add Provider'}
-        </Button>
-        {onCancel && (
-          <Button variant="ghost" size="sm" onClick={handleCancel}>
-            Cancel
-          </Button>
-        )}
-      </div>
+          {(!hideSaveUntilEdited || isAddMode || anyFieldTouched) && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!canSave || isSaving}
+              onClick={handleSave}
+            >
+              {endpoint ? 'Save Changes' : 'Add Provider'}
+            </Button>
+          )}
+          {onCancel && (
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 });
@@ -1219,7 +1237,7 @@ export function CustomEndpointCard({
  * to the target `typeId` are included; irrelevant fields are dropped so
  * they don't pollute the instance config.
  */
-function endpointSaveDataToInstanceArgs(data: EndpointSaveData): {
+export function endpointSaveDataToInstanceArgs(data: EndpointSaveData): {
   typeId: ProviderInstance['typeId'];
   name: string;
   config: Record<string, unknown>;
@@ -1277,6 +1295,75 @@ function endpointSaveDataToInstanceArgs(data: EndpointSaveData): {
         `endpointSaveDataToInstanceArgs: unsupported typeId ${typeId}`,
       );
   }
+}
+
+/**
+ * Inline connection editor for a custom provider instance. The main provider
+ * detail page uses this instead of a read-only placeholder so migrated custom
+ * endpoints retain every configuration control from the legacy screen.
+ */
+export function CustomEndpointConnection({
+  instance,
+  onSaved,
+}: {
+  instance: ProviderInstance;
+  onSaved?: () => void;
+}) {
+  const updateProviderInstance = useKartonProcedure(
+    (p) => p.preferences.updateProviderInstance,
+  );
+  const setProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceApiKey,
+  );
+  const setProviderInstanceSecretKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceSecretKey,
+  );
+  const setProviderInstanceGoogleCredentials = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceGoogleCredentials,
+  );
+
+  const endpoint = providerInstanceToCustomEndpoint(instance);
+
+  const handleSave = useCallback(
+    async (data: EndpointSaveData) => {
+      const { typeId, name, config } = endpointSaveDataToInstanceArgs(data);
+      await updateProviderInstance(instance.id, config, name, typeId);
+
+      // Empty credential fields deliberately mean "keep the existing secret".
+      if (data.apiKey) {
+        await setProviderInstanceApiKey(instance.id, data.apiKey);
+      }
+      if (data.secretKey) {
+        await setProviderInstanceSecretKey(instance.id, data.secretKey);
+      }
+      if (data.googleCredentials) {
+        await setProviderInstanceGoogleCredentials(
+          instance.id,
+          data.googleCredentials,
+        );
+      }
+      onSaved?.();
+    },
+    [
+      instance.id,
+      onSaved,
+      setProviderInstanceApiKey,
+      setProviderInstanceGoogleCredentials,
+      setProviderInstanceSecretKey,
+      updateProviderInstance,
+    ],
+  );
+
+  return (
+    <div className="rounded-lg border border-derived p-3">
+      <CustomEndpointForm
+        endpoint={endpoint}
+        onSave={handleSave}
+        showFooterDivider={false}
+        hideSaveUntilEdited
+      />
+    </div>
+  );
 }
 
 function CustomEndpointsSection() {
