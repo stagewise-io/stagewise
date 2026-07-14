@@ -60,6 +60,74 @@ async function createServiceWithPreferences(
   return service;
 }
 
+describe('PreferencesService provider instance names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it('numbers implicitly named provider instances and reuses available suffixes', async () => {
+    const service = await createServiceWithPreferences();
+
+    const first = await service.addProviderInstance({
+      typeId: 'openai-api',
+      config: {},
+    });
+    const second = await service.addProviderInstance({
+      typeId: 'openai-api',
+      config: {},
+    });
+    const third = await service.addProviderInstance({
+      typeId: 'openai-api',
+      config: {},
+    });
+
+    expect(first).toMatchObject({ success: true });
+    expect(second).toMatchObject({ success: true });
+    expect(third).toMatchObject({ success: true });
+    expect(
+      service.get().providerInstances.map((instance) => instance.name),
+    ).toEqual([
+      'Stagewise Inference',
+      'OpenAI API',
+      'OpenAI API (2)',
+      'OpenAI API (3)',
+    ]);
+
+    await service.removeProviderInstance(
+      (second as { instanceId: string }).instanceId,
+    );
+    await service.addProviderInstance({ typeId: 'openai-api', config: {} });
+
+    expect(
+      service
+        .get()
+        .providerInstances.filter(
+          (instance) => instance.typeId === 'openai-api',
+        )
+        .map((instance) => instance.name),
+    ).toEqual(['OpenAI API', 'OpenAI API (3)', 'OpenAI API (2)']);
+  });
+
+  it('preserves explicit provider instance names', async () => {
+    const service = await createServiceWithPreferences();
+
+    const result = await service.addProviderInstance({
+      typeId: 'openai-api',
+      name: 'Production OpenAI',
+      config: {},
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        typeId: 'openai-api',
+        name: 'Production OpenAI',
+      }),
+    );
+  });
+});
+
 describe('PreferencesService coding plan connection state', () => {
   beforeEach(() => {
     vi.clearAllMocks();

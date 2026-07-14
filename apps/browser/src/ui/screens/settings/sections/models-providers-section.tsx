@@ -345,10 +345,12 @@ function VendorApiKeyInput({
 function ProviderInstanceCard({
   instance,
   onConfigure,
+  onRename,
   onDelete,
 }: {
   instance: ProviderInstance;
   onConfigure?: () => void;
+  onRename?: () => void;
   onDelete?: () => void;
 }) {
   const subscription = useKartonState((s) => s.userAccount.subscription);
@@ -414,7 +416,7 @@ function ProviderInstanceCard({
     </div>
   );
 
-  if (!onDelete) return card;
+  if (!onRename && !onDelete) return card;
 
   return (
     <ContextMenu.Root>
@@ -438,18 +440,34 @@ function ProviderInstanceCard({
               'data-ending-style:opacity-0 data-starting-style:opacity-0',
             )}
           >
-            <MenuBase.Item
-              className={cn(
-                'flex w-full cursor-default flex-row items-center justify-start gap-2',
-                'rounded-md px-2 py-1 text-foreground text-xs outline-none',
-                'transition-colors duration-150 ease-out',
-                'hover:bg-surface-1 data-highlighted:bg-surface-1',
-              )}
-              onClick={onDelete}
-            >
-              <IconTrashOutline18 className="size-3.5 shrink-0" />
-              <span>Delete provider</span>
-            </MenuBase.Item>
+            {onRename && (
+              <MenuBase.Item
+                className={cn(
+                  'flex w-full cursor-default flex-row items-center justify-start gap-2',
+                  'rounded-md px-2 py-1 text-foreground text-xs outline-none',
+                  'transition-colors duration-150 ease-out',
+                  'hover:bg-surface-1 data-highlighted:bg-surface-1',
+                )}
+                onClick={onRename}
+              >
+                <IconPenOutline18 className="size-3.5 shrink-0" />
+                <span>Rename provider</span>
+              </MenuBase.Item>
+            )}
+            {onDelete && (
+              <MenuBase.Item
+                className={cn(
+                  'flex w-full cursor-default flex-row items-center justify-start gap-2',
+                  'rounded-md px-2 py-1 text-foreground text-xs outline-none',
+                  'transition-colors duration-150 ease-out',
+                  'hover:bg-surface-1 data-highlighted:bg-surface-1',
+                )}
+                onClick={onDelete}
+              >
+                <IconTrashOutline18 className="size-3.5 shrink-0" />
+                <span>Delete provider</span>
+              </MenuBase.Item>
+            )}
           </MenuBase.Popup>
         </MenuBase.Positioner>
       </MenuBase.Portal>
@@ -542,7 +560,6 @@ function AddProviderGrid({
 
         const result = await addProviderInstance({
           typeId: plan ? 'coding-plan' : key,
-          name: plan?.displayName,
           config: plan
             ? { planId: plan.id, baseUrl: plan.baseUrl }
             : isSelfHosted
@@ -933,9 +950,11 @@ function AddProviderGrid({
 
 function ProviderInstancesSection({
   onConfigure,
+  onRename,
   onDelete,
 }: {
   onConfigure: (instanceId: string) => void;
+  onRename: (instanceId: string) => void;
   onDelete: (instanceId: string) => void;
 }) {
   const preferences = useKartonState((s) => s.preferences);
@@ -962,6 +981,11 @@ function ProviderInstancesSection({
           key={instance.id}
           instance={instance}
           onConfigure={() => onConfigure(instance.id)}
+          onRename={
+            instance.typeId !== 'stagewise'
+              ? () => onRename(instance.id)
+              : undefined
+          }
           onDelete={
             instance.id !== DEFAULT_INSTANCE_ID
               ? () => onDelete(instance.id)
@@ -1669,7 +1693,7 @@ function CustomModelCard({
             onClick={onEdit}
             className="size-4"
           >
-            <IconPenOutline18 className="size-3.5" />
+            <IconPenOutline18 className="size-4" />
           </Button>
           <Button
             variant="ghost"
@@ -2902,6 +2926,179 @@ function ModelsSection({
 }
 
 // =============================================================================
+// Provider Name Editor
+// =============================================================================
+
+function ProviderNameEditor({
+  instance,
+  autoStart,
+  onAutoStart,
+  onEditingChange,
+  editable,
+}: {
+  instance: ProviderInstance;
+  autoStart: boolean;
+  onAutoStart: () => void;
+  onEditingChange: (isEditing: boolean) => void;
+  editable: boolean;
+}) {
+  const updateProviderInstance = useKartonProcedure(
+    (p) => p.preferences.updateProviderInstance,
+  );
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState(instance.name);
+  const [pendingName, setPendingName] = useState<string | null>(null);
+  const committedRef = useRef(false);
+  const displayName = pendingName ?? instance.name;
+
+  const finishEditing = useCallback(() => {
+    setIsEditing(false);
+    onEditingChange(false);
+  }, [onEditingChange]);
+
+  const startEditing = useCallback(() => {
+    if (!editable) return;
+    committedRef.current = false;
+    setDraftName(instance.name);
+    setIsEditing(true);
+    onEditingChange(true);
+  }, [editable, instance.name, onEditingChange]);
+
+  useEffect(() => {
+    if (!autoStart || !editable) return;
+    onAutoStart();
+    startEditing();
+  }, [autoStart, editable, onAutoStart, startEditing]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const raf = requestAnimationFrame(() => {
+      titleRef.current?.focus();
+      const selection = window.getSelection();
+      if (!selection || !titleRef.current) return;
+      const range = document.createRange();
+      range.selectNodeContents(titleRef.current);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (pendingName !== null && instance.name === pendingName) {
+      setPendingName(null);
+    }
+  }, [instance.name, pendingName]);
+
+  useEffect(() => {
+    if (pendingName === null) return;
+    const timeout = setTimeout(() => setPendingName(null), 3000);
+    return () => clearTimeout(timeout);
+  }, [pendingName]);
+
+  const commitEdit = useCallback(() => {
+    if (committedRef.current) return;
+    const nextName = titleRef.current?.textContent?.trim() ?? draftName.trim();
+    finishEditing();
+
+    if (
+      nextName.length < 2 ||
+      nextName.length > 80 ||
+      nextName === instance.name
+    ) {
+      setDraftName(instance.name);
+      return;
+    }
+
+    committedRef.current = true;
+    setPendingName(nextName);
+    void updateProviderInstance(instance.id, {}, nextName);
+  }, [
+    draftName,
+    finishEditing,
+    instance.id,
+    instance.name,
+    updateProviderInstance,
+  ]);
+
+  const cancelEdit = useCallback(() => {
+    // Escape causes the input to blur as it unmounts; block that blur from
+    // committing the discarded draft.
+    committedRef.current = true;
+    setDraftName(instance.name);
+    finishEditing();
+  }, [finishEditing, instance.name]);
+
+  if (!editable) {
+    return (
+      <h1 className="truncate font-semibold text-foreground text-xl">
+        {displayName}
+      </h1>
+    );
+  }
+
+  return isEditing ? (
+    <span
+      ref={titleRef}
+      role="textbox"
+      contentEditable
+      suppressContentEditableWarning
+      className="block min-w-0 max-w-md cursor-text truncate font-semibold text-foreground text-xl outline-none"
+      aria-label="Provider name"
+      onBlur={commitEdit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commitEdit();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelEdit();
+        }
+      }}
+      onPaste={(event) => {
+        event.preventDefault();
+        const text = event.clipboardData.getData('text/plain');
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }}
+    >
+      {draftName}
+    </span>
+  ) : (
+    <div className="group flex min-w-0 items-center gap-2">
+      <h1 className="min-w-0">
+        <button
+          type="button"
+          className="cursor-pointer truncate font-semibold text-foreground text-xl outline-none"
+          onClick={startEditing}
+        >
+          {displayName}
+        </button>
+      </h1>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="ml-1 size-6 shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+        onClick={startEditing}
+        aria-label={`Rename ${displayName}`}
+      >
+        <IconPenOutline18 className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
+// =============================================================================
 // Self-Hosted Connection (detail page)
 // =============================================================================
 
@@ -3008,6 +3205,8 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
 export function ModelsProvidersSection() {
   const preferences = useKartonState((s) => s.preferences);
   const [detailInstanceId, setDetailInstanceId] = useState<string | null>(null);
+  const [detailRenameRequested, setDetailRenameRequested] = useState(false);
+  const [isDetailNameEditing, setIsDetailNameEditing] = useState(false);
   const removeProviderInstance = useKartonProcedure(
     (p) => p.preferences.removeProviderInstance,
   );
@@ -3025,7 +3224,7 @@ export function ModelsProvidersSection() {
   useEffect(() => {
     if (!detailInstanceId) return;
     const handleDetailEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || isDetailNameEditing) return;
       event.preventDefault();
       event.stopPropagation();
       setDetailInstanceId(null);
@@ -3033,12 +3232,13 @@ export function ModelsProvidersSection() {
     window.addEventListener('keydown', handleDetailEscape, true);
     return () =>
       window.removeEventListener('keydown', handleDetailEscape, true);
-  }, [detailInstanceId]);
+  }, [detailInstanceId, isDetailNameEditing]);
 
   const handleDeleteInstance = useCallback(
     async (instanceId: string) => {
       await removeProviderInstance(instanceId);
       setDetailInstanceId(null);
+      setDetailRenameRequested(false);
     },
     [removeProviderInstance],
   );
@@ -3049,6 +3249,7 @@ export function ModelsProvidersSection() {
     const credentialType = displayInfo?.credentialType ?? 'none';
     const modelCount = getInstanceModelCount(detailInstance);
     const canDelete = detailInstance.id !== DEFAULT_INSTANCE_ID;
+    const canRename = detailInstance.typeId !== 'stagewise';
 
     return (
       <div className="h-full w-full">
@@ -3062,13 +3263,20 @@ export function ModelsProvidersSection() {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => setDetailInstanceId(null)}
+                onClick={() => {
+                  setDetailInstanceId(null);
+                  setDetailRenameRequested(false);
+                }}
               >
                 <IconChevronLeftOutline18 className="size-4" />
               </Button>
-              <h1 className="font-semibold text-foreground text-xl">
-                {detailInstance.name}
-              </h1>
+              <ProviderNameEditor
+                instance={detailInstance}
+                autoStart={detailRenameRequested}
+                onAutoStart={() => setDetailRenameRequested(false)}
+                onEditingChange={setIsDetailNameEditing}
+                editable={canRename}
+              />
             </div>
 
             {/* Provider info */}
@@ -3196,6 +3404,10 @@ export function ModelsProvidersSection() {
 
             <ProviderInstancesSection
               onConfigure={setDetailInstanceId}
+              onRename={(id) => {
+                setDetailInstanceId(id);
+                setDetailRenameRequested(true);
+              }}
               onDelete={(id) => void handleDeleteInstance(id)}
             />
           </section>
