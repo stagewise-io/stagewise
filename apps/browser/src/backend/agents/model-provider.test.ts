@@ -16,7 +16,6 @@ import {
 } from '@shared/karton-contracts/ui/agent/metadata';
 import {
   createReasoningSignatureSource,
-  getSemanticProviderForApiSpec,
   reasoningSourcesMatch,
 } from './reasoning-signatures';
 import { CODING_PLANS } from '@shared/coding-plans';
@@ -1130,18 +1129,6 @@ describe('thinking override provider option resolution', () => {
 });
 
 describe('reasoning signature source helpers', () => {
-  it('maps custom endpoint API specs to semantic providers', () => {
-    expect(getSemanticProviderForApiSpec('anthropic')).toBe('anthropic');
-    expect(getSemanticProviderForApiSpec('amazon-bedrock')).toBe('anthropic');
-    expect(getSemanticProviderForApiSpec('google')).toBe('google');
-    expect(getSemanticProviderForApiSpec('google-vertex')).toBe('google');
-    expect(getSemanticProviderForApiSpec('openai-chat-completions')).toBe(
-      'openai',
-    );
-    expect(getSemanticProviderForApiSpec('openai-responses')).toBe('openai');
-    expect(getSemanticProviderForApiSpec('azure')).toBe('openai');
-  });
-
   it('creates stagewise and official sources with provider and model id', () => {
     expect(
       createReasoningSignatureSource(
@@ -1179,7 +1166,7 @@ describe('reasoning signature source helpers', () => {
     });
   });
 
-  it('rejects incomplete or inconsistent custom source construction', () => {
+  it('rejects incomplete or semantically inconsistent custom sources', () => {
     expect(() =>
       createReasoningSignatureSource('custom', 'google', 'gemini-custom', {
         apiSpec: 'google-vertex',
@@ -1190,12 +1177,21 @@ describe('reasoning signature source helpers', () => {
         endpointId: 'vertex-prod',
       } as any),
     ).toThrow('apiSpec and endpointId');
-    expect(() =>
-      createReasoningSignatureSource('custom', 'google', 'gemini-custom', {
-        apiSpec: 'amazon-bedrock',
-        endpointId: 'bedrock-prod',
-      }),
-    ).toThrow('provider/apiSpec mismatch');
+
+    for (const apiSpec of [
+      'anthropic',
+      'amazon-bedrock',
+      'openai-chat-completions',
+      'openai-responses',
+      'azure',
+    ] as const) {
+      expect(() =>
+        createReasoningSignatureSource('custom', 'google', 'custom-model', {
+          apiSpec,
+          endpointId: 'custom-endpoint',
+        }),
+      ).toThrow('provider/apiSpec mismatch');
+    }
   });
 
   it('matches non-custom sources by provider mode and provider only', () => {

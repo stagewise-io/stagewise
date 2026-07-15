@@ -109,17 +109,17 @@ type AwsProfileInfo = {
  * family and unknown inputs almost always come from typos of a
  * US region.
  */
-function getCredentialDomain(apiSpec: ApiSpec): string {
-  switch (apiSpec) {
-    case 'azure':
-      return 'azure-api-key';
-    case 'amazon-bedrock':
-      return 'aws-credentials';
-    case 'google-vertex':
-      return 'google-credentials';
-    default:
-      return 'api-key';
-  }
+export function shouldWarnAboutCredentialReentry(
+  endpoint: CustomEndpoint | undefined,
+  apiSpec: ApiSpec,
+): boolean {
+  return Boolean(
+    endpoint &&
+      endpoint.apiSpec !== apiSpec &&
+      (endpoint.encryptedApiKey ||
+        endpoint.encryptedSecretKey ||
+        endpoint.encryptedGoogleCredentials),
+  );
 }
 
 function bedrockInferencePrefix(region: string | undefined): string {
@@ -845,15 +845,10 @@ export const CustomEndpointForm = forwardRef<
 
   const canSave =
     name.trim().length > 0 && !mappingError && !bedrockProfileInvalid;
-  const credentialsMustBeReentered =
-    endpoint &&
-    endpoint.apiSpec !== apiSpec &&
-    getCredentialDomain(endpoint.apiSpec) !== getCredentialDomain(apiSpec) &&
-    Boolean(
-      endpoint.encryptedApiKey ||
-        endpoint.encryptedSecretKey ||
-        endpoint.encryptedGoogleCredentials,
-    );
+  const credentialsMustBeReentered = shouldWarnAboutCredentialReentry(
+    endpoint,
+    apiSpec,
+  );
 
   // "Touched" = the user changed anything from the initial field values.
   // Derived from current state so we don't need per-input bookkeeping.

@@ -24,6 +24,7 @@ import {
   type CredentialType,
 } from './karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from './coding-plans';
+import { getSemanticProviderForApiSpec } from './api-spec-provider';
 import {
   availableModels,
   availableModelAliases,
@@ -423,21 +424,6 @@ export function getInstanceThinkingDefaultOptions(
     };
   }
   return { providerMode: 'stagewise' };
-}
-
-function getSemanticProviderForApiSpec(apiSpec: ApiSpec): ModelProvider {
-  switch (apiSpec) {
-    case 'anthropic':
-    case 'amazon-bedrock':
-      return 'anthropic';
-    case 'google':
-    case 'google-vertex':
-      return 'google';
-    case 'openai-chat-completions':
-    case 'openai-responses':
-    case 'azure':
-      return 'openai';
-  }
 }
 
 /**

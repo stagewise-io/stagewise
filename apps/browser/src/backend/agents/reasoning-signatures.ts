@@ -3,23 +3,9 @@ import type {
   ModelProvider,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { ReasoningSignatureSource } from '@shared/karton-contracts/ui/agent/metadata';
+import { getSemanticProviderForApiSpec } from '@shared/api-spec-provider';
 
 export type ProviderMode = 'stagewise' | 'official' | 'custom';
-
-export function getSemanticProviderForApiSpec(apiSpec: ApiSpec): ModelProvider {
-  switch (apiSpec) {
-    case 'anthropic':
-    case 'amazon-bedrock':
-      return 'anthropic';
-    case 'google':
-    case 'google-vertex':
-      return 'google';
-    case 'openai-chat-completions':
-    case 'openai-responses':
-    case 'azure':
-      return 'openai';
-  }
-}
 
 /**
  * Matches the route owner of signed reasoning details.
