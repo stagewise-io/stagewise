@@ -1200,10 +1200,10 @@ describe('thinking override provider option resolution', () => {
     });
   });
 
-  it('maps OpenAI-compatible official overrides to the OpenAI provider namespace', () => {
+  it('uses compatible thinking and vendor signatures for official OpenAI-compatible APIs', () => {
     const service = createTestModelProviderService({
       providerModes: { deepseek: 'official' },
-      modelThinkingOverrides: { 'deepseek-v4-pro': { value: 'high' } },
+      modelThinkingOverrides: { 'deepseek-v4-pro': { enabled: false } },
     });
 
     const result = service.getModelWithOptions(
@@ -1212,10 +1212,33 @@ describe('thinking override provider option resolution', () => {
       agentStepMetadata,
     );
 
-    expect(result.providerOptions?.openai).toMatchObject({
-      reasoningEffort: 'high',
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider: 'deepseek',
     });
-    expect(result.providerOptions).not.toHaveProperty('deepseek');
+    expect(result.providerOptions?.openai).toMatchObject({
+      reasoningEffort: undefined,
+      reasoningSummary: undefined,
+    });
+  });
+
+  it('uses compatible thinking and vendor signatures for coding plans', () => {
+    const service = createTestModelProviderService({
+      providerModes: { 'z-ai': 'official' },
+      connectedCodingPlanIds: { 'z-ai': 'glm-coding-plan' },
+      modelThinkingOverrides: { 'glm-5.2': { enabled: false } },
+    });
+
+    const result = service.getModelWithOptions(
+      'glm-5.2',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider: 'z-ai',
+    });
   });
 
   it('maps OpenAI official overrides while preserving unrelated options', () => {

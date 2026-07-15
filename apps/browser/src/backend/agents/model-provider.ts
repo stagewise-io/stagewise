@@ -681,12 +681,18 @@ export class ModelProviderService {
     // ── Reasoning signature source ──────────────────────────────────────────
     // Stagewise uses the wire-format (prefixed) model ID; official/custom
     // use the mapped (pre-wire) model ID — preserving the prior convention.
+    // Official routes retain the catalog vendor even when they use a shared
+    // wire protocol (for example, DeepSeek's OpenAI-compatible API). Custom
+    // endpoints do not have a trustworthy vendor, so their semantic provider
+    // remains protocol-derived. Stagewise models already use their catalog
+    // vendor above.
     const semanticProvider =
-      type.providerMode === 'stagewise'
-        ? (officialProvider as ModelProvider)
-        : effectiveApiSpec
-          ? getSemanticProviderForApiSpec(effectiveApiSpec)
-          : (officialProvider as ModelProvider);
+      type.providerMode === 'custom' && effectiveApiSpec
+        ? getSemanticProviderForApiSpec(effectiveApiSpec)
+        : ((officialProvider ??
+            (effectiveApiSpec
+              ? getSemanticProviderForApiSpec(effectiveApiSpec)
+              : undefined)) as ModelProvider);
 
     const reasoningModelId =
       type.providerMode === 'stagewise' ? wireModelId : mappedModelId;
@@ -899,7 +905,9 @@ export class ModelProviderService {
     const contextWindow = discovered.contextWindow ?? 128_000;
 
     // ── Reasoning signature source ──────────────────────────────────────────
-    const semanticProvider = getSemanticProviderForApiSpec(apiSpec);
+    // Official discovered models retain their known vendor. OpenRouter has no
+    // single vendor, and custom endpoints likewise use protocol semantics.
+    const semanticProvider = vendor ?? getSemanticProviderForApiSpec(apiSpec);
     // OpenRouter is an official provider with an OpenAI-compatible protocol.
     // Its signatures remain owned by the semantic OpenAI route, while thinking
     // options use the compatible wire format below.

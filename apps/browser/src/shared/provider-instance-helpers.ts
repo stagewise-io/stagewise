@@ -627,12 +627,12 @@ function makeDiscoveredEntry(
  * selector. Each entry represents one model as served by one provider
  * instance.
  *
- * - **stagewise** instance: all catalog models (aliases + concrete) +
- *   custom models whose `providerInstanceId` matches.
- * - **vendor-api** instances (e.g. `anthropic-api`): that vendor's
- *   catalog models + matching custom models.
- * - **coding-plan** instances: the plan's vendor's catalog models +
- *   matching custom models.
+ * - **stagewise** instance: all catalog models (aliases + concrete),
+ *   non-duplicate discovered models, and matching custom models.
+ * - **vendor-api** instances (e.g. `anthropic-api`): that vendor's catalog
+ *   models, non-duplicate discovered models, and matching custom models.
+ * - **coding-plan** instances: the plan vendor's catalog models,
+ *   non-duplicate discovered models, and matching custom models.
  * - **self-hosted** types (e.g. ollama): discovered models filtered by
  *   `enabledModelIds` + matching custom models.
  * - **custom/cloud** types (custom-*, azure, bedrock, vertex): only
