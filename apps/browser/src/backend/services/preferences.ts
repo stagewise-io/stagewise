@@ -1937,44 +1937,6 @@ export class PreferencesService extends DisposableService {
     );
   }
 
-  private getRetainedSensitiveConfig(
-    currentType: ReturnType<typeof getProviderType>,
-    nextType: ReturnType<typeof getProviderType>,
-    currentConfig: Record<string, unknown>,
-  ): Record<string, unknown> {
-    if (
-      this.getCredentialDomain(currentType.id) !==
-      this.getCredentialDomain(nextType.id)
-    ) {
-      return {};
-    }
-    return Object.fromEntries(
-      nextType.sensitiveFields
-        .filter((field) => field in currentConfig)
-        .map((field) => [field, currentConfig[field]]),
-    );
-  }
-
-  private getCredentialDomain(
-    typeId: ProviderInstanceTypeId,
-  ): string | undefined {
-    switch (typeId) {
-      case 'azure':
-        return 'azure-api-key';
-      case 'bedrock':
-        return 'aws-credentials';
-      case 'vertex':
-        return 'google-credentials';
-      case 'coding-plan':
-        return 'coding-plan-api-key';
-      case 'stagewise':
-      case 'ollama':
-        return undefined;
-      default:
-        return 'api-key';
-    }
-  }
-
   /**
    * Merge a partial config into an existing provider instance, and/or
    * update its display name. Only top-level config keys are merged.
@@ -1993,18 +1955,11 @@ export class PreferencesService extends DisposableService {
     const current = this.preferences.providerInstances[idx];
     const typeId = replacementTypeId ?? current.typeId;
     const isTypeReplacement = typeId !== current.typeId;
-    const nextType = getProviderType(typeId);
-    const currentType = getProviderType(current.typeId);
     const currentConfig = current.config as Record<string, unknown>;
+    // Provider types can share broad credential shapes but represent distinct
+    // services. Never carry credentials across a type replacement.
     const nextConfig = isTypeReplacement
-      ? {
-          ...this.getRetainedSensitiveConfig(
-            currentType,
-            nextType,
-            currentConfig,
-          ),
-          ...partialConfig,
-        }
+      ? { ...partialConfig }
       : { ...currentConfig, ...partialConfig };
     // Validate the replacement discriminant and config together before persisting.
     userPreferencesSchema.parse({

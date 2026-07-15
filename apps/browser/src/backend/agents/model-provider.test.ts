@@ -250,6 +250,153 @@ describe('provider instance base URL resolution', () => {
 
     expect(url).toBe('https://openrouter.ai/api/v1');
   });
+
+  it('uses the resolved OpenRouter URL for discovered models', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-blank',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { baseUrl: '   ' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: 'openai/gpt-5',
+            displayName: 'GPT-5',
+          },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'openai/gpt-5',
+      'trace-1',
+      undefined,
+      'openrouter-blank',
+    );
+
+    expect(getModelRequestUrl(result)).toBe(
+      'https://openrouter.ai/api/v1/chat/completions',
+    );
+  });
+});
+
+describe('discovered model routing', () => {
+  it('uses OpenRouter-compatible thinking, official signatures, and safe telemetry', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-instance',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { encryptedApiKey: 'router-key' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: 'openai/gpt-5',
+            displayName: 'GPT-5',
+            thinkingEnabled: true,
+          },
+        ],
+      },
+    ];
+    preferences.agent.modelThinkingOverrides = {
+      'openrouter-instance': {
+        'openai/gpt-5': {
+          enabled: true,
+          provider: 'openai-compatible',
+          value: 'high',
+        },
+      },
+    };
+
+    const result = service.getModelWithOptions(
+      'openai/gpt-5',
+      'trace-1',
+      {
+        [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
+        [PROVIDER_INSTANCE_ID_METADATA_KEY]: 'openrouter-instance',
+        requestSource: 'discovered-routing-test',
+      },
+      'openrouter-instance',
+    );
+
+    expect(result.providerMode).toBe('official');
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider: 'openai',
+    });
+    expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'high' },
+    });
+
+    const tracingConfig = (service as any).telemetryService.withTracing.mock
+      .calls[0]?.[1];
+    expect(tracingConfig.posthogProperties).toMatchObject({
+      requestSource: 'discovered-routing-test',
+      isDiscoveredModel: true,
+    });
+    expect(tracingConfig.posthogProperties).not.toHaveProperty(
+      MODEL_REQUEST_PURPOSE_METADATA_KEY,
+    );
+    expect(tracingConfig.posthogProperties).not.toHaveProperty(
+      PROVIDER_INSTANCE_ID_METADATA_KEY,
+    );
+  });
+
+  it('keeps discovered custom routes endpoint-bound', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'custom-instance',
+        typeId: 'custom-openai-chat',
+        name: 'Custom OpenAI',
+        config: { baseUrl: 'https://custom.example/v1' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: 'gpt-5.5',
+            displayName: 'Custom GPT-5.5',
+            thinkingEnabled: true,
+          },
+        ],
+      },
+    ];
+    preferences.agent.modelThinkingOverrides = {
+      'custom-instance': {
+        'gpt-5.5': {
+          enabled: true,
+          provider: 'openai-compatible',
+          value: 'high',
+        },
+      },
+    };
+
+    const result = service.getModelWithOptions(
+      'gpt-5.5',
+      'trace-1',
+      agentStepMetadata,
+      'custom-instance',
+    );
+
+    expect(result.providerMode).toBe('custom');
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'custom',
+      provider: 'openai',
+      apiSpec: 'openai-chat-completions',
+      endpointId: 'custom-instance',
+    });
+    expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'high' },
+    });
+  });
 });
 
 function getModelRequestUrl(

@@ -34,6 +34,7 @@ import {
   createThinkingProviderOptionsPatch,
   getDefaultThinkingSelection,
   type ThinkingCapableModel,
+  type ThinkingProvider,
 } from '@shared/model-thinking-capabilities';
 
 // ── Provider type registry ──────────────────────────────────────────────────
@@ -738,9 +739,14 @@ export class ModelProviderService {
     traceId: string,
     otherPostHogProperties?: Record<string, unknown>,
   ): Omit<ModelWithOptions, 'providerMode'> {
-    const resolved = this.resolveCustomModelInstance(
-      customModel.providerInstanceId ?? '',
-    );
+    const providerInstanceId =
+      customModel.providerInstanceId ?? customModel.endpointId;
+    if (!providerInstanceId) {
+      throw new Error(
+        `Custom model ${customModel.modelId} has no provider instance`,
+      );
+    }
+    const resolved = this.resolveCustomModelInstance(providerInstanceId);
     const { type, apiKey, baseURL, decryptedConfig, apiSpec, instance } =
       resolved;
 
@@ -830,19 +836,30 @@ export class ModelProviderService {
     otherPostHogProperties?: Record<string, unknown>,
   ): ModelWithOptions {
     const type = getProviderType(instance.typeId);
-    const baseURL =
-      ((instance.config as Record<string, unknown>).baseUrl as
-        | string
-        | undefined) ?? type.defaultBaseUrl;
+    const baseURL = ModelProviderService.resolveInstanceBaseURL(instance, type);
+    const apiSpec = getEffectiveApiSpec(type, instance.config);
+    if (!apiSpec) {
+      throw new Error(
+        `Cannot resolve apiSpec for discovered model on instance ${instance.id} (type: ${instance.typeId})`,
+      );
+    }
 
+    const vendor =
+      type.vendor ??
+      (instance.typeId === 'coding-plan'
+        ? getCodingPlanVendor(instance.config as CodingPlanConfig)
+        : undefined);
+    const wireModelId =
+      type.toWireModelId?.(discovered.modelId, vendor) ?? discovered.modelId;
     const decryptedConfig = this.decryptSensitiveFields(instance, type);
 
     const { model: rawModel, middleware } = type.createLanguageModel({
-      modelId: discovered.modelId,
+      modelId: wireModelId,
       apiKey: decryptedConfig.encryptedApiKey ?? '',
       baseURL,
       config: instance.config as never,
       decryptedConfig,
+      vendor,
     });
 
     let model = rawModel;
@@ -859,7 +876,7 @@ export class ModelProviderService {
         modelId: discovered.modelId,
         isDiscoveredModel: true,
         providerType: instance.typeId,
-        ...otherPostHogProperties,
+        ...omitModelRequestMetadata(otherPostHogProperties),
       },
     };
 
@@ -869,29 +886,25 @@ export class ModelProviderService {
     const contextWindow = discovered.contextWindow ?? 128_000;
 
     // ── Reasoning signature source ──────────────────────────────────────────
-    // Coding-plan intentionally omits apiSpec (resolved dynamically per
-    // instance), so resolve it via the vendor — same pattern as
-    // resolveInstance at line ~382.
-    let apiSpec = type.apiSpec;
-    if (!apiSpec && instance.typeId === 'coding-plan') {
-      const vendor = getCodingPlanVendor(instance.config as CodingPlanConfig);
-      apiSpec = VENDOR_API_SPECS[vendor];
-    }
-    if (!apiSpec) {
-      throw new Error(
-        `Cannot resolve apiSpec for discovered model on instance ${instance.id} (type: ${instance.typeId})`,
-      );
-    }
     const semanticProvider = getSemanticProviderForApiSpec(apiSpec);
-    const reasoningSignatureSource = createReasoningSignatureSource(
-      'custom',
-      semanticProvider,
-      discovered.modelId,
-      {
-        apiSpec: apiSpec as ApiSpec,
-        endpointId: instance.id,
-      },
-    );
+    // OpenRouter is an official provider with an OpenAI-compatible protocol.
+    // Its signatures remain owned by the semantic OpenAI route, while thinking
+    // options use the compatible wire format below.
+    const thinkingProvider: ThinkingProvider | undefined =
+      instance.typeId === 'openrouter' ? 'openai-compatible' : undefined;
+    const reasoningSignatureSource =
+      type.providerMode === 'custom'
+        ? createReasoningSignatureSource(
+            'custom',
+            semanticProvider,
+            discovered.modelId,
+            { apiSpec: apiSpec as ApiSpec, endpointId: instance.id },
+          )
+        : createReasoningSignatureSource(
+            type.providerMode as 'stagewise' | 'official',
+            semanticProvider,
+            discovered.modelId,
+          );
 
     // ── Thinking override lookup (instance-aware) ─────────────────────────
     // Same pattern as the catalog path — look up the override by the
@@ -900,15 +913,6 @@ export class ModelProviderService {
       this.preferencesService.get().agent.modelThinkingOverrides;
     const thinkingOverride =
       thinkingOverrides[instance.id]?.[discovered.modelId];
-
-    // Resolve the vendor for officialProvider on the ThinkingCapableModel.
-    // For official-api types, type.vendor is set. For coding-plan, use the
-    // vendor already resolved above.
-    const vendor =
-      type.vendor ??
-      (instance.typeId === 'coding-plan'
-        ? getCodingPlanVendor(instance.config as CodingPlanConfig)
-        : undefined);
 
     const thinkingModel: ThinkingCapableModel = {
       modelId: discovered.modelId,
@@ -923,6 +927,7 @@ export class ModelProviderService {
       override: thinkingOverride,
       providerMode: type.providerMode,
       semanticProvider,
+      thinkingProvider,
       customEndpointApiSpec: apiSpec as ApiSpec,
       requestMetadata: otherPostHogProperties,
     });
@@ -949,6 +954,7 @@ type ThinkingProviderOptionsInput = {
   override?: ModelThinkingOverride;
   providerMode: ProviderMode;
   semanticProvider: ModelProvider;
+  thinkingProvider?: ThinkingProvider;
   customEndpointApiSpec?: ApiSpec;
   requestMetadata?: Record<string, unknown>;
 };
@@ -959,6 +965,7 @@ function resolveThinkingProviderOptions({
   override,
   providerMode,
   semanticProvider,
+  thinkingProvider,
   customEndpointApiSpec,
   requestMetadata,
 }: ThinkingProviderOptionsInput): ProviderOptions {
@@ -980,6 +987,7 @@ function resolveThinkingProviderOptions({
     const defaultSelection = getDefaultThinkingSelection(modelSettings, {
       providerMode,
       modelProvider: semanticProvider,
+      thinkingProvider,
       customEndpointApiSpec,
     });
     if (!defaultSelection?.enabled) {
@@ -991,6 +999,7 @@ function resolveThinkingProviderOptions({
       route: {
         providerMode,
         modelProvider: semanticProvider,
+        thinkingProvider,
         customEndpointApiSpec,
       },
       override: {
@@ -1010,6 +1019,7 @@ function resolveThinkingProviderOptions({
     route: {
       providerMode,
       modelProvider: semanticProvider,
+      thinkingProvider,
       customEndpointApiSpec,
     },
   });

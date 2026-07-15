@@ -201,6 +201,28 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     });
   });
 
+  it('preserves nested overrides for model IDs named like override fields', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'custom-instance': {
+            enabled: { enabled: true, provider: 'openai' },
+            provider: { enabled: false, provider: 'anthropic' },
+            value: { value: 'high' },
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'custom-instance': {
+        enabled: { enabled: true, provider: 'openai' },
+        provider: { enabled: false, provider: 'anthropic' },
+        value: { value: 'high' },
+      },
+    });
+  });
+
   it('sanitizes invalid model thinking override entries field-by-field', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {

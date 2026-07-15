@@ -132,28 +132,26 @@ export async function discoverOllamaModels(
   const url = `${baseUrl.replace(/\/$/, '')}/api/tags`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
-  let response: Response;
   try {
-    response = await fetch(url, { signal: controller.signal });
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error(
-        `Ollama discovery timed out after ${DISCOVERY_TIMEOUT_MS / 1000}s at ${url}`,
-      );
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error(
+          `Ollama discovery timed out after ${DISCOVERY_TIMEOUT_MS / 1000}s at ${url}`,
+        );
+      }
+      throw err;
     }
-    throw err;
-  }
-  if (!response.ok) {
-    clearTimeout(timeout);
-    throw new Error(`Ollama /api/tags returned ${response.status}`);
-  }
-  const data = (await response.json()) as {
-    models?: { name: string; modified_at?: string; size?: number }[];
-  };
-  const models = data.models ?? [];
-  const endpoint = `${baseUrl.replace(/\/$/, '')}/api`;
-  try {
+    if (!response.ok) {
+      throw new Error(`Ollama /api/tags returned ${response.status}`);
+    }
+    const data = (await response.json()) as {
+      models?: { name: string; modified_at?: string; size?: number }[];
+    };
+    const models = data.models ?? [];
+    const endpoint = `${baseUrl.replace(/\/$/, '')}/api`;
     const metadata = await mapWithBoundedConcurrency(
       models,
       METADATA_CONCURRENCY,
