@@ -937,6 +937,38 @@ describe('built-in model wire-format conversion', () => {
     );
   });
 
+  it('uses a dotted custom Anthropic mapping as the final wire ID', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'custom-anthropic',
+        typeId: 'custom-anthropic',
+        name: 'Custom Anthropic',
+        config: {
+          baseUrl: 'https://anthropic.example.com/v1',
+          modelIdMapping: {
+            'claude-fable-5': 'provider.claude.fable',
+          },
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'claude-fable-5',
+      'trace-1',
+      undefined,
+      'custom-anthropic',
+    );
+
+    expect((result.model as unknown as { modelId: string }).modelId).toBe(
+      'provider.claude.fable',
+    );
+  });
+
   it('uses a dotted Bedrock mapping as the final wire ID', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();

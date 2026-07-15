@@ -5,6 +5,7 @@ import {
 } from './karton-contracts/ui/shared-types';
 import {
   findInstanceForVendor,
+  findModelSelectorEntry,
   getInstanceModelCount,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
@@ -114,6 +115,39 @@ describe('discovered model catalog matching', () => {
       ),
     ).toHaveLength(1);
     expect(getInstanceModelCount(anthropicInstance)).toBe(
+      getSelectableModelEntries(prefs).length,
+    );
+  });
+
+  it('resolves persisted native Anthropic IDs to their catalog entry', () => {
+    const prefs = { providerInstances: [anthropicInstance], customModels: [] };
+
+    expect(
+      findModelSelectorEntry(prefs, anthropicInstance.id, 'claude-opus-4-8')
+        ?.modelId,
+    ).toBe('claude-opus-4.8');
+  });
+
+  it('counts non-catalog discovered models for coding plans', () => {
+    const codingPlanInstance: ProviderInstance = {
+      id: 'coding-plan:glm-coding-plan',
+      typeId: 'coding-plan',
+      name: 'GLM Coding Plan',
+      config: {
+        encryptedApiKey: 'plan-key',
+        planId: 'glm-coding-plan',
+        baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+      },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [
+        { modelId: 'glm-5.2', displayName: 'GLM 5.2' },
+        { modelId: 'glm-unlisted', displayName: 'GLM Unlisted' },
+      ],
+    };
+    const prefs = { providerInstances: [codingPlanInstance], customModels: [] };
+
+    expect(getInstanceModelCount(codingPlanInstance)).toBe(
       getSelectableModelEntries(prefs).length,
     );
   });

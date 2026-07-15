@@ -70,7 +70,7 @@ export function createAnthropicModel(
   modelId: string,
 ): LanguageModelV3 {
   const p = createAnthropic({ apiKey, baseURL });
-  return p(toNativeAnthropicModelId(modelId) as never);
+  return p(modelId as never);
 }
 
 export function createOpenAIChatModel(
@@ -453,9 +453,16 @@ function mapOpenRouterModality(modality: string): string | undefined {
  */
 function mapOpenRouterCapabilities(
   entry: OpenRouterModelEntry,
-): ModelCapabilities | undefined {
+): ModelCapabilities {
   const { input_modalities, output_modalities } = entry.architecture ?? {};
-  if (!input_modalities && !output_modalities) return undefined;
+  if (!input_modalities && !output_modalities) {
+    return {
+      ...DEFAULT_DISCOVERED_CAPABILITIES,
+      toolCalling: entry.supported_parameters
+        ? entry.supported_parameters.includes('tools')
+        : DEFAULT_DISCOVERED_CAPABILITIES.toolCalling,
+    };
+  }
 
   const input: ModelCapabilities['inputModalities'] = {
     text: false,
