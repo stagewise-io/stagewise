@@ -14,6 +14,7 @@ import { BROWSER_DOMAIN_ID } from '@/env-domains/browser-domain-adapter';
 import { LOG_INGEST_DOMAIN_ID } from '@/env-domains/log-ingest-domain-adapter';
 import { SANDBOX_DOMAIN_ID } from '@/env-domains/sandbox-domain-adapter';
 import { SHELLS_DOMAIN_ID } from '@stagewise/agent-shell/env';
+import { getModelCapabilities } from '@shared/available-models';
 import type { ModelProviderService } from '@/agents/model-provider';
 import type { Logger as BrowserLogger } from '@/services/logger';
 import type { TelemetryService, UIEventName } from '@/services/telemetry';
@@ -249,6 +250,40 @@ describe('createBrowserHostModels', () => {
 });
 
 describe('createLazyBrowserHostModels', () => {
+  it('rejects model resolution and reports unavailable models before initialization', async () => {
+    const lazyModels = createLazyBrowserHostModels();
+
+    await expect(
+      lazyModels.hostModels.get('gpt-5.5', 'trace-1'),
+    ).rejects.toThrow('ModelProviderService not initialized yet');
+    await expect(
+      lazyModels.hostModels.getWithOptions('gpt-5.5', 'trace-1'),
+    ).rejects.toThrow('ModelProviderService not initialized yet');
+    expect(lazyModels.hostModels.has('gpt-5.5')).toBe(false);
+  });
+
+  it('uses static catalog capabilities before initialization', () => {
+    const lazyModels = createLazyBrowserHostModels();
+
+    expect(lazyModels.hostModels.getCapabilities('gpt-5.5')).toEqual(
+      getModelCapabilities('gpt-5.5'),
+    );
+  });
+
+  it('rejects setting the model provider service twice', () => {
+    const lazyModels = createLazyBrowserHostModels();
+    const mp = {
+      modelExists: vi.fn(),
+      getModelWithOptions: vi.fn(),
+    };
+
+    lazyModels.setModelProviderService(mp as unknown as ModelProviderService);
+
+    expect(() =>
+      lazyModels.setModelProviderService(mp as unknown as ModelProviderService),
+    ).toThrow('setModelProviderService called twice');
+  });
+
   it('forwards provider instance IDs after initialization', () => {
     const mp = {
       modelExists: vi.fn(
