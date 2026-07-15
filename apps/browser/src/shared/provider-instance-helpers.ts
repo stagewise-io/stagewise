@@ -205,9 +205,9 @@ export function providerInstanceToCustomEndpoint(
 /**
  * Resolve the provider instance that serves a given vendor.
  *
- * Uses the same logic as the routing layer's `findInstanceForVendor`, but
- * also checks the legacy `providerConfigs` custom-mode link so that
- * custom-mode vendors resolve correctly during the PR 1 transition.
+ * Mirrors backend routing: the legacy custom-provider link remains explicit,
+ * while concrete coding-plan and vendor API instances take precedence over a
+ * stale legacy `stagewise` mode.
  */
 export function findInstanceForVendor(
   preferences: UserPreferences,
@@ -216,73 +216,57 @@ export function findInstanceForVendor(
   const instances = preferences.providerInstances ?? [];
   const legacyConfig = preferences.providerConfigs?.[vendor];
 
-  // The legacy `mode` is the source of truth for the user's routing intent.
-  // When it is set we resolve strictly by it — no stagewise fallback — so
-  // that an 'official' vendor without a created instance yet returns
-  // undefined (not the shared stagewise instance), which lets the UI
-  // distinguish "no key configured" from "using stagewise".
-  if (legacyConfig) {
-    switch (legacyConfig.mode) {
-      case 'stagewise':
-        return undefined;
-      case 'custom':
-        if (!legacyConfig.customProviderId) return undefined;
-        return instances.find((i) => i.id === legacyConfig.customProviderId);
-      case 'official':
-        return findVendorApiInstance(instances, vendor);
-    }
+  // Custom-mode routing remains an explicit legacy link during the transition.
+  if (legacyConfig?.mode === 'custom') {
+    if (!legacyConfig.customProviderId) return undefined;
+    return instances.find(
+      (instance) => instance.id === legacyConfig.customProviderId,
+    );
   }
 
-  // No legacy config — derive from instances, falling back to stagewise.
-  return (
-    findVendorApiInstance(instances, vendor) ??
-    instances.find((i) => i.typeId === 'stagewise')
-  );
+  return findVendorApiInstance(instances, vendor);
 }
 
 /**
- * Scan instances for a vendor-specific `-api` or `coding-plan` instance.
- * Returns undefined if none matches.
+ * Resolve a vendor's concrete instance. Coding plans win over general vendor
+ * API instances regardless of their position in the instance list.
  */
 function findVendorApiInstance(
   instances: ProviderInstance[],
   vendor: ModelProvider,
 ): ProviderInstance | undefined {
-  for (const instance of instances) {
-    if (instance.typeId === 'stagewise') continue;
-    if (instance.typeId.endsWith('-api')) {
-      if (instance.typeId.slice(0, -4) === vendor) return instance;
-      continue;
-    }
-    if (instance.typeId === 'coding-plan') {
-      const plan = CODING_PLANS[instance.config.planId as CodingPlanId];
-      if (plan?.provider === vendor) return instance;
-      continue;
-    }
-  }
-  return undefined;
+  const codingPlanInstance = instances.find((instance) => {
+    if (instance.typeId !== 'coding-plan') return false;
+    const plan = CODING_PLANS[instance.config.planId as CodingPlanId];
+    return plan?.provider === vendor;
+  });
+  if (codingPlanInstance) return codingPlanInstance;
+
+  return instances.find(
+    (instance) =>
+      instance.typeId !== 'stagewise' &&
+      instance.typeId.endsWith('-api') &&
+      instance.typeId.slice(0, -4) === vendor,
+  );
 }
 
 /**
- * Derive the effective endpoint mode for a vendor from its provider instance.
- * Falls back to `providerConfigs[vendor].mode` for custom-mode vendors
- * whose instance link is only stored in the legacy config.
+ * Derive the effective endpoint mode for a vendor from its serving instance.
+ * A legacy official mode remains visible before an instance is created, but a
+ * stale legacy stagewise mode cannot mask a concrete route.
  */
 export function getVendorMode(
   preferences: UserPreferences,
   vendor: ModelProvider,
 ): ProviderEndpointMode {
-  // The legacy `mode` is the source of truth for routing intent. Respect it
-  // directly — an 'official' mode must surface as 'official' even before a
-  // vendor-api instance has been created (the instance is only created after
-  // the user enters and validates a key).
   const legacyConfig = preferences.providerConfigs?.[vendor];
-  if (legacyConfig) return legacyConfig.mode;
-
-  // No legacy config — derive from instances.
   const instance = findInstanceForVendor(preferences, vendor);
-  if (!instance || instance.typeId === 'stagewise') return 'stagewise';
-  return 'official';
+
+  if (legacyConfig?.mode === 'custom') {
+    return instance ? 'custom' : 'stagewise';
+  }
+  if (instance) return 'official';
+  return legacyConfig?.mode === 'official' ? 'official' : 'stagewise';
 }
 
 /**
