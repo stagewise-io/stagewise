@@ -919,24 +919,24 @@ export const userPreferencesSchema = z.object({
             const record = val as Record<string, unknown>;
             const entries = Object.entries(record);
             if (entries.length === 0) return {};
-            // Current maps are structurally two levels deep: each outer
-            // instance value maps model IDs to override objects. This avoids
-            // mistaking model IDs such as "enabled", "provider", or "value"
-            // for fields of a legacy override.
+            // Current maps are two levels deep. Preserve the outer instance
+            // key whenever its value looks like a model map, even if a nested
+            // override is malformed; field-level sanitization handles it.
             const isCurrentNestedMap = entries.every(
               ([, instanceOverrides]) =>
                 isPlainRecord(instanceOverrides) &&
-                Object.values(instanceOverrides).every(isPlainRecord),
+                Object.values(instanceOverrides).some(isPlainRecord),
             );
             if (isCurrentNestedMap) return val;
 
-            // A legacy flat map can contain malformed values. If at least
-            // one entry is recognizably an override object, retain those
-            // valid entries and discard malformed siblings before wrapping.
+            // A legacy flat map can contain malformed values. Recognize an
+            // entry only when at least one override field has a valid type.
             const legacyEntries = entries.filter(([, value]) => {
               if (!isPlainRecord(value)) return false;
-              return ['enabled', 'provider', 'value'].some((key) =>
-                Object.hasOwn(value, key),
+              return (
+                typeof value.enabled === 'boolean' ||
+                thinkingProviderSchema.safeParse(value.provider).success ||
+                typeof value.value === 'string'
               );
             });
             if (legacyEntries.length > 0) {

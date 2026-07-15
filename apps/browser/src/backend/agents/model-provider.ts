@@ -12,9 +12,9 @@ import type {
 import type { ReasoningSignatureSource } from '@shared/karton-contracts/ui/agent/metadata';
 import {
   createReasoningSignatureSource,
-  getSemanticProviderForApiSpec,
   type ProviderMode,
 } from './reasoning-signatures';
+import { getSemanticProviderForApiSpec } from '@shared/api-spec-provider';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import {
   type availableModels,

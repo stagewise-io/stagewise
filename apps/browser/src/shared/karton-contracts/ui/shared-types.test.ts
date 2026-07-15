@@ -223,6 +223,28 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     });
   });
 
+  it('keeps malformed nested overrides under their provider instance', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'custom-instance': {
+            enabled: { enabled: 'invalid' },
+            provider: { provider: 'invalid' },
+            value: { value: 1 },
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'custom-instance': {
+        enabled: {},
+        provider: {},
+        value: {},
+      },
+    });
+  });
+
   it('sanitizes invalid model thinking override entries field-by-field', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {
