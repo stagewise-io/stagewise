@@ -181,7 +181,9 @@ export function getThinkingProviderForRoute({
     case 'mistral':
       return 'openai-compatible';
     default:
-      return providerMode === 'stagewise' ? 'stagewise' : 'stagewise';
+      // Unknown routes have no proven provider-native reasoning contract.
+      // Never emit Stagewise-only fields to an external endpoint.
+      return providerMode === 'stagewise' ? 'stagewise' : 'openai-compatible';
   }
 }
 

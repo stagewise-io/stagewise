@@ -344,7 +344,7 @@ describe('discovered model routing', () => {
     });
   });
 
-  it('uses OpenRouter-compatible thinking, official signatures, and safe telemetry', () => {
+  it('uses OpenRouter-compatible thinking, vendor-owned official signatures, and safe telemetry', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
     preferences.providerInstances = [
@@ -406,6 +406,47 @@ describe('discovered model routing', () => {
     expect(tracingConfig.posthogProperties).not.toHaveProperty(
       PROVIDER_INSTANCE_ID_METADATA_KEY,
     );
+  });
+
+  it('keeps OpenRouter reasoning signatures scoped to the routed vendor', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-instance',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { encryptedApiKey: 'router-key' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: 'anthropic/claude-opus-4.8',
+            displayName: 'Claude Opus 4.8',
+            thinkingEnabled: true,
+          },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'anthropic/claude-opus-4.8',
+      'trace-1',
+      agentStepMetadata,
+      'openrouter-instance',
+    );
+
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider: 'anthropic',
+    });
+    expect(
+      reasoningSourcesMatch(result.reasoningSignatureSource!, {
+        providerMode: 'official',
+        provider: 'openai',
+        modelId: 'openai/gpt-5',
+      }),
+    ).toBe(false);
   });
 
   it('keeps discovered custom routes endpoint-bound', () => {

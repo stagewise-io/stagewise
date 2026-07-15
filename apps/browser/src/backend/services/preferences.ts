@@ -177,16 +177,18 @@ export class PreferencesService extends DisposableService {
         !config.customProviderId
       ) {
         const id = crypto.randomUUID();
-        const apiSpecMap: Record<string, string> = {
-          anthropic: 'anthropic',
-          openai: 'openai-chat-completions',
-          google: 'google',
-        };
+        const apiSpec = getProviderType(`${provider}-api`).apiSpec;
+        if (!apiSpec) {
+          this.logger.warn(
+            `[PreferencesService] Skipped customBaseUrl migration for unsupported provider ${provider}`,
+          );
+          continue;
+        }
 
         this.preferences.customEndpoints.push({
           id,
           name: `Migrated ${provider} endpoint`,
-          apiSpec: apiSpecMap[provider] as any,
+          apiSpec,
           baseUrl: config.customBaseUrl,
           encryptedApiKey: config.encryptedApiKey,
           // Default value mirrors the Zod schema — only Bedrock reads it,
