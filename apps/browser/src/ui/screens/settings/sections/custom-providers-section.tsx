@@ -103,11 +103,8 @@ type AwsProfileInfo = {
 };
 
 /**
- * Map an AWS region to the Bedrock cross-region inference profile
- * prefix required by Claude 4.x and Nova. Falls back to `us.` for
- * unrecognised regions because `us.` is the most broadly supported
- * family and unknown inputs almost always come from typos of a
- * US region.
+ * Whether switching the API specification will clear persisted credentials
+ * and therefore requires the user to enter them again before saving.
  */
 export function shouldWarnAboutCredentialReentry(
   endpoint: CustomEndpoint | undefined,
@@ -122,6 +119,11 @@ export function shouldWarnAboutCredentialReentry(
   );
 }
 
+/**
+ * Map an AWS region to the Bedrock cross-region inference profile prefix
+ * required by Claude 4.x and Nova. Falls back to `us.` for unrecognised
+ * regions because it is the most broadly supported profile family.
+ */
 function bedrockInferencePrefix(region: string | undefined): string {
   if (!region) return 'us.';
   if (region.startsWith('us-') || region.startsWith('ca-')) return 'us.';

@@ -919,18 +919,9 @@ export const userPreferencesSchema = z.object({
             const record = val as Record<string, unknown>;
             const entries = Object.entries(record);
             if (entries.length === 0) return {};
-            // Current maps are two levels deep. Preserve the outer instance
-            // key whenever its value looks like a model map, even if a nested
-            // override is malformed; field-level sanitization handles it.
-            const isCurrentNestedMap = entries.every(
-              ([, instanceOverrides]) =>
-                isPlainRecord(instanceOverrides) &&
-                Object.values(instanceOverrides).some(isPlainRecord),
-            );
-            if (isCurrentNestedMap) return val;
-
-            // A legacy flat map can contain malformed values. Recognize an
-            // entry only when at least one override field has a valid type.
+            // A legacy flat map can contain malformed values. Recognize a
+            // valid override before considering a nested map: an extra object
+            // field on a legacy override must not change its representation.
             const legacyEntries = entries.filter(([, value]) => {
               if (!isPlainRecord(value)) return false;
               return (
@@ -944,6 +935,16 @@ export const userPreferencesSchema = z.object({
                 'stagewise-default': Object.fromEntries(legacyEntries),
               };
             }
+
+            // Current maps are two levels deep. Preserve the outer instance
+            // key whenever its value looks like a model map, even if a nested
+            // override is malformed; field-level sanitization handles it.
+            const isCurrentNestedMap = entries.every(
+              ([, instanceOverrides]) =>
+                isPlainRecord(instanceOverrides) &&
+                Object.values(instanceOverrides).some(isPlainRecord),
+            );
+            if (isCurrentNestedMap) return val;
             return val;
           },
           z.record(

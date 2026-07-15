@@ -73,37 +73,30 @@ function findInstanceForVendor(
   const instances = prefs.providerInstances;
   const legacyConfig = prefs.providerConfigs?.[vendor];
 
-  // The legacy `mode` is the source of truth for routing intent. When it is
-  // set, resolve strictly by it so that a user who switched back to
-  // 'stagewise' does not accidentally route through a leftover vendor-api
-  // instance.
-  if (legacyConfig) {
-    switch (legacyConfig.mode) {
-      case 'stagewise':
-        return undefined;
-      case 'custom':
-        if (!legacyConfig.customProviderId) return undefined;
-        return instances.find((i) => i.id === legacyConfig.customProviderId);
-      case 'official':
-        break; // fall through to instance scan below
-    }
+  // Custom-mode routing remains an explicit legacy link during the transition.
+  if (legacyConfig?.mode === 'custom') {
+    if (!legacyConfig.customProviderId) return undefined;
+    return instances.find((i) => i.id === legacyConfig.customProviderId);
   }
 
-  for (const instance of instances) {
-    if (instance.typeId === 'stagewise') continue;
-    if (instance.typeId.endsWith('-api')) {
-      const v = instance.typeId.slice(0, -4); // strip `-api`
-      if (v === vendor) return instance;
-      continue;
-    }
-    if (instance.typeId === 'coding-plan') {
-      const plan =
-        CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS];
-      if (plan?.provider === vendor) return instance;
-      continue;
-    }
-  }
-  return undefined;
+  // Prefer a coding plan before a general vendor API. Legacy migrations append
+  // plans after existing API instances, but the plan is the active route when
+  // both are present. A stale legacy `stagewise` flag must likewise not hide a
+  // concrete BYOK instance added by a newer client.
+  const codingPlanInstance = instances.find((instance) => {
+    if (instance.typeId !== 'coding-plan') return false;
+    const plan =
+      CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS];
+    return plan?.provider === vendor;
+  });
+  if (codingPlanInstance) return codingPlanInstance;
+
+  return instances.find(
+    (instance) =>
+      instance.typeId !== 'stagewise' &&
+      instance.typeId.endsWith('-api') &&
+      instance.typeId.slice(0, -4) === vendor,
+  );
 }
 
 /**
@@ -644,8 +637,19 @@ export class ModelProviderService {
     }
 
     // ── Apply wire-format model ID transform ────────────────────────────────
+    // Compatible transports do not necessarily own the catalog vendor's
+    // native model-ID convention (for example MiniMax via custom OpenAI).
+    // Apply an explicit mapping first, then use the transport transform when
+    // available or the official vendor transform as the compatibility fallback.
     const wireModelId =
-      type.toWireModelId?.(mappedModelId, officialProvider) ?? mappedModelId;
+      type.toWireModelId?.(mappedModelId, officialProvider) ??
+      (officialProvider
+        ? getProviderTypeByVendor(officialProvider).toWireModelId?.(
+            mappedModelId,
+            officialProvider,
+          )
+        : undefined) ??
+      mappedModelId;
 
     // ── Create the language model via the provider type ─────────────────────
     const { model: rawModel, middleware } = type.createLanguageModel({
@@ -977,12 +981,12 @@ function resolveThinkingProviderOptions({
     return baseProviderOptions as ProviderOptions;
   }
 
-  // When thinking is enabled but no explicit override exists, emit a
-  // default thinking patch so that models whose base providerOptions are
-  // sparse (e.g. discovered models, which start with {}) still receive
-  // reasoning configuration. Catalog models already carry reasoning
-  // settings in their base providerOptions, so for them this patch is
-  // redundant — the deep-merge simply overwrites with the same values.
+  // Catalog definitions own their curated default provider options. Only
+  // sparse definitions (notably discovered models) need an inferred patch.
+  if (!override && Object.keys(baseProviderOptions).length > 0) {
+    return baseProviderOptions as ProviderOptions;
+  }
+
   if (!override) {
     const defaultSelection = getDefaultThinkingSelection(modelSettings, {
       providerMode,

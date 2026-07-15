@@ -284,6 +284,39 @@ describe('provider instance base URL resolution', () => {
 });
 
 describe('discovered model routing', () => {
+  it('adds a default thinking patch for sparse discovered models', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-instance',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { encryptedApiKey: 'router-key' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: 'openai/gpt-5',
+            displayName: 'GPT-5',
+            thinkingEnabled: true,
+          },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'openai/gpt-5',
+      'trace-1',
+      agentStepMetadata,
+      'openrouter-instance',
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      openai: { reasoningEffort: 'medium' },
+    });
+  });
+
   it('uses OpenRouter-compatible thinking, official signatures, and safe telemetry', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
@@ -698,6 +731,70 @@ describe('model alias routing', () => {
 });
 
 describe('official provider endpoint resolution', () => {
+  it('prefers a concrete API instance over a stale stagewise legacy mode', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerConfigs.openai.mode = 'stagewise';
+    preferences.providerInstances = [
+      {
+        id: 'openai-byok',
+        typeId: 'openai-api',
+        name: 'OpenAI BYOK',
+        config: {
+          encryptedApiKey: 'byok-key',
+          baseUrl: 'https://byok.example.com/v1',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    const result = service.getModelWithOptions('gpt-5.5', 'trace-1');
+
+    expect(result.providerMode).toBe('official');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://byok.example.com/v1/chat/completions',
+    );
+  });
+
+  it('prefers a coding plan over stale stagewise mode and earlier API instances', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerConfigs['z-ai'].mode = 'stagewise';
+    preferences.providerInstances = [
+      {
+        id: 'z-ai-byok',
+        typeId: 'z-ai-api',
+        name: 'Z.ai BYOK',
+        config: {
+          encryptedApiKey: 'byok-key',
+          baseUrl: 'https://byok.example.com/v4',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'z-ai-plan',
+        typeId: 'coding-plan',
+        name: 'GLM Coding Plan',
+        config: { encryptedApiKey: 'plan-key', planId: 'glm-coding-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    const result = service.getModelWithOptions('glm-5.2', 'trace-1');
+
+    expect(result.providerMode).toBe('official');
+    expect(result.connectedCodingPlanId).toBe('glm-coding-plan');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    );
+  });
+
   it('routes vendor-resolved coding plans through the plan endpoint', () => {
     const service = createTestModelProviderService({
       providerModes: { 'z-ai': 'official' },
@@ -784,6 +881,51 @@ describe('official provider endpoint resolution', () => {
     expect(result.providerMode).toBe('official');
     expect(getModelRequestUrl(result)).toBe(
       'https://api.z.ai/api/paas/v4/chat/completions',
+    );
+  });
+});
+
+describe('built-in model wire-format conversion', () => {
+  it('converts canonical MiniMax IDs through custom OpenAI transports', () => {
+    const service = createTestModelProviderService({
+      providerModes: { minimax: 'custom' },
+      customEndpoints: [
+        {
+          id: 'minimax-custom',
+          name: 'MiniMax-compatible',
+          apiSpec: 'openai-chat-completions',
+          baseUrl: 'https://minimax.example.com/v1',
+          awsAuthMode: 'access-keys',
+        },
+      ],
+    });
+
+    const result = service.getModelWithOptions('minimax-m3', 'trace-1');
+
+    expect((result.model as unknown as { modelId: string }).modelId).toBe(
+      'MiniMax-M3',
+    );
+  });
+
+  it('uses an explicit instance model-ID mapping before vendor conversion', () => {
+    const service = createTestModelProviderService({
+      providerModes: { minimax: 'custom' },
+      customEndpoints: [
+        {
+          id: 'minimax-custom',
+          name: 'MiniMax-compatible',
+          apiSpec: 'openai-chat-completions',
+          baseUrl: 'https://minimax.example.com/v1',
+          awsAuthMode: 'access-keys',
+          modelIdMapping: { 'minimax-m3': 'deployment-name' },
+        },
+      ],
+    });
+
+    const result = service.getModelWithOptions('minimax-m3', 'trace-1');
+
+    expect((result.model as unknown as { modelId: string }).modelId).toBe(
+      'deployment-name',
     );
   });
 });
