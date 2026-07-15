@@ -267,6 +267,27 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     });
   });
 
+  it('classifies a legacy override with extra nested fields as legacy', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'gpt-5.5': {
+            enabled: true,
+            provider: 'openai',
+            value: 'high',
+            legacyMetadata: { source: 'old-client' },
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'stagewise-default': {
+        'gpt-5.5': { enabled: true, provider: 'openai', value: 'high' },
+      },
+    });
+  });
+
   it('retains valid legacy overrides while discarding malformed entries', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {

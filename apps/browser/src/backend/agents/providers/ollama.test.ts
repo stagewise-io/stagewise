@@ -1,5 +1,35 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { discoverOllamaModels } from './ollama';
+import { discoverOllamaModels, ollamaProviderType } from './ollama';
+
+describe('ollamaProviderType.createLanguageModel', () => {
+  it.each([
+    ['http://localhost:11434', 'http://localhost:11434/v1/chat/completions'],
+    ['http://localhost:11434/', 'http://localhost:11434/v1/chat/completions'],
+    ['http://localhost:11434/v1', 'http://localhost:11434/v1/chat/completions'],
+    [
+      'http://localhost:11434/v1/',
+      'http://localhost:11434/v1/chat/completions',
+    ],
+  ])('uses exactly one /v1 suffix for %s', (baseURL, expectedUrl) => {
+    const { model } = ollamaProviderType.createLanguageModel({
+      modelId: 'llama3',
+      baseURL,
+      apiKey: '',
+      config: { baseUrl: baseURL },
+      decryptedConfig: {},
+    });
+
+    expect(
+      (
+        model as unknown as {
+          config: { url: (options: { path: string }) => URL };
+        }
+      ).config
+        .url({ path: '/chat/completions' })
+        .toString(),
+    ).toBe(expectedUrl);
+  });
+});
 
 describe('discoverOllamaModels', () => {
   afterEach(() => {
