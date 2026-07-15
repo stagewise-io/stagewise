@@ -383,9 +383,9 @@ export function getInstanceThinkingDefaultOptions(
   if (instance.typeId === 'stagewise') {
     return { providerMode: 'stagewise' };
   }
-  if (instance.typeId === 'openrouter') {
-    // OpenRouter uses the OpenAI Chat Completions protocol, even though its
-    // discovered model IDs are not owned by one catalog vendor.
+  if (instance.typeId === 'openrouter' || instance.typeId === 'ollama') {
+    // OpenRouter and Ollama use the OpenAI Chat Completions protocol, even
+    // though their discovered model IDs are not owned by one catalog vendor.
     return {
       providerMode: 'official',
       modelProvider: 'openai',

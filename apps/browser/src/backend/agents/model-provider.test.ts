@@ -298,6 +298,9 @@ describe('discovered model routing', () => {
     }));
 
     expect(service.modelExists('local-chat')).toBe(false);
+    expect(service.modelExists('local-chat', 'one')).toBe(true);
+    expect(service.modelExists('local-chat', 'two')).toBe(true);
+    expect(service.modelExists('local-chat', 'missing')).toBe(false);
     expect(() => service.getModelWithOptions('local-chat', 'trace-1')).toThrow(
       'Model local-chat not found',
     );

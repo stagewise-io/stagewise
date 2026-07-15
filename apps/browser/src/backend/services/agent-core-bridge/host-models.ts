@@ -23,9 +23,8 @@ import { PROVIDER_INSTANCE_ID_METADATA_KEY } from '@stagewise/agent-core/host';
  * normalized into `Error` so callers receive a consistent rejection
  * shape.
  *
- * `has(id)` delegates to `ModelProviderService.modelExists` as a global,
- * no-instance lookup. Instance-scoped discovered models require their provider
- * instance ID through `getWithOptions` metadata and are intentionally excluded.
+ * `has(id, providerInstanceId)` delegates to `ModelProviderService.modelExists`.
+ * Instance-scoped discovered models require their provider instance ID.
  */
 export function createBrowserHostModels(
   modelProviderService: ModelProviderService,
@@ -69,8 +68,11 @@ export function createBrowserHostModels(
       const { model } = await getWithOptions(modelId, traceId);
       return model;
     },
-    has(modelId) {
-      return modelProviderService.modelExists(modelId as ModelId);
+    has(modelId, providerInstanceId) {
+      return modelProviderService.modelExists(
+        modelId as ModelId,
+        providerInstanceId,
+      );
     },
     getCapabilities(modelId): ModelCapabilities {
       return getModelCapabilities(modelId as ModelId) as ModelCapabilities;

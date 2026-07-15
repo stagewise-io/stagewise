@@ -181,8 +181,34 @@ describe('createBrowserHostModels', () => {
 
     expect(models.has('known')).toBe(true);
     expect(models.has('missing')).toBe(false);
-    expect(mp.modelExists).toHaveBeenNthCalledWith(1, 'known');
-    expect(mp.modelExists).toHaveBeenNthCalledWith(2, 'missing');
+    expect(mp.modelExists).toHaveBeenNthCalledWith(1, 'known', undefined);
+    expect(mp.modelExists).toHaveBeenNthCalledWith(2, 'missing', undefined);
+  });
+
+  it('forwards the optional provider instance to has()', () => {
+    const mp = {
+      modelExists: vi.fn(
+        (id: string, providerInstanceId?: string) =>
+          id === 'local-chat' && providerInstanceId === 'ollama-local',
+      ),
+      getModelWithOptions: vi.fn(),
+    };
+    const models = createBrowserHostModels(
+      mp as unknown as ModelProviderService,
+    );
+
+    expect(models.has('local-chat', 'ollama-local')).toBe(true);
+    expect(models.has('local-chat', 'another-instance')).toBe(false);
+    expect(mp.modelExists).toHaveBeenNthCalledWith(
+      1,
+      'local-chat',
+      'ollama-local',
+    );
+    expect(mp.modelExists).toHaveBeenNthCalledWith(
+      2,
+      'local-chat',
+      'another-instance',
+    );
   });
 
   it('re-throws Error instances unchanged', async () => {

@@ -127,9 +127,10 @@ export interface HostModels {
 
   /**
    * Synchronous existence check. Cheap; intended for UI-facing
-   * fallbacks ("model unavailable, use default?").
+   * fallbacks ("model unavailable, use default?"). Discovered models
+   * require their owning provider instance ID.
    */
-  has(modelId: string): boolean;
+  has(modelId: string, providerInstanceId?: string): boolean;
 
   /**
    * Returns the {@link ModelCapabilities} for `modelId` (input/output

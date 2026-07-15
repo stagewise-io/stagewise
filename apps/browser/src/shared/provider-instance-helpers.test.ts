@@ -22,6 +22,16 @@ const openrouterInstance: ProviderInstance = {
   discoveredModels: [],
 };
 
+const ollamaInstance: ProviderInstance = {
+  id: 'ollama-local',
+  typeId: 'ollama',
+  name: 'Ollama',
+  config: { baseUrl: 'http://localhost:11434' },
+  enabledModelIds: [],
+  disabledModelIds: [],
+  discoveredModels: [],
+};
+
 describe('getInstanceThinkingDefaultOptions', () => {
   it('uses the OpenAI-compatible official route for OpenRouter', () => {
     expect(getInstanceThinkingDefaultOptions(openrouterInstance)).toEqual({
@@ -37,6 +47,21 @@ describe('getInstanceThinkingDefaultOptions', () => {
         'gpt-5.5',
         getInstanceThinkingDefaultOptions(openrouterInstance),
       ).map((option) => option.value),
+    ).toEqual(['low', 'medium', 'high']);
+  });
+
+  it('uses the OpenAI-compatible official route for Ollama', () => {
+    const route = getInstanceThinkingDefaultOptions(ollamaInstance);
+
+    expect(route).toEqual({
+      providerMode: 'official',
+      modelProvider: 'openai',
+      thinkingProvider: 'openai-compatible',
+    });
+    expect(
+      getSupportedThinkingOptions('gpt-5.5', route).map(
+        (option) => option.value,
+      ),
     ).toEqual(['low', 'medium', 'high']);
   });
 });

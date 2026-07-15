@@ -23,6 +23,7 @@ function createDeps() {
   };
   const persistenceDb = {
     getLastChatWorkspacePaths: vi.fn(async () => null),
+    getLastChatModelSelection: vi.fn(async () => null),
   };
   return {
     registry: new CommandRegistry(),
@@ -117,6 +118,83 @@ describe('AgentManager agents.create handler', () => {
       toolApprovalMode: 'alwaysAllow',
     });
 
+    await manager.teardown();
+  });
+
+  it('uses the provider instance when restoring the last chat model', async () => {
+    const deps = createDeps();
+    const has = vi.fn(
+      (modelId: string, providerInstanceId?: string) =>
+        modelId === 'local-chat' && providerInstanceId === 'ollama-local',
+    );
+    (deps.host.models as any).has = has;
+    (deps.persistenceDb as any).getLastChatModelSelection = vi.fn(async () => ({
+      activeModelId: 'local-chat',
+      activeProviderInstanceId: 'ollama-local',
+    }));
+    const manager = buildManager(deps);
+
+    await expect(
+      manager.createAgent(AgentTypes.CHAT, undefined),
+    ).rejects.toThrow();
+
+    expect(has).toHaveBeenCalledWith('local-chat', 'ollama-local');
+    await manager.teardown();
+  });
+
+  it('uses the provider instance when validating a resumed model', async () => {
+    const deps = createDeps();
+    const has = vi.fn(
+      (modelId: string, providerInstanceId?: string) =>
+        modelId === 'local-chat' && providerInstanceId === 'ollama-local',
+    );
+    (deps.host.models as any).has = has;
+    (deps.persistenceDb as any).getStoredAgentInstanceById = vi.fn(
+      async () => ({
+        type: AgentTypes.CHAT,
+        parentAgentInstanceId: null,
+        activeModelId: 'local-chat',
+        activeProviderInstanceId: 'ollama-local',
+        title: '',
+        history: [],
+        queuedMessages: [],
+        instanceConfig: undefined,
+      }),
+    );
+    const manager = buildManager(deps);
+
+    await expect(manager.resumeAgent('restored')).rejects.toThrow();
+
+    expect(has).toHaveBeenCalledWith('local-chat', 'ollama-local');
+    await manager.teardown();
+  });
+
+  it('uses the provider instance when updating an active model', async () => {
+    const deps = createDeps();
+    const has = vi.fn(
+      (modelId: string, providerInstanceId?: string) =>
+        modelId === 'local-chat' && providerInstanceId === 'ollama-local',
+    );
+    (deps.host.models as any).has = has;
+    const manager = buildManager(deps);
+    const updateActiveModelId = vi.fn(async () => {});
+    (manager as any).activeAgents.set('active-agent', {
+      updateActiveModelId,
+      onTeardown: vi.fn(async () => {}),
+      agentType: AgentTypes.CHAT,
+    });
+
+    await deps.registry.dispatch<unknown[], void>(
+      'agents.setActiveModelId',
+      { callerId: 'test' },
+      ['active-agent', 'local-chat', 'ollama-local'],
+    );
+
+    expect(has).toHaveBeenCalledWith('local-chat', 'ollama-local');
+    expect(updateActiveModelId).toHaveBeenCalledWith(
+      'local-chat',
+      'ollama-local',
+    );
     await manager.teardown();
   });
 
