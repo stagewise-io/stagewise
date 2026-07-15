@@ -122,9 +122,9 @@ export function createLazyBrowserHostModels(): LazyBrowserHostModels {
       }
       return inner.get(modelId, traceId);
     },
-    has(modelId) {
+    has(modelId, providerInstanceId) {
       if (!inner) return false;
-      return inner.has(modelId);
+      return inner.has(modelId, providerInstanceId);
     },
     getCapabilities(modelId) {
       // Capability lookup is pure metadata derived from the static

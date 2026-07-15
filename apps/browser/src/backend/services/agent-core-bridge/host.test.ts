@@ -18,7 +18,10 @@ import type { ModelProviderService } from '@/agents/model-provider';
 import type { Logger as BrowserLogger } from '@/services/logger';
 import type { TelemetryService, UIEventName } from '@/services/telemetry';
 import { createBrowserAgentHost } from './host';
-import { createBrowserHostModels } from './host-models';
+import {
+  createBrowserHostModels,
+  createLazyBrowserHostModels,
+} from './host-models';
 import { createBrowserHostPaths } from './host-paths';
 import { createBrowserTelemetrySink } from './host-telemetry';
 
@@ -242,6 +245,36 @@ describe('createBrowserHostModels', () => {
     await expect(models.getWithOptions('x', 't')).rejects.toMatchObject({
       message: 'string-failure',
     });
+  });
+});
+
+describe('createLazyBrowserHostModels', () => {
+  it('forwards provider instance IDs after initialization', () => {
+    const mp = {
+      modelExists: vi.fn(
+        (modelId: string, providerInstanceId?: string) =>
+          modelId === 'local-chat' && providerInstanceId === 'ollama-local',
+      ),
+      getModelWithOptions: vi.fn(),
+    };
+    const lazyModels = createLazyBrowserHostModels();
+
+    lazyModels.setModelProviderService(mp as unknown as ModelProviderService);
+
+    expect(lazyModels.hostModels.has('local-chat', 'ollama-local')).toBe(true);
+    expect(lazyModels.hostModels.has('local-chat', 'other-instance')).toBe(
+      false,
+    );
+    expect(mp.modelExists).toHaveBeenNthCalledWith(
+      1,
+      'local-chat',
+      'ollama-local',
+    );
+    expect(mp.modelExists).toHaveBeenNthCalledWith(
+      2,
+      'local-chat',
+      'other-instance',
+    );
   });
 });
 
