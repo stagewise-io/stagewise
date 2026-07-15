@@ -516,6 +516,26 @@ describe('PreferencesService legacy provider migration', () => {
     expect(persistedDataMock.writePersistedData).toHaveBeenCalledTimes(1);
   });
 
+  it('migrates OpenAI-compatible custom base URLs with their protocol API spec', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerConfigs.moonshotai = {
+      ...preferences.providerConfigs.moonshotai,
+      mode: 'custom',
+      customBaseUrl: 'https://moonshot.example/v1',
+      encryptedApiKey: 'moonshot-key',
+    };
+
+    const service = await createServiceWithPreferences(preferences);
+
+    expect(service.get().customEndpoints).toContainEqual(
+      expect.objectContaining({
+        name: 'Migrated moonshotai endpoint',
+        apiSpec: 'openai-chat-completions',
+        baseUrl: 'https://moonshot.example/v1',
+      }),
+    );
+  });
+
   it('reconciles a legacy coding plan when provider instances already exist', async () => {
     const preferences = cloneDefaultPreferences();
     preferences.providerInstances = [

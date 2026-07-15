@@ -862,12 +862,24 @@ export class ModelProviderService {
     const contextWindow = discovered.contextWindow ?? 128_000;
 
     // ── Reasoning signature source ──────────────────────────────────────────
-    // Official discovered models retain their known vendor. OpenRouter has no
-    // single vendor, and custom endpoints likewise use protocol semantics.
-    const semanticProvider = vendor ?? getSemanticProviderForApiSpec(apiSpec);
+    // Official discovered models retain their known vendor. OpenRouter model
+    // IDs conventionally start with the upstream vendor (for example,
+    // `anthropic/claude-opus-4.8`); preserve that semantic owner so reasoning
+    // signatures cannot cross between vendor protocols. Its request transport
+    // remains OpenAI-compatible below.
+    const openRouterVendor =
+      instance.typeId === 'openrouter'
+        ? discovered.modelId.split('/', 1)[0]
+        : undefined;
+    const semanticProvider =
+      vendor ??
+      (openRouterVendor && Object.hasOwn(VENDOR_API_SPECS, openRouterVendor)
+        ? (openRouterVendor as ModelProvider)
+        : undefined) ??
+      getSemanticProviderForApiSpec(apiSpec);
     // OpenRouter is an official provider with an OpenAI-compatible protocol.
-    // Its signatures remain owned by the semantic OpenAI route, while thinking
-    // options use the compatible wire format below.
+    // Its signatures retain the routed model vendor, while thinking options use
+    // the compatible wire format below.
     const thinkingProvider: ThinkingProvider | undefined =
       instance.typeId === 'openrouter' ? 'openai-compatible' : undefined;
     const reasoningSignatureSource =

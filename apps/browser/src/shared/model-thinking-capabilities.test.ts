@@ -3,6 +3,7 @@ import {
   createThinkingProviderOptionsPatch,
   getEffectiveThinkingSelection,
   getSupportedThinkingOptions,
+  getThinkingProviderForRoute,
   type ThinkingCapableModel,
 } from './model-thinking-capabilities';
 
@@ -262,6 +263,19 @@ describe('model thinking capabilities', () => {
         customEndpointApiSpec: 'openai-chat-completions',
       }).map((option) => option.value),
     ).toEqual(['low', 'medium', 'high']);
+  });
+
+  it('uses protocol-safe options for unknown external routes', () => {
+    expect(
+      getThinkingProviderForRoute({
+        providerMode: 'official',
+      }),
+    ).toBe('openai-compatible');
+    expect(
+      getThinkingProviderForRoute({
+        providerMode: 'custom',
+      }),
+    ).toBe('openai-compatible');
   });
 
   it('recognises GPT-5.6 models as known GPT-5 reasoning models', () => {
