@@ -29,6 +29,12 @@ export type ThinkingSelection = {
 export type ThinkingRoute = {
   providerMode?: ProviderEndpointMode;
   modelProvider?: ModelProvider;
+  /**
+   * Protocol-level thinking behavior when it differs from the semantic vendor.
+   * OpenRouter, for example, is an official provider but exposes OpenAI Chat
+   * Completions-compatible reasoning options rather than OpenAI's native API.
+   */
+  thinkingProvider?: ThinkingProvider;
   customEndpointApiSpec?: ApiSpec;
 };
 
@@ -138,8 +144,11 @@ function createOptions(
 export function getThinkingProviderForRoute({
   providerMode = 'stagewise',
   modelProvider,
+  thinkingProvider,
   customEndpointApiSpec,
 }: ThinkingRoute): ThinkingProvider {
+  if (thinkingProvider) return thinkingProvider;
+
   if (providerMode === 'custom' && customEndpointApiSpec) {
     switch (customEndpointApiSpec) {
       case 'anthropic':

@@ -30,6 +30,7 @@ import {
   getAvailableModel,
   type BuiltInModel,
 } from './available-models';
+import type { ThinkingRoute } from './model-thinking-capabilities';
 
 /**
  * Get display info for a vendor by looking up its `-api` provider type.
@@ -391,29 +392,52 @@ export const DEFAULT_INSTANCE_ID = 'stagewise-default';
  * determine whether thinking defaults come from stagewise, official API,
  * or a custom endpoint.
  */
-export function getInstanceThinkingDefaultOptions(instance: ProviderInstance): {
-  providerMode: ProviderEndpointMode;
-  customEndpointApiSpec?: ApiSpec;
-} {
+export function getInstanceThinkingDefaultOptions(
+  instance: ProviderInstance,
+): ThinkingRoute {
   if (instance.typeId === 'stagewise') {
     return { providerMode: 'stagewise' };
   }
-  if (instance.typeId === 'coding-plan') {
-    // Coding plans route through the plan vendor's official API.
-    return { providerMode: 'official' };
-  }
   if (instance.typeId === 'openrouter') {
-    return { providerMode: 'official' };
+    // OpenRouter uses the OpenAI Chat Completions protocol, even though its
+    // discovered model IDs are not owned by one catalog vendor.
+    return {
+      providerMode: 'official',
+      modelProvider: 'openai',
+      thinkingProvider: 'openai-compatible',
+    };
   }
-  if (instance.typeId.endsWith('-api')) {
-    return { providerMode: 'official' };
+  if (instance.typeId === 'coding-plan' || instance.typeId.endsWith('-api')) {
+    return {
+      providerMode: 'official',
+      modelProvider: getVendorForInstance(instance),
+    };
   }
   // Custom-type instance (custom-*, azure, bedrock, vertex).
   const apiSpec = instanceTypeIdToApiSpec(instance.typeId);
   if (apiSpec) {
-    return { providerMode: 'custom', customEndpointApiSpec: apiSpec };
+    return {
+      providerMode: 'custom',
+      modelProvider: getSemanticProviderForApiSpec(apiSpec),
+      customEndpointApiSpec: apiSpec,
+    };
   }
   return { providerMode: 'stagewise' };
+}
+
+function getSemanticProviderForApiSpec(apiSpec: ApiSpec): ModelProvider {
+  switch (apiSpec) {
+    case 'anthropic':
+    case 'amazon-bedrock':
+      return 'anthropic';
+    case 'google':
+    case 'google-vertex':
+      return 'google';
+    case 'openai-chat-completions':
+    case 'openai-responses':
+    case 'azure':
+      return 'openai';
+  }
 }
 
 /**

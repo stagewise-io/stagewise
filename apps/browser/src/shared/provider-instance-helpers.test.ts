@@ -14,22 +14,20 @@ const openrouterInstance: ProviderInstance = {
 };
 
 describe('getInstanceThinkingDefaultOptions', () => {
-  it('uses the official route for OpenRouter', () => {
+  it('uses the OpenAI-compatible official route for OpenRouter', () => {
     expect(getInstanceThinkingDefaultOptions(openrouterInstance)).toEqual({
       providerMode: 'official',
+      modelProvider: 'openai',
+      thinkingProvider: 'openai-compatible',
     });
   });
 
-  it('preserves official OpenAI thinking capabilities for OpenRouter', () => {
-    const route = {
-      ...getInstanceThinkingDefaultOptions(openrouterInstance),
-      modelProvider: 'openai' as const,
-    };
-
+  it('uses OpenAI-compatible thinking capabilities for OpenRouter', () => {
     expect(
-      getSupportedThinkingOptions('gpt-5.5', route).map(
-        (option) => option.value,
-      ),
-    ).toEqual(['none', 'low', 'medium', 'high', 'xhigh']);
+      getSupportedThinkingOptions(
+        'gpt-5.5',
+        getInstanceThinkingDefaultOptions(openrouterInstance),
+      ).map((option) => option.value),
+    ).toEqual(['low', 'medium', 'high']);
   });
 });

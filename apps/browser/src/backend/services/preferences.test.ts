@@ -9,7 +9,6 @@ vi.hoisted(() => {
   vi.stubGlobal('__APP_BUNDLE_ID__', 'io.stagewise.test');
   vi.stubGlobal('__APP_VERSION__', '0.0.0-test');
   vi.stubGlobal('__APP_PLATFORM__', 'darwin');
-  vi.stubGlobal('__APP_RELEASE_CHANNEL__', 'test');
   vi.stubGlobal('__APP_AUTHOR__', 'stagewise');
   vi.stubGlobal('__APP_COPYRIGHT__', 'stagewise');
   vi.stubGlobal('__APP_HOMEPAGE__', 'https://stagewise.io');
@@ -350,7 +349,7 @@ describe('PreferencesService provider instance type replacements', () => {
     });
   });
 
-  it('retains credentials when replacement types share a credential domain', async () => {
+  it('clears credentials when replacement types share a credential shape', async () => {
     const service = await createServiceWithPreferences();
     const added = await service.addProviderInstance({
       typeId: 'custom-openai-chat',
@@ -368,17 +367,14 @@ describe('PreferencesService provider instance type replacements', () => {
       'custom-anthropic',
     );
 
-    expect(
-      service
-        .get()
-        .providerInstances.find((instance) => instance.id === instanceId),
-    ).toMatchObject({
+    const replacement = service
+      .get()
+      .providerInstances.find((instance) => instance.id === instanceId);
+    expect(replacement).toMatchObject({
       typeId: 'custom-anthropic',
-      config: {
-        baseUrl: 'https://anthropic.example.com',
-        encryptedApiKey: 'encrypted-api-key',
-      },
+      config: { baseUrl: 'https://anthropic.example.com' },
     });
+    expect(replacement?.config).not.toHaveProperty('encryptedApiKey');
   });
 });
 

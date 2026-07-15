@@ -3,6 +3,7 @@ import { discoverOllamaModels } from './ollama';
 
 describe('discoverOllamaModels', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -54,6 +55,18 @@ describe('discoverOllamaModels', () => {
     ]);
   });
 
+  it('clears the discovery deadline when tags JSON is malformed', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{', { status: 200 }),
+    );
+
+    await expect(
+      discoverOllamaModels('http://localhost:11434'),
+    ).rejects.toThrow(SyntaxError);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('retains all models when a shared discovery deadline aborts queued metadata', async () => {
     vi.useFakeTimers();
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
@@ -84,6 +97,5 @@ describe('discoverOllamaModels', () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     await expect(discovery).resolves.toHaveLength(5);
-    vi.useRealTimers();
   });
 });

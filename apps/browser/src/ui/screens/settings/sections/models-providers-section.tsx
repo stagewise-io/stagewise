@@ -1692,7 +1692,9 @@ function computeEntryThinkingDisplay(
         modelId: entry.targetModelId,
         modelDisplayName: entry.displayName,
         providerOptions: {},
-        officialProvider: getVendorForInstance(instance),
+        officialProvider:
+          getInstanceThinkingDefaultOptions(instance).modelProvider ??
+          getVendorForInstance(instance),
         thinkingEnabled: true,
       },
       override,
@@ -2407,7 +2409,9 @@ function ModelsSection({
             modelId: entry.targetModelId,
             modelDisplayName: entry.displayName,
             providerOptions: {},
-            officialProvider: getVendorForInstance(instance),
+            officialProvider:
+              getInstanceThinkingDefaultOptions(instance).modelProvider ??
+              getVendorForInstance(instance),
             thinkingEnabled: true,
           };
         }
@@ -2647,7 +2651,9 @@ function ModelsSection({
         modelId: entry.targetModelId,
         modelDisplayName: entry.displayName,
         providerOptions: {},
-        officialProvider: getVendorForInstance(instance),
+        officialProvider:
+          getInstanceThinkingDefaultOptions(instance).modelProvider ??
+          getVendorForInstance(instance),
         thinkingEnabled: true,
       };
     },
@@ -2662,7 +2668,9 @@ function ModelsSection({
 
       const instance = providerInstances.find((i) => i.id === instanceId);
       if (!instance) return;
-      const route = getInstanceThinkingDefaultOptions(instance);
+      const { modelProvider, ...route } =
+        getInstanceThinkingDefaultOptions(instance);
+      model.officialProvider ??= modelProvider;
 
       const currentOverride = getInstanceModelThinkingOverride(
         preferences,
@@ -2700,7 +2708,9 @@ function ModelsSection({
 
       const instance = providerInstances.find((i) => i.id === instanceId);
       if (!instance) return;
-      const route = getInstanceThinkingDefaultOptions(instance);
+      const { modelProvider, ...route } =
+        getInstanceThinkingDefaultOptions(instance);
+      model.officialProvider ??= modelProvider;
 
       const option = getModelThinkingOptions(model, route).find(
         (item) => item.value === value,
