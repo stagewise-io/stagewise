@@ -66,6 +66,32 @@ describe('discoverOllamaModels', () => {
   });
 
   it.each([
+    ['reported tools', ['completion', 'tools'], true],
+    ['reported lack of tools', ['completion'], false],
+  ])('uses %s capability metadata for tool calling', async (_scenario, capabilities, toolCalling) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/api/tags')) {
+        return new Response(JSON.stringify({ models: [{ name: 'chat' }] }), {
+          status: 200,
+        });
+      }
+      if (url.endsWith('/api/show')) {
+        return new Response(JSON.stringify({ capabilities }), { status: 200 });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await expect(
+      discoverOllamaModels('http://localhost:11434'),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        capabilities: expect.objectContaining({ toolCalling }),
+      }),
+    ]);
+  });
+
+  it.each([
     'http://localhost:11434',
     'http://localhost:11434/',
     'http://localhost:11434/v1',
@@ -121,8 +147,14 @@ describe('discoverOllamaModels', () => {
     await expect(
       discoverOllamaModels('http://localhost:11434'),
     ).resolves.toEqual([
-      expect.objectContaining({ modelId: 'one' }),
-      expect.objectContaining({ modelId: 'two' }),
+      expect.objectContaining({
+        modelId: 'one',
+        capabilities: expect.objectContaining({ toolCalling: true }),
+      }),
+      expect.objectContaining({
+        modelId: 'two',
+        capabilities: expect.objectContaining({ toolCalling: true }),
+      }),
     ]);
   });
 
