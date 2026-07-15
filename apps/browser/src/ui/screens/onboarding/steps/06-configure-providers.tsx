@@ -136,8 +136,8 @@ const SELF_HOSTED_ENTRIES = UNIFIED_ENTRIES.filter(
 
 // ─── Truncated Error Text ──────────────────────────────────────────────────
 
-function TruncatedErrorText({ text }: { text: string }) {
-  const ref = useRef<HTMLParagraphElement>(null);
+export function TruncatedErrorText({ text }: { text: string }) {
+  const ref = useRef<HTMLButtonElement>(null);
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -154,9 +154,11 @@ function TruncatedErrorText({ text }: { text: string }) {
   return (
     <Tooltip open={isTruncated && tooltipOpen} onOpenChange={setTooltipOpen}>
       <TooltipTrigger>
-        <p
+        <button
           ref={ref}
-          className="truncate text-error-foreground text-xs"
+          type="button"
+          className="block w-full truncate text-left text-error-foreground text-xs"
+          tabIndex={isTruncated ? 0 : -1}
           onMouseEnter={() => {
             checkTruncation();
             setTooltipOpen(true);
@@ -169,7 +171,7 @@ function TruncatedErrorText({ text }: { text: string }) {
           onBlur={() => setTooltipOpen(false)}
         >
           {text}
-        </p>
+        </button>
       </TooltipTrigger>
       <TooltipContent>{text}</TooltipContent>
     </Tooltip>

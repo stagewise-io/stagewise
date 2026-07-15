@@ -403,10 +403,7 @@ export function getInstanceThinkingDefaultOptions(instance: ProviderInstance): {
     return { providerMode: 'official' };
   }
   if (instance.typeId === 'openrouter') {
-    return {
-      providerMode: 'custom',
-      customEndpointApiSpec: 'openai-chat-completions',
-    };
+    return { providerMode: 'official' };
   }
   if (instance.typeId.endsWith('-api')) {
     return { providerMode: 'official' };

@@ -66,6 +66,10 @@ export const API_SPEC_OPTIONS: {
   { value: 'google-vertex', label: 'Google Vertex AI', group: 'Cloud' },
 ];
 
+export function getCustomProviderSaveError(error: unknown): string {
+  return error instanceof Error ? error.message : 'Failed to save provider';
+}
+
 export type EndpointSaveData = {
   name: string;
   apiSpec: ApiSpec;
@@ -105,6 +109,19 @@ type AwsProfileInfo = {
  * family and unknown inputs almost always come from typos of a
  * US region.
  */
+function getCredentialDomain(apiSpec: ApiSpec): string {
+  switch (apiSpec) {
+    case 'azure':
+      return 'azure-api-key';
+    case 'amazon-bedrock':
+      return 'aws-credentials';
+    case 'google-vertex':
+      return 'google-credentials';
+    default:
+      return 'api-key';
+  }
+}
+
 function bedrockInferencePrefix(region: string | undefined): string {
   if (!region) return 'us.';
   if (region.startsWith('us-') || region.startsWith('ca-')) return 'us.';
@@ -658,6 +675,7 @@ export const CustomEndpointForm = forwardRef<
       : '',
   );
   const [mappingError, setMappingError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Auto-suggestion toggle for the Bedrock model-id mapping. On by
   // default when there is no existing mapping so new Bedrock users
   // immediately get the correct cross-region inference-profile IDs
@@ -792,6 +810,7 @@ export const CustomEndpointForm = forwardRef<
         : '',
     );
     setMappingError(null);
+    setSaveError(null);
     setBedrockSuggestionEnabled(
       endpoint?.apiSpec !== 'amazon-bedrock' ||
         !endpoint?.modelIdMapping ||
@@ -826,6 +845,15 @@ export const CustomEndpointForm = forwardRef<
 
   const canSave =
     name.trim().length > 0 && !mappingError && !bedrockProfileInvalid;
+  const credentialsMustBeReentered =
+    endpoint &&
+    endpoint.apiSpec !== apiSpec &&
+    getCredentialDomain(endpoint.apiSpec) !== getCredentialDomain(apiSpec) &&
+    Boolean(
+      endpoint.encryptedApiKey ||
+        endpoint.encryptedSecretKey ||
+        endpoint.encryptedGoogleCredentials,
+    );
 
   // "Touched" = the user changed anything from the initial field values.
   // Derived from current state so we don't need per-input bookkeeping.
@@ -896,6 +924,7 @@ export const CustomEndpointForm = forwardRef<
   }, [apiSpec, awsAuthMode, baseUrl, telemetryLevel]);
 
   const handleSave = async () => {
+    setSaveError(null);
     let modelIdMapping: Record<string, string> | undefined;
     if (modelIdMappingJson.trim()) {
       try {
@@ -931,7 +960,7 @@ export const CustomEndpointForm = forwardRef<
       }
       savedRef.current = true;
     } catch (error) {
-      console.error('Failed to save custom endpoint', error);
+      setSaveError(getCustomProviderSaveError(error));
     } finally {
       setIsSaving(false);
     }
@@ -979,6 +1008,13 @@ export const CustomEndpointForm = forwardRef<
           triggerClassName="w-full"
         />
       </div>
+
+      {credentialsMustBeReentered && (
+        <p className="rounded-md bg-warning-background px-2 py-1.5 text-warning-foreground text-xs">
+          Changing provider types clears the existing credentials. Enter new
+          credentials for this provider before saving.
+        </p>
+      )}
 
       <ProviderSpecificFields
         apiSpec={apiSpec}
@@ -1081,6 +1117,12 @@ export const CustomEndpointForm = forwardRef<
           <p className="text-error-foreground text-xs">{mappingError}</p>
         )}
       </div>
+
+      {saveError && (
+        <p className="text-error-foreground text-xs" role="alert">
+          {saveError}
+        </p>
+      )}
 
       {(!hideSaveUntilEdited || isAddMode || anyFieldTouched || onCancel) && (
         <div
@@ -1447,8 +1489,7 @@ function CustomEndpointsSection() {
           validateApiKey: data.apiKey || undefined,
         });
         if (!result.success) {
-          console.error('Failed to add provider instance:', result.error);
-          return;
+          throw new Error(result.error);
         }
         const instanceId = result.instanceId;
 
