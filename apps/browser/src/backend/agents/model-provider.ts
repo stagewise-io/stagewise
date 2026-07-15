@@ -869,7 +869,7 @@ export class ModelProviderService {
     // remains OpenAI-compatible below.
     const openRouterVendor =
       instance.typeId === 'openrouter'
-        ? discovered.modelId.split('/', 1)[0]
+        ? discovered.modelId.replace(/^~/, '').split('/', 1)[0]
         : undefined;
     const semanticProvider =
       vendor ??
@@ -979,7 +979,13 @@ function resolveThinkingProviderOptions({
     // them when they cover the active transport; otherwise add only the
     // missing transport-specific default (e.g. Claude via OpenAI-compatible).
     const activeThinkingProvider = getThinkingProviderForRoute(route);
-    if (baseProviderOptions[activeThinkingProvider] !== undefined) {
+    // The OpenAI-compatible transport is represented as the `openai` key in
+    // AI SDK provider options, not by its semantic routing label.
+    const activeProviderOptionsKey =
+      activeThinkingProvider === 'openai-compatible'
+        ? 'openai'
+        : activeThinkingProvider;
+    if (baseProviderOptions[activeProviderOptionsKey] !== undefined) {
       return baseProviderOptions as ProviderOptions;
     }
 

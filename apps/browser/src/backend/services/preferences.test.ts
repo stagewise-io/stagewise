@@ -516,6 +516,26 @@ describe('PreferencesService legacy provider migration', () => {
     expect(persistedDataMock.writePersistedData).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves the legacy Chat Completions protocol for OpenAI custom base URLs', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerConfigs.openai = {
+      ...preferences.providerConfigs.openai,
+      mode: 'custom',
+      customBaseUrl: 'https://openai-compatible.example/v1',
+      encryptedApiKey: 'openai-compatible-key',
+    };
+
+    const service = await createServiceWithPreferences(preferences);
+
+    expect(service.get().customEndpoints).toContainEqual(
+      expect.objectContaining({
+        name: 'Migrated openai endpoint',
+        apiSpec: 'openai-chat-completions',
+        baseUrl: 'https://openai-compatible.example/v1',
+      }),
+    );
+  });
+
   it('migrates OpenAI-compatible custom base URLs with their protocol API spec', async () => {
     const preferences = cloneDefaultPreferences();
     preferences.providerConfigs.moonshotai = {

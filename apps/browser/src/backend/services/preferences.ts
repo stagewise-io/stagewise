@@ -177,7 +177,13 @@ export class PreferencesService extends DisposableService {
         !config.customProviderId
       ) {
         const id = crypto.randomUUID();
-        const apiSpec = getProviderType(`${provider}-api`).apiSpec;
+        // Legacy OpenAI customBaseUrl configurations used Chat Completions.
+        // Keep that wire contract even though the current official OpenAI
+        // provider defaults to Responses.
+        const apiSpec =
+          provider === 'openai'
+            ? 'openai-chat-completions'
+            : getProviderType(`${provider}-api`).apiSpec;
         if (!apiSpec) {
           this.logger.warn(
             `[PreferencesService] Skipped customBaseUrl migration for unsupported provider ${provider}`,
