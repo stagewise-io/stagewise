@@ -445,15 +445,22 @@ export class ModelProviderService {
   // ===========================================================================
 
   /**
-   * Check whether a model ID can be resolved without provider-instance
-   * metadata. Discovered models are instance-scoped and require their owning
-   * instance ID, so they are intentionally excluded from this global lookup.
+   * Check whether a model ID can be resolved. Discovered models are
+   * instance-scoped, so they require their owning instance ID.
    */
-  public modelExists(modelId: ModelId): boolean {
+  public modelExists(modelId: ModelId, providerInstanceId?: string): boolean {
     if (getAvailableModel(modelId)) return true;
-    return this.preferencesService
-      .get()
-      .customModels.some((model) => model.modelId === modelId);
+    const preferences = this.preferencesService.get();
+    if (preferences.customModels.some((model) => model.modelId === modelId)) {
+      return true;
+    }
+    if (!providerInstanceId) return false;
+
+    return (
+      preferences.providerInstances
+        ?.find((instance) => instance.id === providerInstanceId)
+        ?.discoveredModels?.some((model) => model.modelId === modelId) ?? false
+    );
   }
 
   /**

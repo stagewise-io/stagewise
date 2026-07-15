@@ -1038,7 +1038,10 @@ export class AgentManager extends DisposableService {
         : null;
     const lastModelValid =
       lastChatSelection?.activeModelId &&
-      this.host.models.has(lastChatSelection.activeModelId);
+      this.host.models.has(
+        lastChatSelection.activeModelId,
+        lastChatSelection.activeProviderInstanceId ?? undefined,
+      );
 
     // Build state object outside setState to avoid "Type instantiation is excessively deep" error
     // caused by complex Draft<[]> inference from the 'ai' package's UIMessage type
@@ -1218,7 +1221,11 @@ export class AgentManager extends DisposableService {
 
     // Validate that the persisted model still exists (it may have been a deleted custom model)
     const resumedModelValid =
-      agent.activeModelId && this.host.models.has(agent.activeModelId);
+      agent.activeModelId &&
+      this.host.models.has(
+        agent.activeModelId,
+        agent.activeProviderInstanceId ?? undefined,
+      );
 
     const createdAgent = await this.createAgent(
       agent.type,
@@ -1712,7 +1719,7 @@ export class AgentManager extends DisposableService {
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
-    if (!this.host.models.has(modelId)) {
+    if (!this.host.models.has(modelId, providerInstanceId)) {
       throw new Error(
         `Cannot set model: "${modelId}" does not exist (it may have been deleted)`,
       );
