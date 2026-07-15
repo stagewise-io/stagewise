@@ -74,14 +74,12 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
   createLanguageModel({ modelId, baseURL }) {
     // Ollama's OpenAI-compatible endpoint is at /v1, but the AI-SDK OpenAI
     // provider appends /chat/completions directly to baseURL. Prepend /v1.
-    const normalizedBaseURL = (
+    const rootBaseURL = normalizeOllamaRootUrl(
       baseURL ??
-      PROVIDER_TYPE_DISPLAY_INFO.ollama.defaultBaseUrl ??
-      'http://localhost:11434'
-    ).replace(/\/$/, '');
-    const v1BaseURL = normalizedBaseURL.endsWith('/v1')
-      ? normalizedBaseURL
-      : `${normalizedBaseURL}/v1`;
+        PROVIDER_TYPE_DISPLAY_INFO.ollama.defaultBaseUrl ??
+        'http://localhost:11434',
+    );
+    const v1BaseURL = `${rootBaseURL}/v1`;
     const model = createOpenAIChatModel(
       'ollama',
       v1BaseURL,
@@ -97,6 +95,13 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
 const METADATA_CONCURRENCY = 4;
+
+function normalizeOllamaRootUrl(baseUrl: string): string {
+  const withoutTrailingSlash = baseUrl.replace(/\/$/, '');
+  return withoutTrailingSlash.endsWith('/v1')
+    ? withoutTrailingSlash.slice(0, -3)
+    : withoutTrailingSlash;
+}
 
 type OllamaModelMetadata = {
   capabilities?: string[];
@@ -134,7 +139,8 @@ function isEmbeddingOnly(metadata: OllamaModelMetadata | undefined): boolean {
 export async function discoverOllamaModels(
   baseUrl: string,
 ): Promise<DiscoveredModel[]> {
-  const url = `${baseUrl.replace(/\/$/, '')}/api/tags`;
+  const rootBaseUrl = normalizeOllamaRootUrl(baseUrl);
+  const url = `${rootBaseUrl}/api/tags`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
   try {
@@ -156,7 +162,7 @@ export async function discoverOllamaModels(
       models?: { name: string; modified_at?: string; size?: number }[];
     };
     const models = data.models ?? [];
-    const endpoint = `${baseUrl.replace(/\/$/, '')}/api`;
+    const endpoint = `${rootBaseUrl}/api`;
     const metadata = await mapWithBoundedConcurrency(
       models,
       METADATA_CONCURRENCY,

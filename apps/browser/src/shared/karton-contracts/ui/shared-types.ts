@@ -936,15 +936,8 @@ export const userPreferencesSchema = z.object({
               };
             }
 
-            // Current maps are two levels deep. Preserve the outer instance
-            // key whenever its value looks like a model map, even if a nested
-            // override is malformed; field-level sanitization handles it.
-            const isCurrentNestedMap = entries.every(
-              ([, instanceOverrides]) =>
-                isPlainRecord(instanceOverrides) &&
-                Object.values(instanceOverrides).some(isPlainRecord),
-            );
-            if (isCurrentNestedMap) return val;
+            // Preserve nested maps under their outer instance key. Field-level
+            // sanitization handles malformed nested overrides.
             return val;
           },
           z.record(
