@@ -279,7 +279,11 @@ describe('openrouterProviderType', () => {
     const models = await openrouterProviderType.getInitialModels!({}, {});
 
     const model = models[0] as DiscoveredModel;
-    expect(model.capabilities).toBeUndefined();
+    expect(model.capabilities).toMatchObject({
+      inputModalities: { text: true },
+      outputModalities: { text: true },
+      toolCalling: true,
+    });
   });
 
   it('sends Authorization header when API key is provided', async () => {

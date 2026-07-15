@@ -783,8 +783,22 @@ export function findModelSelectorEntry(
   instanceId: string,
   modelId: string,
 ): ModelSelectorEntry | undefined {
-  return getSelectableModelEntries(prefs, { includeDisabled: true }).find(
-    (e) => e.instanceId === instanceId && e.modelId === modelId,
+  const entries = getSelectableModelEntries(prefs, { includeDisabled: true });
+  const exactEntry = entries.find(
+    (entry) => entry.instanceId === instanceId && entry.modelId === modelId,
+  );
+  if (exactEntry) return exactEntry;
+
+  const instance = (prefs.providerInstances ?? []).find(
+    (candidate) => candidate.id === instanceId,
+  );
+  if (!instance) return undefined;
+
+  const canonicalModelId = getCatalogMatchId(instance, modelId);
+  return entries.find(
+    (entry) =>
+      entry.instanceId === instanceId &&
+      getCatalogMatchId(instance, entry.modelId) === canonicalModelId,
   );
 }
 
@@ -838,20 +852,22 @@ export function getInstanceModelCount(
       for (const m of vendorModels)
         catalogModelIds.add(getCatalogMatchId(instance, m.modelId));
     }
+  }
 
-    // Discovered models (self-hosted + vendor API discovery)
-    if (instance.discoveredModels && instance.discoveredModels.length > 0) {
-      const enabled = new Set(instance.enabledModelIds ?? []);
-      const hasEnabledList =
-        instance.enabledModelIds && instance.enabledModelIds.length > 0;
-      for (const dm of instance.discoveredModels) {
-        if (catalogModelIds.has(getCatalogMatchId(instance, dm.modelId))) {
-          continue;
-        }
-        if (disabled.has(dm.modelId)) continue;
-        if (hasEnabledList && !enabled.has(dm.modelId)) continue;
-        count++;
+  // Discovered models (self-hosted + vendor API discovery). This runs for
+  // every instance type because coding plans and stagewise may also discover
+  // vendor models beyond their catalog entries.
+  if (instance.discoveredModels && instance.discoveredModels.length > 0) {
+    const enabled = new Set(instance.enabledModelIds ?? []);
+    const hasEnabledList =
+      instance.enabledModelIds && instance.enabledModelIds.length > 0;
+    for (const dm of instance.discoveredModels) {
+      if (catalogModelIds.has(getCatalogMatchId(instance, dm.modelId))) {
+        continue;
       }
+      if (disabled.has(dm.modelId)) continue;
+      if (hasEnabledList && !enabled.has(dm.modelId)) continue;
+      count++;
     }
   }
 

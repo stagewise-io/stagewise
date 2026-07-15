@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { discoverAnthropicModels } from './shared';
+import { discoverAnthropicModels, discoverOpenRouterModels } from './shared';
 
 describe('discoverAnthropicModels', () => {
   afterEach(() => {
@@ -78,5 +78,42 @@ describe('discoverAnthropicModels', () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     await expectation;
+  });
+});
+
+describe('discoverOpenRouterModels', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('uses conservative defaults when architecture is absent', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: 'vendor/tools-only', supported_parameters: ['tools'] },
+            { id: 'vendor/no-tools', supported_parameters: [] },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(discoverOpenRouterModels('test-key')).resolves.toEqual([
+      expect.objectContaining({
+        modelId: 'vendor/tools-only',
+        capabilities: expect.objectContaining({
+          inputModalities: expect.objectContaining({ text: true }),
+          toolCalling: true,
+        }),
+      }),
+      expect.objectContaining({
+        modelId: 'vendor/no-tools',
+        capabilities: expect.objectContaining({
+          inputModalities: expect.objectContaining({ text: true }),
+          toolCalling: false,
+        }),
+      }),
+    ]);
   });
 });
