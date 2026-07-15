@@ -65,6 +65,47 @@ describe('discoverOllamaModels', () => {
     ).resolves.toEqual([expect.objectContaining({ modelId: 'chat' })]);
   });
 
+  it.each([
+    'http://localhost:11434',
+    'http://localhost:11434/',
+    'http://localhost:11434/v1',
+    'http://localhost:11434/v1/',
+  ])('derives discovery routes from the Ollama root for %s', async (baseUrl) => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = String(input);
+        if (url === 'http://localhost:11434/api/tags') {
+          return new Response(JSON.stringify({ models: [{ name: 'chat' }] }), {
+            status: 200,
+          });
+        }
+        if (url === 'http://localhost:11434/api/show') {
+          return new Response(
+            JSON.stringify({ capabilities: ['completion'] }),
+            {
+              status: 200,
+            },
+          );
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      });
+
+    await expect(discoverOllamaModels(baseUrl)).resolves.toEqual([
+      expect.objectContaining({ modelId: 'chat' }),
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'http://localhost:11434/api/tags',
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:11434/api/show',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('keeps models selectable when metadata enrichment fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);

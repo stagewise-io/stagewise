@@ -23,7 +23,9 @@ import { PROVIDER_INSTANCE_ID_METADATA_KEY } from '@stagewise/agent-core/host';
  * normalized into `Error` so callers receive a consistent rejection
  * shape.
  *
- * `has(id)` delegates to `ModelProviderService.modelExists`.
+ * `has(id)` delegates to `ModelProviderService.modelExists` as a global,
+ * no-instance lookup. Instance-scoped discovered models require their provider
+ * instance ID through `getWithOptions` metadata and are intentionally excluded.
  */
 export function createBrowserHostModels(
   modelProviderService: ModelProviderService,

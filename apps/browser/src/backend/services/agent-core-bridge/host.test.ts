@@ -167,17 +167,22 @@ describe('createBrowserHostModels', () => {
     expect(result).toBe(full);
   });
 
-  it('delegates has()', () => {
+  it('uses global no-instance lookup for has()', () => {
     const mp = {
-      modelExists: vi.fn((id: string) => id === 'known'),
+      modelExists: vi.fn(
+        (id: string, providerInstanceId?: string) =>
+          id === 'known' && providerInstanceId === undefined,
+      ),
       getModelWithOptions: vi.fn(),
     };
     const models = createBrowserHostModels(
       mp as unknown as ModelProviderService,
     );
+
     expect(models.has('known')).toBe(true);
     expect(models.has('missing')).toBe(false);
-    expect(mp.modelExists).toHaveBeenCalledTimes(2);
+    expect(mp.modelExists).toHaveBeenNthCalledWith(1, 'known');
+    expect(mp.modelExists).toHaveBeenNthCalledWith(2, 'missing');
   });
 
   it('re-throws Error instances unchanged', async () => {

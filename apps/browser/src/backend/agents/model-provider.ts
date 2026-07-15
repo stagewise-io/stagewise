@@ -33,6 +33,7 @@ import {
 import {
   createThinkingProviderOptionsPatch,
   getDefaultThinkingSelection,
+  getThinkingProviderForRoute,
   type ThinkingCapableModel,
   type ThinkingProvider,
 } from '@shared/model-thinking-capabilities';
@@ -444,15 +445,15 @@ export class ModelProviderService {
   // ===========================================================================
 
   /**
-   * Check whether a model ID exists (built-in or custom).
+   * Check whether a model ID can be resolved without provider-instance
+   * metadata. Discovered models are instance-scoped and require their owning
+   * instance ID, so they are intentionally excluded from this global lookup.
    */
   public modelExists(modelId: ModelId): boolean {
     if (getAvailableModel(modelId)) return true;
-    const prefs = this.preferencesService.get();
-    if (prefs.customModels.some((m) => m.modelId === modelId)) return true;
-    return (prefs.providerInstances ?? []).some((inst) =>
-      (inst.discoveredModels ?? []).some((dm) => dm.modelId === modelId),
-    );
+    return this.preferencesService
+      .get()
+      .customModels.some((model) => model.modelId === modelId);
   }
 
   /**
@@ -614,8 +615,8 @@ export class ModelProviderService {
     // ── Apply model ID mapping from instance config (if any) ────────────────
     const modelIdMapping = (instanceConfig as Record<string, unknown>)
       .modelIdMapping as Record<string, string> | undefined;
-    const mappedModelId =
-      modelIdMapping?.[modelSettings.modelId] ?? modelSettings.modelId;
+    const explicitMappedModelId = modelIdMapping?.[modelSettings.modelId];
+    const mappedModelId = explicitMappedModelId ?? modelSettings.modelId;
 
     // ── Incompatible-specs guard ────────────────────────────────────────────
     // Built-in models routed through cloud endpoints (azure/bedrock/vertex)
@@ -642,6 +643,7 @@ export class ModelProviderService {
     // Apply an explicit mapping first, then use the transport transform when
     // available or the official vendor transform as the compatibility fallback.
     const wireModelId =
+      explicitMappedModelId ??
       type.toWireModelId?.(mappedModelId, officialProvider) ??
       (officialProvider
         ? getProviderTypeByVendor(officialProvider).toWireModelId?.(
@@ -981,31 +983,30 @@ function resolveThinkingProviderOptions({
     return baseProviderOptions as ProviderOptions;
   }
 
-  // Catalog definitions own their curated default provider options. Only
-  // sparse definitions (notably discovered models) need an inferred patch.
-  if (!override && Object.keys(baseProviderOptions).length > 0) {
-    return baseProviderOptions as ProviderOptions;
-  }
+  const route = {
+    providerMode,
+    modelProvider: semanticProvider,
+    thinkingProvider,
+    customEndpointApiSpec,
+  };
 
   if (!override) {
-    const defaultSelection = getDefaultThinkingSelection(modelSettings, {
-      providerMode,
-      modelProvider: semanticProvider,
-      thinkingProvider,
-      customEndpointApiSpec,
-    });
+    // Catalog definitions own their curated default provider options. Preserve
+    // them when they cover the active transport; otherwise add only the
+    // missing transport-specific default (e.g. Claude via OpenAI-compatible).
+    const activeThinkingProvider = getThinkingProviderForRoute(route);
+    if (baseProviderOptions[activeThinkingProvider] !== undefined) {
+      return baseProviderOptions as ProviderOptions;
+    }
+
+    const defaultSelection = getDefaultThinkingSelection(modelSettings, route);
     if (!defaultSelection?.enabled) {
       return baseProviderOptions as ProviderOptions;
     }
 
     const defaultPatch = createThinkingProviderOptionsPatch({
       model: modelSettings,
-      route: {
-        providerMode,
-        modelProvider: semanticProvider,
-        thinkingProvider,
-        customEndpointApiSpec,
-      },
+      route,
       override: {
         enabled: true,
         provider: defaultSelection.provider,
@@ -1020,12 +1021,7 @@ function resolveThinkingProviderOptions({
   const patch = createThinkingProviderOptionsPatch({
     model: modelSettings,
     override,
-    route: {
-      providerMode,
-      modelProvider: semanticProvider,
-      thinkingProvider,
-      customEndpointApiSpec,
-    },
+    route,
   });
 
   if (!patch) return baseProviderOptions as ProviderOptions;

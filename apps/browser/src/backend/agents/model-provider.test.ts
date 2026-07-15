@@ -284,6 +284,30 @@ describe('provider instance base URL resolution', () => {
 });
 
 describe('discovered model routing', () => {
+  it('requires an owning instance for discovered models with duplicate IDs', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = ['one', 'two'].map((id) => ({
+      id,
+      typeId: 'ollama',
+      name: id,
+      config: { baseUrl: `http://${id}.example` },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [{ modelId: 'local-chat', displayName: 'Local chat' }],
+    }));
+
+    expect(service.modelExists('local-chat')).toBe(false);
+    expect(() => service.getModelWithOptions('local-chat', 'trace-1')).toThrow(
+      'Model local-chat not found',
+    );
+    expect(
+      getModelRequestUrl(
+        service.getModelWithOptions('local-chat', 'trace-1', undefined, 'two'),
+      ),
+    ).toBe('http://two.example/v1/chat/completions');
+  });
+
   it('adds a default thinking patch for sparse discovered models', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
@@ -734,7 +758,10 @@ describe('official provider endpoint resolution', () => {
   it('prefers a concrete API instance over a stale stagewise legacy mode', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
-    preferences.providerConfigs.openai.mode = 'stagewise';
+    preferences.providerConfigs.openai = {
+      ...preferences.providerConfigs.openai,
+      mode: 'stagewise',
+    };
     preferences.providerInstances = [
       {
         id: 'openai-byok',
@@ -907,25 +934,36 @@ describe('built-in model wire-format conversion', () => {
     );
   });
 
-  it('uses an explicit instance model-ID mapping before vendor conversion', () => {
-    const service = createTestModelProviderService({
-      providerModes: { minimax: 'custom' },
-      customEndpoints: [
-        {
-          id: 'minimax-custom',
-          name: 'MiniMax-compatible',
-          apiSpec: 'openai-chat-completions',
-          baseUrl: 'https://minimax.example.com/v1',
-          awsAuthMode: 'access-keys',
-          modelIdMapping: { 'minimax-m3': 'deployment-name' },
+  it('uses a dotted Bedrock mapping as the final wire ID', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'bedrock-anthropic',
+        typeId: 'bedrock',
+        name: 'Bedrock Anthropic',
+        config: {
+          awsAuthMode: 'default-chain',
+          region: 'us-east-1',
+          modelIdMapping: {
+            'claude-fable-5': 'anthropic.claude-sonnet-4-20250514-v1:0',
+          },
         },
-      ],
-    });
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
 
-    const result = service.getModelWithOptions('minimax-m3', 'trace-1');
+    const result = service.getModelWithOptions(
+      'claude-fable-5',
+      'trace-1',
+      undefined,
+      'bedrock-anthropic',
+    );
 
     expect((result.model as unknown as { modelId: string }).modelId).toBe(
-      'deployment-name',
+      'anthropic.claude-sonnet-4-20250514-v1:0',
     );
   });
 });
@@ -1240,6 +1278,32 @@ describe('thinking override provider option resolution', () => {
     expect(result.providerOptions).toMatchObject({
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
       anthropic: { thinking: { type: 'adaptive' }, effort: 'max' },
+    });
+  });
+
+  it('adds compatible defaults while preserving Claude catalog options', () => {
+    const service = createTestModelProviderService({
+      providerModes: { anthropic: 'custom' },
+      customEndpoints: [
+        {
+          id: 'anthropic-custom',
+          name: 'OpenAI-compatible Claude',
+          apiSpec: 'openai-chat-completions',
+          baseUrl: 'https://example.com/v1',
+          awsAuthMode: 'access-keys',
+        },
+      ],
+    });
+
+    const result = service.getModelWithOptions(
+      'claude-fable-5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      anthropic: { thinking: { type: 'adaptive' } },
+      openai: { reasoningEffort: 'medium' },
     });
   });
 
