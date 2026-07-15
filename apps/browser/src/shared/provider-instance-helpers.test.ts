@@ -5,7 +5,9 @@ import {
 } from './karton-contracts/ui/shared-types';
 import {
   findInstanceForVendor,
+  getInstanceModelCount,
   getInstanceThinkingDefaultOptions,
+  getSelectableModelEntries,
   getVendorInstanceId,
   getVendorMode,
   vendorHasApiKey,
@@ -20,6 +22,21 @@ const openrouterInstance: ProviderInstance = {
   enabledModelIds: [],
   disabledModelIds: [],
   discoveredModels: [],
+};
+
+const anthropicInstance: ProviderInstance = {
+  id: 'anthropic-default',
+  typeId: 'anthropic-api',
+  name: 'Anthropic API',
+  config: {},
+  enabledModelIds: [],
+  disabledModelIds: [],
+  discoveredModels: [
+    {
+      modelId: 'claude-opus-4-8',
+      displayName: 'Claude Opus 4.8',
+    },
+  ],
 };
 
 const ollamaInstance: ProviderInstance = {
@@ -81,6 +98,26 @@ function createVendorApiInstance(): ProviderInstance {
     discoveredModels: [],
   };
 }
+
+describe('discovered model catalog matching', () => {
+  it('deduplicates native Anthropic discovery IDs against dotted catalog IDs', () => {
+    const prefs = { providerInstances: [anthropicInstance], customModels: [] };
+
+    expect(
+      getSelectableModelEntries(prefs).filter(
+        (entry) => entry.modelId === 'claude-opus-4-8',
+      ),
+    ).toHaveLength(0);
+    expect(
+      getSelectableModelEntries(prefs).filter(
+        (entry) => entry.modelId === 'claude-opus-4.8',
+      ),
+    ).toHaveLength(1);
+    expect(getInstanceModelCount(anthropicInstance)).toBe(
+      getSelectableModelEntries(prefs).length,
+    );
+  });
+});
 
 describe('vendor instance routing', () => {
   it('prefers a concrete vendor API instance over stale stagewise state', () => {
