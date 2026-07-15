@@ -508,6 +508,21 @@ function getVendorForTypeId(
 }
 
 /**
+ * Normalize model IDs for catalog/discovery matching without changing the ID
+ * displayed or sent to the provider. Anthropic's catalog uses dotted version
+ * numbers, while its native discovery API returns the equivalent hyphenated ID.
+ */
+function getCatalogMatchId(
+  instance: ProviderInstance,
+  modelId: string,
+): string {
+  const vendor = getVendorForInstance(instance);
+  return vendor === 'anthropic'
+    ? modelId.replace(/\./g, '-').toLowerCase()
+    : modelId.toLowerCase();
+}
+
+/**
  * Resolve the vendor for any provider instance, including coding plans.
  * Returns `undefined` for stagewise, custom/cloud, and self-hosted types.
  */
@@ -663,7 +678,7 @@ export function getSelectableModelEntries(
             alias.targetModelId,
           ),
         );
-        catalogModelIds.add(alias.modelId.toLowerCase());
+        catalogModelIds.add(getCatalogMatchId(instance, alias.modelId));
       }
       // All concrete catalog models
       for (const model of availableModels) {
@@ -679,7 +694,7 @@ export function getSelectableModelEntries(
             model.modelId,
           ),
         );
-        catalogModelIds.add(model.modelId.toLowerCase());
+        catalogModelIds.add(getCatalogMatchId(instance, model.modelId));
       }
     } else if (instance.typeId === 'coding-plan') {
       // Serve the plan vendor's catalog models
@@ -701,7 +716,7 @@ export function getSelectableModelEntries(
               model.modelId,
             ),
           );
-          catalogModelIds.add(model.modelId.toLowerCase());
+          catalogModelIds.add(getCatalogMatchId(instance, model.modelId));
         }
       }
     } else {
@@ -722,7 +737,7 @@ export function getSelectableModelEntries(
               model.modelId,
             ),
           );
-          catalogModelIds.add(model.modelId.toLowerCase());
+          catalogModelIds.add(getCatalogMatchId(instance, model.modelId));
         }
       }
       // Custom/cloud types (no vendor): only custom models below
@@ -737,7 +752,9 @@ export function getSelectableModelEntries(
       const hasEnabledList =
         instance.enabledModelIds && instance.enabledModelIds.length > 0;
       for (const dm of instance.discoveredModels) {
-        if (catalogModelIds.has(dm.modelId.toLowerCase())) continue;
+        if (catalogModelIds.has(getCatalogMatchId(instance, dm.modelId))) {
+          continue;
+        }
         if (isDisabled(dm.modelId)) continue;
         if (hasEnabledList && !enabled.has(dm.modelId)) continue;
         entries.push(makeDiscoveredEntry(instance, dm));
@@ -792,12 +809,12 @@ export function getInstanceModelCount(
     ).length;
     for (const a of availableModelAliases) {
       if (!disabled.has(a.modelId))
-        catalogModelIds.add(a.modelId.toLowerCase());
+        catalogModelIds.add(getCatalogMatchId(instance, a.modelId));
     }
     count += availableModels.filter((m) => !disabled.has(m.modelId)).length;
     for (const m of availableModels) {
       if (!disabled.has(m.modelId))
-        catalogModelIds.add(m.modelId.toLowerCase());
+        catalogModelIds.add(getCatalogMatchId(instance, m.modelId));
     }
   } else if (instance.typeId === 'coding-plan') {
     const planId = (instance.config as { planId: string })
@@ -809,7 +826,7 @@ export function getInstanceModelCount(
       );
       count += vendorModels.length;
       for (const m of vendorModels)
-        catalogModelIds.add(m.modelId.toLowerCase());
+        catalogModelIds.add(getCatalogMatchId(instance, m.modelId));
     }
   } else {
     const vendor = getVendorForTypeId(instance.typeId);
@@ -819,7 +836,7 @@ export function getInstanceModelCount(
       );
       count += vendorModels.length;
       for (const m of vendorModels)
-        catalogModelIds.add(m.modelId.toLowerCase());
+        catalogModelIds.add(getCatalogMatchId(instance, m.modelId));
     }
 
     // Discovered models (self-hosted + vendor API discovery)
@@ -828,7 +845,9 @@ export function getInstanceModelCount(
       const hasEnabledList =
         instance.enabledModelIds && instance.enabledModelIds.length > 0;
       for (const dm of instance.discoveredModels) {
-        if (catalogModelIds.has(dm.modelId.toLowerCase())) continue;
+        if (catalogModelIds.has(getCatalogMatchId(instance, dm.modelId))) {
+          continue;
+        }
         if (disabled.has(dm.modelId)) continue;
         if (hasEnabledList && !enabled.has(dm.modelId)) continue;
         count++;
