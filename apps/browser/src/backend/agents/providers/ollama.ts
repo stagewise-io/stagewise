@@ -23,7 +23,10 @@ export type OllamaConfig = {
 
 const VISION_SUFFIXES = /llava|bakllava|llama.*vision|minicpm-v/i;
 
-function inferCapabilities(modelName: string): ModelCapabilities {
+function inferCapabilities(
+  modelName: string,
+  metadata: OllamaModelMetadata | undefined,
+): ModelCapabilities {
   const hasVision = VISION_SUFFIXES.test(modelName);
 
   return {
@@ -41,7 +44,7 @@ function inferCapabilities(modelName: string): ModelCapabilities {
       video: false,
       file: false,
     },
-    toolCalling: false,
+    toolCalling: metadata?.capabilities?.includes('tools') ?? true,
   };
 }
 
@@ -178,7 +181,7 @@ export async function discoverOllamaModels(
             {
               modelId: model.name,
               displayName: model.name,
-              capabilities: inferCapabilities(model.name),
+              capabilities: inferCapabilities(model.name, metadata[index]),
             },
           ],
     );
