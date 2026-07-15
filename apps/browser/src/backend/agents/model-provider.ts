@@ -26,7 +26,10 @@ import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
 import type { streamText } from 'ai';
 import { wrapLanguageModel } from 'ai';
-import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
+import {
+  MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
+} from '@stagewise/agent-core/host';
 import {
   createThinkingProviderOptionsPatch,
   getDefaultThinkingSelection,
@@ -195,15 +198,28 @@ export class ModelProviderService {
   }
 
   /**
-   * Resolve the base URL for a provider instance, preferring the user's
-   * config and falling back to the type's `defaultBaseUrl`.
+   * Resolve the base URL for a provider instance. Coding plans may define a
+   * dedicated subscription endpoint, which takes precedence over the vendor
+   * API default after an explicit instance override.
    */
-  private static resolveBaseURL(
-    config: Record<string, unknown>,
+  private static resolveInstanceBaseURL(
+    instance: ProviderInstance,
     type: ProviderType,
   ): string | undefined {
-    const baseUrl = config.baseUrl as string | undefined;
+    const config = instance.config as Record<string, unknown>;
+    const baseUrl =
+      typeof config.baseUrl === 'string' ? config.baseUrl.trim() : undefined;
     if (baseUrl) return baseUrl;
+
+    if (instance.typeId === 'coding-plan') {
+      const planConfig = config as CodingPlanConfig;
+      const plan = CODING_PLANS[planConfig.planId as keyof typeof CODING_PLANS];
+      return (
+        plan?.baseUrl ??
+        getProviderTypeByVendor(getCodingPlanVendor(planConfig)).defaultBaseUrl
+      );
+    }
+
     return type.defaultBaseUrl;
   }
 
@@ -243,7 +259,7 @@ export class ModelProviderService {
     const config = instance.config as Record<string, unknown>;
     const decryptedConfig = this.decryptSensitiveFields(instance, type);
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
-    const baseURL = ModelProviderService.resolveBaseURL(config, type);
+    const baseURL = ModelProviderService.resolveInstanceBaseURL(instance, type);
 
     if (instance.typeId === 'coding-plan') {
       return {
@@ -324,7 +340,7 @@ export class ModelProviderService {
     const config = instance.config as Record<string, unknown>;
     const decryptedConfig = this.decryptSensitiveFields(instance, type);
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
-    const baseURL = ModelProviderService.resolveBaseURL(config, type);
+    const baseURL = ModelProviderService.resolveInstanceBaseURL(instance, type);
 
     if (instance.typeId === 'coding-plan') {
       return {
@@ -394,15 +410,11 @@ export class ModelProviderService {
     if (instance.typeId === 'coding-plan') {
       const planConfig = config as CodingPlanConfig;
       const vendor = getCodingPlanVendor(planConfig);
-      const plan = CODING_PLANS[planConfig.planId as keyof typeof CODING_PLANS];
       return {
         instance,
         type,
         apiKey,
-        baseURL:
-          planConfig.baseUrl ??
-          plan?.baseUrl ??
-          getProviderTypeByVendor(vendor).defaultBaseUrl,
+        baseURL: ModelProviderService.resolveInstanceBaseURL(instance, type),
         decryptedConfig,
         apiSpec: VENDOR_API_SPECS[vendor],
       };
@@ -415,7 +427,7 @@ export class ModelProviderService {
         type,
         apiKey,
         baseURL:
-          ModelProviderService.resolveBaseURL(config, type) ??
+          ModelProviderService.resolveInstanceBaseURL(instance, type) ??
           getProviderTypeByVendor(vendor).defaultBaseUrl,
         decryptedConfig,
         apiSpec: VENDOR_API_SPECS[vendor],
@@ -427,7 +439,7 @@ export class ModelProviderService {
       instance,
       type,
       apiKey,
-      baseURL: ModelProviderService.resolveBaseURL(config, type),
+      baseURL: ModelProviderService.resolveInstanceBaseURL(instance, type),
       decryptedConfig,
       apiSpec: type.apiSpec,
     };
@@ -1014,7 +1026,7 @@ function omitModelRequestMetadata(
 
   const {
     [MODEL_REQUEST_PURPOSE_METADATA_KEY]: _purpose,
-    $provider_instance_id: _providerInstanceId,
+    [PROVIDER_INSTANCE_ID_METADATA_KEY]: _providerInstanceId,
     ...telemetry
   } = metadata;
   return telemetry;

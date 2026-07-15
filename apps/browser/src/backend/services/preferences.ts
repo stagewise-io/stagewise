@@ -1290,8 +1290,12 @@ export class PreferencesService extends DisposableService {
   private getLegacyProviderRoutingInstancePatches(
     provider: ModelProvider,
     encryptedApiKey: string | undefined,
+    connectedCodingPlanId?: CodingPlanId,
   ): Patch[] {
     const instanceId = `${provider}-api-default`;
+    const legacyCodingPlanInstanceId = connectedCodingPlanId
+      ? `coding-plan:${connectedCodingPlanId}`
+      : undefined;
     const typeId = `${provider}-api` as Exclude<
       ProviderInstanceTypeId,
       'stagewise'
@@ -1337,11 +1341,7 @@ export class PreferencesService extends DisposableService {
       .map((instance, index) => ({ instance, index }))
       .filter(({ instance }) => {
         if (instance.id === instanceId) return !encryptedApiKey;
-        if (instance.typeId !== 'coding-plan') return false;
-        const planId = (instance.config as { planId?: string }).planId;
-        return planId
-          ? CODING_PLANS[planId as CodingPlanId]?.provider === provider
-          : false;
+        return instance.id === legacyCodingPlanInstanceId;
       })
       .map(({ index }) => index)
       .sort((a, b) => b - a);
@@ -1354,15 +1354,19 @@ export class PreferencesService extends DisposableService {
 
   private getLegacyProviderRoutingCleanupPatches(
     provider: ModelProvider,
+    connectedCodingPlanId?: CodingPlanId,
+    includeCanonicalInstance = true,
   ): Patch[] {
+    const canonicalInstanceId = `${provider}-api-default`;
+    const legacyCodingPlanInstanceId = connectedCodingPlanId
+      ? `coding-plan:${connectedCodingPlanId}`
+      : undefined;
     const removedIds = this.preferences.providerInstances
-      .filter((instance) => {
-        if (instance.typeId !== 'coding-plan') return false;
-        const planId = (instance.config as { planId?: string }).planId;
-        return planId
-          ? CODING_PLANS[planId as CodingPlanId]?.provider === provider
-          : false;
-      })
+      .filter(
+        (instance) =>
+          (includeCanonicalInstance && instance.id === canonicalInstanceId) ||
+          instance.id === legacyCodingPlanInstanceId,
+      )
       .map((instance) => instance.id);
     const patches: Patch[] = [];
     for (
@@ -1372,7 +1376,9 @@ export class PreferencesService extends DisposableService {
     ) {
       if (
         removedIds.includes(
-          this.preferences.customModels[index]!.providerInstanceId ?? '',
+          this.preferences.customModels[index]!.providerInstanceId ??
+            this.preferences.customModels[index]!.endpointId ??
+            '',
         )
       ) {
         patches.push({ op: 'remove', path: ['customModels', index] });
@@ -1419,6 +1425,12 @@ export class PreferencesService extends DisposableService {
       ...this.getLegacyProviderRoutingInstancePatches(
         provider,
         encryptedBase64,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+      ),
+      ...this.getLegacyProviderRoutingCleanupPatches(
+        provider,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+        false,
       ),
     ];
 
@@ -1448,8 +1460,15 @@ export class PreferencesService extends DisposableService {
         path: ['providerConfigs', provider, 'connectedCodingPlanId'],
         value: undefined,
       },
-      ...this.getLegacyProviderRoutingInstancePatches(provider, undefined),
-      ...this.getLegacyProviderRoutingCleanupPatches(provider),
+      ...this.getLegacyProviderRoutingInstancePatches(
+        provider,
+        undefined,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+      ),
+      ...this.getLegacyProviderRoutingCleanupPatches(
+        provider,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+      ),
     ];
 
     await this.update(patches);
@@ -1491,7 +1510,15 @@ export class PreferencesService extends DisposableService {
     ];
 
     patches.push(
-      ...this.getLegacyProviderRoutingInstancePatches(provider, undefined),
+      ...this.getLegacyProviderRoutingInstancePatches(
+        provider,
+        undefined,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+      ),
+      ...this.getLegacyProviderRoutingCleanupPatches(
+        provider,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+      ),
     );
 
     await this.update(patches);
@@ -1558,6 +1585,12 @@ export class PreferencesService extends DisposableService {
       ...this.getLegacyProviderRoutingInstancePatches(
         provider,
         encryptedBase64,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+      ),
+      ...this.getLegacyProviderRoutingCleanupPatches(
+        provider,
+        this.preferences.providerConfigs[provider].connectedCodingPlanId,
+        false,
       ),
     ];
     await this.update(patches);
@@ -1904,6 +1937,44 @@ export class PreferencesService extends DisposableService {
     );
   }
 
+  private getRetainedSensitiveConfig(
+    currentType: ReturnType<typeof getProviderType>,
+    nextType: ReturnType<typeof getProviderType>,
+    currentConfig: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (
+      this.getCredentialDomain(currentType.id) !==
+      this.getCredentialDomain(nextType.id)
+    ) {
+      return {};
+    }
+    return Object.fromEntries(
+      nextType.sensitiveFields
+        .filter((field) => field in currentConfig)
+        .map((field) => [field, currentConfig[field]]),
+    );
+  }
+
+  private getCredentialDomain(
+    typeId: ProviderInstanceTypeId,
+  ): string | undefined {
+    switch (typeId) {
+      case 'azure':
+        return 'azure-api-key';
+      case 'bedrock':
+        return 'aws-credentials';
+      case 'vertex':
+        return 'google-credentials';
+      case 'coding-plan':
+        return 'coding-plan-api-key';
+      case 'stagewise':
+      case 'ollama':
+        return undefined;
+      default:
+        return 'api-key';
+    }
+  }
+
   /**
    * Merge a partial config into an existing provider instance, and/or
    * update its display name. Only top-level config keys are merged.
@@ -1923,15 +1994,16 @@ export class PreferencesService extends DisposableService {
     const typeId = replacementTypeId ?? current.typeId;
     const isTypeReplacement = typeId !== current.typeId;
     const nextType = getProviderType(typeId);
+    const currentType = getProviderType(current.typeId);
     const currentConfig = current.config as Record<string, unknown>;
     const nextConfig = isTypeReplacement
       ? {
-          ...partialConfig,
-          ...Object.fromEntries(
-            nextType.sensitiveFields
-              .filter((field) => field in currentConfig)
-              .map((field) => [field, currentConfig[field]]),
+          ...this.getRetainedSensitiveConfig(
+            currentType,
+            nextType,
+            currentConfig,
           ),
+          ...partialConfig,
         }
       : { ...currentConfig, ...partialConfig };
     // Validate the replacement discriminant and config together before persisting.

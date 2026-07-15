@@ -919,18 +919,21 @@ export const userPreferencesSchema = z.object({
             const record = val as Record<string, unknown>;
             const entries = Object.entries(record);
             if (entries.length === 0) return {};
-            // Detect the old flat format only when every top-level value
-            // is an override object rather than a nested instance record.
-            const looksLikeOldFormat = entries.every(([, v]) => {
-              if (typeof v !== 'object' || v === null || Array.isArray(v))
-                return false;
-              const keys = Object.keys(v);
-              return keys.some(
-                (k) => k === 'enabled' || k === 'provider' || k === 'value',
+            // A legacy flat map can contain malformed values. If at least
+            // one entry is recognizably an override object, retain those
+            // valid entries and discard malformed siblings before wrapping.
+            // Already nested maps contain model IDs as their object keys,
+            // not override fields, so they continue through unchanged.
+            const legacyEntries = entries.filter(([, value]) => {
+              if (!isPlainRecord(value)) return false;
+              return ['enabled', 'provider', 'value'].some((key) =>
+                Object.hasOwn(value, key),
               );
             });
-            if (looksLikeOldFormat) {
-              return { 'stagewise-default': record };
+            if (legacyEntries.length > 0) {
+              return {
+                'stagewise-default': Object.fromEntries(legacyEntries),
+              };
             }
             return val;
           },

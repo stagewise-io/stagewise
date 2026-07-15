@@ -7,6 +7,7 @@ import type {
 import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
 import { createOpenAIChatModel } from './shared';
+import { mapWithBoundedConcurrency } from './bounded-concurrency';
 
 // ============================================================================
 // Ollama config — just a base URL, no auth needed
@@ -99,15 +100,14 @@ type OllamaModelMetadata = {
 async function getOllamaModelMetadata(
   endpoint: string,
   name: string,
+  signal: AbortSignal,
 ): Promise<OllamaModelMetadata | undefined> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
   try {
     const response = await fetch(`${endpoint}/show`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
-      signal: controller.signal,
+      signal,
     });
     if (!response.ok) return undefined;
     return (await response.json()) as OllamaModelMetadata;
@@ -115,8 +115,6 @@ async function getOllamaModelMetadata(
     // The tags response is still useful when an older server does not expose
     // capabilities. Unknown models remain selectable rather than hidden.
     return undefined;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -126,24 +124,6 @@ function isEmbeddingOnly(metadata: OllamaModelMetadata | undefined): boolean {
     !!capabilities?.includes('embedding') &&
     !capabilities.includes('completion')
   );
-}
-
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  limit: number,
-  mapper: (value: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(values.length);
-  let nextIndex = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, values.length) }, async () => {
-      while (nextIndex < values.length) {
-        const index = nextIndex++;
-        results[index] = await mapper(values[index]!);
-      }
-    }),
-  );
-  return results;
 }
 
 export async function discoverOllamaModels(
@@ -164,8 +144,8 @@ export async function discoverOllamaModels(
     }
     throw err;
   }
-  clearTimeout(timeout);
   if (!response.ok) {
+    clearTimeout(timeout);
     throw new Error(`Ollama /api/tags returned ${response.status}`);
   }
   const data = (await response.json()) as {
@@ -173,21 +153,27 @@ export async function discoverOllamaModels(
   };
   const models = data.models ?? [];
   const endpoint = `${baseUrl.replace(/\/$/, '')}/api`;
-  const metadata = await mapWithConcurrency(
-    models,
-    METADATA_CONCURRENCY,
-    (model) => getOllamaModelMetadata(endpoint, model.name),
-  );
+  try {
+    const metadata = await mapWithBoundedConcurrency(
+      models,
+      METADATA_CONCURRENCY,
+      (model) =>
+        getOllamaModelMetadata(endpoint, model.name, controller.signal),
+      { signal: controller.signal, fallback: (value) => value },
+    );
 
-  return models.flatMap((model, index) =>
-    isEmbeddingOnly(metadata[index])
-      ? []
-      : [
-          {
-            modelId: model.name,
-            displayName: model.name,
-            capabilities: inferCapabilities(model.name),
-          },
-        ],
-  );
+    return models.flatMap((model, index) =>
+      isEmbeddingOnly(metadata[index])
+        ? []
+        : [
+            {
+              modelId: model.name,
+              displayName: model.name,
+              capabilities: inferCapabilities(model.name),
+            },
+          ],
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 }

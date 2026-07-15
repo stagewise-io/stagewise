@@ -223,6 +223,29 @@ describe('userPreferencesSchema model thinking override defaults', () => {
     });
   });
 
+  it('retains valid legacy overrides while discarding malformed entries', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        modelThinkingOverrides: {
+          'gpt-5.5': {
+            enabled: true,
+            provider: 'invalid-provider',
+            value: 'high',
+          },
+          'invalid-scalar': 'not-an-override',
+          'invalid-object': { unrelated: true },
+          'invalid-null': null,
+        },
+      },
+    });
+
+    expect(parsed.agent.modelThinkingOverrides).toEqual({
+      'stagewise-default': {
+        'gpt-5.5': { enabled: true, value: 'high' },
+      },
+    });
+  });
+
   it('wraps legacy flat modelThinkingOverrides under stagewise-default', () => {
     const parsed = userPreferencesSchema.parse({
       agent: {

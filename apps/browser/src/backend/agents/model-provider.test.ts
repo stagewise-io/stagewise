@@ -4,8 +4,12 @@ import {
   type ProviderInstance,
   type CustomEndpoint,
 } from '@shared/karton-contracts/ui/shared-types';
-import { MODEL_REQUEST_PURPOSE_METADATA_KEY } from '@stagewise/agent-core/host';
+import {
+  MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
+} from '@stagewise/agent-core/host';
 import { ModelProviderService } from './model-provider';
+import { getProviderType } from './providers/registry';
 import {
   reasoningSignatureSourceSchema,
   type ReasoningSignatureSource,
@@ -216,6 +220,38 @@ const agentStepMetadata = {
   [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
 };
 
+describe('provider instance base URL resolution', () => {
+  const openRouterType = getProviderType('openrouter');
+
+  it('trims an explicit OpenRouter base URL at runtime', () => {
+    const url = (ModelProviderService as any).resolveInstanceBaseURL(
+      {
+        id: 'openrouter-explicit',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { baseUrl: '  https://router.example/v1/  ' },
+      },
+      openRouterType,
+    );
+
+    expect(url).toBe('https://router.example/v1/');
+  });
+
+  it('uses the OpenRouter default when the configured URL is whitespace', () => {
+    const url = (ModelProviderService as any).resolveInstanceBaseURL(
+      {
+        id: 'openrouter-blank',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { baseUrl: '   ' },
+      },
+      openRouterType,
+    );
+
+    expect(url).toBe('https://openrouter.ai/api/v1');
+  });
+});
+
 function getModelRequestUrl(
   result: ReturnType<ModelProviderService['getModelWithOptions']>,
 ) {
@@ -280,6 +316,35 @@ describe('custom model provider instance routing', () => {
     expect(decryptProviderApiKey).not.toHaveBeenCalledWith('first-key');
     expect(getModelRequestUrl(result)).toBe(
       'https://selected.example.com/v1/chat/completions',
+    );
+  });
+
+  it('removes reserved routing metadata from telemetry properties', () => {
+    const service = createTestModelProviderService();
+    const metadata = {
+      [PROVIDER_INSTANCE_ID_METADATA_KEY]: 'openai-api-selected',
+      [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
+      requestSource: 'test',
+    };
+
+    service.getModelWithOptions('gpt-5.5', 'trace-1', metadata);
+
+    const withTracing = (service as any).telemetryService.withTracing;
+    expect(withTracing).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        posthogProperties: expect.objectContaining({
+          requestSource: 'test',
+          modelId: 'gpt-5.5',
+        }),
+      }),
+    );
+    const config = withTracing.mock.calls[0]?.[1];
+    expect(config.posthogProperties).not.toHaveProperty(
+      PROVIDER_INSTANCE_ID_METADATA_KEY,
+    );
+    expect(config.posthogProperties).not.toHaveProperty(
+      MODEL_REQUEST_PURPOSE_METADATA_KEY,
     );
   });
 
@@ -487,7 +552,7 @@ describe('model alias routing', () => {
 });
 
 describe('official provider endpoint resolution', () => {
-  it('routes connected GLM Coding Plan requests through the coding endpoint', () => {
+  it('routes vendor-resolved coding plans through the plan endpoint', () => {
     const service = createTestModelProviderService({
       providerModes: { 'z-ai': 'official' },
       connectedCodingPlanIds: { 'z-ai': 'glm-coding-plan' },
@@ -498,6 +563,68 @@ describe('official provider endpoint resolution', () => {
     expect(result.providerMode).toBe('official');
     expect(getModelRequestUrl(result)).toBe(
       'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    );
+  });
+
+  it('routes selected coding-plan instances through the plan endpoint', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'coding-plan-selected',
+        typeId: 'coding-plan',
+        name: 'Selected GLM Coding Plan',
+        config: {
+          encryptedApiKey: 'selected-plan-key',
+          planId: 'glm-coding-plan',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'glm-5.2',
+      'trace-1',
+      undefined,
+      'coding-plan-selected',
+    );
+
+    expect(result.providerMode).toBe('official');
+    expect(getModelRequestUrl(result)).toBe(
+      'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    );
+  });
+
+  it('prefers an explicit coding-plan instance URL over the plan endpoint', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'coding-plan-selected',
+        typeId: 'coding-plan',
+        name: 'Selected GLM Coding Plan',
+        config: {
+          encryptedApiKey: 'selected-plan-key',
+          planId: 'glm-coding-plan',
+          baseUrl: 'https://override.example.com/v4',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'glm-5.2',
+      'trace-1',
+      undefined,
+      'coding-plan-selected',
+    );
+
+    expect(getModelRequestUrl(result)).toBe(
+      'https://override.example.com/v4/chat/completions',
     );
   });
 

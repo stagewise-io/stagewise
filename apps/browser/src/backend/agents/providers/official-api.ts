@@ -475,6 +475,7 @@ function createOpenAICompatibleApiType(
               content: 'What is the capital of France? Respond with one word.',
             },
           ],
+          abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
         });
         return { success: true };
       } catch (err) {

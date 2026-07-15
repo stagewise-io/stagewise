@@ -233,11 +233,152 @@ describe('PreferencesService provider instance type replacements', () => {
         name: 'Bedrock endpoint',
         config: {
           region: 'us-east-1',
-          encryptedApiKey: 'encrypted-api-key',
           awsAuthMode: 'access-keys',
         },
       }),
     );
+  });
+
+  it('clears credentials when a replacement crosses credential domains', async () => {
+    const service = await createServiceWithPreferences();
+    const added = await service.addProviderInstance({
+      typeId: 'azure',
+      config: {
+        baseUrl: 'https://azure.example.com',
+        encryptedApiKey: 'azure-key',
+      },
+    });
+    const instanceId = (added as { instanceId: string }).instanceId;
+
+    await service.updateProviderInstance(
+      instanceId,
+      { region: 'us-east-1' },
+      undefined,
+      'bedrock',
+    );
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId),
+    ).toMatchObject({
+      typeId: 'bedrock',
+      config: { region: 'us-east-1', awsAuthMode: 'access-keys' },
+    });
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId)
+        ?.config,
+    ).not.toHaveProperty('encryptedApiKey');
+
+    await service.updateProviderInstance(
+      instanceId,
+      { baseUrl: 'https://azure.example.com' },
+      undefined,
+      'azure',
+    );
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId),
+    ).toMatchObject({
+      typeId: 'azure',
+      config: { baseUrl: 'https://azure.example.com' },
+    });
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId)
+        ?.config,
+    ).not.toHaveProperty('encryptedApiKey');
+  });
+
+  it('clears Bedrock credentials when replacing it with Azure', async () => {
+    const service = await createServiceWithPreferences();
+    const added = await service.addProviderInstance({
+      typeId: 'bedrock',
+      config: {
+        region: 'us-east-1',
+        encryptedApiKey: 'aws-access-key',
+        encryptedSecretKey: 'aws-secret-key',
+      },
+    });
+    const instanceId = (added as { instanceId: string }).instanceId;
+
+    await service.updateProviderInstance(
+      instanceId,
+      { baseUrl: 'https://azure.example.com' },
+      undefined,
+      'azure',
+    );
+
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId),
+    ).toMatchObject({
+      typeId: 'azure',
+      config: { baseUrl: 'https://azure.example.com' },
+    });
+  });
+
+  it('retains credentials for same-type edits', async () => {
+    const service = await createServiceWithPreferences();
+    const added = await service.addProviderInstance({
+      typeId: 'azure',
+      config: {
+        baseUrl: 'https://azure.example.com',
+        encryptedApiKey: 'azure-key',
+      },
+    });
+    const instanceId = (added as { instanceId: string }).instanceId;
+
+    await service.updateProviderInstance(instanceId, {
+      baseUrl: 'https://updated.azure.example.com',
+    });
+
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId),
+    ).toMatchObject({
+      typeId: 'azure',
+      config: {
+        baseUrl: 'https://updated.azure.example.com',
+        encryptedApiKey: 'azure-key',
+      },
+    });
+  });
+
+  it('retains credentials when replacement types share a credential domain', async () => {
+    const service = await createServiceWithPreferences();
+    const added = await service.addProviderInstance({
+      typeId: 'custom-openai-chat',
+      config: {
+        baseUrl: 'https://example.com/v1',
+        encryptedApiKey: 'encrypted-api-key',
+      },
+    });
+    const instanceId = (added as { instanceId: string }).instanceId;
+
+    await service.updateProviderInstance(
+      instanceId,
+      { baseUrl: 'https://anthropic.example.com' },
+      undefined,
+      'custom-anthropic',
+    );
+
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === instanceId),
+    ).toMatchObject({
+      typeId: 'custom-anthropic',
+      config: {
+        baseUrl: 'https://anthropic.example.com',
+        encryptedApiKey: 'encrypted-api-key',
+      },
+    });
   });
 });
 
@@ -621,6 +762,88 @@ describe('PreferencesService coding plan connection state', () => {
     );
     expect(service.get().providerInstances).not.toContainEqual(
       expect.objectContaining({ id: 'openai-api-default' }),
+    );
+  });
+
+  it.each([
+    [
+      'setProviderApiKey',
+      (service: PreferencesService) =>
+        service.setProviderApiKey('z-ai', 'manual-key'),
+    ],
+    [
+      'clearProviderApiKey',
+      (service: PreferencesService) => service.clearProviderApiKey('z-ai'),
+    ],
+    [
+      'disconnectProvider',
+      (service: PreferencesService) => service.disconnectProvider('z-ai'),
+    ],
+  ])('%s removes only its linked legacy coding plan', async (_operation, runOperation) => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerConfigs['z-ai'] = {
+      ...preferences.providerConfigs['z-ai'],
+      mode: 'official',
+      encryptedApiKey: 'legacy-key',
+      connectedCodingPlanId: 'glm-coding-plan',
+    };
+    const service = await createServiceWithPreferences(preferences);
+    const independentPlan = await service.addProviderInstance({
+      typeId: 'coding-plan',
+      name: 'Independent GLM plan',
+      config: {
+        planId: 'glm-coding-plan',
+        baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+      },
+    });
+
+    await runOperation(service);
+
+    expect(service.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({ id: 'coding-plan:glm-coding-plan' }),
+    );
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        id: (independentPlan as { instanceId: string }).instanceId,
+        name: 'Independent GLM plan',
+      }),
+    );
+  });
+
+  it.each([
+    [
+      'clearProviderApiKey',
+      (service: PreferencesService) => service.clearProviderApiKey('openai'),
+    ],
+    [
+      'disconnectProvider',
+      (service: PreferencesService) => service.disconnectProvider('openai'),
+    ],
+  ])('%s removes dependent canonical-instance records', async (_operation, runOperation) => {
+    const service = await createServiceWithPreferences();
+    await service.setProviderApiKey('openai', 'legacy-key');
+    await service.update([
+      {
+        op: 'add',
+        path: ['customModels', 0],
+        value: {
+          modelId: 'legacy-custom-model',
+          displayName: 'Legacy custom model',
+          providerInstanceId: 'openai-api-default',
+        },
+      },
+      {
+        op: 'add',
+        path: ['agent', 'modelThinkingOverrides', 'openai-api-default'],
+        value: { 'legacy-custom-model': { enabled: true } },
+      },
+    ]);
+
+    await runOperation(service);
+
+    expect(service.get().customModels).toEqual([]);
+    expect(service.get().agent.modelThinkingOverrides).not.toHaveProperty(
+      'openai-api-default',
     );
   });
 });

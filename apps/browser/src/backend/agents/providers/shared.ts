@@ -236,20 +236,33 @@ export async function discoverAnthropicModels(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(`Model discovery at ${url} returned ${response.status}`);
-    }
-    const data = (await response.json()) as {
-      data?: { id: string; display_name?: string }[];
-    };
-    return (data.data ?? []).map((model) => ({
+    const models: { id: string; display_name?: string }[] = [];
+    let afterId: string | undefined;
+    do {
+      const pageUrl = new URL(url);
+      if (afterId) pageUrl.searchParams.set('after_id', afterId);
+      const response = await fetch(pageUrl, {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Model discovery at ${pageUrl} returned ${response.status}`,
+        );
+      }
+      const data = (await response.json()) as {
+        data?: { id: string; display_name?: string }[];
+        has_more?: boolean;
+        last_id?: string;
+      };
+      models.push(...(data.data ?? []));
+      afterId = data.has_more ? data.last_id : undefined;
+    } while (afterId);
+
+    return models.map((model) => ({
       modelId: model.id,
       displayName: model.display_name ?? model.id,
       capabilities: DEFAULT_DISCOVERED_CAPABILITIES,

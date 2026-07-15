@@ -29,9 +29,7 @@ export const stagewiseProviderType: ProviderType<StagewiseConfig> = {
   } {
     const provider = createStagewise({ apiKey, baseURL: baseURL ?? '' });
     return {
-      // The provider uses the AI SDK v4 interface, while the agent runtime
-      // currently accepts the v3 interface used by the remaining providers.
-      model: provider.chatModel(modelId) as unknown as LanguageModelV3,
+      model: provider.chatModel(modelId),
       middleware: [stagewiseUrlPassthroughMiddleware],
     };
   },

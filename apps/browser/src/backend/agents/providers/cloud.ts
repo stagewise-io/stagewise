@@ -67,9 +67,11 @@ export type BedrockConfig = {
  * `decryptedSecretKey` is only needed for `access-keys` mode and is
  * passed in already decrypted by the routing layer.
  */
-function resolveProfileRegion(profileName: string): string | undefined {
+export function resolveProfileRegion(profileName: string): string | undefined {
   try {
-    const config = readFileSync(join(homedir(), '.aws', 'config'), 'utf8');
+    const configPath =
+      process.env.AWS_CONFIG_FILE?.trim() || join(homedir(), '.aws', 'config');
+    const config = readFileSync(configPath, 'utf8');
     const section =
       profileName === 'default' ? 'default' : `profile ${profileName}`;
     const header = new RegExp(
