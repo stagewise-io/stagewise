@@ -7,7 +7,6 @@ import type {
   DiscoveredModel,
   ModelThinkingOverride,
   ProviderInstance,
-  UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { ReasoningSignatureSource } from '@shared/karton-contracts/ui/agent/metadata';
 import {
@@ -30,6 +29,7 @@ import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
 } from '@stagewise/agent-core/host';
+import { findInstanceForVendor } from '@shared/provider-instance-helpers';
 import {
   createThinkingProviderOptionsPatch,
   getDefaultThinkingSelection,
@@ -56,49 +56,6 @@ export type { ProviderMode } from './reasoning-signatures';
 // ============================================================================
 // Instance resolution helpers
 // ============================================================================
-
-/**
- * Resolve which provider instance serves a given vendor.
- * Returns `undefined` when the vendor falls back to the shared stagewise
- * instance (i.e. no vendor-specific instance is configured).
- *
- * PR 1 hybrid: custom-mode vendors are linked to their instance via the
- * legacy `providerConfigs[vendor].customProviderId` field. The migration
- * reuses the endpoint ID as the instance ID, so the lookup is a direct
- * ID match.
- */
-function findInstanceForVendor(
-  prefs: UserPreferences,
-  vendor: ModelProvider,
-): ProviderInstance | undefined {
-  const instances = prefs.providerInstances;
-  const legacyConfig = prefs.providerConfigs?.[vendor];
-
-  // Custom-mode routing remains an explicit legacy link during the transition.
-  if (legacyConfig?.mode === 'custom') {
-    if (!legacyConfig.customProviderId) return undefined;
-    return instances.find((i) => i.id === legacyConfig.customProviderId);
-  }
-
-  // Prefer a coding plan before a general vendor API. Legacy migrations append
-  // plans after existing API instances, but the plan is the active route when
-  // both are present. A stale legacy `stagewise` flag must likewise not hide a
-  // concrete BYOK instance added by a newer client.
-  const codingPlanInstance = instances.find((instance) => {
-    if (instance.typeId !== 'coding-plan') return false;
-    const plan =
-      CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS];
-    return plan?.provider === vendor;
-  });
-  if (codingPlanInstance) return codingPlanInstance;
-
-  return instances.find(
-    (instance) =>
-      instance.typeId !== 'stagewise' &&
-      instance.typeId.endsWith('-api') &&
-      instance.typeId.slice(0, -4) === vendor,
-  );
-}
 
 /**
  * Resolve the effective `ApiSpec` for a provider type + instance config.

@@ -170,6 +170,36 @@ describe('PreferencesService provider instance deletion', () => {
     );
   });
 
+  it('clears the legacy coding-plan link when deleting its instance', async () => {
+    const preferences = cloneDefaultPreferences();
+    const planId = 'glm-coding-plan';
+    preferences.providerConfigs['z-ai'] = {
+      ...preferences.providerConfigs['z-ai'],
+      connectedCodingPlanId: planId,
+    };
+    preferences.providerInstances.push({
+      id: `coding-plan:${planId}`,
+      typeId: 'coding-plan',
+      name: CODING_PLANS[planId].displayName,
+      config: { planId },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [],
+    });
+    const service = await createServiceWithPreferences(preferences);
+
+    await service.removeProviderInstance(`coding-plan:${planId}`);
+
+    expect(
+      service.get().providerConfigs['z-ai'].connectedCodingPlanId,
+    ).toBeUndefined();
+
+    const reloaded = await createServiceWithPreferences(service.get());
+    expect(reloaded.get().providerInstances).not.toContainEqual(
+      expect.objectContaining({ id: `coding-plan:${planId}` }),
+    );
+  });
+
   it('keeps unrelated preference records when deleting an instance', async () => {
     const service = await createServiceWithPreferences();
     const first = await service.addProviderInstance({

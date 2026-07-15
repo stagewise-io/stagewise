@@ -1908,9 +1908,27 @@ export class PreferencesService extends DisposableService {
       throw new Error(`Provider instance ${instanceId} not found`);
     }
 
+    const instance = this.preferences.providerInstances[idx];
     const patches: Patch[] = [
       { op: 'remove', path: ['providerInstances', idx] },
     ];
+    if (instance.typeId === 'coding-plan') {
+      const planId = instance.config.planId as CodingPlanId;
+      const plan = CODING_PLANS[planId];
+      const legacyInstanceId = `coding-plan:${planId}`;
+      if (
+        instance.id === legacyInstanceId &&
+        plan &&
+        this.preferences.providerConfigs[plan.provider]
+          .connectedCodingPlanId === planId
+      ) {
+        patches.push({
+          op: 'replace',
+          path: ['providerConfigs', plan.provider, 'connectedCodingPlanId'],
+          value: undefined,
+        });
+      }
+    }
     for (
       let index = this.preferences.customModels.length - 1;
       index >= 0;
