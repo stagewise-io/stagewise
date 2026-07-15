@@ -449,6 +449,40 @@ describe('discovered model routing', () => {
     ).toBe(false);
   });
 
+  it('keeps tilde-prefixed OpenRouter signatures scoped to the routed vendor', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-instance',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { encryptedApiKey: 'router-key' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: '~anthropic/claude-haiku-latest',
+            displayName: 'Claude Haiku',
+            thinkingEnabled: true,
+          },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      '~anthropic/claude-haiku-latest',
+      'trace-1',
+      agentStepMetadata,
+      'openrouter-instance',
+    );
+
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider: 'anthropic',
+    });
+  });
+
   it('keeps discovered custom routes endpoint-bound', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
@@ -1071,6 +1105,26 @@ describe('thinking override provider option resolution', () => {
 
     expect(result.providerOptions).toMatchObject({
       stagewise: { reasoning: { enabled: true, effort: 'xhigh' } },
+      openai: { reasoningEffort: 'xhigh' },
+    });
+  });
+
+  it('preserves curated OpenAI-compatible defaults for official GLM 5.2 routes', () => {
+    const service = createTestModelProviderService({
+      providerModes: { 'z-ai': 'official' },
+    });
+
+    const result = service.getModelWithOptions(
+      'glm-5.2',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toEqual({
+      stagewise: {
+        reasoning: { enabled: true, effort: 'xhigh' },
+        provider: { require_parameters: true },
+      },
       openai: { reasoningEffort: 'xhigh' },
     });
   });
