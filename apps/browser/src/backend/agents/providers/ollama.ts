@@ -74,15 +74,15 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
   createLanguageModel({ modelId, baseURL }) {
     // Ollama's OpenAI-compatible endpoint is at /v1, but the AI-SDK OpenAI
     // provider appends /chat/completions directly to baseURL. Prepend /v1.
-    const rootBaseURL = normalizeOllamaRootUrl(
+    const rootBaseUrl = normalizeOllamaRootUrl(
       baseURL ??
         PROVIDER_TYPE_DISPLAY_INFO.ollama.defaultBaseUrl ??
         'http://localhost:11434',
     );
-    const v1BaseURL = `${rootBaseURL}/v1`;
+    const v1BaseUrl = `${rootBaseUrl}/v1`;
     const model = createOpenAIChatModel(
       'ollama',
-      v1BaseURL,
+      v1BaseUrl,
       modelId,
     ) as LanguageModelV3;
     return { model };
