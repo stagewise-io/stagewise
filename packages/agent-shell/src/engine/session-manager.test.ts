@@ -344,6 +344,23 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
     expect(r.resolvedBy).toBe('exit');
   });
 
+  it('executes a command larger than 1024 bytes', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-test', cwd, env);
+    await waitForReady(sm, sid);
+    const marker = 'LONG_COMMAND_COMPLETED';
+    const payload = 'x'.repeat(1100);
+
+    const r = await sm.executeCommand(sid, {
+      command: `printf '%s\\n' "${payload}"; printf '%s\\n' '${marker}'`,
+      waitUntil: { timeoutMs: 5000, idleMs: 0 },
+    });
+
+    expect(r.output).toContain(marker);
+    expect(r.exitCode).toBe(0);
+    expect(r.resolvedBy).toBe('exit');
+  });
+
   it('propagates non-zero exit codes', async () => {
     sm = createSM();
     const sid = sm.createSession('agent-test', cwd, env);
