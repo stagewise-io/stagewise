@@ -282,16 +282,18 @@ export class ModelProviderService {
     const prefs = this.preferencesService.get();
     const instance = prefs.providerInstances.find((i) => i.id === instanceId);
     if (!instance) {
-      // Persisted chats can outlive a deleted provider instance. Built-in
-      // catalog models remain routable through Stagewise Inference; custom
-      // and discovered models are rejected before reaching this path.
-      return {
-        instance: undefined,
-        type: stagewiseProviderType,
-        apiKey: this.authService.accessToken ?? '',
-        baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
-        decryptedConfig: {} as Record<string, string>,
-      };
+      // Legacy migrated custom models use this well-known Stagewise sentinel
+      // even when the provider instance was not persisted by older versions.
+      if (instanceId === 'stagewise-default') {
+        return {
+          instance: undefined,
+          type: stagewiseProviderType,
+          apiKey: this.authService.accessToken ?? '',
+          baseURL: process.env.LLM_PROXY_URL || 'https://llm.stagewise.io',
+          decryptedConfig: {} as Record<string, string>,
+        };
+      }
+      throw new Error(`Provider instance ${instanceId} not found`);
     }
 
     // Stagewise instance → inference path (same as no-vendor fallback).
@@ -423,17 +425,28 @@ export class ModelProviderService {
    * instance-scoped, so they require their owning instance ID.
    */
   public modelExists(modelId: ModelId, providerInstanceId?: string): boolean {
-    if (getAvailableModel(modelId)) return true;
     const preferences = this.preferencesService.get();
+    const providerInstance = providerInstanceId
+      ? preferences.providerInstances?.find(
+          (instance) => instance.id === providerInstanceId,
+        )
+      : undefined;
+
+    // An explicit instance is part of the model identity. If it was deleted,
+    // do not reinterpret an instance-scoped selection as a global catalog
+    // model merely because the model IDs happen to collide.
+    if (providerInstanceId && !providerInstance) return false;
+
+    if (getAvailableModel(modelId)) return true;
     if (preferences.customModels.some((model) => model.modelId === modelId)) {
       return true;
     }
-    if (!providerInstanceId) return false;
+    if (!providerInstance) return false;
 
     return (
-      preferences.providerInstances
-        ?.find((instance) => instance.id === providerInstanceId)
-        ?.discoveredModels?.some((model) => model.modelId === modelId) ?? false
+      providerInstance.discoveredModels?.some(
+        (model) => model.modelId === modelId,
+      ) ?? false
     );
   }
 
@@ -473,17 +486,26 @@ export class ModelProviderService {
     providerInstanceId?: string,
   ): ModelWithOptions {
     const preferences = this.preferencesService.get();
+    const selectedInstance = providerInstanceId
+      ? preferences.providerInstances?.find(
+          (candidate) => candidate.id === providerInstanceId,
+        )
+      : undefined;
+
+    // An explicit instance is part of the model identity. Failing closed here
+    // prevents a deleted discovered route from silently becoming a Stagewise
+    // catalog route when the two models share an ID.
+    if (providerInstanceId && !selectedInstance) {
+      throw new Error(`Provider instance ${providerInstanceId} not found`);
+    }
 
     // Resolve the selected (instanceId, modelId) pair before the global
     // catalog. Self-hosted and aggregator instances can expose literal model
     // IDs that collide with catalog IDs or aliases. Only prefer discovery when
     // the selector exposes that pair as a discovered entry; vendor instances
     // intentionally deduplicate matching discoveries in favor of the catalog.
-    if (providerInstanceId) {
-      const instance = preferences.providerInstances?.find(
-        (candidate) => candidate.id === providerInstanceId,
-      );
-      const discovered = instance?.discoveredModels?.find(
+    if (providerInstanceId && selectedInstance) {
+      const discovered = selectedInstance.discoveredModels?.find(
         (candidate) => candidate.modelId === modelId,
       );
       const selectorEntry = findModelSelectorEntry(
@@ -491,14 +513,9 @@ export class ModelProviderService {
         providerInstanceId,
         modelId,
       );
-      if (
-        instance &&
-        discovered &&
-        selectorEntry &&
-        !selectorEntry.catalogModel
-      ) {
+      if (discovered && selectorEntry && !selectorEntry.catalogModel) {
         return this.createDiscoveredModelWithOptions(
-          instance,
+          selectedInstance,
           discovered,
           traceId,
           otherPostHogProperties,
@@ -533,22 +550,17 @@ export class ModelProviderService {
     }
 
     // Discovered models (self-hosted providers) — require providerInstanceId
-    if (providerInstanceId) {
-      const instance = preferences.providerInstances?.find(
-        (i) => i.id === providerInstanceId,
+    if (selectedInstance) {
+      const discovered = (selectedInstance.discoveredModels ?? []).find(
+        (dm) => dm.modelId === modelId,
       );
-      if (instance) {
-        const discovered = (instance.discoveredModels ?? []).find(
-          (dm) => dm.modelId === modelId,
+      if (discovered) {
+        return this.createDiscoveredModelWithOptions(
+          selectedInstance,
+          discovered,
+          traceId,
+          otherPostHogProperties,
         );
-        if (discovered) {
-          return this.createDiscoveredModelWithOptions(
-            instance,
-            discovered,
-            traceId,
-            otherPostHogProperties,
-          );
-        }
       }
     }
 

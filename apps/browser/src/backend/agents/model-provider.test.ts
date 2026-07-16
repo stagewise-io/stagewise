@@ -829,20 +829,22 @@ describe('legacy Stagewise custom model routing', () => {
 });
 
 describe('deleted provider instance recovery', () => {
-  it('routes built-in models through Stagewise when their instance was deleted', () => {
+  it.each([
+    'gpt-5.5',
+    'default',
+    'deepseek-v4-pro',
+  ])('rejects catalog model %s when its explicit instance was deleted', (modelId) => {
     const service = createTestModelProviderService();
 
-    const result = service.getModelWithOptions(
-      'gpt-5.5',
-      'trace-1',
-      undefined,
-      'deleted-openai-instance',
-    );
-
-    expect(result.reasoningSignatureSource).toMatchObject({
-      providerMode: 'stagewise',
-      provider: 'openai',
-    });
+    expect(service.modelExists(modelId, 'deleted-instance')).toBe(false);
+    expect(() =>
+      service.getModelWithOptions(
+        modelId,
+        'trace-1',
+        undefined,
+        'deleted-instance',
+      ),
+    ).toThrow('Provider instance deleted-instance not found');
   });
 
   it('keeps custom models unavailable after their provider instance is deleted', () => {
