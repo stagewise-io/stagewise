@@ -38,7 +38,7 @@
 
 | **सदस्यता** | **प्रदाता** | **प्रमुख मॉडल** | **डैशबोर्ड** |
 | ----------- | ---------- | --------------- | ------------ |
-| Kimi | [Moonshot AI](https://platform.moonshot.ai) | Kimi K2.7 Code, Kimi K2.6, Kimi K2.5 | [API कुंजी प्राप्त करें](https://platform.moonshot.ai/console/api-keys) |
+| Kimi | [Moonshot AI](https://platform.moonshot.ai) | Kimi K3, Kimi K2.7 Code, Kimi K2.6, Kimi K2.5 | [API कुंजी प्राप्त करें](https://platform.moonshot.ai/console/api-keys) |
 | Qwen Coding Plan | [Alibaba DashScope](https://dashscope.console.aliyun.com) | Qwen 3-Coder 30B-A3B, Qwen 3-32B | [API कुंजी प्राप्त करें](https://dashscope.console.aliyun.com/apiKey) |
 | MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [API कुंजी प्राप्त करें](https://platform.minimax.io/user-center/basic-information/interface-key) |
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5 | [API कुंजी प्राप्त करें](https://platform.xiaomimimo.com/#/console/plan-manage) |
@@ -57,7 +57,7 @@
 
 #### ओपन-वेट मॉडल्स
 
-- **Moonshot AI**: Kimi K2.7 Code, Kimi K2.6, Kimi K2.5
+- **Moonshot AI**: Kimi K3, Kimi K2.7 Code, Kimi K2.6, Kimi K2.5
 - **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
 - **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
 - **Z.ai**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
