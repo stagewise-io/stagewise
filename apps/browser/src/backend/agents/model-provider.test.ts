@@ -449,6 +449,44 @@ describe('discovered model routing', () => {
     ).toBe(false);
   });
 
+  it.each([
+    ['qwen/qwen3-coder-plus', 'alibaba'],
+    ['xiaomi/mimo-v2.5', 'xiaomi-mimo'],
+    ['mistralai/mistral-medium-3-5', 'mistral'],
+  ] as const)('maps OpenRouter alias prefix %s to semantic provider %s', (modelId, provider) => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-instance',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { encryptedApiKey: 'router-key' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId,
+            displayName: modelId,
+            thinkingEnabled: true,
+          },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      modelId,
+      'trace-1',
+      agentStepMetadata,
+      'openrouter-instance',
+    );
+
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider,
+    });
+  });
+
   it('keeps tilde-prefixed OpenRouter signatures scoped to the routed vendor', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
@@ -687,8 +725,10 @@ describe('custom model provider instance routing', () => {
 });
 
 describe('legacy Stagewise custom model routing', () => {
-  it('routes a migrated custom model through its legacy vendor', () => {
-    const service = createTestModelProviderService();
+  it('keeps a migrated custom model on Stagewise when vendor BYOK exists', () => {
+    const service = createTestModelProviderService({
+      providerModes: { openai: 'official' },
+    });
     const preferences = (service as any).preferencesService.get();
     preferences.customModels.push({
       modelId: 'legacy-stagewise-custom',
@@ -708,6 +748,9 @@ describe('legacy Stagewise custom model routing', () => {
     expect((result.model as any).modelId).toBe(
       'openai/legacy-stagewise-custom',
     );
+    expect(
+      (service as any).preferencesService.decryptProviderApiKey,
+    ).not.toHaveBeenCalled();
     expect(result.reasoningSignatureSource).toMatchObject({
       providerMode: 'custom',
       provider: 'openai',
