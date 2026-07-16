@@ -686,6 +686,35 @@ describe('custom model provider instance routing', () => {
   });
 });
 
+describe('legacy Stagewise custom model routing', () => {
+  it('routes a migrated custom model through its legacy vendor', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.customModels.push({
+      modelId: 'legacy-stagewise-custom',
+      displayName: 'Legacy Stagewise custom model',
+      providerInstanceId: 'stagewise-default',
+      endpointId: 'openai',
+      providerOptions: {},
+      headers: {},
+      contextWindowSize: 128_000,
+    });
+
+    const result = service.getModelWithOptions(
+      'legacy-stagewise-custom',
+      'trace-1',
+    );
+
+    expect((result.model as any).modelId).toBe(
+      'openai/legacy-stagewise-custom',
+    );
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'custom',
+      provider: 'openai',
+    });
+  });
+});
+
 describe('deleted provider instance recovery', () => {
   it('routes built-in models through Stagewise when their instance was deleted', () => {
     const service = createTestModelProviderService();

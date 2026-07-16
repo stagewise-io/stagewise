@@ -722,7 +722,21 @@ export class ModelProviderService {
         `Custom model ${customModel.modelId} has no provider instance`,
       );
     }
-    const resolved = this.resolveCustomModelInstance(providerInstanceId);
+    // Legacy custom models routed through Stagewise retain their vendor in
+    // endpointId because the shared instance alone cannot resolve it.
+    const legacyStagewiseVendor =
+      providerInstanceId === 'stagewise-default' && customModel.endpointId
+        ? (customModel.endpointId as ModelProvider)
+        : undefined;
+    const resolved = legacyStagewiseVendor
+      ? {
+          ...this.resolveVendorEndpoint(legacyStagewiseVendor),
+          apiSpec: getEffectiveApiSpec(
+            getProviderTypeByVendor(legacyStagewiseVendor),
+            {},
+          ),
+        }
+      : this.resolveCustomModelInstance(providerInstanceId);
     const { type, apiKey, baseURL, decryptedConfig, apiSpec, instance } =
       resolved;
 
@@ -740,8 +754,9 @@ export class ModelProviderService {
     };
 
     // ── Wire-format model ID ────────────────────────────────────────────────
-    const vendor =
-      instance.typeId === 'coding-plan'
+    const vendor = legacyStagewiseVendor
+      ? legacyStagewiseVendor
+      : instance?.typeId === 'coding-plan'
         ? getCodingPlanVendor(instance.config as CodingPlanConfig)
         : undefined;
     const wireModelId =
@@ -752,7 +767,7 @@ export class ModelProviderService {
       modelId: wireModelId,
       apiKey,
       baseURL,
-      config: instance.config as never,
+      config: (instance?.config ?? {}) as never,
       decryptedConfig,
       vendor,
     });
@@ -785,7 +800,7 @@ export class ModelProviderService {
       customModel.modelId,
       {
         apiSpec: apiSpec as ApiSpec,
-        endpointId: instance.id,
+        endpointId: instance?.id ?? providerInstanceId,
       },
     );
 
