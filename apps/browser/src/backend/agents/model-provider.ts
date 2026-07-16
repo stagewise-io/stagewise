@@ -29,7 +29,10 @@ import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
 } from '@stagewise/agent-core/host';
-import { findInstanceForVendor } from '@shared/provider-instance-helpers';
+import {
+  findInstanceForVendor,
+  findModelSelectorEntry,
+} from '@shared/provider-instance-helpers';
 import {
   createThinkingProviderOptionsPatch,
   getDefaultThinkingSelection,
@@ -469,6 +472,40 @@ export class ModelProviderService {
     otherPostHogProperties?: Record<string, unknown>,
     providerInstanceId?: string,
   ): ModelWithOptions {
+    const preferences = this.preferencesService.get();
+
+    // Resolve the selected (instanceId, modelId) pair before the global
+    // catalog. Self-hosted and aggregator instances can expose literal model
+    // IDs that collide with catalog IDs or aliases. Only prefer discovery when
+    // the selector exposes that pair as a discovered entry; vendor instances
+    // intentionally deduplicate matching discoveries in favor of the catalog.
+    if (providerInstanceId) {
+      const instance = preferences.providerInstances?.find(
+        (candidate) => candidate.id === providerInstanceId,
+      );
+      const discovered = instance?.discoveredModels?.find(
+        (candidate) => candidate.modelId === modelId,
+      );
+      const selectorEntry = findModelSelectorEntry(
+        preferences,
+        providerInstanceId,
+        modelId,
+      );
+      if (
+        instance &&
+        discovered &&
+        selectorEntry &&
+        !selectorEntry.catalogModel
+      ) {
+        return this.createDiscoveredModelWithOptions(
+          instance,
+          discovered,
+          traceId,
+          otherPostHogProperties,
+        );
+      }
+    }
+
     const builtIn = getAvailableModel(modelId);
     if (builtIn) {
       const alias = getModelAlias(modelId);
@@ -486,9 +523,7 @@ export class ModelProviderService {
       );
     }
 
-    const custom = this.preferencesService
-      .get()
-      .customModels.find((m) => m.modelId === modelId);
+    const custom = preferences.customModels.find((m) => m.modelId === modelId);
     if (custom) {
       return this.createCustomModelWithOptions(
         custom,
@@ -499,9 +534,9 @@ export class ModelProviderService {
 
     // Discovered models (self-hosted providers) — require providerInstanceId
     if (providerInstanceId) {
-      const instance = this.preferencesService
-        .get()
-        .providerInstances?.find((i) => i.id === providerInstanceId);
+      const instance = preferences.providerInstances?.find(
+        (i) => i.id === providerInstanceId,
+      );
       if (instance) {
         const discovered = (instance.discoveredModels ?? []).find(
           (dm) => dm.modelId === modelId,

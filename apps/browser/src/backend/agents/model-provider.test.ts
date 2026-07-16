@@ -311,6 +311,76 @@ describe('discovered model routing', () => {
     ).toBe('http://two.example/v1/chat/completions');
   });
 
+  it.each([
+    'default',
+    'deepseek-v4-pro',
+  ])('routes a self-hosted discovered model named %s through its owning instance', (modelId) => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'ollama-local',
+        typeId: 'ollama',
+        name: 'Local Ollama',
+        config: { baseUrl: 'http://ollama.example' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [{ modelId, displayName: modelId }],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      modelId,
+      'trace-1',
+      undefined,
+      'ollama-local',
+    );
+
+    expect(getModelRequestUrl(result)).toBe(
+      'http://ollama.example/v1/chat/completions',
+    );
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'custom',
+      modelId,
+      endpointId: 'ollama-local',
+    });
+  });
+
+  it('keeps catalog precedence for discovered duplicates on vendor instances', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'deepseek-api-local',
+        typeId: 'deepseek-api',
+        name: 'DeepSeek API',
+        config: { encryptedApiKey: 'encrypted' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          { modelId: 'deepseek-v4-pro', displayName: 'Discovered duplicate' },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'deepseek-v4-pro',
+      'trace-1',
+      undefined,
+      'deepseek-api-local',
+    );
+
+    expect(result.reasoningSignatureSource).toMatchObject({
+      providerMode: 'official',
+      provider: 'deepseek',
+      modelId: 'deepseek-v4-pro',
+    });
+    expect(
+      (service as any).telemetryService.withTracing.mock.calls[0]?.[1]
+        .posthogProperties,
+    ).not.toHaveProperty('isDiscoveredModel');
+  });
+
   it('adds a default thinking patch for sparse discovered models', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
