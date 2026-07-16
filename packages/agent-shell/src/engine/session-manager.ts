@@ -32,6 +32,38 @@ import {
 /** Cap for rawOutput accumulator used only for pattern matching. */
 const MAX_RAW_OUTPUT_BYTES = 1_024 * 1_024;
 
+// Some PTYs limit terminal input to 1024 bytes. Writing a larger command in one
+// burst can silently drop its tail, leaving the shell waiting for input (for
+// example, when the closing quote is lost). Small paced writes give the shell
+// enough time to drain the input queue between chunks.
+const PTY_INPUT_CHUNK_THRESHOLD_BYTES = 768;
+const PTY_INPUT_CHUNK_BYTES = 256;
+const PTY_INPUT_CHUNK_DELAY_MS = 5;
+
+async function writePtyInput(
+  ptyProcess: pty.IPty,
+  input: string,
+): Promise<void> {
+  const buffer = Buffer.from(input, 'utf8');
+  if (buffer.length <= PTY_INPUT_CHUNK_THRESHOLD_BYTES) {
+    ptyProcess.write(buffer);
+    return;
+  }
+
+  for (
+    let offset = 0;
+    offset < buffer.length;
+    offset += PTY_INPUT_CHUNK_BYTES
+  ) {
+    ptyProcess.write(buffer.subarray(offset, offset + PTY_INPUT_CHUNK_BYTES));
+    if (offset + PTY_INPUT_CHUNK_BYTES < buffer.length) {
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, PTY_INPUT_CHUNK_DELAY_MS),
+      );
+    }
+  }
+}
+
 // ─── Command timeout/idle policy ────────────────────────────────
 // Exported so tests can exercise the selection logic as pure helpers.
 // Kept here (not inlined in `executeCommand`) so the policy is easy to
@@ -646,7 +678,7 @@ export class SessionManager {
       this.resolveCommandWithTimeout(existingCommandId, 'abort');
     }
 
-    return new Promise<SessionCommandResult>((resolve) => {
+    const resultPromise = new Promise<SessionCommandResult>((resolve) => {
       const mark = session.logger?.getMarkPosition() ?? 0;
       const idleMs = getCommandIdleMs(request);
       const pending: PendingCommand = {
@@ -696,36 +728,36 @@ export class SessionManager {
         // The exit handler is already wired via handleSessionExit
         // which will resolve any pending commands when the session exits.
       }
-
-      const command = request.command;
-
-      if (request.rawInput) {
-        // Raw stdin: write bytes verbatim — no \r, no sentinel
-        session.pty.write(command);
-      } else if (command.length === 0) {
-        // Empty command, no rawInput — don't write anything to the PTY.
-        // The agent is just waiting for output; the pending command will
-        // resolve via timeout, pattern match, or session exit.
-      } else if (session.shellIntegrationActive) {
-        // Shell integration handles output boundaries via OSC 133 and emits
-        // OSC 7 cwd metadata at prompt time for session cwd tracking.
-        session.pty.write(`${command}\r`);
-      } else if (session.parser.currentMode === 'sentinel') {
-        // Wrap with sentinel for exit code detection
-        session.pty.write(
-          wrapWithSentinel(
-            commandId,
-            command,
-            this.shell.type === 'powershell',
-          ),
-        );
-      } else {
-        // Still in detecting mode — write normally, might get OSC or sentinel
-        session.pty.write(`${command}\r`);
-      }
-
-      session.lastActivityAt = Date.now();
     });
+
+    if (!this.pendingCommands.has(commandId)) return resultPromise;
+
+    const command = request.command;
+
+    if (request.rawInput) {
+      // Raw stdin: write bytes verbatim — no \r, no sentinel
+      session.pty.write(command);
+    } else if (command.length === 0) {
+      // Empty command, no rawInput — don't write anything to the PTY.
+      // The agent is just waiting for output; the pending command will
+      // resolve via timeout, pattern match, or session exit.
+    } else if (session.shellIntegrationActive) {
+      // Shell integration handles output boundaries via OSC 133 and emits
+      // OSC 7 cwd metadata at prompt time for session cwd tracking.
+      await writePtyInput(session.pty, `${command}\r`);
+    } else if (session.parser.currentMode === 'sentinel') {
+      // Wrap with sentinel for exit code detection
+      await writePtyInput(
+        session.pty,
+        wrapWithSentinel(commandId, command, this.shell.type === 'powershell'),
+      );
+    } else {
+      // Still in detecting mode — write normally, might get OSC or sentinel
+      await writePtyInput(session.pty, `${command}\r`);
+    }
+
+    session.lastActivityAt = Date.now();
+    return resultPromise;
   }
 
   // ─── Live snapshot (UI streaming) ───────────────────────────────

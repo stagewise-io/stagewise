@@ -11,6 +11,7 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 - **New session:** Omit `session_id`, set `cwd` (mount prefix). **Reuse:** pass the `session_id` from the result. `cwd` is ignored on reuse — the shell stays wherever `cd` left it.
 - **Reuse sessions.** Creating a session is expensive (shell init delay). Reuse an existing session (`session_id`) whenever one is available — active sessions are listed in `<shell-sessions>` in the env-snapshot. Only create a new session when no suitable one exists or when you need parallel execution (e.g. long-running dev server in one session, short commands in another).
 - **`command`:** Writes text + Enter to the shell.
+- **`command` input:** `command` is sent to an interactive shell as terminal input, so raw line breaks act like Enter. Keep it on one physical line. If a bash/zsh/sh command must span lines, put `\` immediately before each line break (PowerShell: backtick). Join multiple commands on the same physical line with `&&` or `;`.
 - **`wait_until`:** Optional; controls when the tool returns.
   - `timeout_ms` — hard cap. Normal `wait_until` max is 60 s (default 15 s). With `exited: true`, max/default is 5 min. Without `wait_until`, default is 10 s. **Leave at default unless you know the command needs a different cap.**
   - `output_pattern` — regex on output; resolves early when matched. Use for dev servers and watchers that do not exit on their own.
