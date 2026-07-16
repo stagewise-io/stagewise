@@ -10,6 +10,7 @@ import { OpenAiLogo } from './openai';
 import { XiaomiMiMoLogo } from './xiaomi-mimo';
 import { ZAiLogo } from './z-ai';
 import { MistralLogo } from './mistral';
+import { XaiLogo } from './xai';
 
 export type ProviderLogoComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -30,6 +31,7 @@ export const PROVIDER_LOGOS: Record<ModelProvider, ProviderLogoComponent> = {
   minimax: MinimaxLogo,
   'xiaomi-mimo': XiaomiMiMoLogo,
   mistral: MistralLogo,
+  'x-ai': XaiLogo,
 };
 
 /**
