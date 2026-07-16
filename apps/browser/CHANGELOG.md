@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.0 (2026-07-16)
+
+### Features
+
+* add Kimi K3 model (925ba2c)
+
 ## 1.20.0 (2026-07-11)
 
 ### Features
