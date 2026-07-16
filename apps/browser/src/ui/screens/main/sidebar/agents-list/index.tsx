@@ -752,6 +752,11 @@ export function AgentsList() {
       ? (s.agents.instances[openAgent]?.state.activeModelId ?? null)
       : null,
   );
+  const openAgentProviderInstanceId = useKartonState((s) =>
+    openAgent
+      ? (s.agents.instances[openAgent]?.state.activeProviderInstanceId ?? null)
+      : null,
+  );
   const openAgentToolApprovalMode = useKartonState((s) =>
     openAgent
       ? (s.agents.instances[openAgent]?.state.toolApprovalMode ?? null)
@@ -764,6 +769,8 @@ export function AgentsList() {
   );
   const openAgentModelIdRef = useRef(openAgentModelId);
   openAgentModelIdRef.current = openAgentModelId;
+  const openAgentProviderInstanceIdRef = useRef(openAgentProviderInstanceId);
+  openAgentProviderInstanceIdRef.current = openAgentProviderInstanceId;
   const openAgentToolApprovalModeRef = useRef<ToolApprovalMode | null>(
     openAgentToolApprovalMode,
   );
@@ -874,12 +881,15 @@ export function AgentsList() {
     setPendingCreate(true);
     window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
     const currentModelId = openAgentModelIdRef.current ?? undefined;
+    const currentProviderInstanceId =
+      openAgentProviderInstanceIdRef.current ?? undefined;
     const currentToolApprovalMode =
       openAgentToolApprovalModeRef.current ?? undefined;
     const paths = currentMountPathsRef.current;
     void createAgent(
       undefined,
       currentModelId,
+      currentProviderInstanceId,
       currentToolApprovalMode,
       paths.length > 0 ? paths : undefined,
     ).then((id) => {
@@ -1029,11 +1039,14 @@ export function AgentsList() {
       setPendingCreate(true);
       window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
       const currentModelId = openAgentModelIdRef.current ?? undefined;
+      const currentProviderInstanceId =
+        openAgentProviderInstanceIdRef.current ?? undefined;
       const currentToolApprovalMode =
         openAgentToolApprovalModeRef.current ?? undefined;
       void createAgent(
         undefined,
         currentModelId,
+        currentProviderInstanceId,
         currentToolApprovalMode,
         [workspacePath],
         true,

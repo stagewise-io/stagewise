@@ -1278,6 +1278,7 @@ export type KartonContract = {
       create: (
         initialInputState?: string,
         modelId?: ModelId,
+        providerInstanceId?: string,
         toolApprovalMode?: ToolApprovalMode,
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,

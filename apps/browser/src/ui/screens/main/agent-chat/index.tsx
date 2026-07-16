@@ -43,6 +43,11 @@ export function AgentChat({
       ? (s.agents.instances[openAgent]?.state.activeModelId ?? null)
       : null,
   );
+  const openAgentProviderInstanceId = useKartonState((s) =>
+    openAgent
+      ? (s.agents.instances[openAgent]?.state.activeProviderInstanceId ?? null)
+      : null,
+  );
   const openAgentToolApprovalMode = useKartonState((s) =>
     openAgent
       ? (s.agents.instances[openAgent]?.state.toolApprovalMode ?? null)
@@ -57,6 +62,8 @@ export function AgentChat({
   // Ref snapshots so the callback isn't re-created on every state change.
   const openAgentModelIdRef = useRef(openAgentModelId);
   openAgentModelIdRef.current = openAgentModelId;
+  const openAgentProviderInstanceIdRef = useRef(openAgentProviderInstanceId);
+  openAgentProviderInstanceIdRef.current = openAgentProviderInstanceId;
   const openAgentToolApprovalModeRef = useRef(openAgentToolApprovalMode);
   openAgentToolApprovalModeRef.current = openAgentToolApprovalMode;
   const currentMountPathsRef = useRef(currentMounts.map((m) => m.path));
@@ -87,12 +94,15 @@ export function AgentChat({
 
     setPendingCreate(true);
     const currentModelId = openAgentModelIdRef.current ?? undefined;
+    const currentProviderInstanceId =
+      openAgentProviderInstanceIdRef.current ?? undefined;
     const currentToolApprovalMode =
       openAgentToolApprovalModeRef.current ?? undefined;
     const paths = currentMountPathsRef.current;
     void createAgent(
       undefined,
       currentModelId,
+      currentProviderInstanceId,
       currentToolApprovalMode,
       paths.length > 0 ? paths : undefined,
     )
