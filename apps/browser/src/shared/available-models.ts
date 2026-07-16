@@ -821,6 +821,47 @@ export const availableModels = [
   },
   {
     officialProvider: 'moonshotai',
+    modelId: 'kimi-k3',
+    modelDisplayName: 'Kimi K3',
+    modelDescription:
+      "Kimi's most capable model with 2.8T parameters, 1M-token context, native vision, and always-on deep reasoning for software engineering and knowledge work.",
+    modelContext: '1M context',
+    modelContextRaw: 1048576,
+    headers: {},
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      moonshotai: {
+        thinking: { type: 'adaptive' },
+        effort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 3.0,
+      outputPerMillion: 15.0,
+      relativeMultiplier: 3.0,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: true,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GOOGLE_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'moonshotai',
     modelId: 'kimi-k2.7-code',
     modelDisplayName: 'Kimi K2.7 Code',
     modelDescription:
