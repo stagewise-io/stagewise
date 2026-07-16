@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const readFileSync = vi.hoisted(() => vi.fn());
@@ -48,7 +49,7 @@ describe('resolveProfileRegion', () => {
 
     expect(resolveProfileRegion('staging')).toBe('ap-southeast-2');
     expect(readFileSync).toHaveBeenCalledWith(
-      '/home/tester/.aws/config',
+      join('/home/tester', '.aws', 'config'),
       'utf8',
     );
   });
