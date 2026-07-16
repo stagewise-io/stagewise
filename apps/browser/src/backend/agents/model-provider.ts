@@ -47,6 +47,7 @@ import {
   type CodingPlanConfig,
 } from './providers/coding-plan';
 import { VENDOR_API_SPECS } from './providers/official-api';
+import { OPENROUTER_PROVIDER_MAP } from './providers/shared';
 
 type ProviderOptions = Parameters<typeof streamText>[0]['providerOptions'];
 type BuiltInModelSettings = (typeof availableModels)[number];
@@ -72,6 +73,19 @@ function getEffectiveApiSpec(
     return VENDOR_API_SPECS[vendor];
   }
   return undefined;
+}
+
+function getOpenRouterSemanticProvider(
+  modelId: string,
+): ModelProvider | undefined {
+  const prefix = modelId.replace(/^~/, '').split('/', 1)[0];
+  if (Object.hasOwn(VENDOR_API_SPECS, prefix)) {
+    return prefix as ModelProvider;
+  }
+
+  return (
+    Object.entries(OPENROUTER_PROVIDER_MAP) as [ModelProvider, string][]
+  ).find(([, openRouterPrefix]) => openRouterPrefix === prefix)?.[0];
 }
 
 export type ModelWithOptions = {
@@ -730,7 +744,12 @@ export class ModelProviderService {
         : undefined;
     const resolved = legacyStagewiseVendor
       ? {
-          ...this.resolveVendorEndpoint(legacyStagewiseVendor),
+          // endpointId is vendor metadata for the shared Stagewise route, not
+          // permission to select a newer vendor-specific BYOK/plan instance.
+          ...this.resolveInstanceById(
+            providerInstanceId,
+            legacyStagewiseVendor,
+          ),
           apiSpec: getEffectiveApiSpec(
             getProviderTypeByVendor(legacyStagewiseVendor),
             {},
@@ -884,14 +903,10 @@ export class ModelProviderService {
     // remains OpenAI-compatible below.
     const openRouterVendor =
       instance.typeId === 'openrouter'
-        ? discovered.modelId.replace(/^~/, '').split('/', 1)[0]
+        ? getOpenRouterSemanticProvider(discovered.modelId)
         : undefined;
     const semanticProvider =
-      vendor ??
-      (openRouterVendor && Object.hasOwn(VENDOR_API_SPECS, openRouterVendor)
-        ? (openRouterVendor as ModelProvider)
-        : undefined) ??
-      getSemanticProviderForApiSpec(apiSpec);
+      vendor ?? openRouterVendor ?? getSemanticProviderForApiSpec(apiSpec);
     // OpenRouter is an official provider with an OpenAI-compatible protocol.
     // Its signatures retain the routed model vendor, while thinking options use
     // the compatible wire format below.
