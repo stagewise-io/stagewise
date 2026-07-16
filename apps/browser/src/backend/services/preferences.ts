@@ -352,17 +352,25 @@ export class PreferencesService extends DisposableService {
 
     // 5. Rewrite customModels: endpointId -> providerInstanceId.
     for (const model of this.preferences.customModels) {
+      const legacyVendor =
+        model.endpointId && BUILT_IN_VENDOR_NAMES.has(model.endpointId)
+          ? (model.endpointId as ModelProvider)
+          : undefined;
       if (!model.providerInstanceId && model.endpointId) {
-        if (BUILT_IN_VENDOR_NAMES.has(model.endpointId)) {
+        if (legacyVendor) {
           model.providerInstanceId =
-            vendorToInstanceId.get(model.endpointId as ModelProvider) ??
-            'stagewise-default';
+            vendorToInstanceId.get(legacyVendor) ?? 'stagewise-default';
         } else {
           // Custom endpoint id — instance ids reuse endpoint ids.
           model.providerInstanceId = model.endpointId;
         }
       }
-      model.endpointId = undefined;
+      // A shared Stagewise instance does not encode which vendor its custom
+      // model should target. Keep that legacy vendor reference for routing;
+      // all other endpoint IDs are fully represented by their instance ID.
+      if (model.providerInstanceId !== 'stagewise-default' || !legacyVendor) {
+        model.endpointId = undefined;
+      }
     }
 
     // 4. Migrate global disabledModelIds → stagewise-default instance.

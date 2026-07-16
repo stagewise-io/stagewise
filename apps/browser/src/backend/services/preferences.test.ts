@@ -516,6 +516,53 @@ describe('PreferencesService legacy provider migration', () => {
     expect(persistedDataMock.writePersistedData).toHaveBeenCalledTimes(1);
   });
 
+  it('retains the vendor for custom models migrated from Stagewise routing', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerConfigs.openai = {
+      ...preferences.providerConfigs.openai,
+      mode: 'stagewise',
+    };
+    preferences.customModels = [
+      {
+        modelId: 'legacy-stagewise-custom',
+        displayName: 'Legacy Stagewise custom model',
+        description: '',
+        contextWindowSize: 128_000,
+        endpointId: 'openai',
+        thinkingEnabled: false,
+        capabilities: {
+          inputModalities: {
+            text: true,
+            audio: false,
+            image: false,
+            video: false,
+            file: false,
+          },
+          outputModalities: {
+            text: true,
+            audio: false,
+            image: false,
+            video: false,
+            file: false,
+          },
+          toolCalling: true,
+        },
+        providerOptions: {},
+        headers: {},
+      },
+    ];
+
+    const service = await createServiceWithPreferences(preferences);
+
+    expect(service.get().customModels).toContainEqual(
+      expect.objectContaining({
+        modelId: 'legacy-stagewise-custom',
+        providerInstanceId: 'stagewise-default',
+        endpointId: 'openai',
+      }),
+    );
+  });
+
   it('preserves the legacy Chat Completions protocol for OpenAI custom base URLs', async () => {
     const preferences = cloneDefaultPreferences();
     preferences.providerConfigs.openai = {
