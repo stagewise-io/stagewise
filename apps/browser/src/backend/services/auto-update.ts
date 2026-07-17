@@ -297,6 +297,7 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(`[AutoUpdateService] Error message: ${error.message}`);
       this.logger.debug(`[AutoUpdateService] Error stack: ${error.stack}`);
       this.report(error, 'autoUpdaterError');
+      this.dismissUpdateNotification();
       this.setAutoUpdateState('error', null, error.message);
     });
 
@@ -309,6 +310,7 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] Update available, download starting automatically',
       );
+      this.showUpdateDownloadingNotification();
       this.setAutoUpdateState('downloading');
     });
 
@@ -360,12 +362,30 @@ export class AutoUpdateService extends DisposableService {
     });
   }
 
+  private dismissUpdateNotification(): void {
+    if (!this.updateNotificationId) return;
+
+    this.notificationService.dismissNotification(this.updateNotificationId);
+    this.updateNotificationId = null;
+  }
+
+  private showUpdateDownloadingNotification(): void {
+    this.dismissUpdateNotification();
+
+    this.updateNotificationId = this.notificationService.showNotification({
+      title: 'Update Available',
+      message: 'A new version is being downloaded.',
+      type: 'info',
+      icon: 'spinner',
+      actions: [],
+    });
+  }
+
   private showUpdateReadyNotification(releaseName: string): void {
     const versionDisplay = releaseName || 'a new version';
 
     // Dismiss any previous update notification before showing a new one
-    if (this.updateNotificationId)
-      this.notificationService.dismissNotification(this.updateNotificationId);
+    this.dismissUpdateNotification();
 
     this.updateNotificationId = this.notificationService.showNotification({
       title: 'Update Ready',
