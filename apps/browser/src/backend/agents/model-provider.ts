@@ -511,37 +511,59 @@ export class ModelProviderService {
       throw new Error(`Provider instance ${providerInstanceId} not found`);
     }
 
-    const selectedCustom = providerInstanceId
-      ? preferences.customModels.find(
-          (candidate) =>
-            candidate.modelId === modelId &&
-            (candidate.providerInstanceId ?? candidate.endpointId) ===
-              providerInstanceId,
-        )
-      : undefined;
-    if (selectedCustom) {
-      return this.createCustomModelWithOptions(
-        selectedCustom,
-        traceId,
-        otherPostHogProperties,
-      );
-    }
-
-    // Resolve the selected (instanceId, modelId) pair before the global
-    // catalog. Self-hosted and aggregator instances can expose literal model
-    // IDs that collide with catalog IDs or aliases. Only prefer discovery when
-    // the selector exposes that pair as a discovered entry; vendor instances
-    // intentionally deduplicate matching discoveries in favor of the catalog.
+    // An explicit instance must resolve through the same selector entry used by
+    // modelExists. This keeps catalog eligibility, discovery enablement, and
+    // custom-model precedence consistent between validation and creation.
     if (providerInstanceId && selectedInstance) {
-      const discovered = selectedInstance.discoveredModels?.find(
-        (candidate) => candidate.modelId === modelId,
-      );
       const selectorEntry = findModelSelectorEntry(
         preferences,
         providerInstanceId,
         modelId,
       );
-      if (discovered && selectorEntry && !selectorEntry.catalogModel) {
+      if (!selectorEntry) {
+        throw new Error(`Model ${modelId} not found`);
+      }
+
+      const selectedCustom = preferences.customModels.find(
+        (candidate) =>
+          candidate.modelId === selectorEntry.modelId &&
+          (candidate.providerInstanceId ?? candidate.endpointId) ===
+            providerInstanceId,
+      );
+      if (selectedCustom) {
+        return this.createCustomModelWithOptions(
+          selectedCustom,
+          traceId,
+          otherPostHogProperties,
+        );
+      }
+
+      if (selectorEntry.catalogModel) {
+        const catalogModel = getAvailableModel(selectorEntry.targetModelId);
+        if (!catalogModel) {
+          throw new Error(`Model ${modelId} not found`);
+        }
+        const alias = selectorEntry.isAlias
+          ? getModelAlias(selectorEntry.modelId)
+          : undefined;
+        return this.createBuiltInModelWithOptions(
+          catalogModel,
+          traceId,
+          alias,
+          alias
+            ? {
+                ...otherPostHogProperties,
+                requestedModelId: alias.modelId,
+              }
+            : otherPostHogProperties,
+          providerInstanceId,
+        );
+      }
+
+      const discovered = selectedInstance.discoveredModels?.find(
+        (candidate) => candidate.modelId === selectorEntry.modelId,
+      );
+      if (discovered) {
         return this.createDiscoveredModelWithOptions(
           selectedInstance,
           discovered,
@@ -549,6 +571,8 @@ export class ModelProviderService {
           otherPostHogProperties,
         );
       }
+
+      throw new Error(`Model ${modelId} not found`);
     }
 
     const builtIn = getAvailableModel(modelId);
@@ -577,21 +601,6 @@ export class ModelProviderService {
         traceId,
         otherPostHogProperties,
       );
-    }
-
-    // Discovered models (self-hosted providers) — require providerInstanceId
-    if (selectedInstance) {
-      const discovered = (selectedInstance.discoveredModels ?? []).find(
-        (dm) => dm.modelId === modelId,
-      );
-      if (discovered) {
-        return this.createDiscoveredModelWithOptions(
-          selectedInstance,
-          discovered,
-          traceId,
-          otherPostHogProperties,
-        );
-      }
     }
 
     throw new Error(`Model ${modelId} not found`);

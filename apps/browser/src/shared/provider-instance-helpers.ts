@@ -664,7 +664,9 @@ export function getSelectableModelEntries(
         !isDisabled(model.modelId),
     );
     const customModelIds = new Set(
-      instanceCustomModels.map((model) => model.modelId),
+      instanceCustomModels.map((model) =>
+        getCatalogMatchId(instance, model.modelId),
+      ),
     );
 
     // --- Catalog models for this instance ---
@@ -748,7 +750,31 @@ export function getSelectableModelEntries(
           catalogModelIds.add(getCatalogMatchId(instance, model.modelId));
         }
       }
-      // Custom/cloud types (no vendor): only custom models below
+      // Custom/cloud instances expose catalog models explicitly configured in
+      // their wire-ID mapping. Treat the mapping keys as selectable canonical
+      // IDs so validation and model creation agree on these routes.
+      if (!vendor) {
+        const modelIdMapping = (
+          instance.config as { modelIdMapping?: Record<string, string> }
+        ).modelIdMapping;
+        for (const modelId of Object.keys(modelIdMapping ?? {})) {
+          if (isDisabled(modelId)) continue;
+          const model = getAvailableModel(modelId);
+          if (!model) continue;
+          entries.push(
+            makeBuiltInEntry(
+              instance,
+              model.modelId,
+              model.modelDisplayName,
+              model.modelDescription,
+              model,
+              false,
+              model.modelId,
+            ),
+          );
+          catalogModelIds.add(getCatalogMatchId(instance, model.modelId));
+        }
+      }
     }
 
     // --- Discovered models (self-hosted + vendor API discovery) ---
@@ -762,7 +788,7 @@ export function getSelectableModelEntries(
       for (const dm of instance.discoveredModels) {
         if (
           catalogModelIds.has(getCatalogMatchId(instance, dm.modelId)) ||
-          customModelIds.has(dm.modelId)
+          customModelIds.has(getCatalogMatchId(instance, dm.modelId))
         ) {
           continue;
         }
