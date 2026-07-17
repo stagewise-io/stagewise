@@ -6,9 +6,9 @@ const { generateText } = vi.hoisted(() => ({
 
 vi.mock('ai', () => ({ generateText }));
 
-import { deepseekApiType } from './official-api';
+import { deepseekApiType, minimaxApiType } from './official-api';
 
-describe('factory-created official API providers', () => {
+describe('official API providers', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     generateText.mockReset();
@@ -29,5 +29,21 @@ describe('factory-created official API providers', () => {
         abortSignal: expect.any(AbortSignal),
       }),
     );
+  });
+
+  it('falls back to MiniMax-M3 when the primary validation model fails', async () => {
+    generateText
+      .mockRejectedValueOnce(new Error('model unavailable'))
+      .mockResolvedValueOnce({});
+
+    const result = await minimaxApiType.validateCredentials!(
+      { encryptedApiKey: 'encrypted' },
+      { encryptedApiKey: 'test-key' },
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(generateText).toHaveBeenCalledTimes(2);
+    expect(generateText.mock.calls[0]?.[0].model.modelId).toBe('minimax-m2.7');
+    expect(generateText.mock.calls[1]?.[0].model.modelId).toBe('MiniMax-M3');
   });
 });

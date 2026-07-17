@@ -363,27 +363,29 @@ export const minimaxApiType: ProviderType<OfficialApiConfig> = {
         error: 'No base URL configured for MiniMax API',
       };
     }
-    const validationModelId = VENDOR_VALIDATION_MODEL.minimax!;
-    try {
-      await generateText({
-        model: createOpenAIChatModel(apiKey, baseUrl, validationModelId),
-        messages: [
-          {
-            role: 'user',
-            content: 'What is the capital of France? Respond with one word.',
-          },
-        ],
-        abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
-      });
-      return { success: true };
-    } catch (err) {
-      return {
-        success: false,
-        error: `Invalid MiniMax API key: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      };
+    const validationModelIds = [VENDOR_VALIDATION_MODEL.minimax!, 'MiniMax-M3'];
+    const errors: string[] = [];
+    for (const validationModelId of validationModelIds) {
+      try {
+        await generateText({
+          model: createOpenAIChatModel(apiKey, baseUrl, validationModelId),
+          messages: [
+            {
+              role: 'user',
+              content: 'What is the capital of France? Respond with one word.',
+            },
+          ],
+          abortSignal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
+        });
+        return { success: true };
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
     }
+    return {
+      success: false,
+      error: `Invalid MiniMax API key: ${errors.join(' | ')}`,
+    };
   },
 
   // ── Model ID transforms ────────────────────────────────────────────────
