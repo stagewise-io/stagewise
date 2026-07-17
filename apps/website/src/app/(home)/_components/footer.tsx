@@ -71,6 +71,15 @@ export function Footer() {
                 stagewise with GLM
               </Link>
               <Link
+                href="/use-cases/kimi"
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'xs' }),
+                  'justify-end',
+                )}
+              >
+                stagewise with Kimi
+              </Link>
+              <Link
                 href="/use-cases/minimax"
                 className={cn(
                   buttonVariants({ variant: 'ghost', size: 'xs' }),
