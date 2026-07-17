@@ -171,6 +171,7 @@ const VENDOR_REASONING_MODEL_IDS: Partial<Record<ModelProvider, Set<string>>> =
     ]),
     moonshotai: new Set([
       'kimi-k2.5',
+      'kimi-k3',
       'kimi-k2.6',
       'kimi-k2.7-code',
       'kimi-thinking-preview',
