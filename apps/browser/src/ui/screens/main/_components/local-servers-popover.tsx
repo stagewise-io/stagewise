@@ -35,6 +35,7 @@ import {
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
+import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { Globe2 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -146,6 +147,10 @@ export function LocalServersPopover({
     Record<string, FaviconBitmapResult>
   >({});
   const suppressedServerIdsRef = useRef(new Set<string>());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { maskStyle } = useScrollFadeMask(scrollContainerRef, {
+    axis: 'vertical',
+  });
 
   const getRunningServers = useKartonProcedure(
     (procedures) => procedures.browser.getRunningServers,
@@ -364,11 +369,18 @@ export function LocalServersPopover({
           </div>
           <PopoverClose />
 
-          <div className="flex max-h-80 flex-col gap-3 overflow-y-auto">
+          <div
+            ref={scrollContainerRef}
+            className="mask-alpha flex max-h-80 min-h-0 flex-col gap-3 overflow-y-auto"
+            style={maskStyle}
+          >
             {groups.map((group) => {
               const ChatIcon = group.agentId ? IconMsgWritingOutline18 : Globe2;
               return (
-                <section key={group.id} className="flex flex-col gap-1">
+                <section
+                  key={group.id}
+                  className="flex shrink-0 flex-col gap-1"
+                >
                   <div className="flex min-w-0 items-center gap-1.5 px-1.5 py-0.5 text-muted-foreground text-xs">
                     {group.agentId ? (
                       <button
@@ -466,10 +478,12 @@ export function LocalServersPopover({
                             </div>
                           </div>
                           <div
-                            className="w-full truncate rounded-sm bg-background px-1.5 py-1 font-mono text-foreground"
+                            className="flex w-full items-center rounded-sm bg-background px-1.5 py-1"
                             title={server.command}
                           >
-                            {server.command}
+                            <span className="truncate font-mono text-foreground">
+                              {server.command}
+                            </span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {server.endpoints.map((endpoint) => {
