@@ -432,22 +432,30 @@ export class ModelProviderService {
         )
       : undefined;
 
-    // An explicit instance is part of the model identity. If it was deleted,
-    // do not reinterpret an instance-scoped selection as a global catalog
-    // model merely because the model IDs happen to collide.
-    if (providerInstanceId && !providerInstance) return false;
-
-    if (getAvailableModel(modelId)) return true;
-    if (preferences.customModels.some((model) => model.modelId === modelId)) {
-      return true;
+    if (!providerInstanceId) {
+      return (
+        !!getAvailableModel(modelId) ||
+        preferences.customModels.some((model) => model.modelId === modelId)
+      );
     }
-    if (!providerInstance) return false;
 
-    return (
-      providerInstance.discoveredModels?.some(
-        (model) => model.modelId === modelId,
-      ) ?? false
-    );
+    // Older preferences can reference the well-known Stagewise route without
+    // persisting a corresponding instance. Preserve only that compatibility
+    // route; every other missing explicit instance fails closed.
+    if (!providerInstance) {
+      if (providerInstanceId !== 'stagewise-default') return false;
+      return (
+        !!getAvailableModel(modelId) ||
+        preferences.customModels.some(
+          (model) =>
+            model.modelId === modelId &&
+            (model.providerInstanceId ?? model.endpointId) ===
+              'stagewise-default',
+        )
+      );
+    }
+
+    return !!findModelSelectorEntry(preferences, providerInstanceId, modelId);
   }
 
   /**
@@ -495,8 +503,28 @@ export class ModelProviderService {
     // An explicit instance is part of the model identity. Failing closed here
     // prevents a deleted discovered route from silently becoming a Stagewise
     // catalog route when the two models share an ID.
-    if (providerInstanceId && !selectedInstance) {
+    if (
+      providerInstanceId &&
+      !selectedInstance &&
+      providerInstanceId !== 'stagewise-default'
+    ) {
       throw new Error(`Provider instance ${providerInstanceId} not found`);
+    }
+
+    const selectedCustom = providerInstanceId
+      ? preferences.customModels.find(
+          (candidate) =>
+            candidate.modelId === modelId &&
+            (candidate.providerInstanceId ?? candidate.endpointId) ===
+              providerInstanceId,
+        )
+      : undefined;
+    if (selectedCustom) {
+      return this.createCustomModelWithOptions(
+        selectedCustom,
+        traceId,
+        otherPostHogProperties,
+      );
     }
 
     // Resolve the selected (instanceId, modelId) pair before the global

@@ -301,6 +301,7 @@ describe('discovered model routing', () => {
     expect(service.modelExists('local-chat', 'one')).toBe(true);
     expect(service.modelExists('local-chat', 'two')).toBe(true);
     expect(service.modelExists('local-chat', 'missing')).toBe(false);
+    expect(service.modelExists('gpt-5.5', 'one')).toBe(false);
     expect(() => service.getModelWithOptions('local-chat', 'trace-1')).toThrow(
       'Model local-chat not found',
     );
@@ -344,6 +345,66 @@ describe('discovered model routing', () => {
       modelId,
       endpointId: 'ollama-local',
     });
+  });
+
+  it('prefers an instance-owned custom model over a discovered duplicate', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'custom-instance',
+        typeId: 'custom-openai-chat',
+        name: 'Custom OpenAI',
+        config: { baseUrl: 'https://discovered.example/v1' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          { modelId: 'duplicate-model', displayName: 'Discovered duplicate' },
+        ],
+      },
+    ];
+    preferences.customModels = [
+      {
+        modelId: 'duplicate-model',
+        displayName: 'Configured custom model',
+        providerInstanceId: 'custom-instance',
+        endpointId: 'custom-instance',
+        providerOptions: {},
+        headers: {},
+        contextWindowSize: 64_000,
+      },
+      {
+        modelId: 'other-custom-model',
+        displayName: 'Other custom model',
+        providerInstanceId: 'other-instance',
+        endpointId: 'other-instance',
+        providerOptions: {},
+        headers: {},
+        contextWindowSize: 64_000,
+      },
+    ];
+
+    expect(service.modelExists('duplicate-model', 'custom-instance')).toBe(
+      true,
+    );
+    expect(service.modelExists('other-custom-model', 'custom-instance')).toBe(
+      false,
+    );
+    const result = service.getModelWithOptions(
+      'duplicate-model',
+      'trace-1',
+      undefined,
+      'custom-instance',
+    );
+
+    expect(getModelRequestUrl(result)).toBe(
+      'https://discovered.example/v1/chat/completions',
+    );
+    expect(result.providerMode).toBe('custom');
+    expect(
+      (service as any).telemetryService.withTracing.mock.calls[0]?.[1]
+        .posthogProperties,
+    ).toMatchObject({ isCustomModel: true });
   });
 
   it('keeps catalog precedence for discovered duplicates on vendor instances', () => {
@@ -829,6 +890,20 @@ describe('legacy Stagewise custom model routing', () => {
 });
 
 describe('deleted provider instance recovery', () => {
+  it('preserves the legacy Stagewise sentinel without a persisted instance', () => {
+    const service = createTestModelProviderService();
+
+    expect(service.modelExists('gpt-5.5', 'stagewise-default')).toBe(true);
+    expect(() =>
+      service.getModelWithOptions(
+        'gpt-5.5',
+        'trace-1',
+        undefined,
+        'stagewise-default',
+      ),
+    ).not.toThrow();
+  });
+
   it.each([
     'gpt-5.5',
     'default',

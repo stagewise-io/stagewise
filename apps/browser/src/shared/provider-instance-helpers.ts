@@ -658,6 +658,14 @@ export function getSelectableModelEntries(
     // native casing (e.g. MiniMax `MiniMax-M3`) while the catalog uses
     // lowercase (`minimax-m3`).
     const catalogModelIds = new Set<string>();
+    const instanceCustomModels = customModels.filter(
+      (model) =>
+        (model.providerInstanceId ?? model.endpointId) === instance.id &&
+        !isDisabled(model.modelId),
+    );
+    const customModelIds = new Set(
+      instanceCustomModels.map((model) => model.modelId),
+    );
 
     // --- Catalog models for this instance ---
 
@@ -752,7 +760,10 @@ export function getSelectableModelEntries(
       const hasEnabledList =
         instance.enabledModelIds && instance.enabledModelIds.length > 0;
       for (const dm of instance.discoveredModels) {
-        if (catalogModelIds.has(getCatalogMatchId(instance, dm.modelId))) {
+        if (
+          catalogModelIds.has(getCatalogMatchId(instance, dm.modelId)) ||
+          customModelIds.has(dm.modelId)
+        ) {
           continue;
         }
         if (isDisabled(dm.modelId)) continue;
@@ -763,10 +774,7 @@ export function getSelectableModelEntries(
 
     // --- Custom models for this instance ---
 
-    for (const cm of customModels) {
-      const assignedInstanceId = cm.providerInstanceId ?? cm.endpointId;
-      if (assignedInstanceId !== instance.id) continue;
-      if (isDisabled(cm.modelId)) continue;
+    for (const cm of instanceCustomModels) {
       entries.push(makeCustomEntry(instance, cm));
     }
   }
