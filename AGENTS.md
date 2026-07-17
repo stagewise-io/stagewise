@@ -113,7 +113,7 @@ Scopes must match workspace package names exactly:
 
 Examples:
 ```bash
-feat(browser): add dark mode toggle
+feat(stagewise): add dark mode toggle
 fix(karton): resolve connection timeout
 ```
 
