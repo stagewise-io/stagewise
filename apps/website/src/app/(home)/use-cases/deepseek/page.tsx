@@ -317,7 +317,7 @@ export default function DeepSeekUseCasePage() {
                   >
                     MiniMax M3
                   </Link>{' '}
-                  offer native vision capabilities.
+                  offers native vision capabilities.
                 </p>
               </div>
             </ScrollReveal>

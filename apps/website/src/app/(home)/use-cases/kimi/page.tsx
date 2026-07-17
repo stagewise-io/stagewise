@@ -180,6 +180,8 @@ export default function KimiUseCasePage() {
                   <img
                     src="/use-cases/kimi/intelligence-index.png"
                     alt="Artificial Analysis Intelligence Index showing model comparison scores"
+                    width={4640}
+                    height={1952}
                     className="block h-auto w-full bg-surface-1"
                   />
                 </div>
@@ -264,6 +266,8 @@ export default function KimiUseCasePage() {
                   <img
                     src="/use-cases/kimi/mmmu-pro.png"
                     alt="MMMU-Pro benchmark showing visual reasoning scores across models"
+                    width={4512}
+                    height={1824}
                     className="block h-auto w-full bg-surface-1"
                   />
                 </div>
