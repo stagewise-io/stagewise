@@ -888,6 +888,15 @@ export function getInstanceModelCount(
     }
   }
 
+  const customModelIds = new Set(
+    (preferences?.customModels ?? [])
+      .filter(
+        (model) =>
+          (model.providerInstanceId ?? model.endpointId) === instance.id,
+      )
+      .map((model) => getCatalogMatchId(instance, model.modelId)),
+  );
+
   // Discovered models (self-hosted + vendor API discovery). This runs for
   // every instance type because coding plans and stagewise may also discover
   // vendor models beyond their catalog entries.
@@ -896,7 +905,11 @@ export function getInstanceModelCount(
     const hasEnabledList =
       instance.enabledModelIds && instance.enabledModelIds.length > 0;
     for (const dm of instance.discoveredModels) {
-      if (catalogModelIds.has(getCatalogMatchId(instance, dm.modelId))) {
+      const normalizedModelId = getCatalogMatchId(instance, dm.modelId);
+      if (
+        catalogModelIds.has(normalizedModelId) ||
+        customModelIds.has(normalizedModelId)
+      ) {
         continue;
       }
       if (disabled.has(dm.modelId)) continue;

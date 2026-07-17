@@ -575,6 +575,25 @@ export class ModelProviderService {
       throw new Error(`Model ${modelId} not found`);
     }
 
+    // Legacy preferences may reference the well-known Stagewise route without
+    // persisting an instance. Preserve instance-scoped custom models on that
+    // compatibility route without reopening global cross-instance fallback.
+    if (providerInstanceId === 'stagewise-default' && !selectedInstance) {
+      const legacyStagewiseCustom = preferences.customModels.find(
+        (candidate) =>
+          candidate.modelId === modelId &&
+          (candidate.providerInstanceId ?? candidate.endpointId) ===
+            'stagewise-default',
+      );
+      if (legacyStagewiseCustom) {
+        return this.createCustomModelWithOptions(
+          legacyStagewiseCustom,
+          traceId,
+          otherPostHogProperties,
+        );
+      }
+    }
+
     const builtIn = getAvailableModel(modelId);
     if (builtIn) {
       const alias = getModelAlias(modelId);
