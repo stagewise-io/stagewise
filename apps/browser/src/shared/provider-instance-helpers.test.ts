@@ -185,6 +185,62 @@ describe('discovered model catalog matching', () => {
     });
   });
 
+  it('deduplicates custom and discovered model IDs case-insensitively', () => {
+    const instance: ProviderInstance = {
+      id: 'custom-instance',
+      typeId: 'custom-openai-chat',
+      name: 'Custom OpenAI',
+      config: { baseUrl: 'https://example.com/v1' },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [
+        { modelId: 'GPT-4', displayName: 'Discovered duplicate' },
+      ],
+    };
+    const prefs = {
+      providerInstances: [instance],
+      customModels: [
+        {
+          modelId: 'gpt-4',
+          displayName: 'Configured custom model',
+          description: 'Configured description',
+          contextWindowSize: 64_000,
+          thinkingEnabled: false,
+          capabilities: {
+            inputModalities: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              file: false,
+            },
+            outputModalities: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              file: false,
+            },
+            toolCalling: true,
+          },
+          providerOptions: {},
+          headers: {},
+          providerInstanceId: instance.id,
+        },
+      ],
+    };
+
+    const entries = getSelectableModelEntries(prefs).filter(
+      (entry) => entry.modelId.toLowerCase() === 'gpt-4',
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      modelId: 'gpt-4',
+      displayName: 'Configured custom model',
+    });
+  });
+
   it('counts non-catalog discovered models for coding plans', () => {
     const codingPlanInstance: ProviderInstance = {
       id: 'coding-plan:glm-coding-plan',

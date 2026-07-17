@@ -455,6 +455,61 @@ describe('discovered model routing', () => {
     ).toThrow('Model instance-scoped-model not found');
   });
 
+  it('rejects catalog models that are not selectable on an explicit instance', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'anthropic-instance',
+        typeId: 'anthropic-api',
+        name: 'Anthropic API',
+        config: { encryptedApiKey: 'encrypted' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    expect(service.modelExists('gpt-5.5', 'anthropic-instance')).toBe(false);
+    expect(() =>
+      service.getModelWithOptions(
+        'gpt-5.5',
+        'trace-1',
+        undefined,
+        'anthropic-instance',
+      ),
+    ).toThrow('Model gpt-5.5 not found');
+  });
+
+  it('rejects disabled discovered models on an explicit instance', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'ollama-local',
+        typeId: 'ollama',
+        name: 'Local Ollama',
+        config: { baseUrl: 'http://ollama.example' },
+        enabledModelIds: ['enabled-model'],
+        disabledModelIds: [],
+        discoveredModels: [
+          { modelId: 'enabled-model', displayName: 'Enabled' },
+          { modelId: 'ineligible-model', displayName: 'Ineligible' },
+        ],
+      },
+    ];
+
+    expect(service.modelExists('ineligible-model', 'ollama-local')).toBe(false);
+    expect(() =>
+      service.getModelWithOptions(
+        'ineligible-model',
+        'trace-1',
+        undefined,
+        'ollama-local',
+      ),
+    ).toThrow('Model ineligible-model not found');
+  });
+
   it('keeps catalog precedence for discovered duplicates on vendor instances', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
