@@ -128,6 +128,63 @@ describe('discovered model catalog matching', () => {
     ).toBe('claude-opus-4.8');
   });
 
+  it('prefers an instance-owned custom model over a discovered duplicate', () => {
+    const instance: ProviderInstance = {
+      id: 'custom-instance',
+      typeId: 'custom-openai-chat',
+      name: 'Custom OpenAI',
+      config: { baseUrl: 'https://example.com/v1' },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [
+        { modelId: 'duplicate-model', displayName: 'Discovered duplicate' },
+      ],
+    };
+    const prefs = {
+      providerInstances: [instance],
+      customModels: [
+        {
+          modelId: 'duplicate-model',
+          displayName: 'Configured custom model',
+          description: 'Configured description',
+          contextWindowSize: 64_000,
+          thinkingEnabled: false,
+          capabilities: {
+            inputModalities: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              file: false,
+            },
+            outputModalities: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              file: false,
+            },
+            toolCalling: true,
+          },
+          providerOptions: {},
+          headers: {},
+          providerInstanceId: instance.id,
+        },
+      ],
+    };
+
+    const entries = getSelectableModelEntries(prefs).filter(
+      (entry) => entry.modelId === 'duplicate-model',
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      displayName: 'Configured custom model',
+      description: 'Configured description',
+      contextWindowRaw: 64_000,
+    });
+  });
+
   it('counts non-catalog discovered models for coding plans', () => {
     const codingPlanInstance: ProviderInstance = {
       id: 'coding-plan:glm-coding-plan',
