@@ -46,6 +46,7 @@ import {
   SIDEBAR_PANEL_MIN_SIZE,
   SIDEBAR_PANEL_ORDER,
 } from './_components/sidebar-panel-config';
+import { LocalServersPopover } from './_components/local-servers-popover';
 
 // Reuse the same autoSaveId as the settings screen so the root panel layout
 // (sidebar width, content width) persists when switching between screens.
@@ -235,24 +236,31 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
       </>
     ) : null;
 
-  const chatTopRightActions = !showContent ? (
+  const chatTopRightActions = (
     <>
-      {hasVisibleTabs ? (
-        <ContentToggleButton />
-      ) : (
-        <NewTabButtons
-          onCreateBrowserTab={handleCreateTab}
-          onCreateTerminalTab={handleOpenTerminal}
-        />
-      )}
-      {!fileTreeVisible && (
+      <LocalServersPopover
+        trailingContent={!showContent ? <ActionDivider /> : null}
+      />
+      {!showContent && (
         <>
-          <ActionDivider />
-          <FileTreeToggleButton />
+          {hasVisibleTabs ? (
+            <ContentToggleButton />
+          ) : (
+            <NewTabButtons
+              onCreateBrowserTab={handleCreateTab}
+              onCreateTerminalTab={handleOpenTerminal}
+            />
+          )}
+          {!fileTreeVisible && (
+            <>
+              <ActionDivider />
+              <FileTreeToggleButton />
+            </>
+          )}
         </>
       )}
     </>
-  ) : null;
+  );
 
   const openedContentTopRightActions =
     showContent && fileTreeVisible ? <ContentToggleButton /> : null;

@@ -48,490 +48,322 @@ export async function checkProcessOwnsPort(
   return ports.includes(port);
 }
 
-interface PortInfo {
-  protocol: 'TCP' | 'UDP';
-  localAddress: string;
-  localPort: number;
-  state: string | null;
-  listening: boolean;
+export type ProcessListeningEndpoint = {
+  host: string;
+  port: number;
+};
+
+export type ProcessSnapshotEntry = {
+  pid: number;
+  parentPid: number;
+  state: string;
+  command: string;
+};
+
+export type ProcessTreeSnapshot = {
+  command: string | null;
+  endpoints: ProcessListeningEndpoint[];
+};
+
+export function normalizeListeningHost(host: string): string {
+  const normalized = host.replace(/^\[|\]$/g, '');
+  return normalized === '*' ||
+    normalized === '0.0.0.0' ||
+    normalized === '::' ||
+    normalized === '::0' ||
+    normalized === '127.0.0.1' ||
+    normalized === '::1'
+    ? 'localhost'
+    : normalized;
 }
 
-/**
- * Get all child processes of a given PID
- * Platform-specific implementation
- */
-async function getChildProcesses(pid: number): Promise<number[]> {
-  try {
-    const platform = process.platform;
+function parseEndpoint(value: string): ProcessListeningEndpoint | null {
+  const localAddress = value.split('->')[0]?.replace(/\s+\(LISTEN\)$/, '');
+  if (!localAddress) return null;
 
-    if (platform === 'win32') {
-      // Windows: Use WMIC to get child processes
-      try {
-        const { stdout } = await execFileAsync(
-          'wmic',
-          ['process', 'where', `ParentProcessId=${pid}`, 'get', 'ProcessId'],
-          { windowsHide: true },
-        );
+  const bracketed = /^\[([^\]]+)\]:(\d+)$/.exec(localAddress);
+  const separator = localAddress.lastIndexOf(':');
+  const host = bracketed?.[1] ?? localAddress.slice(0, separator);
+  const port = Number.parseInt(
+    bracketed?.[2] ?? localAddress.slice(separator + 1),
+    10,
+  );
+  if (!host || separator < 0 || Number.isNaN(port)) return null;
+  return { host: normalizeListeningHost(host), port };
+}
 
-        const pids: number[] = [];
-        const lines = stdout.split(/\r?\n/);
+function addEndpoint(
+  endpointsByPid: Map<number, ProcessListeningEndpoint[]>,
+  pid: number,
+  endpoint: ProcessListeningEndpoint,
+): void {
+  const endpoints = endpointsByPid.get(pid) ?? [];
+  if (
+    !endpoints.some(
+      (entry) => entry.host === endpoint.host && entry.port === endpoint.port,
+    )
+  ) {
+    endpoints.push(endpoint);
+    endpointsByPid.set(pid, endpoints);
+  }
+}
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed && trimmed !== 'ProcessId') {
-            const childPid = Number.parseInt(trimmed, 10);
-            if (!Number.isNaN(childPid) && childPid > 0) {
-              pids.push(childPid);
-            }
-          }
-        }
+export function parseLsofListeningSnapshot(
+  output: string,
+): Map<number, ProcessListeningEndpoint[]> {
+  const endpointsByPid = new Map<number, ProcessListeningEndpoint[]>();
+  let pid: number | null = null;
 
-        return pids;
-      } catch {
-        // Fallback to PowerShell if WMIC fails
-        try {
-          const psCommand = `Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq ${pid} } | Select-Object -Property ProcessId`;
-
-          const { stdout } = await execFileAsync(
-            'powershell',
-            ['-NoProfile', '-Command', psCommand],
-            { windowsHide: true },
-          );
-
-          const pids: number[] = [];
-          const lines = stdout.split(/\r?\n/);
-
-          for (const line of lines) {
-            const match = line.match(/\d+/);
-            if (match) {
-              const childPid = Number.parseInt(match[0], 10);
-              if (!Number.isNaN(childPid) && childPid > 0) {
-                pids.push(childPid);
-              }
-            }
-          }
-
-          return pids;
-        } catch {
-          return [];
-        }
-      }
-    } else if (platform === 'darwin') {
-      // macOS: Use BSD-style ps command
-      const { stdout } = await execFileAsync('ps', ['-o', 'pid,ppid', '-A'], {
-        maxBuffer: 10_000_000,
-      });
-
-      const pids: number[] = [];
-      const lines = stdout.split('\n');
-
-      // Skip header line
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line) continue;
-
-        const trimmedLine = line.trim();
-        if (!trimmedLine) continue;
-
-        const parts = trimmedLine.split(/\s+/);
-        if (parts.length >= 2) {
-          const childPidStr = parts[0];
-          const parentPidStr = parts[1];
-          if (!childPidStr || !parentPidStr) continue;
-
-          const parentPid = Number.parseInt(parentPidStr, 10);
-          const childPid = Number.parseInt(childPidStr, 10);
-
-          if (parentPid === pid && !Number.isNaN(childPid) && childPid > 0) {
-            pids.push(childPid);
-          }
-        }
-      }
-
-      return pids;
-    } else {
-      // Linux: Use GNU-style ps command
-      try {
-        const { stdout } = await execFileAsync(
-          'ps',
-          ['-o', 'pid', '--ppid', String(pid), '--no-headers'],
-          { maxBuffer: 10_000_000 },
-        );
-
-        const pids: number[] = [];
-        const lines = stdout.split('\n');
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed) {
-            const childPid = Number.parseInt(trimmed, 10);
-            if (!Number.isNaN(childPid) && childPid > 0) {
-              pids.push(childPid);
-            }
-          }
-        }
-
-        return pids;
-      } catch {
-        // Fallback to more universal format if GNU-style fails
-        const { stdout } = await execFileAsync('ps', ['-o', 'pid,ppid', '-A'], {
-          maxBuffer: 10_000_000,
-        });
-
-        const pids: number[] = [];
-        const lines = stdout.split('\n');
-
-        // Skip header line
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i];
-          if (!line) continue;
-
-          const trimmedLine = line.trim();
-          if (!trimmedLine) continue;
-
-          const parts = trimmedLine.split(/\s+/);
-          if (parts.length >= 2) {
-            const childPidStr = parts[0];
-            const parentPidStr = parts[1];
-            if (!childPidStr || !parentPidStr) continue;
-
-            const parentPid = Number.parseInt(parentPidStr, 10);
-            const childPid = Number.parseInt(childPidStr, 10);
-
-            if (parentPid === pid && !Number.isNaN(childPid) && childPid > 0) {
-              pids.push(childPid);
-            }
-          }
-        }
-
-        return pids;
-      }
+  for (const line of output.split(/\r?\n/)) {
+    if (line.startsWith('p')) {
+      const parsedPid = Number.parseInt(line.slice(1), 10);
+      pid = Number.isNaN(parsedPid) ? null : parsedPid;
+    } else if (pid !== null && line.startsWith('n')) {
+      const endpoint = parseEndpoint(line.slice(1));
+      if (endpoint) addEndpoint(endpointsByPid, pid, endpoint);
     }
+  }
+
+  return endpointsByPid;
+}
+
+export function parseUnixProcessSnapshot(
+  output: string,
+): ProcessSnapshotEntry[] {
+  return output
+    .split(/\r?\n/)
+    .map((line): ProcessSnapshotEntry | null => {
+      const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.+?)\s*$/.exec(line);
+      if (!match) return null;
+      return {
+        pid: Number.parseInt(match[1]!, 10),
+        parentPid: Number.parseInt(match[2]!, 10),
+        state: match[3]!,
+        command: match[4]!,
+      };
+    })
+    .filter((entry): entry is ProcessSnapshotEntry => entry !== null);
+}
+
+function parseJsonRows<T>(output: string): T[] {
+  const trimmed = output.replace(/^\uFEFF/, '').trim();
+  if (!trimmed) return [];
+  const parsed: T | T[] | null = JSON.parse(trimmed);
+  if (parsed === null) return [];
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
+
+export function parseWindowsProcessSnapshot(
+  output: string,
+): ProcessSnapshotEntry[] {
+  type WindowsProcess = {
+    ProcessId: number;
+    ParentProcessId: number;
+    Name: string | null;
+    CommandLine: string | null;
+  };
+  return parseJsonRows<WindowsProcess>(output).map((entry) => ({
+    pid: entry.ProcessId,
+    parentPid: entry.ParentProcessId,
+    state: '',
+    command: entry.CommandLine?.trim() || entry.Name || '',
+  }));
+}
+
+async function readProcessSnapshot(): Promise<ProcessSnapshotEntry[]> {
+  try {
+    if (process.platform === 'win32') {
+      const command =
+        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress';
+      const { stdout } = await execFileAsync(
+        'powershell',
+        ['-NoProfile', '-Command', command],
+        { windowsHide: true, maxBuffer: 10_000_000 },
+      );
+      return parseWindowsProcessSnapshot(stdout);
+    }
+
+    const { stdout } = await execFileAsync(
+      'ps',
+      ['-ww', '-axo', 'pid=,ppid=,stat=,command='],
+      { maxBuffer: 10_000_000 },
+    );
+    return parseUnixProcessSnapshot(stdout);
   } catch {
     return [];
   }
 }
 
-/**
- * Recursively get all descendant processes (children, grandchildren, etc.)
- * @param pid - Parent process ID
- * @param visited - Set of already visited PIDs to avoid infinite loops
- */
-async function getAllDescendantProcesses(
-  pid: number,
-  visited = new Set<number>(),
-): Promise<number[]> {
-  if (visited.has(pid)) {
-    return [];
+function parseWindowsNetstatSnapshot(
+  output: string,
+): Map<number, ProcessListeningEndpoint[]> {
+  const endpointsByPid = new Map<number, ProcessListeningEndpoint[]>();
+  for (const line of output.split(/\r?\n/)) {
+    const [protocol, localAddress, , state, pidValue] = line
+      .trim()
+      .split(/\s+/);
+    if (protocol !== 'TCP' || state !== 'LISTENING' || !localAddress) continue;
+    const pid = Number.parseInt(pidValue ?? '', 10);
+    const endpoint = parseEndpoint(localAddress);
+    if (!Number.isNaN(pid) && endpoint)
+      addEndpoint(endpointsByPid, pid, endpoint);
   }
-
-  visited.add(pid);
-  const children = await getChildProcesses(pid);
-  const allDescendants = [...children];
-
-  // Recursively get descendants of each child
-  for (const childPid of children) {
-    const descendants = await getAllDescendantProcesses(childPid, visited);
-    allDescendants.push(...descendants);
-  }
-
-  return allDescendants;
+  return endpointsByPid;
 }
 
-/**
- * Get all ports that a specific process is listening on (including child processes)
- * Returns array of port numbers (only listening ports)
- * @param pid - Process ID to check
- * @param includeChildren - Whether to include child processes (default: true)
- */
+export function parseWindowsListeningSnapshot(
+  output: string,
+  pids?: ReadonlySet<number>,
+): Map<number, ProcessListeningEndpoint[]> {
+  type WindowsConnection = {
+    LocalAddress: string;
+    LocalPort: number;
+    OwningProcess: number;
+  };
+  const endpointsByPid = new Map<number, ProcessListeningEndpoint[]>();
+  for (const entry of parseJsonRows<WindowsConnection>(output)) {
+    if (pids && !pids.has(entry.OwningProcess)) continue;
+    addEndpoint(endpointsByPid, entry.OwningProcess, {
+      host: normalizeListeningHost(entry.LocalAddress),
+      port: entry.LocalPort,
+    });
+  }
+  return endpointsByPid;
+}
+
+async function readListeningSnapshot(
+  pids?: ReadonlySet<number>,
+): Promise<Map<number, ProcessListeningEndpoint[]>> {
+  if (pids?.size === 0) return new Map();
+
+  if (process.platform === 'win32') {
+    try {
+      const command =
+        'Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress,LocalPort,OwningProcess | ConvertTo-Json -Compress';
+      const { stdout } = await execFileAsync(
+        'powershell',
+        ['-NoProfile', '-Command', command],
+        { windowsHide: true, maxBuffer: 10_000_000 },
+      );
+      return parseWindowsListeningSnapshot(stdout, pids);
+    } catch {
+      try {
+        const { stdout } = await execFileAsync('netstat', ['-ano']);
+        const snapshot = parseWindowsNetstatSnapshot(stdout);
+        if (!pids) return snapshot;
+        return new Map([...snapshot].filter(([pid]) => pids.has(pid)));
+      } catch {
+        return new Map();
+      }
+    }
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      'lsof',
+      ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn'],
+      {
+        maxBuffer: 10_000_000,
+      },
+    );
+    const snapshot = parseLsofListeningSnapshot(stdout);
+    if (!pids) return snapshot;
+    return new Map([...snapshot].filter(([pid]) => pids.has(pid)));
+  } catch {
+    return new Map();
+  }
+}
+
+export function buildProcessTreeSnapshots(
+  rootPids: number[],
+  processes: ProcessSnapshotEntry[],
+  endpointsByPid: ReadonlyMap<number, ProcessListeningEndpoint[]>,
+): Map<number, ProcessTreeSnapshot> {
+  const childrenByParentPid = groupProcessesByParent(processes);
+  const snapshots = new Map<number, ProcessTreeSnapshot>();
+
+  for (const rootPid of rootPids) {
+    const processPids = collectProcessTreePids(rootPid, childrenByParentPid);
+    const endpoints = new Map<string, ProcessListeningEndpoint>();
+    for (const pid of processPids) {
+      for (const endpoint of endpointsByPid.get(pid) ?? []) {
+        endpoints.set(`${endpoint.host}:${endpoint.port}`, endpoint);
+      }
+    }
+    const command = (childrenByParentPid.get(rootPid) ?? [])
+      .filter((child) => !child.state.includes('Z'))
+      .sort((a, b) => b.pid - a.pid)[0]?.command;
+    snapshots.set(rootPid, {
+      command: command || null,
+      endpoints: [...endpoints.values()].sort(
+        (a, b) => a.port - b.port || a.host.localeCompare(b.host),
+      ),
+    });
+  }
+  return snapshots;
+}
+
+function groupProcessesByParent(
+  processes: ProcessSnapshotEntry[],
+): Map<number, ProcessSnapshotEntry[]> {
+  const childrenByParentPid = new Map<number, ProcessSnapshotEntry[]>();
+  for (const processEntry of processes) {
+    const children = childrenByParentPid.get(processEntry.parentPid) ?? [];
+    children.push(processEntry);
+    childrenByParentPid.set(processEntry.parentPid, children);
+  }
+  return childrenByParentPid;
+}
+
+function collectProcessTreePids(
+  rootPid: number,
+  childrenByParentPid: ReadonlyMap<number, ProcessSnapshotEntry[]>,
+): number[] {
+  const processPids = [rootPid];
+  const visited = new Set(processPids);
+  for (let index = 0; index < processPids.length; index++) {
+    for (const child of childrenByParentPid.get(processPids[index]!) ?? []) {
+      if (visited.has(child.pid)) continue;
+      visited.add(child.pid);
+      processPids.push(child.pid);
+    }
+  }
+  return processPids;
+}
+
+export async function getProcessTreeSnapshots(
+  rootPids: number[],
+): Promise<Map<number, ProcessTreeSnapshot>> {
+  const uniqueRootPids = [...new Set(rootPids)];
+  if (uniqueRootPids.length === 0) return new Map();
+
+  const processes = await readProcessSnapshot();
+  const childrenByParentPid = groupProcessesByParent(processes);
+  const relevantPids = new Set(uniqueRootPids);
+  for (const rootPid of uniqueRootPids) {
+    for (const pid of collectProcessTreePids(rootPid, childrenByParentPid))
+      relevantPids.add(pid);
+  }
+  const endpointsByPid = await readListeningSnapshot(relevantPids);
+  return buildProcessTreeSnapshots(uniqueRootPids, processes, endpointsByPid);
+}
+
+export async function getProcessListeningEndpoints(
+  pid: number,
+  includeChildren = true,
+): Promise<ProcessListeningEndpoint[]> {
+  if (includeChildren) {
+    return (await getProcessTreeSnapshots([pid])).get(pid)?.endpoints ?? [];
+  }
+  return (await readListeningSnapshot(new Set([pid]))).get(pid) ?? [];
+}
+
 export async function getProcessListeningPorts(
   pid: number,
   includeChildren = true,
 ): Promise<number[]> {
-  try {
-    // Get ports for the main process
-    const portInfos = await getPortsByPid(pid);
-    const mainPorts = portInfos
-      .filter((p) => p.listening || p.state === 'LISTEN')
-      .map((p) => p.localPort)
-      .filter((port): port is number => port !== null && !Number.isNaN(port));
-
-    const allPorts = new Set<number>(mainPorts);
-
-    if (includeChildren) {
-      // Get all child processes recursively
-      const childPids = await getAllDescendantProcesses(pid);
-
-      // Get ports for all child processes
-      for (const childPid of childPids) {
-        try {
-          const childPortInfos = await getPortsByPid(childPid);
-          const childPorts = childPortInfos
-            .filter((p) => p.listening || p.state === 'LISTEN')
-            .map((p) => p.localPort)
-            .filter(
-              (port): port is number => port !== null && !Number.isNaN(port),
-            );
-
-          for (const port of childPorts) {
-            allPorts.add(port);
-          }
-        } catch {
-          // Continue if we can't get ports for a specific child process
-        }
-      }
-    }
-
-    return Array.from(allPorts).sort((a, b) => a - b);
-  } catch (_error) {
-    return [];
-  }
-}
-
-/**
- * Debug helper: Get detailed information about process and its ports
- */
-export async function debugProcessPorts(pid: number): Promise<{
-  mainProcess: { pid: number; ports: PortInfo[] };
-  children: Array<{ pid: number; ports: PortInfo[] }>;
-  allListeningPorts: number[];
-}> {
-  const mainPorts = await getPortsByPid(pid);
-  const childPids = await getAllDescendantProcesses(pid);
-
-  const children = [];
-  for (const childPid of childPids) {
-    try {
-      const childPorts = await getPortsByPid(childPid);
-      children.push({ pid: childPid, ports: childPorts });
-    } catch {
-      children.push({ pid: childPid, ports: [] });
-    }
-  }
-
-  const allListeningPorts = await getProcessListeningPorts(pid);
-
-  return {
-    mainProcess: { pid, ports: mainPorts },
-    children,
-    allListeningPorts,
-  };
-}
-
-/**
- * Get detailed port information for a process
- * Cross-platform implementation with proper error handling
- */
-async function getPortsByPid(pid: number): Promise<PortInfo[]> {
-  const platform = process.platform;
-
-  if (platform === 'win32') {
-    // Windows: Try PowerShell first (more reliable, doesn't need elevation for most cases)
-    try {
-      const psCommand = `
-        Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq ${pid} } | Select-Object -Property LocalAddress,LocalPort,State;
-        Get-NetUDPEndpoint -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq ${pid} } | Select-Object -Property LocalAddress,LocalPort
-      `.trim();
-
-      const { stdout } = await execFileAsync(
-        'powershell',
-        ['-NoProfile', '-Command', psCommand],
-        { windowsHide: true, maxBuffer: 10_000_000 },
-      );
-
-      return parsePowerShellOutput(stdout);
-    } catch {
-      // Fallback to netstat for older systems
-      try {
-        const { stdout } = await execFileAsync('netstat', ['-ano']);
-        return parseNetstatWindows(stdout, pid);
-      } catch {
-        return [];
-      }
-    }
-  } else {
-    // Unix systems: use lsof
-    try {
-      // -n: no DNS resolution (faster)
-      // -P: show port numbers, not service names
-      // -i: network connections only
-      // -a: AND condition
-      // -p: specific process
-      const { stdout } = await execFileAsync('lsof', [
-        '-nP',
-        '-i',
-        '-a',
-        '-p',
-        String(pid),
-      ]);
-
-      return parseLsofOutput(stdout);
-    } catch {
-      // If lsof fails or doesn't exist, return empty
-      return [];
-    }
-  }
-}
-
-/**
- * Parse PowerShell Get-NetTCPConnection/Get-NetUDPEndpoint output
- */
-function parsePowerShellOutput(text: string): PortInfo[] {
-  const results: PortInfo[] = [];
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  let inTCP = true; // We start with TCP results
-
-  for (const line of lines) {
-    // Skip headers and separators
-    if (line.includes('LocalAddress') || line.includes('---')) continue;
-
-    // PowerShell output is whitespace-separated
-    const parts = line.split(/\s+/);
-    if (parts.length < 2) continue;
-
-    // Detect if we're in UDP section (UDP doesn't have State column)
-    if (parts.length === 2 || !parts[2]) {
-      inTCP = false;
-    }
-
-    const [address, portStr, state] = parts;
-    const port = Number.parseInt(portStr || '', 10);
-
-    if (Number.isNaN(port)) continue;
-
-    results.push({
-      protocol: inTCP ? 'TCP' : 'UDP',
-      localAddress: address || '0.0.0.0',
-      localPort: port,
-      state: state || (inTCP ? null : 'UNSPEC'),
-      listening: state === 'Listen' || state === 'LISTEN',
-    });
-  }
-
-  return dedupePortInfo(results);
-}
-
-/**
- * Parse netstat -ano output (Windows fallback)
- */
-function parseNetstatWindows(text: string, pid: number): PortInfo[] {
-  const results: PortInfo[] = [];
-  const lines = text.split(/\r?\n/);
-
-  for (const line of lines) {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 4) continue;
-
-    const [proto, localAddr, , stateOrPid, pidOrEmpty] = parts;
-
-    // Check if this line belongs to our PID
-    const linePid = Number.parseInt(pidOrEmpty || stateOrPid || '', 10);
-    if (linePid !== pid) continue;
-
-    // Parse protocol
-    if (!proto || (!proto.startsWith('TCP') && !proto.startsWith('UDP')))
-      continue;
-
-    // Parse local address and port
-    if (!localAddr) continue;
-    const lastColon = localAddr.lastIndexOf(':');
-    if (lastColon === -1) continue;
-
-    const address = localAddr.substring(0, lastColon);
-    const port = Number.parseInt(localAddr.substring(lastColon + 1), 10);
-
-    if (Number.isNaN(port)) continue;
-
-    // For TCP, stateOrPid is the state; for UDP, it's the PID
-    const state = proto.startsWith('TCP') ? stateOrPid || null : 'UNSPEC';
-
-    results.push({
-      protocol: proto.startsWith('TCP') ? 'TCP' : 'UDP',
-      localAddress: address,
-      localPort: port,
-      state,
-      listening: state === 'LISTENING' || state === 'LISTEN',
-    });
-  }
-
-  return dedupePortInfo(results);
-}
-
-/**
- * Parse lsof output (Unix/Linux/macOS)
- */
-function parseLsofOutput(text: string): PortInfo[] {
-  const results: PortInfo[] = [];
-  const lines = text.split('\n');
-
-  for (const line of lines) {
-    // Skip header line
-    if (line.startsWith('COMMAND')) continue;
-    if (!line.trim()) continue;
-
-    // Check if it's TCP or UDP
-    const isTCP = line.includes(' TCP ');
-    const isUDP = line.includes(' UDP ');
-
-    if (!isTCP && !isUDP) continue;
-
-    // Extract state for TCP connections (in parentheses)
-    const stateMatch = line.match(
-      /\((LISTEN|ESTABLISHED|CLOSE_WAIT|TIME_WAIT|CLOSED|FIN_WAIT.*|SYN_.*)\)/,
-    );
-
-    // Extract the network endpoint
-    // Format can be like: TCP 127.0.0.1:3000 (LISTEN)
-    //                 or: TCP *:3000 (LISTEN)
-    //                 or: TCP 127.0.0.1:3000->127.0.0.1:54321 (ESTABLISHED)
-    const protocol = isTCP ? 'TCP' : 'UDP';
-
-    // Look for the local address:port pattern
-    const addressPattern =
-      protocol === 'TCP'
-        ? /TCP\s+([^:\s]+|\*):(\d+)/
-        : /UDP\s+([^:\s]+|\*):(\d+)/;
-
-    const addressMatch = line.match(addressPattern);
-
-    if (!addressMatch) continue;
-
-    const [, host, portStr] = addressMatch;
-    const port = Number.parseInt(portStr || '', 10);
-
-    if (Number.isNaN(port)) continue;
-
-    // Convert * to 0.0.0.0
-    const address = host === '*' ? '0.0.0.0' : host;
-    const state = stateMatch?.[1] || (protocol === 'UDP' ? 'UNSPEC' : null);
-
-    results.push({
-      protocol,
-      localAddress: address || '0.0.0.0',
-      localPort: port,
-      state,
-      listening: state === 'LISTEN',
-    });
-  }
-
-  return dedupePortInfo(results);
-}
-
-/**
- * Remove duplicate port entries
- */
-function dedupePortInfo(ports: PortInfo[]): PortInfo[] {
-  const seen = new Set<string>();
-  return ports.filter((p) => {
-    const key = `${p.protocol}|${p.localAddress}|${p.localPort}|${p.state}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const endpoints = await getProcessListeningEndpoints(pid, includeChildren);
+  return [...new Set(endpoints.map((endpoint) => endpoint.port))];
 }
 
 /**
@@ -539,69 +371,14 @@ function dedupePortInfo(ports: PortInfo[]): PortInfo[] {
  * Returns a sorted array of unique port numbers.
  */
 export async function getAllListeningPorts(): Promise<number[]> {
-  try {
-    const platform = process.platform;
-
-    if (platform === 'win32') {
-      // Windows: Try PowerShell first
-      try {
-        const psCommand =
-          'Get-NetTCPConnection -State Listen | Select-Object -Property LocalAddress,LocalPort,State';
-        const { stdout } = await execFileAsync(
-          'powershell',
-          ['-NoProfile', '-Command', psCommand],
-          { windowsHide: true, maxBuffer: 10_000_000 },
-        );
-        const portInfos = parsePowerShellOutput(stdout);
-        const ports = portInfos
-          .filter((p) => p.listening || p.state === 'Listen')
-          .map((p) => p.localPort);
-        return [...new Set(ports)].sort((a, b) => a - b);
-      } catch {
-        // Fallback to netstat
-        try {
-          const { stdout } = await execFileAsync('netstat', ['-ano']);
-          const ports: number[] = [];
-          const lines = stdout.split(/\r?\n/);
-          for (const line of lines) {
-            if (!line.includes('LISTENING')) continue;
-            const parts = line.trim().split(/\s+/);
-            if (parts.length < 4) continue;
-            const localAddr = parts[1];
-            if (!localAddr) continue;
-            const lastColon = localAddr.lastIndexOf(':');
-            if (lastColon === -1) continue;
-            const port = Number.parseInt(
-              localAddr.substring(lastColon + 1),
-              10,
-            );
-            if (!Number.isNaN(port)) ports.push(port);
-          }
-          return [...new Set(ports)].sort((a, b) => a - b);
-        } catch {
-          return [];
-        }
-      }
-    } else {
-      // macOS/Linux: lsof without -a -p flags to get all listening ports
-      try {
-        const { stdout } = await execFileAsync(
-          'lsof',
-          ['-nP', '-iTCP', '-sTCP:LISTEN'],
-          { maxBuffer: 10_000_000 },
-        );
-        const portInfos = parseLsofOutput(stdout);
-        const ports = portInfos
-          .filter((p) => p.listening || p.state === 'LISTEN')
-          .map((p) => p.localPort);
-        return [...new Set(ports)].sort((a, b) => a - b);
-      } catch {
-        return [];
-      }
-    }
-  } catch {
-    return [];
-  }
+  const snapshot = await readListeningSnapshot();
+  return [
+    ...new Set(
+      [...snapshot.values()].flatMap((endpoints) =>
+        endpoints.map((e) => e.port),
+      ),
+    ),
+  ].sort((a, b) => a - b);
 }
 
 /**

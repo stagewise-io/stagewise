@@ -54,6 +54,7 @@ type TerminalProcessInfo = {
   pid: number;
   parentPid: number;
   command: string;
+  commandName: string;
   state: string;
 };
 
@@ -189,10 +190,14 @@ function readProcessList(): TerminalProcessInfo[] {
   }
 
   try {
-    const output = execFileSync('ps', ['-axo', 'pid=,ppid=,stat=,comm='], {
-      encoding: 'utf8',
-      timeout: 500,
-    });
+    const output = execFileSync(
+      'ps',
+      ['-ww', '-axo', 'pid=,ppid=,stat=,command='],
+      {
+        encoding: 'utf8',
+        timeout: 500,
+      },
+    );
 
     return output
       .split('\n')
@@ -203,7 +208,8 @@ function readProcessList(): TerminalProcessInfo[] {
           pid: Number.parseInt(match[1]!, 10),
           parentPid: Number.parseInt(match[2]!, 10),
           state: match[3]!,
-          command: commandName(match[4]!),
+          command: match[4]!,
+          commandName: commandName(match[4]!),
         };
       })
       .filter((entry): entry is TerminalProcessInfo => Boolean(entry));
@@ -361,6 +367,36 @@ export class TerminalService extends DisposableService {
     }
   }
 
+  /** Returns the root PTY pid used to associate local servers with tabs. */
+  public getSessionProcessId(terminalId: string): number | undefined {
+    return this.sessions.get(terminalId)?.pty.pid;
+  }
+
+  public getShellType(): string {
+    return this.shell.type;
+  }
+
+  /** Writes raw input to a user terminal PTY. */
+  public writeTerminalInput(terminalId: string, data: string): boolean {
+    const session = this.sessions.get(terminalId);
+    if (!session) {
+      this.logger.warn(
+        `[TerminalService] terminalInput: unknown terminal ${terminalId}`,
+      );
+      return false;
+    }
+    try {
+      session.pty.write(data);
+      return true;
+    } catch (err) {
+      this.logger.warn(
+        `[TerminalService] Error writing to PTY ${terminalId}`,
+        err,
+      );
+      return false;
+    }
+  }
+
   constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -482,7 +518,7 @@ export class TerminalService extends DisposableService {
     this.uiKarton.registerServerProcedureHandler(
       'browser.terminalInput',
       async (_callingClientId: string, terminalId: string, data: string) => {
-        this.handleTerminalInput(terminalId, data);
+        this.writeTerminalInput(terminalId, data);
       },
     );
 
@@ -697,7 +733,7 @@ export class TerminalService extends DisposableService {
       const tab = draft.contentTabs.tabs[terminalId];
       if (!tab || tab.type !== 'terminal') return;
       if (cwd) tab.cwd = cwd;
-      tab.terminalRunningProcess = runningProcess?.command ?? null;
+      tab.terminalRunningProcess = runningProcess?.commandName ?? null;
     });
   }
 
@@ -982,24 +1018,6 @@ export class TerminalService extends DisposableService {
     // We must NOT set activeTabId ourselves — that would bypass the
     // Electron view management in handleSwitchTab.
     this.onTerminalTabRemoved?.(terminalId);
-  }
-
-  private handleTerminalInput(terminalId: string, data: string): void {
-    const session = this.sessions.get(terminalId);
-    if (!session) {
-      this.logger.warn(
-        `[TerminalService] terminalInput: unknown terminal ${terminalId}`,
-      );
-      return;
-    }
-    try {
-      session.pty.write(data);
-    } catch (err) {
-      this.logger.warn(
-        `[TerminalService] Error writing to PTY ${terminalId}`,
-        err,
-      );
-    }
   }
 
   private handleTerminalResize(

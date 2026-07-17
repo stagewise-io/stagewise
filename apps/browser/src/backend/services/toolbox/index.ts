@@ -46,6 +46,11 @@ import type { CredentialTypeId } from '@shared/credential-types';
 import { createAuthenticatedClient } from './utils/create-authenticated-client';
 import { createFileDiffHandler } from './utils/sandbox-callbacks';
 import type { AttachmentsService } from '@stagewise/agent-core/attachments';
+import { getProcessTreeSnapshots } from '@/utils/port-utils';
+import type {
+  RunningServer,
+  RunningServerOwner,
+} from '@shared/karton-contracts/ui';
 import { getBrowserHostPaths } from '@/services/agent-core-bridge/host-paths';
 import {
   getDataRoot,
@@ -132,6 +137,7 @@ export class ToolboxService
   private readonly agentStore: AgentStore;
   private readonly hostAgentStateMutations: HostAgentStateMutations;
   private readonly attachments: AttachmentsService;
+  private runningServerScan: Promise<RunningServer[]> | null = null;
 
   private sandboxService: SandboxService | null = null;
   private shellService: ShellService | null = null;
@@ -856,6 +862,104 @@ export class ToolboxService
     this.shellService?.killSession(sessionId);
   }
 
+  private getRunningServers(): Promise<RunningServer[]> {
+    if (!this.runningServerScan) {
+      this.runningServerScan = this.scanRunningServers().finally(() => {
+        this.runningServerScan = null;
+      });
+    }
+    return this.runningServerScan;
+  }
+
+  private async scanRunningServers(): Promise<RunningServer[]> {
+    const candidates: Array<{
+      pid: number;
+      command: string | null;
+      fallbackCommand: string;
+      cwd: string;
+      shellType: string;
+      owner: RunningServerOwner;
+    }> = [];
+
+    for (const tab of Object.values(this.uiKarton.state.contentTabs.tabs)) {
+      if (tab.type !== 'terminal') continue;
+      const pid = this.terminalService?.getSessionProcessId(tab.id);
+      if (pid === undefined) continue;
+      candidates.push({
+        pid,
+        command: null,
+        fallbackCommand: tab.title,
+        cwd: tab.cwd,
+        shellType: this.terminalService?.getShellType() ?? '',
+        owner: {
+          type: 'terminal',
+          terminalId: tab.id,
+          agentInstanceId: tab.agentInstanceId,
+        },
+      });
+    }
+
+    for (const [agentInstanceId, toolbox] of Object.entries(
+      this.uiKarton.state.toolbox,
+    )) {
+      for (const session of toolbox.shells?.sessions ?? []) {
+        if (session.exited) continue;
+        const pid = this.shellService?.getSessionProcessId(session.id);
+        if (pid === undefined) continue;
+        candidates.push({
+          pid,
+          command: this.shellService?.getSessionCommand(session.id) ?? null,
+          fallbackCommand: 'Shell',
+          cwd:
+            this.shellService?.getSessionCurrentCwd(session.id) ?? session.cwd,
+          shellType: this.shellService?.getShellInfo()?.type ?? '',
+          owner: {
+            type: 'agent',
+            agentInstanceId,
+            sessionId: session.id,
+          },
+        });
+      }
+    }
+
+    const processTrees = await getProcessTreeSnapshots(
+      candidates.map((candidate) => candidate.pid),
+    );
+    const servers = candidates.flatMap((candidate): RunningServer[] => {
+      const processTree = processTrees.get(candidate.pid);
+      if (!processTree || processTree.endpoints.length === 0) return [];
+      return [
+        {
+          command:
+            candidate.command ??
+            processTree.command ??
+            candidate.fallbackCommand,
+          cwd: candidate.cwd,
+          shellType: candidate.shellType,
+          endpoints: processTree.endpoints,
+          owner: candidate.owner,
+        },
+      ];
+    });
+
+    return servers.sort(
+      (a, b) => (a.endpoints[0]?.port ?? 0) - (b.endpoints[0]?.port ?? 0),
+    );
+  }
+
+  private stopRunningServer(owner: RunningServerOwner): boolean {
+    if (owner.type === 'terminal') {
+      return (
+        this.terminalService?.writeTerminalInput(owner.terminalId, '\x03') ??
+        false
+      );
+    }
+
+    return (
+      this.shellService?.writeSessionInput(owner.sessionId, '\x03') ?? false
+    );
+  }
+
   public getBrowserSnapshot(agentInstanceId: string): BrowserSnapshot {
     const contentTabs = this.uiKarton.state.contentTabs;
 
@@ -1532,6 +1636,16 @@ export class ToolboxService
       );
     }
 
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.getRunningServers',
+      async () => this.getRunningServers(),
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'browser.stopRunningServer',
+      async (_callingClientId: string, owner: RunningServerOwner) =>
+        this.stopRunningServer(owner),
+    );
+
     // Use arrow function to preserve `this` binding when called as callback
     this.authService.registerAuthStateChangeCallback(() =>
       this.refreshApiClient(),
@@ -1839,6 +1953,9 @@ export class ToolboxService
   }
 
   protected async onTeardown(): Promise<void> {
+    this.uiKarton.removeServerProcedureHandler('browser.getRunningServers');
+    this.uiKarton.removeServerProcedureHandler('browser.stopRunningServer');
+
     this.unsubPreferenceSync?.();
     this.unsubPreferenceSync = null;
 
