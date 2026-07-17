@@ -239,6 +239,7 @@ describe('discovered model catalog matching', () => {
       modelId: 'gpt-4',
       displayName: 'Configured custom model',
     });
+    expect(getInstanceModelCount(instance, prefs)).toBe(entries.length);
   });
 
   it('counts non-catalog discovered models for coding plans', () => {
