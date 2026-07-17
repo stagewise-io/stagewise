@@ -407,6 +407,54 @@ describe('discovered model routing', () => {
     ).toMatchObject({ isCustomModel: true });
   });
 
+  it('does not resolve a custom model through a different explicit instance', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'requested-instance',
+        typeId: 'custom-openai-chat',
+        name: 'Requested instance',
+        config: { baseUrl: 'https://requested.example/v1' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'owning-instance',
+        typeId: 'custom-openai-chat',
+        name: 'Owning instance',
+        config: { baseUrl: 'https://owning.example/v1' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+    preferences.customModels = [
+      {
+        modelId: 'instance-scoped-model',
+        displayName: 'Instance-scoped model',
+        providerInstanceId: 'owning-instance',
+        endpointId: 'owning-instance',
+        providerOptions: {},
+        headers: {},
+        contextWindowSize: 64_000,
+      },
+    ];
+
+    expect(
+      service.modelExists('instance-scoped-model', 'requested-instance'),
+    ).toBe(false);
+    expect(() =>
+      service.getModelWithOptions(
+        'instance-scoped-model',
+        'trace-1',
+        undefined,
+        'requested-instance',
+      ),
+    ).toThrow('Model instance-scoped-model not found');
+  });
+
   it('keeps catalog precedence for discovered duplicates on vendor instances', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();

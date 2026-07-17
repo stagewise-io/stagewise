@@ -568,7 +568,9 @@ export class ModelProviderService {
       );
     }
 
-    const custom = preferences.customModels.find((m) => m.modelId === modelId);
+    const custom = providerInstanceId
+      ? undefined
+      : preferences.customModels.find((m) => m.modelId === modelId);
     if (custom) {
       return this.createCustomModelWithOptions(
         custom,
