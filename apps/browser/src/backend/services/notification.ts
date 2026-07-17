@@ -13,6 +13,7 @@ export interface Notification {
   title: string;
   message: string;
   type: 'info' | 'warning' | 'error';
+  icon?: 'spinner';
   duration?: number; // Duration in milliseconds. Will never auto-dismiss if not set.
   actions: {
     label: string;
@@ -83,6 +84,7 @@ export class NotificationService extends DisposableService {
         title: notification.title,
         message: notification.message,
         type: notification.type,
+        icon: notification.icon,
         duration: notification.duration,
         actions: actionsForState,
       });

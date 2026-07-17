@@ -1162,6 +1162,7 @@ export type AppState = {
     title: string | null;
     message: string | null;
     type: 'info' | 'warning' | 'error';
+    icon?: 'spinner';
     duration?: number; // Duration in milliseconds. Will never auto-dismiss if not set.
     actions: {
       label: string;
