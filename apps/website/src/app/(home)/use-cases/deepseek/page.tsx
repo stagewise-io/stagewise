@@ -305,12 +305,19 @@ export default function DeepSeekUseCasePage() {
                   assets, or understanding the layout of a design directory. If
                   your workflow requires actual visual reasoning,{' '}
                   <Link
+                    href="/use-cases/kimi"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Kimi K3
+                  </Link>{' '}
+                  or{' '}
+                  <Link
                     href="/use-cases/minimax"
                     className="text-primary underline-offset-4 hover:underline"
                   >
                     MiniMax M3
                   </Link>{' '}
-                  offers native vision capabilities.
+                  offer native vision capabilities.
                 </p>
               </div>
             </ScrollReveal>

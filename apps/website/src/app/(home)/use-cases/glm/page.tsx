@@ -367,12 +367,19 @@ export default function GLMUseCasePage() {
                   operate with images in the software engineering context. If
                   your workflow requires actual visual reasoning,{' '}
                   <Link
+                    href="/use-cases/kimi"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Kimi K3
+                  </Link>{' '}
+                  or{' '}
+                  <Link
                     href="/use-cases/minimax"
                     className="text-primary underline-offset-4 hover:underline"
                   >
                     MiniMax M3
                   </Link>{' '}
-                  offers native vision capabilities.
+                  offer native vision capabilities.
                 </p>
               </div>
             </ScrollReveal>
