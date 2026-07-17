@@ -1113,6 +1113,31 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       return result;
     },
   );
+  uiKarton.registerServerProcedureHandler(
+    'browser.getFaviconBitmapsForPageUrls',
+    async (
+      _cid: string,
+      pageUrls: string[],
+    ): Promise<Record<string, FaviconBitmapResult>> => {
+      const originsByPageUrl = new Map(
+        pageUrls.map((pageUrl) => [pageUrl, new URL(pageUrl).origin]),
+      );
+      const faviconUrlsByOrigin = await faviconService.getFaviconsForOrigins(
+        Array.from(new Set(originsByPageUrl.values())),
+      );
+      const bitmapsByFavicon = await faviconService.getFaviconBitmaps(
+        Array.from(new Set(faviconUrlsByOrigin.values())),
+      );
+      const result: Record<string, FaviconBitmapResult> = {};
+      for (const [pageUrl, origin] of originsByPageUrl) {
+        const faviconUrl = faviconUrlsByOrigin.get(origin);
+        if (!faviconUrl) continue;
+        const bitmap = bitmapsByFavicon.get(faviconUrl);
+        if (bitmap) result[pageUrl] = bitmap;
+      }
+      return result;
+    },
+  );
 
   // toolbox.getContextFiles / toolbox.generateWorkspaceMdForPath
   uiKarton.registerServerProcedureHandler(

@@ -1,5 +1,5 @@
 import type { Logger } from '../logger';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, or, sql } from 'drizzle-orm';
 import * as schema from './schema';
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient } from '@libsql/client';
@@ -212,6 +212,48 @@ export class FaviconService {
     const map = new Map<string, string>();
     for (const row of results) {
       map.set(row.pageUrl, row.faviconUrl);
+    }
+    return map;
+  }
+
+  /** Get a cached favicon bitmap URL for each page origin. */
+  async getFaviconsForOrigins(origins: string[]): Promise<Map<string, string>> {
+    if (origins.length === 0) return new Map();
+
+    const originSet = new Set(origins);
+    const results = await this.db
+      .select({
+        pageUrl: schema.iconMapping.pageUrl,
+        faviconUrl: schema.favicons.url,
+      })
+      .from(schema.iconMapping)
+      .innerJoin(
+        schema.favicons,
+        eq(schema.iconMapping.iconId, schema.favicons.id),
+      )
+      .innerJoin(
+        schema.faviconBitmaps,
+        eq(schema.favicons.id, schema.faviconBitmaps.iconId),
+      )
+      .where(
+        or(
+          ...origins.map((origin) =>
+            like(schema.iconMapping.pageUrl, `${origin}%`),
+          ),
+        ),
+      )
+      .orderBy(desc(schema.iconMapping.id));
+
+    const map = new Map<string, string>();
+    for (const row of results) {
+      try {
+        const origin = new URL(row.pageUrl).origin;
+        if (originSet.has(origin) && !map.has(origin)) {
+          map.set(origin, row.faviconUrl);
+        }
+      } catch {
+        // Ignore malformed cached page URLs.
+      }
     }
     return map;
   }

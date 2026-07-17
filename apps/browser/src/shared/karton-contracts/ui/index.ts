@@ -923,6 +923,29 @@ export type OmniboxSuggestions = {
   }[];
 };
 
+export type RunningServerOwner =
+  | {
+      type: 'agent';
+      agentInstanceId: string;
+      sessionId: string;
+    }
+  | {
+      type: 'terminal';
+      terminalId: string;
+      agentInstanceId: string | null;
+    };
+
+export type RunningServer = {
+  command: string;
+  cwd: string;
+  shellType: string;
+  endpoints: Array<{
+    host: string;
+    port: number;
+  }>;
+  owner: RunningServerOwner;
+};
+
 export type PlanEntry = {
   name: string;
   description: string | null;
@@ -1870,6 +1893,10 @@ export type KartonContract = {
         cols: number;
         rows: number;
       }>;
+      /** Discover local servers owned by Stagewise terminal sessions. */
+      getRunningServers: () => Promise<RunningServer[]>;
+      /** Send Ctrl+C to the terminal session owning a local server. */
+      stopRunningServer: (owner: RunningServerOwner) => Promise<boolean>;
       /** Add a custom search engine */
       addSearchEngine: (
         input: AddSearchEngineInput,
@@ -1885,6 +1912,10 @@ export type KartonContract = {
       /** Get base64-encoded favicon bitmaps for a list of favicon URLs */
       getFaviconBitmaps: (
         faviconUrls: string[],
+      ) => Promise<Record<string, FaviconBitmapResult>>;
+      /** Get cached favicon bitmaps keyed by page URL and matched by origin. */
+      getFaviconBitmapsForPageUrls: (
+        pageUrls: string[],
       ) => Promise<Record<string, FaviconBitmapResult>>;
     };
     credentials: {

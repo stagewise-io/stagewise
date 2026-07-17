@@ -311,6 +311,15 @@ export class ShellService extends DisposableService {
     return this.sessionManager?.getSessionCwd(sessionId);
   }
 
+  /** Returns the root PTY pid used to associate local servers with sessions. */
+  public getSessionProcessId(sessionId: string): number | undefined {
+    return this.sessionManager?.getSession(sessionId)?.pty.pid;
+  }
+
+  public getSessionCommand(sessionId: string): string | undefined {
+    return this.sessionManager?.getSession(sessionId)?.lastCommand ?? undefined;
+  }
+
   clearPendingOutputs(agentId: string, toolCallId: string): void {
     this.outputBuffers.delete(toolCallId);
 
@@ -327,6 +336,10 @@ export class ShellService extends DisposableService {
 
     if (!this.sink) return;
     this.sink.clearPending(agentId, toolCallId);
+  }
+
+  writeSessionInput(sessionId: string, data: string): boolean {
+    return this.sessionManager?.writeSessionInput(sessionId, data) ?? false;
   }
 
   killSession(sessionId: string): boolean {

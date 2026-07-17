@@ -466,6 +466,7 @@ export class SessionManager {
       shellIntegrationActive: false,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
+      lastCommand: null,
       exited: false,
       exitCode: null,
       deactivated: false,
@@ -734,6 +735,10 @@ export class SessionManager {
 
     const command = request.command;
 
+    if (!request.rawInput && command.length > 0) {
+      session.lastCommand = command;
+    }
+
     if (request.rawInput) {
       // Raw stdin: write bytes verbatim — no \r, no sentinel
       session.pty.write(command);
@@ -790,6 +795,19 @@ export class SessionManager {
   }
 
   // ─── Session management ──────────────────────────────────────
+
+  writeSessionInput(sessionId: string, data: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.exited) return false;
+
+    try {
+      session.pty.write(data);
+      session.lastActivityAt = Date.now();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   killSession(sessionId: string): boolean {
     const session = this.sessions.get(sessionId);

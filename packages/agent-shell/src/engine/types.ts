@@ -131,6 +131,7 @@ export interface PtySession {
   shellIntegrationActive: boolean;
   createdAt: number;
   lastActivityAt: number;
+  lastCommand: string | null;
   exited: boolean;
   exitCode: number | null;
   /** True once the PTY has been killed, logger closed, and timers cleared. Session stays in the map for UI visibility. */

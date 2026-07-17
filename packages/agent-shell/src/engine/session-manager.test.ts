@@ -737,6 +737,26 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
 
   // ─── Session lifecycle ───────────────────────────────────────
 
+  it('writes Ctrl+C without terminating the session', async () => {
+    sm = createSM();
+    const sid = sm.createSession('agent-test', cwd, env);
+    await waitForReady(sm, sid);
+
+    const resultPromise = sm.executeCommand(sid, {
+      command: 'sleep 60',
+      waitUntil: { timeoutMs: 30000 },
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    expect(sm.getSession(sid)?.lastCommand).toBe('sleep 60');
+    expect(sm.writeSessionInput(sid, '\x03')).toBe(true);
+
+    const result = await resultPromise;
+    expect(result.sessionExited).toBe(false);
+    expect(sm.getSession(sid)?.exited).toBe(false);
+    expect(sm.getSession(sid)?.lastCommand).toBe('sleep 60');
+  });
+
   it('killSession terminates a running command', async () => {
     sm = createSM();
     const sid = sm.createSession('agent-test', cwd, env);
