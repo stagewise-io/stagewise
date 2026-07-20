@@ -54,7 +54,6 @@ type TerminalProcessInfo = {
   pid: number;
   parentPid: number;
   command: string;
-  commandName: string;
   state: string;
 };
 
@@ -190,14 +189,10 @@ function readProcessList(): TerminalProcessInfo[] {
   }
 
   try {
-    const output = execFileSync(
-      'ps',
-      ['-ww', '-axo', 'pid=,ppid=,stat=,command='],
-      {
-        encoding: 'utf8',
-        timeout: 500,
-      },
-    );
+    const output = execFileSync('ps', ['-axo', 'pid=,ppid=,stat=,comm='], {
+      encoding: 'utf8',
+      timeout: 500,
+    });
 
     return output
       .split('\n')
@@ -208,8 +203,7 @@ function readProcessList(): TerminalProcessInfo[] {
           pid: Number.parseInt(match[1]!, 10),
           parentPid: Number.parseInt(match[2]!, 10),
           state: match[3]!,
-          command: match[4]!,
-          commandName: commandName(match[4]!),
+          command: commandName(match[4]!),
         };
       })
       .filter((entry): entry is TerminalProcessInfo => Boolean(entry));
@@ -733,7 +727,7 @@ export class TerminalService extends DisposableService {
       const tab = draft.contentTabs.tabs[terminalId];
       if (!tab || tab.type !== 'terminal') return;
       if (cwd) tab.cwd = cwd;
-      tab.terminalRunningProcess = runningProcess?.commandName ?? null;
+      tab.terminalRunningProcess = runningProcess?.command ?? null;
     });
   }
 
