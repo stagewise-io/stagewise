@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.1 (2026-07-20)
+
+### Bug Fixes
+
+* improve scroll fades and plan preview (40e7f1a)
+
 ## 1.22.0 (2026-07-17)
 
 ### Features
