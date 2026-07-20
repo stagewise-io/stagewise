@@ -16,7 +16,7 @@ import type {
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
-import type { FileDiff } from './shared-types';
+import type { ExternalIde, FileDiff } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
 import type {
@@ -1227,6 +1227,8 @@ export type AppState = {
   // Current system theme (light or dark) based on OS preference
   systemTheme: 'light' | 'dark';
 
+  installedIdes: ExternalIde[];
+
   /** Deduplicated workspace mounts from all agent instances */
   workspaceMounts: MountEntry[];
   /** Workspace paths where a WORKSPACE.md agent is currently running */
@@ -2322,6 +2324,7 @@ export const defaultState: KartonContract['state'] = {
   preferences: defaultUserPreferences,
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
+  installedIdes: [],
   workspaceMounts: [],
   workspaceMdGenerating: {},
   plugins: [],
