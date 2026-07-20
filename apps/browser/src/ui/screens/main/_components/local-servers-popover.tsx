@@ -35,7 +35,6 @@ import {
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { Globe2 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -147,10 +146,6 @@ export function LocalServersPopover({
     Record<string, FaviconBitmapResult>
   >({});
   const suppressedServerIdsRef = useRef(new Set<string>());
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { maskStyle } = useScrollFadeMask(scrollContainerRef, {
-    axis: 'vertical',
-  });
 
   const getRunningServers = useKartonProcedure(
     (procedures) => procedures.browser.getRunningServers,
@@ -369,11 +364,7 @@ export function LocalServersPopover({
           </div>
           <PopoverClose />
 
-          <div
-            ref={scrollContainerRef}
-            className="mask-alpha flex max-h-80 min-h-0 flex-col gap-3 overflow-y-auto"
-            style={maskStyle}
-          >
+          <div className="scroll-fade-y scroll-fade-4 flex max-h-80 min-h-0 flex-col gap-3 overflow-y-auto">
             {groups.map((group) => {
               const ChatIcon = group.agentId ? IconMsgWritingOutline18 : Globe2;
               return (
