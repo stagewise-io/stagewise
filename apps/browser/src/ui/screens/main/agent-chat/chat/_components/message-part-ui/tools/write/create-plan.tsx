@@ -13,10 +13,9 @@ import { stripMountPrefix } from '@ui/utils';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure } from '@ui/hooks/use-karton';
 import { useKartonState } from '@ui/hooks/use-karton';
-import { memo, useMemo, useCallback, useState } from 'react';
+import { memo, useMemo, useCallback } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { cn } from '@ui/utils';
 import { IconClipboardOutline18 } from '@stagewise/icons';
 import { usePlanPhase } from '@ui/hooks/use-plan-phase';
@@ -128,17 +127,6 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
   const planName = livePlan?.name ?? parsed?.name;
   const planDescription = parsed?.description;
 
-  // Scroll fade mask for the task list
-  const [taskViewport, setTaskViewport] = useState<HTMLElement | null>(null);
-  const taskViewportRef = useMemo(
-    () => ({ current: taskViewport }),
-    [taskViewport],
-  ) as React.RefObject<HTMLElement>;
-  const { maskStyle } = useScrollFadeMask(taskViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
-
   // Navigation: open plan in a tab
   const createTab = useKartonProcedure((p) => p.browser.createTab);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
@@ -199,18 +187,16 @@ function CreatePlanSettledCard({ part }: { part: WritePart }) {
 
         {/* Description */}
         {planDescription && (
-          <p className="-mt-1.5 line-clamp-3 pb-2.5 text-muted-foreground text-xs leading-relaxed">
-            {planDescription}
-          </p>
+          <div className="scroll-fade-y scroll-fade-4 scrollbar-subtle mb-2.5 max-h-[3.5rem] overflow-y-auto pr-1">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              {planDescription}
+            </p>
+          </div>
         )}
 
         {/* Task preview — grouped, scrollable with fade */}
         {taskGroups.length > 0 && (
-          <div
-            ref={setTaskViewport}
-            className="mask-alpha scrollbar-subtle max-h-40 overflow-y-auto rounded-md"
-            style={maskStyle}
-          >
+          <div className="scroll-fade-y scroll-fade-4 scrollbar-subtle max-h-40 overflow-y-auto rounded-md">
             {taskGroups.map((group, gi) => (
               <div key={`${gi}-${group.label}`}>
                 {group.label && (

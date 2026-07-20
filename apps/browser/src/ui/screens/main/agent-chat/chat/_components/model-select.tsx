@@ -31,7 +31,6 @@ import {
   useState,
 } from 'react';
 import { cn } from '@ui/utils';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
@@ -348,12 +347,6 @@ export const ModelSelect = memo(function ModelSelect({
   }, [cancelPendingClear]);
 
   useEffect(() => () => cancelPendingClear(), [cancelPendingClear]);
-
-  const listScrollRef = useRef<HTMLDivElement>(null);
-  const { maskStyle: listMaskStyle } = useScrollFadeMask(listScrollRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
 
   const editingThinkingModel = useMemo<ThinkingPanelModel | undefined>(() => {
     if (!editingEntry) return undefined;
@@ -730,11 +723,7 @@ export const ModelSelect = memo(function ModelSelect({
               </div>
 
               <ComboboxList>
-                <div
-                  ref={listScrollRef}
-                  className="mask-alpha scrollbar-subtle max-h-48 overflow-y-auto"
-                  style={listMaskStyle}
-                >
+                <div className="scroll-fade-y scroll-fade-4 scrollbar-subtle max-h-48 overflow-y-auto">
                   {filteredGrouped.map((group) => (
                     <ComboboxGroup
                       key={group.instanceId}

@@ -21,7 +21,6 @@ import {
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useEventListener } from '@ui/hooks/use-event-listener';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 
 import { BrowserTabHotkeys } from './_components/browser-tab-hotkeys';
 import {
@@ -681,11 +680,6 @@ export function MainSection({
 
   const tabBarScrollRef = useRef<HTMLDivElement>(null);
 
-  const { maskStyle } = useScrollFadeMask(tabBarScrollRef, {
-    axis: 'horizontal',
-    fadeDistance: 8,
-  });
-
   // Redirect vertical mouse-wheel to horizontal scroll on the tab bar.
   // Must be a non-passive listener so we can call preventDefault().
   useEffect(() => {
@@ -739,8 +733,7 @@ export function MainSection({
               }
             }}
             ref={tabBarScrollRef}
-            style={maskStyle}
-            className="w-auto min-w-0 max-w-full shrink items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="scroll-fade-x scroll-fade-2 w-auto min-w-0 max-w-full shrink items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {/* Global (pinned) tabs — shrinks independently, inner scroll handles overflow */}
             {globalTabItems.length > 0 && (

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -7,7 +7,6 @@ import {
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@ui/utils';
 import { ChevronDownIcon } from 'lucide-react';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useAutoScroll } from '@ui/hooks/use-auto-scroll';
 
 type ToolPartUIProps = {
@@ -52,8 +51,7 @@ export const ToolPartUI = (props: ToolPartUIProps) => {
 
 /**
  * Inner component that only mounts when content is defined.
- * Keeps useAutoScroll / useScrollFadeMask hooks out of the
- * content-less (trigger-only) render path.
+ * Keeps useAutoScroll out of the content-less (trigger-only) render path.
  */
 const ToolPartUIWithContent = ({
   trigger,
@@ -84,30 +82,13 @@ const ToolPartUIWithContent = ({
     initializeAtBottom: false,
   });
 
-  // State for viewport reference (for fade effect detection)
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-
-  // Callback to receive viewport ref from OverlayScrollbar
-  // Connects both auto-scroll hook and fade mask effect to the viewport element
+  // Callback to receive viewport ref from OverlayScrollbar.
   const handleViewportRef = useCallback(
     (vp: HTMLElement | null) => {
-      setViewport(vp);
       scrollerRef(vp);
     },
     [scrollerRef],
   );
-
-  // Create a ref-like object for useScrollFadeMask hook
-  const viewportRef = useMemo(
-    () => ({ current: viewport }),
-    [viewport],
-  ) as React.RefObject<HTMLElement>;
-
-  // Use the hook for scroll fade mask (both axes)
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'both',
-    fadeDistance: 16,
-  });
 
   return (
     <div
@@ -161,13 +142,12 @@ const ToolPartUIWithContent = ({
         >
           <div
             className={cn(
-              'mask-alpha',
               showBorder ? 'max-h-64' : 'max-h-none',
               contentFooter && !contentFooterStatic && 'mb-6',
             )}
-            style={maskStyle}
           >
             <OverlayScrollbar
+              viewportClassName="scroll-fade-both scroll-fade-4"
               contentClassName={cn('py-0.5', contentClassName)}
               options={{
                 overflow: { x: 'scroll', y: 'scroll' },

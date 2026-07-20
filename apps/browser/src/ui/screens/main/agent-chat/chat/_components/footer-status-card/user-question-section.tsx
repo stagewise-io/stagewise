@@ -14,7 +14,6 @@ import {
   RadioLabel,
 } from '@stagewise/stage-ui/components/radio';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { ChevronDownIcon, XIcon } from 'lucide-react';
 import { cn } from '@ui/utils';
 import { Streamdown, InlineMarkdown } from '@ui/components/streamdown';
@@ -303,17 +302,6 @@ function UserQuestionForm({
       ?.focus();
   }, []);
 
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-  const viewportRef = useMemo(
-    () => ({ current: viewport }),
-    [viewport],
-  ) as React.RefObject<HTMLElement>;
-
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'vertical',
-    fadeDistances: { top: 12, bottom: 20 },
-  });
-
   const { setRef: submitRef, isWinner: submitIsWinner } = useCmdEnterTarget({
     id: 'user-question-submit',
     priority: CmdEnterPriority.USER_QUESTION,
@@ -330,11 +318,10 @@ function UserQuestionForm({
       onKeyDown={handleKeyDown}
     >
       <OverlayScrollbar
-        className="mask-alpha min-h-0 flex-1"
+        className="min-h-0 flex-1"
+        viewportClassName="scroll-fade-y scroll-fade-t-3 scroll-fade-b-5"
         contentClassName="flex flex-col gap-4 p-2 pt-1 pb-5"
-        style={maskStyle}
         options={{ overflow: { x: 'hidden', y: 'scroll' } }}
-        onViewportRef={setViewport}
       >
         {currentStepData.description && (
           <span className="shrink-0 text-muted-foreground text-xs [&_p]:m-0 [&_p]:inline">

@@ -11,6 +11,7 @@
 @import "./shadows.css";
 @import "./derived-utilities.css";
 @import "./animations.css";
+@import "./scroll-fade.css";
 @import "./code-block-syntax.css";
 @import "./code-block-syntax-example.css";
 @import "./code-block.css";

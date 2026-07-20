@@ -25,7 +25,6 @@ import {
 import { toast } from '@stagewise/stage-ui/components/toaster';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { SettingsScrollTabs } from '../_components/settings-scroll-tabs';
 import type {
   KartonContract,
@@ -597,13 +596,6 @@ function ManagedWorktreeList({
   onConfirmDelete: (worktree: WorktreeSetupManagedWorktree) => Promise<boolean>;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-  const viewportRef = useRef<HTMLElement | null>(null);
-  viewportRef.current = viewport;
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'vertical',
-    fadeDistance: 24,
-  });
 
   const filteredWorktrees = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -652,9 +644,8 @@ function ManagedWorktreeList({
         </div>
       ) : (
         <OverlayScrollbar
-          className="mask-alpha max-h-80"
-          style={maskStyle}
-          onViewportRef={setViewport}
+          className="max-h-80"
+          viewportClassName="scroll-fade-y scroll-fade-6"
           contentClassName="space-y-2"
         >
           {filteredWorktrees.map((worktree) => (

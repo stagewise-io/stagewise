@@ -1,8 +1,6 @@
-import { useRef, useState } from 'react';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@ui/utils';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 
 export interface SettingsScrollTabItem {
   id: string;
@@ -34,20 +32,11 @@ export function SettingsScrollTabs({
   onSelect,
   truncateSubLabelFromStart = false,
 }: SettingsScrollTabsProps) {
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-  const viewportRef = useRef<HTMLElement | null>(null);
-  viewportRef.current = viewport;
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'horizontal',
-    fadeDistance: 24,
-  });
-
   return (
     <OverlayScrollbar
-      className="scrollbar-subtle mask-alpha max-w-full"
-      style={maskStyle}
+      className="scrollbar-subtle max-w-full"
+      viewportClassName="scroll-fade-x scroll-fade-6"
       options={{ overflow: { x: 'scroll', y: 'hidden' } }}
-      onViewportRef={setViewport}
       contentClassName="flex gap-2"
     >
       <nav className="flex gap-2">

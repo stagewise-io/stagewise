@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import {
@@ -8,7 +8,6 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { FileIcon } from '@ui/components/file-icon';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { getBaseName } from '@shared/path-utils';
 import type { WorkspaceGitSetupRun } from '@shared/karton-contracts/ui';
 import { IconTriangleWarningOutline18 } from '@stagewise/icons';
@@ -78,18 +77,7 @@ export function SetupRunSidePanel({
 }: {
   setupRun: WorkspaceGitSetupRun;
 }) {
-  const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
-    null,
-  );
   const [now, setNow] = useState(() => Date.now());
-  const scrollViewportRef = useMemo(
-    () => ({ current: scrollViewport }),
-    [scrollViewport],
-  ) as React.RefObject<HTMLElement>;
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
 
   useEffect(() => {
     if (setupRun.status !== 'running') return;
@@ -129,10 +117,9 @@ export function SetupRunSidePanel({
         </div>
       </div>
       <OverlayScrollbar
-        className="mask-alpha max-h-80"
-        style={maskStyle}
+        className="max-h-80"
+        viewportClassName="scroll-fade-y scroll-fade-4"
         options={{ overflow: { x: 'hidden', y: 'scroll' } }}
-        onViewportRef={setScrollViewport}
       >
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1.5 px-2.5 py-2 text-2xs">
           <span className="pt-0.5 text-subtle-foreground leading-none">
@@ -207,14 +194,6 @@ function SetupOutputBlock({
   const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
     null,
   );
-  const scrollViewportRef = useMemo(
-    () => ({ current: scrollViewport }),
-    [scrollViewport],
-  ) as React.RefObject<HTMLElement>;
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
 
   useEffect(() => {
     if (!scrollViewport) return;
@@ -240,8 +219,8 @@ function SetupOutputBlock({
         {label}
       </span>
       <OverlayScrollbar
-        className="mask-alpha scrollbar-subtle max-h-40 min-w-0 overflow-y-auto"
-        style={maskStyle}
+        className="scrollbar-subtle max-h-40 min-w-0 overflow-y-auto"
+        viewportClassName="scroll-fade-y scroll-fade-4"
         options={{ overflow: { x: 'hidden', y: 'scroll' } }}
         onViewportRef={setScrollViewport}
       >

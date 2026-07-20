@@ -1,7 +1,6 @@
-import { forwardRef, useRef } from 'react';
+import { forwardRef } from 'react';
 import { cn } from '@ui/utils';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 
 const MAX_POPUP_HEIGHT = 208; // max-h-52
 
@@ -21,12 +20,6 @@ export const SuggestionPopupContainer = forwardRef<
   { clientRect, children, sidePanel, onMouseMove },
   ref,
 ) {
-  const mainViewportRef = useRef<HTMLElement | null>(null);
-  const { maskStyle: mainMaskStyle } = useScrollFadeMask(mainViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 12,
-  });
-
   const rect = clientRect?.();
   if (!rect) return null;
 
@@ -47,12 +40,9 @@ export const SuggestionPopupContainer = forwardRef<
     >
       <div className="w-64 rounded-lg border border-derived bg-background p-1 shadow-lg">
         <OverlayScrollbar
-          className="mask-alpha max-h-52"
-          style={mainMaskStyle}
+          className="max-h-52"
+          viewportClassName="scroll-fade-y scroll-fade-3"
           defer={false}
-          onViewportRef={(el) => {
-            mainViewportRef.current = el;
-          }}
         >
           {children}
         </OverlayScrollbar>
@@ -79,12 +69,6 @@ export const SuggestionSidePanel = forwardRef<
   { offset, children, className, disableScroll },
   ref,
 ) {
-  const viewportRef = useRef<HTMLElement | null>(null);
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'vertical',
-    fadeDistance: 12,
-  });
-
   return (
     <div
       ref={ref}
@@ -99,12 +83,9 @@ export const SuggestionSidePanel = forwardRef<
         children
       ) : (
         <OverlayScrollbar
-          className="mask-alpha max-h-52 p-2.5"
-          style={maskStyle}
+          className="max-h-52 p-2.5"
+          viewportClassName="scroll-fade-y scroll-fade-3"
           defer={false}
-          onViewportRef={(el) => {
-            viewportRef.current = el;
-          }}
         >
           <div className="flex flex-col gap-2">{children}</div>
         </OverlayScrollbar>

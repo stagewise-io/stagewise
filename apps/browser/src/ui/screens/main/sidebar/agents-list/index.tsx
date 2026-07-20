@@ -122,7 +122,6 @@ import {
 } from '../../_components/shared-agent-context-menu';
 import { DeleteConfirmPopover } from '../../_components/delete-confirm-popover';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useCommandCenter } from '../../command-center';
 import { IDE_SELECTION_ITEMS } from '@shared/ide-url';
 import { getBaseName } from '@shared/path-utils';
@@ -1904,16 +1903,6 @@ export function AgentsList() {
   // =========================================================================
 
   const scrollRef = useRef<OverlayScrollbarRef>(null);
-  const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
-    null,
-  );
-  const scrollViewportRef = useRef<HTMLElement | null>(null);
-  scrollViewportRef.current = scrollViewport;
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
-
   /**
    * Scroll a card into the safe (non-masked) area of the scroll container.
    * The same agent can be rendered in multiple groups; `querySelector` returns
@@ -2394,13 +2383,12 @@ export function AgentsList() {
       <OverlayScrollbar
         ref={scrollRef}
         className="-mr-1 min-h-5"
+        viewportClassName="scroll-fade-y scroll-fade-4"
         contentClassName="flex flex-col gap-px pl-0.5 pt-3 pb-3.5 pr-1.5"
         options={{
           overflow: { x: 'visible' },
           scrollbars: { theme: 'os-theme-stagewise-subtle' },
         }}
-        style={maskStyle}
-        onViewportRef={setScrollViewport}
       >
         <div className="flex shrink-0 items-center pt-0 pr-0 pb-1 pl-1.5">
           <div className="min-w-0 flex-1 truncate font-normal text-sidebar-foreground text-xs">

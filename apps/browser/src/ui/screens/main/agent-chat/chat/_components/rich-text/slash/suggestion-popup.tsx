@@ -16,7 +16,6 @@ import {
   IconImageSparkle3Outline18,
   IconSideProfileSparkleOutline18,
 } from '@stagewise/icons';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { SuggestionPopupContainer, SuggestionSidePanel } from '../shared';
 import type { SlashItem } from './types';
 
@@ -145,11 +144,6 @@ const ShowMoreSidePanel = forwardRef<
   const nestedPanelRef = useRef<HTMLDivElement>(null);
   const [nestedPanelOffset, setNestedPanelOffset] = useState(0);
 
-  const { maskStyle } = useScrollFadeMask(scrollRef, {
-    axis: 'vertical',
-    fadeDistance: 12,
-  });
-
   // Scroll highlighted panel item into view (keyboard only).
   useEffect(() => {
     if (!isPanelFocused || selectionSource !== 'keyboard') return;
@@ -191,8 +185,7 @@ const ShowMoreSidePanel = forwardRef<
       <div className="relative">
         <div
           ref={scrollRef}
-          className="mask-alpha scrollbar-subtle max-h-52 overflow-y-auto"
-          style={maskStyle}
+          className="scroll-fade-y scroll-fade-3 scrollbar-subtle max-h-52 overflow-y-auto"
         >
           <div className="flex flex-col gap-0.5">
             {hiddenItems.map((hi, idx) => (
