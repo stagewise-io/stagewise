@@ -269,6 +269,20 @@ async function waitForReady(
 }
 
 /**
+ * WinPTY defers writes and kills until its data pipe is ready. Tests that
+ * create and immediately tear down sessions can otherwise close the pipe
+ * while the deferred shell-integration write is still pending, surfacing as
+ * an asynchronous EAGAIN after the test environment has been torn down.
+ */
+async function waitForWindowsPtyReadyBeforeTeardown(
+  sm: SessionManager,
+  sessionIds: string[],
+): Promise<void> {
+  if (process.platform !== 'win32') return;
+  await Promise.all(sessionIds.map((id) => waitForReady(sm, id)));
+}
+
+/**
  * Wait until the session's PTY has exited and `session.exited` has been
  * flipped by `handleSessionExit`. On Windows ConPTY, the shell-integration
  * exit trap can emit OSC 133;D (firing the command's promise) before
@@ -754,6 +768,8 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
     const sid2 = sm.createSession('agent-destroy', cwd, env);
     const sidOther = sm.createSession('agent-other', cwd, env);
 
+    await waitForWindowsPtyReadyBeforeTeardown(sm, [sid1, sid2, sidOther]);
+
     sm.destroyAgent('agent-destroy');
 
     expect(sm.getSession(sid1)).toBeUndefined();
@@ -802,25 +818,31 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
 
   // ─── Concurrency limits ──────────────────────────────────────
 
-  it('enforces max concurrent sessions per agent', () => {
+  it('enforces max concurrent sessions per agent', async () => {
     sm = createSM();
+    const sessionIds: string[] = [];
     for (let i = 0; i < MAX_SESSIONS_PER_AGENT; i++) {
-      sm.createSession('agent-max', cwd, env);
+      sessionIds.push(sm.createSession('agent-max', cwd, env));
     }
 
     expect(() => sm.createSession('agent-max', cwd, env)).toThrow(
       /Maximum.*concurrent sessions/,
     );
+
+    await waitForWindowsPtyReadyBeforeTeardown(sm, sessionIds);
   });
 
-  it('max sessions is per-agent — other agents unaffected', () => {
+  it('max sessions is per-agent — other agents unaffected', async () => {
     sm = createSM();
+    const sessionIds: string[] = [];
     for (let i = 0; i < MAX_SESSIONS_PER_AGENT; i++) {
-      sm.createSession('agent-a', cwd, env);
+      sessionIds.push(sm.createSession('agent-a', cwd, env));
     }
 
     // Different agent can still create sessions
-    expect(() => sm.createSession('agent-b', cwd, env)).not.toThrow();
+    sessionIds.push(sm.createSession('agent-b', cwd, env));
+
+    await waitForWindowsPtyReadyBeforeTeardown(sm, sessionIds);
   });
 
   // ─── Edge cases ──────────────────────────────────────────────
@@ -841,15 +863,19 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
     expect(sm.killSession('nonexistent')).toBe(false);
   });
 
-  it('getSessionsForAgent returns only that agent sessions', () => {
+  it('getSessionsForAgent returns only that agent sessions', async () => {
     sm = createSM();
-    sm.createSession('agent-x', cwd, env);
-    sm.createSession('agent-x', cwd, env);
-    sm.createSession('agent-y', cwd, env);
+    const sessionIds = [
+      sm.createSession('agent-x', cwd, env),
+      sm.createSession('agent-x', cwd, env),
+      sm.createSession('agent-y', cwd, env),
+    ];
 
     expect(sm.getSessionsForAgent('agent-x')).toHaveLength(2);
     expect(sm.getSessionsForAgent('agent-y')).toHaveLength(1);
     expect(sm.getSessionsForAgent('agent-z')).toHaveLength(0);
+
+    await waitForWindowsPtyReadyBeforeTeardown(sm, sessionIds);
   });
 });
 
