@@ -119,9 +119,10 @@ function PortFavicon({ bitmap }: { bitmap: FaviconBitmapResult | undefined }) {
     );
   }
 
-  const mimeType = bitmap.faviconUrl.endsWith('.ico')
+  const faviconPath = bitmap.faviconUrl.replace(/[?#].*$/, '').toLowerCase();
+  const mimeType = faviconPath.endsWith('.ico')
     ? 'image/x-icon'
-    : bitmap.faviconUrl.endsWith('.svg')
+    : faviconPath.endsWith('.svg')
       ? 'image/svg+xml'
       : 'image/png';
 

@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-const SNAPSHOT_TIMEOUT_MS = 3_000;
+const SNAPSHOT_TIMEOUT_MS = 10_000;
 
 const HTTP_REQUEST_TIMEOUT_MS = 500;
 
