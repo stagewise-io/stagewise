@@ -1140,7 +1140,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     (direction: PromptHistoryDirection) => {
       if (!openAgent) return false;
 
-      const entries = [...historyRef.current, ...queuedMessages].filter(
+      const entries = historyRef.current.filter(
         (message) => message.role === 'user',
       );
 
@@ -1171,11 +1171,12 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       }
 
       setFileAttachments(attachments);
+      setLocalInputState(content);
       chatInputRef.current?.setContent(content);
       promptHistoryCursorRef.current = step.cursor;
       return true;
     },
-    [openAgent, queuedMessages, setFileAttachments],
+    [openAgent, setFileAttachments],
   );
   const flushQueue = useKartonProcedure((p) => p.agents.flushQueue);
   const handleFlushQueue = useCallback(() => {
