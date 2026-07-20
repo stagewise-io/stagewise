@@ -80,6 +80,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import {
+  getPromptHistoryStep,
+  type PromptHistoryDirection,
+} from './prompt-history';
 
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -89,6 +93,10 @@ const EMPTY_WORKSPACE_ACTION_CONFIGS: ReadonlyMap<
   WorkspaceActionConfig
 > = new Map();
 const CHAT_INPUT_FOCUS_REQUESTED_EVENT = 'chat-input-focus-requested';
+
+function createEmptyChatContent(): Content {
+  return { type: 'doc', content: [{ type: 'paragraph' }] };
+}
 
 function formatWorkspaceGitRef(git: MountEntry['git']): string | null {
   return git?.branch ?? git?.headSha?.slice(0, 7) ?? null;
@@ -240,12 +248,14 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     const initial = chatInputStateRef.current;
     return initial && initial.length > 0 ? JSON.parse(initial) : null;
   });
+  const promptHistoryCursorRef = useRef<number | null>(null);
 
   // Re-sync local input state when the active agent changes
   const prevOpenAgentRef = useRef(openAgent);
   useEffect(() => {
     if (openAgent === prevOpenAgentRef.current) return;
     prevOpenAgentRef.current = openAgent;
+    promptHistoryCursorRef.current = null;
     const serverState = chatInputStateRef.current;
     const parsed =
       serverState && serverState.length > 0 ? JSON.parse(serverState) : null;
@@ -262,9 +272,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       // The state variable is only updated for rare events (submit, error
       // restore, agent switch) where ChatInput needs an external reset.
       localInputStateRef.current = newInputState;
-      setCanSendMessage(
-        (chatInputRef.current?.getTextContent()?.trim().length ?? 0) > 0,
-      );
+      const inputIsEmpty =
+        (chatInputRef.current?.getTextContent()?.trim().length ?? 0) === 0;
+      setCanSendMessage(!inputIsEmpty);
+      promptHistoryCursorRef.current = null;
       if (openAgent) {
         void setChatInputState(openAgent, JSON.stringify(newInputState));
       }
@@ -970,10 +981,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
     // Clear input IMMEDIATELY (before network call)
     chatInputRef.current?.clear();
-    const emptyDoc: Content = {
-      type: 'doc',
-      content: [{ type: 'paragraph' }],
-    };
+    const emptyDoc = createEmptyChatContent();
     localInputStateRef.current = emptyDoc;
     setLocalInputState(emptyDoc);
     setCanSendMessage(false);
@@ -1126,6 +1134,48 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     openAgent
       ? (s.agents.instances[openAgent]?.state.queuedMessages ?? EMPTY_QUEUE)
       : EMPTY_QUEUE,
+  );
+
+  const handlePromptHistoryNavigationRequest = useCallback(
+    (direction: PromptHistoryDirection) => {
+      if (!openAgent) return false;
+
+      const entries = [...historyRef.current, ...queuedMessages].filter(
+        (message) => message.role === 'user',
+      );
+
+      const step = getPromptHistoryStep({
+        direction,
+        cursor: promptHistoryCursorRef.current,
+        entryCount: entries.length,
+        canStart:
+          (chatInputRef.current?.getTextContent().trim().length ?? 0) === 0,
+      });
+      if (!step.handled) return false;
+
+      let content: Content;
+      let attachments: AttachmentMetadata[];
+
+      if (step.cursor === null) {
+        content = createEmptyChatContent();
+        attachments = [];
+      } else {
+        const message = entries[step.cursor];
+        if (!message) return false;
+        const textPart = message.parts.find((part) => part.type === 'text');
+        const text = textPart?.type === 'text' ? textPart.text : '';
+        content = enrichTipTapContent(markdownToTipTapContent(text), {
+          attachments: message.metadata?.attachments,
+        });
+        attachments = message.metadata?.attachments ?? [];
+      }
+
+      setFileAttachments(attachments);
+      chatInputRef.current?.setContent(content);
+      promptHistoryCursorRef.current = step.cursor;
+      return true;
+    },
+    [openAgent, queuedMessages, setFileAttachments],
   );
   const flushQueue = useKartonProcedure((p) => p.agents.flushQueue);
   const handleFlushQueue = useCallback(() => {
@@ -1771,6 +1821,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             value={localInputState}
             onChange={updateChatInputState}
             onSubmit={handleSubmit}
+            onPromptHistoryNavigationRequest={
+              handlePromptHistoryNavigationRequest
+            }
             disabled={!enableInputField}
             placeholder={
               hasPendingQuestion ? 'Write a message instead' : undefined
