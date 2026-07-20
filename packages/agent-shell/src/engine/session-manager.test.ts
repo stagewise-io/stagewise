@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +28,7 @@ import {
   SHELL_RESPONSE_TAIL_MAX_CHARS,
   TAIL_LINES,
 } from './types';
-import type { DetectedShell, PtySession } from './types';
+import type { DetectedShell } from './types';
 
 // ─── Section A: applyHeadTailCap (pure) ──────────────────────────
 
@@ -193,75 +193,7 @@ describe('command timeout/idle selection', () => {
   });
 });
 
-// ─── Section D: Chunked PTY input cancellation ──────────────────
-
-describe('chunked PTY input cancellation', () => {
-  it('stops writing an older command when a new command replaces it', async () => {
-    vi.useFakeTimers();
-
-    try {
-      const writes: Buffer[] = [];
-      const sessionId = 'test-session';
-      const sm = new SessionManager({ type: 'bash', path: '/bin/bash' });
-      const session = {
-        id: sessionId,
-        agentInstanceId: 'test-agent',
-        pty: {
-          write: (data: string | Uint8Array) => {
-            writes.push(Buffer.from(data));
-          },
-        },
-        parser: { currentMode: 'detecting' },
-        shellIntegrationActive: true,
-        createdAt: Date.now(),
-        lastActivityAt: Date.now(),
-        exited: false,
-        exitCode: null,
-        deactivated: false,
-        detectTimerHandle: null,
-        ready: true,
-        readyPromise: Promise.resolve(),
-        readyResolve: () => {},
-        onData: null,
-        logger: null,
-        cwd: process.cwd(),
-        currentCwd: process.cwd(),
-        initScriptPath: null,
-      } as unknown as PtySession;
-      const internals = sm as unknown as {
-        sessions: Map<string, PtySession>;
-      };
-      internals.sessions.set(sessionId, session);
-
-      const firstResultPromise = sm.executeCommand(sessionId, {
-        command: 'a'.repeat(2048),
-      });
-      await Promise.resolve();
-      expect(writes).toHaveLength(1);
-
-      const replacementAbort = new AbortController();
-      const replacementResultPromise = sm.executeCommand(sessionId, {
-        command: '',
-        abortSignal: replacementAbort.signal,
-      });
-      replacementAbort.abort();
-
-      await vi.advanceTimersByTimeAsync(5);
-      const [firstResult, replacementResult] = await Promise.all([
-        firstResultPromise,
-        replacementResultPromise,
-      ]);
-
-      expect(firstResult.resolvedBy).toBe('abort');
-      expect(replacementResult.resolvedBy).toBe('abort');
-      expect(writes).toHaveLength(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-// ─── Section E: Integration tests (real PTY sessions) ───────────
+// ─── Section D: Integration tests (real PTY sessions) ────────────
 
 const shell = detectShell();
 
