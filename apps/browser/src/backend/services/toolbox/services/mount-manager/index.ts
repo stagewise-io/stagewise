@@ -943,13 +943,6 @@ export class MountManagerService extends DisposableService {
     this.core.clearAgentMounts(agentInstanceId);
   }
 
-  public setWorkspaceMdContent(
-    workspacePath: string,
-    content: string | null,
-  ): void {
-    this.core.setWorkspaceMdContent(workspacePath, content);
-  }
-
   public getMountedPathsWithRuntimes(agentInstanceId: string): Array<{
     prefix: string;
     path: string;

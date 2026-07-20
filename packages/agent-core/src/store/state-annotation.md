@@ -257,13 +257,7 @@ state. The package-owned schema represents them from day one.
    and the persistence layer, and before removing the per-agent blob
    directory. `archiveAgent` performs the same depth-first traversal
    for the in-memory side without deleting persisted rows.
-4. **Child agents are `persistent: false`.** The only child-spawning
-   agent today is `WorkspaceMdAgent`, which sets `persistent: false` in
-   its config (see
-   [](path:w787f/apps/browser/src/backend/agents/workspace-md/workspace-md.ts)
-   line 23). The agent row is still written so delete-cascade works,
-   but the flag means no auto-resume happens on app boot.
-5. **Toolbox is created per-instance at `createAgent` time.** The
+4. **Toolbox is created per-instance at `createAgent` time.** The
    toolbox slice for a child is populated by the same services as for
    a root agent (mount-manager, diff-history, etc.). No toolbox state
    is copied from the parent.

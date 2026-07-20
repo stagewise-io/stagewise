@@ -22,7 +22,6 @@ export interface AgentManagerToolboxPort {
     path: string;
     permissions: MountPermission[];
   }>;
-  setWorkspaceMdContent(workspacePath: string, content: string): void;
   acceptAllPendingEditsForAgent(agentInstanceId: string): Promise<void>;
   getEditedFilePathsForAgent(agentInstanceId: string): Promise<string[]>;
   getShellSnapshot?(agentInstanceId: string): unknown;

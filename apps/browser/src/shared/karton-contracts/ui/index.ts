@@ -57,7 +57,6 @@ import type {
   RemoveSearchEngineResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
-  ContextFilesResult,
   CurrentUsageResponse,
   UsageHistoryResponse,
 } from '../pages-api/types';
@@ -1229,8 +1228,6 @@ export type AppState = {
 
   /** Deduplicated workspace mounts from all agent instances */
   workspaceMounts: MountEntry[];
-  /** Workspace paths where a WORKSPACE.md agent is currently running */
-  workspaceMdGenerating: Record<string, boolean>;
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
 
@@ -1466,14 +1463,6 @@ export type KartonContract = {
         mountPrefix: string,
         options: WorkspaceGitCreateWorktreeOptions,
       ) => Promise<WorkspaceGitCreateWorktreeResult>;
-      generateWorkspaceMd: (
-        agentInstanceId: string,
-        mountPrefix: string,
-      ) => Promise<void>;
-      /** Get context files for all workspaces */
-      getContextFiles: () => Promise<ContextFilesResult>;
-      /** Generate WORKSPACE.md for a workspace path (does not require agent instance) */
-      generateWorkspaceMdForPath: (workspacePath: string) => Promise<void>;
       submitUserQuestionStep: (
         agentInstanceId: string,
         questionId: string,
@@ -2323,7 +2312,6 @@ export const defaultState: KartonContract['state'] = {
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
   workspaceMounts: [],
-  workspaceMdGenerating: {},
   plugins: [],
   skills: [],
   globalSkills: [],

@@ -15,7 +15,6 @@ function createDeps() {
     handleMountWorkspace: vi.fn(async () => {}),
     cancelQuestion: vi.fn(),
     getWorkspaceSnapshotForPersistence: vi.fn(() => []),
-    setWorkspaceMdContent: vi.fn(),
     acceptAllPendingEditsForAgent: vi.fn(async () => {}),
     getEditedFilePathsForAgent: vi.fn(async () => []),
     // Default to identity mapping; specific tests override per-call.

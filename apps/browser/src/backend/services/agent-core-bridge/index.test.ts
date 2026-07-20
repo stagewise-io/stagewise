@@ -831,7 +831,6 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
       path: '/repos/alpha',
       git: null,
       skills: [],
-      workspaceMdContent: null,
       agentsMdContent: null,
       ...overrides,
     };
@@ -914,17 +913,17 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
   it('mirrors per-entry field updates when the service allocates a fresh entry object', () => {
     const { mounts, getKartonState } = createMountsMirrorHarness();
 
-    const initial = makeMount({ prefix: 'w1', workspaceMdContent: null });
+    const initial = makeMount({ prefix: 'w1', agentsMdContent: null });
     mounts.setMounts('a1', [initial]);
 
-    const updated = { ...initial, workspaceMdContent: 'new content' };
+    const updated = { ...initial, agentsMdContent: 'new content' };
     mounts.setMounts('a1', [updated]);
 
     const mirrored = getKartonState().toolbox.a1!.workspace as {
       mounts: MountEntry[];
     };
     expect(mirrored.mounts).toHaveLength(1);
-    expect(mirrored.mounts[0]!.workspaceMdContent).toBe('new content');
+    expect(mirrored.mounts[0]!.agentsMdContent).toBe('new content');
   });
 
   it('mirrors a clear (empty mounts array) through to Karton', () => {

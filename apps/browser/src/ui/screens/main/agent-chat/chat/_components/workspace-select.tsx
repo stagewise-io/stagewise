@@ -35,7 +35,6 @@ import {
   IconArrowUpRightOutline18,
   IconFolder5Outline18,
   IconFolderOpenOutline18,
-  IconPenDrawSparkleOutline18,
   IconSquareTerminalOutline18,
 } from '@stagewise/icons';
 import {
@@ -51,7 +50,7 @@ import {
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
+import { CheckIcon, XIcon } from 'lucide-react';
 
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
@@ -77,7 +76,6 @@ import {
   type WorkspaceGitSetupRun,
   type KartonContract,
 } from '@shared/karton-contracts/ui';
-import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useContentCollapsed } from '@ui/screens/main/_components/content-collapsed-context';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
@@ -123,11 +121,9 @@ function formatGitStatus(
 const WorkspaceBadge = memo(function WorkspaceBadge({
   mount,
   onUnmount,
-  agentInstanceId,
 }: {
   mount: MountEntry;
   onUnmount: (prefix: string) => void;
-  agentInstanceId: string;
 }) {
   const display = getWorkspaceDisplayInfo(mount);
   const gitRef = mount.git ? formatGitRef(mount.git) : null;
@@ -155,26 +151,6 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
   const preferencesUpdate = useKartonProcedure(
     (p: KartonProcedures) => p.preferences.update,
   );
-  const generateWorkspaceMd = useKartonProcedure(
-    (p: KartonProcedures) => p.toolbox.generateWorkspaceMd,
-  );
-
-  const isGeneratingWorkspaceMd = useKartonState((s: KartonState) => {
-    for (const id in s.agents.instances) {
-      const inst = s.agents.instances[id];
-      if (!inst) continue;
-      if (inst.type !== AgentTypes.WORKSPACE_MD) continue;
-      if (!inst.state.isWorking) continue;
-      const agentPath = s.toolbox[id]?.workspace?.mounts?.[0]?.path;
-      if (agentPath === mount.path) return true;
-    }
-    return false;
-  });
-
-  const handleGenerateWorkspaceMd = useCallback(() => {
-    void generateWorkspaceMd(agentInstanceId, mount.prefix);
-  }, [agentInstanceId, mount.prefix, generateWorkspaceMd]);
-
   const handleToggleAgentsMd = useCallback(
     (checked: boolean) => {
       const currentSettings =
@@ -497,25 +473,17 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                 )}
                 style={{ top: sidePanelOffset }}
               >
-                {sidePanelContent.type === 'workspaceMd' ||
-                sidePanelContent.type === 'agentsMd' ? (
+                {sidePanelContent.type === 'agentsMd' ? (
                   <MdSidePanelContent
                     sidePanelContent={sidePanelContent}
-                    isIncludedInAgentContext={
-                      sidePanelContent.type === 'agentsMd'
-                        ? respectAgentsMd
-                        : true
-                    }
+                    isIncludedInAgentContext={respectAgentsMd}
                     viewportClassName="scroll-fade-y scroll-fade-6"
                   />
                 ) : sidePanelContent.type === 'contextFiles' ? (
                   <ContextFilesSidePanel
                     mount={mount}
-                    name={display.label}
                     respectAgentsMd={respectAgentsMd}
                     onToggleAgentsMd={handleToggleAgentsMd}
-                    isGeneratingWorkspaceMd={isGeneratingWorkspaceMd}
-                    onGenerateWorkspaceMd={handleGenerateWorkspaceMd}
                   />
                 ) : sidePanelContent.type === 'setupRun' && setupRun ? (
                   <SetupRunSidePanel setupRun={setupRun} />
@@ -540,18 +508,12 @@ function MdSidePanelContent({
   viewportClassName,
   isIncludedInAgentContext,
 }: {
-  sidePanelContent: Extract<
-    SidePanelContent,
-    { type: 'workspaceMd' | 'agentsMd' }
-  >;
+  sidePanelContent: Extract<SidePanelContent, { type: 'agentsMd' }>;
   viewportClassName: string;
   isIncludedInAgentContext: boolean;
 }) {
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
-  const filePath =
-    sidePanelContent.type === 'workspaceMd'
-      ? '.stagewise/WORKSPACE.md'
-      : 'AGENTS.md';
+  const filePath = 'AGENTS.md';
 
   return (
     <>
@@ -561,11 +523,7 @@ function MdSidePanelContent({
           !isIncludedInAgentContext && 'opacity-60',
         )}
       >
-        <span className="font-semibold">
-          {sidePanelContent.type === 'workspaceMd'
-            ? 'WORKSPACE.md'
-            : 'AGENTS.md'}
-        </span>
+        <span className="font-semibold">AGENTS.md</span>
       </div>
       <div
         className={cn(
@@ -604,7 +562,6 @@ function MdSidePanelContent({
 }
 
 type SidePanelContent =
-  | { type: 'workspaceMd'; content: string; workspacePath: string }
   | { type: 'agentsMd'; content: string; workspacePath: string }
   | { type: 'contextFiles' }
   | { type: 'skillsList' }
@@ -612,35 +569,25 @@ type SidePanelContent =
 
 function ContextFilesSidePanel({
   mount,
-  name,
   respectAgentsMd,
   onToggleAgentsMd,
-  isGeneratingWorkspaceMd,
-  onGenerateWorkspaceMd,
 }: {
   mount: MountEntry;
-  name: string;
   respectAgentsMd: boolean;
   onToggleAgentsMd: (checked: boolean) => void;
-  isGeneratingWorkspaceMd: boolean;
-  onGenerateWorkspaceMd: () => void;
 }) {
   const agentsMdDisabled = mount.agentsMdContent === null;
   const [hoveredContextFile, setHoveredContextFile] = useState<Extract<
     SidePanelContent,
-    { type: 'workspaceMd' | 'agentsMd' }
+    { type: 'agentsMd' }
   > | null>(null);
   const [nestedPanelOffset, setNestedPanelOffset] = useState(0);
-  const workspaceMdRowRef = useRef<HTMLDivElement>(null);
   const agentsMdRowRef = useRef<HTMLDivElement>(null);
   const nestedPanelRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!hoveredContextFile) return;
-    const itemEl =
-      hoveredContextFile.type === 'workspaceMd'
-        ? workspaceMdRowRef.current
-        : agentsMdRowRef.current;
+    const itemEl = agentsMdRowRef.current;
     const panel = nestedPanelRef.current;
     if (!itemEl || !panel) return;
 
@@ -664,70 +611,6 @@ function ContextFilesSidePanel({
         className="relative flex flex-col gap-1 px-2.5 py-2"
         onMouseLeave={() => setHoveredContextFile(null)}
       >
-        {/* WORKSPACE.md row */}
-        <div
-          ref={workspaceMdRowRef}
-          className="flex items-center gap-1.5"
-          onMouseEnter={
-            mount.workspaceMdContent
-              ? () =>
-                  setHoveredContextFile({
-                    type: 'workspaceMd',
-                    content: mount.workspaceMdContent!,
-                    workspacePath: mount.path,
-                  })
-              : undefined
-          }
-        >
-          {mount.workspaceMdContent !== null ? (
-            <>
-              <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
-              <span className="flex-1 px-0 text-muted-foreground text-xs">
-                WORKSPACE.md
-              </span>
-            </>
-          ) : (
-            <>
-              <Tooltip>
-                <TooltipTrigger>
-                  <span className="inline-flex items-center gap-1.5 text-subtle-foreground">
-                    <XIcon className="size-3 shrink-0" />
-                    <span className="text-xs">WORKSPACE.md</span>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  No WORKSPACE.md available for {name}.
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    className="ml-auto shrink-0 pr-0.5"
-                    disabled={isGeneratingWorkspaceMd}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onGenerateWorkspaceMd();
-                    }}
-                  >
-                    {isGeneratingWorkspaceMd ? (
-                      <Loader2Icon className="size-3 animate-spin" />
-                    ) : (
-                      <IconPenDrawSparkleOutline18 className="size-3" />
-                    )}
-                    {isGeneratingWorkspaceMd ? 'Generating...' : 'Generate'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Automatically generate a WORKSPACE.md to improve agent
-                  performance.
-                </TooltipContent>
-              </Tooltip>
-            </>
-          )}
-        </div>
-
         {/* AGENTS.md toggle */}
         {mount.agentsMdContent !== null && (
           <Tooltip>
@@ -792,9 +675,7 @@ function ContextFilesSidePanel({
           >
             <MdSidePanelContent
               sidePanelContent={hoveredContextFile}
-              isIncludedInAgentContext={
-                hoveredContextFile.type === 'agentsMd' ? respectAgentsMd : true
-              }
+              isIncludedInAgentContext={respectAgentsMd}
               viewportClassName="scroll-fade-y scroll-fade-4"
             />
           </div>
@@ -3930,7 +3811,6 @@ export const WorkspaceSelect = memo(function WorkspaceSelect({
               key={mount.prefix}
               mount={mount}
               onUnmount={handleUnmount}
-              agentInstanceId={openAgent}
             />
           );
         })}
