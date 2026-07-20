@@ -2055,7 +2055,7 @@ function ModelCardList({
   );
 
   return (
-    <div className="space-y-2 pl-1">
+    <div className="space-y-2">
       {entries.map((entry) => {
         const customModel = customModelsById.get(entry.modelId);
         return customModel ? (
