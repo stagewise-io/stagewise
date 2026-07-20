@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { cn } from '@ui/utils';
 import {
   Collapsible,
@@ -6,7 +6,6 @@ import {
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
 
 /** Extract text content from a AgentMessage's parts */
@@ -66,26 +65,13 @@ export interface StatusCardSection {
 }
 
 function ScrollableContent({ children }: { children: React.ReactNode }) {
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-
-  const viewportRef = useMemo(
-    () => ({ current: viewport }),
-    [viewport],
-  ) as React.RefObject<HTMLElement>;
-
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
-
   return (
     <OverlayScrollbar
-      className="mask-alpha max-h-48"
-      style={maskStyle}
+      className="max-h-48"
+      viewportClassName="scroll-fade-y scroll-fade-4"
       options={{
         overflow: { x: 'hidden', y: 'scroll' },
       }}
-      onViewportRef={setViewport}
     >
       {children}
     </OverlayScrollbar>

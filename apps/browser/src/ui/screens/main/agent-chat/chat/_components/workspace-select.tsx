@@ -54,7 +54,6 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
 
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useTrack } from '@ui/hooks/use-track';
 import { Tutorial } from '@ui/components/tutorial';
 import { useTutorial } from '@ui/contexts/tutorial';
@@ -309,19 +308,6 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
     [cancelPendingClear, cancelPendingOpen],
   );
 
-  const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
-    null,
-  );
-  const scrollViewportRef = useMemo(
-    () => ({ current: scrollViewport }),
-    [scrollViewport],
-  ) as React.RefObject<HTMLElement>;
-
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 24,
-  });
-
   const updateSidePanelOffset = useCallback(() => {
     if (!sidePanelContent || !sidePanelRef.current || !containerRef.current)
       return;
@@ -520,8 +506,7 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
                         ? respectAgentsMd
                         : true
                     }
-                    maskStyle={maskStyle}
-                    onViewportRef={setScrollViewport}
+                    viewportClassName="scroll-fade-y scroll-fade-6"
                   />
                 ) : sidePanelContent.type === 'contextFiles' ? (
                   <ContextFilesSidePanel
@@ -552,16 +537,14 @@ const WorkspaceBadge = memo(function WorkspaceBadge({
 
 function MdSidePanelContent({
   sidePanelContent,
-  maskStyle,
-  onViewportRef,
+  viewportClassName,
   isIncludedInAgentContext,
 }: {
   sidePanelContent: Extract<
     SidePanelContent,
     { type: 'workspaceMd' | 'agentsMd' }
   >;
-  maskStyle: React.CSSProperties;
-  onViewportRef: (el: HTMLElement | null) => void;
+  viewportClassName: string;
   isIncludedInAgentContext: boolean;
 }) {
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
@@ -591,16 +574,15 @@ function MdSidePanelContent({
         )}
       >
         <OverlayScrollbar
-          className="mask-alpha max-h-64"
+          className="max-h-64"
+          viewportClassName={viewportClassName}
           style={
             {
-              ...maskStyle,
               '--os-scrollbar-inset-top': '8px',
               '--os-scrollbar-inset-bottom': '24px',
             } as React.CSSProperties
           }
           options={{ overflow: { x: 'hidden', y: 'scroll' } }}
-          onViewportRef={onViewportRef}
         >
           <pre className="wrap-break-word whitespace-pre-wrap px-2.5 py-2 font-mono text-[11px] text-muted-foreground leading-relaxed">
             {sidePanelContent.content}
@@ -652,17 +634,6 @@ function ContextFilesSidePanel({
   const workspaceMdRowRef = useRef<HTMLDivElement>(null);
   const agentsMdRowRef = useRef<HTMLDivElement>(null);
   const nestedPanelRef = useRef<HTMLDivElement>(null);
-  const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
-    null,
-  );
-  const scrollViewportRef = useMemo(
-    () => ({ current: scrollViewport }),
-    [scrollViewport],
-  ) as React.RefObject<HTMLElement>;
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
 
   useLayoutEffect(() => {
     if (!hoveredContextFile) return;
@@ -824,8 +795,7 @@ function ContextFilesSidePanel({
               isIncludedInAgentContext={
                 hoveredContextFile.type === 'agentsMd' ? respectAgentsMd : true
               }
-              maskStyle={maskStyle}
-              onViewportRef={setScrollViewport}
+              viewportClassName="scroll-fade-y scroll-fade-4"
             />
           </div>
         )}
@@ -855,14 +825,6 @@ function SkillsListSidePanel({
   const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
     null,
   );
-  const scrollViewportRef = useMemo(
-    () => ({ current: scrollViewport }),
-    [scrollViewport],
-  ) as React.RefObject<HTMLElement>;
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
 
   // Position the third-level (skill description) panel relative to the
   // hovered skill row's vertical center, clamped to the scroll viewport.
@@ -898,8 +860,8 @@ function SkillsListSidePanel({
       </div>
       <div className="relative">
         <OverlayScrollbar
-          className="mask-alpha max-h-64"
-          style={maskStyle}
+          className="max-h-64"
+          viewportClassName="scroll-fade-y scroll-fade-4"
           options={{ overflow: { x: 'hidden', y: 'scroll' } }}
           onViewportRef={setScrollViewport}
         >
@@ -3024,15 +2986,6 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
   const [pendingRowKey, setPendingRowKey] = useState<string | null>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const recentListScrollRef = useRef<HTMLDivElement>(null);
-  const { maskStyle: recentListMaskStyle } = useScrollFadeMask(
-    recentListScrollRef,
-    {
-      axis: 'vertical',
-      fadeDistances: { bottom: 28 },
-    },
-  );
-
   const getOrInitState = useCallback(
     (rowKey: string): ConnectActionState => {
       const existing = pathStates.get(rowKey);
@@ -3509,11 +3462,7 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
               </div>
             )}
             {recentPaths.length > 0 && (
-              <div
-                ref={recentListScrollRef}
-                className="mask-alpha scrollbar-subtle max-h-[8.75rem] overflow-y-auto"
-                style={recentListMaskStyle}
-              >
+              <div className="scroll-fade-y scroll-fade-4 scroll-fade-b-7 scrollbar-subtle max-h-[8.75rem] overflow-y-auto">
                 {recentPaths.map((workspace, index) => {
                   const rowKey = `workspace:${workspace.path}`;
                   const rowState =

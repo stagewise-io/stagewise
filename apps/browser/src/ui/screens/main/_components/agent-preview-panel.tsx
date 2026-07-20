@@ -11,7 +11,6 @@ import type { StoredAgentPreview } from '@shared/karton-contracts/ui/agent';
 import { FileIcon } from '@ui/components/file-icon';
 import { getWorkspaceDisplayInfo } from '@ui/utils/workspace-display';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import {
   IconCodeBranchOutline18,
   IconFolder5Outline18,
@@ -363,27 +362,16 @@ function PreviewContent({ preview }: { preview: PreviewData }) {
 }
 
 function EditedFilesSection({ files }: { files: string[] }) {
-  const [viewport, setViewport] = useState<HTMLElement | null>(null);
-  const viewportRef = useMemo(
-    () => ({ current: viewport }),
-    [viewport],
-  ) as React.RefObject<HTMLElement>;
-  const { maskStyle } = useScrollFadeMask(viewportRef, {
-    axis: 'vertical',
-    fadeDistance: 12,
-  });
-
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-subtle-foreground">
         {files.length} {files.length === 1 ? 'Edit' : 'Edits'}
       </span>
       <OverlayScrollbar
-        className="mask-alpha max-h-[134px]"
-        style={maskStyle}
+        className="max-h-[134px]"
+        viewportClassName="scroll-fade-y scroll-fade-3"
         defer={false}
         options={{ overflow: { x: 'hidden', y: 'scroll' } }}
-        onViewportRef={setViewport}
       >
         <div className="flex flex-col">
           {files.map((f) => (

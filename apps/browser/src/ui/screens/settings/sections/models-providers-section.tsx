@@ -64,7 +64,6 @@ import {
 
 import { cn } from '@ui/utils';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
@@ -1226,16 +1225,6 @@ function CustomModelDialog({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
-  const [scrollViewport, setScrollViewport] = useState<HTMLElement | null>(
-    null,
-  );
-  const scrollViewportRef = useRef<HTMLElement | null>(null);
-  scrollViewportRef.current = scrollViewport;
-  const { maskStyle } = useScrollFadeMask(scrollViewportRef, {
-    axis: 'vertical',
-    fadeDistance: 24,
-  });
-
   useEffect(() => {
     if (!open) return;
     setModelId(model?.modelId ?? '');
@@ -1371,9 +1360,8 @@ function CustomModelDialog({
         </DialogHeader>
 
         <OverlayScrollbar
-          className="mask-alpha min-h-0 flex-1"
-          style={maskStyle}
-          onViewportRef={setScrollViewport}
+          className="min-h-0 flex-1"
+          viewportClassName="scroll-fade-y scroll-fade-6"
         >
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -2365,12 +2353,6 @@ function ModelsSection({
   // --- Thinking panel state ---
   const [listScrollViewport, setListScrollViewport] =
     useState<HTMLElement | null>(null);
-  const listScrollRef = useRef<HTMLElement | null>(null);
-  listScrollRef.current = listScrollViewport;
-  const { maskStyle: listMaskStyle } = useScrollFadeMask(listScrollRef, {
-    axis: 'vertical',
-    fadeDistance: 24,
-  });
 
   const listContainerRef = useRef<HTMLDivElement>(null);
   const thinkingPanelRef = useRef<HTMLDivElement>(null);
@@ -2820,8 +2802,8 @@ function ModelsSection({
 
       <div ref={listContainerRef} className="relative">
         <OverlayScrollbar
-          className="mask-alpha max-h-[40vh] w-full min-[1800px]:max-h-[55vh]"
-          style={listMaskStyle}
+          className="max-h-[40vh] w-full min-[1800px]:max-h-[55vh]"
+          viewportClassName="scroll-fade-y scroll-fade-6"
           onViewportRef={setListScrollViewport}
           contentClassName="space-y-3"
         >

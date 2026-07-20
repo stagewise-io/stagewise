@@ -35,6 +35,8 @@ export interface OverlayScrollbarProps {
   children: React.ReactNode;
   /** CSS class name for the host element (outer wrapper) */
   className?: string;
+  /** CSS class name for the actual scrollable viewport element. */
+  viewportClassName?: string;
   /**
    * CSS class name for the content wrapper inside the scrollable area.
    * Use this for layout classes like flex-col, gap-*, etc. that need to
@@ -112,6 +114,7 @@ export const OverlayScrollbar = forwardRef<
   {
     children,
     className,
+    viewportClassName,
     contentClassName,
     style,
     options,
@@ -135,6 +138,11 @@ export const OverlayScrollbar = forwardRef<
       // when focus moves to items inside, but Tab should not land on the scroll
       // container itself (which happens with certain overflow configurations).
       viewport.tabIndex = -1;
+      if (viewportClassName) {
+        viewport.classList.add(
+          ...viewportClassName.split(/\s+/).filter(Boolean),
+        );
+      }
       if (onViewportRef) {
         onViewportRef(viewport);
       }
@@ -142,7 +150,7 @@ export const OverlayScrollbar = forwardRef<
         onInitialized(instance);
       }
     },
-    [onViewportRef, onInitialized],
+    [viewportClassName, onViewportRef, onInitialized],
   );
 
   // Merge custom options with defaults

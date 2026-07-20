@@ -9,7 +9,6 @@ import {
 import { Logo } from '@stagewise/stage-ui/components/logo';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { cn } from '@ui/utils';
 import {
@@ -601,17 +600,6 @@ function ScrollableProviderList({
     [filteredVendorEntries, isEntryConnected],
   );
 
-  // Scroll fade mask
-  const [contentViewport, setContentViewport] = useState<HTMLElement | null>(
-    null,
-  );
-  const contentScrollRef = useRef<HTMLElement | null>(null);
-  contentScrollRef.current = contentViewport;
-  const { maskStyle } = useScrollFadeMask(contentScrollRef, {
-    axis: 'vertical',
-    fadeDistance: 24,
-  });
-
   const noResults =
     query.length > 0 &&
     connectedEntries.length === 0 &&
@@ -623,9 +611,8 @@ function ScrollableProviderList({
   return (
     <div className="min-h-0 pb-4">
       <OverlayScrollbar
-        className="mask-alpha h-80 sm:h-96"
-        style={maskStyle}
-        onViewportRef={setContentViewport}
+        className="h-80 sm:h-96"
+        viewportClassName="scroll-fade-y scroll-fade-6"
         contentClassName="flex flex-col gap-4"
       >
         {noResults && (

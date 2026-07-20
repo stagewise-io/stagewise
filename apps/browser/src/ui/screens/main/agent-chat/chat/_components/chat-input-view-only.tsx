@@ -1,6 +1,4 @@
-import { useMemo, useState } from 'react';
 import { cn } from '@ui/utils';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import {
   AttachmentRegistryNodeView,
   ElementAttachmentView,
@@ -48,30 +46,15 @@ export function ChatInputViewOnly({
   tipTapContent,
   className,
 }: ChatInputViewOnlyProps) {
-  // Container ref for overflow fade effect
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const containerRef = useMemo(
-    () => ({ current: container }),
-    [container],
-  ) as React.RefObject<HTMLDivElement>;
-
-  // Scroll fade mask (only bottom fade when content overflows)
-  const { maskStyle } = useScrollFadeMask(containerRef, {
-    axis: 'vertical',
-    fadeDistances: { top: 0, bottom: 16 },
-  });
-
   // If no valid JSON content, render plain text fallback
   if (!tipTapContent) return null;
   else if (typeof tipTapContent === 'string') {
     return (
       <div
-        ref={setContainer}
         className={cn(
-          'mask-alpha max-h-43.5 w-full overflow-y-hidden',
+          'scroll-fade-b scroll-fade-4 max-h-43.5 w-full overflow-y-hidden',
           className,
         )}
-        style={maskStyle}
       >
         <p className="m-0 min-h-[1.5em] leading-relaxed">{tipTapContent}</p>
       </div>
@@ -80,17 +63,15 @@ export function ChatInputViewOnly({
 
   return (
     <div
-      ref={setContainer}
       className={cn(
         // Max height with overflow fade
-        'mask-alpha max-h-43.5 overflow-y-hidden',
+        'scroll-fade-b scroll-fade-4 max-h-43.5 overflow-y-hidden',
         // Match ChatInput prose styling
         'h-full w-full text-foreground text-sm',
         'prose prose-sm max-w-none',
         '[&_p]:m-0 [&_p]:leading-relaxed',
         className,
       )}
-      style={maskStyle}
     >
       {(tipTapContent as TiptapDoc)?.content?.map((node, index) => (
         <RenderNode key={getNodeKey(node, index)} node={node} />

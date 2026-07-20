@@ -1,7 +1,6 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
-import { useScrollFadeMask } from '@ui/hooks/use-scroll-fade-mask';
 import { IconTrash2Outline24 } from '@stagewise/icons';
 import { IconBranchOutOutline18 } from '@stagewise/icons';
 import { SidebarToast } from '../_components/sidebar-toast';
@@ -32,12 +31,6 @@ export function WorktreeCleanupBadge() {
     () => cleanup.candidates.map((candidate) => candidate.path),
     [cleanup.candidates],
   );
-  const listScrollRef = useRef<HTMLDivElement>(null);
-  const { maskStyle: listMaskStyle } = useScrollFadeMask(listScrollRef, {
-    axis: 'vertical',
-    fadeDistance: 16,
-  });
-
   if (cleanup.dismissed || cleanup.candidates.length === 0) return null;
 
   const count = cleanup.candidates.length;
@@ -70,11 +63,7 @@ export function WorktreeCleanupBadge() {
         </p>
       </div>
 
-      <div
-        ref={listScrollRef}
-        className="mask-alpha scrollbar-subtle flex max-h-44 flex-col gap-1 overflow-y-auto py-1"
-        style={listMaskStyle}
-      >
+      <div className="scroll-fade-y scroll-fade-4 scrollbar-subtle flex max-h-44 flex-col gap-1 overflow-y-auto py-1">
         {cleanup.candidates.map((candidate) => (
           <div
             key={candidate.path}
