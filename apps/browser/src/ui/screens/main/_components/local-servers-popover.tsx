@@ -23,6 +23,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@stagewise/stage-ui/components/popover';
+import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import {
   Tooltip,
   TooltipContent,
@@ -364,7 +365,11 @@ export function LocalServersPopover({
           </div>
           <PopoverClose />
 
-          <div className="scroll-fade-y scroll-fade-4 flex max-h-80 min-h-0 flex-col gap-3 overflow-y-auto">
+          <OverlayScrollbar
+            className="max-h-80 min-h-0"
+            viewportClassName="scroll-fade-y scroll-fade-4"
+            contentClassName="flex flex-col gap-3"
+          >
             {groups.map((group) => {
               const ChatIcon = group.agentId ? IconMsgWritingOutline18 : Globe2;
               return (
@@ -512,7 +517,7 @@ export function LocalServersPopover({
                 </section>
               );
             })}
-          </div>
+          </OverlayScrollbar>
         </PopoverContent>
       </Popover>
       {trailingContent}
