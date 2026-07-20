@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+const SNAPSHOT_TIMEOUT_MS = 3_000;
 
 const HTTP_REQUEST_TIMEOUT_MS = 500;
 
@@ -178,7 +179,11 @@ async function readProcessSnapshot(): Promise<ProcessSnapshotEntry[]> {
       const { stdout } = await execFileAsync(
         'powershell',
         ['-NoProfile', '-Command', command],
-        { windowsHide: true, maxBuffer: 10_000_000 },
+        {
+          windowsHide: true,
+          maxBuffer: 10_000_000,
+          timeout: SNAPSHOT_TIMEOUT_MS,
+        },
       );
       return parseWindowsProcessSnapshot(stdout);
     }
@@ -186,7 +191,7 @@ async function readProcessSnapshot(): Promise<ProcessSnapshotEntry[]> {
     const { stdout } = await execFileAsync(
       'ps',
       ['-ww', '-axo', 'pid=,ppid=,stat=,command='],
-      { maxBuffer: 10_000_000 },
+      { maxBuffer: 10_000_000, timeout: SNAPSHOT_TIMEOUT_MS },
     );
     return parseUnixProcessSnapshot(stdout);
   } catch {
@@ -243,12 +248,18 @@ async function readListeningSnapshot(
       const { stdout } = await execFileAsync(
         'powershell',
         ['-NoProfile', '-Command', command],
-        { windowsHide: true, maxBuffer: 10_000_000 },
+        {
+          windowsHide: true,
+          maxBuffer: 10_000_000,
+          timeout: SNAPSHOT_TIMEOUT_MS,
+        },
       );
       return parseWindowsListeningSnapshot(stdout, pids);
     } catch {
       try {
-        const { stdout } = await execFileAsync('netstat', ['-ano']);
+        const { stdout } = await execFileAsync('netstat', ['-ano'], {
+          timeout: SNAPSHOT_TIMEOUT_MS,
+        });
         const snapshot = parseWindowsNetstatSnapshot(stdout);
         if (!pids) return snapshot;
         return new Map([...snapshot].filter(([pid]) => pids.has(pid)));
@@ -264,6 +275,7 @@ async function readListeningSnapshot(
       ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn'],
       {
         maxBuffer: 10_000_000,
+        timeout: SNAPSHOT_TIMEOUT_MS,
       },
     );
     const snapshot = parseLsofListeningSnapshot(stdout);
