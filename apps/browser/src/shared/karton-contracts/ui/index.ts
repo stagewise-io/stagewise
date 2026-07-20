@@ -1970,6 +1970,10 @@ export type KartonContract = {
         workspaceKey: string,
         directoryPath: string,
       ) => Promise<FileTreeOperationResult>;
+      createFolder: (
+        workspaceKey: string,
+        directoryPath: string,
+      ) => Promise<FileTreeOperationResult>;
       recreateDeletedFile: (
         workspaceKey: string,
         relativePath: string,
