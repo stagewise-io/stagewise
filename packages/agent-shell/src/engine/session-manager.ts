@@ -40,30 +40,6 @@ const PTY_INPUT_CHUNK_THRESHOLD_BYTES = 768;
 const PTY_INPUT_CHUNK_BYTES = 256;
 const PTY_INPUT_CHUNK_DELAY_MS = 5;
 
-async function writePtyInput(
-  ptyProcess: pty.IPty,
-  input: string,
-): Promise<void> {
-  const buffer = Buffer.from(input, 'utf8');
-  if (buffer.length <= PTY_INPUT_CHUNK_THRESHOLD_BYTES) {
-    ptyProcess.write(buffer);
-    return;
-  }
-
-  for (
-    let offset = 0;
-    offset < buffer.length;
-    offset += PTY_INPUT_CHUNK_BYTES
-  ) {
-    ptyProcess.write(buffer.subarray(offset, offset + PTY_INPUT_CHUNK_BYTES));
-    if (offset + PTY_INPUT_CHUNK_BYTES < buffer.length) {
-      await new Promise<void>((resolve) =>
-        setTimeout(resolve, PTY_INPUT_CHUNK_DELAY_MS),
-      );
-    }
-  }
-}
-
 // ─── Command timeout/idle policy ────────────────────────────────
 // Exported so tests can exercise the selection logic as pure helpers.
 // Kept here (not inlined in `executeCommand`) so the policy is easy to
@@ -625,6 +601,34 @@ export class SessionManager {
 
   // ─── Command execution ───────────────────────────────────────
 
+  private async writePtyInput(
+    ptyProcess: pty.IPty,
+    input: string,
+    commandId: string,
+  ): Promise<void> {
+    const buffer = Buffer.from(input, 'utf8');
+    if (!this.pendingCommands.has(commandId)) return;
+
+    if (buffer.length <= PTY_INPUT_CHUNK_THRESHOLD_BYTES) {
+      ptyProcess.write(buffer);
+      return;
+    }
+
+    for (
+      let offset = 0;
+      offset < buffer.length;
+      offset += PTY_INPUT_CHUNK_BYTES
+    ) {
+      if (!this.pendingCommands.has(commandId)) return;
+      ptyProcess.write(buffer.subarray(offset, offset + PTY_INPUT_CHUNK_BYTES));
+      if (offset + PTY_INPUT_CHUNK_BYTES < buffer.length) {
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, PTY_INPUT_CHUNK_DELAY_MS),
+        );
+      }
+    }
+  }
+
   async executeCommand(
     sessionId: string,
     request: SessionCommandRequest,
@@ -744,16 +748,17 @@ export class SessionManager {
     } else if (session.shellIntegrationActive) {
       // Shell integration handles output boundaries via OSC 133 and emits
       // OSC 7 cwd metadata at prompt time for session cwd tracking.
-      await writePtyInput(session.pty, `${command}\r`);
+      await this.writePtyInput(session.pty, `${command}\r`, commandId);
     } else if (session.parser.currentMode === 'sentinel') {
       // Wrap with sentinel for exit code detection
-      await writePtyInput(
+      await this.writePtyInput(
         session.pty,
         wrapWithSentinel(commandId, command, this.shell.type === 'powershell'),
+        commandId,
       );
     } else {
       // Still in detecting mode — write normally, might get OSC or sentinel
-      await writePtyInput(session.pty, `${command}\r`);
+      await this.writePtyInput(session.pty, `${command}\r`, commandId);
     }
 
     session.lastActivityAt = Date.now();
