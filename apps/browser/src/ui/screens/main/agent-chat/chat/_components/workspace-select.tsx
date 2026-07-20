@@ -513,7 +513,6 @@ function MdSidePanelContent({
   isIncludedInAgentContext: boolean;
 }) {
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
-  const filePath = 'AGENTS.md';
 
   return (
     <>
@@ -549,7 +548,7 @@ function MdSidePanelContent({
         <button
           type="button"
           onClick={() => {
-            void openFileTab(sidePanelContent.workspacePath, filePath);
+            void openFileTab(sidePanelContent.workspacePath, 'AGENTS.md');
           }}
           className="absolute right-0 bottom-0 flex h-6 items-center gap-1 rounded-tl-lg border-derived border-t border-l bg-background px-2 py-1 text-muted-foreground text-xs hover:bg-muted hover:text-foreground dark:bg-surface-1"
         >

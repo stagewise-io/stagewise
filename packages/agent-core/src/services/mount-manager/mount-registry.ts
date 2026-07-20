@@ -69,6 +69,7 @@ export class MountManager {
   > = new Map();
 
   private watchersPerPath: Map<WorkspacePath, FSWatcher> = new Map();
+  private watcherReadinessPerPath = new Map<WorkspacePath, Promise<void>>();
   private watcherDebounceTimers: Map<
     WorkspacePath,
     ReturnType<typeof setTimeout>
@@ -106,8 +107,10 @@ export class MountManager {
       // (and watcher refreshes) find a ready runtime.
       await this.hooks.onWorkspaceAttached?.(workspacePath);
       this.workspacePathsPerMount.set(prefix, workspacePath);
-      this.startWorkspaceWatcher(workspacePath);
     }
+
+    // Prevent writes between mounting and Chokidar's completed initial scan.
+    await this.startWorkspaceWatcher(workspacePath);
 
     const mounts = existing ?? new Set<MountPrefix>();
     mounts.add(prefix);
@@ -262,8 +265,9 @@ export class MountManager {
     this.hooks.onWorkspaceReleased?.(workspacePath);
   }
 
-  private startWorkspaceWatcher(wsPath: WorkspacePath): void {
-    if (this.watchersPerPath.has(wsPath)) return;
+  private startWorkspaceWatcher(wsPath: WorkspacePath): Promise<void> {
+    const existingReadiness = this.watcherReadinessPerPath.get(wsPath);
+    if (existingReadiness) return existingReadiness;
 
     // Always include `.stagewise` so the legacy skills dir keeps working.
     const allowedTopLevel = new Set([
@@ -326,10 +330,17 @@ export class MountManager {
         });
       });
 
+    const readiness = new Promise<void>((resolve) => {
+      watcher.once('ready', resolve);
+      watcher.once('error', () => resolve());
+    });
+
     this.watchersPerPath.set(wsPath, watcher);
+    this.watcherReadinessPerPath.set(wsPath, readiness);
     this.logger.debug('[MountManager] Started workspace watcher', {
       path: wsPath,
     });
+    return readiness;
   }
 
   private stopWorkspaceWatcher(wsPath: WorkspacePath): void {
@@ -338,6 +349,7 @@ export class MountManager {
       clearTimeout(timer);
       this.watcherDebounceTimers.delete(wsPath);
     }
+    this.watcherReadinessPerPath.delete(wsPath);
     const watcher = this.watchersPerPath.get(wsPath);
     if (watcher) {
       void watcher.close();
