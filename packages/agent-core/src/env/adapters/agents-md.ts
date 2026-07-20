@@ -52,8 +52,8 @@ async function buildAgentsMdState(
       const content = await readAgentsMd(workspacePath);
       if (content) entries.push({ mountPrefix: prefix, content });
 
-      const workspaceSetting = settings.get(workspacePath);
-      if (workspaceSetting?.respectAgentsMd) respectedMounts.push(prefix);
+      if (settings.get(workspacePath)?.respectAgentsMd ?? true)
+        respectedMounts.push(prefix);
     }),
   );
 
