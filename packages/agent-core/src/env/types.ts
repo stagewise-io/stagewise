@@ -3,7 +3,7 @@
  *
  * After the env-state migration (Phase 4), agent-core no longer owns a
  * combined "full environment snapshot" type. Each domain adapter owns its
- * own state shape. The schemas here back the seven core-owned domains
+ * own state shape. The schemas here back the five core-owned domains
  * (`workspace`, `agentsMd`, `enabledSkills`, `plans`, `logs`).
  * Host-specific schemas (browser, shells, activeApp, logIngest)
  * live in the host package.
