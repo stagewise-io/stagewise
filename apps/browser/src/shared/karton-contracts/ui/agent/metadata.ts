@@ -11,8 +11,6 @@ import {
   plansSnapshotSchema,
   planTaskSchema,
   taskGroupSchema,
-  workspaceMdEntrySchema,
-  workspaceMdSnapshotSchema,
   workspaceSnapshotSchema,
 } from '@stagewise/agent-core/env';
 import {
@@ -31,7 +29,6 @@ import type {
   Mount,
   MountPermission,
   PlansSnapshot,
-  WorkspaceMdSnapshot,
   WorkspaceSnapshot,
 } from '@stagewise/agent-core/env';
 import type {
@@ -91,8 +88,6 @@ export {
   shellSnapshotSchema,
   taskGroupSchema,
   textClipAttachmentSchema,
-  workspaceMdEntrySchema,
-  workspaceMdSnapshotSchema,
   workspaceMentionMetaSchema,
   workspaceSnapshotSchema,
 };
@@ -117,7 +112,6 @@ export type {
   ShellSessionSnapshot,
   ShellSnapshot,
   TextClipAttachment,
-  WorkspaceMdSnapshot,
   WorkspaceMentionMeta,
   WorkspaceSnapshot,
 };

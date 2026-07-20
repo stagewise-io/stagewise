@@ -969,52 +969,6 @@ export class AgentManager extends DisposableService {
     }
   }
 
-  /**
-   * Trigger WORKSPACE.md generation for a specific workspace path.
-   * Finds a parent chat agent that has this path mounted and spawns
-   * a workspace-md agent under it.
-   */
-  public async generateWorkspaceMdForPath(
-    workspacePath: string,
-  ): Promise<void> {
-    let parentAgentId: string | undefined;
-    for (const [agentId, toolboxState] of Object.entries(
-      this.agentStore.get().toolbox,
-    )) {
-      if (toolboxState.workspace.mounts.some((m) => m.path === workspacePath)) {
-        parentAgentId = agentId;
-        break;
-      }
-    }
-
-    await this.createAgent(
-      AgentTypes.WORKSPACE_MD,
-      { workspacePath },
-      {
-        parentInstanceId: parentAgentId ?? '',
-        onFinish: async () => {
-          const readMd = this.host.readWorkspaceMdFromDisk;
-          if (!readMd) {
-            throw new Error(
-              'AgentHost.readWorkspaceMdFromDisk is required for workspace-md generation',
-            );
-          }
-          const content = await readMd(workspacePath);
-          this.managerToolbox.setWorkspaceMdContent(
-            workspacePath,
-            content ?? '',
-          );
-        },
-        onError: (error) => {
-          this.report(error, 'workspaceMdGenerationFailed');
-          this.logger.error('[AgentManager] WorkspaceMd generation failed', {
-            error,
-          });
-        },
-      },
-    );
-  }
-
   // Create a new agent. Should be called when the user creates a new agent.
   public async createAgent(
     type: AgentTypes,

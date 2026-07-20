@@ -45,7 +45,6 @@ import {
   createAgentCoreSeam,
   attachAgentCoreBridge,
 } from './services/agent-core-bridge/wiring';
-import { registerToolboxGenerateWorkspaceMd } from './services/agent-core-bridge/handlers/toolbox';
 import { createBrowserHostPaths } from './services/agent-core-bridge/host-paths';
 import { createBrowserAgentHost } from './services/agent-core-bridge/host';
 import { createLazyBrowserHostModels } from './services/agent-core-bridge/host-models';
@@ -89,7 +88,6 @@ import {
   createMemoryDomainAdapter,
   createPlansDomainAdapter,
   createWorkspaceDomainAdapter,
-  createWorkspaceMdDomainAdapter,
 } from '@stagewise/agent-core/env/adapters';
 import {
   createBrowserHostEnvironmentSources,
@@ -647,12 +645,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       )) ?? new Map(),
   );
 
-  registerToolboxGenerateWorkspaceMd(agentCoreSeam.registry, uiKarton, {
-    store: agentCoreSeam.store,
-    generateWorkspaceMdForPath: (workspacePath) =>
-      agentManagerService.generateWorkspaceMdForPath(workspacePath),
-  });
-
   // Phase 5: now that `ModelProviderService` exists, activate the lazy
   // `HostModels` slot inside the already-assembled `agentCoreHost`. Must
   // happen before `attachAgentCoreBridge` so any attach-phase handler
@@ -698,18 +690,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       mountManager: coreMountManager,
     }),
   );
-  const workspaceMdRelativePath = agentCoreHost.workspaceMdRelativePath?.();
   agentManagerService.registerEnvAdapter(
     createAgentsMdDomainAdapter({
       host: agentCoreHost,
       mountManager: coreMountManager,
-      workspaceMdRelativePath,
-    }),
-  );
-  agentManagerService.registerEnvAdapter(
-    createWorkspaceMdDomainAdapter({
-      mountManager: coreMountManager,
-      workspaceMdRelativePath,
     }),
   );
   agentManagerService.registerEnvAdapter(
@@ -791,7 +775,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   });
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
-  // workspace-md generating, search engines, global config, auth)
+  // search engines, global config, auth)
   await wirePagesStateSync({
     uiKarton,
     pagesService,
@@ -1149,20 +1133,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         if (bitmap) result[pageUrl] = bitmap;
       }
       return result;
-    },
-  );
-
-  // toolbox.getContextFiles / toolbox.generateWorkspaceMdForPath
-  uiKarton.registerServerProcedureHandler(
-    'toolbox.getContextFiles',
-    async (_cid: string) => {
-      return toolboxService.getContextFilesForAllWorkspaces();
-    },
-  );
-  uiKarton.registerServerProcedureHandler(
-    'toolbox.generateWorkspaceMdForPath',
-    async (_cid: string, workspacePath: string) => {
-      await agentManagerService.generateWorkspaceMdForPath(workspacePath);
     },
   );
 

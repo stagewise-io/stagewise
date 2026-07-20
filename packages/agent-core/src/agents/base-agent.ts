@@ -135,9 +135,6 @@ export interface BaseAgentToolboxView {
     workspacePath: string,
     permissions?: MountPermission[],
   ): Promise<void>;
-  getWorkspaceMd(
-    agentInstanceId: string,
-  ): Promise<Array<{ mountPrefix: string; path: string; content: string }>>;
 }
 
 /**

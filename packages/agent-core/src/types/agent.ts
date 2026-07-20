@@ -8,7 +8,6 @@ import type { UniversalTools } from './tools';
 
 export enum AgentTypes {
   CHAT = 'chat',
-  WORKSPACE_MD = 'project-md',
 }
 
 export type AgentMessage<

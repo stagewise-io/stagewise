@@ -1,5 +1,4 @@
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
-import { WorkspaceMdAgent } from '@stagewise/agent-core/agents';
 import { BrowserChatAgent } from './chat/chat';
 
 /**
@@ -12,7 +11,6 @@ import { BrowserChatAgent } from './chat/chat';
 declare module '@stagewise/agent-core/agents' {
   interface AgentTypeMap {
     [AgentTypes.CHAT]: typeof BrowserChatAgent;
-    [AgentTypes.WORKSPACE_MD]: typeof WorkspaceMdAgent;
   }
 }
 
@@ -31,5 +29,4 @@ export type { AgentTypeMap } from '@stagewise/agent-core/agents';
  */
 export const AgentsMap = {
   [AgentTypes.CHAT]: BrowserChatAgent,
-  [AgentTypes.WORKSPACE_MD]: WorkspaceMdAgent,
 } as const;

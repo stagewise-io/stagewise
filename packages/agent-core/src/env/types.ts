@@ -4,8 +4,8 @@
  * After the env-state migration (Phase 4), agent-core no longer owns a
  * combined "full environment snapshot" type. Each domain adapter owns its
  * own state shape. The schemas here back the seven core-owned domains
- * (`workspace`, `agentsMd`, `workspaceMd`, `enabledSkills`, `plans`,
- * `logs`). Host-specific schemas (browser, shells, activeApp, logIngest)
+ * (`workspace`, `agentsMd`, `enabledSkills`, `plans`, `logs`).
+ * Host-specific schemas (browser, shells, activeApp, logIngest)
  * live in the host package.
  *
  * `mountSchema` / `mountPermissionSchema` and the various `*EntrySchema`
@@ -55,20 +55,6 @@ export const agentsMdSnapshotSchema = z.object({
   respectedMounts: z.array(z.string()),
 });
 export type AgentsMdSnapshot = z.infer<typeof agentsMdSnapshotSchema>;
-
-// ---------------------------------------------------------------------------
-// Section: workspaceMd
-// ---------------------------------------------------------------------------
-
-export const workspaceMdEntrySchema = z.object({
-  mountPrefix: z.string(),
-  content: z.string(),
-});
-
-export const workspaceMdSnapshotSchema = z.object({
-  entries: z.array(workspaceMdEntrySchema),
-});
-export type WorkspaceMdSnapshot = z.infer<typeof workspaceMdSnapshotSchema>;
 
 // ---------------------------------------------------------------------------
 // Section: enabledSkills
