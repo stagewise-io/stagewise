@@ -288,8 +288,8 @@ export class MountManager {
       depth: 4,
       awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
       ignored: (filePath: string) => {
-        if (filePath === wsPath) return false;
         const rel = path.relative(wsPath, filePath);
+        if (rel === '') return false;
         const segments = rel.split(path.sep);
         const first = segments[0] ?? '';
         const second = segments[1] ?? '';
@@ -332,7 +332,6 @@ export class MountManager {
 
     const readiness = new Promise<void>((resolve) => {
       watcher.once('ready', resolve);
-      watcher.once('error', () => resolve());
     });
 
     this.watchersPerPath.set(wsPath, watcher);
