@@ -2270,6 +2270,7 @@ function ModelsSection({
     hasInstanceModels &&
     instanceEntries.every((entry) => instanceDisabledSet.has(entry.modelId));
   const showEnabledOnly = modelVisibility === 'enabled';
+  const hasSearch = searchQuery.trim().length > 0;
   const isModelEnabled = (entry: ModelSelectorEntry) =>
     !instanceDisabledSet.has(entry.modelId);
 
@@ -2310,11 +2311,16 @@ function ModelsSection({
       .filter((g) => g.entries.length > 0);
   }, [groupedByInstance, searchQuery, filterInstanceId]);
 
-  const noResults =
-    (searchQuery.trim().length > 0 || showEnabledOnly) &&
-    !filteredGroups.some((group) =>
-      group.entries.some((entry) => !showEnabledOnly || isModelEnabled(entry)),
-    );
+  const noResults = !filteredGroups.some((group) =>
+    group.entries.some((entry) => !showEnabledOnly || isModelEnabled(entry)),
+  );
+  const noResultsMessage = !hasInstanceModels
+    ? 'No models are available for this provider.'
+    : showEnabledOnly
+      ? hasSearch
+        ? 'No enabled models match your search. Switch to All to include disabled models.'
+        : 'No models are enabled. Switch to All to enable models.'
+      : 'No models match your search. Try a different model name or ID.';
 
   // --- Thinking panel state ---
   const [listScrollViewport, setListScrollViewport] =
@@ -2848,7 +2854,6 @@ function ModelsSection({
             ? (() => {
                 const filteredGroup = filteredGroups[0];
                 if (!filteredGroup) return null;
-                const hasSearch = searchQuery.trim().length > 0;
                 const vendorGroups = groupEntriesByVendor(
                   filteredGroup.entries,
                   filterInstance,
@@ -2913,9 +2918,7 @@ function ModelsSection({
           {noResults && (
             <div className="rounded-lg border border-derived-subtle p-4">
               <p className="text-center text-muted-foreground text-sm">
-                {showEnabledOnly && !searchQuery.trim()
-                  ? 'No models are enabled.'
-                  : 'No models match your filter.'}
+                {noResultsMessage}
               </p>
             </div>
           )}
