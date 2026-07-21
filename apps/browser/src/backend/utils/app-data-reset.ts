@@ -10,19 +10,24 @@ export function requestAppDataReset(userDataDirectory: string): void {
 export function applyPendingAppDataReset(userDataDirectory: string): void {
   const markerPath = path.join(userDataDirectory, RESET_MARKER);
   if (!fs.existsSync(markerPath)) return;
+  const removeOptions = { recursive: true, force: true };
 
-  const identityPath = path.join(
-    userDataDirectory,
-    'stagewise',
-    'identity.json',
-  );
-  const identity = fs.existsSync(identityPath)
-    ? fs.readFileSync(identityPath)
-    : undefined;
-
-  fs.rmSync(userDataDirectory, { recursive: true, force: true });
-  if (identity) {
-    fs.mkdirSync(path.dirname(identityPath), { recursive: true });
-    fs.writeFileSync(identityPath, identity);
+  for (const entry of fs.readdirSync(userDataDirectory)) {
+    if (
+      entry === RESET_MARKER ||
+      entry === 'stagewise' ||
+      entry.startsWith('Singleton')
+    )
+      continue;
+    fs.rmSync(path.join(userDataDirectory, entry), removeOptions);
   }
+
+  const dataRoot = path.join(userDataDirectory, 'stagewise');
+  if (fs.existsSync(dataRoot))
+    for (const entry of fs.readdirSync(dataRoot)) {
+      if (entry !== 'identity.json')
+        fs.rmSync(path.join(dataRoot, entry), removeOptions);
+    }
+
+  fs.rmSync(markerPath);
 }
