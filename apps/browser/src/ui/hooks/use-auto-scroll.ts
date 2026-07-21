@@ -17,6 +17,13 @@ export function useAutoScroll({
   const shouldFollowRef = useRef(true);
   const scrollFrameRef = useRef<number | null>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  const [followOutput, setFollowOutput] = useState<'auto' | false>('auto');
+
+  const setShouldFollow = useCallback((shouldFollow: boolean) => {
+    if (shouldFollowRef.current === shouldFollow) return;
+    shouldFollowRef.current = shouldFollow;
+    setFollowOutput(shouldFollow ? 'auto' : false);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     if (scrollFrameRef.current !== null)
@@ -30,40 +37,43 @@ export function useAutoScroll({
     });
   }, []);
 
-  const scrollerRef = useCallback((element: HTMLElement | Window | null) => {
-    const viewport = element instanceof HTMLElement ? element : null;
-    viewportRef.current = viewport;
-    shouldFollowRef.current = viewport !== null;
-    setScroller(viewport);
-  }, []);
+  const scrollerRef = useCallback(
+    (element: HTMLElement | Window | null) => {
+      const viewport = element instanceof HTMLElement ? element : null;
+      viewportRef.current = viewport;
+      if (viewport) setShouldFollow(true);
+      else shouldFollowRef.current = false;
+      setScroller(viewport);
+    },
+    [setShouldFollow],
+  );
 
   const forceEnableAutoScroll = useCallback(() => {
-    shouldFollowRef.current = true;
+    setShouldFollow(true);
     scrollToBottom();
-  }, [scrollToBottom]);
+  }, [scrollToBottom, setShouldFollow]);
 
   const disableAutoScroll = useCallback(() => {
-    shouldFollowRef.current = false;
-  }, []);
+    setShouldFollow(false);
+  }, [setShouldFollow]);
 
   const isAutoScrollEnabled = useCallback(() => shouldFollowRef.current, []);
 
   useEffect(() => {
     if (!scroller || !enabled) return;
 
+    let previousScrollTop = scroller.scrollTop;
     const handleScroll = () => {
-      const distanceFromBottom =
-        scroller.scrollHeight - (scroller.scrollTop + scroller.clientHeight);
-      if (distanceFromBottom > 1) shouldFollowRef.current = false;
+      if (scroller.scrollTop < previousScrollTop) setShouldFollow(false);
+      previousScrollTop = scroller.scrollTop;
     };
     const handleScrollEnd = () => {
       const distanceFromBottom =
         scroller.scrollHeight - (scroller.scrollTop + scroller.clientHeight);
-      if (distanceFromBottom <= scrollEndThreshold)
-        shouldFollowRef.current = true;
+      if (distanceFromBottom <= scrollEndThreshold) setShouldFollow(true);
     };
     const handleWheel = (event: WheelEvent) => {
-      if (event.deltaY < 0) shouldFollowRef.current = false;
+      if (event.deltaY < 0) setShouldFollow(false);
     };
 
     scroller.addEventListener('wheel', handleWheel, { passive: true });
@@ -98,6 +108,7 @@ export function useAutoScroll({
     scrollEndThreshold,
     scroller,
     scrollToBottom,
+    setShouldFollow,
   ]);
 
   return {
@@ -106,6 +117,6 @@ export function useAutoScroll({
     forceEnableAutoScroll,
     disableAutoScroll,
     isAutoScrollEnabled,
-    followOutput: 'auto' as const,
+    followOutput,
   };
 }

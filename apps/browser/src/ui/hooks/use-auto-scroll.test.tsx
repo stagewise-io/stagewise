@@ -32,44 +32,46 @@ describe('useAutoScroll', () => {
     };
   };
 
-  it('uses Virtuoso native output following', () => {
-    const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
-
-    expect(result.current.followOutput).toBe('auto');
-  });
-
   it('pauses on wheel-up and resumes at the bottom', () => {
     const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
     const { viewport, setHeight } = createViewport();
 
     act(() => result.current.scrollerRef(viewport));
     flushScroll();
+    expect(result.current.followOutput).toBe('auto');
+
     viewport.scrollTop = 400;
     act(() => viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -1 })));
 
     expect(result.current.isAutoScrollEnabled()).toBe(false);
+    expect(result.current.followOutput).toBe(false);
 
     setHeight(1_500);
     act(result.current.forceEnableAutoScroll);
     flushScroll();
     expect(viewport.scrollTop).toBe(1_500);
     expect(result.current.isAutoScrollEnabled()).toBe(true);
+    expect(result.current.followOutput).toBe('auto');
   });
 
-  it('pauses when the scrollbar thumb moves upward', () => {
+  it('follows content growth but pauses when scrolling upward', () => {
     const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
-    const { viewport } = createViewport();
+    const { viewport, setHeight } = createViewport();
 
     act(() => result.current.scrollerRef(viewport));
     flushScroll();
-    viewport.scrollTop = 500;
     act(() => viewport.dispatchEvent(new Event('scroll')));
+
+    setHeight(1_500);
+    viewport.scrollTop = 1_100;
+    act(() => viewport.dispatchEvent(new Event('scroll')));
+    expect(result.current.followOutput).toBe('auto');
+
     viewport.scrollTop = 400;
     act(() => viewport.dispatchEvent(new Event('scroll')));
-
     expect(result.current.isAutoScrollEnabled()).toBe(false);
 
-    viewport.scrollTop = 1_000;
+    viewport.scrollTop = 1_500;
     act(() => viewport.dispatchEvent(new Event('scroll')));
     act(() => viewport.dispatchEvent(new Event('scrollend')));
     expect(result.current.isAutoScrollEnabled()).toBe(true);
