@@ -100,7 +100,9 @@ export function Sidebar() {
         )}
       </ResizablePanel>
 
-      {!collapsed && <ResizableHandle onDoubleClick={reset} />}
+      {!collapsed && (
+        <ResizableHandle className="after:w-2.5" onDoubleClick={reset} />
+      )}
     </>
   );
 }
