@@ -35,4 +35,14 @@ describe('app data reset', () => {
     expect(fs.existsSync(path.join(dataRoot, 'preferences.json'))).toBe(false);
     expect(fs.existsSync(path.join(userDataDirectory, 'session'))).toBe(false);
   });
+
+  it('deletes user data without an identity.json', () => {
+    userDataDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'stagewise-reset-'),
+    );
+    requestAppDataReset(userDataDirectory);
+
+    applyPendingAppDataReset(userDataDirectory);
+    expect(fs.existsSync(userDataDirectory)).toBe(false);
+  });
 });

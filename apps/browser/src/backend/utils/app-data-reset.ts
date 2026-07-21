@@ -16,9 +16,13 @@ export function applyPendingAppDataReset(userDataDirectory: string): void {
     'stagewise',
     'identity.json',
   );
-  const identity = fs.readFileSync(identityPath);
+  const identity = fs.existsSync(identityPath)
+    ? fs.readFileSync(identityPath)
+    : undefined;
 
   fs.rmSync(userDataDirectory, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(identityPath), { recursive: true });
-  fs.writeFileSync(identityPath, identity);
+  if (identity) {
+    fs.mkdirSync(path.dirname(identityPath), { recursive: true });
+    fs.writeFileSync(identityPath, identity);
+  }
 }

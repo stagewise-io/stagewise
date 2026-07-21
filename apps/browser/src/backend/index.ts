@@ -63,12 +63,6 @@ installStartupOpenUrlListener();
 app.setPath('userData', path.join(app.getPath('appData'), appBaseName));
 app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
 
-try {
-  applyPendingAppDataReset(app.getPath('userData'));
-} catch (error) {
-  console.error('[AppDataReset] Failed to reset app data', error);
-}
-
 // Register custom protocols as privileged (must happen before app.ready)
 protocol.registerSchemesAsPrivileged([
   {
@@ -129,6 +123,12 @@ const singleInstanceLock = app.requestSingleInstanceLock();
 
 if (!singleInstanceLock) {
   app.quit();
+} else if (!started) {
+  try {
+    applyPendingAppDataReset(app.getPath('userData'));
+  } catch (error) {
+    console.error('[AppDataReset] Failed to reset app data', error);
+  }
 }
 
 // This method will be called when Electron has finished
