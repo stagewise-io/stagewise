@@ -43,7 +43,7 @@ export interface WorkspaceAgentSettingsEntry {
 export interface GlobalSkillsMount {
   /** Mount prefix used in the agent-facing workspace list. */
   prefix: string;
-  /** Absolute directory containing this mount's skill directories. */
+  /** Absolute directory exposed to the agent by this mount. */
   absolutePath: string;
   /** `true` when the absolute path exists on disk right now. */
   exists: boolean;
@@ -75,7 +75,7 @@ export interface HostEnvironmentSources {
 
   /**
    * Static global-skills mounts exposed in the workspace snapshot
-   * (e.g. `~/.stagewise/skills`, `~/.agents/skills`). The host is
+   * (e.g. `~/.stagewise/skills`, `~/.agents`). The host is
    * responsible for filtering out entries that do not exist on disk
    * (`exists: false` entries are still emitted so callers can log or
    * diagnose).

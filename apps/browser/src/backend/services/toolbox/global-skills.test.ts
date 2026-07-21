@@ -30,8 +30,11 @@ describe('getGlobalSkillsMounts', () => {
   it('resolves paths under the home directory', () => {
     const home = homedir();
     const mounts = getGlobalSkillsMounts();
-    const sw = mounts.find((m) => m.prefix === 'globalskills-codex');
-    expect(sw?.absolutePath).toBe(path.resolve(home, '.codex', 'skills'));
+    const codex = mounts.find((m) => m.prefix === 'globalskills-codex');
+    const agents = mounts.find((m) => m.prefix === 'globalskills-agents');
+    expect(codex?.absolutePath).toBe(path.resolve(home, '.codex', 'skills'));
+    expect(agents?.absolutePath).toBe(path.resolve(home, '.agents'));
+    expect(agents?.skillsPath).toBe(path.resolve(home, '.agents', 'skills'));
   });
 });
 

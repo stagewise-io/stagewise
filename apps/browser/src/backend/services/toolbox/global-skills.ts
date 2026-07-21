@@ -11,6 +11,7 @@ import { ALWAYS_ENABLED_GLOBAL_SKILL_PREFIXES } from '@shared/global-skill-prefi
 export function getGlobalSkillsMounts(): Array<{
   prefix: string;
   absolutePath: string;
+  skillsPath?: string;
 }> {
   const home = homedir();
   return [
@@ -20,7 +21,8 @@ export function getGlobalSkillsMounts(): Array<{
     },
     {
       prefix: 'globalskills-agents',
-      absolutePath: path.resolve(home, '.agents', 'skills'),
+      absolutePath: path.resolve(home, '.agents'),
+      skillsPath: path.resolve(home, '.agents', 'skills'),
     },
     {
       prefix: 'globalskills-codex',
@@ -45,7 +47,7 @@ export function getGlobalSkillsMounts(): Array<{
  */
 export function getEnabledGlobalSkillsMounts(
   enabledGlobalSkillDirs: readonly string[],
-): Array<{ prefix: string; absolutePath: string }> {
+): Array<{ prefix: string; absolutePath: string; skillsPath?: string }> {
   const enabled = new Set(enabledGlobalSkillDirs);
   return getGlobalSkillsMounts().filter(
     (m) =>
