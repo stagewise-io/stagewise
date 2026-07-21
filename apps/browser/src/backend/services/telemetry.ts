@@ -65,6 +65,7 @@ export type EventProperties = {
     matched_process_counts: Record<string, number>;
     total_matched_processes: number;
   };
+  'app-data-reset': undefined;
   'telemetry-level-changed': { from: TelemetryLevel; to: TelemetryLevel };
   'onboarding-completed': {
     skipped: boolean;

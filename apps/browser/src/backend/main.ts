@@ -24,6 +24,7 @@ import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
 import { NotificationSoundsService } from './services/notification-sounds';
 import { WindowLayoutService } from './services/window-layout';
+import { revealPathInFileManager } from './services/window-layout/protocol-utils';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { WebDataService } from './services/webdata';
@@ -71,6 +72,7 @@ import { AssetCacheService } from './services/asset-cache';
 import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
+import { requestAppDataReset } from './utils/app-data-reset';
 import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';
 import { AgentRuntimeRecoveryService } from './services/agent-runtime-recovery';
 import { MacOSClosedLidSleepService } from './services/macos-closed-lid-sleep';
@@ -455,6 +457,17 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       telemetryService.capture(eventName, parsedProperties);
     },
   );
+
+  uiKarton.registerServerProcedureHandler('appData.openFolder', async () =>
+    revealPathInFileManager(app.getPath('userData')),
+  );
+
+  uiKarton.registerServerProcedureHandler('appData.reset', async () => {
+    requestAppDataReset(app.getPath('userData'));
+    telemetryService.capture('app-data-reset');
+    if (app.isPackaged) app.relaunch();
+    app.quit();
+  });
 
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(logger, uiKarton);
