@@ -67,6 +67,11 @@ import { Input } from '@stagewise/stage-ui/components/input';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@stagewise/stage-ui/components/tabs';
+import {
   Dialog,
   DialogContent,
   DialogTitle,
@@ -89,6 +94,7 @@ import {
   IconArrowUpRightOutline18,
   IconDotsOutline18,
   IconRefreshAnticlockwiseOutline18,
+  IconLoader6Outline18,
   IconCheck2Outline18,
   IconBanOutline18,
 } from '@stagewise/icons';
@@ -98,7 +104,6 @@ import {
   MenuTrigger,
   MenuContent,
   MenuItem,
-  MenuSeparator,
 } from '@stagewise/stage-ui/components/menu';
 import { ContextMenu } from '@base-ui/react/context-menu';
 import { Menu as MenuBase } from '@base-ui/react/menu';
@@ -109,6 +114,8 @@ const consoleUrl =
 enablePatches();
 
 const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
+
+type ModelVisibility = 'all' | 'enabled';
 
 // =============================================================================
 // Provider Instance Logo
@@ -2105,6 +2112,7 @@ function VendorModelGroup({
   onEditCustomModel,
   onDeleteCustomModel,
   defaultExpanded,
+  onlyEnabled = false,
 }: {
   instance: ProviderInstance;
   group: VendorGroup;
@@ -2118,16 +2126,18 @@ function VendorModelGroup({
   onEditCustomModel: (model: CustomModel) => void;
   onDeleteCustomModel: (modelId: string) => void;
   defaultExpanded?: boolean;
+  onlyEnabled?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded ?? true);
   const disabledSet = useMemo(
     () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
     [preferences, instance.id],
   );
-  const enabledCount = group.entries.reduce(
-    (count, entry) => count + Number(!disabledSet.has(entry.modelId)),
-    0,
+  const enabledEntries = group.entries.filter(
+    (entry) => !disabledSet.has(entry.modelId),
   );
+  const enabledCount = enabledEntries.length;
+  const visibleEntries = onlyEnabled ? enabledEntries : group.entries;
 
   const VendorLogo = group.logo;
 
@@ -2164,7 +2174,7 @@ function VendorModelGroup({
       {expanded && (
         <ModelCardList
           instance={instance}
-          entries={group.entries}
+          entries={visibleEntries}
           preferences={preferences}
           onToggleModel={onToggleModel}
           onEditThinking={onEditThinking}
@@ -2228,6 +2238,8 @@ function ModelsSection({
   );
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [modelVisibility, setModelVisibility] =
+    useState<ModelVisibility>('all');
 
   // Group selectable entries by instance
   const allEntries = useMemo(
@@ -2257,6 +2269,9 @@ function ModelsSection({
   const allInstanceModelsDisabled =
     hasInstanceModels &&
     instanceEntries.every((entry) => instanceDisabledSet.has(entry.modelId));
+  const showEnabledOnly = modelVisibility === 'enabled';
+  const isModelEnabled = (entry: ModelSelectorEntry) =>
+    !instanceDisabledSet.has(entry.modelId);
 
   const groupedByInstance = useMemo(() => {
     const groups = new Map<
@@ -2296,7 +2311,10 @@ function ModelsSection({
   }, [groupedByInstance, searchQuery, filterInstanceId]);
 
   const noResults =
-    searchQuery.trim().length > 0 && filteredGroups.length === 0;
+    (searchQuery.trim().length > 0 || showEnabledOnly) &&
+    !filteredGroups.some((group) =>
+      group.entries.some((entry) => !showEnabledOnly || isModelEnabled(entry)),
+    );
 
   // --- Thinking panel state ---
   const [listScrollViewport, setListScrollViewport] =
@@ -2467,13 +2485,22 @@ function ModelsSection({
   useEffect(() => {
     if (!thinkingPanelModelId) return;
     const stillVisible = filteredGroups.some((g) =>
-      g.entries.some((e) => e.modelId === thinkingPanelModelId),
+      g.entries.some(
+        (e) =>
+          e.modelId === thinkingPanelModelId &&
+          (!showEnabledOnly || !instanceDisabledSet.has(e.modelId)),
+      ),
     );
     if (!stillVisible) {
       setThinkingPanelModelId(null);
       setThinkingPanelInstanceId(null);
     }
-  }, [filteredGroups, thinkingPanelModelId]);
+  }, [
+    filteredGroups,
+    thinkingPanelModelId,
+    showEnabledOnly,
+    instanceDisabledSet,
+  ]);
 
   // Close thinking panel on outside click
   useEffect(() => {
@@ -2734,7 +2761,17 @@ function ModelsSection({
 
   return (
     <div className="flex flex-col space-y-3">
-      <div className="flex items-center gap-3">
+      <Tabs
+        value={modelVisibility}
+        onValueChange={(value) => setModelVisibility(value as ModelVisibility)}
+      >
+        <TabsList className="w-auto">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="enabled">Enabled only</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex items-center gap-2">
         <Input
           placeholder="Filter models..."
           value={searchQuery}
@@ -2749,36 +2786,34 @@ function ModelsSection({
             Add Model
           </Button>
         )}
+        {!isTrulyCustom && filterInstance && (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={isReloading}
+            onClick={() => void handleReloadModels()}
+          >
+            {isReloading ? (
+              <IconLoader6Outline18 className="size-3.5 animate-spin" />
+            ) : (
+              <IconRefreshAnticlockwiseOutline18 className="size-3.5" />
+            )}
+            Reload models
+          </Button>
+        )}
         {filterInstance && (
           <Menu>
             <MenuTrigger>
               <Button
                 variant="secondary"
                 size="icon-sm"
-                aria-label="Model actions"
+                className="rounded-md"
+                aria-label="Bulk model actions"
               >
-                <IconDotsOutline18 className="size-4" />
+                <IconDotsOutline18 className="size-4 rotate-90" />
               </Button>
             </MenuTrigger>
             <MenuContent side="bottom" align="end" size="sm">
-              {!isTrulyCustom && (
-                <>
-                  <MenuItem
-                    disabled={isReloading}
-                    className="data-disabled:opacity-50"
-                    onClick={() => void handleReloadModels()}
-                  >
-                    <IconRefreshAnticlockwiseOutline18
-                      className={cn(
-                        'size-3.5 shrink-0',
-                        isReloading && 'animate-spin',
-                      )}
-                    />
-                    {isReloading ? 'Reloading models...' : 'Reload models'}
-                  </MenuItem>
-                  <MenuSeparator />
-                </>
-              )}
               <MenuItem
                 disabled={!hasInstanceModels || allInstanceModelsEnabled}
                 className="data-disabled:opacity-50"
@@ -2817,6 +2852,9 @@ function ModelsSection({
                 const vendorGroups = groupEntriesByVendor(
                   filteredGroup.entries,
                   filterInstance,
+                )?.filter(
+                  (group) =>
+                    !showEnabledOnly || group.entries.some(isModelEnabled),
                 );
 
                 // Search results are intentionally flat. Outside of search,
@@ -2827,7 +2865,7 @@ function ModelsSection({
                     <div className="space-y-2">
                       {vendorGroups.map((group) => (
                         <VendorModelGroup
-                          key={group.prefix || 'other'}
+                          key={`${modelVisibility}-${group.prefix || 'other'}`}
                           instance={filteredGroup.instance}
                           group={group}
                           preferences={preferences}
@@ -2835,7 +2873,8 @@ function ModelsSection({
                           onEditThinking={handleEditThinking}
                           onEditCustomModel={handleEdit}
                           onDeleteCustomModel={handleDelete}
-                          defaultExpanded={false}
+                          defaultExpanded={showEnabledOnly}
+                          onlyEnabled={showEnabledOnly}
                         />
                       ))}
                     </div>
@@ -2845,7 +2884,11 @@ function ModelsSection({
                 return (
                   <ModelCardList
                     instance={filteredGroup.instance}
-                    entries={filteredGroup.entries}
+                    entries={
+                      showEnabledOnly
+                        ? filteredGroup.entries.filter(isModelEnabled)
+                        : filteredGroup.entries
+                    }
                     preferences={preferences}
                     onToggleModel={handleToggleModel}
                     onEditThinking={handleEditThinking}
@@ -2870,7 +2913,9 @@ function ModelsSection({
           {noResults && (
             <div className="rounded-lg border border-derived-subtle p-4">
               <p className="text-center text-muted-foreground text-sm">
-                No models match your filter.
+                {showEnabledOnly && !searchQuery.trim()
+                  ? 'No models are enabled.'
+                  : 'No models match your filter.'}
               </p>
             </div>
           )}
