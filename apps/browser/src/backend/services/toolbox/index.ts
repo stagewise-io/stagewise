@@ -1093,9 +1093,7 @@ export class ToolboxService
     const perMount = await Promise.all(
       mounts.map(async (m) => ({
         mount: m,
-        skills: existsSync(m.absolutePath)
-          ? await discoverSkills(m.absolutePath)
-          : [],
+        skills: await discoverSkills(m.skillsPath ?? m.absolutePath),
       })),
     );
     if (gen !== this.globalSkillsRebuildGeneration) return;
@@ -1184,7 +1182,9 @@ export class ToolboxService
       this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
     );
     for (const mount of enabledGlobalMounts) {
-      const skills = await discoverSkills(mount.absolutePath);
+      const skills = await discoverSkills(
+        mount.skillsPath ?? mount.absolutePath,
+      );
       for (const skill of skills) {
         if (allDisabled.has(skill.name) || disabledGlobalSkills.has(skill.name))
           continue;
@@ -1813,7 +1813,7 @@ export class ToolboxService
     };
 
     for (const mount of getGlobalSkillsMounts()) {
-      const parentDir = path.dirname(mount.absolutePath);
+      const parentDir = path.dirname(mount.skillsPath ?? mount.absolutePath);
       if (!existsSync(parentDir)) continue;
 
       const watcher = chokidar.watch(parentDir, {

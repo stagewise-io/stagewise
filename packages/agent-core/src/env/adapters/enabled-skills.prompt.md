@@ -9,7 +9,7 @@ Each skill is a folder with a `SKILL.md` file and optional supporting files.
 1. **`plugins/{id}/SKILL.md`** — Core intrinsic knowledge. Always prefer.
 2. **`globalskills-sw/*`** — User-level skills from `~/.stagewise/skills/`. Personal defaults across all workspaces.
 3. **`{WORKSPACE}/.stagewise/skills/*`** — Workspace-specific, created for you. Overrides general skills.
-4. **`globalskills-agents/*`** — Cross-agent user-level skills from `~/.agents/skills/`.
+4. **`globalskills-agents/skills/*`** — Cross-agent user-level skills from `~/.agents/skills/`.
 5. **`{WORKSPACE}/.agents/skills/*`** — General skills shared with other agents.
 
 ### Workflow
