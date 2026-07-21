@@ -6,13 +6,7 @@ import {
   IconCircleInfoOutline18,
 } from '@stagewise/icons';
 import { LoaderCircleIcon } from 'lucide-react';
-import type { AppState } from '@shared/karton-contracts/ui';
 import { SidebarToast } from '../../../_components/sidebar-toast';
-
-type NotificationIconProps = Pick<
-  AppState['notifications'][number],
-  'type' | 'icon'
->;
 
 export function NotificationBanners() {
   const notifications = useKartonState((s) => s.notifications);
@@ -82,15 +76,13 @@ export function NotificationBanners() {
   );
 }
 
-function NotificationIcon({ type, icon }: NotificationIconProps) {
+function NotificationIcon({ type, icon }: { type: string; icon?: 'spinner' }) {
   if (icon === 'spinner') {
     return (
-      <span
+      <LoaderCircleIcon
         className="mt-0.5 size-3.5 shrink-0 animate-spin text-foreground"
         aria-hidden="true"
-      >
-        <LoaderCircleIcon className="size-full" />
-      </span>
+      />
     );
   }
 
