@@ -334,8 +334,6 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
             <>
               <Sidebar />
 
-              {!sidebarCollapsed && <ResizableHandle />}
-
               <ResizablePanel
                 id="content-panel"
                 order={1}
