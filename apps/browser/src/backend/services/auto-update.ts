@@ -199,6 +199,7 @@ export class AutoUpdateService extends DisposableService {
 
       // Reset downloaded state so the guard in checkForUpdates() allows
       // re-checking against the new channel's update feed.
+      this.dismissUpdateNotification();
       this.updateDownloaded = false;
       this.updateInfo = null;
       this.setAutoUpdateState('idle');
@@ -297,6 +298,14 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(`[AutoUpdateService] Error message: ${error.message}`);
       this.logger.debug(`[AutoUpdateService] Error stack: ${error.stack}`);
       this.report(error, 'autoUpdaterError');
+
+      if (this.updateDownloaded) {
+        this.logger.debug(
+          '[AutoUpdateService] Preserving ready update after updater error',
+        );
+        return;
+      }
+
       this.dismissUpdateNotification();
       this.setAutoUpdateState('error', null, error.message);
     });
@@ -318,6 +327,15 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] No update available, app is up to date',
       );
+
+      if (this.updateDownloaded) {
+        this.logger.debug(
+          '[AutoUpdateService] Ignoring stale no-update result because an update is ready',
+        );
+        return;
+      }
+
+      this.dismissUpdateNotification();
       this.setAutoUpdateState('not-available');
     });
 
