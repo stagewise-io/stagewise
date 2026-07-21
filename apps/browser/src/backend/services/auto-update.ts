@@ -299,12 +299,8 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(`[AutoUpdateService] Error stack: ${error.stack}`);
       this.report(error, 'autoUpdaterError');
 
-      if (this.updateDownloaded) {
-        this.logger.debug(
-          '[AutoUpdateService] Preserving ready update after updater error',
-        );
-        return;
-      }
+      // Keep the ready-to-install update visible.
+      if (this.updateDownloaded) return;
 
       this.dismissUpdateNotification();
       this.setAutoUpdateState('error', null, error.message);
@@ -319,7 +315,14 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] Update available, download starting automatically',
       );
-      this.showUpdateDownloadingNotification();
+      this.dismissUpdateNotification();
+      this.updateNotificationId = this.notificationService.showNotification({
+        title: 'Update Available',
+        message: 'A new version is being downloaded.',
+        type: 'info',
+        icon: 'spinner',
+        actions: [],
+      });
       this.setAutoUpdateState('downloading');
     });
 
@@ -327,14 +330,6 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] No update available, app is up to date',
       );
-
-      if (this.updateDownloaded) {
-        this.logger.debug(
-          '[AutoUpdateService] Ignoring stale no-update result because an update is ready',
-        );
-        return;
-      }
-
       this.dismissUpdateNotification();
       this.setAutoUpdateState('not-available');
     });
@@ -385,18 +380,6 @@ export class AutoUpdateService extends DisposableService {
 
     this.notificationService.dismissNotification(this.updateNotificationId);
     this.updateNotificationId = null;
-  }
-
-  private showUpdateDownloadingNotification(): void {
-    this.dismissUpdateNotification();
-
-    this.updateNotificationId = this.notificationService.showNotification({
-      title: 'Update Available',
-      message: 'A new version is being downloaded.',
-      type: 'info',
-      icon: 'spinner',
-      actions: [],
-    });
   }
 
   private showUpdateReadyNotification(releaseName: string): void {
