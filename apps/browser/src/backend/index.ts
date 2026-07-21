@@ -5,6 +5,7 @@ import { app, protocol } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { installStartupOpenUrlListener } from './startup-url-events';
+import { applyPendingAppDataReset } from './utils/app-data-reset';
 
 // CRITICAL: `main` is imported dynamically (below in the 'ready' handler)
 // instead of statically. On Windows machines without the VC++ redistributable
@@ -61,6 +62,12 @@ installStartupOpenUrlListener();
 // We keep userData where it is, but we will put session data into a sub-folder called "session"
 app.setPath('userData', path.join(app.getPath('appData'), appBaseName));
 app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
+
+try {
+  applyPendingAppDataReset(app.getPath('userData'));
+} catch (error) {
+  console.error('[AppDataReset] Failed to reset app data', error);
+}
 
 // Register custom protocols as privileged (must happen before app.ready)
 protocol.registerSchemesAsPrivileged([

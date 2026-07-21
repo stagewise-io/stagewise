@@ -1658,6 +1658,12 @@ export type KartonContract = {
       /** Quit the app and install the downloaded update */
       quitAndInstall: () => Promise<void>;
     };
+    appData: {
+      /** Open the OS-specific Electron userData directory. */
+      openFolder: () => Promise<void>;
+      /** Delete app data on restart while retaining the installation ID. */
+      reset: () => Promise<void>;
+    };
     config: {
       set: (config: Partial<GlobalConfig>) => Promise<void>;
       previewSoundPack: (
