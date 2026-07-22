@@ -98,6 +98,7 @@ export type ModelWithOptions = {
   contextWindowSize: number;
   providerMode: ProviderMode;
   connectedCodingPlanId?: string;
+  providerType?: string;
   reasoningSignatureSource: ReasoningSignatureSource;
   /**
    * When true, the agent must strip the `strict` field from every tool
@@ -804,6 +805,7 @@ export class ModelProviderService {
       }),
       contextWindowSize: modelSettings.modelContextRaw,
       providerMode: type.providerMode,
+      providerType: instance?.typeId ?? type.id,
       ...(resolved.connectedCodingPlanId
         ? { connectedCodingPlanId: resolved.connectedCodingPlanId }
         : {}),
@@ -935,6 +937,7 @@ export class ModelProviderService {
         typeof streamText
       >[0]['providerOptions'],
       contextWindowSize: customModel.contextWindowSize,
+      providerType: instance?.typeId ?? type.id,
       reasoningSignatureSource,
       ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
     };
@@ -1063,6 +1066,7 @@ export class ModelProviderService {
       providerOptions: resolvedProviderOptions,
       contextWindowSize: contextWindow,
       providerMode: type.providerMode,
+      providerType: instance.typeId,
       reasoningSignatureSource,
       ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
     };

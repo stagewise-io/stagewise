@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Select } from '@stagewise/stage-ui/components/select';
 import { Slider } from '@stagewise/stage-ui/components/slider';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -16,10 +16,31 @@ import { PlayIcon } from 'lucide-react';
 export function StepTheme({
   onNext,
   onBack,
+  onPersonalizationChanged,
 }: {
   onNext: () => void;
   onBack: () => void;
+  onPersonalizationChanged: () => void;
 }) {
+  const [pendingMutationCount, setPendingMutationCount] = useState(0);
+  const isPersonalizationPending = pendingMutationCount > 0;
+
+  const persistPersonalizationChange = useCallback(
+    async (mutation: () => Promise<boolean>) => {
+      setPendingMutationCount((count) => count + 1);
+      try {
+        if (await mutation()) onPersonalizationChanged();
+      } finally {
+        setPendingMutationCount((count) => count - 1);
+      }
+    },
+    [onPersonalizationChanged],
+  );
+
+  const handleFinish = useCallback(() => {
+    if (!isPersonalizationPending) onNext();
+  }, [isPersonalizationPending, onNext]);
+
   return (
     <>
       <div className="app-no-drag flex flex-1 flex-col items-center overflow-hidden px-8 py-8">
@@ -37,19 +58,33 @@ export function StepTheme({
             </p>
           </div>
 
-          <ThemeSelection />
-          <SoundSelection />
+          <ThemeSelection onChange={persistPersonalizationChange} />
+          <SoundSelection onChange={persistPersonalizationChange} />
         </OverlayScrollbar>
       </div>
       <OnboardingBottomNav
         left={<BackButton onClick={onBack} />}
-        right={<NextButton onClick={onNext} label="Finish" />}
+        right={
+          <NextButton
+            onClick={handleFinish}
+            label="Finish"
+            disabled={isPersonalizationPending}
+          />
+        }
       />
     </>
   );
 }
 
-function ThemeSelection() {
+type PersonalizationChangeHandler = (
+  mutation: () => Promise<boolean>,
+) => Promise<void>;
+
+function ThemeSelection({
+  onChange,
+}: {
+  onChange: PersonalizationChangeHandler;
+}) {
   const { currentThemeId, handleThemeChange } = useThemeSelection();
 
   const themeIds = PERSONALIZATION_THEMES.map((t) => t.id);
@@ -72,7 +107,7 @@ function ThemeSelection() {
       if (nextIndex !== null) {
         e.preventDefault();
         const nextId = themeIds[nextIndex]!;
-        void handleThemeChange(nextId);
+        void onChange(() => handleThemeChange(nextId));
         // Move focus to the newly-selected radio
         const container = e.currentTarget.parentElement;
         if (container) {
@@ -82,7 +117,7 @@ function ThemeSelection() {
         }
       }
     },
-    [themeIds, handleThemeChange],
+    [themeIds, handleThemeChange, onChange],
   );
 
   return (
@@ -98,7 +133,9 @@ function ThemeSelection() {
             key={theme.id}
             type="button"
             className="group rounded-lg"
-            onClick={() => handleThemeChange(theme.id)}
+            onClick={() => {
+              void onChange(() => handleThemeChange(theme.id));
+            }}
             onKeyDown={(e) => handleThemeKeyDown(e, index)}
             aria-checked={active}
             aria-label={`Use ${theme.name} theme`}
@@ -114,7 +151,11 @@ function ThemeSelection() {
   );
 }
 
-function SoundSelection() {
+function SoundSelection({
+  onChange,
+}: {
+  onChange: PersonalizationChangeHandler;
+}) {
   const {
     soundLoudness,
     currentPack,
@@ -132,7 +173,9 @@ function SoundSelection() {
         <div className="flex items-center gap-1">
           <Select
             value={currentPack}
-            onValueChange={handleSoundPackChange}
+            onValueChange={(value) => {
+              void onChange(() => handleSoundPackChange(value));
+            }}
             items={soundPackItems}
             size="sm"
             triggerClassName="w-40"
@@ -161,7 +204,9 @@ function SoundSelection() {
             step={1}
             ariaLabel="Notification sound loudness"
             thickness="default"
-            onValueChange={handleLoudnessChange}
+            onValueChange={(value) => {
+              void onChange(() => handleLoudnessChange(value));
+            }}
           />
           <div className="relative h-3 text-[11px] text-muted-foreground">
             {NOTIFICATION_LOUDNESS_OPTIONS.map((option, index) => (

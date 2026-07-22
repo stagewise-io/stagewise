@@ -7,6 +7,7 @@ import type { PreferencesService } from './preferences';
 import {
   modelProviderSchema,
   personalizationThemeIdSchema,
+  providerInstanceTypeIds,
   socialAuthProviderSchema,
   type ModelProvider,
   type PersonalizationThemeId,
@@ -14,6 +15,12 @@ import {
   type TelemetryLevel,
   type ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  AuthHandoffProvider,
+  UIEventName,
+  UIEventProperties,
+} from '@shared/karton-contracts/ui/telemetry';
+export type { UIEventName } from '@shared/karton-contracts/ui/telemetry';
 import type { CodingPlanId } from '@shared/coding-plans';
 import type { Logger } from './logger';
 import { DisposableService } from './disposable';
@@ -29,7 +36,8 @@ type OnboardingAuthFailureKind =
 type OnboardingOtpFailureKind =
   | 'backend-error'
   | 'network-error'
-  | 'turnstile-not-ready';
+  | 'turnstile-not-ready'
+  | 'turnstile-solve-failed';
 
 const onboardingAuthMethodSchema = z.enum([
   'stagewise',
@@ -53,9 +61,35 @@ const onboardingOtpFailureKindSchema = z.enum([
   'backend-error',
   'network-error',
   'turnstile-not-ready',
+  'turnstile-solve-failed',
 ]);
 
-export type EventProperties = {
+const authHandoffProviderSchema = z.union([
+  socialAuthProviderSchema,
+  z.literal('email'),
+]);
+const providerInstanceTypeIdSchema = z.enum(providerInstanceTypeIds);
+const onboardingStepSchema = z.enum([
+  'login',
+  'configure-providers',
+  'personalization',
+]);
+const nonNegativeNumberSchema = z.number().nonnegative();
+const nonNegativeIntegerSchema = nonNegativeNumberSchema.int();
+const positiveIntegerSchema = z.number().int().positive();
+const onboardingProviderIdentitySchema = z.object({
+  provider_key: z.string().min(1),
+  provider_type: providerInstanceTypeIdSchema,
+  provider_kind: z.enum([
+    'vendor-api',
+    'coding-plan',
+    'gateway',
+    'self-hosted',
+  ]),
+  plan_id: codingPlanIdSchema.optional(),
+});
+
+export type BackendEventProperties = {
   // Lifecycle
   'app-launched': {
     matched_process_counts: Record<string, number>;
@@ -74,6 +108,12 @@ export type EventProperties = {
     auth_method?: OnboardingAuthCompletionMethod;
     provider?: ModelProvider;
     plan_id?: CodingPlanId;
+    onboarding_run_id?: string;
+    total_duration_ms?: number;
+    connected_provider_keys?: string[];
+    connected_provider_count?: number;
+    provider_step_skipped?: boolean;
+    personalization_changed?: boolean;
   };
   'onboarding-demo-slide-clicked': {
     slide_name: string;
@@ -106,7 +146,7 @@ export type EventProperties = {
   };
   'onboarding-auth-method-failed': {
     auth_method: OnboardingAuthMethod;
-    provider?: ModelProvider | SocialAuthProvider;
+    provider?: ModelProvider | AuthHandoffProvider;
     plan_id?: CodingPlanId;
     error_kind: OnboardingAuthFailureKind;
   };
@@ -124,7 +164,7 @@ export type EventProperties = {
   };
   'account-auth-method-failed': {
     auth_method: 'stagewise';
-    provider?: SocialAuthProvider;
+    provider?: AuthHandoffProvider;
     error_kind: OnboardingAuthFailureKind;
   };
   'chat-auth-social-requested': { provider: SocialAuthProvider };
@@ -136,7 +176,7 @@ export type EventProperties = {
   };
   'chat-auth-method-failed': {
     auth_method: 'stagewise';
-    provider?: SocialAuthProvider;
+    provider?: AuthHandoffProvider;
     error_kind: OnboardingAuthFailureKind;
   };
 
@@ -208,6 +248,7 @@ export type EventProperties = {
     model_id: string;
     provider_mode: string;
     coding_plan_id?: string;
+    provider_type?: string;
     input_tokens: number;
     output_tokens: number;
     tool_call_count: number;
@@ -487,6 +528,9 @@ export type EventProperties = {
   'experience-founder-call-survey-dismissed': undefined;
 };
 
+export type EventProperties = Omit<BackendEventProperties, UIEventName> &
+  UIEventProperties;
+
 export const UI_TELEMETRY_EVENT_NAMES = [
   'account-page-viewed',
   'chat-new-agent-clicked',
@@ -500,6 +544,15 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'custom-provider-add-started',
   'element-selection-started',
   'element-selection-stopped',
+  'onboarding-started',
+  'onboarding-step-viewed',
+  'onboarding-step-exited',
+  'onboarding-auth-skipped',
+  'onboarding-provider-detail-viewed',
+  'onboarding-provider-connect-attempted',
+  'onboarding-provider-connected',
+  'onboarding-provider-connect-failed',
+  'onboarding-provider-step-completed',
   'onboarding-auth-api-key-input-focused',
   'onboarding-auth-coding-plan-opened',
   'onboarding-auth-method-completed',
@@ -507,6 +560,8 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'onboarding-auth-mode-switched',
   'onboarding-auth-social-requested',
   'onboarding-auth-social-verified',
+  'onboarding-auth-email-handoff-requested',
+  'onboarding-auth-email-handoff-verified',
   'onboarding-auth-otp-failed',
   'onboarding-auth-otp-requested',
   'onboarding-auth-otp-verified',
@@ -518,12 +573,16 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'account-auth-otp-verified',
   'account-auth-social-requested',
   'account-auth-social-verified',
+  'account-auth-email-handoff-requested',
+  'account-auth-email-handoff-verified',
   'chat-auth-method-failed',
   'chat-auth-otp-failed',
   'chat-auth-otp-requested',
   'chat-auth-otp-verified',
   'chat-auth-social-requested',
   'chat-auth-social-verified',
+  'chat-auth-email-handoff-requested',
+  'chat-auth-email-handoff-verified',
   'onboarding-demo-slide-clicked',
   'settings-opened',
   'suggestion-clicked',
@@ -540,15 +599,18 @@ export const UI_TELEMETRY_EVENT_NAMES = [
   'experience-survey-feedback-submitted',
   'experience-founder-call-survey-opened',
   'experience-founder-call-survey-dismissed',
-] as const satisfies ReadonlyArray<keyof EventProperties>;
-
-export type UIEventName = (typeof UI_TELEMETRY_EVENT_NAMES)[number];
-export type UIEventProperties = Pick<EventProperties, UIEventName>;
+] as const satisfies ReadonlyArray<UIEventName>;
 
 const UI_TELEMETRY_EVENT_SCHEMAS = {
   'account-page-viewed': z.undefined().optional(),
   'chat-new-agent-clicked': z.object({
-    source: z.enum(['sidebar-top', 'sidebar-active-agents', 'hotkey']),
+    source: z.enum([
+      'sidebar-top',
+      'sidebar-active-agents',
+      'sidebar-workspace-group',
+      'collapsed-titlebar',
+      'hotkey',
+    ]),
   }),
   'chat-sidebar-toggled': z.object({
     new_value: z.enum(['open', 'closed']),
@@ -562,16 +624,19 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   }),
   'custom-model-add-finished': z.undefined().optional(),
   'custom-model-add-started': z.undefined().optional(),
-  'custom-provider-add-aborted': z.object({
-    had_validation_errors: z.boolean(),
-    any_field_touched: z.boolean(),
-    api_spec: z.string(),
-    is_local: z.boolean().optional(),
-    base_url: z.string().optional(),
-    aws_auth_mode: z
-      .enum(['access-keys', 'profile', 'default-chain'])
-      .optional(),
-  }),
+  'custom-provider-add-aborted': z
+    .object({
+      had_validation_errors: z.boolean(),
+      any_field_touched: z.boolean(),
+      api_spec: z.string(),
+      is_local: z.boolean().optional(),
+      base_url: z.string().optional(),
+      aws_auth_mode: z
+        .enum(['access-keys', 'profile', 'default-chain'])
+        .optional(),
+    })
+    .strict()
+    .optional(),
   'custom-provider-add-finished': z.object({
     api_spec: z.string(),
     is_local: z.boolean().optional(),
@@ -585,6 +650,83 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'element-selection-stopped': z.object({
     element_selected: z.boolean(),
   }),
+  'onboarding-started': z
+    .object({
+      onboarding_run_id: z.string().min(1),
+      already_authenticated: z.boolean(),
+      connected_provider_count: nonNegativeIntegerSchema,
+    })
+    .strict(),
+  'onboarding-step-viewed': z
+    .object({
+      onboarding_run_id: z.string().min(1),
+      step: onboardingStepSchema,
+      previous_step: onboardingStepSchema.optional(),
+      visit_index: positiveIntegerSchema,
+      elapsed_ms_since_start: nonNegativeNumberSchema,
+    })
+    .strict(),
+  'onboarding-step-exited': z
+    .object({
+      onboarding_run_id: z.string().min(1),
+      step: onboardingStepSchema,
+      destination: z.union([onboardingStepSchema, z.literal('completed')]),
+      action: z.enum(['next', 'back', 'skip', 'finish']),
+      duration_ms: nonNegativeNumberSchema,
+    })
+    .strict(),
+  'onboarding-auth-skipped': z
+    .object({ onboarding_run_id: z.string().min(1) })
+    .strict(),
+  'onboarding-provider-detail-viewed': onboardingProviderIdentitySchema
+    .extend({
+      onboarding_run_id: z.string().min(1),
+      position: nonNegativeIntegerSchema,
+      search_active: z.boolean(),
+      already_connected: z.boolean(),
+    })
+    .strict(),
+  'onboarding-provider-connect-attempted': onboardingProviderIdentitySchema
+    .extend({
+      onboarding_run_id: z.string().min(1),
+      attempt_number: positiveIntegerSchema,
+    })
+    .strict(),
+  'onboarding-provider-connected': onboardingProviderIdentitySchema
+    .extend({
+      onboarding_run_id: z.string().min(1),
+      attempt_number: positiveIntegerSchema,
+      duration_ms: nonNegativeNumberSchema,
+      discovered_model_count: nonNegativeIntegerSchema,
+    })
+    .strict(),
+  'onboarding-provider-connect-failed': onboardingProviderIdentitySchema
+    .extend({
+      onboarding_run_id: z.string().min(1),
+      attempt_number: positiveIntegerSchema,
+      duration_ms: nonNegativeNumberSchema,
+      failure_stage: z.enum(['credential-validation', 'rpc']),
+      error_kind: z.enum([
+        'validation-error',
+        'network-error',
+        'unknown-error',
+      ]),
+    })
+    .strict(),
+  'onboarding-provider-step-completed': z
+    .object({
+      onboarding_run_id: z.string().min(1),
+      duration_ms: nonNegativeNumberSchema,
+      connected_provider_count: nonNegativeIntegerSchema,
+      connected_during_step_count: nonNegativeIntegerSchema,
+      connected_provider_keys: z.array(z.string().min(1)),
+      viewed_provider_count: nonNegativeIntegerSchema,
+      connection_attempt_count: nonNegativeIntegerSchema,
+      connection_failure_count: nonNegativeIntegerSchema,
+      search_used: z.boolean(),
+      skipped_without_provider: z.boolean(),
+    })
+    .strict(),
   'onboarding-auth-api-key-input-focused': z.object({
     provider: modelProviderSchema,
   }),
@@ -600,7 +742,7 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'onboarding-auth-method-failed': z.object({
     auth_method: onboardingAuthMethodSchema,
     provider: z
-      .union([modelProviderSchema, socialAuthProviderSchema])
+      .union([modelProviderSchema, authHandoffProviderSchema])
       .optional(),
     plan_id: codingPlanIdSchema.optional(),
     error_kind: onboardingAuthFailureKindSchema,
@@ -615,6 +757,8 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'onboarding-auth-social-verified': z.object({
     provider: socialAuthProviderSchema,
   }),
+  'onboarding-auth-email-handoff-requested': z.undefined().optional(),
+  'onboarding-auth-email-handoff-verified': z.undefined().optional(),
   'onboarding-auth-otp-failed': z.object({
     error_kind: onboardingOtpFailureKindSchema,
   }),
@@ -634,6 +778,8 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'account-auth-social-verified': z.object({
     provider: socialAuthProviderSchema,
   }),
+  'account-auth-email-handoff-requested': z.undefined().optional(),
+  'account-auth-email-handoff-verified': z.undefined().optional(),
   'account-auth-otp-failed': z.object({
     error_kind: onboardingOtpFailureKindSchema,
   }),
@@ -641,7 +787,7 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'account-auth-otp-verified': z.undefined().optional(),
   'account-auth-method-failed': z.object({
     auth_method: z.literal('stagewise'),
-    provider: socialAuthProviderSchema.optional(),
+    provider: authHandoffProviderSchema.optional(),
     error_kind: onboardingAuthFailureKindSchema,
   }),
   'chat-auth-social-requested': z.object({
@@ -650,6 +796,8 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'chat-auth-social-verified': z.object({
     provider: socialAuthProviderSchema,
   }),
+  'chat-auth-email-handoff-requested': z.undefined().optional(),
+  'chat-auth-email-handoff-verified': z.undefined().optional(),
   'chat-auth-otp-failed': z.object({
     error_kind: onboardingOtpFailureKindSchema,
   }),
@@ -657,7 +805,7 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'chat-auth-otp-verified': z.undefined().optional(),
   'chat-auth-method-failed': z.object({
     auth_method: z.literal('stagewise'),
-    provider: socialAuthProviderSchema.optional(),
+    provider: authHandoffProviderSchema.optional(),
     error_kind: onboardingAuthFailureKindSchema,
   }),
   'onboarding-demo-slide-clicked': z.object({
@@ -687,7 +835,7 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
     theme: personalizationThemeIdSchema,
   }),
   'changed-notification-sound-loudness': z.object({
-    loudness: z.enum(['off', 'subtle', 'loud']),
+    loudness: z.enum(['off', 'subtle', 'default']),
   }),
   'changed-notification-sound-theme': z.object({
     theme: z.string(),

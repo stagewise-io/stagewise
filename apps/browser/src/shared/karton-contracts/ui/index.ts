@@ -19,6 +19,11 @@ import type { SelectedElement } from '../../selected-elements';
 import type { FileDiff } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
+export type {
+  UIEventName,
+  UIEventProperties,
+  TrackUIEvent,
+} from './telemetry';
 import type {
   FilePickerRequest,
   GlobalConfig,
@@ -1281,6 +1286,15 @@ export type AppState = {
   logIngest: { port: number; token: string } | null;
 };
 
+export type OnboardingCompletionSummary = {
+  onboarding_run_id: string;
+  total_duration_ms: number;
+  connected_provider_keys: string[];
+  connected_provider_count: number;
+  provider_step_skipped: boolean;
+  personalization_changed: boolean;
+};
+
 export type AuthStatus =
   | 'authenticated'
   | 'unauthenticated'
@@ -1594,7 +1608,7 @@ export type KartonContract = {
                   | 'minimax-plan'
                   | 'mimo-plan';
               };
-              suggestion?: { id: string; url: string; prompt: string };
+              summary?: OnboardingCompletionSummary;
             },
       ) => Promise<void>;
       clearPendingOnboardingSuggestion: () => Promise<void>;
