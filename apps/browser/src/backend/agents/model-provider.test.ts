@@ -340,6 +340,7 @@ describe('discovered model routing', () => {
     expect(getModelRequestUrl(result)).toBe(
       'http://ollama.example/v1/chat/completions',
     );
+    expect(result.providerType).toBe('ollama');
     expect(result.reasoningSignatureSource).toMatchObject({
       providerMode: 'custom',
       modelId,
@@ -401,6 +402,7 @@ describe('discovered model routing', () => {
       'https://discovered.example/v1/chat/completions',
     );
     expect(result.providerMode).toBe('custom');
+    expect(result.providerType).toBe('custom-openai-chat');
     expect(
       (service as any).telemetryService.withTracing.mock.calls[0]?.[1]
         .posthogProperties,

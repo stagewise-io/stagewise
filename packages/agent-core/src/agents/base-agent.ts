@@ -593,6 +593,7 @@ export abstract class BaseAgent<
   private _stepStartTime = 0;
   private _stepProviderMode = '';
   private _stepCodingPlanId: string | undefined;
+  private _stepProviderType: string | undefined;
   private _toolCallDurations = new Map<string, number>();
   private _memoryWriter: AgentMemoryWriter | null = null;
   private _memoryWriteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1636,9 +1637,10 @@ export abstract class BaseAgent<
           [PROVIDER_INSTANCE_ID_METADATA_KEY]: stepProviderInstanceId,
         },
       );
-      this._stepProviderMode = modelWithOptions.providerMode;
-      this._stepCodingPlanId = modelWithOptions.connectedCodingPlanId;
+      this.applyStepProviderMetadataIfCurrent(modelWithOptions, stepGen);
+      if (this._stepGeneration !== stepGen) return;
     } catch (error) {
+      if (this._stepGeneration !== stepGen) return;
       const err = error as Error;
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] Failed to resolve model "${stepModelId}": ${err.message}`,
@@ -1666,18 +1668,23 @@ export abstract class BaseAgent<
         queueFlushIndex >= 0 ? queueFlushIndex : undefined,
         modelWithOptions.reasoningSignatureSource,
       );
+      if (this._stepGeneration !== stepGen) return;
       tools = await this.getToolsForStep();
+      if (this._stepGeneration !== stepGen) return;
       this._toolCallDurations.clear();
       tools = this.wrapToolsWithTiming(tools);
       tools = this.wrapToolsWithOutputBudget(tools);
       if (modelWithOptions.stripStrictFromTools) {
         tools = this.stripStrictFromTools(tools);
       }
+      const modelSettings = await this.getModelSettings(this.messages);
+      if (this._stepGeneration !== stepGen) return;
       resolvedConfig = {
         ...this.config,
-        ...(await this.getModelSettings(this.messages)),
+        ...modelSettings,
       };
     } catch (e) {
+      if (this._stepGeneration !== stepGen) return;
       const error = e as Error;
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] Failed to prepare step context: ${this.formatError(error)}`,
@@ -1695,6 +1702,8 @@ export abstract class BaseAgent<
       return;
     }
 
+    if (this._stepGeneration !== stepGen) return;
+
     if (isApprovalContinuation)
       modelMessages = this.ensureToolApprovalResponseIsLast(modelMessages);
 
@@ -1703,8 +1712,10 @@ export abstract class BaseAgent<
 
     this.host.logger.debug(`[BaseAgent:${this.instanceId}] Running step`);
 
+    if (this._stepGeneration !== stepGen) return;
     this.stepAbortController = new AbortController();
 
+    if (this._stepGeneration !== stepGen) return;
     const stream = streamText({
       model: modelWithOptions.model,
       providerOptions: modelWithOptions.providerOptions,
@@ -2442,6 +2453,7 @@ export abstract class BaseAgent<
       model_id: this.state.get().activeModelId,
       provider_mode: this._stepProviderMode,
       coding_plan_id: this._stepCodingPlanId,
+      provider_type: this._stepProviderType,
       input_tokens: result.usage.inputTokens ?? 0,
       output_tokens: result.usage.outputTokens ?? 0,
       tool_call_count: result.toolCalls.length,
@@ -2911,6 +2923,17 @@ export abstract class BaseAgent<
         },
       });
     }
+  }
+
+  private applyStepProviderMetadataIfCurrent(
+    modelWithOptions: ModelWithOptions,
+    stepGeneration: number,
+  ): void {
+    if (this._stepGeneration !== stepGeneration) return;
+
+    this._stepProviderMode = modelWithOptions.providerMode;
+    this._stepCodingPlanId = modelWithOptions.connectedCodingPlanId;
+    this._stepProviderType = modelWithOptions.providerType;
   }
 
   private async internalStop(

@@ -65,6 +65,8 @@ export interface ModelWithOptions {
    * telemetry.
    */
   connectedCodingPlanId?: string;
+  /** Stable host-defined provider type used for aggregate telemetry. */
+  providerType?: string;
   /**
    * Semantic owner of any signed `reasoning_details` this route produces.
    * Threaded through the step so capture tags the metadata and conversion
