@@ -721,7 +721,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     if (openAgent) await stopAgent(openAgent);
   }, [stopAgent, openAgent, isEarlyAbortEligible]);
 
-  // Stable abort callback for ChatInputActions — avoids memo-busting when
+  // Stable abort callback for ChatInput — avoids memo-busting when
   // abortAgent's reference changes (e.g. openAgent switches).
   const abortAgentRef = useRef(abortAgent);
   abortAgentRef.current = abortAgent;
@@ -795,6 +795,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     openAgent ? (s.toolbox[openAgent]?.pendingUserQuestion?.id ?? null) : null,
   );
   const hasPendingQuestion = pendingQuestionId !== null;
+  const canStopAgent = isWorking && !hasPendingQuestion;
   const pendingQuestionIdRef = useRef(pendingQuestionId);
   pendingQuestionIdRef.current = pendingQuestionId;
   const interruptQuestionWithMessage = useKartonProcedure(
@@ -1398,7 +1399,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       [shouldPreserveNativeCopy],
     ),
     HotkeyActions.STOP_AGENT,
-    isWorking && !hasPendingQuestion,
+    canStopAgent,
   );
 
   useEventListener(
@@ -1406,7 +1407,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     (e: KeyboardEvent) => {
       if (e.code === 'Escape' && chatInputActive) {
         if (e.defaultPrevented) return; // ChatInput's onEscape already handled it
-        if (isWorking && !hasPendingQuestion) {
+        if (canStopAgent) {
           abortAgentRef.current();
           return;
         }
@@ -1860,6 +1861,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             attachmentCount={fileAttachments.length}
             showModelSelect
             onModelChange={handleModelChange}
+            onStop={canStopAgent ? stableAbortAgent : undefined}
             showContextUsageRing={
               !!usedTokens && (isVerboseMode || contextUsed > 80)
             }
@@ -1877,9 +1879,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             slashCommands={slashCommands}
           />
           <ChatInputActions
-            isAgentWorking={isWorking}
-            hasPendingQuestion={hasPendingQuestion}
-            onStop={stableAbortAgent}
             showElementSelectorButton={hasVisibleBrowsingTab}
             elementSelectionActive={elementSelectionActive}
             onToggleElementSelection={handleToggleElementSelection}

@@ -774,7 +774,6 @@ export const MessageUser = memo(
                     {/* Action buttons */}
                     <div className="relative flex shrink-0 flex-col items-center justify-end gap-1">
                       <ChatInputActions
-                        isAgentWorking={false}
                         showElementSelectorButton={hasVisibleBrowsingTab}
                         elementSelectionActive={elementSelectionActive}
                         onToggleElementSelection={handleToggleElementSelection}

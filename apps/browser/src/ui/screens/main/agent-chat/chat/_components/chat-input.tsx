@@ -234,6 +234,8 @@ export interface ChatInputProps {
   showToolApprovalSelect?: boolean;
   onToolApprovalChange?: () => void;
 
+  onStop?: () => void;
+
   // Context usage ring
   showContextUsageRing?: boolean;
   contextUsedPercentage?: number;
@@ -307,6 +309,8 @@ export const ChatInput = memo(function ChatInput({
 
   showToolApprovalSelect = true,
   onToolApprovalChange,
+
+  onStop,
 
   showContextUsageRing = false,
   contextUsedPercentage = 0,
@@ -857,14 +861,15 @@ export const ChatInput = memo(function ChatInput({
         />
       </div>
 
-      {/* Controls area - only shown when not disabled and has content to show */}
       {!disabled &&
         (showModelSelect ||
           showToolApprovalSelect ||
+          onStop ||
           (showContextUsageRing && contextUsedPercentage > 0)) && (
           <div
             className={cn(
-              'flex shrink-0 flex-row flex-wrap items-center justify-start gap-2 pr-2 pl-1 *:shrink-0',
+              'relative flex shrink-0 flex-wrap items-center gap-2 pl-1 *:shrink-0',
+              onStop ? 'pr-11' : 'pr-1',
             )}
           >
             {showModelSelect && (
@@ -878,20 +883,30 @@ export const ChatInput = memo(function ChatInput({
               />
             )}
             {showToolApprovalSelect && (
-              <>
-                {/*
-                  Invisible flex spacer that eats remaining horizontal space on
-                  the line containing `ToolApprovalSelect`, pushing the select
-                  to the right edge. `!shrink` overrides the parent's
-                  `*:shrink-0` so the spacer can collapse to 0 when the row
-                  wraps — otherwise it would prevent natural wrap behavior and
-                  force `ToolApprovalSelect` onto its own line prematurely.
-                */}
-                <div className="!shrink min-w-0 grow" aria-hidden />
-                <ToolApprovalSelect
-                  onToolApprovalChange={handleToolApprovalChange}
-                />
-              </>
+              <ToolApprovalSelect
+                onToolApprovalChange={handleToolApprovalChange}
+              />
+            )}
+            {onStop && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    onClick={onStop}
+                    aria-label="Stop agent"
+                    variant="secondary"
+                    className="group absolute right-1 bottom-0 z-10 size-8 cursor-pointer rounded-full p-1 opacity-100! shadow-md"
+                  >
+                    <SquareIcon className="size-3 fill-current" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="flex items-center gap-1.5">
+                    <span>Stop agent</span>
+                    <HotkeyCombo action={HotkeyActions.STOP_AGENT} size="xs" />
+                    <ShortcutCombo value="Esc" size="xs" />
+                  </span>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         )}
@@ -900,12 +915,6 @@ export const ChatInput = memo(function ChatInput({
 });
 
 export interface ChatInputActionsProps {
-  /** Whether the agent is currently working (used to determine stop/send button visibility) */
-  isAgentWorking?: boolean;
-  /** Whether the agent has a pending user question (hides stop button) */
-  hasPendingQuestion?: boolean;
-  onStop?: () => void;
-
   showElementSelectorButton?: boolean;
   elementSelectionActive?: boolean;
   onToggleElementSelection?: () => void;
@@ -919,10 +928,6 @@ export interface ChatInputActionsProps {
 }
 
 export const ChatInputActions = memo(function ChatInputActions({
-  isAgentWorking = false,
-  hasPendingQuestion = false,
-  onStop,
-
   showElementSelectorButton = true,
   elementSelectionActive = false,
   onToggleElementSelection,
@@ -934,10 +939,6 @@ export const ChatInputActions = memo(function ChatInputActions({
   canSendMessage,
   onSubmit,
 }: ChatInputActionsProps) {
-  // Always show the send button; show stop button alongside it when agent is working
-  const showStopButton = isAgentWorking && !hasPendingQuestion && !!onStop;
-  const showSendButton = true;
-
   return (
     <div className="flex shrink-0 flex-col items-end justify-end gap-1">
       {/* Element selector and image upload - always shown (can add context to queued messages) */}
@@ -1020,46 +1021,20 @@ export const ChatInputActions = memo(function ChatInputActions({
           </Tooltip>
         </>
       )}
-      {/* Stop + Send buttons row — stop is shown to the left when agent is working */}
-      <div className="flex flex-row items-center gap-2">
-        {showStopButton && (
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                onClick={onStop}
-                aria-label="Stop agent"
-                variant="secondary"
-                className="group z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 opacity-100! shadow-md"
-              >
-                <SquareIcon className="size-3 fill-current" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span className="flex items-center gap-1.5">
-                <span>Stop agent</span>
-                <HotkeyCombo action={HotkeyActions.STOP_AGENT} size="xs" />
-                <ShortcutCombo value="Esc" size="xs" />
-              </span>
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {showSendButton && (
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                disabled={!canSendMessage}
-                onClick={onSubmit}
-                aria-label="Send message"
-                variant="primary"
-                className="z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 shadow-md transition-all disabled:opacity-50"
-              >
-                <ArrowUpIcon className="size-4 stroke-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Send message</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
+      <Tooltip>
+        <TooltipTrigger>
+          <Button
+            disabled={!canSendMessage}
+            onClick={onSubmit}
+            aria-label="Send message"
+            variant="primary"
+            className="z-10 size-8 shrink-0 cursor-pointer rounded-full p-1 shadow-md transition-all disabled:opacity-50"
+          >
+            <ArrowUpIcon className="size-4 stroke-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Send message</TooltipContent>
+      </Tooltip>
     </div>
   );
 });
