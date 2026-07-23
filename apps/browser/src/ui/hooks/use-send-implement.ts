@@ -39,7 +39,9 @@ export function useSendImplement(): () => void {
 
     // Dispatch for optimistic rendering + auto-scroll
     window.dispatchEvent(
-      new CustomEvent('chat-message-sent', { detail: { message } }),
+      new CustomEvent('chat-message-sent', {
+        detail: { agentId: openAgentId, message },
+      }),
     );
 
     void sendUserMessage(openAgentId, message);

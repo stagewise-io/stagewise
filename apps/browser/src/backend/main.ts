@@ -625,6 +625,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         (workspacePath) => gitService.getMountedWorkspaceSummary(workspacePath),
         logger,
       ),
+    (agentIds) => windowLayoutService.removeDeletedSideChatTabs(agentIds),
+  );
+  windowLayoutService.setOnCloseSideChat((agentId) =>
+    agentCoreSeam.registry.dispatch(
+      'agents.discardSideChat',
+      { callerId: 'side-chat-tab-close' },
+      [agentId],
+    ),
   );
 
   toolboxService.setWorkspaceLastUsedAtResolver(

@@ -1,50 +1,57 @@
-import { useMessageEditState } from '@ui/hooks/use-message-edit-state';
+import {
+  MessageEditStateProvider,
+  useMessageEditState,
+} from '@ui/hooks/use-message-edit-state';
+import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
 import {
   useMemo,
   useRef,
   useState,
   useCallback,
   useDeferredValue,
+  useEffect,
 } from 'react';
 import { ChatHistory } from './chat-history';
 import { ChatPanelFooter } from './panel-footer';
-import { useComparingSelector, useKartonState } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import {
   useOpenAgent,
   OpenAgentContext,
   noopAgentSwitcher,
 } from '@ui/hooks/use-open-chat';
-import { useCmdEnterDispatcher } from '@ui/hooks/use-cmd-enter-dispatcher';
 
-export function ChatPanel() {
+export function ChatPanel({ agentId }: { agentId?: string }) {
+  return (
+    <MessageEditStateProvider>
+      <ChatDraftProvider>
+        <ChatPanelInner agentId={agentId} />
+      </ChatDraftProvider>
+    </MessageEditStateProvider>
+  );
+}
+
+function ChatPanelInner({ agentId }: { agentId?: string }) {
   const { forwardDropEvent } = useMessageEditState();
   const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
+  const requestedAgent = agentId ?? openAgent;
 
-  // Single global CMD+Enter listener — dispatches to the highest-priority
-  // visible target registered via `useCmdEnterTarget`.
-  useCmdEnterDispatcher();
-
-  // Narrow selectors: only extract primitive/stable values so streaming
-  // chunks on unrelated agents don't trigger a re-render.
-  const agentHistoryLengths = useKartonState(
-    useComparingSelector((s) =>
-      Object.fromEntries(
-        Object.entries(s.agents.instances).map(([id, agent]) => [
-          id,
-          agent.state.history?.length ?? 0,
-        ]),
-      ),
-    ),
+  const openAgentExists = useKartonState((s) =>
+    requestedAgent ? s.agents.instances[requestedAgent] !== undefined : false,
   );
-  const openAgentExists = openAgent ? openAgent in agentHistoryLengths : false;
+  const resumeAgent = useKartonProcedure((p) => p.agents.resume);
+  useEffect(() => {
+    if (agentId && !openAgentExists) void resumeAgent(agentId);
+  }, [agentId, openAgentExists, resumeAgent]);
   // Defer heavy chat rendering so the sidebar updates instantly while the
   // chat area stays empty during the transition.
-  const deferredAgent = useDeferredValue(openAgent);
-  const isTransitioning = openAgent !== deferredAgent;
-  const deferredAgentHistoryLen = deferredAgent
-    ? (agentHistoryLengths[deferredAgent] ?? 0)
-    : 0;
+  const deferredAgent = useDeferredValue(requestedAgent);
+  const isTransitioning = requestedAgent !== deferredAgent;
+  const deferredAgentHistoryLen = useKartonState((s) =>
+    deferredAgent
+      ? (s.agents.instances[deferredAgent]?.state.history.length ?? 0)
+      : 0,
+  );
 
   // Auto-selecting the first agent when openAgent is null is handled
   // centrally by `useAutoSelectFirstAgent` at the main layout root —
@@ -113,7 +120,7 @@ export function ChatPanel() {
     [deferredAgent, setOpenAgent, removeFromHistory],
   );
 
-  if (openAgent === null || openAgent === undefined || !openAgentExists)
+  if (!requestedAgent || !openAgentExists)
     return (
       <div className="flex size-full items-center justify-center text-muted-foreground">
         No agent selected
@@ -137,12 +144,12 @@ export function ChatPanel() {
         {isTransitioning ? (
           <div className={deferredAgentHistoryLen > 0 ? 'flex-1' : 'h-0'} />
         ) : (
-          <ChatHistory />
+          <ChatHistory flushTop={Boolean(agentId)} />
         )}
+        <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
+          <ChatPanelFooter key={requestedAgent} />
+        </div>
       </OpenAgentContext.Provider>
-      <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
-        <ChatPanelFooter key={openAgent} />
-      </div>
     </div>
   );
 }

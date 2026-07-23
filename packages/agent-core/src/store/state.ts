@@ -85,6 +85,8 @@ export type AgentInstanceState<TTools extends UITools = UniversalTools> = {
   allowUserInput: boolean;
   /** @persistence persisted-core — column `parent_agent_instance_id`; used to rebuild the parent/child tree on boot (D13). */
   parentAgentInstanceId: string | null;
+  /** @persistence persisted-core — owning main chat while this chat is presented as a side chat. */
+  sideChatParentId: string | null;
   /** @persistence mixed — see field-level tags on `AgentState` below. */
   state: AgentState<AgentMessage<TTools>>;
 };

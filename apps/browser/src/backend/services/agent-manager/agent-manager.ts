@@ -27,6 +27,9 @@ import { renderBrowserExtraMention } from '@/agents/shared/base-agent/utils';
 
 const AGENT_RPC_COMMANDS = [
   'agents.create',
+  'agents.createSideChat',
+  'agents.promoteSideChat',
+  'agents.discardSideChat',
   'agents.resume',
   'agents.sendUserMessage',
   'agents.interruptQuestionWithMessage',
@@ -57,6 +60,10 @@ export class AgentManagerService extends DisposableService {
   private readonly manager: AgentManager;
   private readonly commandRegistry: CommandRegistry;
   private readonly karton: KartonService;
+  private readonly agentDb: AgentPersistenceDB;
+  private readonly onAgentsDeleted?: (
+    agentIds: readonly string[],
+  ) => Promise<void> | void;
 
   public constructor(
     karton: KartonService,
@@ -81,10 +88,13 @@ export class AgentManagerService extends DisposableService {
     enrichHistoryEntries?: (
       entries: AgentHistoryEntry[],
     ) => Promise<AgentHistoryEntry[]>,
+    onAgentsDeleted?: (agentIds: readonly string[]) => Promise<void> | void,
   ) {
     super();
     this.commandRegistry = commandRegistry;
     this.karton = karton;
+    this.agentDb = agentDb;
+    this.onAgentsDeleted = onAgentsDeleted;
     this.manager = new AgentManager({
       host: agentCoreHost,
       commandRegistry,
@@ -156,10 +166,28 @@ export class AgentManagerService extends DisposableService {
         name as any,
         async (callingClientId: string, ...rest: unknown[]) => {
           const ctx: CommandContext = { callerId: callingClientId };
-          return await this.commandRegistry.dispatch(name, ctx, rest);
+          const deletedAgentIds =
+            name === 'agents.delete' && this.onAgentsDeleted
+              ? await this.collectAgentTreeIds(rest[0] as string)
+              : null;
+          const result = await this.commandRegistry.dispatch(name, ctx, rest);
+          if (deletedAgentIds) await this.onAgentsDeleted?.(deletedAgentIds);
+          return result;
         },
       );
     }
+  }
+
+  private async collectAgentTreeIds(rootId: string): Promise<string[]> {
+    const ids = new Set<string>();
+    const pending = [rootId];
+    while (pending.length > 0) {
+      const id = pending.pop()!;
+      if (ids.has(id)) continue;
+      ids.add(id);
+      pending.push(...(await this.agentDb.getChildAgentInstanceIds(id)));
+    }
+    return [...ids];
   }
 
   protected async onTeardown(): Promise<void> {

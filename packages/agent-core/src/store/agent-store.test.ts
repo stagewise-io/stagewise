@@ -13,6 +13,7 @@ function makeInitialState(): AgentSystemState {
           requiredModelCapabilities: {},
           allowUserInput: true,
           parentAgentInstanceId: null,
+          sideChatParentId: null,
           state: {
             title: 'initial',
             isWorking: false,

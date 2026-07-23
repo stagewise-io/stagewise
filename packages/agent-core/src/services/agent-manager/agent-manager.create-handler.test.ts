@@ -153,6 +153,7 @@ describe('AgentManager agents.create handler', () => {
       async () => ({
         type: AgentTypes.CHAT,
         parentAgentInstanceId: null,
+        sideChatParentId: null,
         activeModelId: 'local-chat',
         activeProviderInstanceId: 'ollama-local',
         title: '',

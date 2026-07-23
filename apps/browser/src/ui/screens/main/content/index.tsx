@@ -543,11 +543,13 @@ export function MainSection({
           forceActionsVisible:
             id === tutorialTabId && shouldForceTabTutorialActions,
           actions:
-            tab.type !== 'terminal' && (tab.isPlayingAudio || tab.isMuted) ? (
+            tab.type !== 'terminal' &&
+            tab.type !== 'side-chat' &&
+            (tab.isPlayingAudio || tab.isMuted) ? (
               <AudioMuteButton tab={tab} />
             ) : undefined,
           wrapTrigger: (inner: ReactElement) =>
-            tab.type === 'file' ? (
+            tab.type === 'file' || tab.type === 'side-chat' ? (
               inner
             ) : tab.type === 'terminal' ? (
               <WithTerminalTabPreviewCard

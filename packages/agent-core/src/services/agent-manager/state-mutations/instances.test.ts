@@ -35,6 +35,7 @@ function makeEnvelope(state: AgentState): AgentInstanceEnvelope {
     requiredModelCapabilities: { foo: true } as unknown,
     allowUserInput: true,
     parentAgentInstanceId: null,
+    sideChatParentId: null,
     state,
   };
 }

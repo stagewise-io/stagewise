@@ -28,7 +28,11 @@ export function useAutoSelectFirstAgent(): void {
   const appScreenMode = useKartonState((s) => s.appScreen.mode);
 
   const activeAgentIdsRaw = useKartonState(
-    useComparingSelector((s) => Object.keys(s.agents.instances)),
+    useComparingSelector((s) =>
+      Object.entries(s.agents.instances)
+        .filter(([, agent]) => !agent.sideChatParentId)
+        .map(([id]) => id),
+    ),
   );
   const { pending: pendingRemovals } = usePendingRemovals();
 

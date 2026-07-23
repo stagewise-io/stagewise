@@ -267,7 +267,11 @@ export const MessageUser = memo(
           // and hides the old message + subsequent messages
           window.dispatchEvent(
             new CustomEvent('chat-message-edited', {
-              detail: { replacedMessageId: msg.id, newMessage },
+              detail: {
+                agentId: openAgent,
+                replacedMessageId: msg.id,
+                newMessage,
+              },
             }),
           );
 
@@ -294,7 +298,7 @@ export const MessageUser = memo(
           // Remove the optimistic message on failure
           window.dispatchEvent(
             new CustomEvent('chat-message-failed', {
-              detail: { clientId: newMessageId },
+              detail: { agentId: openAgent, clientId: newMessageId },
             }),
           );
           // On error, close popover but stay in edit mode so user can retry
@@ -568,7 +572,7 @@ export const MessageUser = memo(
         activeTab.agentInstanceId != null &&
         activeTab.agentInstanceId !== openAgent;
       return (
-        activeTab.type !== 'terminal' &&
+        (activeTab.type === undefined || activeTab.type === 'browser') &&
         !activeTab.url?.startsWith('stagewise://internal/') &&
         !ownedByOtherAgent
       );

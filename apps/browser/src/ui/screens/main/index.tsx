@@ -13,7 +13,7 @@ import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { OpenAgentProvider, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NewTabButtons } from './_components/new-tab-buttons';
-import { ChatDraftProvider } from '@ui/hooks/use-chat-draft';
+import { useCmdEnterDispatcher } from '@ui/hooks/use-cmd-enter-dispatcher';
 import { PendingRemovalsProvider } from '@ui/hooks/use-pending-agent-removals';
 import { useAutoSelectFirstAgent } from '@ui/hooks/use-auto-select-agent';
 import {
@@ -81,22 +81,21 @@ function ActionDivider() {
 export function DefaultLayout({ show }: { show: boolean }) {
   return (
     <OpenAgentProvider>
-      <ChatDraftProvider>
-        <SidebarCollapsedProvider>
-          <ContentCollapsedProvider>
-            <PendingRemovalsProvider>
-              <CommandCenterProvider>
-                <DefaultLayoutInner show={show} />
-              </CommandCenterProvider>
-            </PendingRemovalsProvider>
-          </ContentCollapsedProvider>
-        </SidebarCollapsedProvider>
-      </ChatDraftProvider>
+      <SidebarCollapsedProvider>
+        <ContentCollapsedProvider>
+          <PendingRemovalsProvider>
+            <CommandCenterProvider>
+              <DefaultLayoutInner show={show} />
+            </CommandCenterProvider>
+          </PendingRemovalsProvider>
+        </ContentCollapsedProvider>
+      </SidebarCollapsedProvider>
     </OpenAgentProvider>
   );
 }
 
 function DefaultLayoutInner({ show }: { show: boolean }) {
+  useCmdEnterDispatcher();
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const isFullScreen = useKartonState((s) => s.appInfo.isFullScreen);
   const tabs = useKartonState((s) => s.contentTabs.tabs);

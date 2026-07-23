@@ -159,6 +159,11 @@ export interface UIControllerEventMap {
     sourceTabId?: string,
     onCreated?: (tabId: string | undefined) => void,
   ];
+  createSideChatTab: [
+    parentAgentInstanceId: string,
+    sideChatAgentInstanceId: string,
+    onCreated: (tabId: string) => void,
+  ];
   closeTab: [tabId: string];
   switchTab: [tabId: string];
   reorderTabs: [tabIds: string[]];
@@ -745,6 +750,24 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.createSideChatTab',
+      async (
+        _callingClientId: string,
+        parentAgentInstanceId: string,
+        sideChatAgentInstanceId: string,
+      ): Promise<string | undefined> => {
+        return await new Promise((resolve) => {
+          const handled = this.emit(
+            'createSideChatTab',
+            parentAgentInstanceId,
+            sideChatAgentInstanceId,
+            resolve,
+          );
+          if (!handled) resolve(undefined);
+        });
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.clearFileNotice',
       async (_callingClientId: string, tabId: string) => {
         this.uiKarton.setState((draft) => {
@@ -1210,6 +1233,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('appScreen.setSettingsRoute');
     this.uiKarton.removeServerProcedureHandler('openExternalUrl');
     this.uiKarton.removeServerProcedureHandler('browser.createTab');
+    this.uiKarton.removeServerProcedureHandler('browser.createSideChatTab');
     this.uiKarton.removeServerProcedureHandler('browser.closeTab');
     this.uiKarton.removeServerProcedureHandler('browser.switchTab');
     this.uiKarton.removeServerProcedureHandler('browser.reorderTabs');

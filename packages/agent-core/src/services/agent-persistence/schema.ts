@@ -100,6 +100,7 @@ export const agentInstances = sqliteTable(
   {
     id: text('id').primaryKey(),
     parentAgentInstanceId: text('parent_agent_instance_id'),
+    sideChatParentId: text('side_chat_parent_id'),
     type: agentType('type').notNull(),
     instanceConfig: _sqliteJson('instance_config').$type<unknown>(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),

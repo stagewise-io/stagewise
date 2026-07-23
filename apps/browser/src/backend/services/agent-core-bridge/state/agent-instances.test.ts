@@ -57,6 +57,7 @@ function makeEnvelope(
     },
     allowUserInput: true,
     parentAgentInstanceId: null,
+    sideChatParentId: null,
     state: baseState,
     ...overrides,
   };

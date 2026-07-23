@@ -11,6 +11,7 @@ import {
   eq,
   sql,
   gte,
+  or,
 } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
@@ -27,6 +28,12 @@ import {
   type AgentMessage,
 } from '../../types/agent';
 import type { ToolApprovalMode } from '../../types/tool-approval';
+
+const rootChatFilter = and(
+  isNull(schema.agentInstances.parentAgentInstanceId),
+  isNull(schema.agentInstances.sideChatParentId),
+  eq(schema.agentInstances.type, AgentTypes.CHAT),
+);
 
 export interface AgentPersistenceDBDeps {
   host: HostPaths;
@@ -201,8 +208,7 @@ export class AgentPersistenceDB {
       .where(
         and(
           notInArray(schema.agentInstances.id, excludeIds),
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
+          rootChatFilter,
           titleLike
             ? sql`lower(${schema.agentInstances.title}) like lower(${titleLike})`
             : undefined,
@@ -246,13 +252,7 @@ export class AgentPersistenceDB {
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
-      .where(
-        and(
-          inArray(schema.agentInstances.id, ids),
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      );
+      .where(and(inArray(schema.agentInstances.id, ids), rootChatFilter));
 
     this._logger.debug(
       `[AgentPersistenceDB] Fetched agent history entries by ids`,
@@ -478,12 +478,7 @@ export class AgentPersistenceDB {
           schema.agentInstances.activeProviderInstanceId,
       })
       .from(schema.agentInstances)
-      .where(
-        and(
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      )
+      .where(rootChatFilter)
       .orderBy(desc(schema.agentInstances.lastMessageAt))
       .limit(1)
       .catch((error) => {
@@ -506,12 +501,7 @@ export class AgentPersistenceDB {
     const results = await this._db
       .select({ toolApprovalMode: schema.agentInstances.toolApprovalMode })
       .from(schema.agentInstances)
-      .where(
-        and(
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      )
+      .where(rootChatFilter)
       .orderBy(desc(schema.agentInstances.lastMessageAt))
       .limit(1)
       .catch((error) => {
@@ -536,12 +526,7 @@ export class AgentPersistenceDB {
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
-      .where(
-        and(
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      )
+      .where(rootChatFilter)
       .orderBy(desc(schema.agentInstances.lastMessageAt))
       .limit(1)
       .catch((error) => {
@@ -566,12 +551,7 @@ export class AgentPersistenceDB {
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
-      .where(
-        and(
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      )
+      .where(rootChatFilter)
       .catch((error) => {
         this._logger.error(
           `[AgentPersistenceDB] Failed to fetch workspace last-use data: ${error}`,
@@ -639,15 +619,34 @@ export class AgentPersistenceDB {
    *
    * @param id The id of the agent instance to delete
    */
+  public async isSideChat(id: string): Promise<boolean> {
+    const rows = await this._db
+      .select({ sideChatParentId: schema.agentInstances.sideChatParentId })
+      .from(schema.agentInstances)
+      .where(eq(schema.agentInstances.id, id))
+      .limit(1);
+    return Boolean(rows[0]?.sideChatParentId);
+  }
+
+  public async getChildAgentInstanceIds(id: string): Promise<string[]> {
+    const rows = await this._db
+      .select({ id: schema.agentInstances.id })
+      .from(schema.agentInstances)
+      .where(
+        or(
+          eq(schema.agentInstances.parentAgentInstanceId, id),
+          eq(schema.agentInstances.sideChatParentId, id),
+        ),
+      );
+    return rows.map((row) => row.id);
+  }
+
   public async deleteAgentInstance(id: string): Promise<void> {
     this._logger.debug(`[AgentPersistenceDB] Deleting agent instance: ${id}`);
     // Recursively delete all persisted child agents
-    const childAgentInstanceIds = await this._db
-      .select({ id: schema.agentInstances.id })
-      .from(schema.agentInstances)
-      .where(eq(schema.agentInstances.parentAgentInstanceId, id));
+    const childAgentInstanceIds = await this.getChildAgentInstanceIds(id);
     for (const childAgentInstanceId of childAgentInstanceIds) {
-      await this.deleteAgentInstance(childAgentInstanceId.id);
+      await this.deleteAgentInstance(childAgentInstanceId);
     }
 
     // Delete associated messages first
@@ -700,12 +699,7 @@ export class AgentPersistenceDB {
     const result = await this._db
       .select({ count: sql<number>`count(*)` })
       .from(schema.agentInstances)
-      .where(
-        and(
-          isNull(schema.agentInstances.parentAgentInstanceId),
-          eq(schema.agentInstances.type, AgentTypes.CHAT),
-        ),
-      );
+      .where(rootChatFilter);
     return result[0]?.count ?? 0;
   }
 }

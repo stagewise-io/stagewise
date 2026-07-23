@@ -496,6 +496,15 @@ export class AgentManager extends DisposableService {
         return agent.instanceId;
       },
     );
+    this.wrapAgentRpc('agents.createSideChat', (sourceAgentId: string) =>
+      this.createSideChat(sourceAgentId),
+    );
+    this.wrapAgentRpc('agents.promoteSideChat', (agentId: string) =>
+      this.promoteSideChat(agentId),
+    );
+    this.wrapAgentRpc('agents.discardSideChat', (agentId: string) =>
+      this.discardSideChat(agentId),
+    );
     this.wrapAgentRpc('agents.resume', async (instanceId: string) => {
       await this.resumeAgent(instanceId);
       return;
@@ -1027,13 +1036,14 @@ export class AgentManager extends DisposableService {
     initialState?: Partial<AgentState>,
     instanceId?: string,
     initialInputState?: string,
+    sideChatParentId?: string,
   ): Promise<BaseAgent<any, any>> {
     const agentInstanceId = instanceId ?? randomUUID();
 
     // For new chat agents (not resumed), use the model from the last persisted chat
     // Validate the model still exists (it may have been a deleted custom model)
     const lastChatSelection =
-      type === AgentTypes.CHAT
+      type === AgentTypes.CHAT && !initialState
         ? await this.persistenceDb.getLastChatModelSelection()
         : null;
     const lastModelValid =
@@ -1077,6 +1087,7 @@ export class AgentManager extends DisposableService {
         .requiredCapabilities,
       allowUserInput: (this.agentsMap as any)[type].config.allowUserInput,
       parentAgentInstanceId: parent?.parentInstanceId ?? null,
+      sideChatParentId: sideChatParentId ?? null,
       state: { ...defaultState, ...(resolvedInitialState ?? {}) } as AgentState,
     } as AgentInstanceEnvelope);
 
@@ -1248,6 +1259,8 @@ export class AgentManager extends DisposableService {
         isWorking: false,
       },
       instanceId,
+      undefined,
+      agent.sideChatParentId ?? undefined,
     );
 
     if (agent.mountedWorkspaces && Array.isArray(agent.mountedWorkspaces)) {
@@ -1301,6 +1314,7 @@ export class AgentManager extends DisposableService {
     await this.persistenceDb.storeAgentInstance(
       {
         id: instanceId,
+        sideChatParentId: envelope.sideChatParentId,
         type: agent.agentType,
         title: agentState.title,
         titleLockedByUser: agentState.titleLockedByUser,
@@ -1323,6 +1337,94 @@ export class AgentManager extends DisposableService {
     );
   }
 
+  private async createSideChat(sourceAgentId: string): Promise<string> {
+    const sourceEnvelope = getAgentInstance(this.agentStore, sourceAgentId);
+    if (!sourceEnvelope) {
+      throw new Error(`Agent with instance id ${sourceAgentId} not found`);
+    }
+    if (sourceEnvelope.type !== AgentTypes.CHAT) {
+      throw new Error('Side chats can only be forked from chat agents');
+    }
+    if (sourceEnvelope.sideChatParentId) {
+      throw new Error('Promote this side chat before forking it again');
+    }
+    if (sourceEnvelope.state.isWorking) {
+      throw new Error(
+        'Wait for the current response before opening a side chat',
+      );
+    }
+
+    const sideChatId = randomUUID();
+    const mountedWorkspaces =
+      this.managerToolbox.getWorkspaceSnapshotForPersistence(sourceAgentId);
+
+    await this.createAgent(
+      AgentTypes.CHAT,
+      undefined,
+      undefined,
+      {
+        title: sourceEnvelope.state.title
+          ? `Side chat: ${sourceEnvelope.state.title}`
+          : 'Side chat',
+        history: sourceEnvelope.state.history.slice(),
+        activeModelId: sourceEnvelope.state.activeModelId,
+        activeProviderInstanceId: sourceEnvelope.state.activeProviderInstanceId,
+        toolApprovalMode: sourceEnvelope.state.toolApprovalMode,
+        usedTokens: sourceEnvelope.state.usedTokens,
+      },
+      sideChatId,
+      '',
+      sourceAgentId,
+    );
+
+    try {
+      await this.attachments.cloneAgentBlobs(sourceAgentId, sideChatId);
+      for (const workspace of mountedWorkspaces) {
+        await this.managerToolbox.handleMountWorkspace(
+          sideChatId,
+          workspace.path,
+          workspace.permissions,
+        );
+      }
+      await this.persistAgentState(sideChatId);
+      return sideChatId;
+    } catch (error) {
+      await this.deleteAgent(sideChatId);
+      throw error;
+    }
+  }
+
+  private async promoteSideChat(instanceId: string): Promise<void> {
+    const envelope = getAgentInstance(this.agentStore, instanceId);
+    if (!envelope?.sideChatParentId) {
+      throw new Error(`Agent ${instanceId} is not a side chat`);
+    }
+    if (envelope.state.isWorking) {
+      throw new Error('Wait for the side chat response before promoting it');
+    }
+    this.agentStore.update((draft) => {
+      draft.agents.instances[instanceId]!.sideChatParentId = null;
+    });
+    await this.persistAgentState(instanceId);
+  }
+
+  private async discardSideChat(instanceId: string): Promise<void> {
+    const envelope = getAgentInstance(this.agentStore, instanceId);
+    if (envelope && !envelope.sideChatParentId) return;
+    if (!envelope && !(await this.persistenceDb.isSideChat(instanceId))) return;
+    await this.deleteAgent(instanceId);
+  }
+
+  private getActiveChildAgentInstanceIds(instanceId: string): string[] {
+    return Object.entries(this.agentStore.get().agents.instances)
+      .filter(
+        ([, instance]) =>
+          instance.parentAgentInstanceId === instanceId ||
+          instance.sideChatParentId === instanceId,
+      )
+      .map(([id]) => id);
+  }
+
   /**
    * Deletes an agent and all it's child agents permanently.
    *
@@ -1337,11 +1439,10 @@ export class AgentManager extends DisposableService {
       this.agentStore.get().agents.instances[instanceId]?.type ?? 'unknown';
 
     // Recursively delete all child agents first
-    const childAgentInstanceIds = Object.entries(
-      this.agentStore.get().agents.instances,
-    )
-      .filter(([_, instance]) => instance.parentAgentInstanceId === instanceId)
-      .map(([id]) => id);
+    const childAgentInstanceIds = new Set([
+      ...this.getActiveChildAgentInstanceIds(instanceId),
+      ...(await this.persistenceDb.getChildAgentInstanceIds(instanceId)),
+    ]);
     for (const childAgentInstanceId of childAgentInstanceIds) {
       await this.deleteAgent(childAgentInstanceId);
     }
@@ -1393,11 +1494,8 @@ export class AgentManager extends DisposableService {
     }
 
     // Delete all child agents as well. Do this recursively.
-    const childAgentInstanceIds = Object.entries(
-      this.agentStore.get().agents.instances,
-    )
-      .filter(([_, instance]) => instance.parentAgentInstanceId === instanceId)
-      .map(([id]) => id);
+    const childAgentInstanceIds =
+      this.getActiveChildAgentInstanceIds(instanceId);
     for (const childAgentInstanceId of childAgentInstanceIds) {
       const childAgent = this.activeAgents.get(childAgentInstanceId);
       await childAgent?.onTeardown();

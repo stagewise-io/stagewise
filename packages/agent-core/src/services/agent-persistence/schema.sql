@@ -1,4 +1,4 @@
--- VERSION: 10
+-- VERSION: 11
 
 CREATE TABLE IF NOT EXISTS meta(
   key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY,
@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS meta(
 CREATE TABLE IF NOT EXISTS agentInstances(
   id TEXT PRIMARY KEY,
   parent_agent_instance_id TEXT,
+  side_chat_parent_id TEXT,
   type TEXT NOT NULL,
   instance_config TEXT,
   created_at INTEGER NOT NULL,

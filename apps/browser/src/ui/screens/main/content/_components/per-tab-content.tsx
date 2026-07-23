@@ -14,6 +14,7 @@ import { ColorSchemeWidget } from './control-buttons/color-scheme';
 import { ChromeDevToolsWidget } from './control-buttons/chrome-devtools';
 import { PerTerminalContent } from '../../terminal-panel/_components/per-terminal-content';
 import { FilePreviewTabContent } from '../../file-tree/file-preview-tab-content';
+import { ChatPanel } from '../../agent-chat/chat/_components';
 
 export interface PerTabContentRef {
   focusOmnibox: () => void;
@@ -57,7 +58,11 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
       [],
     );
 
-    return tab?.type === 'file' ? (
+    return tab?.type === 'side-chat' && tab.sideChatAgentInstanceId ? (
+      <div className="absolute inset-0 z-10 bg-background p-1">
+        <ChatPanel agentId={tab.sideChatAgentInstanceId} />
+      </div>
+    ) : tab?.type === 'file' ? (
       <FilePreviewTabContent tab={tab} />
     ) : tab?.type === 'terminal' ? (
       <div className="absolute inset-0 z-10 flex flex-col">

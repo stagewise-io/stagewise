@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import type { HostPaths } from '../../host';
 import {
   access,
+  constants,
   copyFile,
+  cp,
   createReadStream,
   mkdir,
   readFile,
@@ -90,6 +92,23 @@ export class AttachmentsService {
   public async deleteAgentBlobs(agentId: string): Promise<void> {
     const dir = this.paths.agentAttachmentsDir(agentId);
     await rm(dir, { recursive: true, force: true });
+  }
+
+  /** Clone all attachment blobs referenced by a forked chat history. */
+  public async cloneAgentBlobs(
+    sourceAgentId: string,
+    targetAgentId: string,
+  ): Promise<void> {
+    const sourceDir = this.paths.agentAttachmentsDir(sourceAgentId);
+    try {
+      await access(sourceDir);
+    } catch {
+      return;
+    }
+    await cp(sourceDir, this.paths.agentAttachmentsDir(targetAgentId), {
+      recursive: true,
+      mode: constants.COPYFILE_FICLONE,
+    });
   }
 
   public async exists(agentId: string, attachmentId: string): Promise<boolean> {

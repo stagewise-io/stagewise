@@ -2,15 +2,24 @@ import type { SkillDefinitionUI } from '@shared/skills';
 import type { SlashItem } from './types';
 
 const MAX_COLLAPSED = 3;
+const SIDE_CHAT_ITEM: SlashItem = {
+  id: 'command:side',
+  label: 'Side',
+  description: 'Fork this chat into an independent side chat',
+  group: 'builtin',
+};
 
 /**
  * Module-level ref holding the current list of available skills.
- * Written synchronously by panel-footer during render (same pattern
- * as mentionContextRef) so the TipTap suggestion `items` callback
- * always sees current data.
+ * Updated when a chat input receives focus so the TipTap suggestion
+ * callback uses that input's commands.
  */
 export const slashSkillsRef: { current: SkillDefinitionUI[] } = {
   current: [],
+};
+export const slashSideChatEnabledRef = { current: true };
+export const slashOpenSideChatRef: { current: (() => void) | null } = {
+  current: null,
 };
 
 /** Groups that the user has expanded in the current `/` session. */
@@ -37,21 +46,19 @@ const GROUP_ORDER: readonly string[] = ['builtin', 'workspace', 'plugin'];
  */
 export function querySlashItems(query: string): SlashItem[] {
   const q = query.toLowerCase();
-  const all = slashSkillsRef.current
-    .filter(
-      (cmd) =>
-        cmd.id.toLowerCase().includes(q) ||
-        cmd.displayName.toLowerCase().includes(q) ||
-        cmd.description.toLowerCase().includes(q),
-    )
-    .map(
+  const all = [
+    ...(slashSideChatEnabledRef.current ? [SIDE_CHAT_ITEM] : []),
+    ...slashSkillsRef.current.map(
       (cmd): SlashItem => ({
         id: cmd.id,
         label: cmd.displayName,
         description: cmd.description,
         group: cmd.source,
       }),
-    );
+    ),
+  ].filter((item) =>
+    `${item.id} ${item.label} ${item.description}`.toLowerCase().includes(q),
+  );
 
   // Bucket by group, preserving discovery order within each bucket.
   const buckets = new Map<string, SlashItem[]>();

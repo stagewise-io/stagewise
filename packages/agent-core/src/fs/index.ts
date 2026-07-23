@@ -34,11 +34,12 @@ export {
   unlink,
   rm,
   copyFile,
+  cp,
   access,
   open,
   realpath,
 } from 'node:fs/promises';
-export { createReadStream, createWriteStream } from 'node:fs';
+export { constants, createReadStream, createWriteStream } from 'node:fs';
 export type { ReadStream, WriteStream } from 'node:fs';
 
 import chokidar, { type FSWatcher, type ChokidarOptions } from 'chokidar';

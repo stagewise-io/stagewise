@@ -987,6 +987,7 @@ export function createAgentInstance(
     },
     allowUserInput: options?.allowUserInput ?? true,
     parentAgentInstanceId: null,
+    sideChatParentId: null,
     state: {
       title: options?.title ?? 'Test Agent',
       isWorking: options?.isWorking ?? false,
