@@ -1,10 +1,8 @@
 import type {
-  MountEntry,
   RunningServer,
   RunningServerOwner,
 } from '@shared/karton-contracts/ui';
 import type { FaviconBitmapResult } from '@shared/karton-contracts/pages-api/types';
-import { getBaseName, normalizePath } from '@shared/path-utils';
 import {
   IconArrowUpRightOutline18,
   IconCodeBranchOutline18,
@@ -39,6 +37,7 @@ import {
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { Globe2 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { getWorkspaceLocation } from '../_lib/workspace-location';
 
 const REFRESH_INTERVAL_MS = 5_000;
 
@@ -48,41 +47,6 @@ type ServerGroup = {
   agentId: string | null;
   servers: RunningServer[];
 };
-
-type ServerLocation = {
-  isGit: boolean;
-  name: string;
-  detail: string | null;
-};
-
-function getServerLocation(cwd: string, mounts: MountEntry[]): ServerLocation {
-  const normalizedCwd = normalizePath(cwd).replace(/\/$/, '');
-  let closestMount: MountEntry | undefined;
-
-  for (const mount of mounts) {
-    const mountPath = normalizePath(mount.path).replace(/\/$/, '');
-    if (
-      (normalizedCwd === mountPath ||
-        normalizedCwd.startsWith(`${mountPath}/`)) &&
-      (!closestMount || mountPath.length > closestMount.path.length)
-    ) {
-      closestMount = mount;
-    }
-  }
-
-  if (!closestMount?.git) {
-    return { isGit: false, name: cwd, detail: null };
-  }
-
-  const repoPath =
-    closestMount.git.mainWorktreePath ?? closestMount.git.repoRoot;
-  return {
-    isGit: true,
-    name: getBaseName(repoPath) || repoPath,
-    detail:
-      closestMount.git.branch ?? closestMount.git.headSha?.slice(0, 7) ?? null,
-  };
-}
 
 function getServerId(owner: RunningServerOwner): string {
   return owner.type === 'agent' ? owner.sessionId : owner.terminalId;
@@ -404,7 +368,7 @@ export function LocalServersPopover({
                   <div className="flex flex-col gap-1.5">
                     {group.servers.map((server) => {
                       const isAgent = server.owner.type === 'agent';
-                      const location = getServerLocation(
+                      const location = getWorkspaceLocation(
                         server.cwd,
                         workspaceMounts,
                       );

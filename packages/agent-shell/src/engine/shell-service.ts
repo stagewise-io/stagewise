@@ -357,6 +357,7 @@ export class ShellService extends DisposableService {
     const sessions = this.sessionManager.getSessionsForAgent(agentInstanceId);
     const TAIL_CHARS = 400;
     const snapshot: ShellSnapshot = {
+      shellType: this.shell?.type,
       sessions: sessions.map((s) => {
         const lineCount = s.logger?.lineCount ?? 0;
         const logPath = s.logger

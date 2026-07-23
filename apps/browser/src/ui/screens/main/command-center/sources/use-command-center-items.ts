@@ -6,6 +6,7 @@ import type {
 import { useAgentCommandItems } from './use-agent-command-items';
 import { useSettingsCommandItems } from './use-settings-command-items';
 import { useTabCommandItems } from './use-tab-command-items';
+import { useTerminalCommandItems } from './use-terminal-command-items';
 import { useFileSearchCommandItems } from './use-file-command-items';
 import type { FileSearchFilterState as FileFilterState } from './use-file-command-items';
 
@@ -39,6 +40,7 @@ export function useCommandCenterItems({
     enabled: mode === 'global' || mode === 'agents',
   });
   const tabs = useTabCommandItems(query);
+  const terminals = useTerminalCommandItems(query);
   const settings = useSettingsCommandItems(query);
   // File search runs in both "files" mode and the "all" (global) mode. In
   // global mode we always search across every connected workspace (empty
@@ -63,16 +65,29 @@ export function useCommandCenterItems({
   const items = useMemo<CommandCenterItem[]>(() => {
     if (mode === 'agents') return agents.items;
     if (mode === 'browser') return tabs.items;
+    if (mode === 'terminals') return terminals.items;
     if (mode === 'files') return fileItems;
     if (mode === 'settings') return settings.items;
 
-    const ranked = [...agents.items, ...tabs.items, ...settings.items]
+    const ranked = [
+      ...agents.items,
+      ...tabs.items,
+      ...terminals.items,
+      ...settings.items,
+    ]
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, GLOBAL_LIMIT);
     // Append file results after the ranked list so they always surface in the
     // "all" view rather than being cut by the global limit.
     return [...ranked, ...fileItems];
-  }, [agents.items, fileItems, mode, settings.items, tabs.items]);
+  }, [
+    agents.items,
+    fileItems,
+    mode,
+    settings.items,
+    tabs.items,
+    terminals.items,
+  ]);
 
   return {
     items,
