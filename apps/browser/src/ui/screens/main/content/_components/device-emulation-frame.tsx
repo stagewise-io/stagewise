@@ -26,10 +26,6 @@ const DEVICE_PRESET_ITEMS = DEVICE_PRESETS.map((preset) => ({
   label: preset.label,
   description: `${preset.width} × ${preset.height}`,
 }));
-const ZOOM_ITEMS = [50, 75, 100, 125, 150, 200].map((zoom) => ({
-  value: String(zoom),
-  label: `${zoom}%`,
-}));
 
 const RESIZE_HANDLES = [
   ['left', 'top-0 -left-4 h-full w-4 cursor-ew-resize', 'h-10 w-0.5'],
@@ -93,9 +89,6 @@ function EnabledDeviceEmulationFrame({
   const setDeviceEmulation = useKartonProcedure(
     (procedures) => procedures.browser.setDeviceEmulation,
   );
-  const setZoomPercentage = useKartonProcedure(
-    (procedures) => procedures.browser.setZoomPercentage,
-  );
   const uiZoomPercentage = useKartonState(
     (state) => state.preferences.general.uiZoomPercentage,
   );
@@ -155,11 +148,12 @@ function EnabledDeviceEmulationFrame({
       {
         ...emulation,
         scale: appliedScale,
+        fitScale,
       },
       tab.id,
       dragRef.current !== null,
     );
-  }, [emulation, appliedScale, setDeviceEmulation, tab.id]);
+  }, [emulation, appliedScale, fitScale, setDeviceEmulation, tab.id]);
 
   useEffect(
     () => () => {
@@ -323,16 +317,6 @@ function EnabledDeviceEmulationFrame({
           </TooltipTrigger>
           <TooltipContent>Rotate viewport</TooltipContent>
         </Tooltip>
-        <Select
-          items={ZOOM_ITEMS}
-          value={String(tab.zoomPercentage)}
-          onValueChange={(value) => setZoomPercentage(Number(value), tab.id)}
-          renderValue={() => `${tab.zoomPercentage}%`}
-          size="sm"
-          triggerVariant="ghost"
-          triggerClassName="w-20 justify-between tabular-nums"
-          align="end"
-        />
         <div className="ml-auto">
           <Tooltip>
             <TooltipTrigger>
