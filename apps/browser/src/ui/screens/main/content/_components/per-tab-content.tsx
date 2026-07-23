@@ -11,7 +11,9 @@ import { WebContentsOverlay } from '@ui/components/web-contents-overlay';
 import { WebContentsOverlayProvider } from '@ui/contexts';
 import { BasicAuthDialog } from './basic-auth-dialog';
 import { ColorSchemeWidget } from './control-buttons/color-scheme';
+import { DeviceEmulationWidget } from './control-buttons/device-emulation';
 import { ChromeDevToolsWidget } from './control-buttons/chrome-devtools';
+import { DeviceEmulationFrame } from './device-emulation-frame';
 import { PerTerminalContent } from '../../terminal-panel/_components/per-terminal-content';
 import { FilePreviewTabContent } from '../../file-tree/file-preview-tab-content';
 
@@ -76,16 +78,16 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
           )}
           <div className="flex flex-row items-center gap-0.5">
             {tab && <ColorSchemeWidget tab={tab} />}
+            {tab && <DeviceEmulationWidget tab={tab} />}
             {tab && <ChromeDevToolsWidget tab={tab} />}
           </div>
         </div>
         {/* Content area - wrapped with WebContentsOverlayProvider for overlay access */}
         <WebContentsOverlayProvider>
-          <div className="flex size-full flex-col items-center justify-center overflow-hidden">
-            <div
-              ref={devAppPreviewContainerRef}
-              id={`dev-app-preview-container-${tabId}`}
-              className="relative flex size-full flex-col items-center justify-center overflow-hidden rounded-lg"
+          {tab ? (
+            <DeviceEmulationFrame
+              tab={tab}
+              containerRef={devAppPreviewContainerRef}
             >
               {/* Unified web contents overlay for devtools and DOM selection */}
               {!isInternalPage && <WebContentsOverlay />}
@@ -97,8 +99,8 @@ export const PerTabContent = forwardRef<PerTabContentRef, PerTabContentProps>(
                   container={devAppPreviewContainerRef}
                 />
               )}
-            </div>
-          </div>
+            </DeviceEmulationFrame>
+          ) : null}
         </WebContentsOverlayProvider>
       </div>
     );

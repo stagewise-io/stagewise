@@ -761,6 +761,15 @@ export type FileTreeOperationResult = {
   relativePath?: string;
 };
 
+export type DeviceEmulation = {
+  presetId: string;
+  width: number;
+  height: number;
+  deviceScaleFactor: number;
+  mobile: boolean;
+  scale: number;
+};
+
 export type TabState = {
   id: string;
   /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs, 'file' for workspace file previews. */
@@ -775,6 +784,8 @@ export type TabState = {
   isPlayingAudio: boolean;
   isMuted: boolean;
   colorScheme: ColorScheme;
+  /** Per-tab device viewport emulation. `null` means the normal browser viewport. */
+  deviceEmulation: DeviceEmulation | null;
   error: {
     code: number;
     message?: string;
@@ -837,6 +848,7 @@ export function getTerminalTabDefaults(): Omit<
     isPlayingAudio: false,
     isMuted: false,
     colorScheme: 'system' as TabState['colorScheme'],
+    deviceEmulation: null,
     error: null,
     navigationHistory: { canGoBack: false, canGoForward: false },
     devTools: { open: false, chromeOpen: false },
@@ -870,6 +882,7 @@ export function getFileTabDefaults(): Omit<
     isPlayingAudio: false,
     isMuted: false,
     colorScheme: 'system' as TabState['colorScheme'],
+    deviceEmulation: null,
     error: null,
     navigationHistory: { canGoBack: false, canGoForward: false },
     devTools: { open: false, chromeOpen: false },
@@ -1780,6 +1793,11 @@ export type KartonContract = {
       toggleAudioMuted: (tabId?: string) => Promise<void>;
       setColorScheme: (scheme: ColorScheme, tabId?: string) => Promise<void>;
       cycleColorScheme: (tabId?: string) => Promise<void>;
+      setDeviceEmulation: (
+        emulation: DeviceEmulation | null,
+        tabId?: string,
+        transient?: boolean,
+      ) => Promise<void>;
       setZoomPercentage: (percentage: number, tabId?: string) => Promise<void>;
       /** Set the agent instance ID this tab is attached to (null = globally visible) */
       setTabAgentInstance: (

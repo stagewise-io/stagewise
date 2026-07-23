@@ -20,7 +20,7 @@ import {
   type TabKartonContract,
   type SerializableKeyboardEvent,
 } from '@shared/karton-contracts/web-contents-preload';
-import type { ColorScheme } from '@shared/karton-contracts/ui';
+import type { ColorScheme, DeviceEmulation } from '@shared/karton-contracts/ui';
 import type { SelectedElement } from '@shared/selected-elements';
 import { SelectedElementTracker } from './selected-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
@@ -65,6 +65,7 @@ export interface TabState {
   isPlayingAudio: boolean;
   isMuted: boolean;
   colorScheme: ColorScheme;
+  deviceEmulation: DeviceEmulation | null;
   error: {
     code: number;
     message?: string;
@@ -378,6 +379,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
       isPlayingAudio: this.webContentsView.webContents.isCurrentlyAudible(),
       isMuted: this.webContentsView.webContents.audioMuted,
       colorScheme: 'system',
+      deviceEmulation: null,
       error: null,
       navigationHistory: {
         canGoBack: false,
@@ -835,6 +837,36 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
         new_value: nextScheme,
       });
     }
+  }
+
+  public setDeviceEmulation(
+    emulation: DeviceEmulation | null,
+    transient = false,
+  ) {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed()) return;
+
+    if (!transient) this.updateState({ deviceEmulation: emulation });
+    if (!wc.isDevToolsOpened()) this.applyDeviceEmulation(emulation);
+  }
+
+  private applyDeviceEmulation(emulation: DeviceEmulation | null) {
+    const wc = this.webContentsView.webContents;
+
+    if (!emulation) {
+      wc.disableDeviceEmulation();
+      return;
+    }
+
+    const viewSize = { width: emulation.width, height: emulation.height };
+    wc.enableDeviceEmulation({
+      screenPosition: emulation.mobile ? 'mobile' : 'desktop',
+      screenSize: viewSize,
+      viewPosition: { x: 0, y: 0 },
+      deviceScaleFactor: emulation.deviceScaleFactor,
+      viewSize,
+      scale: emulation.scale,
+    });
   }
 
   public focus() {
@@ -1528,6 +1560,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
         devTools: { open: this.currentState.devTools.open, chromeOpen: false },
       });
       this.detachDevToolsDebugger();
+      this.applyDeviceEmulation(this.currentState.deviceEmulation);
       // Immediately update viewport size when DevTools close
       // to transition back to regular viewport tracking (full size)
       try {
@@ -1540,6 +1573,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.on('devtools-opened', () => {
+      wc.disableDeviceEmulation();
       this.emit('devtoolsOpened', this.id);
       this.updateState({
         devTools: { open: this.currentState.devTools.open, chromeOpen: true },

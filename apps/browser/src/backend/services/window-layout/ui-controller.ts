@@ -8,7 +8,7 @@ import type { TelemetryService } from '../telemetry';
 import { EventEmitter } from 'node:events';
 import { KartonService } from '../karton';
 import type { SerializableKeyboardEvent } from '@shared/karton-contracts/web-contents-preload';
-import type { ColorScheme } from '@shared/karton-contracts/ui';
+import type { ColorScheme, DeviceEmulation } from '@shared/karton-contracts/ui';
 import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import type { SelectedElement } from '@shared/selected-elements';
 import type { SettingsRoute } from '@shared/settings-route';
@@ -178,6 +178,11 @@ export interface UIControllerEventMap {
   toggleAudioMuted: [tabId?: string];
   setColorScheme: [scheme: ColorScheme, tabId?: string];
   cycleColorScheme: [tabId?: string];
+  setDeviceEmulation: [
+    emulation: DeviceEmulation | null,
+    tabId?: string,
+    transient?: boolean,
+  ];
   setZoomPercentage: [percentage: number, tabId?: string];
   setTabAgentInstance: [tabId: string, agentInstanceId: string | null];
   setLastOpenAgentId: [agentInstanceId: string | null];
@@ -876,6 +881,17 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'browser.setDeviceEmulation',
+      async (
+        _callingClientId: string,
+        emulation: DeviceEmulation | null,
+        tabId?: string,
+        transient?: boolean,
+      ) => {
+        this.emit('setDeviceEmulation', emulation, tabId, transient);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'browser.setZoomPercentage',
       async (_callingClientId: string, percentage: number, tabId?: string) => {
         this.emit('setZoomPercentage', percentage, tabId);
@@ -1234,6 +1250,7 @@ export class UIController extends EventEmitter<UIControllerEventMap> {
     this.uiKarton.removeServerProcedureHandler('browser.toggleAudioMuted');
     this.uiKarton.removeServerProcedureHandler('browser.setColorScheme');
     this.uiKarton.removeServerProcedureHandler('browser.cycleColorScheme');
+    this.uiKarton.removeServerProcedureHandler('browser.setDeviceEmulation');
     this.uiKarton.removeServerProcedureHandler('browser.setZoomPercentage');
     this.uiKarton.removeServerProcedureHandler('browser.setTabAgentInstance');
     this.uiKarton.removeServerProcedureHandler(
