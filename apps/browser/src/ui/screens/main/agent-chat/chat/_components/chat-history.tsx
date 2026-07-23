@@ -252,38 +252,27 @@ export const ChatHistory = () => {
     [updateSpacerHeight],
   );
 
-  // Auto-scroll hook
+  // Virtuoso-specific auto-scroll controller. Virtuoso reports measured list
+  // height changes, so streaming and other layout growth do not need a DOM
+  // MutationObserver.
   const {
-    scrollerRef: autoScrollRef,
-    isAutoScrollEnabled,
-    scrollToBottom,
+    scroller,
+    scrollerRef,
     forceEnableAutoScroll,
-  } = useAutoScroll({
-    scrollEndThreshold: 100,
-  });
+    disableAutoScroll,
+    isAutoScrollEnabled,
+    followOutput,
+  } = useAutoScroll({ mode: 'virtuoso', scrollEndThreshold: 100 });
 
-  // Track scroller element for spacerHeight calculation
-  const [scroller, setScroller] = useState<HTMLElement | null>(null);
   // Track scroll offset to drive the top fade overlay. We only need an
   // approximate value (used to fade between 0 and 16px) so no throttling.
   const [scrollTop, setScrollTop] = useState(0);
-  const scrollerRef = useCallback(
-    (element: HTMLElement | Window | null) => {
-      // Chain to auto-scroll hook
-      autoScrollRef(element);
-      // Store element for local use (spacerHeight, etc.)
-      if (element instanceof HTMLElement) {
-        setScroller(element);
-      } else {
-        setScroller(null);
-      }
-    },
-    [autoScrollRef],
-  );
 
   const scrollChatHistoryByPage = useCallback(
     (direction: ChatHistoryScrollDirection) => {
       if (!scroller) return;
+
+      if (direction === 'up') disableAutoScroll();
 
       const amount = Math.max(
         CHAT_PAGE_SCROLL_MIN,
@@ -294,7 +283,7 @@ export const ChatHistory = () => {
         behavior: 'smooth',
       });
     },
-    [scroller],
+    [disableAutoScroll, scroller],
   );
 
   useEffect(() => {
@@ -400,7 +389,7 @@ export const ChatHistory = () => {
       cancelAnimationFrame(rafId);
       disconnectResizeObserver?.();
     };
-  }, [isAutoScrollEnabled, scrollToBottom, scroller]);
+  }, [isAutoScrollEnabled, scroller, updateSpacerHeight]);
 
   const handleRemoveSuggestion = (id: string) => {
     // State update first — telemetry is fire-and-forget and must never be
@@ -717,9 +706,6 @@ export const ChatHistory = () => {
 
   // Calculate average estimated height for defaultItemHeight
 
-  // Track when user sends a message - we'll enable auto-scroll once the message is in DOM
-  const pendingAutoScrollRef = useRef(false);
-  const prevMessagesLengthRef = useRef(filteredMessages.length);
   const serverUserMessageCountRef = useRef(0);
   serverUserMessageCountRef.current = serverMessages.filter(
     (message) => message.role === 'user',
@@ -740,7 +726,7 @@ export const ChatHistory = () => {
             serverUserMessageCountRef.current + prev.length,
         },
       ]);
-      pendingAutoScrollRef.current = true;
+      forceEnableAutoScroll();
       pendingWorkingRef.current = true;
     };
 
@@ -787,7 +773,7 @@ export const ChatHistory = () => {
         _replacedMessageId: replaceId,
       };
       setOptimisticMessages((prev) => [...prev, optimisticMsg]);
-      pendingAutoScrollRef.current = true;
+      forceEnableAutoScroll();
       pendingWorkingRef.current = true;
     };
 
@@ -815,43 +801,14 @@ export const ChatHistory = () => {
       );
       window.removeEventListener('chat-message-edited', handleMessageEdited);
     };
-  }, []);
-
-  // Enable auto-scroll ONLY when new message is actually in the DOM
-  useLayoutEffect(() => {
-    const prevLength = prevMessagesLengthRef.current;
-    const currentLength = filteredMessages.length;
-    prevMessagesLengthRef.current = currentLength;
-
-    // Trigger auto-scroll when:
-    // 1. Messages increased (new message added) AND we were waiting to auto-scroll
-    // 2. OR we're in edit mode (replacedMessageId set) AND pending scroll
-    //    (edit mode may decrease length but we still want to scroll)
-    const shouldTrigger =
-      pendingAutoScrollRef.current &&
-      (currentLength > prevLength || replacedMessageId !== null);
-
-    if (shouldTrigger) {
-      pendingAutoScrollRef.current = false;
-      forceEnableAutoScroll();
-      // Also scroll immediately - the MutationObserver may have already fired
-      // while auto-scroll was disabled, so we need to scroll manually
-      scrollToBottom();
-    }
-  }, [
-    filteredMessages.length,
-    replacedMessageId,
-    forceEnableAutoScroll,
-    scrollToBottom,
-  ]);
+  }, [forceEnableAutoScroll]);
 
   // Scroll to bottom when an error appears so it's always visible
   useEffect(() => {
     if (error) {
       forceEnableAutoScroll();
-      scrollToBottom();
     }
-  }, [error, forceEnableAutoScroll, scrollToBottom]);
+  }, [error, forceEnableAutoScroll]);
 
   // Clear pending-working bridge once isWorking catches up.
   useEffect(() => {
@@ -1335,7 +1292,8 @@ export const ChatHistory = () => {
             increaseViewportBy={{ top: 400, bottom: 400 }} // Render items above and below viewport
             heightEstimates={estimatedHeights}
             itemContent={itemContent}
-            followOutput={false} // We use our own auto-scroll logic
+            atBottomThreshold={100}
+            followOutput={followOutput}
             computeItemKey={(_, message) => message.id}
             totalCount={filteredMessages.length}
           />

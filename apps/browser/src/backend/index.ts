@@ -5,6 +5,7 @@ import { app, protocol } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { installStartupOpenUrlListener } from './startup-url-events';
+import { applyPendingAppDataReset } from './utils/app-data-reset';
 
 // CRITICAL: `main` is imported dynamically (below in the 'ready' handler)
 // instead of statically. On Windows machines without the VC++ redistributable
@@ -122,6 +123,12 @@ const singleInstanceLock = app.requestSingleInstanceLock();
 
 if (!singleInstanceLock) {
   app.quit();
+} else if (!started) {
+  try {
+    applyPendingAppDataReset(app.getPath('userData'));
+  } catch (error) {
+    console.error('[AppDataReset] Failed to reset app data', error);
+  }
 }
 
 // This method will be called when Electron has finished

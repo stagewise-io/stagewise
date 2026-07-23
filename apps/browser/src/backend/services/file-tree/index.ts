@@ -645,6 +645,33 @@ export class FileTreeService extends DisposableService {
     }
   }
 
+  async createFolder(
+    workspaceKey: string,
+    directoryPath: string,
+  ): Promise<FileTreeOperationResult> {
+    if (isReadOnlyWorkspaceKey(workspaceKey)) {
+      throw new Error('This location is read-only and cannot be created in');
+    }
+    try {
+      const directory = await this.validatePath(workspaceKey, directoryPath);
+      const dirStat = await fs.stat(directory.absolutePath);
+      if (!dirStat.isDirectory()) {
+        return { success: false, error: 'Target path is not a directory.' };
+      }
+
+      const { relativePath } = await this.createAvailableNewFolder(
+        directory.absolutePath,
+        directory.relativePath,
+      );
+
+      this.bumpDirectoryRevisionsNow(directory.key, [directory.relativePath]);
+      return { success: true, relativePath };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }
+
   async recreateDeletedFile(
     workspaceKey: string,
     relativePath: string,
@@ -1714,6 +1741,40 @@ export class FileTreeService extends DisposableService {
     }
 
     throw new Error('Could not find an available file name');
+  }
+
+  private async createAvailableNewFolder(
+    directoryAbsolutePath: string,
+    directoryRelativePath: string,
+  ): Promise<{ folderName: string; relativePath: string }> {
+    const baseName = 'new folder';
+    const candidates = [
+      baseName,
+      ...Array.from({ length: 99 }, (_, index) => `${baseName} ${index + 2}`),
+    ];
+
+    for (const candidate of candidates) {
+      const candidatePath = path.join(directoryAbsolutePath, candidate);
+      try {
+        await fs.mkdir(candidatePath);
+      } catch (error) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          (error as { code?: string }).code === 'EEXIST'
+        ) {
+          continue;
+        }
+        throw error;
+      }
+      const relativePath = directoryRelativePath
+        ? `${directoryRelativePath}/${candidate}`
+        : candidate;
+      return { folderName: candidate, relativePath };
+    }
+
+    throw new Error('Could not find an available folder name');
   }
 
   private updateFileTabsAfterMove(

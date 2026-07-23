@@ -9,7 +9,6 @@ function makeEntry(overrides: Partial<MountEntry> = {}): MountEntry {
     path: '/repos/alpha',
     git: null,
     skills: [],
-    workspaceMdContent: null,
     agentsMdContent: null,
     ...overrides,
   };

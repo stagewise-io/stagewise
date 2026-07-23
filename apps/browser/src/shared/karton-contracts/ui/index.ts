@@ -19,6 +19,11 @@ import type { SelectedElement } from '../../selected-elements';
 import type { ExternalIde, FileDiff } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
+export type {
+  UIEventName,
+  UIEventProperties,
+  TrackUIEvent,
+} from './telemetry';
 import type {
   FilePickerRequest,
   GlobalConfig,
@@ -57,7 +62,6 @@ import type {
   RemoveSearchEngineResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
-  ContextFilesResult,
   CurrentUsageResponse,
   UsageHistoryResponse,
 } from '../pages-api/types';
@@ -923,6 +927,29 @@ export type OmniboxSuggestions = {
   }[];
 };
 
+export type RunningServerOwner =
+  | {
+      type: 'agent';
+      agentInstanceId: string;
+      sessionId: string;
+    }
+  | {
+      type: 'terminal';
+      terminalId: string;
+      agentInstanceId: string | null;
+    };
+
+export type RunningServer = {
+  command: string;
+  cwd: string;
+  shellType: string;
+  endpoints: Array<{
+    host: string;
+    port: number;
+  }>;
+  owner: RunningServerOwner;
+};
+
 export type PlanEntry = {
   name: string;
   description: string | null;
@@ -1139,6 +1166,7 @@ export type AppState = {
     title: string | null;
     message: string | null;
     type: 'info' | 'warning' | 'error';
+    icon?: 'spinner';
     duration?: number; // Duration in milliseconds. Will never auto-dismiss if not set.
     actions: {
       label: string;
@@ -1231,8 +1259,6 @@ export type AppState = {
 
   /** Deduplicated workspace mounts from all agent instances */
   workspaceMounts: MountEntry[];
-  /** Workspace paths where a WORKSPACE.md agent is currently running */
-  workspaceMdGenerating: Record<string, boolean>;
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
 
@@ -1260,6 +1286,15 @@ export type AppState = {
   logChannels: LogChannelEntry[];
   /** Ingest server info — null when server not yet started */
   logIngest: { port: number; token: string } | null;
+};
+
+export type OnboardingCompletionSummary = {
+  onboarding_run_id: string;
+  total_duration_ms: number;
+  connected_provider_keys: string[];
+  connected_provider_count: number;
+  provider_step_skipped: boolean;
+  personalization_changed: boolean;
 };
 
 export type AuthStatus =
@@ -1468,14 +1503,6 @@ export type KartonContract = {
         mountPrefix: string,
         options: WorkspaceGitCreateWorktreeOptions,
       ) => Promise<WorkspaceGitCreateWorktreeResult>;
-      generateWorkspaceMd: (
-        agentInstanceId: string,
-        mountPrefix: string,
-      ) => Promise<void>;
-      /** Get context files for all workspaces */
-      getContextFiles: () => Promise<ContextFilesResult>;
-      /** Generate WORKSPACE.md for a workspace path (does not require agent instance) */
-      generateWorkspaceMdForPath: (workspacePath: string) => Promise<void>;
       submitUserQuestionStep: (
         agentInstanceId: string,
         questionId: string,
@@ -1583,7 +1610,7 @@ export type KartonContract = {
                   | 'minimax-plan'
                   | 'mimo-plan';
               };
-              suggestion?: { id: string; url: string; prompt: string };
+              summary?: OnboardingCompletionSummary;
             },
       ) => Promise<void>;
       clearPendingOnboardingSuggestion: () => Promise<void>;
@@ -1635,6 +1662,12 @@ export type KartonContract = {
       checkForUpdates: () => Promise<void>;
       /** Quit the app and install the downloaded update */
       quitAndInstall: () => Promise<void>;
+    };
+    appData: {
+      /** Open the OS-specific Electron userData directory. */
+      openFolder: () => Promise<void>;
+      /** Delete app data on restart while retaining the installation ID. */
+      reset: () => Promise<void>;
     };
     config: {
       set: (config: Partial<GlobalConfig>) => Promise<void>;
@@ -1872,6 +1905,10 @@ export type KartonContract = {
         cols: number;
         rows: number;
       }>;
+      /** Discover local servers owned by Stagewise terminal sessions. */
+      getRunningServers: () => Promise<RunningServer[]>;
+      /** Send Ctrl+C to the terminal session owning a local server. */
+      stopRunningServer: (owner: RunningServerOwner) => Promise<boolean>;
       /** Add a custom search engine */
       addSearchEngine: (
         input: AddSearchEngineInput,
@@ -1887,6 +1924,10 @@ export type KartonContract = {
       /** Get base64-encoded favicon bitmaps for a list of favicon URLs */
       getFaviconBitmaps: (
         faviconUrls: string[],
+      ) => Promise<Record<string, FaviconBitmapResult>>;
+      /** Get cached favicon bitmaps keyed by page URL and matched by origin. */
+      getFaviconBitmapsForPageUrls: (
+        pageUrls: string[],
       ) => Promise<Record<string, FaviconBitmapResult>>;
     };
     credentials: {
@@ -1969,6 +2010,10 @@ export type KartonContract = {
       setActiveWorkspace: (workspaceKey: string | null) => Promise<void>;
       setViewMode: (mode: 'files' | 'diff') => Promise<void>;
       createFile: (
+        workspaceKey: string,
+        directoryPath: string,
+      ) => Promise<FileTreeOperationResult>;
+      createFolder: (
         workspaceKey: string,
         directoryPath: string,
       ) => Promise<FileTreeOperationResult>;
@@ -2326,7 +2371,6 @@ export const defaultState: KartonContract['state'] = {
   systemTheme: 'light', // Will be set correctly by backend on init
   installedIdes: [],
   workspaceMounts: [],
-  workspaceMdGenerating: {},
   plugins: [],
   skills: [],
   globalSkills: [],

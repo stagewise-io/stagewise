@@ -24,6 +24,7 @@ import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
 import { NotificationSoundsService } from './services/notification-sounds';
 import { WindowLayoutService } from './services/window-layout';
+import { revealPathInFileManager } from './services/window-layout/protocol-utils';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { WebDataService } from './services/webdata';
@@ -44,7 +45,6 @@ import {
   createAgentCoreSeam,
   attachAgentCoreBridge,
 } from './services/agent-core-bridge/wiring';
-import { registerToolboxGenerateWorkspaceMd } from './services/agent-core-bridge/handlers/toolbox';
 import { createBrowserHostPaths } from './services/agent-core-bridge/host-paths';
 import { createBrowserAgentHost } from './services/agent-core-bridge/host';
 import { createLazyBrowserHostModels } from './services/agent-core-bridge/host-models';
@@ -71,6 +71,7 @@ import { AssetCacheService } from './services/asset-cache';
 import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
+import { requestAppDataReset } from './utils/app-data-reset';
 import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';
 import { AgentRuntimeRecoveryService } from './services/agent-runtime-recovery';
 import { MacOSClosedLidSleepService } from './services/macos-closed-lid-sleep';
@@ -87,7 +88,6 @@ import {
   createMemoryDomainAdapter,
   createPlansDomainAdapter,
   createWorkspaceDomainAdapter,
-  createWorkspaceMdDomainAdapter,
 } from '@stagewise/agent-core/env/adapters';
 import {
   createBrowserHostEnvironmentSources,
@@ -462,6 +462,17 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     },
   );
 
+  uiKarton.registerServerProcedureHandler('appData.openFolder', async () =>
+    revealPathInFileManager(app.getPath('userData')),
+  );
+
+  uiKarton.registerServerProcedureHandler('appData.reset', async () => {
+    requestAppDataReset(app.getPath('userData'));
+    telemetryService.capture('app-data-reset');
+    if (app.isPackaged) app.relaunch();
+    app.quit();
+  });
+
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(logger, uiKarton);
 
@@ -640,12 +651,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       )) ?? new Map(),
   );
 
-  registerToolboxGenerateWorkspaceMd(agentCoreSeam.registry, uiKarton, {
-    store: agentCoreSeam.store,
-    generateWorkspaceMdForPath: (workspacePath) =>
-      agentManagerService.generateWorkspaceMdForPath(workspacePath),
-  });
-
   // Phase 5: now that `ModelProviderService` exists, activate the lazy
   // `HostModels` slot inside the already-assembled `agentCoreHost`. Must
   // happen before `attachAgentCoreBridge` so any attach-phase handler
@@ -691,18 +696,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       mountManager: coreMountManager,
     }),
   );
-  const workspaceMdRelativePath = agentCoreHost.workspaceMdRelativePath?.();
   agentManagerService.registerEnvAdapter(
     createAgentsMdDomainAdapter({
       host: agentCoreHost,
       mountManager: coreMountManager,
-      workspaceMdRelativePath,
-    }),
-  );
-  agentManagerService.registerEnvAdapter(
-    createWorkspaceMdDomainAdapter({
-      mountManager: coreMountManager,
-      workspaceMdRelativePath,
     }),
   );
   agentManagerService.registerEnvAdapter(
@@ -784,7 +781,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   });
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
-  // workspace-md generating, search engines, global config, auth)
+  // search engines, global config, auth)
   await wirePagesStateSync({
     uiKarton,
     pagesService,
@@ -911,6 +908,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     'fileTree.createFile',
     async (_cid, workspaceKey: string, directoryPath: string) =>
       fileTreeService.createFile(workspaceKey, directoryPath),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.createFolder',
+    async (_cid, workspaceKey: string, directoryPath: string) =>
+      fileTreeService.createFolder(workspaceKey, directoryPath),
   );
   uiKarton.registerServerProcedureHandler(
     'fileTree.recreateDeletedFile',
@@ -1114,18 +1116,29 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       return result;
     },
   );
-
-  // toolbox.getContextFiles / toolbox.generateWorkspaceMdForPath
   uiKarton.registerServerProcedureHandler(
-    'toolbox.getContextFiles',
-    async (_cid: string) => {
-      return toolboxService.getContextFilesForAllWorkspaces();
-    },
-  );
-  uiKarton.registerServerProcedureHandler(
-    'toolbox.generateWorkspaceMdForPath',
-    async (_cid: string, workspacePath: string) => {
-      await agentManagerService.generateWorkspaceMdForPath(workspacePath);
+    'browser.getFaviconBitmapsForPageUrls',
+    async (
+      _cid: string,
+      pageUrls: string[],
+    ): Promise<Record<string, FaviconBitmapResult>> => {
+      const originsByPageUrl = new Map(
+        pageUrls.map((pageUrl) => [pageUrl, new URL(pageUrl).origin]),
+      );
+      const faviconUrlsByOrigin = await faviconService.getFaviconsForOrigins(
+        Array.from(new Set(originsByPageUrl.values())),
+      );
+      const bitmapsByFavicon = await faviconService.getFaviconBitmaps(
+        Array.from(new Set(faviconUrlsByOrigin.values())),
+      );
+      const result: Record<string, FaviconBitmapResult> = {};
+      for (const [pageUrl, origin] of originsByPageUrl) {
+        const faviconUrl = faviconUrlsByOrigin.get(origin);
+        if (!faviconUrl) continue;
+        const bitmap = bitmapsByFavicon.get(faviconUrl);
+        if (bitmap) result[pageUrl] = bitmap;
+      }
+      return result;
     },
   );
 

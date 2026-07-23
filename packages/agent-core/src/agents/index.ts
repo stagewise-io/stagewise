@@ -23,10 +23,6 @@ export {
   type MessageId,
 } from './base-agent';
 export { ChatAgent } from './chat/chat';
-export {
-  WorkspaceMdAgent,
-  type WorkspaceMdInstanceConfig,
-} from './workspace-md/workspace-md';
 
 // Shared helpers used across agent classes. Migrated from
 // `apps/browser/src/backend/agents/shared/base-agent/` in Phase 10 task 7.

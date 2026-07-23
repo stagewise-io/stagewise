@@ -1,4 +1,5 @@
 import {
+  ResizableHandle,
   ResizablePanel,
   type ImperativePanelHandle,
 } from '@stagewise/stage-ui/components/resizable';
@@ -27,7 +28,7 @@ import {
 
 // Read the persisted collapsed state *once* at module eval so we can seed
 // `defaultSize` on first render. Without this the panel mounts expanded
-// (`defaultSize={12}`) and then collapses via effect on the next frame,
+// at its default size and then collapses via effect on the next frame,
 // producing a visible flash when the user last left the sidebar collapsed.
 const INITIAL_COLLAPSED = readInitialSidebarCollapsed();
 export function Sidebar() {
@@ -61,39 +62,47 @@ export function Sidebar() {
     }
   }, [collapsed]);
 
+  const reset = () => panelRef.current?.resize(DEFAULT_EXPANDED_SIDEBAR_SIZE);
+
   return (
-    <ResizablePanel
-      ref={panelRef}
-      id={SIDEBAR_PANEL_ID}
-      order={SIDEBAR_PANEL_ORDER}
-      defaultSize={INITIAL_COLLAPSED ? 0 : DEFAULT_EXPANDED_SIDEBAR_SIZE}
-      minSize={SIDEBAR_PANEL_MIN_SIZE}
-      maxSize={SIDEBAR_PANEL_MAX_SIZE}
-      collapsible
-      collapsedSize={0}
-      onCollapse={() => setCollapsed(true)}
-      onExpand={() => setCollapsed(false)}
-      data-tutorial="sidebar-panel"
-      className={`${SIDEBAR_PANEL_CLASS_NAME} data-[panel-size='0.0']:min-w-0`}
-    >
-      <SidebarTitlebarRow absolute />
-      {!collapsed && (
-        <div
-          className="flex h-full flex-col items-stretch p-2"
-          style={{ paddingTop: (TITLEBAR_HEIGHT + 8) * counterScale }}
-        >
-          <AgentsList />
+    <>
+      <ResizablePanel
+        ref={panelRef}
+        id={SIDEBAR_PANEL_ID}
+        order={SIDEBAR_PANEL_ORDER}
+        defaultSize={INITIAL_COLLAPSED ? 0 : DEFAULT_EXPANDED_SIDEBAR_SIZE}
+        minSize={SIDEBAR_PANEL_MIN_SIZE}
+        maxSize={SIDEBAR_PANEL_MAX_SIZE}
+        collapsible
+        collapsedSize={0}
+        onCollapse={() => setCollapsed(true)}
+        onExpand={() => setCollapsed(false)}
+        data-tutorial="sidebar-panel"
+        className={`${SIDEBAR_PANEL_CLASS_NAME} data-[panel-size='0.0']:min-w-0`}
+      >
+        <SidebarTitlebarRow absolute />
+        {!collapsed && (
+          <div
+            className="flex h-full flex-col items-stretch p-2"
+            style={{ paddingTop: (TITLEBAR_HEIGHT + 8) * counterScale }}
+          >
+            <AgentsList />
 
-          <div className="mt-8 flex shrink-0 flex-col gap-2">
-            <SidebarExperienceSurvey />
-            <NotificationBanners />
-            <UsageWarningBadge />
-            <WorktreeCleanupBadge />
+            <div className="mt-8 flex shrink-0 flex-col gap-2">
+              <SidebarExperienceSurvey />
+              <NotificationBanners />
+              <UsageWarningBadge />
+              <WorktreeCleanupBadge />
+            </div>
+
+            <SidebarAuthFooter />
           </div>
+        )}
+      </ResizablePanel>
 
-          <SidebarAuthFooter />
-        </div>
+      {!collapsed && (
+        <ResizableHandle className="after:w-2.5" onDoubleClick={reset} />
       )}
-    </ResizablePanel>
+    </>
   );
 }

@@ -361,6 +361,36 @@ export class TerminalService extends DisposableService {
     }
   }
 
+  /** Returns the root PTY pid used to associate local servers with tabs. */
+  public getSessionProcessId(terminalId: string): number | undefined {
+    return this.sessions.get(terminalId)?.pty.pid;
+  }
+
+  public getShellType(): string {
+    return this.shell.type;
+  }
+
+  /** Writes raw input to a user terminal PTY. */
+  public writeTerminalInput(terminalId: string, data: string): boolean {
+    const session = this.sessions.get(terminalId);
+    if (!session) {
+      this.logger.warn(
+        `[TerminalService] terminalInput: unknown terminal ${terminalId}`,
+      );
+      return false;
+    }
+    try {
+      session.pty.write(data);
+      return true;
+    } catch (err) {
+      this.logger.warn(
+        `[TerminalService] Error writing to PTY ${terminalId}`,
+        err,
+      );
+      return false;
+    }
+  }
+
   constructor(
     logger: Logger,
     uiKarton: KartonService,
@@ -482,7 +512,7 @@ export class TerminalService extends DisposableService {
     this.uiKarton.registerServerProcedureHandler(
       'browser.terminalInput',
       async (_callingClientId: string, terminalId: string, data: string) => {
-        this.handleTerminalInput(terminalId, data);
+        this.writeTerminalInput(terminalId, data);
       },
     );
 
@@ -982,24 +1012,6 @@ export class TerminalService extends DisposableService {
     // We must NOT set activeTabId ourselves — that would bypass the
     // Electron view management in handleSwitchTab.
     this.onTerminalTabRemoved?.(terminalId);
-  }
-
-  private handleTerminalInput(terminalId: string, data: string): void {
-    const session = this.sessions.get(terminalId);
-    if (!session) {
-      this.logger.warn(
-        `[TerminalService] terminalInput: unknown terminal ${terminalId}`,
-      );
-      return;
-    }
-    try {
-      session.pty.write(data);
-    } catch (err) {
-      this.logger.warn(
-        `[TerminalService] Error writing to PTY ${terminalId}`,
-        err,
-      );
-    }
   }
 
   private handleTerminalResize(

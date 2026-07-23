@@ -133,12 +133,6 @@ export class AgentManagerService extends DisposableService {
     this.manager.unregisterEnvAdapter(domainId);
   }
 
-  public async generateWorkspaceMdForPath(
-    workspacePath: string,
-  ): Promise<void> {
-    await this.manager.generateWorkspaceMdForPath(workspacePath);
-  }
-
   public async recoverInterruptedActiveAgents(
     reason: 'system-resumed' | 'event-loop-stalled',
     details?: { stalledForMs?: number },

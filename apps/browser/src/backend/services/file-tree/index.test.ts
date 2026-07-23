@@ -62,7 +62,6 @@ function createState(root: string): MutableState {
         path: root,
         git: null,
         skills: [],
-        workspaceMdContent: null,
         agentsMdContent: null,
       },
     ],
@@ -144,7 +143,6 @@ describe('FileTreeService', () => {
             path: toolboxRoot,
             git: null,
             skills: [],
-            workspaceMdContent: null,
             agentsMdContent: null,
           },
         ],
@@ -225,6 +223,47 @@ describe('FileTreeService', () => {
       ['ignored.txt', true],
       ['visible.txt', false],
     ]);
+  });
+
+  it('creates a new folder in the selected directory', async () => {
+    await mkdir(path.join(root, 'parent'));
+    await service.listDirectory({
+      workspaceKey,
+      directoryPath: 'parent',
+    });
+
+    const result = await service.createFolder(workspaceKey, 'parent');
+    const listing = await service.listDirectory({
+      workspaceKey,
+      directoryPath: 'parent',
+    });
+
+    expect(result).toEqual({
+      success: true,
+      relativePath: 'parent/new folder',
+    });
+    expect(listing.entries).toEqual([
+      expect.objectContaining({
+        kind: 'directory',
+        name: 'new folder',
+        relativePath: 'parent/new folder',
+      }),
+    ]);
+  });
+
+  it('uses the next available name when creating a folder', async () => {
+    await mkdir(path.join(root, 'new folder'));
+    await writeFile(path.join(root, 'new folder 2'), 'occupied');
+
+    const result = await service.createFolder(workspaceKey, '');
+
+    expect(result).toEqual({
+      success: true,
+      relativePath: 'new folder 3',
+    });
+    await expect(realpath(path.join(root, 'new folder 3'))).resolves.toBe(
+      path.join(await realpath(root), 'new folder 3'),
+    );
   });
 
   it('classifies text, image, svg, and binary previews', async () => {

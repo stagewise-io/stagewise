@@ -14,7 +14,7 @@ import { OnboardingBottomNav } from '../index';
 import type { TelemetryLevel } from '@shared/karton-contracts/ui/shared-types';
 
 export type OnboardingAuthCompletion = {
-  auth_method: 'stagewise' | 'api-keys' | 'coding-plan' | 'unknown';
+  auth_method: 'stagewise' | 'api-keys' | 'coding-plan';
   provider?: import('@shared/karton-contracts/ui/shared-types').ModelProvider;
   plan_id?: import('@shared/coding-plan-ids').CodingPlanId;
 };
@@ -22,8 +22,10 @@ export type OnboardingAuthCompletion = {
 export function StepLogin({
   onSkip,
   onAuthenticated,
+  onboardingRunId,
 }: {
   onSkip: () => void;
+  onboardingRunId: string;
   onAuthenticated: (completion: OnboardingAuthCompletion) => void;
 }) {
   const sendOtp = useKartonProcedure((p) => p.userAccount.sendOtp);
@@ -167,7 +169,12 @@ export function StepLogin({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onSkip}
+            onClick={() => {
+              void track('onboarding-auth-skipped', {
+                onboarding_run_id: onboardingRunId,
+              });
+              onSkip();
+            }}
             className={cn('text-muted-foreground hover:text-foreground')}
           >
             Continue without account

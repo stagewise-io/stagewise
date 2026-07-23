@@ -81,6 +81,7 @@ export { IconPhoneOutline18 } from './IconPhoneOutline18';
 export { IconPinTackOutline18 } from './IconPinTackOutline18';
 export { IconPinTackSlashOutline18 } from './IconPinTackSlashOutline18';
 export { IconPlusOutline18 } from './IconPlusOutline18';
+export { IconPowerOffOutline18 } from './IconPowerOffOutline18';
 export { IconPresentationScreenVideoOutline18 } from './IconPresentationScreenVideoOutline18';
 export { IconPuzzlePieceOutline18 } from './IconPuzzlePieceOutline18';
 export { IconRedoOutline18 } from './IconRedoOutline18';

@@ -82,7 +82,7 @@ export const commandCenterSettings: CommandCenterSettingDefinition[] = [
     id: 'setting:skills-context',
     title: 'Skills & Context files',
     subtitle: 'Manage skill and context file preferences',
-    keywords: ['skills', 'context', 'agents.md', 'workspace.md'],
+    keywords: ['skills', 'context', 'agents.md'],
     url: '',
     settingsRoute: ROUTE_SKILLS_CONTEXT,
     iconName: 'context',

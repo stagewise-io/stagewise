@@ -22,6 +22,7 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   FilePlusIcon,
+  FolderPlusIcon,
   Loader2Icon,
   PencilIcon,
   ScissorsIcon,
@@ -151,6 +152,7 @@ export function FileTreeWorkspaceView({
   const pasteEntry = useKartonProcedure((p) => p.fileTree.pasteEntry);
   const deleteEntry = useKartonProcedure((p) => p.fileTree.deleteEntry);
   const createFile = useKartonProcedure((p) => p.fileTree.createFile);
+  const createFolder = useKartonProcedure((p) => p.fileTree.createFolder);
   const copyText = useKartonProcedure((p) => p.browser.copyText);
   const [openAgent] = useOpenAgent();
   const workspaceMount = useKartonState((s) =>
@@ -190,7 +192,7 @@ export function FileTreeWorkspaceView({
     timer: number | null;
   }>({ value: '', timer: null });
   const restoreFocusTimersRef = useRef<number[]>([]);
-  const pendingNewFileRef = useRef<string[]>([]);
+  const pendingNewEntryRef = useRef<string[]>([]);
   const openAfterRenameRef = useRef<Set<string>>(new Set());
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
@@ -201,7 +203,7 @@ export function FileTreeWorkspaceView({
   // previous workspace. Stale entries could otherwise match paths in the new
   // workspace (wrong rename target) or block the queue indefinitely.
   useEffect(() => {
-    pendingNewFileRef.current = [];
+    pendingNewEntryRef.current = [];
     openAfterRenameRef.current = new Set();
     setRenamingPath(null);
   }, [workspaceKey]);
@@ -497,11 +499,38 @@ export function FileTreeWorkspaceView({
         // Track the new file so the rows-watcher effect scrolls to it and
         // enters rename mode once it appears in the tree. Enqueued (not
         // overwritten) so rapid repeated creates each get their turn.
-        pendingNewFileRef.current.push(newFilePath);
+        pendingNewEntryRef.current.push(newFilePath);
         openAfterRenameRef.current.add(newFilePath);
       });
     },
     [createFile, setDirectoryExpanded, workspaceKey],
+  );
+
+  const handleCreateFolder = useCallback(
+    (directoryPath: string) => {
+      if (!workspaceKey) return;
+      const activeWorkspaceKey = workspaceKey;
+      void createFolder(activeWorkspaceKey, directoryPath).then((result) => {
+        if (workspaceKeyRef.current !== activeWorkspaceKey) return;
+        if (!result.success || !result.relativePath) {
+          toast({
+            id: `file-tree-create-folder-error-${Date.now()}`,
+            title: 'New folder failed',
+            message: result.error ?? 'Could not create a new folder.',
+            type: 'error',
+            actions: [],
+          });
+          return;
+        }
+        const newFolderPath = result.relativePath;
+        void setDirectoryExpanded(workspaceKey, directoryPath, true);
+        setFocusedEntryPath(newFolderPath);
+        setSelectedEntryPaths([]);
+        setSelectionAnchorPath(null);
+        pendingNewEntryRef.current.push(newFolderPath);
+      });
+    },
+    [createFolder, setDirectoryExpanded, workspaceKey],
   );
 
   const getActionPaths = useCallback(
@@ -939,14 +968,14 @@ export function FileTreeWorkspaceView({
     };
   }, []);
 
-  // When new files are created, wait for them to appear in the tree rows,
+  // When new entries are created, wait for them to appear in the tree rows,
   // scroll to each in turn, and enter rename mode. Only one rename is
   // active at a time; the rest wait in the queue until the current
   // rename is submitted or cancelled (which sets renamingPath back to
   // null, re-running this effect).
   useEffect(() => {
     if (renamingPath !== null) return;
-    const queue = pendingNewFileRef.current;
+    const queue = pendingNewEntryRef.current;
     const pendingPath = queue.shift();
     if (pendingPath === undefined) return;
     const index = rows.findIndex(
@@ -1015,9 +1044,9 @@ export function FileTreeWorkspaceView({
     : contextIsDirectory
       ? contextTargetPath
       : getParentDirectory(contextTargetPath);
-  // The directory where a new file would be created when the user clicks
-  // “New File” — the targeted directory itself, the parent of a targeted
-  // file, or the workspace root for empty-space right-clicks.
+  // The directory where a new entry would be created — the targeted directory
+  // itself, the parent of a targeted file, or the workspace root for
+  // empty-space right-clicks.
   const contextCreateDirectory = contextPasteDirectory;
   const workspaceIsReadOnly = workspaceKey
     ? isReadOnlyWorkspaceKey(workspaceKey)
@@ -1139,6 +1168,14 @@ export function FileTreeWorkspaceView({
             >
               <FilePlusIcon className="size-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate">New File</span>
+            </MenuBase.Item>
+            <MenuBase.Item
+              className={contextMenuItemClassName}
+              disabled={workspaceIsReadOnly}
+              onClick={() => handleCreateFolder(contextCreateDirectory)}
+            >
+              <FolderPlusIcon className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">New Folder</span>
             </MenuBase.Item>
             <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
             <MenuBase.Item

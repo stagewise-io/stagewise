@@ -171,5 +171,6 @@ describe('createShellsDomainAdapter', () => {
     const section = adapter.promptSection ?? '';
     expect(section).toContain('executeShellCommand');
     expect(section).toContain('wait_until');
+    expect(section).toContain('raw line breaks act like Enter');
   });
 });

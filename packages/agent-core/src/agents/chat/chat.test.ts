@@ -1,26 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTestAgentHost } from '../../host/test-utils';
 import { ChatAgent } from './chat';
 
 /**
  * Tests for {@link ChatAgent}'s tool-resolution contract.
  *
  * `ChatAgent` is the host-agnostic baseline: it must only request the
- * universal file-ops + `updateWorkspaceMd` spawn tool from its toolbox.
+ * universal file operations from its toolbox.
  * Host-specific tools (browser, shell, sandbox, ...) arrive via the
  * `getAdditionalTools` template hook, which subclasses override.
  *
  * We bypass `BaseAgent`'s heavy constructor here by stubbing the few
- * fields `getTools` actually touches (`instanceId`, `toolbox`,
- * `getSpawnChildAgentTool`). This keeps the test focused on the
+ * fields `getTools` actually touches (`instanceId`, `toolbox`). This keeps the test focused on the
  * contract without re-instantiating the whole agent runtime.
  */
 
 interface ChatAgentInternals {
   instanceId: string;
   toolbox: { getTool: ReturnType<typeof vi.fn> };
-  host: { workspaceMdRelativePath: () => string };
-  getSpawnChildAgentTool: () => unknown;
   getTools: () => Promise<Record<string, unknown>>;
   getAdditionalTools: () => Promise<Record<string, unknown>>;
 }
@@ -32,10 +28,6 @@ function makeStubAgent<T extends ChatAgent>(
   const instance = Object.create(ctor.prototype) as ChatAgentInternals;
   instance.instanceId = 'test-agent';
   instance.toolbox = toolboxImpl;
-  // Use a default-configured AgentHost so the tool-description path
-  // reads `workspaceMdRelativePath()` without ceremony.
-  instance.host = createTestAgentHost();
-  instance.getSpawnChildAgentTool = () => ({ kind: 'spawn-child' });
   return instance;
 }
 
@@ -48,7 +40,7 @@ describe('ChatAgent', () => {
     expect(extra).toEqual({});
   });
 
-  it('getTools returns only universal file ops + updateWorkspaceMd', async () => {
+  it('getTools returns only universal file operations', async () => {
     const getTool = vi.fn().mockResolvedValue({});
     const stub = makeStubAgent(ChatAgent, { getTool });
     const tools = await stub.getTools();
@@ -60,7 +52,6 @@ describe('ChatAgent', () => {
       'grepSearch',
       'multiEdit',
       'read',
-      'updateWorkspaceMd',
       'write',
     ]);
   });
@@ -93,7 +84,6 @@ describe('ChatAgent', () => {
     expect(tools).not.toHaveProperty('copy');
     expect(tools).toHaveProperty('read');
     expect(tools).toHaveProperty('write');
-    expect(tools).toHaveProperty('updateWorkspaceMd');
   });
 
   it('subclass overrides of getAdditionalTools are merged into getTools', async () => {

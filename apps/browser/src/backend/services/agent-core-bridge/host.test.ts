@@ -399,7 +399,7 @@ describe('createBrowserAgentHost', () => {
     expect(host.models.has('anything')).toBe(true);
   });
 
-  it('defines a full-surface CHAT profile and a curated WORKSPACE_MD profile', () => {
+  it('defines a full-surface CHAT profile', () => {
     const logger = makeLogger();
     const mp = {
       modelExists: vi.fn(() => true),
@@ -439,13 +439,6 @@ describe('createBrowserAgentHost', () => {
     expect(chat?.systemPromptFragments?.environmentPreamble).toBeTypeOf(
       'string',
     );
-
-    const workspaceMd = host.getAgentProfile(AgentTypes.WORKSPACE_MD);
-    expect(workspaceMd).toBeDefined();
-    expect(workspaceMd?.envDomainIds).toEqual([WORKSPACE_DOMAIN_ID]);
-    expect(workspaceMd?.outputProtocols).toBeUndefined();
-    expect(workspaceMd?.outputAliases).toBeUndefined();
-    expect(workspaceMd?.systemPromptFragments).toBeUndefined();
   });
 
   it('reuses a caller-supplied HostPaths when provided', () => {

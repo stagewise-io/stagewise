@@ -50,6 +50,7 @@ import {
   dispatchChatHistoryScroll,
   type ChatHistoryScrollDirection,
 } from '../_lib/chat-history-scroll-event';
+import type { PromptHistoryDirection } from './prompt-history';
 // Re-export types for convenience
 export type { AttachmentAttributes, AttachmentType };
 
@@ -81,6 +82,25 @@ function getChatHistoryScrollDirectionFromEvent(
   const key = event.key.toLowerCase();
   if (key === 'u') return 'up';
   if (key === 'd') return 'down';
+
+  return null;
+}
+
+function getPromptHistoryDirectionFromEvent(
+  event: KeyboardEvent,
+): PromptHistoryDirection | null {
+  if (
+    event.isComposing ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.shiftKey
+  ) {
+    return null;
+  }
+
+  if (event.key === 'ArrowUp') return 'older';
+  if (event.key === 'ArrowDown') return 'newer';
 
   return null;
 }
@@ -197,6 +217,9 @@ export interface ChatInputProps {
   defaultValue?: Content; // TipTap JSON content string
   onChange?: (TipTapContent: Content) => void;
   onSubmit: () => void;
+  onPromptHistoryNavigationRequest?: (
+    direction: PromptHistoryDirection,
+  ) => boolean;
   disabled?: boolean;
   placeholder?: string;
 
@@ -258,6 +281,8 @@ export interface ChatInputHandle {
   getJsonContent: () => string;
   /** Clear all editor content */
   clear: () => void;
+  /** Replace all editor content, used for prompt-history navigation. */
+  setContent: (content: Content) => void;
   /** Replace an attachment node (by id) with plain text */
   replaceAttachmentWithText: (attachmentId: string, text: string) => void;
   /** Update attributes on an existing attachment node (by id) */
@@ -272,6 +297,7 @@ export const ChatInput = memo(function ChatInput({
   defaultValue,
   onChange,
   onSubmit,
+  onPromptHistoryNavigationRequest,
   disabled = false,
   placeholder,
   attachmentCount: _attachmentCount = 0,
@@ -418,6 +444,15 @@ export const ChatInput = memo(function ChatInput({
           event.preventDefault();
           dispatchChatHistoryScroll(scrollDirection);
           return true;
+        }
+
+        const promptHistoryDirection =
+          getPromptHistoryDirectionFromEvent(event);
+        if (promptHistoryDirection) {
+          if (onPromptHistoryNavigationRequest?.(promptHistoryDirection)) {
+            event.preventDefault();
+            return true;
+          }
         }
 
         // Handle Enter without Shift for submit
@@ -682,6 +717,10 @@ export const ChatInput = memo(function ChatInput({
     },
     clear: () => {
       editor?.commands.clearContent();
+    },
+    setContent: (content: Content) => {
+      editor?.commands.setContent(content);
+      editor?.commands.focus('end');
     },
     replaceAttachmentWithText: (attachmentId: string, text: string) => {
       if (!editor) return;

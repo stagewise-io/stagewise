@@ -1,6 +1,5 @@
 import type { DomainId } from '../env/contract';
 import type { FileTransformer } from '../file-read-transformer/types';
-import { DEFAULT_WORKSPACE_MD_RELATIVE_PATH } from '../services/mount-manager/workspace-info';
 import type { AgentTypes } from '../types/agent';
 import type { HostEnvironmentSources } from './environment-sources';
 import type { Logger } from './logger';
@@ -115,9 +114,7 @@ export type SystemPromptFragmentKey =
  * Profiles are explicit by design: an agent type with no registered
  * profile receives no env state and only the agent-core baseline prompt.
  * Output protocols/aliases/system-prompt-fragments only apply when an
- * agent uses the chat system-prompt builder (e.g. `ChatAgent`); thin
- * agents that build their own prompt (e.g. `WorkspaceMdAgent`) ignore
- * those slots.
+ * agent uses the chat system-prompt builder (e.g. `ChatAgent`).
  */
 export interface AgentProfile {
   /**
@@ -169,19 +166,6 @@ export interface AgentHostConfig {
    * early bring-up) can omit it; providers null-check before use.
    */
   environmentSources?: HostEnvironmentSources;
-  /**
-   * Reads WORKSPACE.md from an absolute workspace path. Returns `null`
-   * when missing (same contract as `readWorkspaceMd` in mount-manager).
-   */
-  readWorkspaceMdFromDisk?: (
-    absoluteWorkspacePath: string,
-  ) => Promise<string | null>;
-  /**
-   * Mount-relative path to the WORKSPACE.md project memo (e.g.
-   * `'.stagewise/WORKSPACE.md'`). Defaults to `.stagewise/WORKSPACE.md`
-   * when omitted.
-   */
-  workspaceMdRelativePath?: string;
 }
 
 /**
@@ -216,11 +200,6 @@ export class AgentHost {
    * Readers must null-check.
    */
   environmentSources: HostEnvironmentSources | undefined;
-  readonly readWorkspaceMdFromDisk:
-    | ((absoluteWorkspacePath: string) => Promise<string | null>)
-    | undefined;
-
-  private readonly _workspaceMdRelativePath: string;
   private readonly fileReadTransformers: Record<string, FileTransformer> = {};
   private readonly toolPartSerializers: Record<string, ToolPartSerializer> = {};
   private readonly profiles = new Map<AgentTypes, AgentProfile>();
@@ -232,18 +211,6 @@ export class AgentHost {
     this.telemetry = cfg.telemetry;
     this.desktop = cfg.desktop;
     this.environmentSources = cfg.environmentSources;
-    this.readWorkspaceMdFromDisk = cfg.readWorkspaceMdFromDisk;
-    this._workspaceMdRelativePath =
-      cfg.workspaceMdRelativePath ?? DEFAULT_WORKSPACE_MD_RELATIVE_PATH;
-  }
-
-  /**
-   * Mount-relative path to the WORKSPACE.md project memo. Always
-   * returns a value; falls back to `.stagewise/WORKSPACE.md` when the
-   * host did not configure one.
-   */
-  workspaceMdRelativePath(): string {
-    return this._workspaceMdRelativePath;
   }
 
   /**
@@ -335,9 +302,9 @@ export class AgentHost {
    *  - `systemPromptFragments` override the chat agent's `<intro>`,
    *    `<soul>`, `<environment>` preamble, and `<authorities>` slots.
    *
-   * Agents that build their own system prompt (e.g.
-   * `WorkspaceMdAgent`) ignore the protocol/alias/fragment slots — for
-   * those agents only `envDomainIds` is meaningful.
+   * Agents that build their own system prompt ignore the
+   * protocol/alias/fragment slots — for those agents only
+   * `envDomainIds` is meaningful.
    */
   defineAgentProfile(type: AgentTypes, profile: AgentProfile): void {
     this.profiles.set(type, profile);
