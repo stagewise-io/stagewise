@@ -200,6 +200,7 @@ export const shellSessionSnapshotSchema = z.object({
 export type ShellSessionSnapshot = z.infer<typeof shellSessionSnapshotSchema>;
 
 export const shellSnapshotSchema = z.object({
+  shellType: z.string().optional(),
   sessions: z.array(shellSessionSnapshotSchema),
 });
 export type ShellSnapshot = z.infer<typeof shellSnapshotSchema>;

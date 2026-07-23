@@ -3,6 +3,7 @@ import {
   IconFolder5Outline18,
   IconGear3Outline18,
   IconMsgWritingOutline18,
+  IconSquareTerminalOutline18,
 } from '@stagewise/icons';
 import type { ComponentType } from 'react';
 import { ShortcutKey } from '@stagewise/stage-ui/components/shortcut-key';
@@ -19,6 +20,11 @@ const modes: ModeDefinition[] = [
   { mode: 'global', label: 'All' },
   { mode: 'agents', label: 'Agents', Icon: IconMsgWritingOutline18 },
   { mode: 'browser', label: 'Browser', Icon: IconEarthSearchOutline18 },
+  {
+    mode: 'terminals',
+    label: 'Terminals',
+    Icon: IconSquareTerminalOutline18,
+  },
   { mode: 'files', label: 'Files', Icon: IconFolder5Outline18 },
   { mode: 'settings', label: 'Settings', Icon: IconGear3Outline18 },
 ];
