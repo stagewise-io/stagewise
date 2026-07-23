@@ -65,7 +65,8 @@ import { normalizePath } from '@shared/path-utils';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
-import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useNextAgentRequiringAttention } from '@ui/hooks/use-next-agent-requiring-attention';
 import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import { getAvailableModel } from '@shared/available-models';
 import {
@@ -85,10 +86,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { Button } from '@stagewise/stage-ui/components/button';
 import {
   getPromptHistoryStep,
   type PromptHistoryDirection,
 } from './prompt-history';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { AgentStatusDot } from '../../../_components/agent-status-dot';
 
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -203,6 +207,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [registerDraftGetter]);
 
   const [openAgent] = useOpenAgent();
+  const { focusAgentFromHotkey } = useAgentSwitcher();
+  const nextAttentionTarget = useNextAgentRequiringAttention(openAgent);
+
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const { collapsed: contentCollapsed } = useContentCollapsed();
 
@@ -385,6 +392,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   // Karton procedures
   const sendUserMessage = useKartonProcedure((p) => p.agents.sendUserMessage);
+  const setLastOpenAgentId = useKartonProcedure(
+    (p) => p.browser.setLastOpenAgentId,
+  );
   const stopAgent = useKartonProcedure((p) => p.agents.stop);
   const createWorkspaceGitWorktree = useKartonProcedure(
     (p) => p.toolbox.createWorkspaceGitWorktree,
@@ -1106,6 +1116,13 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     executePendingWorkspaceActions,
     setFileAttachments,
   ]);
+
+  const handleNextAttentionAgentClick = () => {
+    if (!nextAttentionTarget) return;
+
+    focusAgentFromHotkey(nextAttentionTarget.id);
+    void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
+  };
 
   // Quantize to nearest 1 000 tokens so the value only changes when
   // crossing a 1K boundary — prevents ChatInput memo-busting on every
@@ -1895,12 +1912,49 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       {workspaceActionError && (
         <WorkspaceActionErrorMessage message={workspaceActionError} />
       )}
-      <WorkspaceSelect
-        onWorkspaceChange={handleWorkspaceChange}
-        chatIsEmpty={historyIsEmpty}
-        workspaceActionConfigs={workspaceActionConfigs}
-        onWorkspaceActionConfigChange={handleWorkspaceActionConfigChange}
-      />
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <WorkspaceSelect
+            onWorkspaceChange={handleWorkspaceChange}
+            chatIsEmpty={historyIsEmpty}
+            workspaceActionConfigs={workspaceActionConfigs}
+            onWorkspaceActionConfigChange={handleWorkspaceActionConfigChange}
+          />
+        </div>
+        {nextAttentionTarget ? (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="max-w-64 shrink-0 text-muted-foreground"
+                onClick={handleNextAttentionAgentClick}
+                aria-label={`Open ${nextAttentionTarget.title}, another chat that needs your attention`}
+              >
+                <span className="shrink-0 text-muted-foreground/50">
+                  Next Chat:
+                </span>
+                <span className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125">
+                  <AgentStatusDot severity={nextAttentionTarget.status} />
+                </span>
+                <span className="min-w-0 truncate">
+                  {nextAttentionTarget.title}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="flex items-center gap-1.5">
+                <span>Switch to next chat</span>
+                <HotkeyCombo
+                  action={HotkeyActions.NEXT_AGENT_REQUIRING_ATTENTION}
+                  size="xs"
+                  className="shrink-0"
+                />
+              </span>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
     </footer>
   );
 });

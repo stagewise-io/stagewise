@@ -7,7 +7,8 @@ import {
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
-import { useAgentSwitcher } from '@ui/hooks/use-open-chat';
+import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useNextAgentRequiringAttention } from '@ui/hooks/use-next-agent-requiring-attention';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { produceWithPatches, enablePatches } from 'immer';
 import { useSidebarCollapsed } from './sidebar-collapsed-context';
@@ -51,6 +52,8 @@ export function GlobalHotkeyBindings() {
   const setLastOpenAgentIdRef = useRef(setLastOpenAgentId);
   setLastOpenAgentIdRef.current = setLastOpenAgentId;
   const platform = useMemo(() => getCurrentPlatform(), []);
+  const [openAgent] = useOpenAgent();
+  const nextAttentionTarget = useNextAgentRequiringAttention(openAgent);
   const {
     stepAgentCycle,
     commitAgentCycle,
@@ -168,6 +171,18 @@ export function GlobalHotkeyBindings() {
       window.removeEventListener('blur', handleBlur);
     };
   }, [cancelCycle, commitCycle, mainHotkeysEnabled]);
+
+  useHotKeyListener(
+    () => {
+      if (!nextAttentionTarget) return false;
+      focusAgentFromHotkey(nextAttentionTarget.id);
+      void setLastOpenAgentIdRef
+        .current(nextAttentionTarget.id)
+        .catch(() => undefined);
+    },
+    HotkeyActions.NEXT_AGENT_REQUIRING_ATTENTION,
+    mainHotkeysEnabled,
+  );
 
   const focusAgentByIndex = useCallback(
     (index: number) => {
