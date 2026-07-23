@@ -124,7 +124,7 @@ declare global {
       replacedMessageId: string;
       newMessage: AgentMessage;
     }>;
-    'chat-restore-checkpoint': CustomEvent<{
+    'chat-restore-checkpoint': AgentChatEvent<{
       assistantMessageId: string;
       undoToolCalls: boolean;
     }>;
@@ -1137,6 +1137,7 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
             />
           ) : (
             <MessageAssistant
+              agentId={openAgent!}
               message={message as AgentMessage & { role: 'assistant' }}
               isLastMessage={isLastMessage}
               isWorking={curIsWorking}

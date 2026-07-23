@@ -699,6 +699,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   useEffect(() => {
     const handler = (e: WindowEventMap['chat-restore-checkpoint']) => {
       const detail = e.detail;
+      if (detail.agentId !== openAgent) return;
       if (isWorkingRef.current && openAgent) {
         // Agent is streaming — stop first, defer restore until idle
         setPendingCheckpointRestore(detail);
