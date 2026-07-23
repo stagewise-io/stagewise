@@ -640,10 +640,11 @@ export const openFilesInIdeSchema = z.enum([
   'windsurf',
   'trae',
   'kiro',
-  'other',
+  'fileManager',
 ]);
 
 export type OpenFilesInIde = z.infer<typeof openFilesInIdeSchema>;
+export type ExternalIde = Exclude<OpenFilesInIde, 'fileManager'>;
 
 export const personalizationThemeIds = [
   'default',

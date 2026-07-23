@@ -20,8 +20,8 @@ export function IdePickerPopover({
       { value: 'windsurf', label: 'Windsurf', group: 'Open files in:' },
       { value: 'trae', label: 'Trae', group: 'Open files in:' },
       {
-        value: 'other',
-        label: IDE_SELECTION_ITEMS.other,
+        value: 'fileManager',
+        label: IDE_SELECTION_ITEMS.fileManager,
         group: 'Open files in:',
       },
     ],

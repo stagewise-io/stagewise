@@ -33,6 +33,7 @@ import {
   getFileTreeWorkspaceName,
 } from './file-tree-utils';
 import { Tutorial } from '@ui/components/tutorial';
+import { OpenInIdeMenu } from '@ui/components/open-in-ide-menu-items';
 
 export function FileTreeSidebar() {
   const [openAgent] = useOpenAgent();
@@ -234,6 +235,13 @@ export function FileTreeSidebar() {
             );
           })}
         </div>
+        {selectedWorkspacePath && (
+          <OpenInIdeMenu
+            absolutePath={selectedWorkspacePath}
+            target="folder"
+            buttonClassName="size-7 shrink-0"
+          />
+        )}
         <Tooltip>
           <TooltipTrigger>
             <Button

@@ -43,7 +43,6 @@ import {
   IconArrowsToCenterOutline18,
   IconColorPaletteOutline18,
   IconEye2Outline18,
-  IconOpenExternalOutline18,
   IconRedoOutline18,
   IconSplitViewOutline18,
   IconSquareCodeOutline18,
@@ -52,20 +51,14 @@ import {
   IconTextColorOutline18,
   IconUndoOutline18,
 } from '@stagewise/icons';
-import { Menu as MenuBase } from '@base-ui/react/menu';
 import MonacoEditor, { DiffEditor } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { FileIcon } from '@ui/components/file-icon';
-import { IdeLogo } from '@ui/components/ide-logo';
-import {
-  getIDEFileUrl,
-  IDE_SELECTION_ITEMS,
-  nativeFileManagerLabel,
-} from '@shared/ide-url';
-import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
+import { nativeFileManagerLabel } from '@shared/ide-url';
+import { OpenInIdeMenu } from '@ui/components/open-in-ide-menu-items';
 import { Streamdown } from '@ui/components/streamdown';
 import {
   type EditorActions,
@@ -692,85 +685,6 @@ function getPreviewAbsolutePath(
   return `${workspacePath}/${preview.relativePath}`;
 }
 
-function OpenExternalMenu({ absolutePath }: { absolutePath: string }) {
-  const ides: OpenFilesInIde[] = [
-    'cursor',
-    'vscode',
-    'zed',
-    'kiro',
-    'windsurf',
-    'trae',
-  ];
-
-  const open = (ide: OpenFilesInIde) => {
-    window.open(getIDEFileUrl(absolutePath, ide), '_blank');
-  };
-
-  return (
-    <MenuBase.Root>
-      <Tooltip>
-        <TooltipTrigger>
-          <MenuBase.Trigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Open externally"
-              >
-                <IconOpenExternalOutline18 className="size-4" />
-              </Button>
-            }
-          />
-        </TooltipTrigger>
-        <TooltipContent>Open externally</TooltipContent>
-      </Tooltip>
-      <MenuBase.Portal>
-        <MenuBase.Positioner className="z-50" sideOffset={4} align="end">
-          <MenuBase.Popup
-            className={cn(
-              'flex min-w-44 origin-(--transform-origin) flex-col items-stretch gap-0.5',
-              'rounded-lg border border-border-subtle bg-background p-1',
-              'text-xs shadow-lg',
-              'transition-[transform,scale,opacity] duration-150 ease-out',
-              'data-ending-style:scale-90 data-starting-style:scale-90',
-              'data-ending-style:opacity-0 data-starting-style:opacity-0',
-            )}
-          >
-            {ides.map((ide) => (
-              <MenuBase.Item
-                key={ide}
-                className={cn(
-                  'flex w-full cursor-default flex-row items-center justify-start gap-2',
-                  'rounded-md px-2 py-1 text-foreground text-xs outline-none',
-                  'transition-colors duration-150 ease-out',
-                  'hover:bg-surface-1 data-highlighted:bg-surface-1',
-                )}
-                onClick={() => open(ide)}
-              >
-                <IdeLogo ide={ide} className="size-3.5 shrink-0" />
-                <span>Open in {IDE_SELECTION_ITEMS[ide]}</span>
-              </MenuBase.Item>
-            ))}
-            <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
-            <MenuBase.Item
-              className={cn(
-                'flex w-full cursor-default flex-row items-center justify-start gap-2',
-                'rounded-md px-2 py-1 text-foreground text-xs outline-none',
-                'transition-colors duration-150 ease-out',
-                'hover:bg-surface-1 data-highlighted:bg-surface-1',
-              )}
-              onClick={() => open('other')}
-            >
-              <IdeLogo ide="other" className="size-3.5 shrink-0" />
-              <span>Reveal in {IDE_SELECTION_ITEMS.other}</span>
-            </MenuBase.Item>
-          </MenuBase.Popup>
-        </MenuBase.Positioner>
-      </MenuBase.Portal>
-    </MenuBase.Root>
-  );
-}
-
 function FileTabToolbar({
   actions,
   right,
@@ -799,7 +713,7 @@ function FileTabToolbar({
         <div className="flex items-center">
           {openExternalPath && (
             <div className="flex items-center px-1">
-              <OpenExternalMenu absolutePath={openExternalPath} />
+              <OpenInIdeMenu absolutePath={openExternalPath} target="file" />
             </div>
           )}
           {right ? (
@@ -865,7 +779,7 @@ function FileTabToolbar({
           <>
             <div className="h-5 w-px bg-border-subtle" />
             <div className="flex items-center px-1">
-              <OpenExternalMenu absolutePath={openExternalPath} />
+              <OpenInIdeMenu absolutePath={openExternalPath} target="file" />
             </div>
           </>
         )}

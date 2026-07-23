@@ -506,7 +506,7 @@ function WorkspaceGroupHeader({
   onCreateAgent?: () => void;
   hideActions?: boolean;
 }) {
-  const openInFileManagerLabel = `Open in ${IDE_SELECTION_ITEMS.other}`;
+  const openInFileManagerLabel = `Open in ${IDE_SELECTION_ITEMS.fileManager}`;
   const remoteRepositoryLabel =
     openRemoteRepositoryLabel ?? 'Open remote repository';
 

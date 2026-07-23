@@ -93,6 +93,7 @@ import {
   createBrowserHostEnvironmentSources,
   registerHostEnvDomainAdapters,
 } from './env-domains';
+import { SUPPORTED_IDES } from '@shared/ide-url';
 
 export type MainParameters = {
   launchOptions: {
@@ -203,6 +204,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
   );
   const uiKarton = windowLayoutService.uiKarton;
+  uiKarton.setState((draft) => {
+    draft.installedIdes = SUPPORTED_IDES.filter((ide) =>
+      app.getApplicationNameForProtocol(`${ide}://`),
+    );
+  });
   const fileTreeService = await FileTreeService.create(logger, uiKarton);
   fileTreeService.setOpenFileTabHandler(
     async (metadata, agentInstanceId, options) => {
