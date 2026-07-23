@@ -67,6 +67,8 @@ import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
 import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useNextAgentRequiringAttention } from '@ui/hooks/use-next-agent-requiring-attention';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
 import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import { getAvailableModel } from '@shared/available-models';
 import {
@@ -93,6 +95,7 @@ import {
 } from './prompt-history';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { AgentStatusDot } from '../../../_components/agent-status-dot';
+import { IconArrowRightOutline18 } from '@stagewise/icons';
 
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -1123,6 +1126,13 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     focusAgentFromHotkey(nextAttentionTarget.id);
     void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
   };
+  const { setRef: nextAttentionRef, isWinner: nextAttentionIsCmdEnterWinner } =
+    useCmdEnterTarget({
+      id: 'next-attention-chat',
+      priority: CmdEnterPriority.NEXT_ATTENTION_CHAT,
+      action: handleNextAttentionAgentClick,
+      enabled: !!nextAttentionTarget,
+    });
 
   // Quantize to nearest 1 000 tokens so the value only changes when
   // crossing a 1K boundary — prevents ChatInput memo-busting on every
@@ -1922,37 +1932,34 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
           />
         </div>
         {nextAttentionTarget ? (
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                variant="ghost"
+          <div className="flex shrink-0 items-center">
+            {nextAttentionIsCmdEnterWinner ? (
+              <HotkeyCombo
+                action={HotkeyActions.CMD_ENTER}
                 size="xs"
-                className="max-w-64 shrink-0 text-muted-foreground"
-                onClick={handleNextAttentionAgentClick}
-                aria-label={`Open ${nextAttentionTarget.title}, another chat that needs your attention`}
-              >
-                <span className="shrink-0 text-muted-foreground/50">
-                  Next Chat:
-                </span>
-                <span className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125">
-                  <AgentStatusDot severity={nextAttentionTarget.status} />
-                </span>
-                <span className="min-w-0 truncate">
-                  {nextAttentionTarget.title}
-                </span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <span className="flex items-center gap-1.5">
-                <span>Switch to next chat</span>
-                <HotkeyCombo
-                  action={HotkeyActions.NEXT_AGENT_REQUIRING_ATTENTION}
-                  size="xs"
-                  className="shrink-0"
-                />
+                className="shrink-0 text-muted-foreground"
+              />
+            ) : null}
+            <Button
+              ref={nextAttentionRef}
+              variant="ghost"
+              size="xs"
+              className="max-w-64 shrink-0 text-muted-foreground"
+              onClick={handleNextAttentionAgentClick}
+              aria-label={`Open ${nextAttentionTarget.title}, another chat that needs your attention`}
+            >
+              <span className="shrink-0 text-muted-foreground/50">
+                Next Chat:
               </span>
-            </TooltipContent>
-          </Tooltip>
+              <span className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125">
+                <AgentStatusDot severity={nextAttentionTarget.status} />
+              </span>
+              <span className="min-w-0 truncate">
+                {nextAttentionTarget.title}
+              </span>
+              <IconArrowRightOutline18 className="size-3 shrink-0" />
+            </Button>
+          </div>
         ) : null}
       </div>
     </footer>

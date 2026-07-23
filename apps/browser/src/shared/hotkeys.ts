@@ -91,7 +91,6 @@ export enum HotkeyActions {
   // Agent switching (sidebar agents — independent of browser tabs)
   NEXT_AGENT = 'next_agent',
   PREV_AGENT = 'prev_agent',
-  NEXT_AGENT_REQUIRING_ATTENTION = 'next_agent_requiring_attention',
   FOCUS_AGENT_1 = 'focus_agent_1',
   FOCUS_AGENT_2 = 'focus_agent_2',
   FOCUS_AGENT_3 = 'focus_agent_3',
@@ -288,10 +287,6 @@ export const hotkeyDefinitions: Record<HotkeyActions, HotkeyDefinition> = {
   [HotkeyActions.PREV_AGENT]: {
     accelerator: 'Ctrl+Shift+Tab',
     aliases: ['Mod+PageUp'],
-    captureDominantly: true,
-  },
-  [HotkeyActions.NEXT_AGENT_REQUIRING_ATTENTION]: {
-    accelerator: 'Mod+Shift+PageDown',
     captureDominantly: true,
   },
   [HotkeyActions.FOCUS_AGENT_1]: {
