@@ -386,16 +386,19 @@ export function CommandCenter() {
         void switchTab(item.tabId);
       } else if (item.kind === 'terminal') {
         const agentInstanceId = item.owner.agentInstanceId;
-        if (agentInstanceId) {
-          setOpenAgent(agentInstanceId);
-          void setLastOpenAgentId(agentInstanceId);
-        }
         if (item.owner.type === 'terminal') {
           const { terminalId } = item.owner;
           setContentCollapsed(false);
-          void switchTab(terminalId).then(() =>
-            requestTerminalFocus(terminalId),
-          );
+          void switchTab(terminalId).then(() => {
+            if (agentInstanceId) {
+              setOpenAgent(agentInstanceId);
+              void setLastOpenAgentId(agentInstanceId);
+            }
+            requestTerminalFocus(terminalId);
+          });
+        } else {
+          setOpenAgent(agentInstanceId);
+          void setLastOpenAgentId(agentInstanceId);
         }
       } else if (item.kind === 'setting') {
         if (item.settingsRoute) {
