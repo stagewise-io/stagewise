@@ -3,6 +3,7 @@ import type {
   AgentHistoryWorkspaceEntry,
 } from '@shared/karton-contracts/ui/agent';
 import type {
+  AppState,
   MountEntry,
   WorkspaceGitWorktreeInfo,
   WorkspaceGitWorktreesResult,
@@ -36,6 +37,11 @@ export type MergedAgentEntry = ActiveAgentCardData & {
 };
 
 export type AgentStateSeverity = 'error' | 'warning' | 'success' | 'info';
+
+type AgentStateIndicators = Pick<
+  ActiveAgentCardData,
+  'hasError' | 'isWaitingForUser' | 'isWorking' | 'unread'
+>;
 
 export type WorkspaceAgentRow = {
   agent: MergedAgentEntry;
@@ -198,13 +204,38 @@ export function getOrderedAgentIds(entries: MergedAgentEntry[]): string[] {
   return entries.map((agent) => agent.id);
 }
 
+export function getActiveAgentStateIndicators(
+  instance: AppState['agents']['instances'][string],
+  toolboxEntry: AppState['toolbox'][string] | undefined,
+): AgentStateIndicators {
+  let hasPendingToolApproval = false;
+  for (let i = instance.state.history.length - 1; i >= 0; i--) {
+    const message = instance.state.history[i];
+    if (message?.role !== 'assistant') continue;
+    hasPendingToolApproval = message.parts.some(
+      (part) => (part as { state?: string }).state === 'approval-requested',
+    );
+    break;
+  }
+
+  return {
+    hasError:
+      !!instance.state.error &&
+      instance.state.error.kind !== 'plan-limit-exceeded',
+    isWaitingForUser:
+      !!toolboxEntry?.pendingUserQuestion || hasPendingToolApproval,
+    isWorking: instance.state.isWorking,
+    unread: !!instance.state.unread,
+  };
+}
+
 export function getAgentStateSeverity(
-  agent: MergedAgentEntry,
+  agent: AgentStateIndicators,
 ): AgentStateSeverity | null {
   if (agent.hasError) return 'error';
   if (agent.isWaitingForUser) return 'warning';
-  if (agent.unread) return 'success';
   if (agent.isWorking) return 'info';
+  if (agent.unread) return 'success';
   return null;
 }
 

@@ -10,6 +10,7 @@ export enum CmdEnterPriority {
   ERROR_RETRY = 40,
   PLAN_SECTION = 50,
   FILE_DIFF_ACCEPT = 60,
+  NEXT_ATTENTION_CHAT = 70,
 }
 
 export interface CmdEnterTarget {
