@@ -200,6 +200,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     scale: number;
     zoom: number;
   } | null = null;
+  private deviceEmulationFitScale = 1;
 
   // Viewport tracking
   private viewportTrackingInterval: NodeJS.Timeout | null = null;
@@ -852,6 +853,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
 
   private applyDeviceEmulation(emulation: DeviceEmulation | null) {
     const wc = this.webContentsView.webContents;
+    this.deviceEmulationFitScale = emulation?.fitScale ?? 1;
 
     if (!emulation) {
       wc.disableDeviceEmulation();
@@ -1156,7 +1158,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     // both interpret their inputs as page CSS pixels.
     //
     // Two multiplicative contractions can be in play:
-    //   - scale: DevTools device-emulation scale (1 outside device mode)
+    //   - scale: DevTools or custom device-emulation scale
     //   - zoom:  Chromium page zoom (user Cmd+-/+, persisted per origin)
     //
     // UI px = page px * zoom * scale, so page px = UI px / (zoom * scale).
@@ -1164,7 +1166,9 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     // that scales with the cursor's distance from the origin whenever page zoom
     // was not 100% (e.g. ~30px offset at 90% zoom, ~2x that at 50%).
 
-    const scale = this.currentViewportSize?.scale || 1;
+    const scale = this.webContentsView.webContents.isDevToolsOpened()
+      ? this.currentViewportSize?.scale || 1
+      : this.deviceEmulationFitScale;
     const zoom = this.currentViewportLayout?.zoom || 1;
     const factor = scale * zoom;
     const adjustedX = Math.floor(x / factor);
@@ -1203,7 +1207,9 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
   }) {
     // Same coordinate-space conversion as setContextSelectionMouseCoordinates:
     // UI px -> page px by dividing out both device-emulation scale and page zoom.
-    const scale = this.currentViewportSize?.scale || 1;
+    const scale = this.webContentsView.webContents.isDevToolsOpened()
+      ? this.currentViewportSize?.scale || 1
+      : this.deviceEmulationFitScale;
     const zoom = this.currentViewportLayout?.zoom || 1;
     const factor = scale * zoom;
     const adjustedX = Math.floor(event.x / factor);
@@ -1899,13 +1905,12 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
       await this.updateViewportSizeFromDevTools();
     } else {
       // When DevTools are closed, use full visualViewport dimensions
-      // Scale is always 1 in non-devtools mode
       const viewportSize = {
         width: visualViewport.clientWidth,
         height: visualViewport.clientHeight,
         top: 0,
         left: 0,
-        scale: 1,
+        scale: this.deviceEmulationFitScale,
         fitScale: 1,
         appliedDeviceScaleFactor: 1,
       };

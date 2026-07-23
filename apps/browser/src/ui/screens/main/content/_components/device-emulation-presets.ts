@@ -1,6 +1,6 @@
 import type { DeviceEmulation } from '@shared/karton-contracts/ui';
 
-export type DevicePreset = Omit<DeviceEmulation, 'scale'> & {
+export type DevicePreset = Omit<DeviceEmulation, 'scale' | 'fitScale'> & {
   label: string;
 };
 
@@ -39,4 +39,5 @@ export const getPresetConfig = ({ label: _label, ...config }: DevicePreset) =>
 export const DEFAULT_DEVICE_EMULATION: DeviceEmulation = {
   ...getPresetConfig(DEVICE_PRESETS[0]!),
   scale: 1,
+  fitScale: 1,
 };

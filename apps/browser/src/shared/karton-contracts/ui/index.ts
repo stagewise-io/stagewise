@@ -764,6 +764,7 @@ export type DeviceEmulation = {
   deviceScaleFactor: number;
   mobile: boolean;
   scale: number;
+  fitScale: number;
 };
 
 export type TabState = {
