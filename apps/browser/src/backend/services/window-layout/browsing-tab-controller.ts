@@ -20,7 +20,7 @@ import {
   type TabKartonContract,
   type SerializableKeyboardEvent,
 } from '@shared/karton-contracts/web-contents-preload';
-import type { ColorScheme } from '@shared/karton-contracts/ui';
+import type { ColorScheme, DeviceEmulation } from '@shared/karton-contracts/ui';
 import type { SelectedElement } from '@shared/selected-elements';
 import { SelectedElementTracker } from './selected-element-tracker';
 import { electronInputToDomKeyboardEvent } from '@/utils/electron-input-to-dom-keyboard-event';
@@ -65,6 +65,7 @@ export interface TabState {
   isPlayingAudio: boolean;
   isMuted: boolean;
   colorScheme: ColorScheme;
+  deviceEmulation: DeviceEmulation | null;
   error: {
     code: number;
     message?: string;
@@ -199,6 +200,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     scale: number;
     zoom: number;
   } | null = null;
+  private deviceEmulationFitScale = 1;
 
   // Viewport tracking
   private viewportTrackingInterval: NodeJS.Timeout | null = null;
@@ -378,6 +380,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
       isPlayingAudio: this.webContentsView.webContents.isCurrentlyAudible(),
       isMuted: this.webContentsView.webContents.audioMuted,
       colorScheme: 'system',
+      deviceEmulation: null,
       error: null,
       navigationHistory: {
         canGoBack: false,
@@ -837,6 +840,37 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     }
   }
 
+  public setDeviceEmulation(
+    emulation: DeviceEmulation | null,
+    transient = false,
+  ) {
+    const wc = this.webContentsView.webContents;
+    if (wc.isDestroyed()) return;
+
+    if (!transient) this.updateState({ deviceEmulation: emulation });
+    if (!wc.isDevToolsOpened()) this.applyDeviceEmulation(emulation);
+  }
+
+  private applyDeviceEmulation(emulation: DeviceEmulation | null) {
+    const wc = this.webContentsView.webContents;
+    this.deviceEmulationFitScale = emulation?.fitScale ?? 1;
+
+    if (!emulation) {
+      wc.disableDeviceEmulation();
+      return;
+    }
+
+    const viewSize = { width: emulation.width, height: emulation.height };
+    wc.enableDeviceEmulation({
+      screenPosition: emulation.mobile ? 'mobile' : 'desktop',
+      screenSize: viewSize,
+      viewPosition: { x: 0, y: 0 },
+      deviceScaleFactor: emulation.deviceScaleFactor,
+      viewSize,
+      scale: emulation.scale,
+    });
+  }
+
   public focus() {
     this.webContentsView.webContents.focus();
   }
@@ -1124,7 +1158,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     // both interpret their inputs as page CSS pixels.
     //
     // Two multiplicative contractions can be in play:
-    //   - scale: DevTools device-emulation scale (1 outside device mode)
+    //   - scale: DevTools or custom device-emulation scale
     //   - zoom:  Chromium page zoom (user Cmd+-/+, persisted per origin)
     //
     // UI px = page px * zoom * scale, so page px = UI px / (zoom * scale).
@@ -1132,7 +1166,9 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     // that scales with the cursor's distance from the origin whenever page zoom
     // was not 100% (e.g. ~30px offset at 90% zoom, ~2x that at 50%).
 
-    const scale = this.currentViewportSize?.scale || 1;
+    const scale = this.webContentsView.webContents.isDevToolsOpened()
+      ? this.currentViewportSize?.scale || 1
+      : this.deviceEmulationFitScale;
     const zoom = this.currentViewportLayout?.zoom || 1;
     const factor = scale * zoom;
     const adjustedX = Math.floor(x / factor);
@@ -1171,7 +1207,9 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
   }) {
     // Same coordinate-space conversion as setContextSelectionMouseCoordinates:
     // UI px -> page px by dividing out both device-emulation scale and page zoom.
-    const scale = this.currentViewportSize?.scale || 1;
+    const scale = this.webContentsView.webContents.isDevToolsOpened()
+      ? this.currentViewportSize?.scale || 1
+      : this.deviceEmulationFitScale;
     const zoom = this.currentViewportLayout?.zoom || 1;
     const factor = scale * zoom;
     const adjustedX = Math.floor(event.x / factor);
@@ -1528,6 +1566,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
         devTools: { open: this.currentState.devTools.open, chromeOpen: false },
       });
       this.detachDevToolsDebugger();
+      this.applyDeviceEmulation(this.currentState.deviceEmulation);
       // Immediately update viewport size when DevTools close
       // to transition back to regular viewport tracking (full size)
       try {
@@ -1540,6 +1579,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     });
 
     wc.on('devtools-opened', () => {
+      wc.disableDeviceEmulation();
       this.emit('devtoolsOpened', this.id);
       this.updateState({
         devTools: { open: this.currentState.devTools.open, chromeOpen: true },
@@ -1865,13 +1905,12 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
       await this.updateViewportSizeFromDevTools();
     } else {
       // When DevTools are closed, use full visualViewport dimensions
-      // Scale is always 1 in non-devtools mode
       const viewportSize = {
         width: visualViewport.clientWidth,
         height: visualViewport.clientHeight,
         top: 0,
         left: 0,
-        scale: 1,
+        scale: this.deviceEmulationFitScale,
         fitScale: 1,
         appliedDeviceScaleFactor: 1,
       };
