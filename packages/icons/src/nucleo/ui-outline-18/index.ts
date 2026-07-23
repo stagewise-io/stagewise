@@ -86,6 +86,7 @@ export { IconPresentationScreenVideoOutline18 } from './IconPresentationScreenVi
 export { IconPuzzlePieceOutline18 } from './IconPuzzlePieceOutline18';
 export { IconRedoOutline18 } from './IconRedoOutline18';
 export { IconRefreshAnticlockwiseOutline18 } from './IconRefreshAnticlockwiseOutline18';
+export { IconReuseOutline18 } from './IconReuseOutline18';
 export { IconSearchContentOutline18 } from './IconSearchContentOutline18';
 export { IconServerOutline18 } from './IconServerOutline18';
 export { IconSideProfileSparkleOutline18 } from './IconSideProfileSparkleOutline18';

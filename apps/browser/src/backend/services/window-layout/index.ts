@@ -30,6 +30,7 @@ import { ChatStateController } from './chat-state-controller';
 import {
   type ColorScheme,
   type ConfigurablePermissionType,
+  type DeviceEmulation,
   PermissionSetting,
   configurablePermissionTypes,
   getFileTabDefaults,
@@ -1196,6 +1197,7 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on('toggleAudioMuted', this.handleToggleAudioMuted);
     this.uiController.on('setColorScheme', this.handleSetColorScheme);
     this.uiController.on('cycleColorScheme', this.handleCycleColorScheme);
+    this.uiController.on('setDeviceEmulation', this.handleSetDeviceEmulation);
     this.uiController.on('setZoomPercentage', this.handleSetZoomPercentage);
     this.uiController.on('setTabAgentInstance', this.handleSetTabAgentInstance);
     this.uiController.on('setLastOpenAgentId', this.handleSetLastOpenAgentId);
@@ -2280,6 +2282,15 @@ export class WindowLayoutService extends DisposableService {
   private handleCycleColorScheme = async (tabId?: string) => {
     const tab = tabId ? this.tabs[tabId] : this.activeTab;
     await tab?.cycleColorScheme();
+  };
+
+  private handleSetDeviceEmulation = async (
+    emulation: DeviceEmulation | null,
+    tabId?: string,
+    transient?: boolean,
+  ) => {
+    const tab = tabId ? this.tabs[tabId] : this.activeTab;
+    tab?.setDeviceEmulation(emulation, transient);
   };
 
   private handleSetZoomPercentage = async (
