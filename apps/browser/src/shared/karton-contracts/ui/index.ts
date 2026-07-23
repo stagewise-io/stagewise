@@ -7,7 +7,7 @@ import type {
   MountPermission,
   MentionFileCandidate,
   AttachmentMetadata,
-  ShellSessionSnapshot,
+  ShellSnapshot,
 } from './agent/metadata';
 import type {
   MountEntry,
@@ -1059,7 +1059,7 @@ export type AppState = {
       /** Maps toolCallId → sessionId for in-flight shell commands. */
       pendingShellSessionIds?: Record<string, string>;
       /** Live shell session manifest — pushed eagerly on lifecycle events. */
-      shells?: { sessions: ShellSessionSnapshot[] };
+      shells?: ShellSnapshot;
 
       activeApp?: {
         appId: string;

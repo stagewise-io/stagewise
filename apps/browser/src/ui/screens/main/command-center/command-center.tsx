@@ -21,6 +21,7 @@ import {
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
+import { useContentCollapsed } from '../_components/content-collapsed-context';
 import {
   COMMAND_CENTER_MODES,
   type AgentCommandItem,
@@ -127,6 +128,7 @@ export function CommandCenter() {
     activeTabId ? (s.contentTabs.tabs[activeTabId] ?? null) : null,
   );
   const [openAgent, setOpenAgent] = useOpenAgent();
+  const { setCollapsed: setContentCollapsed } = useContentCollapsed();
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const setFileTreeVisible = useKartonProcedure((p) => p.fileTree.setVisible);
@@ -382,6 +384,19 @@ export function CommandCenter() {
           );
         }
         void switchTab(item.tabId);
+      } else if (item.kind === 'terminal') {
+        const agentInstanceId = item.owner.agentInstanceId;
+        if (agentInstanceId) {
+          setOpenAgent(agentInstanceId);
+          void setLastOpenAgentId(agentInstanceId);
+        }
+        if (item.owner.type === 'terminal') {
+          const { terminalId } = item.owner;
+          setContentCollapsed(false);
+          void switchTab(terminalId).then(() =>
+            requestTerminalFocus(terminalId),
+          );
+        }
       } else if (item.kind === 'setting') {
         if (item.settingsRoute) {
           void openSettings(item.settingsRoute);
@@ -400,10 +415,12 @@ export function CommandCenter() {
       resumeAgent,
       setLastOpenAgentId,
       setOpenAgent,
+      setContentCollapsed,
       switchTab,
       setFileTreeVisible,
       setFileTreeActiveWorkspace,
       setDirectoryExpanded,
+      requestTerminalFocus,
     ],
   );
 

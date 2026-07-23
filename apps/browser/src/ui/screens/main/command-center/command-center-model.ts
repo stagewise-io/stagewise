@@ -1,11 +1,13 @@
 import type { HotkeyActions } from '@shared/hotkeys';
 import type { ReactNode } from 'react';
+import type { RunningServerOwner } from '@shared/karton-contracts/ui';
 import type { SettingsRoute } from '@shared/settings-route';
 
 export type CommandCenterMode =
   | 'global'
   | 'agents'
   | 'browser'
+  | 'terminals'
   | 'settings'
   | 'files';
 
@@ -13,6 +15,7 @@ export const COMMAND_CENTER_MODES: CommandCenterMode[] = [
   'global',
   'agents',
   'browser',
+  'terminals',
   'files',
   'settings',
 ];
@@ -20,6 +23,7 @@ export const COMMAND_CENTER_MODES: CommandCenterMode[] = [
 export type CommandCenterItemKind =
   | 'agent'
   | 'tab'
+  | 'terminal'
   | 'setting'
   | 'action'
   | 'file';
@@ -69,6 +73,14 @@ export type TabCommandItem = CommandCenterItemBase & {
   lastFocusedAt: number;
 };
 
+export type TerminalCommandItem = CommandCenterItemBase & {
+  kind: 'terminal';
+  mode: 'terminals';
+  owner: RunningServerOwner;
+  isActive: boolean;
+  lastFocusedAt: number;
+};
+
 export type SettingCommandItem = CommandCenterItemBase & {
   kind: 'setting';
   mode: 'settings';
@@ -100,6 +112,7 @@ export type ActionCommandItem = CommandCenterItemBase & {
 export type CommandCenterItem =
   | AgentCommandItem
   | TabCommandItem
+  | TerminalCommandItem
   | SettingCommandItem
   | FileCommandItem
   | ActionCommandItem;
