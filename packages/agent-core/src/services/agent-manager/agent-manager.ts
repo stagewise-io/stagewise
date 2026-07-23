@@ -1348,12 +1348,6 @@ export class AgentManager extends DisposableService {
     if (sourceEnvelope.sideChatParentId) {
       throw new Error('Promote this side chat before forking it again');
     }
-    if (sourceEnvelope.state.isWorking) {
-      throw new Error(
-        'Wait for the current response before opening a side chat',
-      );
-    }
-
     const sideChatId = randomUUID();
     const mountedWorkspaces =
       this.managerToolbox.getWorkspaceSnapshotForPersistence(sourceAgentId);
