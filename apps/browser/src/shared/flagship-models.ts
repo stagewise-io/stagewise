@@ -3,11 +3,6 @@ import type {
   ModelProvider,
 } from './karton-contracts/ui/shared-types';
 import { availableModels } from './available-models';
-import {
-  CODING_PLANS,
-  type CodingPlanId,
-  isCodingPlanId,
-} from './coding-plans';
 
 // ============================================================================
 // Flagship model curation for API providers
@@ -121,7 +116,6 @@ const CATALOG_MODEL_IDS_BY_VENDOR: Partial<Record<ModelProvider, Set<string>>> =
  */
 export function isFlagshipFilteringEnabled(typeId: string): boolean {
   if (typeId === 'openrouter') return true;
-  if (typeId === 'coding-plan') return true;
   // Vendor API types end in '-api'
   if (typeId.endsWith('-api') && typeId !== 'anthropic-api') return true;
   return false;
@@ -135,7 +129,7 @@ export function isFlagshipFilteringEnabled(typeId: string): boolean {
  * existing user choices are preserved.
  *
  * @param params.typeId - The provider instance type ID.
- * @param params.config - The provider instance config (used for coding-plan vendor resolution).
+ * @param params.config - The provider instance config.
  * @param params.discoveredModels - The freshly discovered model list.
  * @param params.existingDisabledModelIds - The instance's current `disabledModelIds`.
  * @param params.existingDiscoveredModelIds - Set of model IDs from the *previous* discovery (for refresh).
@@ -150,7 +144,6 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
 }): string[] {
   const {
     typeId,
-    config,
     discoveredModels,
     existingDisabledModelIds,
     existingDiscoveredModelIds,
@@ -161,7 +154,7 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
   }
 
   // Resolve the flagship set and catalog IDs for this instance type.
-  const { flagshipIds, catalogIds } = resolveFlagshipSet(typeId, config);
+  const { flagshipIds, catalogIds } = resolveFlagshipSet(typeId);
 
   // Build the set of currently-discovered model IDs (lowercase).
   const currentDiscoveredIds = new Set(
@@ -220,10 +213,10 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
  * Resolve the flagship model set and catalog model ID set for a given
  * provider instance type.
  */
-function resolveFlagshipSet(
-  typeId: string,
-  config: Record<string, unknown>,
-): { flagshipIds: Set<string>; catalogIds: Set<string> } {
+function resolveFlagshipSet(typeId: string): {
+  flagshipIds: Set<string>;
+  catalogIds: Set<string>;
+} {
   if (typeId === 'openrouter') {
     // OpenRouter: all models are discovered, no catalog overlap.
     return {
@@ -232,17 +225,9 @@ function resolveFlagshipSet(
     };
   }
 
-  // Resolve vendor: either from typeId (*-api) or from coding-plan config.
-  let vendor: ModelProvider | undefined;
-
-  if (typeId === 'coding-plan') {
-    const planId = config.planId as string;
-    if (isCodingPlanId(planId)) {
-      vendor = CODING_PLANS[planId as CodingPlanId]?.provider;
-    }
-  } else if (typeId.endsWith('-api')) {
-    vendor = typeId.slice(0, -4) as ModelProvider;
-  }
+  const vendor = typeId.endsWith('-api')
+    ? (typeId.slice(0, -4) as ModelProvider)
+    : undefined;
 
   if (!vendor) {
     return { flagshipIds: new Set(), catalogIds: new Set() };

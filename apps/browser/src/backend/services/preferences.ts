@@ -28,6 +28,7 @@ import { safeStorage } from 'electron';
 import {
   CODING_PLANS,
   isCodingPlanId,
+  resolveCodingPlanBaseUrl,
   type CodingPlanId,
 } from '@shared/coding-plans';
 import {
@@ -141,6 +142,7 @@ export class PreferencesService extends DisposableService {
     // coding-plan connection. Reconcile those records independently so the
     // migration remains safe when the instance array is already non-empty.
     await this.migrateLegacyCodingPlansToProviderInstances();
+    await this.migrateLegacyQwenCodingPlanEndpoint();
 
     this.logger.debug('[PreferencesService] Loaded preferences', {
       telemetryLevel: this.preferences.privacy.telemetryLevel,
@@ -453,6 +455,43 @@ export class PreferencesService extends DisposableService {
       '[PreferencesService] Migrated legacy coding plans to provider instances',
       { count: instancesToAdd.length },
     );
+  }
+
+  /**
+   * Older Qwen instances used the general DashScope route and may retain a
+   * catalog discovered there. Move only those legacy records to the dedicated
+   * Coding Plan endpoint and seed its documented models.
+   */
+  private async migrateLegacyQwenCodingPlanEndpoint(): Promise<void> {
+    const plan = CODING_PLANS['qwen-plan'];
+    const expectedBaseUrl = resolveCodingPlanBaseUrl(plan);
+    const legacyInstances = this.preferences.providerInstances.filter(
+      (instance) =>
+        instance.typeId === 'coding-plan' &&
+        instance.config.planId === 'qwen-plan' &&
+        instance.config.baseUrl !== expectedBaseUrl,
+    );
+    if (legacyInstances.length === 0) return;
+
+    const legacyIds = new Set(legacyInstances.map((instance) => instance.id));
+    const discoveredModels = (plan.fallbackModelIds ?? []).map((modelId) => ({
+      modelId,
+      displayName: modelId,
+    }));
+    this.preferences = {
+      ...this.preferences,
+      providerInstances: this.preferences.providerInstances.map((instance) => {
+        if (!legacyIds.has(instance.id) || instance.typeId !== 'coding-plan') {
+          return instance;
+        }
+        return {
+          ...instance,
+          config: { ...instance.config, baseUrl: expectedBaseUrl },
+          discoveredModels,
+        };
+      }),
+    };
+    await this.save();
   }
 
   /**
@@ -1814,8 +1853,33 @@ export class PreferencesService extends DisposableService {
   > {
     this.assertNotDisposed();
 
-    const { typeId, config, validateApiKey } = args;
+    const { typeId, validateApiKey } = args;
+    let config = args.config;
     const providerType = getProviderType(typeId);
+
+    if (typeId === 'coding-plan') {
+      const plan = CODING_PLANS[config.planId as CodingPlanId];
+      if (!plan) {
+        return {
+          success: false,
+          error: `Unknown coding plan: ${config.planId}`,
+        };
+      }
+      try {
+        config = {
+          ...config,
+          baseUrl: resolveCodingPlanBaseUrl(
+            plan,
+            typeof config.baseUrl === 'string' ? config.baseUrl : undefined,
+          ),
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
 
     // Build the decrypted sensitive-values map up front so it can be used
     // for both validation and discovery.
@@ -1995,6 +2059,16 @@ export class PreferencesService extends DisposableService {
     const nextConfig = isTypeReplacement
       ? { ...partialConfig }
       : { ...currentConfig, ...partialConfig };
+    if (typeId === 'coding-plan') {
+      const planId = nextConfig.planId as CodingPlanId;
+      const plan = CODING_PLANS[planId];
+      if (plan) {
+        nextConfig.baseUrl = resolveCodingPlanBaseUrl(
+          plan,
+          nextConfig.baseUrl as string | undefined,
+        );
+      }
+    }
     // Validate the replacement discriminant and config together before persisting.
     userPreferencesSchema.parse({
       ...this.preferences,
@@ -2169,7 +2243,11 @@ export class PreferencesService extends DisposableService {
       const plan =
         CODING_PLANS[instance.config.planId as keyof typeof CODING_PLANS];
       if (!plan) return null;
-      return validateCodingPlanApiKey(plan, apiKey);
+      return validateCodingPlanApiKey(
+        plan,
+        apiKey,
+        (instance.config as { baseUrl?: string }).baseUrl,
+      );
     }
     return null;
   }

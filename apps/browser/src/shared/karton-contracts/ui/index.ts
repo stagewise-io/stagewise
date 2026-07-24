@@ -1607,6 +1607,7 @@ export type KartonContract = {
                   | 'glm-coding-plan'
                   | 'kimi-plan'
                   | 'qwen-plan'
+                  | 'qwen-token-plan'
                   | 'minimax-plan'
                   | 'mimo-plan';
               };

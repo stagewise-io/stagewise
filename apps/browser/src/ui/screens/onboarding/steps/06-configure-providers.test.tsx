@@ -234,6 +234,91 @@ describe('ConnectionDetailView telemetry', () => {
     );
   });
 
+  it('persists a normalized Token Plan endpoint without telemetry leakage', async () => {
+    mocks.addProviderInstance.mockResolvedValue({
+      success: true,
+      discoveredModels: [],
+    });
+    const entry: ProviderEntry = {
+      key: 'plan:qwen-token-plan',
+      kind: 'coding-plan',
+      typeId: 'alibaba-api',
+      displayName: 'Qwen Token Plan',
+      tagline: 'Token Plan',
+      planId: 'qwen-token-plan',
+      defaultBaseUrl:
+        'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+      configurableEndpoint: {
+        label: 'Token Plan endpoint',
+        helpText: 'Use the dashboard endpoint.',
+      },
+    };
+    render(
+      <ConnectionDetailView
+        entry={entry}
+        onBack={vi.fn()}
+        onboardingRunId="run-1"
+        getNextAttemptNumber={() => 1}
+        onConnectionResult={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByDisplayValue(entry.defaultBaseUrl!), {
+      target: { value: ' https://token-plan.eu.example.com/v1/ ' },
+    });
+    await connectWithSecret();
+
+    expect(mocks.addProviderInstance).toHaveBeenCalledWith({
+      typeId: 'coding-plan',
+      config: {
+        planId: 'qwen-token-plan',
+        baseUrl: 'https://token-plan.eu.example.com/v1',
+      },
+      validateApiKey: 'sk-sensitive',
+    });
+    const telemetry = JSON.stringify(mocks.track.mock.calls);
+    expect(telemetry).not.toContain('token-plan.eu.example.com');
+    expect(telemetry).not.toContain('sk-sensitive');
+  });
+
+  it('rejects an invalid Token Plan endpoint before calling the backend', async () => {
+    const entry: ProviderEntry = {
+      key: 'plan:qwen-token-plan',
+      kind: 'coding-plan',
+      typeId: 'alibaba-api',
+      displayName: 'Qwen Token Plan',
+      tagline: 'Token Plan',
+      planId: 'qwen-token-plan',
+      defaultBaseUrl: 'https://token-plan.example.com/v1',
+      configurableEndpoint: {
+        label: 'Token Plan endpoint',
+        helpText: 'Use the dashboard endpoint.',
+      },
+    };
+    render(
+      <ConnectionDetailView
+        entry={entry}
+        onBack={vi.fn()}
+        onboardingRunId="run-1"
+        getNextAttemptNumber={() => 1}
+        onConnectionResult={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByDisplayValue(entry.defaultBaseUrl!), {
+      target: { value: 'http://token-plan.example.com/v1' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Enter API key...'), {
+      target: { value: 'sk-sensitive' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    expect(
+      await screen.findByText('The API endpoint must use HTTPS.'),
+    ).toBeTruthy();
+    expect(mocks.addProviderInstance).not.toHaveBeenCalled();
+    expect(mocks.track).not.toHaveBeenCalled();
+  });
+
   it('tracks structured validation failures and increments retries', async () => {
     mocks.addProviderInstance
       .mockResolvedValueOnce({ success: false, error: 'raw backend secret' })

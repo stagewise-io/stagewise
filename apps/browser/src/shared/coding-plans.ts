@@ -32,13 +32,21 @@ export type CodingPlan = {
   baseUrl?: string;
   /** Dedicated validation base URL. Defaults to `baseUrl` when omitted. */
   validationBaseUrl?: string;
+  /** Opts this plan into a user-editable endpoint field in generic plan UI. */
+  configurableEndpoint?: {
+    label: string;
+    placeholder?: string;
+    helpText: string;
+  };
   /** Provider-native model ID to use for validation. */
   validationModelId?: string;
   /** Additional endpoint note rendered in plan UI. */
   endpointHelpText?: string;
   /** Optional disclaimer rendered below the help text (e.g. unofficial status). */
   disclaimer?: string;
-  /** Featured model IDs (must exist in availableModels) — for card copy. */
+  /** Models to expose only when the plan's model-discovery route fails. */
+  fallbackModelIds?: string[];
+  /** Featured provider-native model IDs for card copy. */
   featuredModelIds: string[];
 };
 
@@ -75,12 +83,70 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     id: 'qwen-plan',
     provider: 'alibaba',
     displayName: 'Qwen Coding Plan',
-    tagline: 'Qwen3-Coder via Alibaba DashScope',
-    subscribeUrl: 'https://www.alibabacloud.com/product/modelstudio',
-    apiKeyUrl: 'https://dashscope.console.aliyun.com/apiKey',
-    helpText: 'Create one at dashscope.console.aliyun.com → API-KEY',
-    apiKeyPattern: '^sk-[a-f0-9]{32}$',
-    featuredModelIds: ['qwen3-coder-30b-a3b-instruct', 'qwen3-32b'],
+    tagline: 'Qwen and partner coding models via Coding Plan',
+    subscribeUrl:
+      'https://www.alibabacloud.com/help/en/model-studio/coding-plan',
+    apiKeyUrl: 'https://modelstudio.console.alibabacloud.com/',
+    helpText:
+      'Copy the subscription key from Model Studio → Coding Plan. Plan keys commonly start with sk-sp-.',
+    apiKeyPattern: '^sk-(?:sp-)?[A-Za-z0-9_-]+$',
+    baseUrl: 'https://coding-intl.dashscope.aliyuncs.com/v1',
+    validationBaseUrl: 'https://coding-intl.dashscope.aliyuncs.com/v1',
+    validationModelId: 'qwen3.7-plus',
+    endpointHelpText:
+      'Routed through the international Coding Plan endpoint at coding-intl.dashscope.aliyuncs.com/v1.',
+    disclaimer:
+      'This subscription is limited to interactive coding-agent use and is not a general-purpose or batch API.',
+    fallbackModelIds: [
+      'qwen3.7-plus',
+      'kimi-k2.5',
+      'glm-5',
+      'MiniMax-M2.5',
+      'qwen3.6-plus',
+      'qwen3.5-plus',
+      'qwen3-max-2026-01-23',
+      'qwen3-coder-next',
+      'qwen3-coder-plus',
+      'glm-4.7',
+    ],
+    featuredModelIds: ['qwen3.7-plus', 'qwen3-coder-next'],
+  },
+  'qwen-token-plan': {
+    id: 'qwen-token-plan',
+    provider: 'alibaba',
+    displayName: 'Qwen Token Plan',
+    tagline: 'Qwen and partner models via Token Plan subscription',
+    subscribeUrl:
+      'https://www.alibabacloud.com/help/en/model-studio/token-plan',
+    apiKeyUrl: 'https://modelstudio.console.alibabacloud.com/',
+    helpText:
+      'Copy the subscription key from Model Studio → Token Plan. Plan keys commonly start with sk-sp-.',
+    apiKeyPattern: '^sk-(?:sp-)?[A-Za-z0-9_-]+$',
+    baseUrl:
+      'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+    validationBaseUrl:
+      'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+    validationModelId: 'qwen3.7-plus',
+    configurableEndpoint: {
+      label: 'Token Plan endpoint',
+      placeholder:
+        'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+      helpText:
+        'Use the OpenAI-compatible endpoint shown in your Model Studio dashboard. The default is the Singapore endpoint.',
+    },
+    endpointHelpText:
+      'Defaults to the Singapore Token Plan endpoint. Replace it with the endpoint from your Model Studio dashboard when it differs.',
+    disclaimer:
+      'This subscription is intended for interactive coding-agent traffic; image models use separate APIs and are not exposed here.',
+    fallbackModelIds: [
+      'qwen3.8-max-preview',
+      'qwen3.7-max',
+      'qwen3.7-plus',
+      'qwen3.6-flash',
+      'glm-5.2',
+      'deepseek-v4-pro',
+    ],
+    featuredModelIds: ['qwen3.8-max-preview', 'qwen3.7-plus'],
   },
   'minimax-plan': {
     id: 'minimax-plan',
@@ -114,6 +180,80 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     featuredModelIds: ['mimo-v2.5-pro', 'mimo-v2.5'],
   },
 };
+
+export type CodingPlanEndpointValidationResult =
+  | { success: true; baseUrl: string }
+  | { success: false; error: string };
+
+/** Validate and normalize a hosted coding-plan endpoint before it is persisted. */
+export function validateCodingPlanBaseUrl(
+  value: string,
+): CodingPlanEndpointValidationResult {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { success: false, error: 'Enter an API endpoint.' };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { success: false, error: 'Enter a valid absolute URL.' };
+  }
+
+  if (parsed.protocol !== 'https:') {
+    return { success: false, error: 'The API endpoint must use HTTPS.' };
+  }
+  if (parsed.username || parsed.password) {
+    return {
+      success: false,
+      error: 'The API endpoint must not contain credentials.',
+    };
+  }
+  if (parsed.search || parsed.hash) {
+    return {
+      success: false,
+      error: 'The API endpoint must not contain a query string or fragment.',
+    };
+  }
+
+  const pathname = parsed.pathname.replace(/\/+$/, '');
+  return {
+    success: true,
+    baseUrl: `${parsed.origin}${pathname === '/' ? '' : pathname}`,
+  };
+}
+
+function normalizeResolvedBaseUrl(
+  value: string | undefined,
+): string | undefined {
+  if (!value?.trim()) return undefined;
+  const result = validateCodingPlanBaseUrl(value);
+  if (!result.success) throw new Error(result.error);
+  return result.baseUrl;
+}
+
+/** Resolve the endpoint used for model discovery and runtime requests. */
+export function resolveCodingPlanBaseUrl(
+  plan: CodingPlan,
+  instanceBaseUrl?: string,
+): string | undefined {
+  return (
+    normalizeResolvedBaseUrl(instanceBaseUrl) ??
+    normalizeResolvedBaseUrl(plan.baseUrl)
+  );
+}
+
+/** Resolve validation, preferring the same explicit instance endpoint. */
+export function resolveCodingPlanValidationBaseUrl(
+  plan: CodingPlan,
+  instanceBaseUrl?: string,
+): string | undefined {
+  return (
+    normalizeResolvedBaseUrl(instanceBaseUrl) ??
+    normalizeResolvedBaseUrl(plan.validationBaseUrl ?? plan.baseUrl)
+  );
+}
 
 const codingPlanIdSet = new Set<string>(codingPlanIds);
 

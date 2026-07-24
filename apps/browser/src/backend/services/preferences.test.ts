@@ -500,12 +500,15 @@ describe('PreferencesService legacy provider migration', () => {
         endpointId: undefined,
       }),
     );
-    for (const plan of Object.values(CODING_PLANS)) {
+    // The legacy shape stores one connected plan per vendor, so the last
+    // configured Alibaba plan is the only Qwen plan it can represent.
+    for (const config of Object.values(preferences.providerConfigs)) {
+      if (!config.connectedCodingPlanId) continue;
       expect(
         instances.filter(
           (instance) =>
             instance.typeId === 'coding-plan' &&
-            instance.config.planId === plan.id,
+            instance.config.planId === config.connectedCodingPlanId,
         ),
       ).toHaveLength(1);
     }
@@ -603,6 +606,42 @@ describe('PreferencesService legacy provider migration', () => {
     );
   });
 
+  it('migrates stale Qwen discovery to the dedicated Coding Plan endpoint', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances = [
+      {
+        id: 'legacy-qwen',
+        typeId: 'coding-plan',
+        name: 'Qwen Coding Plan',
+        config: {
+          encryptedApiKey: 'legacy-key',
+          planId: 'qwen-plan',
+          baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          { modelId: 'qwen3-32b', displayName: 'Stale DashScope model' },
+        ],
+      },
+    ];
+
+    const service = await createServiceWithPreferences(preferences);
+    const instance = service
+      .get()
+      .providerInstances.find((candidate) => candidate.id === 'legacy-qwen');
+
+    expect(instance?.config).toMatchObject({
+      baseUrl: 'https://coding-intl.dashscope.aliyuncs.com/v1',
+    });
+    expect(instance?.discoveredModels?.map((model) => model.modelId)).toContain(
+      'qwen3.7-plus',
+    );
+    expect(
+      instance?.discoveredModels?.map((model) => model.modelId),
+    ).not.toContain('qwen3-32b');
+  });
+
   it('reconciles a legacy coding plan when provider instances already exist', async () => {
     const preferences = cloneDefaultPreferences();
     preferences.providerInstances = [
@@ -670,6 +709,7 @@ describe('PreferencesService coding plan connection state', () => {
         validationModelId: 'glm-5.2',
       }),
       'glm-key',
+      'https://api.z.ai/api/coding/paas/v4',
     );
     expect(validationMock.validateApiKeys).not.toHaveBeenCalled();
 
@@ -693,6 +733,126 @@ describe('PreferencesService coding plan connection state', () => {
     expect(service.get().providerConfigs['z-ai']).toEqual(
       defaultUserPreferences.providerConfigs['z-ai'],
     );
+  });
+
+  it.each([
+    [
+      'qwen-plan',
+      'Qwen Coding Plan',
+      'https://coding-intl.dashscope.aliyuncs.com/v1',
+    ],
+    [
+      'qwen-token-plan',
+      'Qwen Token Plan',
+      'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+    ],
+  ] as const)('connects %s with its dedicated endpoint', async (planId, displayName, baseUrl) => {
+    const service = await createServiceWithPreferences();
+
+    const result = await service.connectCodingPlan(planId, 'qwen-plan-key');
+
+    expect(result).toEqual({ success: true });
+    expect(validationMock.validateCodingPlanApiKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: planId,
+        baseUrl,
+        validationBaseUrl: baseUrl,
+        validationModelId: 'qwen3.7-plus',
+      }),
+      'qwen-plan-key',
+      baseUrl,
+    );
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        typeId: 'coding-plan',
+        name: displayName,
+        config: expect.objectContaining({ planId, baseUrl }),
+      }),
+    );
+  });
+
+  it('normalizes and validates a custom Token Plan endpoint', async () => {
+    const service = await createServiceWithPreferences();
+
+    const result = await service.addProviderInstance({
+      typeId: 'coding-plan',
+      config: {
+        planId: 'qwen-token-plan',
+        baseUrl: ' https://token-plan.eu.example.com/compatible-mode/v1/ ',
+      },
+      validateApiKey: 'token-key',
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(validationMock.validateCodingPlanApiKey).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'qwen-token-plan' }),
+      'token-key',
+      'https://token-plan.eu.example.com/compatible-mode/v1',
+    );
+    expect(service.get().providerInstances).toContainEqual(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          planId: 'qwen-token-plan',
+          baseUrl: 'https://token-plan.eu.example.com/compatible-mode/v1',
+        }),
+      }),
+    );
+  });
+
+  it('normalizes coding-plan endpoints when updating an instance', async () => {
+    const service = await createServiceWithPreferences();
+    const result = await service.addProviderInstance({
+      typeId: 'coding-plan',
+      config: { planId: 'qwen-token-plan' },
+      validateApiKey: 'token-key',
+    });
+    if (!result.success) throw new Error(result.error);
+
+    await service.updateProviderInstance(result.instanceId, {
+      baseUrl: ' https://token-plan.eu.example.com/v1/ ',
+    });
+
+    expect(
+      service
+        .get()
+        .providerInstances.find((instance) => instance.id === result.instanceId)
+        ?.config,
+    ).toMatchObject({ baseUrl: 'https://token-plan.eu.example.com/v1' });
+  });
+
+  it('rejects invalid coding-plan endpoints when updating an instance', async () => {
+    const service = await createServiceWithPreferences();
+    const result = await service.addProviderInstance({
+      typeId: 'coding-plan',
+      config: { planId: 'qwen-token-plan' },
+      validateApiKey: 'token-key',
+    });
+    if (!result.success) throw new Error(result.error);
+
+    await expect(
+      service.updateProviderInstance(result.instanceId, {
+        baseUrl: 'http://token-plan.example.com/v1',
+      }),
+    ).rejects.toThrow('The API endpoint must use HTTPS.');
+  });
+
+  it('rejects an invalid custom plan endpoint before credential validation', async () => {
+    const service = await createServiceWithPreferences();
+
+    const result = await service.addProviderInstance({
+      typeId: 'coding-plan',
+      config: {
+        planId: 'qwen-token-plan',
+        baseUrl: 'http://token-plan.example.com/v1',
+      },
+      validateApiKey: 'token-key',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'The API endpoint must use HTTPS.',
+    });
+    expect(validationMock.validateCodingPlanApiKey).not.toHaveBeenCalled();
   });
 
   it('does not mutate preferences when coding-plan validation fails', async () => {

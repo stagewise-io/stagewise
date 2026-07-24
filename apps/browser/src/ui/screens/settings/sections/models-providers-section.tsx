@@ -38,7 +38,11 @@ import {
   type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
-import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
+import {
+  CODING_PLANS,
+  validateCodingPlanBaseUrl,
+  type CodingPlanId,
+} from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
@@ -540,6 +544,7 @@ function AddProviderGrid({
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [selected, setSelected] = useState<SelectionKey | null>(null);
   const [apiKey, setApiKey] = useState('');
+  const [endpoint, setEndpoint] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -585,11 +590,23 @@ function AddProviderGrid({
         const isSelfHosted = ADDABLE_SELF_HOSTED_TYPES.includes(
           key as ProviderInstanceTypeId,
         );
+        const endpointResult = plan?.configurableEndpoint
+          ? validateCodingPlanBaseUrl(endpoint)
+          : undefined;
+        if (endpointResult && !endpointResult.success) {
+          setError(endpointResult.error);
+          return;
+        }
 
         const result = await addProviderInstance({
           typeId: plan ? 'coding-plan' : key,
           config: plan
-            ? { planId: plan.id, baseUrl: plan.baseUrl }
+            ? {
+                planId: plan.id,
+                baseUrl: endpointResult?.success
+                  ? endpointResult.baseUrl
+                  : plan.baseUrl,
+              }
             : isSelfHosted
               ? { baseUrl: value.trim() }
               : {},
@@ -606,7 +623,7 @@ function AddProviderGrid({
         setIsConnecting(false);
       }
     },
-    [addProviderInstance, onConnected],
+    [addProviderInstance, endpoint, onConnected],
   );
 
   // Resolve display info for the current selection
@@ -645,6 +662,7 @@ function AddProviderGrid({
   const handleBack = useCallback(() => {
     setSelected(null);
     setApiKey('');
+    setEndpoint('');
     setSearchQuery('');
     setError(null);
   }, []);
@@ -770,6 +788,33 @@ function AddProviderGrid({
                 </div>
               </div>
 
+              {selectedPlan?.configurableEndpoint && (
+                <div className="space-y-1">
+                  <p className="font-medium text-muted-foreground text-xs">
+                    {selectedPlan.configurableEndpoint.label}
+                  </p>
+                  <Input
+                    type="url"
+                    placeholder={
+                      selectedPlan.configurableEndpoint.placeholder ??
+                      'https://example.com/v1'
+                    }
+                    value={endpoint}
+                    onValueChange={(value) => {
+                      setEndpoint(value);
+                      setError(null);
+                    }}
+                    disabled={isConnecting}
+                    aria-invalid={error ? true : undefined}
+                    size="sm"
+                    style={{ maxWidth: 'none' }}
+                  />
+                  <p className="text-subtle-foreground text-xs">
+                    {selectedPlan.configurableEndpoint.helpText}
+                  </p>
+                </div>
+              )}
+
               <Input
                 autoFocus
                 type={isSelfHosted ? 'text' : 'password'}
@@ -843,7 +888,11 @@ function AddProviderGrid({
               <Button
                 variant="primary"
                 size="sm"
-                disabled={!apiKey.trim() || isConnecting}
+                disabled={
+                  !apiKey.trim() ||
+                  isConnecting ||
+                  (!!selectedPlan?.configurableEndpoint && !endpoint.trim())
+                }
                 onClick={() => void handleConnect(selected, apiKey)}
               >
                 {isConnecting
@@ -893,6 +942,7 @@ function AddProviderGrid({
                             onClick={() => {
                               setSelected(planKey);
                               setApiKey('');
+                              setEndpoint(plan.baseUrl ?? '');
                               setError(null);
                             }}
                             className={cn(
@@ -3153,6 +3203,117 @@ function ProviderNameEditor({
 }
 
 // =============================================================================
+// Configurable Coding Plan Endpoint (detail page)
+// =============================================================================
+
+export function CodingPlanEndpointConnection({
+  instance,
+}: {
+  instance: ProviderInstance;
+}) {
+  const updateProviderInstance = useKartonProcedure(
+    (p) => p.preferences.updateProviderInstance,
+  );
+  const refreshInstanceModels = useKartonProcedure(
+    (p) => p.preferences.refreshInstanceModels,
+  );
+  const planId = (instance.config as { planId?: CodingPlanId }).planId;
+  const plan = planId ? CODING_PLANS[planId] : undefined;
+  const metadata = plan?.configurableEndpoint;
+  const savedBaseUrl =
+    (instance.config as { baseUrl?: string }).baseUrl ?? plan?.baseUrl ?? '';
+  const [baseUrl, setBaseUrl] = useState(savedBaseUrl);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setBaseUrl(savedBaseUrl), [savedBaseUrl]);
+
+  if (!metadata) return null;
+
+  const handleSave = async () => {
+    const validation = validateCodingPlanBaseUrl(baseUrl);
+    if (!validation.success) {
+      setError(validation.error);
+      return;
+    }
+    if (validation.baseUrl === savedBaseUrl) return;
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await updateProviderInstance(instance.id, {
+        baseUrl: validation.baseUrl,
+      });
+      await refreshInstanceModels(instance.id);
+      setBaseUrl(validation.baseUrl);
+    } catch (cause) {
+      const failureMessage =
+        cause instanceof Error
+          ? cause.message
+          : 'Failed to refresh models from this endpoint.';
+      let rollbackMessage: string | undefined;
+      try {
+        await updateProviderInstance(instance.id, { baseUrl: savedBaseUrl });
+      } catch (rollbackCause) {
+        rollbackMessage =
+          rollbackCause instanceof Error
+            ? rollbackCause.message
+            : 'unknown rollback error';
+      }
+      setBaseUrl(savedBaseUrl);
+      setError(
+        rollbackMessage
+          ? `${failureMessage} Failed to restore the previous endpoint: ${rollbackMessage}`
+          : failureMessage,
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isDirty = baseUrl.trim() !== savedBaseUrl;
+  return (
+    <div className="space-y-2 rounded-lg border border-derived p-3">
+      <p className="font-medium text-muted-foreground text-xs">
+        {metadata.label}
+      </p>
+      <div className="flex gap-2">
+        <Input
+          type="url"
+          value={baseUrl}
+          placeholder={metadata.placeholder}
+          onValueChange={(value) => {
+            setBaseUrl(value);
+            setError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && isDirty && !isSaving) {
+              void handleSave();
+            }
+          }}
+          disabled={isSaving}
+          size="sm"
+          style={{ maxWidth: 'none' }}
+          className="flex-1"
+        />
+        {isDirty && (
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!baseUrl.trim() || isSaving}
+            onClick={() => void handleSave()}
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+        )}
+      </div>
+      <p className="text-subtle-foreground text-xs">{metadata.helpText}</p>
+      {error && <TruncatedErrorText text={error} />}
+    </div>
+  );
+}
+
+// =============================================================================
 // Self-Hosted Connection (detail page)
 // =============================================================================
 
@@ -3409,6 +3570,10 @@ export function ModelsProvidersSection() {
                 <div className="rounded-lg border border-derived p-3">
                   <VendorApiKeyInput instance={detailInstance} />
                 </div>
+              )}
+
+              {detailInstance.typeId === 'coding-plan' && (
+                <CodingPlanEndpointConnection instance={detailInstance} />
               )}
 
               {credentialType === 'base-url' && (
