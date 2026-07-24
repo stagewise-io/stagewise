@@ -276,7 +276,7 @@ export class PreferencesService extends DisposableService {
       name: 'Stagewise Inference',
       config: {},
       enabledModelIds: [],
-      disabledModelIds: [],
+      disabledModelIds: ['claude-opus-4.8'],
       discoveredModels: [],
     });
 
