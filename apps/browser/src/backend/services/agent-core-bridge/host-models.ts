@@ -74,6 +74,9 @@ function resolveUtilityEntries(
       }
       return [];
     }
+    // Preset ID is set but the preset was deleted — treat as
+    // inactive and fall through to global lists, matching
+    // resolveActivePresetModels' behavior of returning undefined.
   }
   const globalList =
     task === 'title-generation'

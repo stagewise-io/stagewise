@@ -273,6 +273,7 @@ function SortableModelItem({
           <InlineThinkingConfig
             model={thinkingModel}
             override={thinkingOverride}
+            effectiveOverride={effectiveThinkingOverride}
             defaultOptions={thinkingDefaultOptions}
             onChange={onThinkingChange}
             onReset={onThinkingReset}
@@ -433,17 +434,23 @@ function ModelPickerButton({
 function InlineThinkingConfig({
   model,
   override,
+  effectiveOverride,
   defaultOptions,
   onChange,
   onReset,
 }: {
   model: ThinkingPanelModel;
   override: ModelThinkingOverride | undefined;
+  effectiveOverride: ModelThinkingOverride | undefined;
   defaultOptions: ModelThinkingDefaultOptions | undefined;
   onChange: (override: ModelThinkingOverride) => void;
   onReset: () => void;
 }) {
-  const display = getModelThinkingDisplayState(model, override, defaultOptions);
+  const display = getModelThinkingDisplayState(
+    model,
+    effectiveOverride ?? override,
+    defaultOptions,
+  );
   if (!display) return null;
 
   const options = getModelThinkingOptions(model, defaultOptions);
@@ -496,7 +503,10 @@ function InlineThinkingConfig({
           </RadioLabel>
         ))}
       </RadioGroup>
-      {display.isOverride && (
+      {/* Only show reset when an explicit override is persisted —
+          alias-effective presets without a stored override should not
+          show a reset button. */}
+      {display.isOverride && override !== undefined && (
         <button
           type="button"
           className="text-2xs text-muted-foreground hover:text-foreground"
