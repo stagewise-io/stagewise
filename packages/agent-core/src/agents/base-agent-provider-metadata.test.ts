@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ModelWithOptions } from '../host/models';
 import { ChatAgent } from './chat/chat';
+import { ModelFallbackManager } from './model-fallback-manager';
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -66,6 +67,7 @@ function createStubAgent(
   agent._stepProviderMode = 'current-mode';
   agent._stepCodingPlanId = 'current-plan';
   agent._stepProviderType = 'current-provider';
+  agent._fallbackManager = new ModelFallbackManager();
   agent.canRunStep = vi.fn().mockReturnValue(true);
   agent.generateContextForNewStep = vi.fn();
   agent.getToolsForStep = vi.fn();
@@ -82,6 +84,7 @@ function createStubAgent(
     commands: {
       beginStep: vi.fn().mockReturnValue({ queueFlushIndex: undefined }),
       recordStepError: vi.fn(),
+      setActiveModel: vi.fn(),
     },
   };
   agent.host = {

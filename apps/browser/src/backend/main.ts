@@ -275,7 +275,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // until `setModelProviderService(...)` is called further down. The
   // `DiffHistoryService` itself never consults `host.models`, so the
   // lazy slot is invisible in practice.
-  const lazyHostModels = createLazyBrowserHostModels();
+  const lazyHostModels = createLazyBrowserHostModels(() => {
+    const agent = preferencesService.get().agent;
+    return {
+      utilityModels: agent.utilityModels,
+      activePresetId: agent.activePresetId,
+      modelPresets: agent.modelPresets ?? [],
+    };
+  });
   const agentCoreHost = createBrowserAgentHost({
     logger,
     telemetryService,

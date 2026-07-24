@@ -788,7 +788,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(result).toBe('The user asked the assistant to help with a task.');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'history-compression' }),
     );
@@ -796,7 +796,34 @@ describe('generateSimpleCompressedHistory', () => {
 
   it('falls back to the second model when the first fails', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockResolvedValueOnce({
+        text: 'The assistant provided a DeepSeek-based summary of events.',
+      } as any);
+
+    const mps = makeMockHostModels();
+    const result = await generateSimpleCompressedHistory(
+      makeMessages(4),
+      mps,
+      'agent-1',
+    );
+
+    expect(result).toBe(
+      'The assistant provided a DeepSeek-based summary of events.',
+    );
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      2,
+      'deepseek-v4-flash',
+      'agent-1',
+      expect.any(Object),
+    );
+  });
+
+  it('falls back to the third model when the first two fail', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockResolvedValueOnce({
         text: 'The assistant provided a GPT-based summary of events.',
       } as any);
@@ -811,53 +838,28 @@ describe('generateSimpleCompressedHistory', () => {
     expect(result).toBe(
       'The assistant provided a GPT-based summary of events.',
     );
-    expect(generateTextMock).toHaveBeenCalledTimes(2);
-    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
-      2,
-      'gpt-5.4-nano',
-      'agent-1',
-      expect.any(Object),
-    );
-  });
-
-  it('falls back to the third model when the first two fail', async () => {
-    generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
-      .mockRejectedValueOnce(new Error('GPT failed'))
-      .mockResolvedValueOnce({
-        text: 'The assistant provided a Haiku-based summary of events.',
-      } as any);
-
-    const mps = makeMockHostModels();
-    const result = await generateSimpleCompressedHistory(
-      makeMessages(4),
-      mps,
-      'agent-1',
-    );
-
-    expect(result).toBe(
-      'The assistant provided a Haiku-based summary of events.',
-    );
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4.5',
+      'gpt-5.6-luna',
       'agent-1',
       expect.any(Object),
     );
   });
 
-  it('throws when all three models fail', async () => {
+  it('throws when all models fail', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'));
 
     const mps = makeMockHostModels();
     await expect(
       generateSimpleCompressedHistory(makeMessages(4), mps, 'agent-1'),
     ).rejects.toThrow('Haiku failed');
-    expect(generateTextMock).toHaveBeenCalledTimes(3);
+    expect(generateTextMock).toHaveBeenCalledTimes(5);
   });
 
   it('falls back when the abort signal fires (simulating timeout)', async () => {
@@ -907,13 +909,13 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
@@ -933,7 +935,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(mps.getWithOptions).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
@@ -947,27 +949,41 @@ describe('generateSimpleCompressedHistory', () => {
     generateTextMock
       .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError)
+      .mockRejectedValueOnce(abortError)
+      .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError);
 
     const mps = makeMockHostModels();
     await expect(
       generateSimpleCompressedHistory(makeMessages(4), mps, 'agent-1'),
     ).rejects.toThrow('aborted');
-    expect(generateTextMock).toHaveBeenCalledTimes(3);
+    expect(generateTextMock).toHaveBeenCalledTimes(5);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       3,
+      'gpt-5.6-luna',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      4,
+      'gemini-3.1-flash-lite',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      5,
       'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),
@@ -1101,8 +1117,10 @@ describe('generateSimpleCompressedHistory', () => {
 
   it('tries fallbackModelId after all cheap models fail', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'))
       .mockResolvedValueOnce({
         text: 'The assistant provided a fallback-model summary of events.',
@@ -1119,9 +1137,9 @@ describe('generateSimpleCompressedHistory', () => {
     expect(result).toBe(
       'The assistant provided a fallback-model summary of events.',
     );
-    expect(generateTextMock).toHaveBeenCalledTimes(4);
+    expect(generateTextMock).toHaveBeenCalledTimes(6);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
-      4,
+      6,
       'claude-sonnet-4.6',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'history-compression' }),
@@ -1130,8 +1148,10 @@ describe('generateSimpleCompressedHistory', () => {
 
   it('skips fallbackModelId if it matches a cheap model ID', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'));
 
     const mps = makeMockHostModels();
@@ -1143,13 +1163,15 @@ describe('generateSimpleCompressedHistory', () => {
         'claude-haiku-4.5' as any,
       ),
     ).rejects.toThrow('Haiku failed');
-    expect(mps.getWithOptions).toHaveBeenCalledTimes(3);
+    expect(mps.getWithOptions).toHaveBeenCalledTimes(5);
   });
 
   it('throws when fallback model also fails', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'))
       .mockRejectedValueOnce(new Error('Sonnet failed'));
 
@@ -1162,7 +1184,7 @@ describe('generateSimpleCompressedHistory', () => {
         'claude-sonnet-4.6' as any,
       ),
     ).rejects.toThrow('Sonnet failed');
-    expect(generateTextMock).toHaveBeenCalledTimes(4);
+    expect(generateTextMock).toHaveBeenCalledTimes(6);
   });
 
   it('does not try fallbackModelId when a cheap model succeeds', async () => {
@@ -1182,7 +1204,7 @@ describe('generateSimpleCompressedHistory', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenCalledTimes(1);
     expect(mps.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );

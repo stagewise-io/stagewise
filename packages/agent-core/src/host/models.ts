@@ -35,6 +35,49 @@ export const MODEL_REQUEST_PURPOSE_METADATA_KEY = '$model_request_purpose';
 export const PROVIDER_INSTANCE_ID_METADATA_KEY = '$provider_instance_id';
 
 /**
+ * Reserved metadata key for passing a thinking override for a utility
+ * model call (title generation, context compression). The host reads
+ * this to apply per-model thinking configuration to internal calls
+ * that would otherwise skip thinking resolution.
+ *
+ * The value must be a {@link UtilityModelThinkingOverride} or omitted.
+ */
+export const UTILITY_THINKING_OVERRIDE_METADATA_KEY =
+  '$utility_thinking_override';
+
+/**
+ * Reserved metadata key for passing a preset's thinking override for
+ * the main agent step. The host reads this to apply the active
+ * preset's per-model thinking configuration, taking precedence over
+ * the global `modelThinkingOverrides` stored in preferences.
+ *
+ * The value must be a {@link UtilityModelThinkingOverride} or omitted.
+ */
+export const PRESET_THINKING_OVERRIDE_METADATA_KEY =
+  '$preset_thinking_override';
+
+/**
+ * Thinking override shape for utility model calls. Mirrors the host's
+ * `ModelThinkingOverride` but kept as a structural type so agent-core
+ * does not depend on host-side schema definitions.
+ */
+export interface UtilityModelThinkingOverride {
+  enabled?: boolean;
+  provider?: string;
+  value?: string;
+}
+
+/**
+ * A model entry in a utility model list, carrying optional thinking
+ * override so the host can apply per-model thinking configuration.
+ */
+export interface UtilityModelEntry {
+  modelId: string;
+  providerInstanceId?: string;
+  thinkingOverride?: UtilityModelThinkingOverride;
+}
+
+/**
  * Fully-resolved model with all the options `BaseAgent` needs to
  * invoke `streamText` / `generateText`.
  *
@@ -133,6 +176,54 @@ export interface HostModels {
    * require their owning provider instance ID.
    */
   has(modelId: string, providerInstanceId?: string): boolean;
+
+  /**
+   * Returns the user-configured ordered list of model IDs for a
+   * background utility task (title generation, context compression).
+   *
+   * The first element is the primary; subsequent entries are
+   * fallbacks tried in order. An empty array (or an unimplemented
+   * method) signals the caller to use its built-in default list.
+   *
+   * Hosts that expose user-configurable utility models implement this;
+   * other hosts can omit it.
+   */
+  getUtilityModelIds?(
+    task: 'title-generation' | 'context-compression',
+  ): string[] | undefined;
+
+  /**
+   * Returns the user-configured ordered list of model entries for a
+   * background utility task, including per-model thinking overrides.
+   *
+   * When implemented, takes precedence over {@link getUtilityModelIds}.
+   * Each entry carries a `modelId`, optional `providerInstanceId`, and
+   * optional `thinkingOverride` so the host can apply per-model
+   * thinking configuration to internal utility calls.
+   */
+  getUtilityModelEntries?(
+    task: 'title-generation' | 'context-compression',
+  ): UtilityModelEntry[] | undefined;
+
+  /**
+   * Returns the active preset's ID from user preferences, or
+   * `undefined` when no preset is active.
+   *
+   * Used by the agent's fallback manager to detect preset changes
+   * and reset the fallback pointer to the primary model (index 0).
+   */
+  getActivePresetId?(): string | undefined;
+
+  /**
+   * Returns the active preset's full ordered list of model entries
+   * (main model first, then fallbacks), or `undefined` when no
+   * preset is active.
+   *
+   * Each entry carries `modelId`, optional `providerInstanceId`, and
+   * optional `thinkingOverride`. Used by the fallback manager to
+   * cycle through models on upstream-overload errors.
+   */
+  getActivePresetModels?(): UtilityModelEntry[] | undefined;
 
   /**
    * Returns the {@link ModelCapabilities} for `modelId` (input/output

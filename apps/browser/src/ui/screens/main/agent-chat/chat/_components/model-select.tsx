@@ -54,6 +54,7 @@ import {
   getVendorForInstance,
   type ModelSelectorEntry,
 } from '@shared/provider-instance-helpers';
+import { resolveModelDisplay } from './model-presets-shared';
 import { enablePatches, produceWithPatches } from 'immer';
 
 enablePatches();
@@ -64,6 +65,7 @@ enablePatches();
 // ---------------------------------------------------------------------------
 
 const KEY_SEPARATOR = '\u001f';
+const PRESET_VALUE_PREFIX = '@@preset@@';
 
 function encodeKey(instanceId: string, modelId: string): string {
   return `${instanceId}${KEY_SEPARATOR}${modelId}`;
@@ -78,6 +80,15 @@ function decodeKey(
     instanceId: value.slice(0, idx),
     modelId: value.slice(idx + 1),
   };
+}
+
+function encodePresetKey(presetId: string): string {
+  return `${PRESET_VALUE_PREFIX}${presetId}`;
+}
+
+function decodePresetKey(value: string): string | null {
+  if (!value.startsWith(PRESET_VALUE_PREFIX)) return null;
+  return value.slice(PRESET_VALUE_PREFIX.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +151,17 @@ const OPEN_MODEL_SETTINGS_VALUE = '@@open model settings@@';
 
 const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
   {};
+const EMPTY_MODEL_PRESETS: UserPreferences['agent']['modelPresets'] = [];
+
+/** A preset entry prepared for display in the dropdown. */
+interface PresetEntry {
+  id: string;
+  name: string;
+  modelDisplayName: string;
+  modelId: string;
+  providerInstanceId?: string;
+  thinkingLabel?: string;
+}
 
 export const ModelSelect = memo(function ModelSelect({
   onModelChange,
@@ -161,6 +183,9 @@ export const ModelSelect = memo(function ModelSelect({
     (s) =>
       s.preferences.agent.modelThinkingOverrides ??
       EMPTY_MODEL_THINKING_OVERRIDES,
+  );
+  const modelPresets = useKartonState(
+    (s) => s.preferences.agent.modelPresets ?? EMPTY_MODEL_PRESETS,
   );
 
   // Build a map of instanceId → ProviderInstance for thinking option resolution
@@ -252,6 +277,33 @@ export const ModelSelect = memo(function ModelSelect({
     return Array.from(groups.values());
   }, [selectableEntries]);
 
+  // Build preset entries for the dropdown
+  const presetEntries = useMemo<PresetEntry[]>(() => {
+    return modelPresets.map((preset) => {
+      const mainModel = preset.models[0];
+      const display = mainModel
+        ? resolveModelDisplay(
+            selectableEntries,
+            mainModel.modelId,
+            mainModel.providerInstanceId,
+          )
+        : undefined;
+      let thinkingLabel: string | undefined;
+      if (mainModel?.thinkingOverride?.enabled) {
+        thinkingLabel = mainModel.thinkingOverride.value ?? 'Thinking';
+      }
+      return {
+        id: preset.id,
+        name: preset.name,
+        modelDisplayName:
+          display?.displayName ?? mainModel?.modelId ?? 'Unknown',
+        modelId: mainModel?.modelId ?? '',
+        providerInstanceId: mainModel?.providerInstanceId,
+        thinkingLabel,
+      };
+    });
+  }, [modelPresets, selectableEntries]);
+
   const [open, setOpen] = useState(false);
 
   // Search / filter state
@@ -274,6 +326,16 @@ export const ModelSelect = memo(function ModelSelect({
       .filter((g) => g.entries.length > 0);
   }, [groupedByInstance, query]);
 
+  const filteredPresets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q === '') return presetEntries;
+    return presetEntries.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.modelDisplayName.toLowerCase().includes(q),
+    );
+  }, [presetEntries, query]);
+
   const filteredEntryKeys = useMemo(
     () =>
       filteredGrouped.flatMap((g) =>
@@ -287,33 +349,63 @@ export const ModelSelect = memo(function ModelSelect({
     [selectableEntries],
   );
 
+  const presetKeys = useMemo(
+    () => presetEntries.map((p) => encodePresetKey(p.id)),
+    [presetEntries],
+  );
+
+  const filteredPresetKeys = useMemo(
+    () => filteredPresets.map((p) => encodePresetKey(p.id)),
+    [filteredPresets],
+  );
+
   const filteredItemValues = useMemo(
     () =>
       query.trim() === ''
-        ? [...allEntryKeys, OPEN_MODEL_SETTINGS_VALUE]
-        : filteredEntryKeys.length > 0
-          ? [...filteredEntryKeys, OPEN_MODEL_SETTINGS_VALUE]
+        ? [...presetKeys, ...allEntryKeys, OPEN_MODEL_SETTINGS_VALUE]
+        : filteredPresetKeys.length > 0 || filteredEntryKeys.length > 0
+          ? [
+              ...filteredPresetKeys,
+              ...filteredEntryKeys,
+              OPEN_MODEL_SETTINGS_VALUE,
+            ]
           : [],
-    [allEntryKeys, filteredEntryKeys, query],
+    [allEntryKeys, filteredEntryKeys, presetKeys, filteredPresetKeys, query],
   );
 
-  const hasFilteredResults = filteredEntryKeys.length > 0;
+  const hasFilteredResults =
+    filteredEntryKeys.length > 0 || filteredPresetKeys.length > 0;
+
+  // Active preset — when set, the combobox shows the preset as selected
+  // instead of the underlying model.
+  const activePresetId = preferences.agent.activePresetId;
+  const activePreset = useMemo(
+    () =>
+      activePresetId
+        ? modelPresets.find((p) => p.id === activePresetId)
+        : undefined,
+    [activePresetId, modelPresets],
+  );
 
   // Currently selected entry
   const selectedKey = useMemo(() => {
+    if (activePreset) return encodePresetKey(activePreset.id);
     if (!selectedModel) return null;
     const instId = selectedProviderInstanceId ?? DEFAULT_INSTANCE_ID;
     return encodeKey(instId, selectedModel);
-  }, [selectedModel, selectedProviderInstanceId]);
+  }, [selectedModel, selectedProviderInstanceId, activePreset]);
 
   const selectedEntry = selectedKey ? entryMap.get(selectedKey) : undefined;
 
-  const selectedDisplayName =
-    selectedEntry?.displayName ?? selectedModel ?? 'Select model';
+  const selectedDisplayName = activePreset
+    ? activePreset.name
+    : (selectedEntry?.displayName ?? selectedModel ?? 'Select model');
 
-  const selectedThinkingLabel = selectedEntry?.isAlias
+  const selectedThinkingLabel = activePreset
     ? undefined
-    : selectedEntry?.thinkingLabel;
+    : selectedEntry?.isAlias
+      ? undefined
+      : selectedEntry?.thinkingLabel;
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -434,6 +526,34 @@ export const ModelSelect = memo(function ModelSelect({
         void openSettings({ section: 'models-providers' });
         return;
       }
+      // Check for preset selection
+      const presetId = decodePresetKey(value);
+      if (presetId) {
+        const preset = modelPresets.find((p) => p.id === presetId);
+        if (preset && openAgent) {
+          const mainModel = preset.models[0];
+          if (mainModel) {
+            setSelectedModel(
+              openAgent,
+              mainModel.modelId as ModelId,
+              mainModel.providerInstanceId,
+            );
+          }
+          // Set activePresetId so the agent resolves the model and
+          // thinking overrides from the *current* preset definition on
+          // every step. We deliberately do NOT copy the preset's
+          // thinking overrides into global `modelThinkingOverrides` —
+          // those are resolved dynamically via the host's
+          // `getActivePresetModels()` so that editing the preset in
+          // settings takes effect on the next turn.
+          const [, patches] = produceWithPatches(preferences, (draft) => {
+            draft.agent.activePresetId = preset.id;
+          });
+          void updatePreferences(patches);
+          onModelChange?.();
+        }
+        return;
+      }
       const decoded = decodeKey(value);
       if (!decoded) return;
       if (!openAgent) return;
@@ -442,9 +562,24 @@ export const ModelSelect = memo(function ModelSelect({
         decoded.modelId as ModelId,
         decoded.instanceId,
       );
+      // Clear active preset when selecting a raw model
+      if (preferences.agent.activePresetId) {
+        const [, patches] = produceWithPatches(preferences, (draft) => {
+          draft.agent.activePresetId = undefined;
+        });
+        void updatePreferences(patches);
+      }
       onModelChange?.();
     },
-    [openAgent, openSettings, setSelectedModel, onModelChange],
+    [
+      openAgent,
+      openSettings,
+      setSelectedModel,
+      onModelChange,
+      modelPresets,
+      preferences,
+      updatePreferences,
+    ],
   );
 
   const handleOpenChange = useCallback(
@@ -649,7 +784,7 @@ export const ModelSelect = memo(function ModelSelect({
       value={selectedKey}
       open={open}
       inputValue={query}
-      items={[...allEntryKeys, OPEN_MODEL_SETTINGS_VALUE]}
+      items={[...presetKeys, ...allEntryKeys, OPEN_MODEL_SETTINGS_VALUE]}
       filteredItems={filteredItemValues}
       autoHighlight
       onValueChange={handleValueChange}
@@ -724,6 +859,19 @@ export const ModelSelect = memo(function ModelSelect({
 
               <ComboboxList>
                 <div className="scroll-fade-y scroll-fade-4 scrollbar-subtle max-h-48 overflow-y-auto">
+                  {filteredPresets.length > 0 && (
+                    <ComboboxGroup className="mt-0">
+                      <ComboboxGroupLabel className="px-1.5 pb-1 font-normal text-sidebar-foreground text-xs">
+                        Presets
+                      </ComboboxGroupLabel>
+                      {filteredPresets.map((preset) => (
+                        <PresetItem
+                          key={encodePresetKey(preset.id)}
+                          preset={preset}
+                        />
+                      ))}
+                    </ComboboxGroup>
+                  )}
                   {filteredGrouped.map((group) => (
                     <ComboboxGroup
                       key={group.instanceId}
@@ -882,6 +1030,26 @@ const ModelItem = memo(function ModelItem({
               )}
           </span>
         )}
+      </span>
+    </ComboboxItem>
+  );
+});
+
+const PresetItem = memo(function PresetItem({
+  preset,
+}: {
+  preset: PresetEntry;
+}) {
+  const itemValue = encodePresetKey(preset.id);
+  return (
+    <ComboboxItem value={itemValue} size="xs">
+      <ComboboxItemIndicator />
+      <span className="col-start-2 flex min-w-0 flex-col gap-0 text-xs">
+        <span className="truncate font-medium">{preset.name}</span>
+        <span className="truncate text-[10px] text-subtle-foreground">
+          {preset.modelDisplayName}
+          {preset.thinkingLabel && ` · ${preset.thinkingLabel}`}
+        </span>
       </span>
     </ComboboxItem>
   );
