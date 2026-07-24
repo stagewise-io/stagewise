@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.24.0 (2026-07-24)
+
+### Features
+
+* add installed IDEs to open-in menus (0cb1741)
+
+### Bug Fixes
+
+* split Qwen subscription plans (e46e861)
+
 ## 1.23.0 (2026-07-23)
 
 ### Features
