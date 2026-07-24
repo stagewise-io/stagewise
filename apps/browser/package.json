@@ -74,7 +74,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@electron-forge/cli": "7.11.1",
+    "@electron-forge/cli": "7.11.2",
     "@electron-forge/maker-deb": "7.11.1",
     "@electron-forge/maker-dmg": "7.11.1",
     "@electron-forge/maker-rpm": "7.11.1",
