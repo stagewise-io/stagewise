@@ -1167,12 +1167,14 @@ export abstract class BaseAgent<
    */
   protected async compressHistory(history: AgentMessage[]): Promise<string> {
     // The standard compaction logic is very simple. We can make this more sophisticated later on.
+    const { activeModelId, activeProviderInstanceId } = this.state.get();
     return await generateSimpleCompressedHistory(
       history,
       this.host.models,
       this.instanceId,
-      this.state.get().activeModelId,
+      activeModelId,
       this.host,
+      activeProviderInstanceId,
     );
   }
 
@@ -1237,7 +1239,7 @@ export abstract class BaseAgent<
     reasoningSignatureSource?: ReasoningSignatureSource,
     allowedEnvDomainIds?: readonly string[],
   ): Promise<ModelMessage[]> {
-    const activeModelId = this.state.get().activeModelId;
+    const { activeModelId, activeProviderInstanceId } = this.state.get();
     const fileReadCache = this.fileReadCacheService;
     const capabilities = this.host.models.getCapabilities(activeModelId);
 
@@ -1249,6 +1251,9 @@ export abstract class BaseAgent<
       const { contextWindowSize } = await this.host.models.getWithOptions(
         activeModelId,
         '',
+        {
+          [PROVIDER_INSTANCE_ID_METADATA_KEY]: activeProviderInstanceId,
+        },
       );
       contentLimits = {
         maxReadChars: deriveMaxReadChars(contextWindowSize),
@@ -2107,7 +2112,9 @@ export abstract class BaseAgent<
       let contextWindowSize: number;
       try {
         contextWindowSize = (
-          await this.host.models.getWithOptions(state.activeModelId, '')
+          await this.host.models.getWithOptions(state.activeModelId, '', {
+            [PROVIDER_INSTANCE_ID_METADATA_KEY]: state.activeProviderInstanceId,
+          })
         ).contextWindowSize;
       } catch {
         // Model may have been deleted — fall back to a conservative size
@@ -2466,11 +2473,12 @@ export abstract class BaseAgent<
     // far more tokens than the fractional sweet-spot tuned for 200k models.
     const compactionThreshold = this.config.historyCompressionThreshold ?? 0.65;
     try {
+      const postStepState = this.state.get();
       const contextWindowSize = (
-        await this.host.models.getWithOptions(
-          this.state.get().activeModelId,
-          '',
-        )
+        await this.host.models.getWithOptions(postStepState.activeModelId, '', {
+          [PROVIDER_INSTANCE_ID_METADATA_KEY]:
+            postStepState.activeProviderInstanceId,
+        })
       ).contextWindowSize;
       const fractionalTriggerTokens = compactionThreshold * contextWindowSize;
       const effectiveTriggerTokens = Math.min(
