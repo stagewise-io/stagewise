@@ -65,10 +65,18 @@ const sanitizeTitle = (raw: string): string => {
  * meets the length/word-count floor; rethrows the last error if every
  * fallback fails.
  *
- * The model list is sourced from `hostModels.getUtilityModelIds` when
- * the host exposes user-configured utility models. An empty or absent
- * return falls back to the built-in {@link TITLE_GENERATION_MODELS}.
- * Each model ID is validated via `hostModels.has()` before attempting.
+ * The model list is sourced from `hostModels.getUtilityModelEntries` (or
+ * `getUtilityModelIds` as a fallback) when the host exposes user-configured
+ * utility models. An explicitly empty list falls back to the main chat
+ * model (`fallbackModelId` + `fallbackProviderInstanceId`) if provided;
+ * an absent return falls back to the built-in {@link TITLE_GENERATION_MODELS}.
+ * Each model ID is validated via `hostModels.has()` (with `providerInstanceId`)
+ * before attempting.
+ *
+ * When a `thinkingOverride` is configured on a utility model entry, it is
+ * forwarded via metadata to `getWithOptions` and the resulting provider
+ * options are used as-is. When no override is configured, thinking is
+ * force-disabled to minimise token usage for this lightweight task.
  *
  * The `hostModels` argument is the core `HostModels.getWithOptions`
  * seam — hosts translate it into their native model provider. Unlike
@@ -80,6 +88,7 @@ export const generateSimpleTitle = async (
   hostModels: HostModels,
   agentInstanceId: string,
   fallbackModelId?: string,
+  fallbackProviderInstanceId?: string,
 ): Promise<string> => {
   const messageList = messages
     .filter(
@@ -106,13 +115,22 @@ export const generateSimpleTitle = async (
 
   // Build a unified list of entries (with thinking overrides) from
   // whichever method the host implements.
+  const fallbackEntry: UtilityModelEntry | null = fallbackModelId
+    ? {
+        modelId: fallbackModelId,
+        ...(fallbackProviderInstanceId
+          ? { providerInstanceId: fallbackProviderInstanceId }
+          : {}),
+      }
+    : null;
+
   let entries: UtilityModelEntry[];
   if (configuredEntries !== undefined) {
     entries =
       configuredEntries.length > 0
         ? configuredEntries
-        : fallbackModelId
-          ? [{ modelId: fallbackModelId }]
+        : fallbackEntry
+          ? [fallbackEntry]
           : (TITLE_GENERATION_MODELS as readonly string[]).map((id) => ({
               modelId: id,
             }));
@@ -120,8 +138,8 @@ export const generateSimpleTitle = async (
     entries =
       configuredModels.length > 0
         ? configuredModels.map((id) => ({ modelId: id }))
-        : fallbackModelId
-          ? [{ modelId: fallbackModelId }]
+        : fallbackEntry
+          ? [fallbackEntry]
           : (TITLE_GENERATION_MODELS as readonly string[]).map((id) => ({
               modelId: id,
             }));
@@ -162,12 +180,18 @@ export const generateSimpleTitle = async (
       );
 
       try {
+        // When a thinking override is configured for this entry, respect it.
+        // Otherwise, force-disable thinking to minimise token usage for
+        // this lightweight task.
+        const providerOptions = entry.thinkingOverride
+          ? modelWithOptions.providerOptions
+          : deepMergeProviderOptions(modelWithOptions.providerOptions, {
+              anthropic: { thinking: { type: 'disabled' } },
+            });
+
         const title = await generateText({
           model: modelWithOptions.model,
-          providerOptions: deepMergeProviderOptions(
-            modelWithOptions.providerOptions,
-            { anthropic: { thinking: { type: 'disabled' } } },
-          ),
+          providerOptions,
           headers: modelWithOptions.headers,
           abortSignal: abortController.signal,
           messages: [

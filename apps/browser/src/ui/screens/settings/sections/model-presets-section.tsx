@@ -78,6 +78,7 @@ import {
   type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 import { cn } from '@ui/utils';
+import { getModelAlias } from '@shared/available-models';
 
 enablePatches();
 
@@ -155,6 +156,7 @@ function SortableModelItem({
   onThinkingReset,
   thinkingModel,
   thinkingDefaultOptions,
+  effectiveThinkingOverride,
 }: {
   itemKey: string;
   label?: string;
@@ -169,6 +171,7 @@ function SortableModelItem({
   onThinkingReset: () => void;
   thinkingModel: ThinkingPanelModel | undefined;
   thinkingDefaultOptions: ModelThinkingDefaultOptions | undefined;
+  effectiveThinkingOverride?: ModelThinkingOverride;
 }) {
   const {
     attributes,
@@ -186,10 +189,12 @@ function SortableModelItem({
   };
 
   const canThink = thinkingModel !== undefined;
+  // Use effectiveThinkingOverride for display so alias entries show
+  // their fixed thinkingPreset even when no explicit override is stored.
   const thinkingDisplay = thinkingModel
     ? getModelThinkingDisplayState(
         thinkingModel,
-        thinkingOverride,
+        effectiveThinkingOverride ?? thinkingOverride,
         thinkingDefaultOptions,
       )
     : undefined;
@@ -294,22 +299,29 @@ function ModelPickerButton({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
+  // Compute the picker key consistently with modelKey()/selectorToModelEntry():
+  // `stagewise-default` instance IDs are stripped (implicit), so the key
+  // becomes `modelId::` — matching the stored entry's key. Without this,
+  // already-added stagewise-default models would not be excluded from the
+  // picker, allowing duplicates with colliding React keys.
+  const pickerKey = (e: ModelSelectorEntry) =>
+    `${e.modelId}::${e.instanceId !== 'stagewise-default' ? e.instanceId : ''}`;
+
   const available = useMemo(
-    () =>
-      entries.filter((e) => !excludeIds.has(`${e.modelId}::${e.instanceId}`)),
+    () => entries.filter((e) => !excludeIds.has(pickerKey(e))),
     [entries, excludeIds],
   );
 
   const entryByKey = useMemo(() => {
     const map = new Map<string, ModelSelectorEntry>();
     for (const e of available) {
-      map.set(`${e.modelId}::${e.instanceId}`, e);
+      map.set(pickerKey(e), e);
     }
     return map;
   }, [available]);
 
   const allKeys = useMemo(
-    () => available.map((e) => `${e.modelId}::${e.instanceId}`),
+    () => available.map((e) => pickerKey(e)),
     [available],
   );
 
@@ -325,7 +337,7 @@ function ModelPickerButton({
   }, [available, query]);
 
   const filteredKeys = useMemo(
-    () => filtered.map((e) => `${e.modelId}::${e.instanceId}`),
+    () => filtered.map((e) => pickerKey(e)),
     [filtered],
   );
 
@@ -392,10 +404,10 @@ function ModelPickerButton({
               </div>
             )}
             {grouped.map((group) => (
-              <ComboboxGroup key={group.name}>
+              <ComboboxGroup key={group.entries[0]?.instanceId ?? group.name}>
                 <ComboboxGroupLabel>{group.name}</ComboboxGroupLabel>
                 {group.entries.map((entry) => {
-                  const key = `${entry.modelId}::${entry.instanceId}`;
+                  const key = pickerKey(entry);
                   return (
                     <ComboboxItem key={key} value={key} size="xs">
                       <ComboboxItemIndicator />
@@ -545,6 +557,14 @@ function useModelListItems(
         const thinkingModel = selectorEntry
           ? buildThinkingModel(selectorEntry, instanceMap)
           : undefined;
+        // For alias entries without an explicit thinking override, use the
+        // alias's fixed thinkingPreset so the UI shows the effective thinking
+        // configuration rather than the target model's default.
+        const effectiveThinkingOverride =
+          entry.thinkingOverride ??
+          (selectorEntry?.isAlias
+            ? getModelAlias(selectorEntry.modelId)?.thinkingPreset
+            : undefined);
         const thinkingDefaultOptions = instance
           ? getInstanceThinkingDefaultOptions(instance)
           : undefined;
@@ -559,6 +579,7 @@ function useModelListItems(
           valid,
           thinkingModel,
           thinkingDefaultOptions,
+          effectiveThinkingOverride,
         };
       }),
     [modelEntries, entries, preferences, instanceMap],
@@ -705,6 +726,7 @@ function ModelList({
                   onThinkingReset={() => handleThinkingReset(item.key)}
                   thinkingModel={item.thinkingModel}
                   thinkingDefaultOptions={item.thinkingDefaultOptions}
+                  effectiveThinkingOverride={item.effectiveThinkingOverride}
                 />
               ))}
             </div>
@@ -1062,6 +1084,12 @@ export function ModelPresetsSection() {
         draft.agent.modelPresets = draft.agent.modelPresets.filter(
           (p) => p.id !== id,
         );
+        // Clear activePresetId if it references the deleted preset —
+        // otherwise the agent would try to resolve a stale preset on
+        // the next step.
+        if (draft.agent.activePresetId === id) {
+          draft.agent.activePresetId = undefined;
+        }
       });
       void updatePreferences(patches);
     },

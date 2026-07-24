@@ -984,11 +984,16 @@ export function isModelEntryValid(
   modelId: string,
   providerInstanceId?: string,
 ): boolean {
-  const entries = getSelectableModelEntries(prefs);
   if (providerInstanceId) {
-    return entries.some(
-      (e) => e.instanceId === providerInstanceId && e.modelId === modelId,
+    // Use findModelSelectorEntry for instance-aware matching — it applies
+    // the same catalog normalization (e.g. Anthropic dotted→hyphenated ID
+    // mapping) as the selector, so valid native model IDs are not falsely
+    // rejected by the raw equality check in getSelectableModelEntries.
+    return (
+      findModelSelectorEntry(prefs, providerInstanceId, modelId) !== undefined
     );
   }
+  // No instance specified — check if the model is selectable on any instance.
+  const entries = getSelectableModelEntries(prefs);
   return entries.some((e) => e.modelId === modelId);
 }

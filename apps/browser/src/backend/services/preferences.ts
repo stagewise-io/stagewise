@@ -939,6 +939,24 @@ export class PreferencesService extends DisposableService {
     return structuredClone(this.preferences);
   }
 
+  /**
+   * Get a shallow snapshot of the `agent` sub-object without cloning the
+   * entire preferences tree. Used by hot paths (e.g. the lazy host-models
+   * closure) that only need `utilityModels`, `activePresetId`, and
+   * `modelPresets` and would otherwise pay the cost of a full
+   * `structuredClone` on every agent turn.
+   */
+  public getAgentSnapshot(): UserPreferences['agent'] {
+    this.assertNotDisposed();
+    const agent = this.preferences.agent;
+    return {
+      ...agent,
+      utilityModels: agent.utilityModels,
+      activePresetId: agent.activePresetId,
+      modelPresets: agent.modelPresets ?? [],
+    };
+  }
+
   private async enqueuePreferenceWrite<T>(
     operation: () => Promise<T>,
   ): Promise<T> {

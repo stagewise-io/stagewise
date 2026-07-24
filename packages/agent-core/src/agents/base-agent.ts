@@ -1165,6 +1165,7 @@ export abstract class BaseAgent<
         this.host.models,
         this.instanceId,
         this.state.get().activeModelId,
+        this.state.get().activeProviderInstanceId,
       );
     } catch (e) {
       const error = e as Error;
@@ -1187,14 +1188,13 @@ export abstract class BaseAgent<
    */
   protected async compressHistory(history: AgentMessage[]): Promise<string> {
     // The standard compaction logic is very simple. We can make this more sophisticated later on.
-    const { activeModelId, activeProviderInstanceId } = this.state.get();
     return await generateSimpleCompressedHistory(
       history,
       this.host.models,
       this.instanceId,
-      activeModelId,
+      this.state.get().activeModelId,
+      this.state.get().activeProviderInstanceId,
       this.host,
-      activeProviderInstanceId,
     );
   }
 
@@ -1668,8 +1668,7 @@ export abstract class BaseAgent<
       const resolvedModel: UtilityModelEntry =
         presetModels[fallbackIndex] ?? presetModels[0]!;
       stepModelId = resolvedModel.modelId;
-      stepProviderInstanceId =
-        resolvedModel.providerInstanceId ?? stepProviderInstanceId;
+      stepProviderInstanceId = resolvedModel.providerInstanceId;
       presetThinkingOverride = resolvedModel.thinkingOverride;
       // Sync agent state so the UI and persistence reflect the current
       // preset model. This is idempotent — if the model hasn't changed,
@@ -2156,6 +2155,17 @@ export abstract class BaseAgent<
       // of surfacing the error.
       if (this._pendingFallbackRetry) {
         this._pendingFallbackRetry = false;
+        // Force-terminate any non-terminal tool parts from the aborted
+        // step so canRunStep() does not block the retry. Without this,
+        // partial tool-call parts left in "input-streaming"/
+        // "input-available" state by the aborted stream would cause
+        // the fallback retry to be silently dropped.
+        this.state.commands.denyAllNonTerminalToolPartsInHistory({
+          approvalDenyReason:
+            'Model fallback triggered — retrying with fallback model.',
+          forceErrorText:
+            'Tool execution interrupted — upstream overload triggered model fallback.',
+        });
         try {
           this.stepAbortController?.abort();
         } catch {}

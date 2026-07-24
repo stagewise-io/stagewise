@@ -868,6 +868,7 @@ export const ModelSelect = memo(function ModelSelect({
                         <PresetItem
                           key={encodePresetKey(preset.id)}
                           preset={preset}
+                          onHoverClear={scheduleClear}
                         />
                       ))}
                     </ComboboxGroup>
@@ -1037,12 +1038,14 @@ const ModelItem = memo(function ModelItem({
 
 const PresetItem = memo(function PresetItem({
   preset,
+  onHoverClear,
 }: {
   preset: PresetEntry;
+  onHoverClear: () => void;
 }) {
   const itemValue = encodePresetKey(preset.id);
   return (
-    <ComboboxItem value={itemValue} size="xs">
+    <ComboboxItem value={itemValue} size="xs" onMouseEnter={onHoverClear}>
       <ComboboxItemIndicator />
       <span className="col-start-2 flex min-w-0 flex-col gap-0 text-xs">
         <span className="truncate font-medium">{preset.name}</span>
