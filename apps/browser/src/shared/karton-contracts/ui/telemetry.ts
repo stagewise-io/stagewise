@@ -50,9 +50,15 @@ export type UIEventProperties = {
   'custom-model-add-aborted': {
     had_validation_errors: boolean;
     any_field_touched: boolean;
+    provider_type: ProviderInstanceTypeId | 'unknown';
   };
-  'custom-model-add-finished': undefined;
-  'custom-model-add-started': undefined;
+  'custom-model-add-finished': {
+    model_id?: string;
+    provider_type: ProviderInstanceTypeId | 'unknown';
+  };
+  'custom-model-add-started': {
+    initial_provider_type: ProviderInstanceTypeId | 'unknown';
+  };
   'custom-provider-add-aborted':
     | {
         had_validation_errors: boolean;

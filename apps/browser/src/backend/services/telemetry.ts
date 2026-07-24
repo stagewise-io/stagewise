@@ -444,11 +444,17 @@ export type BackendEventProperties = {
   };
   'element-selection-started': undefined;
   'element-selection-stopped': { element_selected: boolean };
-  'custom-model-add-started': undefined;
-  'custom-model-add-finished': undefined;
+  'custom-model-add-started': {
+    initial_provider_type: string;
+  };
+  'custom-model-add-finished': {
+    model_id?: string;
+    provider_type: string;
+  };
   'custom-model-add-aborted': {
     had_validation_errors: boolean;
     any_field_touched: boolean;
+    provider_type: string;
   };
   'custom-provider-add-started': undefined;
   'custom-provider-add-finished': {
@@ -622,9 +628,15 @@ const UI_TELEMETRY_EVENT_SCHEMAS = {
   'custom-model-add-aborted': z.object({
     had_validation_errors: z.boolean(),
     any_field_touched: z.boolean(),
+    provider_type: z.enum([...providerInstanceTypeIds, 'unknown']),
   }),
-  'custom-model-add-finished': z.undefined().optional(),
-  'custom-model-add-started': z.undefined().optional(),
+  'custom-model-add-finished': z.object({
+    model_id: z.string().optional(),
+    provider_type: z.enum([...providerInstanceTypeIds, 'unknown']),
+  }),
+  'custom-model-add-started': z.object({
+    initial_provider_type: z.enum([...providerInstanceTypeIds, 'unknown']),
+  }),
   'custom-provider-add-aborted': z
     .object({
       had_validation_errors: z.boolean(),
@@ -1049,8 +1061,19 @@ export class TelemetryService extends DisposableService {
 
       const distinctId = this.getDistinctId();
 
+      const privacySafeProperties =
+        eventName === 'custom-model-add-finished' &&
+        telemetryLevel !== 'full' &&
+        typeof properties === 'object' &&
+        properties !== null
+          ? (({ model_id: _, ...safeProperties }) => safeProperties)(
+              properties as Record<string, unknown>,
+            )
+          : properties;
       const finalProperties = {
-        ...(typeof properties === 'object' ? properties : {}),
+        ...(typeof privacySafeProperties === 'object'
+          ? privacySafeProperties
+          : {}),
         product: 'stagewise-browser',
         telemetry_level: telemetryLevel,
         app_version: __APP_VERSION__,

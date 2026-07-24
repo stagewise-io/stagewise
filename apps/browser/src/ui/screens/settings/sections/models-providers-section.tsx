@@ -1222,6 +1222,7 @@ function CustomModelDialog({
   onSave,
   existingModelIds,
   providerInstances,
+  defaultProviderInstanceId,
 }: {
   model?: CustomModel;
   open: boolean;
@@ -1231,13 +1232,22 @@ function CustomModelDialog({
       providerOptions: Record<string, unknown>;
       headers: Record<string, string>;
     },
-  ) => void;
+  ) => Promise<void>;
   existingModelIds: Set<string>;
   providerInstances: ProviderInstance[];
+  defaultProviderInstanceId?: string;
 }) {
   const track = useTrack();
+  const telemetryLevel = useKartonState(
+    (state) => state.preferences.privacy.telemetryLevel,
+  );
   const isAddMode = !model;
   const savedRef = useRef(false);
+  const initialProviderInstanceId =
+    model?.providerInstanceId ??
+    model?.endpointId ??
+    defaultProviderInstanceId ??
+    '';
 
   const [modelId, setModelId] = useState(model?.modelId ?? '');
   const [displayName, setDisplayName] = useState(model?.displayName ?? '');
@@ -1246,7 +1256,7 @@ function CustomModelDialog({
     model?.contextWindowSize ?? 128000,
   );
   const [providerInstanceId, setProviderInstanceId] = useState(
-    model?.providerInstanceId ?? model?.endpointId ?? '',
+    initialProviderInstanceId,
   );
   const [thinkingEnabled, setThinkingEnabled] = useState(
     model?.thinkingEnabled ?? false,
@@ -1283,6 +1293,8 @@ function CustomModelDialog({
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -1290,7 +1302,7 @@ function CustomModelDialog({
     setDisplayName(model?.displayName ?? '');
     setDescription(model?.description ?? '');
     setContextWindowSize(model?.contextWindowSize ?? 128000);
-    setProviderInstanceId(model?.providerInstanceId ?? model?.endpointId ?? '');
+    setProviderInstanceId(initialProviderInstanceId);
     setThinkingEnabled(model?.thinkingEnabled ?? false);
     setCapabilities(model?.capabilities ?? defaultCaps);
     setProviderOptionsJson(
@@ -1305,9 +1317,17 @@ function CustomModelDialog({
     );
     setShowAdvanced(false);
     setJsonError(null);
+    setSaveError(null);
+    setIsSaving(false);
     savedRef.current = false;
     if (isAddMode) {
-      track('custom-model-add-started');
+      const providerType =
+        providerInstances.find(
+          (instance) => instance.id === defaultProviderInstanceId,
+        )?.typeId ?? 'unknown';
+      track('custom-model-add-started', {
+        initial_provider_type: providerType,
+      });
     }
   }, [open]);
 
@@ -1328,8 +1348,7 @@ function CustomModelDialog({
     displayName !== (model?.displayName ?? '') ||
     description !== (model?.description ?? '') ||
     contextWindowSize !== (model?.contextWindowSize ?? 128000) ||
-    providerInstanceId !==
-      (model?.providerInstanceId ?? model?.endpointId ?? '') ||
+    providerInstanceId !== initialProviderInstanceId ||
     thinkingEnabled !== (model?.thinkingEnabled ?? false) ||
     providerOptionsJson !==
       (model?.providerOptions && Object.keys(model.providerOptions).length > 0
@@ -1343,12 +1362,17 @@ function CustomModelDialog({
       JSON.stringify(model?.capabilities ?? defaultCaps);
 
   const hadValidationErrors = isDuplicate || jsonError !== null;
+  const selectedProviderType =
+    providerInstances.find((instance) => instance.id === providerInstanceId)
+      ?.typeId ?? 'unknown';
 
   const handleDialogOpenChange = (next: boolean) => {
+    if (!next && isSaving) return;
     if (!next && open && isAddMode && !savedRef.current) {
       track('custom-model-add-aborted', {
         had_validation_errors: hadValidationErrors,
         any_field_touched: anyFieldTouched,
+        provider_type: selectedProviderType,
       });
     }
     onOpenChange(next);
@@ -1368,7 +1392,8 @@ function CustomModelDialog({
       }));
   }, [providerInstances]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaveError(null);
     let providerOptions: Record<string, unknown> = {};
     let headers: Record<string, string> = {};
 
@@ -1389,22 +1414,34 @@ function CustomModelDialog({
       }
     }
 
-    onSave({
-      modelId: modelId.trim(),
-      displayName: displayName.trim(),
-      description: description.trim(),
-      contextWindowSize,
-      providerInstanceId,
-      thinkingEnabled,
-      capabilities,
-      providerOptions,
-      headers,
-    });
-    if (isAddMode) {
-      track('custom-model-add-finished');
+    setIsSaving(true);
+    try {
+      await onSave({
+        modelId: modelId.trim(),
+        displayName: displayName.trim(),
+        description: description.trim(),
+        contextWindowSize,
+        providerInstanceId,
+        thinkingEnabled,
+        capabilities,
+        providerOptions,
+        headers,
+      });
+      if (isAddMode) {
+        track('custom-model-add-finished', {
+          ...(telemetryLevel === 'full' && { model_id: modelId.trim() }),
+          provider_type: selectedProviderType,
+        });
+      }
+      savedRef.current = true;
+      onOpenChange(false);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : 'Failed to save model.',
+      );
+    } finally {
+      setIsSaving(false);
     }
-    savedRef.current = true;
-    onOpenChange(false);
   };
 
   return (
@@ -1638,18 +1675,20 @@ function CustomModelDialog({
           </div>
         </OverlayScrollbar>
 
+        {saveError && <TruncatedErrorText text={saveError} />}
         <DialogFooter>
           <Button
             variant="primary"
             size="sm"
-            disabled={!canSave}
-            onClick={handleSave}
+            disabled={!canSave || isSaving}
+            onClick={() => void handleSave()}
           >
-            {model ? 'Save Changes' : 'Add Model'}
+            {isSaving ? 'Saving...' : model ? 'Save Changes' : 'Add Model'}
           </Button>
           <Button
             variant="ghost"
             size="sm"
+            disabled={isSaving}
             onClick={() => handleDialogOpenChange(false)}
           >
             Cancel
@@ -3024,6 +3063,7 @@ function ModelsSection({
         onSave={handleSave}
         existingModelIds={existingModelIds}
         providerInstances={providerInstances}
+        defaultProviderInstanceId={filterInstanceId}
       />
     </div>
   );
