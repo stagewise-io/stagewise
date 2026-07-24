@@ -180,17 +180,24 @@ export const generateSimpleTitle = async (
       );
 
       try {
-        // When a thinking override is configured for this entry, respect it.
+        // When a thinking override is configured for this entry, respect
+        // it — the host has already resolved it into providerOptions.
         // Otherwise, force-disable thinking to minimise token usage for
         // this lightweight task.
-        // Check `.enabled !== undefined` rather than truthiness so malformed
-        // or legacy overrides normalised to `{}` don't bypass the disable.
-        const providerOptions =
-          entry.thinkingOverride?.enabled !== undefined
-            ? modelWithOptions.providerOptions
-            : deepMergeProviderOptions(modelWithOptions.providerOptions, {
-                anthropic: { thinking: { type: 'disabled' } },
-              });
+        //
+        // Check for any populated field, not just `enabled`, so overrides
+        // that carry only `provider`/`value` (e.g. from legacy data or
+        // schema normalisation that stripped a non-boolean `enabled`)
+        // are still treated as configured. The schema normaliser returns
+        // `{}` for malformed/empty values, so the key-count check is safe.
+        const hasOverride =
+          entry.thinkingOverride !== undefined &&
+          Object.keys(entry.thinkingOverride).length > 0;
+        const providerOptions = hasOverride
+          ? modelWithOptions.providerOptions
+          : deepMergeProviderOptions(modelWithOptions.providerOptions, {
+              anthropic: { thinking: { type: 'disabled' } },
+            });
 
         const title = await generateText({
           model: modelWithOptions.model,
