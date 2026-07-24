@@ -27,7 +27,7 @@
     "geist": "1.7.2",
     "gray-matter": "^4.0.3",
     "lucide-react": "0.554.0",
-    "next": "16.2.6",
+    "next": "16.2.11",
     "next-mdx-remote": "^6.0.0",
     "@stagewise/icons": "workspace:*",
     "posthog-js": "^1.372.10",
