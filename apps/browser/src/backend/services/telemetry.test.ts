@@ -118,6 +118,33 @@ describe('main UI telemetry schemas', () => {
     ).toBeNull();
   });
 
+  it('validates custom-model telemetry payloads', () => {
+    expect(
+      parseUIEventProperties('custom-model-add-started', {
+        initial_provider_type: 'custom-openai-chat',
+      }),
+    ).toEqual({ initial_provider_type: 'custom-openai-chat' });
+    expect(
+      parseUIEventProperties('custom-model-add-finished', {
+        provider_type: 'custom-openai-chat',
+      }),
+    ).toEqual({ provider_type: 'custom-openai-chat' });
+    expect(
+      parseUIEventProperties('custom-model-add-finished', {
+        model_id: 'private-model',
+        provider_type: 'custom-openai-chat',
+      }),
+    ).toEqual({
+      model_id: 'private-model',
+      provider_type: 'custom-openai-chat',
+    });
+    expect(
+      parseUIEventProperties('custom-model-add-started', {
+        provider_type: 'custom-openai-chat',
+      }),
+    ).toBeNull();
+  });
+
   it('accepts omitted and diagnostic custom-provider abort payloads', () => {
     expect(
       parseUIEventProperties('custom-provider-add-aborted', undefined),
