@@ -78,7 +78,7 @@ describe('generateSimpleTitle', () => {
     expect(title).toBe('My Title');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(hm.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'title-generation' }),
     );
@@ -86,17 +86,17 @@ describe('generateSimpleTitle', () => {
 
   it('falls back to the second model when the first fails', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
-      .mockResolvedValueOnce({ text: 'GPT Title' } as any);
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockResolvedValueOnce({ text: 'DeepSeek Title' } as any);
 
     const hm = makeMockHostModels();
     const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
 
-    expect(title).toBe('GPT Title');
+    expect(title).toBe('DeepSeek Title');
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
@@ -104,34 +104,36 @@ describe('generateSimpleTitle', () => {
 
   it('falls back to the third model when the first two fail', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
-      .mockRejectedValueOnce(new Error('GPT failed'))
-      .mockResolvedValueOnce({ text: 'Haiku Title' } as any);
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockResolvedValueOnce({ text: 'GPT Title' } as any);
 
     const hm = makeMockHostModels();
     const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
 
-    expect(title).toBe('Haiku Title');
+    expect(title).toBe('GPT Title');
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4.5',
+      'gpt-5.6-luna',
       'agent-1',
       expect.any(Object),
     );
   });
 
-  it('throws when all three models fail', async () => {
+  it('throws when all models fail', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'));
 
     const hm = makeMockHostModels();
     await expect(
       generateSimpleTitle(makeMessages(2), hm, 'agent-1'),
     ).rejects.toThrow('Haiku failed');
-    expect(generateTextMock).toHaveBeenCalledTimes(3);
+    expect(generateTextMock).toHaveBeenCalledTimes(5);
   });
 
   it('falls back when getWithOptions throws for a model', async () => {
@@ -210,25 +212,27 @@ describe('generateSimpleTitle', () => {
     // First model attempted, then fallback
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
   });
 
   it('exhausts all models via timeout and throws', async () => {
-    // All three models fail instantly (simulates what happens after abort)
+    // All models fail instantly (simulates what happens after abort)
     const abortError = new DOMException(
       'The operation was aborted.',
       'AbortError',
     );
     generateTextMock
+      .mockRejectedValueOnce(abortError)
+      .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError);
@@ -237,21 +241,33 @@ describe('generateSimpleTitle', () => {
     await expect(
       generateSimpleTitle(makeMessages(2), hm, 'agent-1'),
     ).rejects.toThrow('aborted');
-    expect(generateTextMock).toHaveBeenCalledTimes(3);
+    expect(generateTextMock).toHaveBeenCalledTimes(5);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       3,
+      'gpt-5.6-luna',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(hm.getWithOptions).toHaveBeenNthCalledWith(
+      4,
+      'gemini-3.1-flash-lite',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(hm.getWithOptions).toHaveBeenNthCalledWith(
+      5,
       'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),

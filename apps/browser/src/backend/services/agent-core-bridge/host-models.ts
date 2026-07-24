@@ -2,7 +2,11 @@ import type { HostModels, ModelWithOptions } from '@stagewise/agent-core';
 import type { ModelCapabilities } from '@stagewise/agent-core/types';
 import type { ModelProviderService } from '@/agents/model-provider';
 import { getModelCapabilities, type ModelId } from '@shared/available-models';
-import { PROVIDER_INSTANCE_ID_METADATA_KEY } from '@stagewise/agent-core/host';
+import {
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
+  type UtilityModelEntry as CoreUtilityModelEntry,
+} from '@stagewise/agent-core/host';
+import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
 
 /**
  * Thin `HostModels` adapter over the browser's `ModelProviderService`.
@@ -26,8 +30,110 @@ import { PROVIDER_INSTANCE_ID_METADATA_KEY } from '@stagewise/agent-core/host';
  * `has(id, providerInstanceId)` delegates to `ModelProviderService.modelExists`.
  * Instance-scoped discovered models require their provider instance ID.
  */
+/**
+ * Getter that returns the current agent preferences block from user
+ * preferences. Called on every utility-model resolution and on every
+ * `runStep` model resolution; must be cheap.
+ * Includes `activePresetId` and `modelPresets` so per-preset utility
+ * model overrides and the active preset's main model can be resolved.
+ */
+export type UtilityModelsGetter = () => Pick<
+  UserPreferences['agent'],
+  'utilityModels' | 'activePresetId' | 'modelPresets'
+>;
+
+/**
+ * Resolves the ordered utility model entries for a given task,
+ * checking the active preset's overrides first, then falling back
+ * to global configuration. The global lists are always populated
+ * by schema defaults, so this returns `undefined` only when no
+ * preset is active and the global list is empty (explicitly cleared).
+ */
+function resolveUtilityEntries(
+  task: 'title-generation' | 'context-compression',
+  prefs: Pick<
+    UserPreferences['agent'],
+    'utilityModels' | 'activePresetId' | 'modelPresets'
+  >,
+): CoreUtilityModelEntry[] | undefined {
+  const { utilityModels, activePresetId, modelPresets } = prefs;
+  // If an active preset exists, its utility model lists take
+  // precedence over the global defaults. An undefined or empty list
+  // means "use the main model" — we return [] so agent-core falls
+  // back to fallbackModelId (the preset's main model) instead of
+  // falling through to global defaults.
+  if (activePresetId) {
+    const preset = modelPresets.find((p) => p.id === activePresetId);
+    if (preset) {
+      const presetList =
+        task === 'title-generation'
+          ? preset.titleGeneration
+          : preset.contextCompression;
+      if (presetList && presetList.length > 0) {
+        return presetList.map(toCoreEntry);
+      }
+      return [];
+    }
+  }
+  const globalList =
+    task === 'title-generation'
+      ? utilityModels.titleGeneration
+      : utilityModels.contextCompression;
+  return globalList?.map(toCoreEntry);
+}
+
+/**
+ * Resolves the active preset's ID from user preferences.
+ * Returns `undefined` when no preset is active.
+ */
+function resolveActivePresetId(
+  prefs: Pick<UserPreferences['agent'], 'activePresetId'>,
+): string | undefined {
+  return prefs.activePresetId ?? undefined;
+}
+
+/**
+ * Resolves the active preset's full ordered list of model entries
+ * (main model first, then fallbacks) from user preferences.
+ * Returns `undefined` when no preset is active or the preset has
+ * no models. Each entry carries optional `providerInstanceId` and
+ * `thinkingOverride` so the agent can cycle through them on failure.
+ */
+function resolveActivePresetModels(
+  prefs: Pick<UserPreferences['agent'], 'activePresetId' | 'modelPresets'>,
+): CoreUtilityModelEntry[] | undefined {
+  const { activePresetId, modelPresets } = prefs;
+  if (!activePresetId) return undefined;
+  const preset = modelPresets.find((p) => p.id === activePresetId);
+  if (!preset) return undefined;
+  const models = preset.models;
+  if (!models || models.length === 0) return undefined;
+  return models.map(toCoreEntry);
+}
+
+/**
+ * The shapes are structurally identical, but keeping an explicit
+ * mapping avoids accidental drift.
+ */
+function toCoreEntry(entry: {
+  modelId: string;
+  providerInstanceId?: string;
+  thinkingOverride?: CoreUtilityModelEntry['thinkingOverride'];
+}): CoreUtilityModelEntry {
+  return {
+    modelId: entry.modelId,
+    ...(entry.providerInstanceId
+      ? { providerInstanceId: entry.providerInstanceId }
+      : {}),
+    ...(entry.thinkingOverride
+      ? { thinkingOverride: entry.thinkingOverride }
+      : {}),
+  };
+}
+
 export function createBrowserHostModels(
   modelProviderService: ModelProviderService,
+  getUtilityModels?: UtilityModelsGetter,
 ): HostModels {
   async function getWithOptions(
     modelId: string,
@@ -77,6 +183,18 @@ export function createBrowserHostModels(
     getCapabilities(modelId): ModelCapabilities {
       return getModelCapabilities(modelId as ModelId) as ModelCapabilities;
     },
+    getUtilityModelEntries(task) {
+      if (!getUtilityModels) return undefined;
+      return resolveUtilityEntries(task, getUtilityModels());
+    },
+    getActivePresetId() {
+      if (!getUtilityModels) return undefined;
+      return resolveActivePresetId(getUtilityModels());
+    },
+    getActivePresetModels() {
+      if (!getUtilityModels) return undefined;
+      return resolveActivePresetModels(getUtilityModels());
+    },
   };
 }
 
@@ -102,7 +220,9 @@ export interface LazyBrowserHostModels {
   setModelProviderService(mp: ModelProviderService): void;
 }
 
-export function createLazyBrowserHostModels(): LazyBrowserHostModels {
+export function createLazyBrowserHostModels(
+  getUtilityModels?: UtilityModelsGetter,
+): LazyBrowserHostModels {
   let inner: HostModels | null = null;
 
   const hostModels: HostModels = {
@@ -133,6 +253,22 @@ export function createLazyBrowserHostModels(): LazyBrowserHostModels {
       if (inner) return inner.getCapabilities(modelId);
       return getModelCapabilities(modelId as ModelId) as ModelCapabilities;
     },
+    getUtilityModelEntries(task) {
+      if (inner?.getUtilityModelEntries)
+        return inner.getUtilityModelEntries(task);
+      if (!getUtilityModels) return undefined;
+      return resolveUtilityEntries(task, getUtilityModels());
+    },
+    getActivePresetId() {
+      if (inner?.getActivePresetId) return inner.getActivePresetId();
+      if (!getUtilityModels) return undefined;
+      return resolveActivePresetId(getUtilityModels());
+    },
+    getActivePresetModels() {
+      if (inner?.getActivePresetModels) return inner.getActivePresetModels();
+      if (!getUtilityModels) return undefined;
+      return resolveActivePresetModels(getUtilityModels());
+    },
   };
 
   return {
@@ -143,7 +279,7 @@ export function createLazyBrowserHostModels(): LazyBrowserHostModels {
           '[BrowserHostModels] setModelProviderService called twice',
         );
       }
-      inner = createBrowserHostModels(mp);
+      inner = createBrowserHostModels(mp, getUtilityModels);
     },
   };
 }

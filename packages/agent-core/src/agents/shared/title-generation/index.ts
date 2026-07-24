@@ -1,6 +1,11 @@
 import { generateText } from 'ai';
 import type { AgentMessage } from '../../../types/agent';
-import type { HostModels } from '../../../host/models';
+import {
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
+  UTILITY_THINKING_OVERRIDE_METADATA_KEY,
+  type HostModels,
+  type UtilityModelEntry,
+} from '../../../host/models';
 import { deepMergeProviderOptions } from '../provider-options';
 import { TITLE_GENERATION_SYSTEM_PROMPT } from './prompt';
 
@@ -9,9 +14,11 @@ import { TITLE_GENERATION_SYSTEM_PROMPT } from './prompt';
  * The first model is the primary; subsequent entries are fallbacks
  * tried in order when the previous one fails or times out.
  */
-const TITLE_GENERATION_MODELS = [
+export const TITLE_GENERATION_MODELS = [
+  'default',
+  'deepseek-v4-flash',
+  'gpt-5.6-luna',
   'gemini-3.1-flash-lite',
-  'gpt-5.4-nano',
   'claude-haiku-4.5',
 ] as const;
 
@@ -53,10 +60,15 @@ const sanitizeTitle = (raw: string): string => {
 /**
  * Generate a short conversation title for the given message history.
  *
- * Walks `TITLE_GENERATION_MODELS` in order, timing each attempt out at
+ * Walks the model list in order, timing each attempt out at
  * {@link TITLE_GENERATION_TIMEOUT_MS}. Returns the first title that
  * meets the length/word-count floor; rethrows the last error if every
  * fallback fails.
+ *
+ * The model list is sourced from `hostModels.getUtilityModelIds` when
+ * the host exposes user-configured utility models. An empty or absent
+ * return falls back to the built-in {@link TITLE_GENERATION_MODELS}.
+ * Each model ID is validated via `hostModels.has()` before attempting.
  *
  * The `hostModels` argument is the core `HostModels.getWithOptions`
  * seam — hosts translate it into their native model provider. Unlike
@@ -67,6 +79,7 @@ export const generateSimpleTitle = async (
   messages: AgentMessage[],
   hostModels: HostModels,
   agentInstanceId: string,
+  fallbackModelId?: string,
 ): Promise<string> => {
   const messageList = messages
     .filter(
@@ -83,15 +96,63 @@ export const generateSimpleTitle = async (
 
   let lastError: Error | undefined;
 
-  for (const modelId of TITLE_GENERATION_MODELS) {
+  // Use user-configured utility models when available.
+  // - undefined: not configured → use built-in defaults
+  // - []: explicitly cleared → use main chat model as fallback
+  // - [...items]: user-configured list
+  const configuredEntries =
+    hostModels.getUtilityModelEntries?.('title-generation');
+  const configuredModels = hostModels.getUtilityModelIds?.('title-generation');
+
+  // Build a unified list of entries (with thinking overrides) from
+  // whichever method the host implements.
+  let entries: UtilityModelEntry[];
+  if (configuredEntries !== undefined) {
+    entries =
+      configuredEntries.length > 0
+        ? configuredEntries
+        : fallbackModelId
+          ? [{ modelId: fallbackModelId }]
+          : (TITLE_GENERATION_MODELS as readonly string[]).map((id) => ({
+              modelId: id,
+            }));
+  } else if (configuredModels !== undefined) {
+    entries =
+      configuredModels.length > 0
+        ? configuredModels.map((id) => ({ modelId: id }))
+        : fallbackModelId
+          ? [{ modelId: fallbackModelId }]
+          : (TITLE_GENERATION_MODELS as readonly string[]).map((id) => ({
+              modelId: id,
+            }));
+  } else {
+    entries = (TITLE_GENERATION_MODELS as readonly string[]).map((id) => ({
+      modelId: id,
+    }));
+  }
+
+  for (const entry of entries) {
+    const modelId = entry.modelId;
+    // Skip models that are no longer available (deleted provider, etc.)
+    // Pass `providerInstanceId` so discovered models (which only exist
+    // on a specific instance) are not falsely rejected.
+    if (!hostModels.has(modelId, entry.providerInstanceId)) continue;
     try {
+      const metadata: Record<string, unknown> = {
+        $ai_span_name: 'title-generation',
+        $ai_parent_id: agentInstanceId,
+      };
+      if (entry.providerInstanceId) {
+        metadata[PROVIDER_INSTANCE_ID_METADATA_KEY] = entry.providerInstanceId;
+      }
+      if (entry.thinkingOverride) {
+        metadata[UTILITY_THINKING_OVERRIDE_METADATA_KEY] =
+          entry.thinkingOverride;
+      }
       const modelWithOptions = await hostModels.getWithOptions(
         modelId,
         `${agentInstanceId}`,
-        {
-          $ai_span_name: 'title-generation',
-          $ai_parent_id: agentInstanceId,
-        },
+        metadata,
       );
 
       const abortController = new AbortController();
