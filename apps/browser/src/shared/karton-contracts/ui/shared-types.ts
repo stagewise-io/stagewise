@@ -872,6 +872,36 @@ export const DEFAULT_HISTORY_COMPRESSION_MODELS = [
   'claude-haiku-4.5',
 ] as const;
 
+/**
+ * Compile-time assertion that the browser defaults match the agent-core
+ * runtime constants. If either side adds/removes a model, the corresponding
+ * `TITLE_GENERATION_MODELS` or `HISTORY_COMPRESSION_MODELS` in
+ * `@stagewise/agent-core` must be updated as well.
+ *
+ * The tuple length is encoded as a numeric literal type; if the arrays
+ * diverge in length, the `extends` constraint fails at compile time.
+ */
+type _AssertTitleGenerationLength =
+  typeof DEFAULT_TITLE_GENERATION_MODELS extends readonly [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ]
+    ? true
+    : never;
+type _AssertHistoryCompressionLength =
+  typeof DEFAULT_HISTORY_COMPRESSION_MODELS extends readonly [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ]
+    ? true
+    : never;
+
 /** Entry-shaped defaults derived from the model ID lists above. */
 const DEFAULT_TITLE_GENERATION_ENTRIES = DEFAULT_TITLE_GENERATION_MODELS.map(
   (modelId) => ({ modelId }),

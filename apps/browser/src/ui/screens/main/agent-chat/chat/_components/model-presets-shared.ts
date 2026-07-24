@@ -22,19 +22,21 @@ export function resolveModelDisplay(
       instanceName: entry.instanceName,
     };
   }
-  // Fallback to catalog
-  const catalogModel = getAvailableModel(modelId);
-  if (catalogModel) {
-    return {
-      displayName: catalogModel.modelDisplayName,
-      instanceName: providerInstanceId ?? 'Unknown',
-    };
-  }
-  // Check aliases
+  // Check aliases FIRST — getAvailableModel() resolves aliases to their
+  // concrete target, so checking it first would make the alias branch
+  // unreachable for alias IDs like "default", "quick", "smart".
   const alias = availableModelAliases.find((a) => a.modelId === modelId);
   if (alias) {
     return {
       displayName: alias.modelDisplayName,
+      instanceName: providerInstanceId ?? 'Unknown',
+    };
+  }
+  // Fallback to catalog (resolves aliases to concrete targets)
+  const catalogModel = getAvailableModel(modelId);
+  if (catalogModel) {
+    return {
+      displayName: catalogModel.modelDisplayName,
       instanceName: providerInstanceId ?? 'Unknown',
     };
   }

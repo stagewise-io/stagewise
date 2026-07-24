@@ -183,6 +183,7 @@ export const generateSimpleCompressedHistory = async (
   hostModels: HostModels,
   agentInstanceId: string,
   fallbackModelId?: string,
+  fallbackProviderInstanceId?: string,
   host?: AgentHost,
 ): Promise<string> => {
   const compactConvertedChatHistory =
@@ -209,13 +210,22 @@ export const generateSimpleCompressedHistory = async (
 
   // Build a unified list of entries (with thinking overrides) from
   // whichever method the host implements.
+  const fallbackEntry: UtilityModelEntry | null = fallbackModelId
+    ? {
+        modelId: fallbackModelId,
+        ...(fallbackProviderInstanceId
+          ? { providerInstanceId: fallbackProviderInstanceId }
+          : {}),
+      }
+    : null;
+
   let entries: UtilityModelEntry[];
   if (configuredEntries !== undefined) {
     entries =
       configuredEntries.length > 0
         ? configuredEntries
-        : fallbackModelId
-          ? [{ modelId: fallbackModelId }]
+        : fallbackEntry
+          ? [fallbackEntry]
           : (HISTORY_COMPRESSION_MODELS as readonly string[]).map((id) => ({
               modelId: id,
             }));
@@ -223,8 +233,8 @@ export const generateSimpleCompressedHistory = async (
     entries =
       configuredModels.length > 0
         ? configuredModels.map((id) => ({ modelId: id }))
-        : fallbackModelId
-          ? [{ modelId: fallbackModelId }]
+        : fallbackEntry
+          ? [fallbackEntry]
           : (HISTORY_COMPRESSION_MODELS as readonly string[]).map((id) => ({
               modelId: id,
             }));
@@ -266,7 +276,7 @@ export const generateSimpleCompressedHistory = async (
     );
     try {
       return await tryCompressWithModel(
-        { modelId: fallbackModelId },
+        fallbackEntry ?? { modelId: fallbackModelId },
         hostModels,
         agentInstanceId,
         compactConvertedChatHistory,
