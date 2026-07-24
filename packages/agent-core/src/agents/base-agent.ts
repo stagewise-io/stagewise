@@ -28,10 +28,13 @@ import type { AgentStateMutations } from '../services/agent-manager/state-mutati
 import type { AgentHost } from '../host/host';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PRESET_THINKING_OVERRIDE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   type ModelWithOptions,
+  type UtilityModelEntry,
 } from '../host/models';
 import type { AgentCtor, AgentTypeRegistry } from './agents-registry';
+import { ModelFallbackManager } from './model-fallback-manager';
 
 type ProviderApiError = {
   message?: string;
@@ -624,6 +627,22 @@ export abstract class BaseAgent<
   } | null = null;
 
   /**
+   * Manages automatic failover to the next model in the active
+   * preset's fallback list when the primary model fails with an
+   * upstream-overload error (429, 502, 503, 529). The fallback
+   * persists for 5 minutes after the last message, then resets to
+   * the primary. Changing the preset resets the pointer to index 0.
+   */
+  private _fallbackManager = new ModelFallbackManager();
+
+  /**
+   * Set by `onError` when an upstream-overload error triggers a
+   * fallback retry. The tail of `runStep` checks this flag and
+   * re-invokes `runStep` to retry with the next fallback model.
+   */
+  private _pendingFallbackRetry = false;
+
+  /**
    * Tracks approval IDs for which we have already emitted a
    * `tool-approval-requested` telemetry event. The stream merge loop runs
    * per chunk, so the same `approval-requested` state is observed many
@@ -1145,6 +1164,7 @@ export abstract class BaseAgent<
         messages,
         this.host.models,
         this.instanceId,
+        this.state.get().activeModelId,
       );
     } catch (e) {
       const error = e as Error;
@@ -1589,6 +1609,7 @@ export abstract class BaseAgent<
     // Reset continuation flag at the start of every step so a leftover
     // value from a prior aborted step cannot leak into the tail.
     this._pendingContinue = null;
+    this._pendingFallbackRetry = false;
 
     // Tracks whether the just-finished step ended on an open tool-approval
     // request. Used by the idle tail to suppress the `done` notification
@@ -1617,22 +1638,61 @@ export abstract class BaseAgent<
     // so any later read from async callbacks (telemetry, onError) could
     // attribute the outcome to a model the user switched to mid-flight.
     const stepState = this.state.get();
-    const stepModelId = stepState.activeModelId;
-    const stepProviderInstanceId = stepState.activeProviderInstanceId;
+    let stepModelId = stepState.activeModelId;
+    let stepProviderInstanceId = stepState.activeProviderInstanceId;
+
+    // ── Active preset resolution + fallback ──────────────────────────
+    // When a preset is active, resolve the model from the *current* preset
+    // definition (stored in user preferences) rather than the stale
+    // `activeModelId` that was written into agent state at preset selection
+    // time. This ensures that editing a preset in settings takes effect on
+    // the very next agent turn.
+    //
+    // The fallback manager checks for preset changes (resets to primary),
+    // 5-min expiry (resets to primary), and touches the persistence timer
+    // on every call. If a fallback is active (index > 0), the corresponding
+    // model from the preset's list is used instead of the main model.
+    let presetThinkingOverride: UtilityModelEntry['thinkingOverride'];
+    const presetId = this.host.models.getActivePresetId?.();
+    const presetModels = this.host.models.getActivePresetModels?.();
+    const fallbackIndex = this._fallbackManager.resolveModelIndex(
+      presetId,
+      presetModels,
+    );
+    if (presetModels && presetModels.length > 0) {
+      const resolvedModel: UtilityModelEntry =
+        presetModels[fallbackIndex] ?? presetModels[0]!;
+      stepModelId = resolvedModel.modelId;
+      stepProviderInstanceId =
+        resolvedModel.providerInstanceId ?? stepProviderInstanceId;
+      presetThinkingOverride = resolvedModel.thinkingOverride;
+      // Sync agent state so the UI and persistence reflect the current
+      // preset model. This is idempotent — if the model hasn't changed,
+      // the state mutation is a no-op.
+      this.state.commands.setActiveModel({
+        modelId: stepModelId,
+        providerInstanceId: stepProviderInstanceId,
+      });
+    }
 
     // Get the current model — wrapped in try-catch so a deleted custom model
     // or endpoint doesn't wedge the agent with isWorking=true and no error.
     let modelWithOptions: ModelWithOptions;
     try {
+      const resolutionMetadata: Record<string, unknown> = {
+        $ai_span_name: `${this.agentType}-history`,
+        $ai_parent_id: this.instanceId,
+        [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
+        [PROVIDER_INSTANCE_ID_METADATA_KEY]: stepProviderInstanceId,
+      };
+      if (presetThinkingOverride) {
+        resolutionMetadata[PRESET_THINKING_OVERRIDE_METADATA_KEY] =
+          presetThinkingOverride;
+      }
       modelWithOptions = await this.host.models.getWithOptions(
         stepModelId,
         this.instanceId,
-        {
-          $ai_span_name: `${this.agentType}-history`,
-          $ai_parent_id: this.instanceId,
-          [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
-          [PROVIDER_INSTANCE_ID_METADATA_KEY]: stepProviderInstanceId,
-        },
+        resolutionMetadata,
       );
       this.applyStepProviderMetadataIfCurrent(modelWithOptions, stepGen);
       if (this._stepGeneration !== stepGen) return;
@@ -1866,6 +1926,33 @@ export abstract class BaseAgent<
             status_code: parsedOverload.statusCode,
           });
         }
+        // ── Main-model fallback ──────────────────────────────────────
+        // When an upstream-overload error occurs and the active preset
+        // has fallback models, advance the fallback pointer and schedule
+        // a retry instead of surfacing the error to the user.
+        if (parsedOverload?.kind === 'upstream-overload') {
+          const advanced = this._fallbackManager.advanceOnFailure(presetModels);
+          if (advanced) {
+            this.host.logger.info(
+              `[BaseAgent:${this.instanceId}] Upstream overload on model "${stepModelId}" — ` +
+                `falling back to preset model index ${this._fallbackManager.fallbackModelIndex}.`,
+            );
+            this.host.telemetry?.capture('model-fallback-triggered', {
+              agent_type: this.agentType,
+              failed_model_id: stepModelId,
+              fallback_model_index: this._fallbackManager.fallbackModelIndex,
+              provider_mode: this._stepProviderMode,
+            });
+            // Signal the tail of runStep to retry with the next model.
+            this._pendingFallbackRetry = true;
+            this._pendingContinue = null;
+            try {
+              this.stepAbortController?.abort();
+            } catch {}
+            this.stepAbortController = null;
+            return;
+          }
+        }
         this.state.commands.recordStepError({
           error: parsedPlanLimit ??
             parsedModelRestricted ??
@@ -1996,35 +2083,46 @@ export abstract class BaseAgent<
       // mismatch in case `internalStop` bumped the generation while we
       // were awaiting fs I/O above.
       if (this._stepGeneration === stepGen) {
-        const pending = this._pendingContinue;
-        this._pendingContinue = null;
-        if (pending === true) {
-          // setTimeout to keep the call stack clean (unbounded recursion).
+        // ── Fallback retry ──────────────────────────────────────────
+        // If `onError` triggered a model fallback, re-run the step
+        // with the next model in the preset's fallback list. This
+        // takes priority over the normal continuation decision.
+        if (this._pendingFallbackRetry) {
+          this._pendingFallbackRetry = false;
+          this._pendingContinue = null;
           setTimeout(() => void this.runStep(), 0);
-        } else if (pending === false) {
-          // Mark unread only if history contains at least one assistant
-          // message (covers fresh-session edge case).
-          const hasAssistantMessage = this.state
-            .get()
-            .history.some((m) => m.role === 'assistant');
-          this.state.commands.recordStepError({
-            error: undefined,
-            markUnread: 'if-assistant-history',
-          });
-          this.onIdle();
-          // Only notify "done" for a genuine turn completion: there must
-          // be an assistant message and the agent must not be paused on an
-          // open approval request (that's a `question`, emitted elsewhere).
-          if (hasAssistantMessage && !stepHasApprovalRequest) {
-            this.emitNotificationEvent('done');
+        } else {
+          const pending = this._pendingContinue;
+          this._pendingContinue = null;
+          if (pending === true) {
+            // setTimeout to keep the call stack clean (unbounded recursion).
+            setTimeout(() => void this.runStep(), 0);
+          } else if (pending === false) {
+            // Mark unread only if history contains at least one assistant
+            // message (covers fresh-session edge case).
+            const hasAssistantMessage = this.state
+              .get()
+              .history.some((m) => m.role === 'assistant');
+            this.state.commands.recordStepError({
+              error: undefined,
+              markUnread: 'if-assistant-history',
+            });
+            this.onIdle();
+            // Only notify "done" for a genuine turn completion: there must
+            // be an assistant message and the agent must not be paused on an
+            // open approval request (that's a `question`, emitted elsewhere).
+            if (hasAssistantMessage && !stepHasApprovalRequest) {
+              this.emitNotificationEvent('done');
+            }
           }
+          // pending === null → onFinish never set a decision (error path,
+          // aborted, or superseded step). Nothing to do; the onError /
+          // onAbort / catch handlers own state cleanup.
         }
-        // pending === null → onFinish never set a decision (error path,
-        // aborted, or superseded step). Nothing to do; the onError /
-        // onAbort / catch handlers own state cleanup.
       } else {
-        // Superseded — just clear the flag so nothing leaks.
+        // Superseded — just clear the flags so nothing leaks.
         this._pendingContinue = null;
+        this._pendingFallbackRetry = false;
       }
     } catch (err) {
       const raw = err;
@@ -2049,6 +2147,17 @@ export abstract class BaseAgent<
       // the next step or fire onIdle after an error here.
       this._pendingContinue = null;
       this._pendingSyntheticContinuation = null;
+      // If onError already triggered a fallback retry, honor it instead
+      // of surfacing the error.
+      if (this._pendingFallbackRetry) {
+        this._pendingFallbackRetry = false;
+        try {
+          this.stepAbortController?.abort();
+        } catch {}
+        this.stepAbortController = null;
+        setTimeout(() => void this.runStep(), 0);
+        return;
+      }
       try {
         this.stepAbortController?.abort();
       } catch {}
@@ -2948,6 +3057,7 @@ export abstract class BaseAgent<
     // recovery path sets a fresh one after calling internalStop().
     this._pendingContinue = null;
     this._pendingSyntheticContinuation = null;
+    this._pendingFallbackRetry = false;
     try {
       this.stepAbortController?.abort();
     } catch {}

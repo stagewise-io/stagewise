@@ -52,6 +52,7 @@ import {
   endpointSaveDataToInstanceArgs,
   type EndpointSaveData,
 } from './custom-providers-section';
+import { ModelPresetsSection } from './model-presets-section';
 import {
   useEffect,
   useState,
@@ -3481,6 +3482,9 @@ export function ModelsProvidersSection() {
               onDelete={(id) => void handleDeleteInstance(id)}
             />
           </section>
+
+          {/* Model Presets & Utility Models */}
+          <ModelPresetsSection />
         </div>
       </OverlayScrollbar>
     </div>

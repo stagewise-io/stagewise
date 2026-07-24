@@ -27,7 +27,10 @@ import type { streamText } from 'ai';
 import { wrapLanguageModel } from 'ai';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PRESET_THINKING_OVERRIDE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
+  UTILITY_THINKING_OVERRIDE_METADATA_KEY,
+  type UtilityModelThinkingOverride,
 } from '@stagewise/agent-core/host';
 import {
   findInstanceForVendor,
@@ -1098,6 +1101,42 @@ function resolveThinkingProviderOptions({
   customEndpointApiSpec,
   requestMetadata,
 }: ThinkingProviderOptionsInput): ProviderOptions {
+  // Utility model calls (title generation, context compression) pass a
+  // thinking override via metadata. When present, bypass the purpose
+  // gate — the override is explicit user configuration for this call.
+  const utilityThinkingOverride = requestMetadata?.[
+    UTILITY_THINKING_OVERRIDE_METADATA_KEY
+  ] as UtilityModelThinkingOverride | undefined;
+
+  if (utilityThinkingOverride) {
+    // Use the utility override as the thinking override, taking
+    // precedence over any catalog or instance-level override.
+    const route = {
+      providerMode,
+      modelProvider: semanticProvider,
+      thinkingProvider,
+      customEndpointApiSpec,
+    };
+    const patch = createThinkingProviderOptionsPatch({
+      model: modelSettings,
+      override: utilityThinkingOverride as ModelThinkingOverride,
+      route,
+    });
+    if (!patch) return baseProviderOptions as ProviderOptions;
+    return deepMergeProviderOptions(baseProviderOptions, patch);
+  }
+
+  // Preset thinking override: when an active preset is selected, the
+  // preset's per-model thinking configuration is passed via metadata.
+  // This takes precedence over the global `modelThinkingOverrides`
+  // lookup (the `override` parameter) so that editing a preset's
+  // thinking in settings immediately takes effect on the next turn.
+  const presetThinkingOverride = requestMetadata?.[
+    PRESET_THINKING_OVERRIDE_METADATA_KEY
+  ] as ModelThinkingOverride | undefined;
+
+  const effectiveOverride = presetThinkingOverride ?? override;
+
   if (requestMetadata?.[MODEL_REQUEST_PURPOSE_METADATA_KEY] !== 'agent-step') {
     return baseProviderOptions as ProviderOptions;
   }
@@ -1113,7 +1152,7 @@ function resolveThinkingProviderOptions({
     customEndpointApiSpec,
   };
 
-  if (!override) {
+  if (!effectiveOverride) {
     // Catalog definitions own their curated default provider options. Preserve
     // them when they cover the active transport; otherwise add only the
     // missing transport-specific default (e.g. Claude via OpenAI-compatible).
@@ -1149,7 +1188,7 @@ function resolveThinkingProviderOptions({
 
   const patch = createThinkingProviderOptionsPatch({
     model: modelSettings,
-    override,
+    override: effectiveOverride,
     route,
   });
 
@@ -1166,6 +1205,8 @@ function omitModelRequestMetadata(
   const {
     [MODEL_REQUEST_PURPOSE_METADATA_KEY]: _purpose,
     [PROVIDER_INSTANCE_ID_METADATA_KEY]: _providerInstanceId,
+    [UTILITY_THINKING_OVERRIDE_METADATA_KEY]: _utilityThinkingOverride,
+    [PRESET_THINKING_OVERRIDE_METADATA_KEY]: _presetThinkingOverride,
     ...telemetry
   } = metadata;
   return telemetry;
