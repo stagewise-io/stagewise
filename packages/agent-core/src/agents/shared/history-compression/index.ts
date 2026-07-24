@@ -1,7 +1,10 @@
 import { generateText, type UITools } from 'ai';
 import type { AgentMessage } from '../../../types/agent';
 import type { AgentHost } from '../../../host/host';
-import type { HostModels } from '../../../host/models';
+import {
+  PROVIDER_INSTANCE_ID_METADATA_KEY,
+  type HostModels,
+} from '../../../host/models';
 
 /**
  * Wide AgentMessage type accepting any tool set and any metadata shape.
@@ -84,6 +87,7 @@ const tryCompressWithModel = async (
   agentInstanceId: string,
   compactHistory: string,
   previousBriefingChars: number,
+  providerInstanceId?: string,
 ): Promise<string> => {
   const modelWithOptions = await hostModels.getWithOptions(
     modelId,
@@ -91,6 +95,7 @@ const tryCompressWithModel = async (
     {
       $ai_span_name: 'history-compression',
       $ai_parent_id: `${agentInstanceId}`,
+      [PROVIDER_INSTANCE_ID_METADATA_KEY]: providerInstanceId,
     },
   );
 
@@ -170,6 +175,7 @@ export const generateSimpleCompressedHistory = async (
   agentInstanceId: string,
   fallbackModelId?: string,
   host?: AgentHost,
+  fallbackProviderInstanceId?: string,
 ): Promise<string> => {
   const compactConvertedChatHistory =
     convertAgentMessagesToCompactMessageHistoryString(messages, host);
@@ -200,10 +206,15 @@ export const generateSimpleCompressedHistory = async (
     }
   }
 
-  // Last resort: try the active chat model if it wasn't already attempted.
+  // Last resort: try the active chat model if the same resolution scope was
+  // not already attempted. An instance-scoped model with the same ID as a
+  // preferred model is distinct from the earlier unscoped lookup.
   if (
     fallbackModelId &&
-    !(HISTORY_COMPRESSION_MODELS as readonly string[]).includes(fallbackModelId)
+    (fallbackProviderInstanceId !== undefined ||
+      !(HISTORY_COMPRESSION_MODELS as readonly string[]).includes(
+        fallbackModelId,
+      ))
   ) {
     console.warn(
       `History compression: all preferred models failed, falling back to active model: ${fallbackModelId}`,
@@ -215,6 +226,7 @@ export const generateSimpleCompressedHistory = async (
         agentInstanceId,
         compactConvertedChatHistory,
         previousBriefingChars,
+        fallbackProviderInstanceId,
       );
     } catch (e) {
       lastError = e as Error;
