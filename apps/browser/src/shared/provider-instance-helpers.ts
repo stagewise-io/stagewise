@@ -965,3 +965,30 @@ export function getInstanceModelCount(
 
   return count;
 }
+
+// ===========================================================================
+// Model Validity Checking (for utility models & presets)
+// ===========================================================================
+
+/**
+ * Check whether a `(modelId, providerInstanceId?)` pair is currently
+ * selectable — i.e. the provider instance exists and the model is not
+ * disabled. Used by the settings UI to mark invalid entries in utility
+ * model lists and presets.
+ *
+ * When `providerInstanceId` is omitted, checks whether the model is
+ * selectable on *any* instance.
+ */
+export function isModelEntryValid(
+  prefs: Pick<UserPreferences, 'providerInstances' | 'customModels'>,
+  modelId: string,
+  providerInstanceId?: string,
+): boolean {
+  const entries = getSelectableModelEntries(prefs);
+  if (providerInstanceId) {
+    return entries.some(
+      (e) => e.instanceId === providerInstanceId && e.modelId === modelId,
+    );
+  }
+  return entries.some((e) => e.modelId === modelId);
+}

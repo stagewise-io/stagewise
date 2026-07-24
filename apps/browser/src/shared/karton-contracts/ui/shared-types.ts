@@ -630,6 +630,29 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * A model entry within a preset — used for both the main model and
+ * fallback models. Each entry carries its own optional thinking override
+ * so the user can configure thinking per-model.
+ */
+export const presetModelEntrySchema = z.object({
+  modelId: z.string(),
+  providerInstanceId: z.string().optional(),
+  thinkingOverride: modelThinkingOverrideSchema.optional(),
+});
+export type PresetModelEntry = z.infer<typeof presetModelEntrySchema>;
+
+/**
+ * A model entry in a utility model list (title generation, context
+ * compression). Same shape as {@link PresetModelEntry} but accepts
+ * legacy `string` values for backward compatibility — plain strings
+ * are transformed into `{ modelId: string }`.
+ */
+export const utilityModelEntrySchema = z
+  .union([z.string(), presetModelEntrySchema])
+  .transform((val) => (typeof val === 'string' ? { modelId: val } : val));
+export type UtilityModelEntry = z.infer<typeof utilityModelEntrySchema>;
+
+/**
  * GLOBAL CONFIG CAPABILITIES
  */
 
@@ -821,6 +844,41 @@ const sidebarPreferencesSchema = z
   .default(defaultSidebarPreferences)
   .catch(defaultSidebarPreferences);
 
+/**
+ * Built-in default model IDs for background utility tasks.
+ *
+ * These mirror the constants in `@stagewise/agent-core` but live in the
+ * browser shared layer so the UI and schema defaults can reference them
+ * without importing agent-core (which transitively pulls Node-only
+ * modules like `chokidar` into the renderer process).
+ *
+ * Keep these in sync with:
+ *   packages/agent-core/src/agents/shared/title-generation/index.ts
+ *   packages/agent-core/src/agents/shared/history-compression/index.ts
+ */
+export const DEFAULT_TITLE_GENERATION_MODELS = [
+  'default',
+  'deepseek-v4-flash',
+  'gpt-5.6-luna',
+  'gemini-3.1-flash-lite',
+  'claude-haiku-4.5',
+] as const;
+
+export const DEFAULT_HISTORY_COMPRESSION_MODELS = [
+  'default',
+  'deepseek-v4-flash',
+  'gpt-5.6-luna',
+  'gemini-3.1-flash-lite',
+  'claude-haiku-4.5',
+] as const;
+
+/** Entry-shaped defaults derived from the model ID lists above. */
+const DEFAULT_TITLE_GENERATION_ENTRIES = DEFAULT_TITLE_GENERATION_MODELS.map(
+  (modelId) => ({ modelId }),
+);
+const DEFAULT_HISTORY_COMPRESSION_ENTRIES =
+  DEFAULT_HISTORY_COMPRESSION_MODELS.map((modelId) => ({ modelId }));
+
 export const userPreferencesSchema = z.object({
   privacy: z
     .object({
@@ -962,6 +1020,106 @@ export const userPreferencesSchema = z.object({
        * from any global skill directory.
        */
       disabledGlobalSkills: z.array(z.string()).default([]),
+      /**
+       * User-configured fallback chains for background utility tasks.
+       * Each array is an ordered list of model entries; the agent tries
+       * each in order until one succeeds. An empty array falls back
+       * to the main chat model.
+       *
+       * Defaults are populated from {@link DEFAULT_TITLE_GENERATION_MODELS}
+       * and {@link DEFAULT_HISTORY_COMPRESSION_MODELS} so new users
+       * start with sensible built-in fallbacks without the UI needing
+       * a separate constant file.
+       *
+       * Models that belong to deleted providers or have been disabled
+       * are retained in the array (marked invalid by the UI) rather
+       * than silently removed.
+       */
+      utilityModels: z
+        .object({
+          titleGeneration: z
+            .array(utilityModelEntrySchema)
+            .default(DEFAULT_TITLE_GENERATION_ENTRIES),
+          contextCompression: z
+            .array(utilityModelEntrySchema)
+            .default(DEFAULT_HISTORY_COMPRESSION_ENTRIES),
+        })
+        .default({
+          titleGeneration: DEFAULT_TITLE_GENERATION_ENTRIES,
+          contextCompression: DEFAULT_HISTORY_COMPRESSION_ENTRIES,
+        }),
+      /**
+       * ID of the currently active preset. When set, the preset's
+       * per-preset utility model lists (titleGeneration /
+       * contextCompression) override the global defaults.
+       */
+      activePresetId: z.string().nullable().optional(),
+      /**
+       * Named model configurations surfaced at the top of the model
+       * selection dropdown for one-click switching. Each preset
+       * bundles a main chat model, optional thinking override, and
+       * a list of fallback models.
+       */
+      modelPresets: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              name: z.string().min(1),
+              // New unified models list (first = main, rest = fallbacks)
+              models: z.array(presetModelEntrySchema).optional(),
+              // Per-preset utility model lists (override global defaults)
+              titleGeneration: z.array(utilityModelEntrySchema).optional(),
+              contextCompression: z.array(utilityModelEntrySchema).optional(),
+              // Legacy fields (for migration from old schema)
+              modelId: z.string().optional(),
+              providerInstanceId: z.string().optional(),
+              thinkingOverride: modelThinkingOverrideSchema.optional(),
+              fallbackModels: z
+                .array(
+                  z.object({
+                    modelId: z.string(),
+                    providerInstanceId: z.string().optional(),
+                  }),
+                )
+                .optional(),
+            })
+            .transform((val) => {
+              if (val.models && val.models.length > 0) {
+                return {
+                  id: val.id,
+                  name: val.name,
+                  models: val.models,
+                  titleGeneration: val.titleGeneration,
+                  contextCompression: val.contextCompression,
+                };
+              }
+              // Migrate from legacy format
+              const models: PresetModelEntry[] = [
+                ...(val.modelId
+                  ? [
+                      {
+                        modelId: val.modelId,
+                        providerInstanceId: val.providerInstanceId,
+                        thinkingOverride: val.thinkingOverride,
+                      },
+                    ]
+                  : []),
+                ...(val.fallbackModels ?? []).map((f) => ({
+                  modelId: f.modelId,
+                  providerInstanceId: f.providerInstanceId,
+                })),
+              ];
+              return {
+                id: val.id,
+                name: val.name,
+                models: models.length > 0 ? models : [{ modelId: 'default' }],
+                titleGeneration: val.titleGeneration,
+                contextCompression: val.contextCompression,
+              };
+            }),
+        )
+        .default([]),
     })
     .default({
       workspaceSettings: {},
@@ -971,6 +1129,12 @@ export const userPreferencesSchema = z.object({
       modelThinkingOverrides: {},
       enabledGlobalSkillDirs: [],
       disabledGlobalSkills: [],
+      utilityModels: {
+        titleGeneration: DEFAULT_TITLE_GENERATION_ENTRIES,
+        contextCompression: DEFAULT_HISTORY_COMPRESSION_ENTRIES,
+      },
+      activePresetId: undefined,
+      modelPresets: [],
     }),
   /** LLM provider endpoint configurations (API keys, custom URLs) */
   providerConfigs: providerConfigsSchema.default({
@@ -1084,6 +1248,12 @@ export const defaultUserPreferences: UserPreferences = {
     modelThinkingOverrides: {},
     enabledGlobalSkillDirs: [],
     disabledGlobalSkills: [],
+    utilityModels: {
+      titleGeneration: DEFAULT_TITLE_GENERATION_ENTRIES,
+      contextCompression: DEFAULT_HISTORY_COMPRESSION_ENTRIES,
+    },
+    activePresetId: undefined,
+    modelPresets: [],
   },
   providerConfigs: {
     anthropic: { mode: 'stagewise' },

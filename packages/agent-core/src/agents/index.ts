@@ -47,9 +47,13 @@ export {
   type ProviderOptions,
 } from './shared/provider-options';
 export { MessageCacheAnalyzer } from './shared/message-cache-analyzer';
-export { generateSimpleTitle } from './shared/title-generation';
+export {
+  generateSimpleTitle,
+  TITLE_GENERATION_MODELS,
+} from './shared/title-generation';
 export {
   generateSimpleCompressedHistory,
+  HISTORY_COMPRESSION_MODELS,
   convertAgentMessagesToCompactMessageHistoryString,
   estimateMessageTokens,
   COMPRESSION_SYSTEM_PROMPT,

@@ -45,6 +45,7 @@ export { IconFloppyDiskOutline18 } from './IconFloppyDiskOutline18';
 export { IconFolder5Outline18 } from './IconFolder5Outline18';
 export { IconFolderCloudOutline18 } from './IconFolderCloudOutline18';
 export { IconFolderOpenOutline18 } from './IconFolderOpenOutline18';
+export { IconGripDotsVerticalOutline18 } from './IconGripDotsVerticalOutline18';
 export { IconFolderOutline18 } from './IconFolderOutline18';
 export { IconFolderPenOutline18 } from './IconFolderPenOutline18';
 export { IconFolderPlusOutline18 } from './IconFolderPlusOutline18';
