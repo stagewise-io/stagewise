@@ -407,6 +407,7 @@ function getGoogleOptions(modelId: string): ThinkingOption[] {
 
 function getAnthropicOptions(modelId: string): ThinkingOption[] {
   if (
+    modelId.startsWith('claude-opus-5') ||
     modelId.startsWith('claude-fable-5') ||
     modelId.startsWith('claude-mythos-5') ||
     modelId.startsWith('claude-mythos-preview') ||
