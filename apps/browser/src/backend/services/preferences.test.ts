@@ -479,6 +479,12 @@ describe('PreferencesService legacy provider migration', () => {
 
     expect(instances).toContainEqual(
       expect.objectContaining({
+        id: 'stagewise-default',
+        disabledModelIds: [],
+      }),
+    );
+    expect(instances).toContainEqual(
+      expect.objectContaining({
         id: 'openai-api-default',
         typeId: 'openai-api',
         config: expect.objectContaining({ encryptedApiKey: 'openai-key' }),

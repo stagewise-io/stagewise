@@ -28,8 +28,8 @@ import { availableModels } from './available-models';
 
 const OPENROUTER_FLAGSHIP_MODELS = new Set<string>([
   // Anthropic
+  'anthropic/claude-opus-5',
   'anthropic/claude-sonnet-5',
-  'anthropic/claude-opus-4.8',
   'anthropic/claude-fable-5',
   'anthropic/claude-opus-4.7',
   // OpenAI
