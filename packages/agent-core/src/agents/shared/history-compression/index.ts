@@ -244,14 +244,19 @@ export const generateSimpleCompressedHistory = async (
     }));
   }
 
-  const attemptedModelIds = new Set<string>();
+  const attemptedKeys = new Set<string>();
 
   for (const entry of entries) {
     // Skip models that are no longer available (deleted provider, etc.)
     // Pass `providerInstanceId` so discovered models (which only exist
     // on a specific instance) are not falsely rejected.
     if (!hostModels.has(entry.modelId, entry.providerInstanceId)) continue;
-    attemptedModelIds.add(entry.modelId);
+    // Deduplicate by (modelId, providerInstanceId) so the active
+    // fallback remains available even if a failed entry shared the
+    // same model ID on a different instance.
+    const key = `${entry.modelId}::${entry.providerInstanceId ?? ''}`;
+    if (attemptedKeys.has(key)) continue;
+    attemptedKeys.add(key);
     try {
       return await tryCompressWithModel(
         entry,
@@ -270,7 +275,8 @@ export const generateSimpleCompressedHistory = async (
   }
 
   // Last resort: try the active chat model if it wasn't already attempted.
-  if (fallbackModelId && !attemptedModelIds.has(fallbackModelId)) {
+  const fallbackKey = `${fallbackModelId}::${fallbackProviderInstanceId ?? ''}`;
+  if (fallbackModelId && !attemptedKeys.has(fallbackKey)) {
     console.warn(
       `History compression: all preferred models failed, falling back to active model: ${fallbackModelId}`,
     );

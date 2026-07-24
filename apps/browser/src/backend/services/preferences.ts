@@ -946,14 +946,27 @@ export class PreferencesService extends DisposableService {
    * `modelPresets` and would otherwise pay the cost of a full
    * `structuredClone` on every agent turn.
    */
-  public getAgentSnapshot(): UserPreferences['agent'] {
+  public getAgentSnapshot(): Pick<
+    UserPreferences['agent'],
+    'utilityModels' | 'activePresetId' | 'modelPresets'
+  > {
     this.assertNotDisposed();
     const agent = this.preferences.agent;
+    const modelPresets = agent.modelPresets ?? [];
+    // Validate activePresetId — if the referenced preset was deleted
+    // through a code path that didn't clear the ID, treat it as unset
+    // so resolveUtilityEntries falls through to global lists rather
+    // than silently using global chains when the user expected the
+    // preset's main model.
+    const activePresetId =
+      agent.activePresetId &&
+      modelPresets.some((p) => p.id === agent.activePresetId)
+        ? agent.activePresetId
+        : undefined;
     return {
-      ...agent,
       utilityModels: agent.utilityModels,
-      activePresetId: agent.activePresetId,
-      modelPresets: agent.modelPresets ?? [],
+      activePresetId,
+      modelPresets,
     };
   }
 

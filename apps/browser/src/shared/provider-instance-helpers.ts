@@ -843,8 +843,10 @@ export function findModelSelectorEntry(
   prefs: Pick<UserPreferences, 'providerInstances' | 'customModels'>,
   instanceId: string,
   modelId: string,
+  options?: { includeDisabled?: boolean },
 ): ModelSelectorEntry | undefined {
-  const entries = getSelectableModelEntries(prefs, { includeDisabled: true });
+  const includeDisabled = options?.includeDisabled ?? true;
+  const entries = getSelectableModelEntries(prefs, { includeDisabled });
   const exactEntry = entries.find(
     (entry) => entry.instanceId === instanceId && entry.modelId === modelId,
   );
@@ -989,8 +991,12 @@ export function isModelEntryValid(
     // the same catalog normalization (e.g. Anthropic dotted→hyphenated ID
     // mapping) as the selector, so valid native model IDs are not falsely
     // rejected by the raw equality check in getSelectableModelEntries.
+    // Pass includeDisabled: false so disabled models are correctly marked
+    // invalid in the settings UI.
     return (
-      findModelSelectorEntry(prefs, providerInstanceId, modelId) !== undefined
+      findModelSelectorEntry(prefs, providerInstanceId, modelId, {
+        includeDisabled: false,
+      }) !== undefined
     );
   }
   // No instance specified — check if the model is selectable on any instance.

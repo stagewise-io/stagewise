@@ -183,11 +183,14 @@ export const generateSimpleTitle = async (
         // When a thinking override is configured for this entry, respect it.
         // Otherwise, force-disable thinking to minimise token usage for
         // this lightweight task.
-        const providerOptions = entry.thinkingOverride
-          ? modelWithOptions.providerOptions
-          : deepMergeProviderOptions(modelWithOptions.providerOptions, {
-              anthropic: { thinking: { type: 'disabled' } },
-            });
+        // Check `.enabled !== undefined` rather than truthiness so malformed
+        // or legacy overrides normalised to `{}` don't bypass the disable.
+        const providerOptions =
+          entry.thinkingOverride?.enabled !== undefined
+            ? modelWithOptions.providerOptions
+            : deepMergeProviderOptions(modelWithOptions.providerOptions, {
+                anthropic: { thinking: { type: 'disabled' } },
+              });
 
         const title = await generateText({
           model: modelWithOptions.model,
