@@ -48,6 +48,7 @@ const codingPlanIdSchema = z.enum([
   'glm-coding-plan',
   'kimi-plan',
   'qwen-plan',
+  'qwen-token-plan',
   'minimax-plan',
   'mimo-plan',
 ]);

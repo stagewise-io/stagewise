@@ -1284,7 +1284,7 @@ describe('official provider endpoint resolution', () => {
         },
         enabledModelIds: [],
         disabledModelIds: [],
-        discoveredModels: [],
+        discoveredModels: [{ modelId: 'glm-5.2', displayName: 'GLM 5.2' }],
       },
     ];
 
@@ -1301,7 +1301,85 @@ describe('official provider endpoint resolution', () => {
     );
   });
 
-  it('prefers an explicit coding-plan instance URL over the plan endpoint', () => {
+  it('keeps coexisting Qwen plans scoped to their selected endpoints', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'qwen-coding',
+        typeId: 'coding-plan',
+        name: 'Qwen Coding Plan',
+        config: { encryptedApiKey: 'coding-key', planId: 'qwen-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          { modelId: 'qwen3.7-plus', displayName: 'Qwen 3.7 Plus' },
+        ],
+      },
+      {
+        id: 'qwen-token',
+        typeId: 'coding-plan',
+        name: 'Qwen Token Plan',
+        config: { encryptedApiKey: 'token-key', planId: 'qwen-token-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          { modelId: 'qwen3.7-plus', displayName: 'Qwen 3.7 Plus' },
+        ],
+      },
+    ];
+
+    const coding = service.getModelWithOptions(
+      'qwen3.7-plus',
+      'trace-coding',
+      undefined,
+      'qwen-coding',
+    );
+    const token = service.getModelWithOptions(
+      'qwen3.7-plus',
+      'trace-token',
+      undefined,
+      'qwen-token',
+    );
+
+    expect(getModelRequestUrl(coding)).toBe(
+      'https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions',
+    );
+    expect(getModelRequestUrl(token)).toBe(
+      'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions',
+    );
+  });
+
+  it('fails legacy routing when multiple vendor plans are ambiguous', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'qwen-coding',
+        typeId: 'coding-plan',
+        name: 'Qwen Coding Plan',
+        config: { encryptedApiKey: 'coding-key', planId: 'qwen-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'qwen-token',
+        typeId: 'coding-plan',
+        name: 'Qwen Token Plan',
+        config: { encryptedApiKey: 'token-key', planId: 'qwen-token-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    expect(() => service.getModelWithOptions('qwen3-32b', 'trace-1')).toThrow(
+      'Multiple coding plans are configured for alibaba; select a provider instance explicitly',
+    );
+  });
+
+  it('prefers and normalizes an explicit coding-plan instance URL', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
     preferences.providerInstances = [
@@ -1312,11 +1390,11 @@ describe('official provider endpoint resolution', () => {
         config: {
           encryptedApiKey: 'selected-plan-key',
           planId: 'glm-coding-plan',
-          baseUrl: 'https://override.example.com/v4',
+          baseUrl: ' https://override.example.com/v4/ ',
         },
         enabledModelIds: [],
         disabledModelIds: [],
-        discoveredModels: [],
+        discoveredModels: [{ modelId: 'glm-5.2', displayName: 'GLM 5.2' }],
       },
     ];
 
@@ -1330,6 +1408,35 @@ describe('official provider endpoint resolution', () => {
     expect(getModelRequestUrl(result)).toBe(
       'https://override.example.com/v4/chat/completions',
     );
+  });
+
+  it('rejects invalid explicit coding-plan instance URLs at runtime', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'coding-plan-selected',
+        typeId: 'coding-plan',
+        name: 'Selected GLM Coding Plan',
+        config: {
+          encryptedApiKey: 'selected-plan-key',
+          planId: 'glm-coding-plan',
+          baseUrl: 'http://override.example.com/v4',
+        },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [{ modelId: 'glm-5.2', displayName: 'GLM 5.2' }],
+      },
+    ];
+
+    expect(() =>
+      service.getModelWithOptions(
+        'glm-5.2',
+        'trace-1',
+        undefined,
+        'coding-plan-selected',
+      ),
+    ).toThrow('The API endpoint must use HTTPS.');
   });
 
   it('keeps normal official Z.ai requests on the general endpoint', () => {

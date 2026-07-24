@@ -26,7 +26,12 @@ import type {
   ProviderInstanceTypeId,
 } from '@shared/karton-contracts/ui/shared-types';
 import { getTypeDisplayInfo } from '@shared/provider-instance-helpers';
-import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
+import {
+  CODING_PLANS,
+  validateCodingPlanBaseUrl,
+  type CodingPlan,
+  type CodingPlanId,
+} from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
@@ -51,6 +56,7 @@ export type ProviderEntry = {
   /** Extra endpoint routing info shown below the help text. */
   endpointHelpText?: string;
   defaultBaseUrl?: string;
+  configurableEndpoint?: CodingPlan['configurableEndpoint'];
 };
 
 /** All vendor API types shown in the unified provider list. */
@@ -112,6 +118,8 @@ function buildUnifiedEntries(): ProviderEntry[] {
       planId: plan.id,
       disclaimer: plan.disclaimer,
       endpointHelpText: plan.endpointHelpText,
+      defaultBaseUrl: plan.baseUrl,
+      configurableEndpoint: plan.configurableEndpoint,
     });
   }
 
@@ -402,11 +410,21 @@ export function ConnectionDetailView({
   const [apiKey, setApiKey] = useState(
     entry.kind === 'self-hosted' ? (entry.defaultBaseUrl ?? '') : '',
   );
+  const [endpoint, setEndpoint] = useState(
+    entry.configurableEndpoint ? (entry.defaultBaseUrl ?? '') : '',
+  );
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleConnect = useCallback(async () => {
     if (!apiKey.trim()) return;
+    const endpointResult = entry.configurableEndpoint
+      ? validateCodingPlanBaseUrl(endpoint)
+      : undefined;
+    if (endpointResult && !endpointResult.success) {
+      setError(endpointResult.error);
+      return;
+    }
     setIsConnecting(true);
     setError(null);
     const attemptNumber = getNextAttemptNumber(entry);
@@ -462,7 +480,12 @@ export function ConnectionDetailView({
         const plan = CODING_PLANS[entry.planId];
         const result = await addProviderInstance({
           typeId: 'coding-plan',
-          config: { planId: plan.id, baseUrl: plan.baseUrl },
+          config: {
+            planId: plan.id,
+            baseUrl: endpointResult?.success
+              ? endpointResult.baseUrl
+              : plan.baseUrl,
+          },
           validateApiKey: apiKey.trim(),
         });
         if (!result.success) {
@@ -505,6 +528,7 @@ export function ConnectionDetailView({
     }
   }, [
     apiKey,
+    endpoint,
     entry,
     addProviderInstance,
     getNextAttemptNumber,
@@ -533,6 +557,30 @@ export function ConnectionDetailView({
             )}
           </div>
         </div>
+
+        {entry.configurableEndpoint && (
+          <div className="space-y-1">
+            <p className="font-medium text-muted-foreground text-xs">
+              {entry.configurableEndpoint.label}
+            </p>
+            <Input
+              type="url"
+              placeholder={entry.configurableEndpoint.placeholder}
+              value={endpoint}
+              onValueChange={(value) => {
+                setEndpoint(value);
+                setError(null);
+              }}
+              disabled={isConnecting}
+              aria-invalid={error ? true : undefined}
+              size="sm"
+              style={{ maxWidth: 'none' }}
+            />
+            <p className="text-subtle-foreground text-xs">
+              {entry.configurableEndpoint.helpText}
+            </p>
+          </div>
+        )}
 
         <Input
           autoFocus
@@ -605,7 +653,11 @@ export function ConnectionDetailView({
         <Button
           variant="primary"
           size="sm"
-          disabled={!apiKey.trim() || isConnecting}
+          disabled={
+            !apiKey.trim() ||
+            isConnecting ||
+            (!!entry.configurableEndpoint && !endpoint.trim())
+          }
           onClick={() => void handleConnect()}
         >
           {isConnecting ? 'Connecting...' : 'Connect'}

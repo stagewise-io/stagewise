@@ -20,7 +20,7 @@ import {
   getAvailableModel,
   getModelAlias,
 } from '@shared/available-models';
-import { CODING_PLANS } from '@shared/coding-plans';
+import { CODING_PLANS, resolveCodingPlanBaseUrl } from '@shared/coding-plans';
 import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
 import type { streamText } from 'ai';
@@ -177,20 +177,20 @@ export class ModelProviderService {
     type: ProviderType,
   ): string | undefined {
     const config = instance.config as Record<string, unknown>;
-    const baseUrl =
-      typeof config.baseUrl === 'string' ? config.baseUrl.trim() : undefined;
-    if (baseUrl) return baseUrl;
-
     if (instance.typeId === 'coding-plan') {
       const planConfig = config as CodingPlanConfig;
       const plan = CODING_PLANS[planConfig.planId as keyof typeof CODING_PLANS];
       return (
-        plan?.baseUrl ??
+        (plan
+          ? resolveCodingPlanBaseUrl(plan, planConfig.baseUrl)
+          : undefined) ??
         getProviderTypeByVendor(getCodingPlanVendor(planConfig)).defaultBaseUrl
       );
     }
 
-    return type.defaultBaseUrl;
+    const baseUrl =
+      typeof config.baseUrl === 'string' ? config.baseUrl.trim() : undefined;
+    return baseUrl || type.defaultBaseUrl;
   }
 
   // ===========================================================================
@@ -215,6 +215,19 @@ export class ModelProviderService {
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
     const instance = findInstanceForVendor(prefs, provider);
+    if (!instance) {
+      const matchingPlanCount = prefs.providerInstances.filter((candidate) => {
+        if (candidate.typeId !== 'coding-plan') return false;
+        const plan =
+          CODING_PLANS[candidate.config.planId as keyof typeof CODING_PLANS];
+        return plan?.provider === provider;
+      }).length;
+      if (matchingPlanCount > 1) {
+        throw new Error(
+          `Multiple coding plans are configured for ${provider}; select a provider instance explicitly`,
+        );
+      }
+    }
     if (!instance || instance.typeId === 'stagewise') {
       return {
         instance: undefined,

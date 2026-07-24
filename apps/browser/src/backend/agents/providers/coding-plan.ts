@@ -8,6 +8,7 @@ import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-t
 import {
   CODING_PLANS,
   isCodingPlanId,
+  resolveCodingPlanBaseUrl,
   type CodingPlanId,
 } from '@shared/coding-plans';
 import type { ProviderType } from './types';
@@ -28,6 +29,24 @@ export function getCodingPlanVendor(config: CodingPlanConfig): ModelProvider {
     throw new Error(`Unknown coding plan ID: ${config.planId}`);
   }
   return plan.provider;
+}
+
+async function discoverCodingPlanModels(
+  config: CodingPlanConfig,
+  decryptedConfig: Record<string, string>,
+): Promise<DiscoveredModel[]> {
+  const plan = CODING_PLANS[config.planId as CodingPlanId];
+  const vendor = getCodingPlanVendor(config);
+  const apiType = OFFICIAL_API_TYPES[vendor];
+  if (!apiType.getInitialModels) return [];
+
+  return apiType.getInitialModels(
+    {
+      ...config,
+      baseUrl: resolveCodingPlanBaseUrl(plan, config.baseUrl),
+    } as never,
+    decryptedConfig,
+  );
 }
 
 export const codingPlanProviderType: ProviderType<CodingPlanConfig> = {
@@ -64,7 +83,7 @@ export const codingPlanProviderType: ProviderType<CodingPlanConfig> = {
     const { validateCodingPlanApiKey } = await import(
       '../../utils/validate-api-keys'
     );
-    const result = await validateCodingPlanApiKey(plan, apiKey);
+    const result = await validateCodingPlanApiKey(plan, apiKey, config.baseUrl);
     if (!result) {
       return { success: false, error: 'Validation was skipped' };
     }
@@ -75,18 +94,24 @@ export const codingPlanProviderType: ProviderType<CodingPlanConfig> = {
     config: CodingPlanConfig,
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]> {
-    const vendor = getCodingPlanVendor(config);
-    const apiType = OFFICIAL_API_TYPES[vendor];
-    if (!apiType.getInitialModels) return [];
-    // Use the plan's dedicated base URL if set, otherwise fall through
-    // to the vendor type's defaultBaseUrl.
-    const planConfig: CodingPlanConfig = {
-      ...config,
-      baseUrl:
-        config.baseUrl ?? CODING_PLANS[config.planId as CodingPlanId]?.baseUrl,
-    };
-    return apiType.getInitialModels(planConfig as never, decryptedConfig);
+    const plan = CODING_PLANS[config.planId as CodingPlanId];
+    try {
+      return await discoverCodingPlanModels(config, decryptedConfig);
+    } catch (error) {
+      // Some coding plans document their models but restrict `/models`.
+      // Initial setup may use that documented fallback, while explicit refresh
+      // remains strict so endpoint changes cannot hide connectivity failures.
+      if (plan.fallbackModelIds) {
+        return plan.fallbackModelIds.map((modelId) => ({
+          modelId,
+          displayName: modelId,
+        }));
+      }
+      throw error;
+    }
   },
+
+  refreshModels: discoverCodingPlanModels,
 
   createLanguageModel({
     modelId,

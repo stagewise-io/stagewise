@@ -224,7 +224,11 @@ export function findInstanceForVendor(
     );
   }
 
-  return findVendorApiInstance(instances, vendor);
+  return findVendorApiInstance(
+    instances,
+    vendor,
+    legacyConfig?.connectedCodingPlanId,
+  );
 }
 
 /**
@@ -234,13 +238,24 @@ export function findInstanceForVendor(
 function findVendorApiInstance(
   instances: ProviderInstance[],
   vendor: ModelProvider,
+  connectedCodingPlanId?: CodingPlanId,
 ): ProviderInstance | undefined {
-  const codingPlanInstance = instances.find((instance) => {
+  const codingPlanInstances = instances.filter((instance) => {
     if (instance.typeId !== 'coding-plan') return false;
     const plan = CODING_PLANS[instance.config.planId as CodingPlanId];
     return plan?.provider === vendor;
   });
+  const codingPlanInstance = connectedCodingPlanId
+    ? codingPlanInstances.find(
+        (instance) =>
+          (instance.config as { planId: string }).planId ===
+          connectedCodingPlanId,
+      )
+    : codingPlanInstances.length === 1
+      ? codingPlanInstances[0]
+      : undefined;
   if (codingPlanInstance) return codingPlanInstance;
+  if (codingPlanInstances.length > 1) return undefined;
 
   return instances.find(
     (instance) =>
@@ -707,13 +722,21 @@ export function getSelectableModelEntries(
         catalogModelIds.add(getCatalogMatchId(instance, model.modelId));
       }
     } else if (instance.typeId === 'coding-plan') {
-      // Serve the plan vendor's catalog models
+      // Enrich only models returned by this plan's discovery route with
+      // catalog metadata. The vendor catalog is broader than the subscription.
       const planId = (instance.config as { planId: string })
         .planId as CodingPlanId;
       const plan = CODING_PLANS[planId];
       if (plan) {
+        const discoveredIds = new Set(
+          (instance.discoveredModels ?? []).map((model) =>
+            getCatalogMatchId(instance, model.modelId),
+          ),
+        );
         for (const model of availableModels) {
           if (model.officialProvider !== plan.provider) continue;
+          if (!discoveredIds.has(getCatalogMatchId(instance, model.modelId)))
+            continue;
           if (isDisabled(model.modelId)) continue;
           entries.push(
             makeBuiltInEntry(
@@ -785,15 +808,19 @@ export function getSelectableModelEntries(
       const enabled = new Set(instance.enabledModelIds ?? []);
       const hasEnabledList =
         instance.enabledModelIds && instance.enabledModelIds.length > 0;
+      const discoveredModelIds = new Set<string>();
       for (const dm of instance.discoveredModels) {
+        const matchId = getCatalogMatchId(instance, dm.modelId);
         if (
-          catalogModelIds.has(getCatalogMatchId(instance, dm.modelId)) ||
-          customModelIds.has(getCatalogMatchId(instance, dm.modelId))
+          catalogModelIds.has(matchId) ||
+          customModelIds.has(matchId) ||
+          discoveredModelIds.has(matchId)
         ) {
           continue;
         }
         if (isDisabled(dm.modelId)) continue;
         if (hasEnabledList && !enabled.has(dm.modelId)) continue;
+        discoveredModelIds.add(matchId);
         entries.push(makeDiscoveredEntry(instance, dm));
       }
     }
@@ -869,8 +896,16 @@ export function getInstanceModelCount(
       .planId as CodingPlanId;
     const plan = CODING_PLANS[planId];
     if (plan) {
+      const discoveredIds = new Set(
+        (instance.discoveredModels ?? []).map((model) =>
+          getCatalogMatchId(instance, model.modelId),
+        ),
+      );
       const vendorModels = availableModels.filter(
-        (m) => m.officialProvider === plan.provider && !disabled.has(m.modelId),
+        (m) =>
+          m.officialProvider === plan.provider &&
+          discoveredIds.has(getCatalogMatchId(instance, m.modelId)) &&
+          !disabled.has(m.modelId),
       );
       count += vendorModels.length;
       for (const m of vendorModels)
@@ -904,16 +939,19 @@ export function getInstanceModelCount(
     const enabled = new Set(instance.enabledModelIds ?? []);
     const hasEnabledList =
       instance.enabledModelIds && instance.enabledModelIds.length > 0;
+    const discoveredModelIds = new Set<string>();
     for (const dm of instance.discoveredModels) {
       const normalizedModelId = getCatalogMatchId(instance, dm.modelId);
       if (
         catalogModelIds.has(normalizedModelId) ||
-        customModelIds.has(normalizedModelId)
+        customModelIds.has(normalizedModelId) ||
+        discoveredModelIds.has(normalizedModelId)
       ) {
         continue;
       }
       if (disabled.has(dm.modelId)) continue;
       if (hasEnabledList && !enabled.has(dm.modelId)) continue;
+      discoveredModelIds.add(normalizedModelId);
       count++;
     }
   }
