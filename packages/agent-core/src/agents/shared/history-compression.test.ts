@@ -1148,8 +1148,10 @@ describe('generateSimpleCompressedHistory', () => {
 
   it('routes the active fallback through its provider instance', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'))
       .mockResolvedValueOnce({
         text: 'The assistant provided an OpenRouter fallback summary.',
@@ -1161,12 +1163,11 @@ describe('generateSimpleCompressedHistory', () => {
       mps,
       'agent-1',
       'openrouter/free',
-      undefined,
       'openrouter-instance',
     );
 
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
-      4,
+      6,
       'openrouter/free',
       'agent-1',
       expect.objectContaining({
@@ -1175,18 +1176,20 @@ describe('generateSimpleCompressedHistory', () => {
     );
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.objectContaining({
-        $provider_instance_id: undefined,
+        $ai_span_name: 'history-compression',
       }),
     );
   });
 
   it('retries a cheap model ID through its active provider instance', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'))
       .mockResolvedValueOnce({
         text: 'The active provider instance supplied the compression summary.',
@@ -1198,24 +1201,23 @@ describe('generateSimpleCompressedHistory', () => {
       mps,
       'agent-1',
       'claude-haiku-4.5',
-      undefined,
       'active-haiku-instance',
     );
 
     expect(result).toBe(
       'The active provider instance supplied the compression summary.',
     );
-    expect(mps.getWithOptions).toHaveBeenCalledTimes(4);
+    expect(mps.getWithOptions).toHaveBeenCalledTimes(6);
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
-      3,
+      5,
       'claude-haiku-4.5',
       'agent-1',
       expect.objectContaining({
-        $provider_instance_id: undefined,
+        $ai_span_name: 'history-compression',
       }),
     );
     expect(mps.getWithOptions).toHaveBeenNthCalledWith(
-      4,
+      6,
       'claude-haiku-4.5',
       'agent-1',
       expect.objectContaining({
