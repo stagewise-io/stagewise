@@ -1670,6 +1670,14 @@ export abstract class BaseAgent<
       stepModelId = resolvedModel.modelId;
       stepProviderInstanceId = resolvedModel.providerInstanceId;
       presetThinkingOverride = resolvedModel.thinkingOverride;
+      this.host.logger.debug(
+        `[BaseAgent:${this.instanceId}] Chat model resolved — ` +
+          `preset="${presetId}", ` +
+          `index=${fallbackIndex}/${presetModels.length}, ` +
+          `model="${stepModelId}", ` +
+          `instance="${stepProviderInstanceId ?? 'default'}", ` +
+          `fallback=${fallbackIndex > 0 ? 'YES' : 'no'}.`,
+      );
       // Sync agent state so the UI and persistence reflect the current
       // preset model. This is idempotent — if the model hasn't changed,
       // the state mutation is a no-op.
@@ -1677,6 +1685,12 @@ export abstract class BaseAgent<
         modelId: stepModelId,
         providerInstanceId: stepProviderInstanceId,
       });
+    } else {
+      this.host.logger.debug(
+        `[BaseAgent:${this.instanceId}] Chat model resolved — ` +
+          `preset=none, model="${stepModelId}", ` +
+          `instance="${stepProviderInstanceId ?? 'default'}".`,
+      );
     }
 
     // Get the current model — wrapped in try-catch so a deleted custom model
@@ -1937,9 +1951,13 @@ export abstract class BaseAgent<
         if (parsedOverload?.kind === 'upstream-overload') {
           const advanced = this._fallbackManager.advanceOnFailure(presetModels);
           if (advanced) {
+            const fbIdx = this._fallbackManager.fallbackModelIndex;
+            const fbModel = presetModels?.[fbIdx];
             this.host.logger.info(
               `[BaseAgent:${this.instanceId}] Upstream overload on model "${stepModelId}" — ` +
-                `falling back to preset model index ${this._fallbackManager.fallbackModelIndex}.`,
+                `falling back to preset model index ${fbIdx}` +
+                ` (model="${fbModel?.modelId ?? '?'}", ` +
+                `instance="${fbModel?.providerInstanceId ?? 'default'}").`,
             );
             this.host.telemetry?.capture('model-fallback-triggered', {
               agent_type: this.agentType,
@@ -2094,6 +2112,10 @@ export abstract class BaseAgent<
         if (this._pendingFallbackRetry) {
           this._pendingFallbackRetry = false;
           this._pendingContinue = null;
+          this.host.logger.debug(
+            `[BaseAgent:${this.instanceId}] Fallback retry scheduled — ` +
+              `re-invoking runStep via setTimeout(0).`,
+          );
           setTimeout(() => void this.runStep(), 0);
         } else {
           const pending = this._pendingContinue;
