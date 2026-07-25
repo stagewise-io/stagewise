@@ -549,7 +549,7 @@ export const ModelSelect = memo(function ModelSelect({
           const [, patches] = produceWithPatches(preferences, (draft) => {
             draft.agent.activePresetId = preset.id;
           });
-          void updatePreferences(patches);
+          await updatePreferences(patches);
           onModelChange?.();
         }
         return;

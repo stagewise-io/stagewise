@@ -91,6 +91,7 @@ const tryCompressWithModel = async (
   agentInstanceId: string,
   compactHistory: string,
   previousBriefingChars: number,
+  host?: AgentHost,
 ): Promise<string> => {
   const metadata: Record<string, unknown> = {
     $ai_span_name: 'history-compression',
@@ -108,7 +109,7 @@ const tryCompressWithModel = async (
     metadata,
   );
 
-  console.debug(
+  host?.logger.debug(
     `[history-compression] Attempting model "${entry.modelId}"` +
       ` (instance="${entry.providerInstanceId ?? 'default'}")` +
       ` for agent ${agentInstanceId}.`,
@@ -177,7 +178,7 @@ const tryCompressWithModel = async (
       );
     }
 
-    console.debug(
+    host?.logger.debug(
       `[history-compression] Success with model "${entry.modelId}"` +
         ` (instance="${entry.providerInstanceId ?? 'default'}")` +
         ` — ${compactionResult.length} chars.`,
@@ -275,6 +276,7 @@ export const generateSimpleCompressedHistory = async (
         agentInstanceId,
         compactConvertedChatHistory,
         previousBriefingChars,
+        host,
       );
     } catch (e) {
       lastError = e as Error;
@@ -288,7 +290,7 @@ export const generateSimpleCompressedHistory = async (
   // Last resort: try the active chat model if it wasn't already attempted.
   const fallbackKey = `${fallbackModelId}::${fallbackProviderInstanceId ?? ''}`;
   if (fallbackModelId && !attemptedKeys.has(fallbackKey)) {
-    console.warn(
+    host?.logger.warn(
       `History compression: all preferred models failed, falling back to active model: ${fallbackModelId}`,
     );
     try {
@@ -298,6 +300,7 @@ export const generateSimpleCompressedHistory = async (
         agentInstanceId,
         compactConvertedChatHistory,
         previousBriefingChars,
+        host,
       );
     } catch (e) {
       lastError = e as Error;
