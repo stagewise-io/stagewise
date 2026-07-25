@@ -520,7 +520,7 @@ export const ModelSelect = memo(function ModelSelect({
   );
 
   const handleValueChange = useCallback(
-    (value: string | null) => {
+    async (value: string | null) => {
       if (!value) return;
       if (value === OPEN_MODEL_SETTINGS_VALUE) {
         void openSettings({ section: 'models-providers' });
@@ -557,18 +557,20 @@ export const ModelSelect = memo(function ModelSelect({
       const decoded = decodeKey(value);
       if (!decoded) return;
       if (!openAgent) return;
+      // Clear active preset BEFORE setting the model so runStep
+      // doesn't see a stale activePresetId and overwrite the
+      // user's chosen model via setActiveModel.
+      if (preferences.agent.activePresetId) {
+        const [, patches] = produceWithPatches(preferences, (draft) => {
+          draft.agent.activePresetId = undefined;
+        });
+        await updatePreferences(patches);
+      }
       setSelectedModel(
         openAgent,
         decoded.modelId as ModelId,
         decoded.instanceId,
       );
-      // Clear active preset when selecting a raw model
-      if (preferences.agent.activePresetId) {
-        const [, patches] = produceWithPatches(preferences, (draft) => {
-          draft.agent.activePresetId = undefined;
-        });
-        void updatePreferences(patches);
-      }
       onModelChange?.();
     },
     [
@@ -724,6 +726,13 @@ export const ModelSelect = memo(function ModelSelect({
     // Aliases use fixed thinking presets — cycling is disabled for them.
     if (getModelAlias(selectedModel)) return false;
 
+    // When a preset is active, its per-model thinking override takes
+    // precedence over global modelThinkingOverrides (see
+    // resolveThinkingProviderOptions). Cycling would write a global
+    // override that has no effect on the next agent turn. Users should
+    // edit the preset's thinking in settings instead.
+    if (activePresetId) return false;
+
     const model = getAvailableModel(selectedModel);
     if (!model) return false;
     const targetModelId = model.modelId;
@@ -758,6 +767,7 @@ export const ModelSelect = memo(function ModelSelect({
     preferences,
     selectedModel,
     selectedProviderInstanceId,
+    activePresetId,
     instanceMap,
     updatePreferences,
   ]);
