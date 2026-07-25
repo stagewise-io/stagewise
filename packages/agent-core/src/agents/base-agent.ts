@@ -1166,6 +1166,7 @@ export abstract class BaseAgent<
         this.instanceId,
         this.state.get().activeModelId,
         this.state.get().activeProviderInstanceId,
+        this.host,
       );
     } catch (e) {
       const error = e as Error;

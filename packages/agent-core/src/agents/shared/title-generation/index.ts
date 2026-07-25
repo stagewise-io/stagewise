@@ -1,5 +1,6 @@
 import { generateText } from 'ai';
 import type { AgentMessage } from '../../../types/agent';
+import type { AgentHost } from '../../../host/host';
 import {
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   UTILITY_THINKING_OVERRIDE_METADATA_KEY,
@@ -89,6 +90,7 @@ export const generateSimpleTitle = async (
   agentInstanceId: string,
   fallbackModelId?: string,
   fallbackProviderInstanceId?: string,
+  host?: AgentHost,
 ): Promise<string> => {
   const messageList = messages
     .filter(
@@ -155,7 +157,7 @@ export const generateSimpleTitle = async (
     // Pass `providerInstanceId` so discovered models (which only exist
     // on a specific instance) are not falsely rejected.
     if (!hostModels.has(modelId, entry.providerInstanceId)) continue;
-    console.debug(
+    host?.logger.debug(
       `[title-generation] Attempting model "${modelId}"` +
         ` (instance="${entry.providerInstanceId ?? 'default'}")` +
         ` for agent ${agentInstanceId}.`,
@@ -235,7 +237,7 @@ ${messageList}
           throw new Error(`Title too few words: "${title}"`);
         }
 
-        console.debug(
+        host?.logger.debug(
           `[title-generation] Success with model "${modelId}"` +
             ` (instance="${entry.providerInstanceId ?? 'default'}")` +
             ` — title: "${title}".`,
