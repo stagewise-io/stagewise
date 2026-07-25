@@ -38,6 +38,14 @@ export class ModelFallbackManager {
    */
   private _lastPresetId: string | undefined;
 
+  /**
+   * A structural signature of the preset's model list at the time
+   * the fallback index was established. Used to detect in-place
+   * edits (reorder, replace) that keep the same preset ID but
+   * change which model sits at each index.
+   */
+  private _lastPresetSignature: string | undefined;
+
   /** Returns the current fallback model index (0 = primary). */
   get fallbackModelIndex(): number {
     return this._fallbackModelIndex;
@@ -71,10 +79,15 @@ export class ModelFallbackManager {
       return 0;
     }
 
-    // Preset changed — reset to primary.
-    if (this._lastPresetId !== presetId) {
+    // Preset changed or model list edited — reset to primary.
+    const signature = presetSignature(presetModels);
+    if (
+      this._lastPresetId !== presetId ||
+      this._lastPresetSignature !== signature
+    ) {
       this.reset();
       this._lastPresetId = presetId;
+      this._lastPresetSignature = signature;
       return 0;
     }
 
@@ -144,5 +157,18 @@ export class ModelFallbackManager {
     this._fallbackModelIndex = 0;
     this._fallbackSetAt = 0;
     this._lastPresetId = undefined;
+    this._lastPresetSignature = undefined;
   }
 }
+
+/**
+ * Builds a compact structural signature from a preset's model list.
+ * Two lists produce the same signature iff they have the same models
+ * in the same order (by `modelId` + `providerInstanceId`).
+ */
+const presetSignature = (models: UtilityModelEntry[] | undefined): string => {
+  if (!models || models.length === 0) return '';
+  return models
+    .map((m) => `${m.modelId}::${m.providerInstanceId ?? ''}`)
+    .join('|');
+};
