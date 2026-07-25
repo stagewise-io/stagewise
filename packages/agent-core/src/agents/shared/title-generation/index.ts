@@ -155,6 +155,11 @@ export const generateSimpleTitle = async (
     // Pass `providerInstanceId` so discovered models (which only exist
     // on a specific instance) are not falsely rejected.
     if (!hostModels.has(modelId, entry.providerInstanceId)) continue;
+    console.debug(
+      `[title-generation] Attempting model "${modelId}"` +
+        ` (instance="${entry.providerInstanceId ?? 'default'}")` +
+        ` for agent ${agentInstanceId}.`,
+    );
     try {
       const metadata: Record<string, unknown> = {
         $ai_span_name: 'title-generation',
@@ -230,6 +235,11 @@ ${messageList}
           throw new Error(`Title too few words: "${title}"`);
         }
 
+        console.debug(
+          `[title-generation] Success with model "${modelId}"` +
+            ` (instance="${entry.providerInstanceId ?? 'default'}")` +
+            ` — title: "${title}".`,
+        );
         return title;
       } finally {
         clearTimeout(timeout);

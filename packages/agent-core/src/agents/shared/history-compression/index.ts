@@ -108,6 +108,12 @@ const tryCompressWithModel = async (
     metadata,
   );
 
+  console.debug(
+    `[history-compression] Attempting model "${entry.modelId}"` +
+      ` (instance="${entry.providerInstanceId ?? 'default'}")` +
+      ` for agent ${agentInstanceId}.`,
+  );
+
   const abortController = new AbortController();
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let abortGraceTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -171,6 +177,11 @@ const tryCompressWithModel = async (
       );
     }
 
+    console.debug(
+      `[history-compression] Success with model "${entry.modelId}"` +
+        ` (instance="${entry.providerInstanceId ?? 'default'}")` +
+        ` — ${compactionResult.length} chars.`,
+    );
     return compactionResult;
   } finally {
     if (timeout) clearTimeout(timeout);
