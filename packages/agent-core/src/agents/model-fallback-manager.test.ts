@@ -156,4 +156,61 @@ describe('ModelFallbackManager', () => {
     expect(m.resolveModelIndex('preset-1', singleModel, T0 + 200)).toBe(0);
     expect(m.fallbackModelIndex).toBe(0);
   });
+
+  // ── Preset edits (same ID, different model list) ─────────────────
+
+  it('resets to primary when preset models are reordered (same ID)', () => {
+    const m = new ModelFallbackManager();
+    m.resolveModelIndex('preset-1', models, T0);
+    m.advanceOnFailure(models, T0); // index=1 (model-b)
+    expect(m.fallbackModelIndex).toBe(1);
+
+    // Same preset ID, but models reordered — index 1 now points to
+    // a different model. Must reset to avoid silently using the
+    // wrong model.
+    const reordered: UtilityModelEntry[] = [
+      { modelId: 'model-c' },
+      { modelId: 'model-a' },
+      { modelId: 'model-b' },
+    ];
+    expect(m.resolveModelIndex('preset-1', reordered, T0 + 100)).toBe(0);
+    expect(m.fallbackModelIndex).toBe(0);
+    expect(m.fallbackSetAt).toBe(0);
+  });
+
+  it('resets to primary when a preset model is replaced (same ID, same length)', () => {
+    const m = new ModelFallbackManager();
+    m.resolveModelIndex('preset-1', models, T0);
+    m.advanceOnFailure(models, T0); // index=1 (model-b)
+    expect(m.fallbackModelIndex).toBe(1);
+
+    // Same preset ID, same length, but model at index 1 changed.
+    const replaced: UtilityModelEntry[] = [
+      { modelId: 'model-a' },
+      { modelId: 'model-x' },
+      { modelId: 'model-c' },
+    ];
+    expect(m.resolveModelIndex('preset-1', replaced, T0 + 100)).toBe(0);
+    expect(m.fallbackModelIndex).toBe(0);
+    expect(m.fallbackSetAt).toBe(0);
+  });
+
+  it('resets to primary when providerInstanceId changes on a preset model', () => {
+    const m = new ModelFallbackManager();
+    const withInstance: UtilityModelEntry[] = [
+      { modelId: 'model-a', providerInstanceId: 'inst-1' },
+      { modelId: 'model-b', providerInstanceId: 'inst-1' },
+    ];
+    m.resolveModelIndex('preset-1', withInstance, T0);
+    m.advanceOnFailure(withInstance, T0); // index=1
+    expect(m.fallbackModelIndex).toBe(1);
+
+    // Same model IDs, same preset ID, but provider instance changed.
+    const changedInstance: UtilityModelEntry[] = [
+      { modelId: 'model-a', providerInstanceId: 'inst-1' },
+      { modelId: 'model-b', providerInstanceId: 'inst-2' },
+    ];
+    expect(m.resolveModelIndex('preset-1', changedInstance, T0 + 100)).toBe(0);
+    expect(m.fallbackModelIndex).toBe(0);
+  });
 });
