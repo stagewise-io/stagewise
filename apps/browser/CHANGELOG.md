@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.25.0 (2026-07-25)
+
+### Features
+
+* add Claude Opus 5 support (d7902f7)
+* enrich custom model telemetry (27ba864)
+
 ## 1.24.0 (2026-07-24)
 
 ### Features
