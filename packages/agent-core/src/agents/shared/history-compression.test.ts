@@ -59,6 +59,23 @@ function makeMockHostModels(): HostModels {
   } as unknown as HostModels;
 }
 
+function makeMockHostModelsWithPreset(
+  presetModels: { modelId: string; providerInstanceId?: string }[],
+): HostModels {
+  const base = makeMockHostModels();
+  return {
+    ...base,
+    getActivePresetModels: vi.fn(() =>
+      presetModels.map((m) => ({
+        modelId: m.modelId,
+        ...(m.providerInstanceId
+          ? { providerInstanceId: m.providerInstanceId }
+          : {}),
+      })),
+    ),
+  } as unknown as HostModels;
+}
+
 // ---------------------------------------------------------------------------
 // convertAgentMessagesToCompactMessageHistoryString
 // ---------------------------------------------------------------------------
@@ -1109,6 +1126,110 @@ describe('generateSimpleCompressedHistory', () => {
     expect(result).toBe(
       'The assistant provided a provider-fallback summary of events.',
     );
+  });
+
+  // -----------------------------------------------------------------------
+  // preset models as fallback (appended after utility models)
+  // -----------------------------------------------------------------------
+
+  it('falls back to active preset models after all utility models fail', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'))
+      .mockResolvedValueOnce({
+        text: 'The assistant provided a preset-model summary of events.',
+      } as any);
+
+    const mps = makeMockHostModelsWithPreset([
+      { modelId: 'claude-sonnet-4.6' },
+      { modelId: 'gpt-5.6-luna', providerInstanceId: 'openrouter-instance' },
+    ]);
+    const result = await generateSimpleCompressedHistory(
+      makeMessages(4),
+      mps,
+      'agent-1',
+    );
+
+    expect(result).toBe(
+      'The assistant provided a preset-model summary of events.',
+    );
+    expect(generateTextMock).toHaveBeenCalledTimes(6);
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      6,
+      'claude-sonnet-4.6',
+      'agent-1',
+      expect.objectContaining({ $ai_span_name: 'history-compression' }),
+    );
+  });
+
+  it('tries all preset models in order as fallbacks', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'))
+      .mockRejectedValueOnce(new Error('Sonnet failed'))
+      .mockResolvedValueOnce({
+        text: 'The assistant provided a second-preset summary of events.',
+      } as any);
+
+    const mps = makeMockHostModelsWithPreset([
+      { modelId: 'claude-sonnet-4.6' },
+      { modelId: 'gpt-5.6-luna', providerInstanceId: 'openrouter-instance' },
+    ]);
+    const result = await generateSimpleCompressedHistory(
+      makeMessages(4),
+      mps,
+      'agent-1',
+    );
+
+    expect(result).toBe(
+      'The assistant provided a second-preset summary of events.',
+    );
+    expect(generateTextMock).toHaveBeenCalledTimes(7);
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      6,
+      'claude-sonnet-4.6',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(mps.getWithOptions).toHaveBeenNthCalledWith(
+      7,
+      'gpt-5.6-luna',
+      'agent-1',
+      expect.objectContaining({
+        $provider_instance_id: 'openrouter-instance',
+      }),
+    );
+  });
+
+  it('deduplicates preset models already in the utility list', async () => {
+    // 'gpt-5.6-luna' is both the 3rd utility model and a preset model.
+    // It should only be tried once (at its utility position), not retried.
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockResolvedValueOnce({
+        text: 'The assistant provided a GPT summary of events.',
+      } as any);
+
+    const mps = makeMockHostModelsWithPreset([
+      { modelId: 'gpt-5.6-luna' },
+      { modelId: 'claude-sonnet-4.6' },
+    ]);
+    const result = await generateSimpleCompressedHistory(
+      makeMessages(4),
+      mps,
+      'agent-1',
+    );
+
+    expect(result).toBe('The assistant provided a GPT summary of events.');
+    // Only 3 calls: default, deepseek, gpt — gpt is not retried from preset.
+    expect(generateTextMock).toHaveBeenCalledTimes(3);
   });
 
   // -----------------------------------------------------------------------

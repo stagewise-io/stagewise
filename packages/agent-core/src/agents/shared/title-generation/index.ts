@@ -151,6 +151,16 @@ export const generateSimpleTitle = async (
     }));
   }
 
+  // Append the active preset's model list (main model + fallbacks) so
+  // the main chat models serve as ordered fallbacks after all utility
+  // models are exhausted. Dedup by (modelId, providerInstanceId) in the
+  // loop below prevents double-attempts of models that appear in both
+  // lists.
+  const presetModels = hostModels.getActivePresetModels?.();
+  if (presetModels && presetModels.length > 0) {
+    entries = [...entries, ...presetModels];
+  }
+
   for (const entry of entries) {
     const modelId = entry.modelId;
     // Skip models that are no longer available (deleted provider, etc.)
