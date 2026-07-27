@@ -19,7 +19,6 @@ import {
 import {
   clearQueuedMessages,
   enqueueUserMessage,
-  flushQueueIntoHistory,
   removeQueuedMessage,
 } from './queue';
 import {
@@ -83,7 +82,6 @@ export function bindStateMutations(store: AgentStore, agentInstanceId: string) {
     removeQueuedMessage: (args: Parameters<typeof removeQueuedMessage>[2]) =>
       removeQueuedMessage(store, agentInstanceId, args),
     clearQueuedMessages: () => clearQueuedMessages(store, agentInstanceId),
-    flushQueueIntoHistory: () => flushQueueIntoHistory(store, agentInstanceId),
 
     appendHistoryMessage: (args: Parameters<typeof appendHistoryMessage>[2]) =>
       appendHistoryMessage(store, agentInstanceId, args),
