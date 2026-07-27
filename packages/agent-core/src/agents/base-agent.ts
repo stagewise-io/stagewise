@@ -926,7 +926,7 @@ export abstract class BaseAgent<
       this.host.telemetry?.capture('agent-queue-flushed', {
         agent_type: this.agentType,
         agent_instance_id: this.instanceId,
-        flushed_message_count: flushedCount,
+        flushed_message_count: 1,
       });
     }
 
