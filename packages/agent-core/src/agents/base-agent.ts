@@ -967,7 +967,7 @@ export abstract class BaseAgent<
     this.state.commands.setIsWorkingFalse();
 
     this._pendingSyntheticContinuation = { reason };
-    void this.runStep();
+    void this.runStep(false, false);
   }
 
   /**
@@ -2206,7 +2206,7 @@ export abstract class BaseAgent<
           this.stepAbortController?.abort();
         } catch {}
         this.stepAbortController = null;
-        setTimeout(() => void this.runStep(), 0);
+        setTimeout(() => void this.runStep(false, false), 0);
         return;
       }
       try {
@@ -2653,6 +2653,9 @@ export abstract class BaseAgent<
     const userWantsToContinue = (await this.onStepFinished(result)) ?? true;
 
     if (!userWantsToContinue) {
+      if (this.state.get().queuedMessages.length > 0) {
+        return { shouldRun: true, flushQueue: true };
+      }
       return { shouldRun: false, flushQueue: false };
     }
 
