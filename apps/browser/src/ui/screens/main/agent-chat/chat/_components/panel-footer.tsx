@@ -254,6 +254,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     (p) => p.agents.updateInputState,
   );
   const promoteSideChat = useKartonProcedure((p) => p.agents.promoteSideChat);
+  const setLastOpenAgentId = useKartonProcedure(
+    (p) => p.browser.setLastOpenAgentId,
+  );
   const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
@@ -385,6 +388,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const handlePromoteSideChat = useCallback(() => {
     if (!openAgent || !sideChatTabId) return;
     void promoteSideChat(openAgent)
+      .then(() => setLastOpenAgentId(openAgent))
       .then(() => {
         setOpenAgent(openAgent);
         return closeTab(sideChatTabId);
@@ -398,7 +402,14 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
           actions: [],
         });
       });
-  }, [closeTab, openAgent, promoteSideChat, setOpenAgent, sideChatTabId]);
+  }, [
+    closeTab,
+    openAgent,
+    promoteSideChat,
+    setLastOpenAgentId,
+    setOpenAgent,
+    sideChatTabId,
+  ]);
 
   const hasVisibleBrowsingTab = useMemo(() => {
     if (!activeTabData) return false;
