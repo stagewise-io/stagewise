@@ -1002,8 +1002,14 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
         return null;
       }
 
-      // Calculate capture rect with padding, accounting for scroll position
-      const scale = viewportLayout?.scale ?? 1;
+      // Convert page CSS pixels to capture-surface pixels. Custom device
+      // emulation scales the rendered surface without changing DOM rects.
+      const scale =
+        (viewportLayout?.scale ?? 1) *
+        (wc.isDevToolsOpened()
+          ? 1
+          : (viewportLayout?.zoom ?? 1) *
+            (this.currentState.deviceEmulation?.scale ?? 1));
 
       // For iframe elements, transform coordinates to main frame
       let effectiveBoundingRect = boundingRect;
