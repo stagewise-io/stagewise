@@ -113,7 +113,14 @@ export function MessageQueueSection(
           />
           {`${props.queuedMessages.length} Queued`}
         </div>
-        <Button variant="ghost" size="xs" onClick={props.onFlush}>
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onFlush();
+          }}
+        >
           Send now
           <IconArrowUpOutline24 className="size-3" />
         </Button>
