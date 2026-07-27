@@ -134,7 +134,10 @@ export function useAgentCommandItems(
     useComparingSelector(
       (s): ActiveAgentCardData[] =>
         Object.entries(s.agents.instances)
-          .filter(([_, agent]) => agent.type === AgentTypes.CHAT)
+          .filter(
+            ([, agent]) =>
+              agent.type === AgentTypes.CHAT && !agent.sideChatParentId,
+          )
           .map(([id, agent]) => {
             const history = agent.state.history;
             const lastMsg = history[history.length - 1]!;

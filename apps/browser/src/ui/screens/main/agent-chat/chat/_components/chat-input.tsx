@@ -42,7 +42,12 @@ import {
   mentionContextRef,
   type MentionContext,
 } from './rich-text/mentions';
-import { SlashExtension, slashSkillsRef } from './rich-text/slash';
+import {
+  SlashExtension,
+  slashOpenSideChatRef,
+  slashSideChatEnabledRef,
+  slashSkillsRef,
+} from './rich-text/slash';
 import type { SkillDefinitionUI } from '@shared/skills';
 import { useState, memo } from 'react';
 import { useIsContainerScrollable } from '@ui/hooks/use-is-container-scrollable';
@@ -264,6 +269,8 @@ export interface ChatInputProps {
 
   // Slash command definitions (from Karton state)
   slashCommands?: SkillDefinitionUI[];
+  allowSideChatCommand?: boolean;
+  onOpenSideChat?: () => void;
 
   // Styling
   className?: string;
@@ -324,6 +331,8 @@ export const ChatInput = memo(function ChatInput({
 
   mentionContext,
   slashCommands,
+  allowSideChatCommand = true,
+  onOpenSideChat,
 
   className,
   ref,
@@ -555,6 +564,10 @@ export const ChatInput = memo(function ChatInput({
     },
 
     onFocus: () => {
+      if (mentionContext) mentionContextRef.current = mentionContext;
+      if (slashCommands) slashSkillsRef.current = slashCommands;
+      slashSideChatEnabledRef.current = allowSideChatCommand;
+      slashOpenSideChatRef.current = onOpenSideChat ?? null;
       onFocus?.();
     },
     onBlur: ({ event }) => {
@@ -565,13 +578,6 @@ export const ChatInput = memo(function ChatInput({
   useEffect(() => {
     editor?.commands.selectAll();
   }, [editor, shownPlaceholder]);
-
-  // Sync mention context to the module-level ref synchronously during render
-  // so the TipTap suggestion `items` callback always has current data.
-  if (mentionContext) mentionContextRef.current = mentionContext;
-
-  // Sync slash skills to the module-level ref synchronously during render.
-  if (slashCommands) slashSkillsRef.current = slashCommands;
 
   const canSendMessage = useMemo(() => {
     return !disabled && textContent.trim().length > 0;

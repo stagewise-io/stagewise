@@ -3,6 +3,7 @@ import {
   IconArrowsOppositeDirectionXOutline18,
   IconBoxSparkleOutline18,
   IconEarthOutline18,
+  IconHelpChatOutline18,
   IconSquareTerminalOutline18,
 } from '@stagewise/icons';
 import { Logo } from '@ui/components/ui/logo';
@@ -52,6 +53,8 @@ export function TabFavicon({ tabState }: { tabState: TabState }) {
         <IconArrowsOppositeDirectionXOutline18 className="size-4 text-muted-foreground" />
       ) : tabState?.type === 'file' && tabState.file ? (
         <FileIcon filePath={tabState.file.relativePath} className="size-4" />
+      ) : tabState?.type === 'side-chat' ? (
+        <IconHelpChatOutline18 className="size-4 text-muted-foreground" />
       ) : tabState?.isLoading ? (
         <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
       ) : shouldShowFallback ? (
