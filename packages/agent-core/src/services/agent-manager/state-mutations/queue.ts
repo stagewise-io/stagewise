@@ -46,15 +46,3 @@ export function clearQueuedMessages(
     state.queuedMessages = [];
   });
 }
-
-export function flushQueueIntoHistory(
-  store: AgentStore,
-  agentInstanceId: string,
-): void {
-  updateAgentInstanceState(store, agentInstanceId, (state) => {
-    const nextMessage = state.queuedMessages.shift();
-    if (nextMessage) {
-      state.history.push(nextMessage);
-    }
-  });
-}
