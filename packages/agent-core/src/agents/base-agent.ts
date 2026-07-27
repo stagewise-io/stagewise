@@ -903,8 +903,8 @@ export abstract class BaseAgent<
   }
 
   /**
-   * Immediately flushes the queue by stopping the agent (aborts any ongoing streams)
-   * and sending all of the queued messages at once.
+   * Immediately triggers queue processing by stopping the agent (aborts any ongoing streams)
+   * and initiating a new step to dequeue and process the next queued message.
    *
    * @note Pending tool approvals will be denied with reason "User sent new message instead. Retry if necessary." or configurable response.
    * @note Pending tool calls will be aborted with reason "User sent new message instead. Retry if necessary." or configurable response.
