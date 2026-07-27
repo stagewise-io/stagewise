@@ -52,7 +52,9 @@ export function flushQueueIntoHistory(
   agentInstanceId: string,
 ): void {
   updateAgentInstanceState(store, agentInstanceId, (state) => {
-    state.history.push(...state.queuedMessages);
-    state.queuedMessages = [];
+    const nextMessage = state.queuedMessages.shift();
+    if (nextMessage) {
+      state.history.push(nextMessage);
+    }
   });
 }

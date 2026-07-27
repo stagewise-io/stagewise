@@ -61,8 +61,8 @@ export function beginStep(
     state.error = undefined;
     if (args.flushQueue && state.queuedMessages.length > 0) {
       queueFlushIndex = state.history.length;
-      state.history.push(...state.queuedMessages);
-      state.queuedMessages = [];
+      const nextMessage = state.queuedMessages.shift();
+      if (nextMessage) state.history.push(nextMessage);
     }
   });
   return { queueFlushIndex };

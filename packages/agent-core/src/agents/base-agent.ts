@@ -615,7 +615,8 @@ export abstract class BaseAgent<
    * `null` means `onFinish` has not set a decision (e.g. error path,
    * aborted, or step superseded by a newer one) — the tail then no-ops.
    */
-  private _pendingContinue: boolean | null = null;
+  private _pendingContinue: { shouldRun: boolean; flushQueue: boolean } | null =
+    null;
 
   /**
    * Set only for runtime recovery after a suspend/resume or event-loop stall.
@@ -818,7 +819,7 @@ export abstract class BaseAgent<
     this.state.commands.appendHistoryMessage({ message: msg });
     this.scheduleMemorySnapshotWrite('user-message');
 
-    void this.runStep();
+    void this.runStep(false, false);
 
     return id;
   }
@@ -915,8 +916,8 @@ export abstract class BaseAgent<
 
     await this.internalStop('user-flushed-queue');
 
-    // Send all queued messages into the chat
-    this.state.commands.flushQueueIntoHistory();
+    // Let the runStep() at the end of this method handle popping the first queued message
+
     if (flushedCount > 0) {
       this.scheduleMemorySnapshotWrite('queued-messages');
     }
@@ -1596,7 +1597,10 @@ export abstract class BaseAgent<
   /**
    * Should be executed after a user or tool approval message was added to the agent
    */
-  private async runStep(isApprovalContinuation = false): Promise<void> {
+  private async runStep(
+    isApprovalContinuation = false,
+    flushQueue = !isApprovalContinuation,
+  ): Promise<void> {
     // Check canRunStep BEFORE setting isWorking to avoid deadlock
     if (!this.canRunStep()) {
       if (this._pendingSyntheticContinuation) {
@@ -1632,7 +1636,7 @@ export abstract class BaseAgent<
     // complete in isolation first. Queued messages will be picked up
     // by the follow-up runStep() triggered via shouldRunNewStep().
     const { queueFlushIndex: flushedIndex } = this.state.commands.beginStep({
-      flushQueue: !isApprovalContinuation,
+      flushQueue,
     });
     if (flushedIndex !== undefined) {
       this.scheduleMemorySnapshotWrite('queued-messages');
@@ -2119,27 +2123,36 @@ export abstract class BaseAgent<
           );
           setTimeout(() => void this.runStep(), 0);
         } else {
-          const pending = this._pendingContinue;
+          // Capture and clear atomically. The explicit cast breaks
+          // TypeScript's control-flow narrowing which would otherwise
+          // narrow `pending` to `never` after the null assignment to
+          // the backing field.
+          const pending = this._pendingContinue as {
+            shouldRun: boolean;
+            flushQueue: boolean;
+          } | null;
           this._pendingContinue = null;
-          if (pending === true) {
-            // setTimeout to keep the call stack clean (unbounded recursion).
-            setTimeout(() => void this.runStep(), 0);
-          } else if (pending === false) {
-            // Mark unread only if history contains at least one assistant
-            // message (covers fresh-session edge case).
-            const hasAssistantMessage = this.state
-              .get()
-              .history.some((m) => m.role === 'assistant');
-            this.state.commands.recordStepError({
-              error: undefined,
-              markUnread: 'if-assistant-history',
-            });
-            this.onIdle();
-            // Only notify "done" for a genuine turn completion: there must
-            // be an assistant message and the agent must not be paused on an
-            // open approval request (that's a `question`, emitted elsewhere).
-            if (hasAssistantMessage && !stepHasApprovalRequest) {
-              this.emitNotificationEvent('done');
+          if (pending !== null) {
+            if (pending.shouldRun) {
+              // setTimeout to keep the call stack clean (unbounded recursion).
+              setTimeout(() => void this.runStep(false, pending.flushQueue), 0);
+            } else {
+              // Mark unread only if history contains at least one assistant
+              // message (covers fresh-session edge case).
+              const hasAssistantMessage = this.state
+                .get()
+                .history.some((m) => m.role === 'assistant');
+              this.state.commands.recordStepError({
+                error: undefined,
+                markUnread: 'if-assistant-history',
+              });
+              this.onIdle();
+              // Only notify "done" for a genuine turn completion: there must
+              // be an assistant message and the agent must not be paused on an
+              // open approval request (that's a `question`, emitted elsewhere).
+              if (hasAssistantMessage && !stepHasApprovalRequest) {
+                this.emitNotificationEvent('done');
+              }
             }
           }
           // pending === null → onFinish never set a decision (error path,
@@ -2466,15 +2479,10 @@ export abstract class BaseAgent<
    *
    * @returns Whether the agent should run a new step based on the given conditions.
    */
-  private shouldRunNewStep(
-    r: StepResult<ToolSet>,
-    userWantsToContinue: boolean,
-  ): boolean {
-    if (this.state.get().queuedMessages.length > 0) {
-      // We should always continue if the user queued a message
-      return true;
-    }
-
+  private shouldRunNewStep(r: StepResult<ToolSet>): {
+    shouldRun: boolean;
+    flushQueue: boolean;
+  } {
     let stepsSinceLastMessage = 0;
     let lastUserMessageTime = 0;
     const historySnapshot = this.state.get().history;
@@ -2491,12 +2499,15 @@ export abstract class BaseAgent<
       }
     }
 
+    const hasQueuedMessages = this.state.get().queuedMessages.length > 0;
+
     // Check if the maximum number of steps has been reached
     if (this.config.maxSteps && stepsSinceLastMessage >= this.config.maxSteps) {
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Maximum number of steps reached: ${stepsSinceLastMessage} >= ${this.config.maxSteps}`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
     // Check if the maximum time has been reached
@@ -2507,7 +2518,8 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Maximum time reached: ${Date.now() - lastUserMessageTime} >= ${this.config.maxTime}`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
     //Also return a no-continue if one of the called tools is a "finish" tool and only the "finish" tool was called
@@ -2515,7 +2527,8 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Only the "finish" tool was called`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
     // Check if there are any open tool approval requests
@@ -2523,11 +2536,8 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] There are open tool approval requests`,
       );
-      return false;
+      return { shouldRun: false, flushQueue: false };
     }
-
-    // If the user does not want to continue, we don't run a new step
-    if (!userWantsToContinue) return false;
 
     // We assume that approved tool calls are executed and results are attached,
     // because this is what AI-SDK with controlled tool execution promises us
@@ -2541,7 +2551,7 @@ export abstract class BaseAgent<
       this.host.logger.warn(
         `[BaseAgent:${this.instanceId}] Output truncated (finishReason=length). Model will see error results and retry.`,
       );
-      return true;
+      return { shouldRun: true, flushQueue: false };
     }
 
     // Check if the finish reason is not tool-calls (which means user intervention is needed)
@@ -2549,10 +2559,11 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] The finish reason is not "tool-calls", but "${r.finishReason}"`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
-    return true;
+    return { shouldRun: true, flushQueue: false };
   }
 
   /**
@@ -2560,7 +2571,9 @@ export abstract class BaseAgent<
    *
    * @returns Whether the agent should run a new step based on the given conditions.
    */
-  private async handlePostStep(result: StepResult<ToolSet>): Promise<boolean> {
+  private async handlePostStep(
+    result: StepResult<ToolSet>,
+  ): Promise<{ shouldRun: boolean; flushQueue: boolean }> {
     this.state.commands.recordUsage({
       totalTokens: result.usage.totalTokens ?? 0,
     });
@@ -2638,20 +2651,18 @@ export abstract class BaseAgent<
     }
 
     const userWantsToContinue = (await this.onStepFinished(result)) ?? true;
-    const shouldRunNewStep = this.shouldRunNewStep(result, userWantsToContinue);
 
-    if (!shouldRunNewStep) {
-      this.host.logger.debug(
-        `[BaseAgent:${this.instanceId}] Not running new step. Agent Type: ${this.agentType}`,
-      );
-      return false;
+    if (!userWantsToContinue) {
+      return { shouldRun: false, flushQueue: false };
     }
+
+    const shouldRunNewStep = this.shouldRunNewStep(result);
 
     this.host.logger.debug(
       `[BaseAgent:${this.instanceId}] Running new step. Agent Type: ${this.agentType}`,
     );
 
-    return true;
+    return shouldRunNewStep;
   }
 
   /**
