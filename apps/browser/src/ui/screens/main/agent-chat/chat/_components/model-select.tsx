@@ -258,7 +258,11 @@ export const ModelSelect = memo(function ModelSelect({
     return map;
   }, [selectableEntries]);
 
-  // Group entries by provider instance
+  // Group entries by provider instance.
+  // Stagewise inference instances are sorted last so that user-connected
+  // providers appear at the top of the dropdown. Array.sort is stable in
+  // modern engines (per ES2019), so non-stagewise groups preserve their
+  // original insertion order.
   const groupedByInstance = useMemo<InstanceGroup[]>(() => {
     const groups = new Map<string, InstanceGroup>();
     for (const entry of selectableEntries) {
@@ -274,7 +278,12 @@ export const ModelSelect = memo(function ModelSelect({
       }
       group.entries.push(entry);
     }
-    return Array.from(groups.values());
+    return Array.from(groups.values()).sort((a, b) => {
+      const aStagewise = a.typeId === 'stagewise';
+      const bStagewise = b.typeId === 'stagewise';
+      if (aStagewise !== bStagewise) return aStagewise ? 1 : -1;
+      return 0;
+    });
   }, [selectableEntries]);
 
   // Build preset entries for the dropdown
@@ -345,8 +354,13 @@ export const ModelSelect = memo(function ModelSelect({
   );
 
   const allEntryKeys = useMemo(
-    () => selectableEntries.map((e) => encodeKey(e.instanceId, e.modelId)),
-    [selectableEntries],
+    () =>
+      groupedByInstance.flatMap((group) =>
+        group.entries.map((entry) =>
+          encodeKey(entry.instanceId, entry.modelId),
+        ),
+      ),
+    [groupedByInstance],
   );
 
   const presetKeys = useMemo(
