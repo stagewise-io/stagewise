@@ -4,6 +4,7 @@ import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { IconTrash2Outline24 } from '@stagewise/icons';
 import {
+  IconCopyOutline18,
   IconCopyIdOutline18,
   IconFolderOpenOutline18,
   IconPen2Outline18,
@@ -96,6 +97,8 @@ export function buildAgentContextMenuHandler(
 export interface SharedAgentContextMenuHostProps {
   target: AgentContextMenuTarget | null;
   onClose: () => void;
+  /** Duplicate the selected chat, including its history and workspace state. */
+  onForkRequest: (id: string) => void;
   /** User picked "Permanently delete" — caller is expected to show a confirm dialog.
    * Cursor coordinates are forwarded so the confirm popover can anchor
    * right above the click position. */
@@ -106,6 +109,7 @@ export const SharedAgentContextMenuHost = memo(
   function SharedAgentContextMenuHost({
     target,
     onClose,
+    onForkRequest,
     onDeleteRequest,
   }: SharedAgentContextMenuHostProps) {
     const revealWorkingDirectory = useKartonProcedure(
@@ -202,6 +206,15 @@ export const SharedAgentContextMenuHost = memo(
               >
                 <IconPen2Outline18 className="size-3.5 shrink-0" />
                 <span>Rename</span>
+              </AgentMenuItem>
+              <AgentMenuItem
+                onClick={() => {
+                  onForkRequest(agentId);
+                  onClose();
+                }}
+              >
+                <IconCopyOutline18 className="size-3.5 shrink-0" />
+                <span>Fork chat</span>
               </AgentMenuItem>
               {togglePinned && (
                 <AgentMenuItem
