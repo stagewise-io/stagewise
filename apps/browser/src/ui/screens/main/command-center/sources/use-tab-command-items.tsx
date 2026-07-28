@@ -39,8 +39,7 @@ export function useTabCommandItems(query: string) {
       const activeTabId = s.contentTabs.activeTabId;
       return (
         Object.values(s.contentTabs.tabs)
-          // Browser mode intentionally lists web tabs only. Terminal tab
-          // search/switching will be added later as its own command source.
+          // Terminals are provided by their own command source and mode.
           .filter((tab) => tab.type === undefined || tab.type === 'browser')
           .map((tab) => {
             const title = tabTitle(tab);

@@ -19,7 +19,8 @@ function getSearchableUrl(item: CommandCenterItem) {
 
 function getRecency(item: CommandCenterItem) {
   if (item.kind === 'agent') return item.lastMessageAt;
-  if (item.kind === 'tab') return item.lastFocusedAt;
+  if (item.kind === 'tab' || item.kind === 'terminal')
+    return item.lastFocusedAt;
   return 0;
 }
 

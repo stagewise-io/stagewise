@@ -136,7 +136,12 @@ export function ZoomBar({ tabId }: ZoomBarProps) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger>
-            <Button variant="ghost" size="xs" onClick={resetZoom}>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-12 px-0 tabular-nums"
+              onClick={resetZoom}
+            >
               {zoomPercentage}%
             </Button>
           </TooltipTrigger>
