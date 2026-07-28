@@ -20,8 +20,8 @@ import {
   ClipboardIcon,
   ClipboardPasteIcon,
   CopyIcon,
+  ExternalLinkIcon,
   FilePlusIcon,
-  FolderOpenIcon,
   FolderPlusIcon,
   Loader2Icon,
   PencilIcon,
@@ -34,7 +34,12 @@ import { FileTreeNode } from './file-tree-node';
 import type { FileTreeClipboardOperation } from '@shared/karton-contracts/ui';
 import { getCurrentPlatform } from '@shared/hotkeys';
 import { normalizePath } from '@shared/path-utils';
-import { nativeFileManagerLabel } from '@shared/ide-url';
+import {
+  MenuSubmenu,
+  MenuSubmenuContent,
+  MenuSubmenuTrigger,
+} from '@stagewise/stage-ui/components/menu';
+import { OpenInIdeMenuItems } from '@ui/components/open-in-ide-menu-items';
 import {
   getAllFileTreeWorkspaceMounts,
   getFileTreeWorkspaceKey,
@@ -683,14 +688,6 @@ export function FileTreeWorkspaceView({
     ],
   );
 
-  const handleReveal = useCallback(
-    (relativePath: string) => {
-      if (!workspaceKey) return;
-      void revealInFolder(workspaceKey, relativePath);
-    },
-    [revealInFolder, workspaceKey],
-  );
-
   const resolveAbsolutePath = useCallback(
     (relativePath: string): string | null => {
       if (!workspaceMount) return null;
@@ -1037,6 +1034,9 @@ export function FileTreeWorkspaceView({
     ? (entryByRelativePath.get(contextTargetPath)?.entry ?? null)
     : null;
   const contextIsDirectory = contextEntry?.kind === 'directory';
+  const contextAbsolutePath = contextTargetPath
+    ? resolveAbsolutePath(contextTargetPath)
+    : null;
   const contextCanRename =
     contextTargetPath != null && getActionPaths(contextTargetPath).length === 1;
   const contextPasteDirectory = !contextTargetPath
@@ -1270,18 +1270,30 @@ export function FileTreeWorkspaceView({
               <span className="min-w-0 flex-1 truncate">Copy path</span>
             </MenuBase.Item>
             <MenuBase.Separator className="my-0.5 h-px bg-border-subtle" />
-            <MenuBase.Item
-              className={contextMenuItemClassName}
-              disabled={!contextTargetPath}
-              onClick={() => {
-                if (contextTargetPath) handleReveal(contextTargetPath);
-              }}
-            >
-              <FolderOpenIcon className="size-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                Open in {nativeFileManagerLabel}
-              </span>
-            </MenuBase.Item>
+            <MenuSubmenu>
+              <MenuSubmenuTrigger
+                size="xs"
+                className="data-disabled:pointer-events-none data-disabled:opacity-45"
+                disabled={!contextAbsolutePath}
+              >
+                <ExternalLinkIcon className="size-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">Open in…</span>
+              </MenuSubmenuTrigger>
+              {contextAbsolutePath && (
+                <MenuSubmenuContent
+                  className="min-w-44"
+                  size="xs"
+                  side="right"
+                  align="start"
+                  sideOffset={4}
+                >
+                  <OpenInIdeMenuItems
+                    absolutePath={contextAbsolutePath}
+                    target={contextIsDirectory ? 'folder' : 'file'}
+                  />
+                </MenuSubmenuContent>
+              )}
+            </MenuSubmenu>
           </MenuBase.Popup>
         </MenuBase.Positioner>
       </MenuBase.Portal>

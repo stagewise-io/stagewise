@@ -1,25 +1,14 @@
 import { Switch } from '@stagewise/stage-ui/components/switch';
-import { IconPenDrawSparkleFillDuo18 } from '@stagewise/icons';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import {
   useComparingSelector,
   useKartonProcedure,
   useKartonState,
 } from '@ui/hooks/use-karton';
-import {
-  useEffect,
-  useState,
-  useMemo,
-  useCallback,
-  useRef,
-  useLayoutEffect,
-} from 'react';
+import { useState, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import { cn } from '@ui/utils';
-import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/types';
 import type { MountEntry, AppState } from '@shared/karton-contracts/ui';
 import type { Patch } from '@shared/karton-contracts/ui/shared-types';
-import { Button } from '@stagewise/stage-ui/components/button';
-import { Loader2Icon, RefreshCwIcon } from 'lucide-react';
 import { getWorkspaceDisplayInfo } from '@ui/utils/workspace-display';
 import { createRafResizeObserver } from '@ui/utils/resize-observer';
 import {
@@ -206,13 +195,7 @@ function SkillRow({
   );
 }
 
-function WorkspaceDetails({
-  mount,
-  contextFiles,
-}: {
-  mount: MountEntry;
-  contextFiles: ContextFilesResult | null;
-}) {
+function WorkspaceDetails({ mount }: { mount: MountEntry }) {
   return (
     <div className="space-y-8">
       <section className="space-y-3">
@@ -243,16 +226,7 @@ function WorkspaceDetails({
             Manage workspace context files used by the AI agent.
           </p>
         </div>
-        <WorkspaceContextFilesList
-          workspacePath={mount.path}
-          workspaceMd={
-            contextFiles?.[mount.path]?.workspaceMd ?? {
-              exists: mount.workspaceMdContent !== null,
-              path: null,
-              content: null,
-            }
-          }
-        />
+        <WorkspaceContextFilesList workspacePath={mount.path} />
       </section>
     </div>
   );
@@ -459,27 +433,15 @@ function GlobalSkillsDetails() {
 
 function WorkspaceContextFilesList({
   workspacePath,
-  workspaceMd,
 }: {
   workspacePath: string;
-  workspaceMd: { exists: boolean; path: string | null; content: string | null };
 }) {
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const generateWorkspaceMd = useKartonProcedure(
-    (p) => p.toolbox.generateWorkspaceMdForPath,
-  );
-  const isGenerating = useKartonState(
-    (s) => !!s.workspaceMdGenerating[workspacePath],
-  );
 
   const respectAgentsMd =
     preferences?.agent?.workspaceSettings?.[workspacePath]?.respectAgentsMd ??
     true;
-
-  const handleGenerate = useCallback(async () => {
-    await generateWorkspaceMd(workspacePath);
-  }, [generateWorkspaceMd, workspacePath]);
 
   const handleToggleAgentsMd = useCallback(
     async (checked: boolean) => {
@@ -514,47 +476,6 @@ function WorkspaceContextFilesList({
 
   return (
     <div className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-derived">
-      {/* WORKSPACE.md row */}
-      <div className="flex items-start gap-4 p-3">
-        <div className="-mt-1 min-w-0 flex-1">
-          <p className="font-medium text-foreground text-sm">WORKSPACE.md</p>
-          <p className="text-muted-foreground text-xs">
-            {workspaceMd.exists
-              ? 'Auto-generated project analysis.'
-              : 'Not yet generated.'}
-          </p>
-        </div>
-        {workspaceMd.exists ? (
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleGenerate}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2Icon className="size-3 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="size-3" />
-            )}
-            {isGenerating ? 'Updating…' : 'Regenerate'}
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
-            size="xs"
-            onClick={handleGenerate}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2Icon className="size-3 animate-spin" />
-            ) : (
-              <IconPenDrawSparkleFillDuo18 className="size-3" />
-            )}
-            {isGenerating ? 'Generating…' : 'Generate'}
-          </Button>
-        )}
-      </div>
-
       {/* AGENTS.md row */}
       <div
         className="flex cursor-pointer items-start gap-4 p-3"
@@ -621,42 +542,6 @@ export function SkillsContextSection() {
       },
     ),
   );
-  const getContextFiles = useKartonProcedure((p) => p.toolbox.getContextFiles);
-  const getContextFilesRef = useRef(getContextFiles);
-  getContextFilesRef.current = getContextFiles;
-
-  const [contextFiles, setContextFiles] = useState<ContextFilesResult | null>(
-    null,
-  );
-
-  const workspaceMdGenerating = useKartonState((s) => s.workspaceMdGenerating);
-  const prevGeneratingRef = useRef<Record<string, boolean>>({});
-
-  const mountPathsKey = useMemo(
-    () => workspaceMounts.map((m) => m.path).join('\0'),
-    [workspaceMounts],
-  );
-
-  useEffect(() => {
-    void getContextFilesRef.current().then((files) => {
-      setContextFiles(files);
-    });
-  }, [mountPathsKey]);
-
-  useEffect(() => {
-    const prev = prevGeneratingRef.current;
-    const justFinished = Object.keys(prev).some(
-      (path) => prev[path] && !workspaceMdGenerating[path],
-    );
-    prevGeneratingRef.current = { ...workspaceMdGenerating };
-
-    if (justFinished) {
-      void getContextFilesRef.current().then((files) => {
-        setContextFiles(files);
-      });
-    }
-  }, [workspaceMdGenerating]);
-
   const GLOBAL_TAB_ID = '__global__';
 
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
@@ -722,10 +607,7 @@ export function SkillsContextSection() {
             {isGlobalTab ? (
               <GlobalSkillsDetails />
             ) : selectedMount ? (
-              <WorkspaceDetails
-                mount={selectedMount}
-                contextFiles={contextFiles}
-              />
+              <WorkspaceDetails mount={selectedMount} />
             ) : null}
           </div>
         </div>

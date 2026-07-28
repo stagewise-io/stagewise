@@ -54,6 +54,23 @@ function makeMockHostModels(): HostModels {
   } as unknown as HostModels;
 }
 
+function makeMockHostModelsWithPreset(
+  presetModels: { modelId: string; providerInstanceId?: string }[],
+): HostModels {
+  const base = makeMockHostModels();
+  return {
+    ...base,
+    getActivePresetModels: vi.fn(() =>
+      presetModels.map((m) => ({
+        modelId: m.modelId,
+        ...(m.providerInstanceId
+          ? { providerInstanceId: m.providerInstanceId }
+          : {}),
+      })),
+    ),
+  } as unknown as HostModels;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -78,7 +95,7 @@ describe('generateSimpleTitle', () => {
     expect(title).toBe('My Title');
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(hm.getWithOptions).toHaveBeenCalledWith(
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.objectContaining({ $ai_span_name: 'title-generation' }),
     );
@@ -86,17 +103,17 @@ describe('generateSimpleTitle', () => {
 
   it('falls back to the second model when the first fails', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
-      .mockResolvedValueOnce({ text: 'GPT Title' } as any);
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockResolvedValueOnce({ text: 'DeepSeek Title' } as any);
 
     const hm = makeMockHostModels();
     const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
 
-    expect(title).toBe('GPT Title');
+    expect(title).toBe('DeepSeek Title');
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
@@ -104,33 +121,111 @@ describe('generateSimpleTitle', () => {
 
   it('falls back to the third model when the first two fail', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
-      .mockRejectedValueOnce(new Error('GPT failed'))
-      .mockResolvedValueOnce({ text: 'Haiku Title' } as any);
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockResolvedValueOnce({ text: 'GPT Title' } as any);
 
     const hm = makeMockHostModels();
     const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
 
-    expect(title).toBe('Haiku Title');
+    expect(title).toBe('GPT Title');
     expect(generateTextMock).toHaveBeenCalledTimes(3);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       3,
-      'claude-haiku-4.5',
+      'gpt-5.6-luna',
       'agent-1',
       expect.any(Object),
     );
   });
 
-  it('throws when all three models fail', async () => {
+  it('throws when all models fail', async () => {
     generateTextMock
-      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
       .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
       .mockRejectedValueOnce(new Error('Haiku failed'));
 
     const hm = makeMockHostModels();
     await expect(
       generateSimpleTitle(makeMessages(2), hm, 'agent-1'),
     ).rejects.toThrow('Haiku failed');
+    expect(generateTextMock).toHaveBeenCalledTimes(5);
+  });
+
+  // -----------------------------------------------------------------------
+  // preset models as fallback (appended after utility models)
+  // -----------------------------------------------------------------------
+
+  it('falls back to active preset models after all utility models fail', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'))
+      .mockResolvedValueOnce({ text: 'Preset Title' } as any);
+
+    const hm = makeMockHostModelsWithPreset([
+      { modelId: 'claude-sonnet-4.6' },
+      { modelId: 'gpt-5.6-luna', providerInstanceId: 'openrouter-instance' },
+    ]);
+    const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
+
+    expect(title).toBe('Preset Title');
+    expect(generateTextMock).toHaveBeenCalledTimes(6);
+    expect(hm.getWithOptions).toHaveBeenNthCalledWith(
+      6,
+      'claude-sonnet-4.6',
+      'agent-1',
+      expect.any(Object),
+    );
+  });
+
+  it('tries all preset models in order as fallbacks', async () => {
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockRejectedValueOnce(new Error('GPT failed'))
+      .mockRejectedValueOnce(new Error('Gemini failed'))
+      .mockRejectedValueOnce(new Error('Haiku failed'))
+      .mockRejectedValueOnce(new Error('Sonnet failed'))
+      .mockResolvedValueOnce({ text: 'Second Preset Title' } as any);
+
+    const hm = makeMockHostModelsWithPreset([
+      { modelId: 'claude-sonnet-4.6' },
+      { modelId: 'gpt-5.6-luna', providerInstanceId: 'openrouter-instance' },
+    ]);
+    const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
+
+    expect(title).toBe('Second Preset Title');
+    expect(generateTextMock).toHaveBeenCalledTimes(7);
+    expect(hm.getWithOptions).toHaveBeenNthCalledWith(
+      7,
+      'gpt-5.6-luna',
+      'agent-1',
+      expect.objectContaining({
+        $provider_instance_id: 'openrouter-instance',
+      }),
+    );
+  });
+
+  it('deduplicates preset models already in the utility list', async () => {
+    // 'gpt-5.6-luna' is both the 3rd utility model and a preset model.
+    // It should only be tried once (at its utility position), not retried.
+    generateTextMock
+      .mockRejectedValueOnce(new Error('Default failed'))
+      .mockRejectedValueOnce(new Error('DeepSeek failed'))
+      .mockResolvedValueOnce({ text: 'GPT Title' } as any);
+
+    const hm = makeMockHostModelsWithPreset([
+      { modelId: 'gpt-5.6-luna' },
+      { modelId: 'claude-sonnet-4.6' },
+    ]);
+    const title = await generateSimpleTitle(makeMessages(2), hm, 'agent-1');
+
+    expect(title).toBe('GPT Title');
+    // Only 3 calls: default, deepseek, gpt — gpt is not retried from preset.
     expect(generateTextMock).toHaveBeenCalledTimes(3);
   });
 
@@ -210,25 +305,27 @@ describe('generateSimpleTitle', () => {
     // First model attempted, then fallback
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
   });
 
   it('exhausts all models via timeout and throws', async () => {
-    // All three models fail instantly (simulates what happens after abort)
+    // All models fail instantly (simulates what happens after abort)
     const abortError = new DOMException(
       'The operation was aborted.',
       'AbortError',
     );
     generateTextMock
+      .mockRejectedValueOnce(abortError)
+      .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError)
       .mockRejectedValueOnce(abortError);
@@ -237,21 +334,33 @@ describe('generateSimpleTitle', () => {
     await expect(
       generateSimpleTitle(makeMessages(2), hm, 'agent-1'),
     ).rejects.toThrow('aborted');
-    expect(generateTextMock).toHaveBeenCalledTimes(3);
+    expect(generateTextMock).toHaveBeenCalledTimes(5);
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       1,
-      'gemini-3.1-flash-lite',
+      'default',
       'agent-1',
       expect.any(Object),
     );
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       2,
-      'gpt-5.4-nano',
+      'deepseek-v4-flash',
       'agent-1',
       expect.any(Object),
     );
     expect(hm.getWithOptions).toHaveBeenNthCalledWith(
       3,
+      'gpt-5.6-luna',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(hm.getWithOptions).toHaveBeenNthCalledWith(
+      4,
+      'gemini-3.1-flash-lite',
+      'agent-1',
+      expect.any(Object),
+    );
+    expect(hm.getWithOptions).toHaveBeenNthCalledWith(
+      5,
       'claude-haiku-4.5',
       'agent-1',
       expect.any(Object),

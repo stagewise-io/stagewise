@@ -89,13 +89,18 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { toast } from '@stagewise/stage-ui/components/toaster';
 import {
   getPromptHistoryStep,
   type PromptHistoryDirection,
 } from './prompt-history';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { AgentStatusDot } from '../../../_components/agent-status-dot';
-import { IconArrowRightOutline18 } from '@stagewise/icons';
+import {
+  IconArrowRightOutline18,
+  IconArrowUpRightOutline18,
+} from '@stagewise/icons';
+import { useOpenSideChat } from '@ui/hooks/use-open-side-chat';
 
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -199,6 +204,7 @@ function getPendingWorkspacePreparationKind(
 
 export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const chatInputContainerRef = useRef<HTMLDivElement>(null);
   const { registerDraftGetter } = useChatDraft();
 
   // Register the draft getter so other components can access the current input
@@ -209,12 +215,14 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     return unregister;
   }, [registerDraftGetter]);
 
-  const [openAgent] = useOpenAgent();
+  const [openAgent, setOpenAgent] = useOpenAgent();
   const { focusAgentFromHotkey } = useAgentSwitcher();
   const nextAttentionTarget = useNextAgentRequiringAttention(openAgent);
-
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const { collapsed: contentCollapsed } = useContentCollapsed();
+  const sideChatParentId = useKartonState((s) =>
+    openAgent ? s.agents.instances[openAgent]?.sideChatParentId : null,
+  );
 
   const isWorking = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.isWorking || false : false,
@@ -255,6 +263,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const setChatInputState = useKartonProcedure(
     (p) => p.agents.updateInputState,
   );
+  const promoteSideChat = useKartonProcedure((p) => p.agents.promoteSideChat);
+  const setLastOpenAgentId = useKartonProcedure(
+    (p) => p.browser.setLastOpenAgentId,
+  );
+  const closeTab = useKartonProcedure((p) => p.browser.closeTab);
   const togglePanelKeyboardFocus = useKartonProcedure(
     (p) => p.browser.layout.togglePanelKeyboardFocus,
   );
@@ -374,6 +387,39 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     if (!tabId) return null;
     return s.contentTabs.tabs[tabId] ?? null;
   });
+  const sideChatTabId =
+    sideChatParentId && activeTabData?.type === 'side-chat'
+      ? activeTabData.id
+      : null;
+  const isActiveChatSurface = sideChatParentId
+    ? Boolean(sideChatTabId)
+    : activeTabData?.type !== 'side-chat';
+
+  const handlePromoteSideChat = useCallback(() => {
+    if (!openAgent || !sideChatTabId) return;
+    void promoteSideChat(openAgent)
+      .then(() => setLastOpenAgentId(openAgent))
+      .then(() => {
+        setOpenAgent(openAgent);
+        return closeTab(sideChatTabId);
+      })
+      .catch((error) => {
+        toast({
+          id: `side-chat-promote-error-${sideChatTabId}`,
+          title: 'Could not keep side chat',
+          message: error instanceof Error ? error.message : String(error),
+          type: 'error',
+          actions: [],
+        });
+      });
+  }, [
+    closeTab,
+    openAgent,
+    promoteSideChat,
+    setLastOpenAgentId,
+    setOpenAgent,
+    sideChatTabId,
+  ]);
 
   const hasVisibleBrowsingTab = useMemo(() => {
     if (!activeTabData) return false;
@@ -382,7 +428,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       activeTabData.agentInstanceId != null &&
       activeTabData.agentInstanceId !== openAgent;
     return (
-      activeTabData.type !== 'terminal' &&
+      (activeTabData.type === undefined || activeTabData.type === 'browser') &&
       !activeTabData.url?.startsWith('stagewise://internal/') &&
       !ownedByOtherAgent
     );
@@ -395,9 +441,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
   // Karton procedures
   const sendUserMessage = useKartonProcedure((p) => p.agents.sendUserMessage);
-  const setLastOpenAgentId = useKartonProcedure(
-    (p) => p.browser.setLastOpenAgentId,
-  );
+  const openSideChat = useOpenSideChat();
   const stopAgent = useKartonProcedure((p) => p.agents.stop);
   const createWorkspaceGitWorktree = useKartonProcedure(
     (p) => p.toolbox.createWorkspaceGitWorktree,
@@ -676,6 +720,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   useEffect(() => {
     const handler = (e: WindowEventMap['chat-restore-checkpoint']) => {
       const detail = e.detail;
+      if (detail.agentId !== openAgent) return;
       if (isWorkingRef.current && openAgent) {
         // Agent is streaming — stop first, defer restore until idle
         setPendingCheckpointRestore(detail);
@@ -734,7 +779,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     if (openAgent) await stopAgent(openAgent);
   }, [stopAgent, openAgent, isEarlyAbortEligible]);
 
-  // Stable abort callback for ChatInputActions — avoids memo-busting when
+  // Stable abort callback for ChatInput — avoids memo-busting when
   // abortAgent's reference changes (e.g. openAgent switches).
   const abortAgentRef = useRef(abortAgent);
   abortAgentRef.current = abortAgent;
@@ -808,6 +853,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     openAgent ? (s.toolbox[openAgent]?.pendingUserQuestion?.id ?? null) : null,
   );
   const hasPendingQuestion = pendingQuestionId !== null;
+  const canStopAgent = isWorking && !hasPendingQuestion;
   const pendingQuestionIdRef = useRef(pendingQuestionId);
   pendingQuestionIdRef.current = pendingQuestionId;
   const interruptQuestionWithMessage = useKartonProcedure(
@@ -972,7 +1018,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     );
 
     const markdownText = chatInputRef.current!.getTextContent();
-
     // Include all file attachments (validation is handled by prompt builder)
     // Note: We no longer store tipTapContent - the text part contains markdown
     // with attachment links (e.g., [](path:att/abc123)) generated by editor.getText()
@@ -989,10 +1034,17 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             : undefined,
       },
     };
-
     // Save for restore on error
     const previousContent = currentLocalInputState;
     const previousFileAttachments = currentFileAttachments;
+    const restoreInput = () => {
+      localInputStateRef.current = previousContent;
+      setLocalInputState(previousContent);
+      setFileAttachments(previousFileAttachments);
+      setCanSendMessage(true);
+      if (openAgent)
+        void setChatInputState(openAgent, JSON.stringify(previousContent));
+    };
 
     clearAll();
     stopContextSelector();
@@ -1011,7 +1063,9 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     const didDispatchOptimisticMessage = !isWorkingRef.current;
     if (didDispatchOptimisticMessage)
       window.dispatchEvent(
-        new CustomEvent('chat-message-sent', { detail: { message } }),
+        new CustomEvent('chat-message-sent', {
+          detail: { agentId: openAgent!, message },
+        }),
       );
 
     const workspacePreparationKind =
@@ -1025,6 +1079,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       window.dispatchEvent(
         new CustomEvent('chat-workspace-preparation-started', {
           detail: {
+            agentId: openAgent!,
             clientId: message.id,
             kind: workspacePreparationKind,
           },
@@ -1036,7 +1091,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       if (!didDispatchOptimisticMessage || !workspacePreparationKind) return;
       window.dispatchEvent(
         new CustomEvent('chat-workspace-preparation-finished', {
-          detail: { clientId: message.id },
+          detail: { agentId: openAgent!, clientId: message.id },
         }),
       );
     };
@@ -1046,16 +1101,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       finishWorkspacePreparation();
       if (!workspaceActionResult.ok) {
         // Restore input on workspace preparation failure.
-        localInputStateRef.current = previousContent;
-        setLocalInputState(previousContent);
-        setFileAttachments(previousFileAttachments);
-        setCanSendMessage(true);
-        if (openAgent)
-          void setChatInputState(openAgent, JSON.stringify(previousContent));
+        restoreInput();
         if (didDispatchOptimisticMessage) {
           window.dispatchEvent(
             new CustomEvent('chat-message-failed', {
-              detail: { clientId: message.id },
+              detail: { agentId: openAgent!, clientId: message.id },
             }),
           );
         }
@@ -1089,17 +1139,12 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     } catch (error) {
       finishWorkspacePreparation();
       // Restore input on failure
-      localInputStateRef.current = previousContent;
-      setLocalInputState(previousContent);
-      setFileAttachments(previousFileAttachments);
-      setCanSendMessage(markdownText.trim().length > 0);
-      if (openAgent)
-        void setChatInputState(openAgent, JSON.stringify(previousContent));
+      restoreInput();
       // Remove the optimistic message on failure
       if (didDispatchOptimisticMessage) {
         window.dispatchEvent(
           new CustomEvent('chat-message-failed', {
-            detail: { clientId: message.id },
+            detail: { agentId: openAgent!, clientId: message.id },
           }),
         );
       }
@@ -1126,12 +1171,14 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     focusAgentFromHotkey(nextAttentionTarget.id);
     void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
   };
+  const canUseNextAttention =
+    isActiveChatSurface && !sideChatParentId && !!nextAttentionTarget;
   const { setRef: nextAttentionRef, isWinner: nextAttentionIsCmdEnterWinner } =
     useCmdEnterTarget({
       id: 'next-attention-chat',
       priority: CmdEnterPriority.NEXT_ATTENTION_CHAT,
       action: handleNextAttentionAgentClick,
-      enabled: !!nextAttentionTarget,
+      enabled: canUseNextAttention,
     });
 
   // Quantize to nearest 1 000 tokens so the value only changes when
@@ -1300,7 +1347,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     }
     if (
       !target ||
-      (!target.closest('#chat-input-container-box') &&
+      (!chatInputContainerRef.current?.contains(target) &&
         !target.closest('#element-selector-element-canvas'))
     ) {
       // If relatedTarget is null, the app might be losing focus (e.g., CMD+tab)
@@ -1397,6 +1444,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       togglePanelKeyboardFocus,
     ]),
     HotkeyActions.TOGGLE_CONTEXT_SELECTOR,
+    isActiveChatSurface,
   );
 
   // Cmd+L: focus chat input. One-way command; Escape/external focus
@@ -1414,6 +1462,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       chatInputRef.current?.focus();
     }, [chatInputActive, setChatInputActive, togglePanelKeyboardFocus]),
     HotkeyActions.FOCUS_CHAT_INPUT,
+    isActiveChatSurface,
   );
 
   useHotKeyListener(
@@ -1425,15 +1474,16 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       [shouldPreserveNativeCopy],
     ),
     HotkeyActions.STOP_AGENT,
-    isWorking && !hasPendingQuestion,
+    isActiveChatSurface && canStopAgent,
   );
 
   useEventListener(
     'keydown',
     (e: KeyboardEvent) => {
+      if (!isActiveChatSurface) return;
       if (e.code === 'Escape' && chatInputActive) {
         if (e.defaultPrevented) return; // ChatInput's onEscape already handled it
-        if (isWorking && !hasPendingQuestion) {
+        if (canStopAgent) {
           abortAgentRef.current();
           return;
         }
@@ -1837,11 +1887,12 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     <footer className="z-20 flex shrink-0 flex-col items-stretch gap-1 px-1 pb-1">
       <MessageAttachmentsProvider elements={[]} attachments={fileAttachments}>
         <div
+          ref={chatInputContainerRef}
           className={cn(
             'relative flex flex-row items-stretch gap-1 rounded-md bg-background p-2 shadow-elevation-1 ring-1 ring-derived-strong transition-colors dark:bg-surface-1',
             isDragOver && 'bg-hover-derived!',
           )}
-          id="chat-input-container-box"
+          data-chat-input-container
           data-tutorial="chat-input"
           data-chat-active={chatInputActive}
           onKeyDown={(e) => {
@@ -1887,6 +1938,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             attachmentCount={fileAttachments.length}
             showModelSelect
             onModelChange={handleModelChange}
+            onStop={canStopAgent ? stableAbortAgent : undefined}
             showContextUsageRing={
               !!usedTokens && (isVerboseMode || contextUsed > 80)
             }
@@ -1902,11 +1954,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             onAttachmentRemoved={handleAttachmentRemoved}
             mentionContext={mentionContext}
             slashCommands={slashCommands}
+            allowSideChatCommand={!sideChatParentId}
+            onOpenSideChat={openSideChat}
           />
           <ChatInputActions
-            isAgentWorking={isWorking}
-            hasPendingQuestion={hasPendingQuestion}
-            onStop={stableAbortAgent}
             showElementSelectorButton={hasVisibleBrowsingTab}
             elementSelectionActive={elementSelectionActive}
             onToggleElementSelection={handleToggleElementSelection}
@@ -1922,7 +1973,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       {workspaceActionError && (
         <WorkspaceActionErrorMessage message={workspaceActionError} />
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <WorkspaceSelect
             onWorkspaceChange={handleWorkspaceChange}
@@ -1931,7 +1982,18 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             onWorkspaceActionConfigChange={handleWorkspaceActionConfigChange}
           />
         </div>
-        {nextAttentionTarget ? (
+        {sideChatTabId ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="shrink-0 text-muted-foreground"
+            disabled={isWorking}
+            onClick={handlePromoteSideChat}
+          >
+            <IconArrowUpRightOutline18 className="size-3.5" />
+            Keep as main chat
+          </Button>
+        ) : canUseNextAttention && nextAttentionTarget ? (
           <div className="flex shrink-0 items-center">
             {nextAttentionIsCmdEnterWinner ? (
               <HotkeyCombo

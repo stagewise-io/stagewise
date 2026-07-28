@@ -75,26 +75,6 @@ export function createUniversalToolbox(
       return map;
     },
 
-    async getWorkspaceMd(agentInstanceId: string) {
-      const read = deps.host.readWorkspaceMdFromDisk;
-      if (!read) return [];
-      const prefixes = deps.mountManager.getMountPrefixes(agentInstanceId);
-      if (!prefixes) return [];
-      const out: Array<{
-        mountPrefix: string;
-        path: string;
-        content: string;
-      }> = [];
-      for (const prefix of prefixes) {
-        const workspacePath =
-          deps.mountManager.getWorkspacePathForPrefix(prefix);
-        if (!workspacePath) continue;
-        const content = (await read(workspacePath)) ?? '';
-        out.push({ mountPrefix: prefix, path: workspacePath, content });
-      }
-      return out;
-    },
-
     async undoToolCalls(
       _toolCallIds: string[],
       _agentInstanceId: string,

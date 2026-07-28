@@ -20,14 +20,18 @@ import {
   type RecentlyOpenedWorkspace,
   type ExperienceSurvey,
   type FounderCallSurvey,
+  type OnboardingCompletionSummary,
 } from '@shared/karton-contracts/ui';
 import type { KartonService } from './karton';
 import type { Logger } from './logger';
 import { DisposableService } from './disposable';
 import { readPersistedData, writePersistedData } from '../utils/persisted-data';
 import type { TelemetryService } from './telemetry';
-import type { ModelProvider } from '@shared/karton-contracts/ui/shared-types';
-import type { CodingPlanId } from '@shared/coding-plans';
+import {
+  modelProviderSchema,
+  type ModelProvider,
+} from '@shared/karton-contracts/ui/shared-types';
+import { codingPlanIds, type CodingPlanId } from '@shared/coding-plan-ids';
 import type { GitRepositoryInfo, GitService } from './git';
 
 export type OnboardingAuthCompletion = {
@@ -35,6 +39,39 @@ export type OnboardingAuthCompletion = {
   provider?: ModelProvider;
   plan_id?: CodingPlanId;
 };
+
+type OnboardingCompletionInput = {
+  value: boolean;
+  auth?: OnboardingAuthCompletion;
+  summary?: OnboardingCompletionSummary;
+};
+
+const onboardingAuthCompletionSchema = z
+  .object({
+    auth_method: z.enum(['stagewise', 'api-keys', 'coding-plan', 'unknown']),
+    provider: modelProviderSchema.optional(),
+    plan_id: z.enum(codingPlanIds).optional(),
+  })
+  .strict();
+
+const onboardingCompletionSummarySchema = z
+  .object({
+    onboarding_run_id: z.string(),
+    total_duration_ms: z.number().nonnegative(),
+    connected_provider_keys: z.array(z.string()),
+    connected_provider_count: z.number().int().nonnegative(),
+    provider_step_skipped: z.boolean(),
+    personalization_changed: z.boolean(),
+  })
+  .strict();
+
+const onboardingCompletionInputSchema = z
+  .object({
+    value: z.boolean(),
+    auth: onboardingAuthCompletionSchema.optional(),
+    summary: onboardingCompletionSummarySchema.optional(),
+  })
+  .strict();
 
 function redactWorkspacePathForTelemetry(workspacePath: string): string {
   return createHash('sha256').update(workspacePath).digest('hex').slice(0, 12);
@@ -212,11 +249,16 @@ export class UserExperienceService extends DisposableService {
       'userExperience.setHasSeenOnboardingFlow',
       async (
         _callingClientId: string,
-        input: boolean | { value: boolean; auth?: OnboardingAuthCompletion },
+        input: boolean | OnboardingCompletionInput,
       ) => {
-        const value = typeof input === 'boolean' ? input : input.value;
-        const auth = typeof input === 'boolean' ? undefined : input.auth;
-        await this.setHasSeenOnboardingFlow(value, auth);
+        if (typeof input === 'boolean') {
+          await this.setHasSeenOnboardingFlow(input);
+          return;
+        }
+
+        const { value, auth, summary } =
+          onboardingCompletionInputSchema.parse(input);
+        await this.setHasSeenOnboardingFlow(value, auth, summary);
       },
     );
     this.uiKarton.registerServerProcedureHandler(
@@ -936,6 +978,7 @@ export class UserExperienceService extends DisposableService {
   public async setHasSeenOnboardingFlow(
     value: boolean,
     auth: OnboardingAuthCompletion = { auth_method: 'unknown' },
+    summary?: OnboardingCompletionSummary,
   ) {
     try {
       await this.writeOnboardingState(value);
@@ -951,7 +994,15 @@ export class UserExperienceService extends DisposableService {
         this.telemetryService.capture('onboarding-completed', {
           skipped: false,
           telemetry_level: this.telemetryService.telemetryLevel,
-          ...auth,
+          auth_method: auth.auth_method,
+          provider: auth.provider,
+          plan_id: auth.plan_id,
+          onboarding_run_id: summary?.onboarding_run_id,
+          total_duration_ms: summary?.total_duration_ms,
+          connected_provider_keys: summary?.connected_provider_keys,
+          connected_provider_count: summary?.connected_provider_count,
+          provider_step_skipped: summary?.provider_step_skipped,
+          personalization_changed: summary?.personalization_changed,
         });
       }
     } catch (error) {

@@ -29,8 +29,6 @@ export function createCliToolboxPort(deps: {
       }));
     },
 
-    setWorkspaceMdContent() {},
-
     async acceptAllPendingEditsForAgent() {},
 
     async getEditedFilePathsForAgent() {

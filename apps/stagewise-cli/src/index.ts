@@ -10,7 +10,6 @@ import {
   AgentStore,
   AgentTypeRegistry,
   CommandRegistry,
-  WorkspaceMdAgent,
   createUniversalToolbox,
   createInitialAgentSystemState,
 } from '@stagewise/agent-core';
@@ -22,7 +21,6 @@ import {
   MEMORY_DOMAIN_ID,
   PLANS_DOMAIN_ID,
   WORKSPACE_DOMAIN_ID,
-  WORKSPACE_MD_DOMAIN_ID,
   createAgentsMdDomainAdapter,
   createEnabledSkillsDomainAdapter,
   createFileDiffsDomainAdapter,
@@ -30,7 +28,6 @@ import {
   createMemoryDomainAdapter,
   createPlansDomainAdapter,
   createWorkspaceDomainAdapter,
-  createWorkspaceMdDomainAdapter,
 } from '@stagewise/agent-core/env/adapters';
 import type { Logger } from '@stagewise/agent-core/host';
 import type { BaseAgentToolboxView } from '@stagewise/agent-core/agents';
@@ -203,13 +200,11 @@ async function main() {
   );
 
   const store = new AgentStore(createInitialAgentSystemState());
-  const workspaceMdRelativePath = host.workspaceMdRelativePath();
   const mountManager = new MountManager({
     store,
     logger,
     hooks: {},
     getAgentType: () => 'cli-chat',
-    workspaceMdRelativePath,
   });
 
   const toolboxPort = createCliToolboxPort({ mountManager, store });
@@ -247,7 +242,6 @@ async function main() {
   const registry = new CommandRegistry();
   const agentTypeRegistry = new AgentTypeRegistry();
   agentTypeRegistry.register(AgentTypes.CHAT, CliChatAgent);
-  agentTypeRegistry.register(AgentTypes.WORKSPACE_MD, WorkspaceMdAgent);
 
   const manager = new AgentManager({
     host,
@@ -273,13 +267,6 @@ async function main() {
     createAgentsMdDomainAdapter({
       host,
       mountManager,
-      workspaceMdRelativePath,
-    }),
-  );
-  manager.registerEnvAdapter(
-    createWorkspaceMdDomainAdapter({
-      mountManager,
-      workspaceMdRelativePath,
     }),
   );
   manager.registerEnvAdapter(createEnabledSkillsDomainAdapter({ host }));
@@ -308,7 +295,6 @@ async function main() {
     envDomainIds: [
       WORKSPACE_DOMAIN_ID,
       AGENTS_MD_DOMAIN_ID,
-      WORKSPACE_MD_DOMAIN_ID,
       ENABLED_SKILLS_DOMAIN_ID,
       MEMORY_DOMAIN_ID,
       PLANS_DOMAIN_ID,
@@ -316,11 +302,6 @@ async function main() {
       FILE_DIFFS_DOMAIN_ID,
       SHELLS_DOMAIN_ID,
     ],
-  });
-  // WORKSPACE_MD child agent only needs the workspace snapshot to resolve
-  // mount prefixes (mirrors the browser host profile).
-  host.defineAgentProfile(AgentTypes.WORKSPACE_MD, {
-    envDomainIds: [WORKSPACE_DOMAIN_ID],
   });
 
   const agent = await manager.createAgent(

@@ -199,6 +199,7 @@ export class AutoUpdateService extends DisposableService {
 
       // Reset downloaded state so the guard in checkForUpdates() allows
       // re-checking against the new channel's update feed.
+      this.dismissUpdateNotification();
       this.updateDownloaded = false;
       this.updateInfo = null;
       this.setAutoUpdateState('idle');
@@ -297,6 +298,11 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(`[AutoUpdateService] Error message: ${error.message}`);
       this.logger.debug(`[AutoUpdateService] Error stack: ${error.stack}`);
       this.report(error, 'autoUpdaterError');
+
+      // Keep the ready-to-install update visible.
+      if (this.updateDownloaded) return;
+
+      this.dismissUpdateNotification();
       this.setAutoUpdateState('error', null, error.message);
     });
 
@@ -309,6 +315,14 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] Update available, download starting automatically',
       );
+      this.dismissUpdateNotification();
+      this.updateNotificationId = this.notificationService.showNotification({
+        title: 'Update Available',
+        message: 'A new version is being downloaded.',
+        type: 'info',
+        icon: 'spinner',
+        actions: [],
+      });
       this.setAutoUpdateState('downloading');
     });
 
@@ -316,6 +330,7 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(
         '[AutoUpdateService] No update available, app is up to date',
       );
+      this.dismissUpdateNotification();
       this.setAutoUpdateState('not-available');
     });
 
@@ -360,12 +375,18 @@ export class AutoUpdateService extends DisposableService {
     });
   }
 
+  private dismissUpdateNotification(): void {
+    if (!this.updateNotificationId) return;
+
+    this.notificationService.dismissNotification(this.updateNotificationId);
+    this.updateNotificationId = null;
+  }
+
   private showUpdateReadyNotification(releaseName: string): void {
     const versionDisplay = releaseName || 'a new version';
 
     // Dismiss any previous update notification before showing a new one
-    if (this.updateNotificationId)
-      this.notificationService.dismissNotification(this.updateNotificationId);
+    this.dismissUpdateNotification();
 
     this.updateNotificationId = this.notificationService.showNotification({
       title: 'Update Ready',

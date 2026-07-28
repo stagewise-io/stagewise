@@ -24,6 +24,7 @@ import { NotificationService } from './services/notification';
 import { PagesService } from './services/pages';
 import { NotificationSoundsService } from './services/notification-sounds';
 import { WindowLayoutService } from './services/window-layout';
+import { revealPathInFileManager } from './services/window-layout/protocol-utils';
 import { HistoryService } from './services/history';
 import { FaviconService } from './services/favicon';
 import { WebDataService } from './services/webdata';
@@ -44,7 +45,6 @@ import {
   createAgentCoreSeam,
   attachAgentCoreBridge,
 } from './services/agent-core-bridge/wiring';
-import { registerToolboxGenerateWorkspaceMd } from './services/agent-core-bridge/handlers/toolbox';
 import { createBrowserHostPaths } from './services/agent-core-bridge/host-paths';
 import { createBrowserAgentHost } from './services/agent-core-bridge/host';
 import { createLazyBrowserHostModels } from './services/agent-core-bridge/host-models';
@@ -71,6 +71,7 @@ import { AssetCacheService } from './services/asset-cache';
 import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
 import path from 'node:path';
 import { registerStartupUrlHandler } from './startup-url-events';
+import { requestAppDataReset } from './utils/app-data-reset';
 import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';
 import { AgentRuntimeRecoveryService } from './services/agent-runtime-recovery';
 import { MacOSClosedLidSleepService } from './services/macos-closed-lid-sleep';
@@ -87,12 +88,12 @@ import {
   createMemoryDomainAdapter,
   createPlansDomainAdapter,
   createWorkspaceDomainAdapter,
-  createWorkspaceMdDomainAdapter,
 } from '@stagewise/agent-core/env/adapters';
 import {
   createBrowserHostEnvironmentSources,
   registerHostEnvDomainAdapters,
 } from './env-domains';
+import { SUPPORTED_IDES } from '@shared/ide-url';
 
 export type MainParameters = {
   launchOptions: {
@@ -203,6 +204,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     telemetryService,
   );
   const uiKarton = windowLayoutService.uiKarton;
+  uiKarton.setState((draft) => {
+    draft.installedIdes = SUPPORTED_IDES.filter((ide) =>
+      app.getApplicationNameForProtocol(`${ide}://`),
+    );
+  });
   const fileTreeService = await FileTreeService.create(logger, uiKarton);
   fileTreeService.setOpenFileTabHandler(
     async (metadata, agentInstanceId, options) => {
@@ -269,7 +275,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // until `setModelProviderService(...)` is called further down. The
   // `DiffHistoryService` itself never consults `host.models`, so the
   // lazy slot is invisible in practice.
-  const lazyHostModels = createLazyBrowserHostModels();
+  const lazyHostModels = createLazyBrowserHostModels(() => {
+    const agent = preferencesService.getAgentSnapshot();
+    return {
+      utilityModels: agent.utilityModels,
+      activePresetId: agent.activePresetId,
+      modelPresets: agent.modelPresets ?? [],
+    };
+  });
   const agentCoreHost = createBrowserAgentHost({
     logger,
     telemetryService,
@@ -456,6 +469,17 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     },
   );
 
+  uiKarton.registerServerProcedureHandler('appData.openFolder', async () =>
+    revealPathInFileManager(app.getPath('userData')),
+  );
+
+  uiKarton.registerServerProcedureHandler('appData.reset', async () => {
+    requestAppDataReset(app.getPath('userData'));
+    telemetryService.capture('app-data-reset');
+    if (app.isPackaged) app.relaunch();
+    app.quit();
+  });
+
   // Start remaining services that are irrelevant to non-regular operation of the app.
   const filePickerService = await FilePickerService.create(logger, uiKarton);
 
@@ -625,6 +649,14 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         (workspacePath) => gitService.getMountedWorkspaceSummary(workspacePath),
         logger,
       ),
+    (agentIds) => windowLayoutService.removeDeletedSideChatTabs(agentIds),
+  );
+  windowLayoutService.setOnCloseSideChat((agentId) =>
+    agentCoreSeam.registry.dispatch(
+      'agents.discardSideChat',
+      { callerId: 'side-chat-tab-close' },
+      [agentId],
+    ),
   );
 
   toolboxService.setWorkspaceLastUsedAtResolver(
@@ -633,12 +665,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         workspacePaths,
       )) ?? new Map(),
   );
-
-  registerToolboxGenerateWorkspaceMd(agentCoreSeam.registry, uiKarton, {
-    store: agentCoreSeam.store,
-    generateWorkspaceMdForPath: (workspacePath) =>
-      agentManagerService.generateWorkspaceMdForPath(workspacePath),
-  });
 
   // Phase 5: now that `ModelProviderService` exists, activate the lazy
   // `HostModels` slot inside the already-assembled `agentCoreHost`. Must
@@ -685,18 +711,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       mountManager: coreMountManager,
     }),
   );
-  const workspaceMdRelativePath = agentCoreHost.workspaceMdRelativePath?.();
   agentManagerService.registerEnvAdapter(
     createAgentsMdDomainAdapter({
       host: agentCoreHost,
       mountManager: coreMountManager,
-      workspaceMdRelativePath,
-    }),
-  );
-  agentManagerService.registerEnvAdapter(
-    createWorkspaceMdDomainAdapter({
-      mountManager: coreMountManager,
-      workspaceMdRelativePath,
     }),
   );
   agentManagerService.registerEnvAdapter(
@@ -778,7 +796,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   });
 
   // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
-  // workspace-md generating, search engines, global config, auth)
+  // search engines, global config, auth)
   await wirePagesStateSync({
     uiKarton,
     pagesService,
@@ -1136,20 +1154,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         if (bitmap) result[pageUrl] = bitmap;
       }
       return result;
-    },
-  );
-
-  // toolbox.getContextFiles / toolbox.generateWorkspaceMdForPath
-  uiKarton.registerServerProcedureHandler(
-    'toolbox.getContextFiles',
-    async (_cid: string) => {
-      return toolboxService.getContextFilesForAllWorkspaces();
-    },
-  );
-  uiKarton.registerServerProcedureHandler(
-    'toolbox.generateWorkspaceMdForPath',
-    async (_cid: string, workspacePath: string) => {
-      await agentManagerService.generateWorkspaceMdForPath(workspacePath);
     },
   );
 

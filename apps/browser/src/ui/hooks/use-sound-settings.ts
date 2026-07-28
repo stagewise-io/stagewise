@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 
@@ -27,6 +28,9 @@ export function useSoundSettings() {
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
   const previewSoundPack = useKartonProcedure((p) => p.config.previewSoundPack);
   const track = useTrack();
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const latestLoudnessRequestIdRef = useRef(0);
+  const latestSoundPackRequestIdRef = useRef(0);
 
   const soundLoudness: SoundLoudness =
     globalConfig.notificationSoundLoudness ?? 'subtle';
@@ -66,34 +70,68 @@ export function useSoundSettings() {
     );
     const notificationSoundLoudness =
       NOTIFICATION_LOUDNESS_OPTIONS[index]?.value ?? 'subtle';
+    if (notificationSoundLoudness === soundLoudness) return false;
 
     previewSound(currentPack, notificationSoundLoudness);
+    const requestId = latestLoudnessRequestIdRef.current + 1;
+    latestLoudnessRequestIdRef.current = requestId;
+    const save = saveQueueRef.current.then(() =>
+      setGlobalConfig({
+        notificationSoundLoudness,
+      }),
+    );
+    saveQueueRef.current = save.catch(() => {});
 
     try {
-      await setGlobalConfig({
-        notificationSoundLoudness,
-      });
-      track('changed-notification-sound-loudness', {
-        loudness: notificationSoundLoudness,
-      });
+      await save;
     } catch (error) {
       console.error('Failed to save sound loudness', error);
+      return false;
     }
+
+    if (latestLoudnessRequestIdRef.current !== requestId) return false;
+
+    void track('changed-notification-sound-loudness', {
+      loudness: notificationSoundLoudness,
+    }).catch((error) => {
+      console.error('Failed to track sound loudness change', error);
+    });
+    return true;
   };
 
   const handleSoundPackChange = async (value: unknown) => {
-    if (typeof value !== 'string' || !packOptions.includes(value)) return;
+    if (
+      typeof value !== 'string' ||
+      !packOptions.includes(value) ||
+      value === currentPack
+    ) {
+      return false;
+    }
     previewSound(value, soundLoudness);
-    try {
-      await setGlobalConfig({
+    const requestId = latestSoundPackRequestIdRef.current + 1;
+    latestSoundPackRequestIdRef.current = requestId;
+    const save = saveQueueRef.current.then(() =>
+      setGlobalConfig({
         notificationSoundPack: value,
-      });
-      track('changed-notification-sound-theme', {
-        theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
-      });
+      }),
+    );
+    saveQueueRef.current = save.catch(() => {});
+
+    try {
+      await save;
     } catch (error) {
       console.error('Failed to save sound pack', error);
+      return false;
     }
+
+    if (latestSoundPackRequestIdRef.current !== requestId) return false;
+
+    void track('changed-notification-sound-theme', {
+      theme: value === DEFAULT_SOUND_PACK ? value : 'custom',
+    }).catch((error) => {
+      console.error('Failed to track sound pack change', error);
+    });
+    return true;
   };
 
   return {

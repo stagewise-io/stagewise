@@ -20,14 +20,17 @@ import {
   getAvailableModel,
   getModelAlias,
 } from '@shared/available-models';
-import { CODING_PLANS } from '@shared/coding-plans';
+import { CODING_PLANS, resolveCodingPlanBaseUrl } from '@shared/coding-plans';
 import type { AuthService } from '@/services/auth';
 import type { PreferencesService } from '@/services/preferences';
 import type { streamText } from 'ai';
 import { wrapLanguageModel } from 'ai';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PRESET_THINKING_OVERRIDE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
+  UTILITY_THINKING_OVERRIDE_METADATA_KEY,
+  type UtilityModelThinkingOverride,
 } from '@stagewise/agent-core/host';
 import {
   findInstanceForVendor,
@@ -98,6 +101,7 @@ export type ModelWithOptions = {
   contextWindowSize: number;
   providerMode: ProviderMode;
   connectedCodingPlanId?: string;
+  providerType?: string;
   reasoningSignatureSource: ReasoningSignatureSource;
   /**
    * When true, the agent must strip the `strict` field from every tool
@@ -176,20 +180,20 @@ export class ModelProviderService {
     type: ProviderType,
   ): string | undefined {
     const config = instance.config as Record<string, unknown>;
-    const baseUrl =
-      typeof config.baseUrl === 'string' ? config.baseUrl.trim() : undefined;
-    if (baseUrl) return baseUrl;
-
     if (instance.typeId === 'coding-plan') {
       const planConfig = config as CodingPlanConfig;
       const plan = CODING_PLANS[planConfig.planId as keyof typeof CODING_PLANS];
       return (
-        plan?.baseUrl ??
+        (plan
+          ? resolveCodingPlanBaseUrl(plan, planConfig.baseUrl)
+          : undefined) ??
         getProviderTypeByVendor(getCodingPlanVendor(planConfig)).defaultBaseUrl
       );
     }
 
-    return type.defaultBaseUrl;
+    const baseUrl =
+      typeof config.baseUrl === 'string' ? config.baseUrl.trim() : undefined;
+    return baseUrl || type.defaultBaseUrl;
   }
 
   // ===========================================================================
@@ -214,6 +218,19 @@ export class ModelProviderService {
       process.env.LLM_PROXY_URL || 'https://llm.stagewise.io';
 
     const instance = findInstanceForVendor(prefs, provider);
+    if (!instance) {
+      const matchingPlanCount = prefs.providerInstances.filter((candidate) => {
+        if (candidate.typeId !== 'coding-plan') return false;
+        const plan =
+          CODING_PLANS[candidate.config.planId as keyof typeof CODING_PLANS];
+        return plan?.provider === provider;
+      }).length;
+      if (matchingPlanCount > 1) {
+        throw new Error(
+          `Multiple coding plans are configured for ${provider}; select a provider instance explicitly`,
+        );
+      }
+    }
     if (!instance || instance.typeId === 'stagewise') {
       return {
         instance: undefined,
@@ -804,6 +821,7 @@ export class ModelProviderService {
       }),
       contextWindowSize: modelSettings.modelContextRaw,
       providerMode: type.providerMode,
+      providerType: instance?.typeId ?? type.id,
       ...(resolved.connectedCodingPlanId
         ? { connectedCodingPlanId: resolved.connectedCodingPlanId }
         : {}),
@@ -935,6 +953,7 @@ export class ModelProviderService {
         typeof streamText
       >[0]['providerOptions'],
       contextWindowSize: customModel.contextWindowSize,
+      providerType: instance?.typeId ?? type.id,
       reasoningSignatureSource,
       ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
     };
@@ -1063,6 +1082,7 @@ export class ModelProviderService {
       providerOptions: resolvedProviderOptions,
       contextWindowSize: contextWindow,
       providerMode: type.providerMode,
+      providerType: instance.typeId,
       reasoningSignatureSource,
       ...(type.stripStrictFromTools ? { stripStrictFromTools: true } : {}),
     };
@@ -1094,6 +1114,42 @@ function resolveThinkingProviderOptions({
   customEndpointApiSpec,
   requestMetadata,
 }: ThinkingProviderOptionsInput): ProviderOptions {
+  // Utility model calls (title generation, context compression) pass a
+  // thinking override via metadata. When present, bypass the purpose
+  // gate — the override is explicit user configuration for this call.
+  const utilityThinkingOverride = requestMetadata?.[
+    UTILITY_THINKING_OVERRIDE_METADATA_KEY
+  ] as UtilityModelThinkingOverride | undefined;
+
+  if (utilityThinkingOverride) {
+    // Use the utility override as the thinking override, taking
+    // precedence over any catalog or instance-level override.
+    const route = {
+      providerMode,
+      modelProvider: semanticProvider,
+      thinkingProvider,
+      customEndpointApiSpec,
+    };
+    const patch = createThinkingProviderOptionsPatch({
+      model: modelSettings,
+      override: utilityThinkingOverride as ModelThinkingOverride,
+      route,
+    });
+    if (!patch) return baseProviderOptions as ProviderOptions;
+    return deepMergeProviderOptions(baseProviderOptions, patch);
+  }
+
+  // Preset thinking override: when an active preset is selected, the
+  // preset's per-model thinking configuration is passed via metadata.
+  // This takes precedence over the global `modelThinkingOverrides`
+  // lookup (the `override` parameter) so that editing a preset's
+  // thinking in settings immediately takes effect on the next turn.
+  const presetThinkingOverride = requestMetadata?.[
+    PRESET_THINKING_OVERRIDE_METADATA_KEY
+  ] as ModelThinkingOverride | undefined;
+
+  const effectiveOverride = presetThinkingOverride ?? override;
+
   if (requestMetadata?.[MODEL_REQUEST_PURPOSE_METADATA_KEY] !== 'agent-step') {
     return baseProviderOptions as ProviderOptions;
   }
@@ -1109,7 +1165,7 @@ function resolveThinkingProviderOptions({
     customEndpointApiSpec,
   };
 
-  if (!override) {
+  if (!effectiveOverride) {
     // Catalog definitions own their curated default provider options. Preserve
     // them when they cover the active transport; otherwise add only the
     // missing transport-specific default (e.g. Claude via OpenAI-compatible).
@@ -1145,7 +1201,7 @@ function resolveThinkingProviderOptions({
 
   const patch = createThinkingProviderOptionsPatch({
     model: modelSettings,
-    override,
+    override: effectiveOverride,
     route,
   });
 
@@ -1162,6 +1218,8 @@ function omitModelRequestMetadata(
   const {
     [MODEL_REQUEST_PURPOSE_METADATA_KEY]: _purpose,
     [PROVIDER_INSTANCE_ID_METADATA_KEY]: _providerInstanceId,
+    [UTILITY_THINKING_OVERRIDE_METADATA_KEY]: _utilityThinkingOverride,
+    [PRESET_THINKING_OVERRIDE_METADATA_KEY]: _presetThinkingOverride,
     ...telemetry
   } = metadata;
   return telemetry;

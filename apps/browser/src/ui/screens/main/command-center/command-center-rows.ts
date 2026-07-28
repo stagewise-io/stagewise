@@ -80,6 +80,11 @@ function buildGlobalRows(items: CommandCenterItem[]): CommandCenterRenderRow[] {
   );
   pushSection(
     rows,
+    'Terminals',
+    indexedItems.filter(({ item }) => item.kind === 'terminal'),
+  );
+  pushSection(
+    rows,
     'Files',
     indexedItems.filter(({ item }) => item.kind === 'file'),
   );
@@ -136,9 +141,11 @@ export function buildGroupedRows(
   const label =
     mode === 'browser'
       ? 'Browser'
-      : mode === 'files'
-        ? (options?.filesLabel ?? 'Files')
-        : 'Settings';
+      : mode === 'terminals'
+        ? 'Terminals'
+        : mode === 'files'
+          ? (options?.filesLabel ?? 'Files')
+          : 'Settings';
 
   return [
     {

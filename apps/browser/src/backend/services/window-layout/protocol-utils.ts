@@ -101,7 +101,7 @@ export async function openFolderFirstFileInIde(
   const params = new URLSearchParams(
     qIdx >= 0 ? withoutScheme.slice(qIdx) : '',
   );
-  const ide = (params.get('ide') ?? 'other') as OpenFilesInIde;
+  const ide = (params.get('ide') ?? 'fileManager') as OpenFilesInIde;
 
   try {
     const entries = await fs.readdir(folderPath, { withFileTypes: true });

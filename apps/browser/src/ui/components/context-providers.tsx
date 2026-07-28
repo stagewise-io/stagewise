@@ -1,4 +1,3 @@
-import { MessageEditStateProvider } from '@ui/hooks/use-message-edit-state';
 import type { ReactNode } from 'react';
 import { KartonProvider } from '@ui/hooks/use-karton';
 import { TooltipProvider } from '@stagewise/stage-ui/components/tooltip';
@@ -17,12 +16,10 @@ export function ContextProviders({ children }: { children?: ReactNode }) {
         <PostHogProvider>
           <ErrorBoundary>
             <TutorialProvider>
-              <MessageEditStateProvider>
-                <TabStateUIProvider>
-                  <PersonalizationThemeSyncer />
-                  {children}
-                </TabStateUIProvider>
-              </MessageEditStateProvider>
+              <TabStateUIProvider>
+                <PersonalizationThemeSyncer />
+                {children}
+              </TabStateUIProvider>
             </TutorialProvider>
           </ErrorBoundary>
         </PostHogProvider>

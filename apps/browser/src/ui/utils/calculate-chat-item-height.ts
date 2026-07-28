@@ -75,8 +75,7 @@ function isReadOnlyToolPart(part: MessagePart): boolean {
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||
     part.type === 'tool-readConsoleLogs' ||
-    part.type === 'tool-getLintingDiagnostics' ||
-    part.type === 'tool-updateWorkspaceMd'
+    part.type === 'tool-getLintingDiagnostics'
   );
 }
 

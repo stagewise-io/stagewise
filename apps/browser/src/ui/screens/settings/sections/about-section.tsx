@@ -417,6 +417,42 @@ function OpenSourceLicenses() {
   );
 }
 
+function AppDataManagement() {
+  const openFolder = useKartonProcedure((p) => p.appData.openFolder);
+  const resetAppData = useKartonProcedure((p) => p.appData.reset);
+
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="font-medium text-base text-foreground">App Data</h3>
+        <p className="text-muted-foreground text-sm">
+          Open the data folder for troubleshooting or reset stagewise to a clean
+          setup.
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={() => openFolder()}>
+          Open Folder
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => {
+            if (
+              window.confirm(
+                'Delete all app data and restart? This cannot be undone. Your installation identifier will be retained.',
+              )
+            )
+              resetAppData();
+          }}
+        >
+          Delete App Data
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function AboutSection() {
   const appInfo = useKartonState((s) => s.appInfo);
   const [appLicenseOpen, setAppLicenseOpen] = useState(false);
@@ -575,6 +611,12 @@ export function AboutSection() {
               </div>
             </div>
           </div>
+
+          {/* Divider */}
+          <hr className="border-border/30" />
+
+          {/* App Data Management */}
+          <AppDataManagement />
 
           {/* Divider */}
           <hr className="border-border/30" />

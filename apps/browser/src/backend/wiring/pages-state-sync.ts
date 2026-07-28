@@ -98,7 +98,6 @@ export async function wirePagesStateSync(deps: {
         path: m.path,
         git: m.git,
         skills: m.skills,
-        workspaceMdContent: m.workspaceMdContent,
         agentsMdContent: m.agentsMdContent,
       }));
     },

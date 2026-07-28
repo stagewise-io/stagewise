@@ -8,6 +8,7 @@ import { up as v007Up } from './v007-normalize-history';
 import { up as v008Up } from './v008-add-title-locked-by-user';
 import { up as v009Up } from './v009-add-tool-approval-mode';
 import { up as v010Up } from './v010-add-active-provider-instance-id';
+import { up as v011Up } from './v011-add-side-chats';
 
 const registry: MigrationScript[] = [
   { version: 2, name: 'add-mounted-workspaces', up: v002Up },
@@ -19,7 +20,8 @@ const registry: MigrationScript[] = [
   { version: 8, name: 'add-title-locked-by-user', up: v008Up },
   { version: 9, name: 'add-tool-approval-mode', up: v009Up },
   { version: 10, name: 'add-active-provider-instance-id', up: v010Up },
+  { version: 11, name: 'add-side-chats', up: v011Up },
 ];
-const schemaVersion = 10;
+const schemaVersion = 11;
 
 export { registry, schemaVersion };

@@ -1,7 +1,10 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
-import type { CodingPlan } from '@shared/coding-plans';
+import {
+  resolveCodingPlanValidationBaseUrl,
+  type CodingPlan,
+} from '@shared/coding-plans';
 import { generateText, type ModelMessage } from 'ai';
 
 export type ApiKeyProvider =
@@ -137,6 +140,7 @@ async function validateModel(model: ValidationModel): Promise<void> {
 export async function validateCodingPlanApiKey(
   plan: CodingPlan,
   apiKey: string,
+  instanceBaseUrl?: string,
 ): Promise<ApiKeyValidationResult> {
   // MiniMax Token Plan keys use a dedicated lightweight quota endpoint
   // with auto-region detection instead of a chat completion probe.
@@ -144,7 +148,18 @@ export async function validateCodingPlanApiKey(
     return validateMiniMaxTokenPlanKey(apiKey);
   }
 
-  const validationBaseURL = plan.validationBaseUrl ?? plan.baseUrl;
+  let validationBaseURL: string | undefined;
+  try {
+    validationBaseURL = resolveCodingPlanValidationBaseUrl(
+      plan,
+      instanceBaseUrl,
+    );
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 
   if (validationBaseURL && plan.validationModelId) {
     try {

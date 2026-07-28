@@ -41,12 +41,12 @@ export function BrowserTabHotkeys({
   );
 
   // Browser-specific hotkeys are no-ops for state-only tabs.
-  const isStateOnlyTab = useKartonState((s) =>
-    activeTabId
-      ? s.contentTabs.tabs[activeTabId]?.type === 'terminal' ||
-        s.contentTabs.tabs[activeTabId]?.type === 'file'
-      : false,
-  );
+  const isStateOnlyTab = useKartonState((s) => {
+    const type = activeTabId
+      ? s.contentTabs.tabs[activeTabId]?.type
+      : undefined;
+    return type === 'terminal' || type === 'file' || type === 'side-chat';
+  });
 
   useEffect(() => {
     activeTabIdRef.current = activeTabId;

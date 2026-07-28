@@ -54,7 +54,6 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
             path: string;
             git: null;
             skills: Array<{ name: string; description: string }>;
-            workspaceMdContent: string | null;
             agentsMdContent: string | null;
           }>,
         },
@@ -270,7 +269,6 @@ describe('MountManagerService path-based Git actions', () => {
       path: mountedPath,
       git: null,
       skills: [],
-      workspaceMdContent: null,
       agentsMdContent: null,
     });
     setWorkspacePathForMount(service, 'w1234', mountedPath);
@@ -580,7 +578,6 @@ describe('MountManagerService path-based Git actions', () => {
       path: worktreePath,
       git: null,
       skills: [],
-      workspaceMdContent: null,
       agentsMdContent: null,
     });
     setWorkspacePathForMount(service, 'w1234', worktreePath);
@@ -619,7 +616,6 @@ describe('MountManagerService path-based Git actions', () => {
         path: deletedPath,
         git: null,
         skills: [],
-        workspaceMdContent: null,
         agentsMdContent: null,
       },
       {
@@ -627,7 +623,6 @@ describe('MountManagerService path-based Git actions', () => {
         path: keptPath,
         git: null,
         skills: [],
-        workspaceMdContent: null,
         agentsMdContent: null,
       },
     );

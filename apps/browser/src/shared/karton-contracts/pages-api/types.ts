@@ -228,26 +228,6 @@ export interface RemoveSearchEngineResult {
   error?: string;
 }
 
-/** Information about a single context file */
-export interface ContextFileInfo {
-  /** Whether the file exists */
-  exists: boolean;
-  /** Absolute path to the file (null if workspace not loaded) */
-  path: string | null;
-  /** File content (null if file doesn't exist or couldn't be read) */
-  content: string | null;
-}
-
-/** Result of getContextFiles procedure */
-export interface ContextFilesResult {
-  [workspacePath: string]: {
-    /**  file info (auto-generated project analysis at .stagewise/) */
-    workspaceMd: ContextFileInfo;
-    /** AGENTS.md file info (user-created coding guidelines) */
-    agentsMd: ContextFileInfo;
-  };
-}
-
 export interface LocalPortEntry {
   port: number;
   url: string;

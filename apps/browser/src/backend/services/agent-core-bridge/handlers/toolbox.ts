@@ -1,6 +1,4 @@
 import type { CommandRegistry, TelemetrySink } from '@stagewise/agent-core';
-import type { AgentStore } from '@stagewise/agent-core';
-import type { KartonService } from '../../karton';
 import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { ActiveAppStateController } from '../state/toolbox-active-app';
 
@@ -86,45 +84,6 @@ export function registerToolboxAttachHandlers(
       deps.telemetry?.capture('edits-rejected', {
         hunk_count: hunkIds.length,
       });
-    },
-  );
-}
-
-/**
- * Phase 9: `toolbox.generateWorkspaceMd` — registered on both the
- * command registry and Karton (same handler body as the former
- * `AgentManagerService` path).
- */
-export function registerToolboxGenerateWorkspaceMd(
-  registry: CommandRegistry,
-  karton: KartonService,
-  deps: {
-    store: AgentStore;
-    generateWorkspaceMdForPath: (workspacePath: string) => Promise<void>;
-  },
-): void {
-  registry.registerCommand<[string, string], void>(
-    'toolbox.generateWorkspaceMd',
-    async (_ctx, [agentInstanceId, mountPrefix]) => {
-      const mounts =
-        deps.store.get().toolbox[agentInstanceId]?.workspace?.mounts;
-      const mount = mounts?.find((m) => m.prefix === mountPrefix);
-      if (!mount) throw new Error(`Mount ${mountPrefix} not found`);
-      await deps.generateWorkspaceMdForPath(mount.path);
-    },
-  );
-  karton.registerServerProcedureHandler(
-    'toolbox.generateWorkspaceMd',
-    async (
-      _callingClientId: string,
-      agentInstanceId: string,
-      mountPrefix: string,
-    ) => {
-      await registry.dispatch(
-        'toolbox.generateWorkspaceMd',
-        { callerId: _callingClientId },
-        [agentInstanceId, mountPrefix],
-      );
     },
   );
 }

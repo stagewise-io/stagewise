@@ -108,7 +108,7 @@ describe('MountManager registry (unit)', () => {
 
   beforeEach(() => {
     // Each test gets a unique, empty temp dir so the workspace-info
-    // reads resolve to "no WORKSPACE.md / AGENTS.md / skills" rather
+    // reads resolve to "no AGENTS.md / skills" rather
     // than reaching into a real repo.
     tempDir = mkdtempSync(path.join(tmpdir(), 'mount-registry-'));
   });
@@ -140,7 +140,6 @@ describe('MountManager registry (unit)', () => {
     expect(entry.prefix).toBe(mountPrefixForPath(ws));
     expect(entry.path).toBe(ws);
     expect(entry.skills).toEqual([]);
-    expect(entry.workspaceMdContent).toBeNull();
     expect(entry.agentsMdContent).toBeNull();
 
     // Fresh array per write so the Karton-mirror reference diff fires,
@@ -286,23 +285,6 @@ describe('MountManager registry (unit)', () => {
     expect(pickOwningWorkspace(filePath, [wsA, wsB])).toBe(wsA);
   });
 
-  it('setWorkspaceMdContent rebuilds mount entries with a fresh MountEntry', async () => {
-    const store = new MountWriteRecorder();
-    const telemetry = makeTelemetry();
-    const { manager } = makeManager(store, telemetry);
-
-    const ws = tempWorkspace('alpha');
-    await manager.mountWorkspace('agent-1', ws);
-    const before = store.writes[store.writes.length - 1]!.mounts[0]!;
-
-    manager.setWorkspaceMdContent(ws, 'hello world');
-
-    const after = store.writes[store.writes.length - 1]!.mounts[0]!;
-    expect(after.workspaceMdContent).toBe('hello world');
-    // Fresh entry identity so Karton-mirror reference diff fires.
-    expect(after).not.toBe(before);
-  });
-
   it('does not fire onMountsChanged when a redundant mount is requested', async () => {
     const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
@@ -333,50 +315,31 @@ describe('MountManager watcher refresh (integration)', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('rewriting .stagewise/WORKSPACE.md triggers a debounced second write with updated content', async () => {
+  it('rewriting AGENTS.md triggers a debounced second write with updated content', async () => {
     const store = new MountWriteRecorder();
     const telemetry = makeTelemetry();
     const { manager } = makeManager(store, telemetry);
 
     const ws = path.join(tempDir, 'alpha');
-    mkdirSync(path.join(ws, '.stagewise'), { recursive: true });
-    const wsMdPath = path.join(ws, '.stagewise', 'WORKSPACE.md');
-    writeFileSync(wsMdPath, 'first', 'utf-8');
+    mkdirSync(ws, { recursive: true });
+    const agentsMdPath = path.join(ws, 'AGENTS.md');
+    writeFileSync(agentsMdPath, 'first', 'utf-8');
 
-    await manager.mountWorkspace('agent-1', ws);
-    const writesAfterMount = store.writes.length;
-    expect(
-      store.writes[writesAfterMount - 1]!.mounts[0]!.workspaceMdContent,
-    ).toBe('first');
+    try {
+      await manager.mountWorkspace('agent-1', ws);
+      expect(store.writes.at(-1)!.mounts[0]!.agentsMdContent).toBe('first');
 
-    // Give chokidar a beat to attach to the ready handler (ignoreInitial
-    // means the attach-time reads don't fire watcher events).
-    await new Promise((r) => setTimeout(r, 200));
-    writeFileSync(wsMdPath, 'second', 'utf-8');
+      writeFileSync(agentsMdPath, 'second', 'utf-8');
 
-    // The first `change` event after mount can be dropped on slow CI runners
-    // (notably Windows, where chokidar's fs.watch backend attaches well after
-    // the fixed pre-write settle wait, so the single 'second' write lands
-    // inside the attach window and never fires an event). Re-touch the file
-    // during long quiet intervals to recover a missed initial event, while
-    // leaving >1s of silence between touches so the 400 ms refresh debounce
-    // (+150 ms awaitWriteFinish stability) can actually settle and fire.
-    const deadline = Date.now() + 10000;
-    let lastTouch = Date.now();
-    while (Date.now() < deadline) {
-      const latest = store.writes[store.writes.length - 1]!;
-      if (latest.mounts[0]?.workspaceMdContent === 'second') break;
-      if (Date.now() - lastTouch > 1500) {
-        writeFileSync(wsMdPath, 'second', 'utf-8');
-        lastTouch = Date.now();
-      }
-      await new Promise((r) => setTimeout(r, 100));
+      await vi.waitFor(
+        () => {
+          const latest = store.writes[store.writes.length - 1]!;
+          expect(latest.mounts[0]?.agentsMdContent).toBe('second');
+        },
+        { timeout: 10_000 },
+      );
+    } finally {
+      await manager.teardownWatchers();
     }
-
-    const finalWrite = store.writes[store.writes.length - 1]!;
-    expect(finalWrite.mounts[0]!.workspaceMdContent).toBe('second');
-    expect(store.writes.length).toBeGreaterThan(writesAfterMount);
-
-    await manager.teardownWatchers();
   }, 20_000);
 });

@@ -25,8 +25,8 @@ describe('isFlagshipFilteringEnabled', () => {
     expect(isFlagshipFilteringEnabled('openrouter')).toBe(true);
   });
 
-  it('returns true for coding-plan', () => {
-    expect(isFlagshipFilteringEnabled('coding-plan')).toBe(true);
+  it('returns false for coding-plan so discovered models remain enabled', () => {
+    expect(isFlagshipFilteringEnabled('coding-plan')).toBe(false);
   });
 
   it('returns true for vendor API types (except anthropic)', () => {
@@ -309,13 +309,10 @@ describe('computeDisabledModelIdsAfterDiscovery', () => {
   // -- Coding plan ---------------------------------------------------------
 
   describe('Coding plan', () => {
-    it('resolves vendor from config and applies vendor filtering', () => {
-      // GLM coding plan → vendor 'z-ai'. Catalog: glm-5.2, glm-5.1, glm-5v-turbo
+    it('keeps every newly discovered model enabled', () => {
       const discovered: DiscoveredModel[] = [
-        makeDiscoveredModel('glm-5.2'), // catalog
-        makeDiscoveredModel('glm-5.1'), // catalog
-        makeDiscoveredModel('glm-4.5'), // non-flagship discovered-only
-        makeDiscoveredModel('glm-4.5-air'), // non-flagship discovered-only
+        makeDiscoveredModel('glm-5.2'),
+        makeDiscoveredModel('glm-new-model'),
       ];
 
       const result = computeDisabledModelIdsAfterDiscovery({
@@ -326,10 +323,7 @@ describe('computeDisabledModelIdsAfterDiscovery', () => {
         existingDiscoveredModelIds: new Set(),
       });
 
-      expect(result).not.toContain('glm-5.2');
-      expect(result).not.toContain('glm-5.1');
-      expect(result).toContain('glm-4.5');
-      expect(result).toContain('glm-4.5-air');
+      expect(result).toEqual([]);
     });
   });
 

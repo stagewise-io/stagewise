@@ -328,15 +328,12 @@ KartonBridge passes Karton's client ID. CLI can pass `cli`. ACP can pass a sessi
 
 The package-owned state schema must represent child agents from day one.
 
-The current `WorkspaceMdAgent` child-spawning flow renders child progress inline in parent chat. This relationship must survive extraction.
-
 **Invariants** (verified in `packages/agent-core/src/store/state-annotation.md` §4):
 
 - **Back-pointer only.** Tree reconstruction relies solely on `parentAgentInstanceId`. No explicit child list or join table exists in the state or on disk.
 - **On-demand traversal.** Parent→children is computed by filtering `state.agents.instances` at traversal time. Used today by delete-cascade, archive-cascade, and persistence delete-cascade.
 - **Resume is root-only.** `resumeAgent` rejects instances with a non-null `parentAgentInstanceId`. Children exist transiently from a live parent; their rows persist only to keep delete-cascade correct.
 - **Toolbox is per-instance.** A child's `ToolboxAgentState` is not inherited from the parent — mounts, diffs, and pending state are allocated fresh.
-- **Child agents are `persistent: false`.** The only child-spawning agent today (`WorkspaceMdAgent`) sets `persistent: false`, so they are never auto-resumed on boot.
 - **Parent-existence guard is host-enforced today.** Package-side guards land when the `agents` slice becomes `AgentStore`-canonical.
 
 ### D14. Agent domain types move into the agent package
@@ -353,7 +350,7 @@ Affected types include:
 - `Attachment`, `AttachmentMetadata`, `AttachmentMeta` variants
 - `FileDiff`, `TextFileDiff`, `ExternalFileDiff`, `FileDiffSnapshot`, `EnvironmentDiffSnapshot`, `FileResult`
 - `ModelCapabilities`, `ModalityConstraint`, `ModelSettings`, `StagewiseProviderOptions`
-- `WorkspaceSnapshot`, `WorkspaceMdSnapshot`, `AgentsMdSnapshot`, `PlansSnapshot`, `LogsSnapshot`, `EnabledSkillsSnapshot`, `BrowserSnapshot`, `ShellSnapshot`, `ActiveAppSnapshot`, `LogIngestSnapshot`, and the other keys of **`FullEnvironmentSnapshot`** — canonical Zod schemas and inferred TypeScript types live in **`packages/agent-core/src/env/types.ts`** (Phase 8, D23). Package-built environment providers live in `packages/agent-core/src/env/providers/`; Electron registers additional providers under `apps/browser/src/backend/env-providers/`. Host-owned *capabilities* supply runtime values for host-sourced sections; they do not maintain a parallel wire-schema type fork in the browser.
+- `WorkspaceSnapshot`, `AgentsMdSnapshot`, `PlansSnapshot`, `LogsSnapshot`, `EnabledSkillsSnapshot`, `BrowserSnapshot`, `ShellSnapshot`, `ActiveAppSnapshot`, `LogIngestSnapshot`, and the other keys of **`FullEnvironmentSnapshot`** — canonical Zod schemas and inferred TypeScript types live in **`packages/agent-core/src/env/types.ts`** (Phase 8, D23). Package-built environment providers live in `packages/agent-core/src/env/providers/`; Electron registers additional providers under `apps/browser/src/backend/env-providers/`. Host-owned *capabilities* supply runtime values for host-sourced sections; they do not maintain a parallel wire-schema type fork in the browser.
 - `PendingUserQuestion`, `QuestionField`, `QuestionAnswerValue`
 - `MAX_DIFF_TEXT_FILE_SIZE` and related constants used by tools/diff logic
 
@@ -468,13 +465,13 @@ Rationale: there is exactly one host in Sprint 1 (Electron), and every planned S
 
 ### D23. Environment snapshots: typed schema, orchestrator, and providers (Phase 8)
 
-**Canonical schema.** `packages/agent-core/src/env/types.ts` defines Zod schemas and inferred TypeScript types for every `environmentSnapshot` section (including host-populated slices such as `browser`, `shells`, `activeApp`, `logIngest`, `sandboxSessionId`, `browserSessionId`, alongside `workspace`, `plans`, `logs`, `fileDiffs`, `agentsMd`, `workspaceMd`, `enabledSkills`). `FullEnvironmentSnapshot` is the object returned by capture — every key is present at runtime with concrete empty or neutral shapes when a subsystem has nothing to report. The Karton UI contract re-exports these types from `@stagewise/agent-core` so package, bridge, and persistence share one definition (D15 wire compatibility).
+**Canonical schema.** `packages/agent-core/src/env/types.ts` defines Zod schemas and inferred TypeScript types for every `environmentSnapshot` section (including host-populated slices such as `browser`, `shells`, `activeApp`, `logIngest`, `sandboxSessionId`, `browserSessionId`, alongside `workspace`, `plans`, `logs`, `fileDiffs`, `agentsMd`, `enabledSkills`). `FullEnvironmentSnapshot` is the object returned by capture — every key is present at runtime with concrete empty or neutral shapes when a subsystem has nothing to report. The Karton UI contract re-exports these types from `@stagewise/agent-core` so package, bridge, and persistence share one definition (D15 wire compatibility).
 
 **Capture.** `EnvironmentSnapshotOrchestrator` (`packages/agent-core/src/env/orchestrator.ts`) registers exactly one `EnvironmentProvider<K extends EnvironmentSectionKey>` per section key. Each provider exposes `sectionKey` and `getSnapshot(agentInstanceId)` returning `FullEnvironmentSnapshot[K]`. `captureSnapshot(agentInstanceId)` awaits all providers in parallel and assembles a `FullEnvironmentSnapshot` in fixed `ENVIRONMENT_SECTION_ORDER` (ordering is contractually significant for prompt stability). If any section lacks a provider, capture throws — hosts must register the full set before agents run.
 
 **Provider split.**
 
-- **Package** — `packages/agent-core/src/env/providers/`: `workspace`, `fileDiffs`, `agentsMd`, `workspaceMd`, `enabledSkills`, `plans`, `logs`.
+- **Package** — `packages/agent-core/src/env/providers/`: `workspace`, `fileDiffs`, `agentsMd`, `enabledSkills`, `plans`, `logs`.
 - **Electron host** — `apps/browser/src/backend/env-providers/`: `browser`, `shells`, `sandboxSessionId`, `activeApp`, `logIngest`, `browserSessionId`. Implementations read browser/shell/sandbox services; **types** still come from `env/types.ts`.
 
 **Prompt rendering** (separate from capture): `packages/agent-core/src/env/renderer.ts` and `packages/agent-core/src/env/changes/*` resolve effective snapshots across message history, sparsify, and emit the XML environment block. They operate on the same typed `FullEnvironmentSnapshot`, not on `unknown` blobs.
@@ -524,7 +521,7 @@ Rationale: the current product has no user-visible mode concept. Introducing one
 
 The new agent package owns:
 
-- agent classes (`BaseAgent`, `ChatAgent`, `WorkspaceMdAgent`);
+- agent classes (`BaseAgent`, `ChatAgent`);
 - system prompt builders;
 - agent lifecycle manager;
 - agent-owned state store;
@@ -541,7 +538,7 @@ The new agent package owns:
 - child-agent spawning;
 - undo/revert orchestration;
 - agent domain types (see D14);
-- environment snapshot orchestration via a provider registry (see `EnvironmentSnapshotOrchestrator` below and D23); the package ships providers for its owned domains (`workspace`, `plans`, `logs`, `file-diffs`, `workspace-md`, `agents-md`, `enabled-skills`) and never imports host provider shapes;
+- environment snapshot orchestration via a provider registry (see `EnvironmentSnapshotOrchestrator` below and D23); the package ships providers for its owned domains (`workspace`, `plans`, `logs`, `file-diffs`, `agents-md`, `enabled-skills`) and never imports host provider shapes;
 - graceful degradation when optional host-registered tools or providers are absent.
 
 ### Browser app responsibilities
@@ -1023,7 +1020,7 @@ export interface EnvironmentProvider<
 
 ### Provider populations
 
-**Package-owned (`packages/agent-core/src/env/providers/`).** Mount list, diff summary, `AGENTS.md` / `WORKSPACE.md` content, enabled skills, plans, logs — each module owns one `sectionKey` listed in D23.
+**Package-owned (`packages/agent-core/src/env/providers/`).** Mount list, diff summary, `AGENTS.md` content, enabled skills, plans, logs — each module owns one `sectionKey` listed in D23.
 
 **Host-owned (`apps/browser/src/backend/env-providers/`).** Browser tabs, shell sessions, sandbox session id, active mini-app, log-ingest metadata, browser session id. Implementations bind host services; slice types still come from `packages/agent-core/src/env/types.ts`.
 
@@ -1432,7 +1429,7 @@ Maintain existing undo/revert behavior.
 
 ### Phase 6: Move MountManagerService — completed
 
-The mount registry, workspace-info readers (`readWorkspaceMd`, `readAgentsMd`, `getSkills`, `isGitRepo`, `getGitBranch`), chokidar-driven `.stagewise/WORKSPACE.md` refresh, `pickOwningWorkspace`, and `MentionSearchService` now live in `packages/agent-core/src/services/mount-manager/`. The core `MountManager` class accepts an `AgentStore`, `Logger`, optional `TelemetrySink`, and a `MountManagerHostHooks` triad (`onWorkspaceAttached`, `onWorkspaceReleased`, `onMountsChanged`); writes to `toolbox[agentId].workspace.mounts` flow through the colocated `setAgentMounts(store, agentId, mounts)` helper (one `store.update()` per intent, allowlisted in the store-mutation guard). All `node:fs` / `chokidar` access is routed through the `@stagewise/agent-core/fs` proxy.
+The mount registry, workspace-info readers (`readAgentsMd`, `getSkills`, `isGitRepo`, `getGitBranch`), `pickOwningWorkspace`, and `MentionSearchService` now live in `packages/agent-core/src/services/mount-manager/`. The core `MountManager` class accepts an `AgentStore`, `Logger`, optional `TelemetrySink`, and a `MountManagerHostHooks` triad (`onWorkspaceAttached`, `onWorkspaceReleased`, `onMountsChanged`); writes to `toolbox[agentId].workspace.mounts` flow through the colocated `setAgentMounts(store, agentId, mounts)` helper (one `store.update()` per intent, allowlisted in the store-mutation guard). All `node:fs` / `chokidar` access is routed through the `@stagewise/agent-core/fs` proxy.
 
 The host-side `MountManagerService` ([](path:w787f/apps/browser/src/backend/services/toolbox/services/mount-manager/index.ts)) is now a thin composition shell that constructs the core, implements the three hooks to manage `ClientRuntimeNode` + `LspService` lifecycle and call `userExperienceService.saveRecentlyOpenedWorkspace`, and registers the three Karton procedures (`toolbox.mountWorkspace` with file-picker fallback, `toolbox.unmountWorkspace`, `toolbox.searchMentionFiles`).
 
@@ -1450,7 +1447,7 @@ Host-specific effects remain outside the package. Approval policy, shell executi
 
 ### Phase 8: Move BaseAgent and concrete agents — completed
 
-`BaseAgent`, `ChatAgent`, `WorkspaceMdAgent`, the chat system-prompt builder,
+`BaseAgent`, `ChatAgent`, the chat system-prompt builder,
 and agent prompt assets now live under `packages/agent-core/src/agents/`. The
 environment snapshot orchestrator, typed `FullEnvironmentSnapshot`, core
 providers, and renderer live under `packages/agent-core/src/env/` (D23 split);
@@ -1502,7 +1499,6 @@ Run focused checks:
   - inspect pending diffs;
   - accept/reject hunks;
   - revert to prior message;
-  - spawn workspace-md child agent;
   - use sandbox output/attachment;
   - use shell tool (including its smart-approval classifier path — host-internal);
   - restart app and resume persisted agent.
@@ -1623,7 +1619,7 @@ Sprint 1 is done when:
 - Mount initiation is host-owned; core receives concrete paths.
 - Sandbox is delivered as a host-registered tool using AI SDK native tool-output streaming; the host sandbox tool reads current mounts from `AgentStore` at execute-time.
 - Ripgrep is host-provisioned (D17); package fails gracefully if the binary is missing.
-- Environment snapshot composition is provider-driven (D23): the package ships `EnvironmentSnapshotOrchestrator`, typed `FullEnvironmentSnapshot` (`env/types.ts`), render/diff helpers (`env/renderer.ts`, `env/changes/*`), and package providers for `workspace`, `fileDiffs`, `agentsMd`, `workspaceMd`, `enabledSkills`, `plans`, `logs`; the Electron host registers providers for `browser`, `shells`, `sandboxSessionId`, `activeApp`, `logIngest`, `browserSessionId`. Slice values from host subsystems are still typed in core; only the host **services** are browser-specific.
+- Environment snapshot composition is provider-driven (D23): the package ships `EnvironmentSnapshotOrchestrator`, typed `FullEnvironmentSnapshot` (`env/types.ts`), render/diff helpers (`env/renderer.ts`, `env/changes/*`), and package providers for `workspace`, `fileDiffs`, `agentsMd`, `enabledSkills`, `plans`, `logs`; the Electron host registers providers for `browser`, `shells`, `sandboxSessionId`, `activeApp`, `logIngest`, `browserSessionId`. Slice values from host subsystems are still typed in core; only the host **services** are browser-specific.
 - Rendered environment-prompt output is byte-identical to pre-migration baseline for a representative agent state (R10 golden test).
 - Diff-history undo/revert continues to work.
 - Browser app typecheck passes.

@@ -18,6 +18,7 @@ export class GlobalConfigService extends DisposableService {
     newConfig: GlobalConfig,
     oldConfig: GlobalConfig | null,
   ) => void)[] = [];
+  private configPatchQueue: Promise<void> = Promise.resolve();
   private readonly logger: Logger;
   private readonly uiKarton: KartonService;
 
@@ -45,10 +46,7 @@ export class GlobalConfigService extends DisposableService {
     this.uiKarton.registerServerProcedureHandler(
       'config.set',
       async (_callingClientId: string, configPatch: Partial<GlobalConfig>) =>
-        this.set({
-          ...this.get(),
-          ...configPatch,
-        }),
+        this.patch(configPatch),
     );
 
     this.logger.debug(
@@ -83,6 +81,17 @@ export class GlobalConfigService extends DisposableService {
       throw new Error('Global config not initialized');
     }
     return structuredClone(this.config);
+  }
+
+  private patch(configPatch: Partial<GlobalConfig>): Promise<void> {
+    const update = this.configPatchQueue.then(() =>
+      this.set({
+        ...this.get(),
+        ...configPatch,
+      }),
+    );
+    this.configPatchQueue = update.catch(() => {});
+    return update;
   }
 
   /**

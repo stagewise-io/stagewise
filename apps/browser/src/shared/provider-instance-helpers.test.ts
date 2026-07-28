@@ -242,6 +242,67 @@ describe('discovered model catalog matching', () => {
     expect(getInstanceModelCount(instance, prefs)).toBe(entries.length);
   });
 
+  it('keeps Qwen plan models instance-scoped and excludes stale catalog models', () => {
+    const codingPlan: ProviderInstance = {
+      id: 'qwen-coding',
+      typeId: 'coding-plan',
+      name: 'Qwen Coding Plan',
+      config: {
+        encryptedApiKey: 'coding-key',
+        planId: 'qwen-plan',
+      },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [
+        { modelId: 'qwen3.7-plus', displayName: 'Qwen 3.7 Plus' },
+        { modelId: 'qwen3.7-plus', displayName: 'Duplicate' },
+      ],
+    };
+    const tokenPlan: ProviderInstance = {
+      ...codingPlan,
+      id: 'qwen-token',
+      name: 'Qwen Token Plan',
+      config: {
+        encryptedApiKey: 'token-key',
+        planId: 'qwen-token-plan',
+      },
+      discoveredModels: [
+        { modelId: 'qwen3.7-plus', displayName: 'Qwen 3.7 Plus' },
+        { modelId: 'qwen3.8-max-preview', displayName: 'Qwen 3.8 Max' },
+        { modelId: 'qwen-new-model', displayName: 'Qwen New Model' },
+      ],
+    };
+
+    const entries = getSelectableModelEntries({
+      providerInstances: [codingPlan, tokenPlan],
+      customModels: [],
+    });
+
+    expect(
+      entries.filter(
+        (entry) =>
+          entry.instanceId === 'qwen-coding' &&
+          entry.modelId === 'qwen3.7-plus',
+      ),
+    ).toHaveLength(1);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        instanceId: 'qwen-token',
+        modelId: 'qwen3.8-max-preview',
+      }),
+    );
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        instanceId: 'qwen-token',
+        modelId: 'qwen-new-model',
+      }),
+    );
+    expect(entries.some((entry) => entry.modelId === 'qwen3-32b')).toBe(false);
+    expect(getInstanceModelCount(codingPlan)).toBe(
+      entries.filter((entry) => entry.instanceId === codingPlan.id).length,
+    );
+  });
+
   it('counts non-catalog discovered models for coding plans', () => {
     const codingPlanInstance: ProviderInstance = {
       id: 'coding-plan:glm-coding-plan',
@@ -301,6 +362,56 @@ describe('vendor instance routing', () => {
     expect(getVendorInstanceId(preferences, 'z-ai')).toBe(planInstance.id);
     expect(vendorHasApiKey(preferences, 'z-ai')).toBe(true);
     expect(getVendorMode(preferences, 'z-ai')).toBe('official');
+  });
+
+  it('uses the legacy selected plan when a vendor has multiple plans', () => {
+    const preferences = createPreferences();
+    const codingPlan: ProviderInstance = {
+      id: 'qwen-coding',
+      typeId: 'coding-plan',
+      name: 'Qwen Coding Plan',
+      config: { encryptedApiKey: 'coding-key', planId: 'qwen-plan' },
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [],
+    };
+    const tokenPlan: ProviderInstance = {
+      ...codingPlan,
+      id: 'qwen-token',
+      name: 'Qwen Token Plan',
+      config: { encryptedApiKey: 'token-key', planId: 'qwen-token-plan' },
+    };
+    preferences.providerConfigs.alibaba.connectedCodingPlanId =
+      'qwen-token-plan';
+    preferences.providerInstances = [codingPlan, tokenPlan];
+
+    expect(findInstanceForVendor(preferences, 'alibaba')).toBe(tokenPlan);
+  });
+
+  it('does not arbitrarily route a vendor with multiple unselected plans', () => {
+    const preferences = createPreferences();
+    preferences.providerInstances = [
+      {
+        id: 'qwen-coding',
+        typeId: 'coding-plan',
+        name: 'Qwen Coding Plan',
+        config: { encryptedApiKey: 'coding-key', planId: 'qwen-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+      {
+        id: 'qwen-token',
+        typeId: 'coding-plan',
+        name: 'Qwen Token Plan',
+        config: { encryptedApiKey: 'token-key', planId: 'qwen-token-plan' },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+
+    expect(findInstanceForVendor(preferences, 'alibaba')).toBeUndefined();
   });
 
   it('uses the explicit custom-provider link for custom mode', () => {

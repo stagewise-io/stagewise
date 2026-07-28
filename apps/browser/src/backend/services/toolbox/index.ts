@@ -89,13 +89,6 @@ import type { BrowserSnapshot, WorkspaceSnapshot } from './types';
 import type { MountPermission } from '@shared/karton-contracts/ui/agent/metadata';
 import type { WorkspaceInfo } from '@/agents/shared/prompts/utils/workspace-info';
 import { getWorkspaceInfo as getWorkspaceInfoUtil } from '@/agents/shared/prompts/utils/workspace-info';
-import { readAgentsMd } from '@/agents/shared/prompts/utils/read-agents-md';
-import {
-  readWorkspaceMd,
-  WORKSPACE_MD_DIR,
-  WORKSPACE_MD_FILENAME,
-} from '@/agents/shared/prompts/utils/read-workspace-md';
-import type { ContextFilesResult } from '@shared/karton-contracts/pages-api/types';
 import {
   getSkills,
   discoverSkills,
@@ -451,7 +444,7 @@ export class ToolboxService
   /**
    * Expose the package-owned `MountManager` so `main.ts` can wire it
    * into the core env-state {@link DomainAdapter}s (workspace,
-   * agentsMd, workspaceMd). Returns `null` when the mount manager has
+   * agentsMd). Returns `null` when the mount manager has
    * not yet been initialized (defensive — `ToolboxService.create`
    * always initializes it).
    */
@@ -835,13 +828,6 @@ export class ToolboxService
     );
   }
 
-  public setWorkspaceMdContent(
-    workspacePath: string,
-    content: string | null,
-  ): void {
-    this.mountManagerService?.setWorkspaceMdContent(workspacePath, content);
-  }
-
   public async getWorkspaceInfo(
     agentInstanceId: string,
   ): Promise<WorkspaceInfo[]> {
@@ -1093,9 +1079,7 @@ export class ToolboxService
     const perMount = await Promise.all(
       mounts.map(async (m) => ({
         mount: m,
-        skills: existsSync(m.absolutePath)
-          ? await discoverSkills(m.absolutePath)
-          : [],
+        skills: await discoverSkills(m.skillsPath ?? m.absolutePath),
       })),
     );
     if (gen !== this.globalSkillsRebuildGeneration) return;
@@ -1184,7 +1168,9 @@ export class ToolboxService
       this.uiKarton.state.preferences?.agent?.enabledGlobalSkillDirs ?? [],
     );
     for (const mount of enabledGlobalMounts) {
-      const skills = await discoverSkills(mount.absolutePath);
+      const skills = await discoverSkills(
+        mount.skillsPath ?? mount.absolutePath,
+      );
       for (const skill of skills) {
         if (allDisabled.has(skill.name) || disabledGlobalSkills.has(skill.name))
           continue;
@@ -1246,71 +1232,6 @@ export class ToolboxService
         ] ?? { respectAgentsMd: true, disabledSkills: [] },
       );
     }
-    return result;
-  }
-
-  public async getWorkspaceMd(
-    agentInstanceId: string,
-  ): Promise<Array<{ mountPrefix: string; path: string; content: string }>> {
-    const mounts =
-      this.mountManagerService?.getMountedPathsWithRuntimes(agentInstanceId);
-    if (!mounts) return [];
-    if (mounts.length === 0) return [];
-    const results: Array<{
-      mountPrefix: string;
-      path: string;
-      content: string;
-    }> = [];
-    for (const mount of mounts) {
-      const content = await readWorkspaceMd(mount.path);
-      if (content) {
-        results.push({
-          mountPrefix: mount.prefix,
-          path: mount.path,
-          content,
-        });
-      }
-    }
-    return results;
-  }
-
-  public async getContextFilesForAllWorkspaces(): Promise<ContextFilesResult> {
-    const uniquePaths = this.mountManagerService?.getAllMountedPaths();
-    const result: ContextFilesResult = {};
-
-    await Promise.all(
-      [...(uniquePaths ?? [])].map(async (wsPath) => {
-        const clientRuntime =
-          this.mountManagerService?.getClientRuntimeForPath(wsPath);
-        if (!clientRuntime) return;
-
-        const workspaceMdPath = path.resolve(
-          wsPath,
-          WORKSPACE_MD_DIR,
-          WORKSPACE_MD_FILENAME,
-        );
-        const agentsMdPath = path.resolve(wsPath, 'AGENTS.md');
-
-        const [workspaceMdContent, agentsMdContent] = await Promise.all([
-          readWorkspaceMd(wsPath),
-          clientRuntime ? readAgentsMd(clientRuntime) : null,
-        ]);
-
-        result[wsPath] = {
-          workspaceMd: {
-            exists: workspaceMdContent !== null,
-            path: workspaceMdPath,
-            content: workspaceMdContent,
-          },
-          agentsMd: {
-            exists: agentsMdContent !== null,
-            path: agentsMdPath,
-            content: agentsMdContent,
-          },
-        };
-      }),
-    );
-
     return result;
   }
 
@@ -1813,7 +1734,7 @@ export class ToolboxService
     };
 
     for (const mount of getGlobalSkillsMounts()) {
-      const parentDir = path.dirname(mount.absolutePath);
+      const parentDir = path.dirname(mount.skillsPath ?? mount.absolutePath);
       if (!existsSync(parentDir)) continue;
 
       const watcher = chokidar.watch(parentDir, {

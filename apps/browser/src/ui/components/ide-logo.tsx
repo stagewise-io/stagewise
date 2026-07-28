@@ -18,7 +18,7 @@ export const IdeLogo = ({
   ide: OpenFilesInIde;
   className?: string;
 }) => {
-  return ide === 'other' ? (
+  return ide === 'fileManager' ? (
     <NativeFileManagerIcon className={cn('size-3 shrink-0', className)} />
   ) : (
     <img

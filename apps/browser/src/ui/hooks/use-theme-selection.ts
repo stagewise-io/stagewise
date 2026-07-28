@@ -17,6 +17,7 @@ export function useThemeSelection() {
   const setGlobalConfig = useKartonProcedure((p) => p.config.set);
   const track = useTrack();
   const latestSaveRequestIdRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestRequestedThemeIdRef = useRef<PersonalizationThemeId | undefined>(
     undefined,
   );
@@ -49,14 +50,14 @@ export function useThemeSelection() {
       typeof value !== 'string' ||
       !PERSONALIZATION_THEMES.some((theme) => theme.id === value)
     ) {
-      return;
+      return false;
     }
 
     const nextThemeId = value as PersonalizationThemeId;
     const previousThemeId = currentThemeIdRef.current;
 
     if (nextThemeId === previousThemeId) {
-      return;
+      return false;
     }
 
     const saveRequestId = latestSaveRequestIdRef.current + 1;
@@ -66,14 +67,18 @@ export function useThemeSelection() {
     setCurrentTheme(nextThemeId);
     applyPersonalizationThemeToRoot(nextThemeId, { transition: true });
 
-    try {
-      await setGlobalConfig({
+    const save = saveQueueRef.current.then(() =>
+      setGlobalConfig({
         personalizationThemeId: nextThemeId,
-      });
-      track('changed-theme', { theme: nextThemeId });
+      }),
+    );
+    saveQueueRef.current = save.catch(() => {});
+
+    try {
+      await save;
     } catch (error) {
       if (latestSaveRequestIdRef.current !== saveRequestId) {
-        return;
+        return false;
       }
 
       latestRequestedThemeIdRef.current = undefined;
@@ -81,7 +86,15 @@ export function useThemeSelection() {
       setCurrentTheme(groundTruth);
       applyPersonalizationThemeToRoot(groundTruth, { transition: true });
       console.error('Failed to save personalization theme', error);
+      return false;
     }
+
+    if (latestSaveRequestIdRef.current !== saveRequestId) return false;
+
+    void track('changed-theme', { theme: nextThemeId }).catch((error) => {
+      console.error('Failed to track personalization theme change', error);
+    });
+    return true;
   };
 
   return {

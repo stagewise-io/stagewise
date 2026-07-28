@@ -5,6 +5,7 @@ import {
   IconTriangleWarningOutline18,
   IconCircleInfoOutline18,
 } from '@stagewise/icons';
+import { LoaderCircleIcon } from 'lucide-react';
 import { SidebarToast } from '../../../_components/sidebar-toast';
 
 export function NotificationBanners() {
@@ -27,7 +28,10 @@ export function NotificationBanners() {
           onDismiss={() => dismissNotification(notification.id)}
         >
           <div className="flex flex-row items-start gap-2 pr-7">
-            <NotificationIcon type={notification.type} />
+            <NotificationIcon
+              type={notification.type}
+              icon={notification.icon}
+            />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               {notification.title && (
                 <p
@@ -72,7 +76,16 @@ export function NotificationBanners() {
   );
 }
 
-function NotificationIcon({ type }: { type: string }) {
+function NotificationIcon({ type, icon }: { type: string; icon?: 'spinner' }) {
+  if (icon === 'spinner') {
+    return (
+      <LoaderCircleIcon
+        className="mt-0.5 size-3.5 shrink-0 animate-spin text-foreground"
+        aria-hidden="true"
+      />
+    );
+  }
+
   switch (type) {
     case 'warning':
     case 'error':

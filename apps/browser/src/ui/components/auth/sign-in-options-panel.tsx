@@ -9,15 +9,13 @@ import { IconEnvelopeOutline18, IconKey2Outline18 } from '@stagewise/icons';
 import { Loader2Icon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
+import type { TrackUIEvent } from '@shared/karton-contracts/ui';
 import type { SocialAuthProvider } from '@shared/karton-contracts/ui/shared-types';
 export type SignInMethod = SocialAuthProvider | 'email';
 
 type AuthPhase = 'options' | 'email' | 'otp' | 'social';
 type TrackingPrefix = 'onboarding-auth' | 'account-auth' | 'chat-auth';
-type TrackEvent = (
-  eventName: string,
-  properties?: Record<string, unknown>,
-) => void | Promise<void>;
+type TrackEvent = TrackUIEvent;
 
 // This component is shared by both Electron renderer hosts: the main UI
 // preload exposes `window.electron`, while internal pages expose

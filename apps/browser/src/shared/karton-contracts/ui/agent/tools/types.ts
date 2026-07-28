@@ -114,33 +114,6 @@ export const getLintingDiagnosticsToolSchema = {
   outputSchema: getLintingDiagnosticsToolOutputSchema,
 } as const;
 
-// IMPORTANT: This definition is tied to a child agent - so the types are not strictly coupled. Change this type when you change the input schema of the @project-md.ts agent.
-export const updateWorkspaceMdToolInputSchema = z.object({
-  updateReason: z
-    .string()
-    .min(5)
-    .describe(
-      'Brief reason for triggering the .stagewise/WORKSPACE.md update.',
-    ),
-  mountPrefix: z.string().describe('Mount prefix of the workspace to update.'),
-});
-
-export const updateWorkspaceMdToolOutputSchema = z.object({
-  message: z.string(),
-});
-
-export type UpdateWorkspaceMdToolInput = z.infer<
-  typeof updateWorkspaceMdToolInputSchema
->;
-export type UpdateWorkspaceMdToolOutput = z.infer<
-  typeof updateWorkspaceMdToolOutputSchema
->;
-
-export const updateWorkspaceMdToolSchema = {
-  inputSchema: updateWorkspaceMdToolInputSchema,
-  outputSchema: updateWorkspaceMdToolOutputSchema,
-} as const;
-
 export const executeSandboxJsToolInputSchema = z.object({
   explanation: z
     .string()
@@ -467,7 +440,6 @@ import {
 export const allToolSchemas = {
   ...universalToolSchemas,
   getLintingDiagnostics: getLintingDiagnosticsToolSchema,
-  updateWorkspaceMd: updateWorkspaceMdToolSchema,
   executeSandboxJs: executeSandboxJsToolSchema,
   readConsoleLogs: readConsoleLogsToolSchema,
   listLibraryDocs: listLibraryDocsToolSchema,

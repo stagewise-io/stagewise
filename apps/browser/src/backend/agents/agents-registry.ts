@@ -1,7 +1,4 @@
-import {
-  AgentTypeRegistry,
-  WorkspaceMdAgent,
-} from '@stagewise/agent-core/agents';
+import { AgentTypeRegistry } from '@stagewise/agent-core/agents';
 import { AgentTypes } from '@shared/karton-contracts/ui/agent';
 import { BrowserChatAgent } from './chat/chat';
 
@@ -23,6 +20,5 @@ import './agents-map';
 export function createBrowserAgentTypeRegistry(): AgentTypeRegistry {
   const registry = new AgentTypeRegistry();
   registry.register(AgentTypes.CHAT, BrowserChatAgent);
-  registry.register(AgentTypes.WORKSPACE_MD, WorkspaceMdAgent);
   return registry;
 }

@@ -17,9 +17,21 @@ import {
   IconCheck2Outline18,
   IconArrowUpRightOutline18,
 } from '@stagewise/icons';
-import type { ProviderInstanceTypeId } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  OnboardingProviderIdentity,
+  UIEventProperties,
+} from '@shared/karton-contracts/ui/telemetry';
+import type {
+  ProviderInstance,
+  ProviderInstanceTypeId,
+} from '@shared/karton-contracts/ui/shared-types';
 import { getTypeDisplayInfo } from '@shared/provider-instance-helpers';
-import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
+import {
+  CODING_PLANS,
+  validateCodingPlanBaseUrl,
+  type CodingPlan,
+  type CodingPlanId,
+} from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
@@ -30,7 +42,7 @@ const consoleUrl =
 
 // ─── Unified Provider Entries ──────────────────────────────────────────────
 
-type ProviderEntry = {
+export type ProviderEntry = {
   key: string;
   kind: 'vendor-api' | 'coding-plan' | 'gateway' | 'self-hosted';
   typeId: ProviderInstanceTypeId;
@@ -44,6 +56,7 @@ type ProviderEntry = {
   /** Extra endpoint routing info shown below the help text. */
   endpointHelpText?: string;
   defaultBaseUrl?: string;
+  configurableEndpoint?: CodingPlan['configurableEndpoint'];
 };
 
 /** All vendor API types shown in the unified provider list. */
@@ -105,6 +118,8 @@ function buildUnifiedEntries(): ProviderEntry[] {
       planId: plan.id,
       disclaimer: plan.disclaimer,
       endpointHelpText: plan.endpointHelpText,
+      defaultBaseUrl: plan.baseUrl,
+      configurableEndpoint: plan.configurableEndpoint,
     });
   }
 
@@ -124,6 +139,59 @@ function buildUnifiedEntries(): ProviderEntry[] {
 }
 
 const UNIFIED_ENTRIES = buildUnifiedEntries();
+
+function getTelemetryIdentity(
+  entry: ProviderEntry,
+): OnboardingProviderIdentity {
+  return {
+    provider_key: entry.key,
+    provider_type: entry.kind === 'coding-plan' ? 'coding-plan' : entry.typeId,
+    provider_kind: entry.kind,
+    ...(entry.planId ? { plan_id: entry.planId } : {}),
+  };
+}
+
+export type ProviderStepSummary = Pick<
+  UIEventProperties['onboarding-provider-step-completed'],
+  'connected_provider_count' | 'connected_provider_keys'
+> & {
+  provider_step_skipped: boolean;
+};
+
+export function getProviderInstanceTelemetryKey(
+  instance: ProviderInstance,
+): string {
+  if (instance.typeId === 'coding-plan') {
+    const planId = instance.config.planId;
+    if (planId) return `plan:${planId}`;
+  }
+  return instance.typeId;
+}
+
+export function summarizeProviderInstances(
+  instances: ProviderInstance[],
+): Omit<ProviderStepSummary, 'provider_step_skipped'> {
+  const connectedProviderKeys = instances.map(getProviderInstanceTelemetryKey);
+  return {
+    connected_provider_count: connectedProviderKeys.length,
+    connected_provider_keys: connectedProviderKeys,
+  };
+}
+
+export function createProviderStepSummary(
+  instances: ProviderInstance[],
+  connectedDuringStepCount: number,
+): ProviderStepSummary {
+  return {
+    ...summarizeProviderInstances(instances),
+    provider_step_skipped: connectedDuringStepCount === 0,
+  };
+}
+
+type ProviderConnectionResult = {
+  entry: ProviderEntry;
+  success: boolean;
+};
 const VENDOR_ENTRIES = UNIFIED_ENTRIES.filter((e) => e.kind === 'vendor-api');
 const CODING_PLAN_ENTRIES = UNIFIED_ENTRIES.filter(
   (e) => e.kind === 'coding-plan',
@@ -320,12 +388,18 @@ function ProviderListCard({
 
 // ─── Connection Detail View ─────────────────────────────────────────────────
 
-function ConnectionDetailView({
+export function ConnectionDetailView({
   entry,
   onBack,
+  onboardingRunId,
+  getNextAttemptNumber,
+  onConnectionResult,
 }: {
   entry: ProviderEntry;
   onBack: () => void;
+  onboardingRunId: string;
+  getNextAttemptNumber: (entry: ProviderEntry) => number;
+  onConnectionResult: (result: ProviderConnectionResult) => void;
 }) {
   const addProviderInstance = useKartonProcedure(
     (p) => p.preferences.addProviderInstance,
@@ -336,14 +410,33 @@ function ConnectionDetailView({
   const [apiKey, setApiKey] = useState(
     entry.kind === 'self-hosted' ? (entry.defaultBaseUrl ?? '') : '',
   );
+  const [endpoint, setEndpoint] = useState(
+    entry.configurableEndpoint ? (entry.defaultBaseUrl ?? '') : '',
+  );
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleConnect = useCallback(async () => {
     if (!apiKey.trim()) return;
+    const endpointResult = entry.configurableEndpoint
+      ? validateCodingPlanBaseUrl(endpoint)
+      : undefined;
+    if (endpointResult && !endpointResult.success) {
+      setError(endpointResult.error);
+      return;
+    }
     setIsConnecting(true);
     setError(null);
+    const attemptNumber = getNextAttemptNumber(entry);
+    const startedAt = performance.now();
+    const identity = getTelemetryIdentity(entry);
+    void track('onboarding-provider-connect-attempted', {
+      onboarding_run_id: onboardingRunId,
+      ...identity,
+      attempt_number: attemptNumber,
+    });
     try {
+      let discoveredModelCount = 0;
       if (entry.kind === 'vendor-api' || entry.kind === 'gateway') {
         const result = await addProviderInstance({
           typeId: entry.typeId,
@@ -353,11 +446,17 @@ function ConnectionDetailView({
         if (!result.success) {
           setError(result.error);
           void track('onboarding-provider-connect-failed', {
-            key: entry.key,
+            onboarding_run_id: onboardingRunId,
+            ...identity,
+            attempt_number: attemptNumber,
+            duration_ms: performance.now() - startedAt,
+            failure_stage: 'credential-validation',
             error_kind: 'validation-error',
           });
+          onConnectionResult({ entry, success: false });
           return;
         }
+        discoveredModelCount = result.discoveredModels.length;
       } else if (entry.kind === 'self-hosted') {
         const result = await addProviderInstance({
           typeId: entry.typeId,
@@ -366,39 +465,78 @@ function ConnectionDetailView({
         if (!result.success) {
           setError(result.error);
           void track('onboarding-provider-connect-failed', {
-            key: entry.key,
+            onboarding_run_id: onboardingRunId,
+            ...identity,
+            attempt_number: attemptNumber,
+            duration_ms: performance.now() - startedAt,
+            failure_stage: 'credential-validation',
             error_kind: 'validation-error',
           });
+          onConnectionResult({ entry, success: false });
           return;
         }
+        discoveredModelCount = result.discoveredModels.length;
       } else if (entry.planId) {
         const plan = CODING_PLANS[entry.planId];
         const result = await addProviderInstance({
           typeId: 'coding-plan',
-          config: { planId: plan.id, baseUrl: plan.baseUrl },
+          config: {
+            planId: plan.id,
+            baseUrl: endpointResult?.success
+              ? endpointResult.baseUrl
+              : plan.baseUrl,
+          },
           validateApiKey: apiKey.trim(),
         });
         if (!result.success) {
           setError(result.error);
           void track('onboarding-provider-connect-failed', {
-            key: entry.key,
+            onboarding_run_id: onboardingRunId,
+            ...identity,
+            attempt_number: attemptNumber,
+            duration_ms: performance.now() - startedAt,
+            failure_stage: 'credential-validation',
             error_kind: 'validation-error',
           });
+          onConnectionResult({ entry, success: false });
           return;
         }
+        discoveredModelCount = result.discoveredModels.length;
       }
-      void track('onboarding-provider-connected', { key: entry.key });
+      void track('onboarding-provider-connected', {
+        onboarding_run_id: onboardingRunId,
+        ...identity,
+        attempt_number: attemptNumber,
+        duration_ms: performance.now() - startedAt,
+        discovered_model_count: discoveredModelCount,
+      });
+      onConnectionResult({ entry, success: true });
       onBack();
     } catch {
       setError('Connection failed. Please try again.');
       void track('onboarding-provider-connect-failed', {
-        key: entry.key,
-        error_kind: 'network-error',
+        onboarding_run_id: onboardingRunId,
+        ...identity,
+        attempt_number: attemptNumber,
+        duration_ms: performance.now() - startedAt,
+        failure_stage: 'rpc',
+        error_kind: 'unknown-error',
       });
+      onConnectionResult({ entry, success: false });
     } finally {
       setIsConnecting(false);
     }
-  }, [apiKey, entry, addProviderInstance, track, onBack]);
+  }, [
+    apiKey,
+    endpoint,
+    entry,
+    addProviderInstance,
+    getNextAttemptNumber,
+    onBack,
+    onConnectionResult,
+    onboardingRunId,
+    track,
+  ]);
 
   return (
     <div className="space-y-4">
@@ -419,6 +557,30 @@ function ConnectionDetailView({
             )}
           </div>
         </div>
+
+        {entry.configurableEndpoint && (
+          <div className="space-y-1">
+            <p className="font-medium text-muted-foreground text-xs">
+              {entry.configurableEndpoint.label}
+            </p>
+            <Input
+              type="url"
+              placeholder={entry.configurableEndpoint.placeholder}
+              value={endpoint}
+              onValueChange={(value) => {
+                setEndpoint(value);
+                setError(null);
+              }}
+              disabled={isConnecting}
+              aria-invalid={error ? true : undefined}
+              size="sm"
+              style={{ maxWidth: 'none' }}
+            />
+            <p className="text-subtle-foreground text-xs">
+              {entry.configurableEndpoint.helpText}
+            </p>
+          </div>
+        )}
 
         <Input
           autoFocus
@@ -491,7 +653,11 @@ function ConnectionDetailView({
         <Button
           variant="primary"
           size="sm"
-          disabled={!apiKey.trim() || isConnecting}
+          disabled={
+            !apiKey.trim() ||
+            isConnecting ||
+            (!!entry.configurableEndpoint && !endpoint.trim())
+          }
           onClick={() => void handleConnect()}
         >
           {isConnecting ? 'Connecting...' : 'Connect'}
@@ -728,17 +894,29 @@ function ScrollableProviderList({
 export function StepConfigureProviders({
   onNext,
   onBack,
+  onboardingRunId,
+  onSummary,
 }: {
   onNext: () => void;
   onBack: () => void;
+  onboardingRunId: string;
+  onSummary: (summary: ProviderStepSummary) => void;
 }) {
   const preferences = useKartonState((s) => s.preferences);
   const authStatus = useKartonState((s) => s.userAccount.status);
+  const track = useTrack();
 
   const [selectedEntry, setSelectedEntry] = useState<ProviderEntry | null>(
     null,
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const stepStartedAtRef = useRef(performance.now());
+  const viewedProviderKeysRef = useRef(new Set<string>());
+  const connectedDuringStepKeysRef = useRef(new Set<string>());
+  const attemptCountsRef = useRef(new Map<string, number>());
+  const connectionAttemptCountRef = useRef(0);
+  const connectionFailureCountRef = useRef(0);
+  const searchUsedRef = useRef(false);
 
   const isStagewiseConnected =
     authStatus === 'authenticated' || authStatus === 'server_unreachable';
@@ -775,6 +953,65 @@ export function StepConfigureProviders({
     setSearchQuery('');
   }, []);
 
+  const getNextAttemptNumber = useCallback((entry: ProviderEntry) => {
+    const next = (attemptCountsRef.current.get(entry.key) ?? 0) + 1;
+    attemptCountsRef.current.set(entry.key, next);
+    connectionAttemptCountRef.current += 1;
+    return next;
+  }, []);
+
+  const handleConnectionResult = useCallback(
+    ({ entry, success }: ProviderConnectionResult) => {
+      if (success) connectedDuringStepKeysRef.current.add(entry.key);
+      else connectionFailureCountRef.current += 1;
+    },
+    [],
+  );
+
+  const handleSelectEntry = useCallback(
+    (entry: ProviderEntry) => {
+      const position = UNIFIED_ENTRIES.findIndex(
+        (candidate) => candidate.key === entry.key,
+      );
+      viewedProviderKeysRef.current.add(entry.key);
+      void track('onboarding-provider-detail-viewed', {
+        onboarding_run_id: onboardingRunId,
+        ...getTelemetryIdentity(entry),
+        position: Math.max(position, 0),
+        search_active: searchQuery.trim().length > 0,
+        already_connected: isEntryConnected(entry),
+      });
+      setSelectedEntry(entry);
+    },
+    [isEntryConnected, onboardingRunId, searchQuery, track],
+  );
+
+  const handleSearchChange = useCallback((value: string) => {
+    if (value.trim()) searchUsedRef.current = true;
+    setSearchQuery(value);
+  }, []);
+
+  const handleNext = useCallback(() => {
+    const summary = createProviderStepSummary(
+      preferences.providerInstances ?? [],
+      connectedDuringStepKeysRef.current.size,
+    );
+    void track('onboarding-provider-step-completed', {
+      onboarding_run_id: onboardingRunId,
+      duration_ms: performance.now() - stepStartedAtRef.current,
+      connected_provider_count: summary.connected_provider_count,
+      connected_provider_keys: summary.connected_provider_keys,
+      skipped_without_provider: summary.provider_step_skipped,
+      connected_during_step_count: connectedDuringStepKeysRef.current.size,
+      viewed_provider_count: viewedProviderKeysRef.current.size,
+      connection_attempt_count: connectionAttemptCountRef.current,
+      connection_failure_count: connectionFailureCountRef.current,
+      search_used: searchUsedRef.current,
+    });
+    onSummary(summary);
+    onNext();
+  }, [onNext, onSummary, onboardingRunId, preferences, track]);
+
   return (
     <>
       <div className="app-no-drag flex flex-1 flex-col items-center justify-center overflow-hidden">
@@ -801,7 +1038,7 @@ export function StepConfigureProviders({
                 type="text"
                 placeholder="Search providers..."
                 value={searchQuery}
-                onValueChange={setSearchQuery}
+                onValueChange={handleSearchChange}
                 className="w-full"
               />
             )}
@@ -810,7 +1047,13 @@ export function StepConfigureProviders({
           {selectedEntry ? (
             /* Connection detail view */
             <div className="min-h-0 pb-4">
-              <ConnectionDetailView entry={selectedEntry} onBack={handleBack} />
+              <ConnectionDetailView
+                entry={selectedEntry}
+                onBack={handleBack}
+                onboardingRunId={onboardingRunId}
+                getNextAttemptNumber={getNextAttemptNumber}
+                onConnectionResult={handleConnectionResult}
+              />
             </div>
           ) : (
             /* Scrollable provider list with groups */
@@ -818,7 +1061,7 @@ export function StepConfigureProviders({
               isStagewiseConnected={isStagewiseConnected}
               searchQuery={searchQuery}
               isEntryConnected={isEntryConnected}
-              onSelectEntry={setSelectedEntry}
+              onSelectEntry={handleSelectEntry}
               onBack={onBack}
             />
           )}
@@ -833,7 +1076,7 @@ export function StepConfigureProviders({
       ) : (
         <OnboardingBottomNav
           left={<BackButton onClick={onBack} />}
-          right={<NextButton onClick={onNext} label="Next" />}
+          right={<NextButton onClick={handleNext} label="Next" />}
         />
       )}
     </>

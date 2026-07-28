@@ -1,5 +1,4 @@
 import type { StepResult, Tool, ToolSet } from 'ai';
-import { z } from 'zod';
 import { BaseAgent, type BaseAgentConfig } from '../base-agent';
 import { AgentTypes } from '../../types/agent';
 import { isPlanPath } from '../../plans/ownership';
@@ -90,7 +89,6 @@ export class ChatAgent extends BaseAgent<never, undefined> {
   protected async getTools(): Promise<Partial<ToolSet>> {
     const id = this.instanceId;
     const box = this.toolbox;
-    const workspaceMdRelativePath = this.host.workspaceMdRelativePath();
     const baseline: Record<string, Tool | null> = {
       read: await box.getTool('read', id),
       write: await box.getTool('write', id),
@@ -99,22 +97,6 @@ export class ChatAgent extends BaseAgent<never, undefined> {
       delete: await box.getTool('delete', id),
       glob: await box.getTool('glob', id),
       grepSearch: await box.getTool('grepSearch', id),
-      updateWorkspaceMd: this.getSpawnChildAgentTool(
-        `Triggers an update of the \`${workspaceMdRelativePath}\` file. Use this whenever you find that the content of the file \`${workspaceMdRelativePath}\` in the system context is outdated or needs to be updated. Provide a brief reason for the update. Most importantly, provide the mount prefix of the workspace to update.`,
-        z.object({
-          updateReason: z.string().min(5),
-          mountPrefix: z.string().min(1),
-        }),
-        AgentTypes.WORKSPACE_MD,
-        (input) => {
-          return {
-            updateReason: input.updateReason,
-            mountPrefix: input.mountPrefix,
-            parentAgentInstanceId: this.instanceId,
-          };
-        },
-        'asynchronous',
-      ),
     };
     const extra = await this.getAdditionalTools();
     return Object.fromEntries(

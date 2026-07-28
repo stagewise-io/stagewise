@@ -1,4 +1,7 @@
-import type { OpenFilesInIde } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  ExternalIde,
+  OpenFilesInIde,
+} from '@shared/karton-contracts/ui/shared-types';
 import { getCurrentPlatform } from '@shared/hotkeys';
 
 export const nativeFileManagerLabel = (() => {
@@ -25,14 +28,18 @@ export const getFolderIDEUrl = (
 };
 
 export const IDE_SELECTION_ITEMS: Record<OpenFilesInIde, string> = {
-  vscode: 'VS Code',
   cursor: 'Cursor',
-  windsurf: 'Windsurf',
-  trae: 'Trae',
+  vscode: 'VS Code',
   zed: 'Zed',
   kiro: 'Kiro',
-  other: nativeFileManagerLabel,
+  windsurf: 'Windsurf',
+  trae: 'Trae',
+  fileManager: nativeFileManagerLabel,
 };
+
+export const SUPPORTED_IDES = Object.keys(IDE_SELECTION_ITEMS).filter(
+  (ide) => ide !== 'fileManager',
+) as ExternalIde[];
 
 export const getIDEFileUrl = (
   absFilePath: string,
@@ -59,7 +66,7 @@ export const getIDEFileUrl = (
     case 'kiro':
       url = `kiro://file/${absFilePath}`;
       break;
-    case 'other':
+    case 'fileManager':
       url = `stagewise://reveal-file/${encodeURIComponent(absFilePath)}`;
       break;
   }

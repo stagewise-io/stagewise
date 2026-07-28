@@ -20,7 +20,6 @@ import { IconMagnifierOutline18 } from '@stagewise/icons';
 import { GrepSearchToolPart } from './grep-search';
 import { ReadToolPart } from './read';
 import { LsToolPart } from './ls';
-import { UpdateWorkspaceMdToolPart } from './update-workspace-md';
 import { SearchInLibraryDocsToolPart } from './search-in-library-docs';
 import { ListLibraryDocsToolPart } from './list-library-docs';
 import { cn } from '@ui/utils';
@@ -72,8 +71,7 @@ export type ReadOnlyToolPart =
           | 'tool-listLibraryDocs'
           | 'tool-executeSandboxJs'
           | 'tool-readConsoleLogs'
-          | 'tool-getLintingDiagnostics'
-          | 'tool-updateWorkspaceMd';
+          | 'tool-getLintingDiagnostics';
       }
     >
   | ReasoningUIPart;
@@ -91,8 +89,7 @@ export function isReadOnlyToolPart(
     part.type === 'tool-listLibraryDocs' ||
     part.type === 'tool-executeSandboxJs' ||
     part.type === 'tool-readConsoleLogs' ||
-    part.type === 'tool-getLintingDiagnostics' ||
-    part.type === 'tool-updateWorkspaceMd'
+    part.type === 'tool-getLintingDiagnostics'
   );
 }
 
@@ -210,15 +207,6 @@ const PartContent = ({
           capMaxHeight={capMaxHeight}
         />
       );
-    case 'tool-updateWorkspaceMd':
-      return (
-        <UpdateWorkspaceMdToolPart
-          key={part.toolCallId}
-          part={part}
-          disableShimmer={disableShimmer}
-          minimal={minimal}
-        />
-      );
     default:
       return null;
   }
@@ -315,7 +303,6 @@ export const ExploringToolParts = memo(
       let lintingErrors = 0;
       let lintingWarnings = 0;
       let hasCheckedLinting = false;
-      let hasUpdatedWorkspaceMd = false;
 
       let screenshotsTaken = 0;
       let stylesInspected = 0;
@@ -416,9 +403,6 @@ export const ExploringToolParts = memo(
             lintingErrors += part.output?.summary?.errors ?? 0;
             lintingWarnings += part.output?.summary?.warnings ?? 0;
             break;
-          case 'tool-updateWorkspaceMd':
-            hasUpdatedWorkspaceMd = true;
-            break;
         }
       });
 
@@ -451,7 +435,6 @@ export const ExploringToolParts = memo(
         inspectedHostnames,
         enabledPlugins,
         enabledWorkspaceSkills,
-        hasUpdatedWorkspaceMd,
       };
     }, [items, activeTabs, plugins]);
 
@@ -483,7 +466,6 @@ export const ExploringToolParts = memo(
         inspectedHostnames,
         enabledPlugins,
         enabledWorkspaceSkills,
-        hasUpdatedWorkspaceMd,
       } = explorationMetadata;
 
       // Build "Enabled ..." prefix for skill reads (plugins + workspace)
@@ -575,8 +557,6 @@ export const ExploringToolParts = memo(
             );
           textParts.push(lintParts.join(', '));
         }
-
-      if (hasUpdatedWorkspaceMd) textParts.push('workspace info');
 
       if (textParts.length === 0) {
         if (hasCheckedLinting && lintingErrors === 0 && lintingWarnings === 0) {
@@ -684,8 +664,6 @@ export const ExploringToolParts = memo(
         }
         case 'tool-getLintingDiagnostics':
           return 'Checking linting...';
-        case 'tool-updateWorkspaceMd':
-          return 'Updating workspace info...';
         default:
           return isReasoningOnly ? 'Thinking...' : 'Exploring...';
       }

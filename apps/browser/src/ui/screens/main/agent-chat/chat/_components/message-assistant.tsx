@@ -19,7 +19,6 @@ import { TextPart } from './message-part-ui/text';
 import { CopyToolPart } from './message-part-ui/tools/copy';
 import { MkdirToolPart } from './message-part-ui/tools/mkdir';
 import { DeleteFileToolPart } from './message-part-ui/tools/delete';
-import { UpdateWorkspaceMdToolPart } from './message-part-ui/tools/update-workspace-md';
 import { MultiEditToolPart } from './message-part-ui/tools/multi-edit';
 import { WriteToolPart } from './message-part-ui/tools/write';
 import {
@@ -153,8 +152,6 @@ const SinglePartRenderer = memo(
         return <MkdirToolPart key={stableKey} part={part} />;
       case 'tool-delete':
         return <DeleteFileToolPart key={stableKey} part={part} />;
-      case 'tool-updateWorkspaceMd':
-        return <UpdateWorkspaceMdToolPart key={stableKey} part={part} />;
       case 'tool-multiEdit':
         return <MultiEditToolPart key={stableKey} part={part} />;
       case 'tool-executeSandboxJs':
@@ -225,12 +222,14 @@ const SinglePartRenderer = memo(
 
 export const MessageAssistant = memo(
   function MessageAssistant({
+    agentId,
     message: msg,
     isLastMessage,
     isWorking,
     showBetweenStepsIndicator,
     hasSubsequentFileModifications,
   }: {
+    agentId: string;
     message: AssistantMessage;
     isLastMessage: boolean;
     isWorking: boolean;
@@ -266,13 +265,14 @@ export const MessageAssistant = memo(
         window.dispatchEvent(
           new CustomEvent('chat-restore-checkpoint', {
             detail: {
+              agentId,
               assistantMessageId: msg.id,
               undoToolCalls,
             },
           }),
         );
       },
-      [msg.id],
+      [agentId, msg.id],
     );
 
     const handleRestoreCheckpoint = useCallback(() => {

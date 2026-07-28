@@ -52,7 +52,7 @@ const PROVIDERS: ProviderInfo[] = [
       'Best-in-class instruction following and long-context reasoning.',
     models: [
       { name: 'Fable 5', tier: 'frontier' },
-      { name: 'Opus 4.8', tier: 'frontier' },
+      { name: 'Opus 5', tier: 'frontier' },
       { name: 'Opus 4.7', tier: 'frontier' },
       { name: 'Opus 4.6', tier: 'frontier' },
       { name: 'Sonnet 5', tier: 'general' },
@@ -165,7 +165,7 @@ const PROVIDERS: ProviderInfo[] = [
     description:
       'Access 345+ models from all major vendors through a single API key.',
     models: [
-      { name: 'Claude Opus 4.8', tier: 'frontier' },
+      { name: 'Claude Opus 5', tier: 'frontier' },
       { name: 'GPT-5.6 Sol', tier: 'frontier' },
       { name: 'Gemini 3.1 Pro', tier: 'frontier' },
       { name: 'DeepSeek V4 Pro', tier: 'general' },

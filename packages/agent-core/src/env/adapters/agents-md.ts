@@ -12,10 +12,7 @@
 import { createPatch } from 'diff';
 import type { AgentHost } from '../../host/host';
 import { prefixLineNumbers } from '../../file-read-transformer';
-import {
-  DEFAULT_WORKSPACE_MD_RELATIVE_PATH,
-  readAgentsMd,
-} from '../../services/mount-manager/workspace-info';
+import { readAgentsMd } from '../../services/mount-manager/workspace-info';
 import type { MountManager } from '../../services/mount-manager/mount-registry';
 import type { DomainAdapter } from '../contract';
 import type { AgentsMdSnapshot } from '../types';
@@ -31,13 +28,6 @@ export interface AgentsMdDomainAdapterDeps {
   host: AgentHost;
   mountManager: MountManager;
   renderOrder?: number;
-  /**
-   * Mount-relative WORKSPACE.md path used to format the cross-link
-   * inside the AGENTS.md prompt section. Sourced from
-   * `AgentHost.workspaceMdRelativePath()`. Defaults to
-   * `.stagewise/WORKSPACE.md`.
-   */
-  workspaceMdRelativePath?: string;
 }
 
 async function buildAgentsMdState(
@@ -62,8 +52,8 @@ async function buildAgentsMdState(
       const content = await readAgentsMd(workspacePath);
       if (content) entries.push({ mountPrefix: prefix, content });
 
-      const workspaceSetting = settings.get(workspacePath);
-      if (workspaceSetting?.respectAgentsMd) respectedMounts.push(prefix);
+      if (settings.get(workspacePath)?.respectAgentsMd ?? true)
+        respectedMounts.push(prefix);
     }),
   );
 
@@ -162,17 +152,11 @@ export const AGENTS_MD_DOMAIN_ID = 'agentsMd';
 export function createAgentsMdDomainAdapter(
   deps: AgentsMdDomainAdapterDeps,
 ): DomainAdapter<AgentsMdSnapshot> {
-  const relativePath =
-    deps.workspaceMdRelativePath ?? DEFAULT_WORKSPACE_MD_RELATIVE_PATH;
-  const promptSection = AgentsMdPromptSection.replaceAll(
-    '{workspaceMdRelativePath}',
-    relativePath,
-  );
   return {
     domainId: AGENTS_MD_DOMAIN_ID,
     renderOrder: deps.renderOrder ?? 4,
     schemaVersion: CORE_ENV_SCHEMA_VERSION,
-    promptSection,
+    promptSection: AgentsMdPromptSection,
     getState(agentInstanceId) {
       return buildAgentsMdState(agentInstanceId, deps.host, deps.mountManager);
     },

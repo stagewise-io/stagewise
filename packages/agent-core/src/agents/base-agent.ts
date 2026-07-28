@@ -28,10 +28,13 @@ import type { AgentStateMutations } from '../services/agent-manager/state-mutati
 import type { AgentHost } from '../host/host';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PRESET_THINKING_OVERRIDE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   type ModelWithOptions,
+  type UtilityModelEntry,
 } from '../host/models';
 import type { AgentCtor, AgentTypeRegistry } from './agents-registry';
+import { ModelFallbackManager } from './model-fallback-manager';
 
 type ProviderApiError = {
   message?: string;
@@ -135,9 +138,6 @@ export interface BaseAgentToolboxView {
     workspacePath: string,
     permissions?: MountPermission[],
   ): Promise<void>;
-  getWorkspaceMd(
-    agentInstanceId: string,
-  ): Promise<Array<{ mountPrefix: string; path: string; content: string }>>;
 }
 
 /**
@@ -593,6 +593,7 @@ export abstract class BaseAgent<
   private _stepStartTime = 0;
   private _stepProviderMode = '';
   private _stepCodingPlanId: string | undefined;
+  private _stepProviderType: string | undefined;
   private _toolCallDurations = new Map<string, number>();
   private _memoryWriter: AgentMemoryWriter | null = null;
   private _memoryWriteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -614,7 +615,8 @@ export abstract class BaseAgent<
    * `null` means `onFinish` has not set a decision (e.g. error path,
    * aborted, or step superseded by a newer one) — the tail then no-ops.
    */
-  private _pendingContinue: boolean | null = null;
+  private _pendingContinue: { shouldRun: boolean; flushQueue: boolean } | null =
+    null;
 
   /**
    * Set only for runtime recovery after a suspend/resume or event-loop stall.
@@ -624,6 +626,22 @@ export abstract class BaseAgent<
   private _pendingSyntheticContinuation: {
     reason: 'system-resumed' | 'event-loop-stalled';
   } | null = null;
+
+  /**
+   * Manages automatic failover to the next model in the active
+   * preset's fallback list when the primary model fails with an
+   * upstream-overload error (429, 502, 503, 529). The fallback
+   * persists for 5 minutes after the last message, then resets to
+   * the primary. Changing the preset resets the pointer to index 0.
+   */
+  private _fallbackManager = new ModelFallbackManager();
+
+  /**
+   * Set by `onError` when an upstream-overload error triggers a
+   * fallback retry. The tail of `runStep` checks this flag and
+   * re-invokes `runStep` to retry with the next fallback model.
+   */
+  private _pendingFallbackRetry = false;
 
   /**
    * Tracks approval IDs for which we have already emitted a
@@ -801,7 +819,7 @@ export abstract class BaseAgent<
     this.state.commands.appendHistoryMessage({ message: msg });
     this.scheduleMemorySnapshotWrite('user-message');
 
-    void this.runStep();
+    void this.runStep(false, false);
 
     return id;
   }
@@ -885,8 +903,8 @@ export abstract class BaseAgent<
   }
 
   /**
-   * Immediately flushes the queue by stopping the agent (aborts any ongoing streams)
-   * and sending all of the queued messages at once.
+   * Immediately triggers queue processing by stopping the agent (aborts any ongoing streams)
+   * and initiating a new step to dequeue and process the next queued message.
    *
    * @note Pending tool approvals will be denied with reason "User sent new message instead. Retry if necessary." or configurable response.
    * @note Pending tool calls will be aborted with reason "User sent new message instead. Retry if necessary." or configurable response.
@@ -898,8 +916,8 @@ export abstract class BaseAgent<
 
     await this.internalStop('user-flushed-queue');
 
-    // Send all queued messages into the chat
-    this.state.commands.flushQueueIntoHistory();
+    // Let the runStep() at the end of this method handle popping the first queued message
+
     if (flushedCount > 0) {
       this.scheduleMemorySnapshotWrite('queued-messages');
     }
@@ -908,7 +926,7 @@ export abstract class BaseAgent<
       this.host.telemetry?.capture('agent-queue-flushed', {
         agent_type: this.agentType,
         agent_instance_id: this.instanceId,
-        flushed_message_count: flushedCount,
+        flushed_message_count: 1,
       });
     }
 
@@ -949,7 +967,7 @@ export abstract class BaseAgent<
     this.state.commands.setIsWorkingFalse();
 
     this._pendingSyntheticContinuation = { reason };
-    void this.runStep();
+    void this.runStep(false, false);
   }
 
   /**
@@ -1147,6 +1165,9 @@ export abstract class BaseAgent<
         messages,
         this.host.models,
         this.instanceId,
+        this.state.get().activeModelId,
+        this.state.get().activeProviderInstanceId,
+        this.host,
       );
     } catch (e) {
       const error = e as Error;
@@ -1174,6 +1195,7 @@ export abstract class BaseAgent<
       this.host.models,
       this.instanceId,
       this.state.get().activeModelId,
+      this.state.get().activeProviderInstanceId,
       this.host,
     );
   }
@@ -1239,7 +1261,7 @@ export abstract class BaseAgent<
     reasoningSignatureSource?: ReasoningSignatureSource,
     allowedEnvDomainIds?: readonly string[],
   ): Promise<ModelMessage[]> {
-    const activeModelId = this.state.get().activeModelId;
+    const { activeModelId, activeProviderInstanceId } = this.state.get();
     const fileReadCache = this.fileReadCacheService;
     const capabilities = this.host.models.getCapabilities(activeModelId);
 
@@ -1251,6 +1273,9 @@ export abstract class BaseAgent<
       const { contextWindowSize } = await this.host.models.getWithOptions(
         activeModelId,
         '',
+        {
+          [PROVIDER_INSTANCE_ID_METADATA_KEY]: activeProviderInstanceId,
+        },
       );
       contentLimits = {
         maxReadChars: deriveMaxReadChars(contextWindowSize),
@@ -1572,7 +1597,10 @@ export abstract class BaseAgent<
   /**
    * Should be executed after a user or tool approval message was added to the agent
    */
-  private async runStep(isApprovalContinuation = false): Promise<void> {
+  private async runStep(
+    isApprovalContinuation = false,
+    flushQueue = !isApprovalContinuation,
+  ): Promise<void> {
     // Check canRunStep BEFORE setting isWorking to avoid deadlock
     if (!this.canRunStep()) {
       if (this._pendingSyntheticContinuation) {
@@ -1591,6 +1619,7 @@ export abstract class BaseAgent<
     // Reset continuation flag at the start of every step so a leftover
     // value from a prior aborted step cannot leak into the tail.
     this._pendingContinue = null;
+    this._pendingFallbackRetry = false;
 
     // Tracks whether the just-finished step ended on an open tool-approval
     // request. Used by the idle tail to suppress the `done` notification
@@ -1607,7 +1636,7 @@ export abstract class BaseAgent<
     // complete in isolation first. Queued messages will be picked up
     // by the follow-up runStep() triggered via shouldRunNewStep().
     const { queueFlushIndex: flushedIndex } = this.state.commands.beginStep({
-      flushQueue: !isApprovalContinuation,
+      flushQueue,
     });
     if (flushedIndex !== undefined) {
       this.scheduleMemorySnapshotWrite('queued-messages');
@@ -1619,26 +1648,79 @@ export abstract class BaseAgent<
     // so any later read from async callbacks (telemetry, onError) could
     // attribute the outcome to a model the user switched to mid-flight.
     const stepState = this.state.get();
-    const stepModelId = stepState.activeModelId;
-    const stepProviderInstanceId = stepState.activeProviderInstanceId;
+    let stepModelId = stepState.activeModelId;
+    let stepProviderInstanceId = stepState.activeProviderInstanceId;
+
+    // ── Active preset resolution + fallback ──────────────────────────
+    // When a preset is active, resolve the model from the *current* preset
+    // definition (stored in user preferences) rather than the stale
+    // `activeModelId` that was written into agent state at preset selection
+    // time. This ensures that editing a preset in settings takes effect on
+    // the very next agent turn.
+    //
+    // The fallback manager checks for preset changes (resets to primary),
+    // 5-min expiry (resets to primary), and touches the persistence timer
+    // on every call. If a fallback is active (index > 0), the corresponding
+    // model from the preset's list is used instead of the main model.
+    let presetThinkingOverride: UtilityModelEntry['thinkingOverride'];
+    const presetId = this.host.models.getActivePresetId?.();
+    const presetModels = this.host.models.getActivePresetModels?.();
+    const fallbackIndex = this._fallbackManager.resolveModelIndex(
+      presetId,
+      presetModels,
+    );
+    if (presetModels && presetModels.length > 0) {
+      const resolvedModel: UtilityModelEntry =
+        presetModels[fallbackIndex] ?? presetModels[0]!;
+      stepModelId = resolvedModel.modelId;
+      stepProviderInstanceId = resolvedModel.providerInstanceId;
+      presetThinkingOverride = resolvedModel.thinkingOverride;
+      this.host.logger.debug(
+        `[BaseAgent:${this.instanceId}] Chat model resolved — ` +
+          `preset="${presetId}", ` +
+          `index=${fallbackIndex}/${presetModels.length}, ` +
+          `model="${stepModelId}", ` +
+          `instance="${stepProviderInstanceId ?? 'default'}", ` +
+          `fallback=${fallbackIndex > 0 ? 'YES' : 'no'}.`,
+      );
+      // Sync agent state so the UI and persistence reflect the current
+      // preset model. This is idempotent — if the model hasn't changed,
+      // the state mutation is a no-op.
+      this.state.commands.setActiveModel({
+        modelId: stepModelId,
+        providerInstanceId: stepProviderInstanceId,
+      });
+    } else {
+      this.host.logger.debug(
+        `[BaseAgent:${this.instanceId}] Chat model resolved — ` +
+          `preset=none, model="${stepModelId}", ` +
+          `instance="${stepProviderInstanceId ?? 'default'}".`,
+      );
+    }
 
     // Get the current model — wrapped in try-catch so a deleted custom model
     // or endpoint doesn't wedge the agent with isWorking=true and no error.
     let modelWithOptions: ModelWithOptions;
     try {
+      const resolutionMetadata: Record<string, unknown> = {
+        $ai_span_name: `${this.agentType}-history`,
+        $ai_parent_id: this.instanceId,
+        [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
+        [PROVIDER_INSTANCE_ID_METADATA_KEY]: stepProviderInstanceId,
+      };
+      if (presetThinkingOverride) {
+        resolutionMetadata[PRESET_THINKING_OVERRIDE_METADATA_KEY] =
+          presetThinkingOverride;
+      }
       modelWithOptions = await this.host.models.getWithOptions(
         stepModelId,
         this.instanceId,
-        {
-          $ai_span_name: `${this.agentType}-history`,
-          $ai_parent_id: this.instanceId,
-          [MODEL_REQUEST_PURPOSE_METADATA_KEY]: 'agent-step',
-          [PROVIDER_INSTANCE_ID_METADATA_KEY]: stepProviderInstanceId,
-        },
+        resolutionMetadata,
       );
-      this._stepProviderMode = modelWithOptions.providerMode;
-      this._stepCodingPlanId = modelWithOptions.connectedCodingPlanId;
+      this.applyStepProviderMetadataIfCurrent(modelWithOptions, stepGen);
+      if (this._stepGeneration !== stepGen) return;
     } catch (error) {
+      if (this._stepGeneration !== stepGen) return;
       const err = error as Error;
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] Failed to resolve model "${stepModelId}": ${err.message}`,
@@ -1666,18 +1748,23 @@ export abstract class BaseAgent<
         queueFlushIndex >= 0 ? queueFlushIndex : undefined,
         modelWithOptions.reasoningSignatureSource,
       );
+      if (this._stepGeneration !== stepGen) return;
       tools = await this.getToolsForStep();
+      if (this._stepGeneration !== stepGen) return;
       this._toolCallDurations.clear();
       tools = this.wrapToolsWithTiming(tools);
       tools = this.wrapToolsWithOutputBudget(tools);
       if (modelWithOptions.stripStrictFromTools) {
         tools = this.stripStrictFromTools(tools);
       }
+      const modelSettings = await this.getModelSettings(this.messages);
+      if (this._stepGeneration !== stepGen) return;
       resolvedConfig = {
         ...this.config,
-        ...(await this.getModelSettings(this.messages)),
+        ...modelSettings,
       };
     } catch (e) {
+      if (this._stepGeneration !== stepGen) return;
       const error = e as Error;
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] Failed to prepare step context: ${this.formatError(error)}`,
@@ -1695,6 +1782,8 @@ export abstract class BaseAgent<
       return;
     }
 
+    if (this._stepGeneration !== stepGen) return;
+
     if (isApprovalContinuation)
       modelMessages = this.ensureToolApprovalResponseIsLast(modelMessages);
 
@@ -1703,8 +1792,10 @@ export abstract class BaseAgent<
 
     this.host.logger.debug(`[BaseAgent:${this.instanceId}] Running step`);
 
+    if (this._stepGeneration !== stepGen) return;
     this.stepAbortController = new AbortController();
 
+    if (this._stepGeneration !== stepGen) return;
     const stream = streamText({
       model: modelWithOptions.model,
       providerOptions: modelWithOptions.providerOptions,
@@ -1858,6 +1949,37 @@ export abstract class BaseAgent<
             status_code: parsedOverload.statusCode,
           });
         }
+        // ── Main-model fallback ──────────────────────────────────────
+        // When an upstream-overload error occurs and the active preset
+        // has fallback models, advance the fallback pointer and schedule
+        // a retry instead of surfacing the error to the user.
+        if (parsedOverload?.kind === 'upstream-overload') {
+          const advanced = this._fallbackManager.advanceOnFailure(presetModels);
+          if (advanced) {
+            const fbIdx = this._fallbackManager.fallbackModelIndex;
+            const fbModel = presetModels?.[fbIdx];
+            this.host.logger.info(
+              `[BaseAgent:${this.instanceId}] Upstream overload on model "${stepModelId}" — ` +
+                `falling back to preset model index ${fbIdx}` +
+                ` (model="${fbModel?.modelId ?? '?'}", ` +
+                `instance="${fbModel?.providerInstanceId ?? 'default'}").`,
+            );
+            this.host.telemetry?.capture('model-fallback-triggered', {
+              agent_type: this.agentType,
+              failed_model_id: stepModelId,
+              fallback_model_index: this._fallbackManager.fallbackModelIndex,
+              provider_mode: this._stepProviderMode,
+            });
+            // Signal the tail of runStep to retry with the next model.
+            this._pendingFallbackRetry = true;
+            this._pendingContinue = null;
+            try {
+              this.stepAbortController?.abort();
+            } catch {}
+            this.stepAbortController = null;
+            return;
+          }
+        }
         this.state.commands.recordStepError({
           error: parsedPlanLimit ??
             parsedModelRestricted ??
@@ -1988,35 +2110,59 @@ export abstract class BaseAgent<
       // mismatch in case `internalStop` bumped the generation while we
       // were awaiting fs I/O above.
       if (this._stepGeneration === stepGen) {
-        const pending = this._pendingContinue;
-        this._pendingContinue = null;
-        if (pending === true) {
-          // setTimeout to keep the call stack clean (unbounded recursion).
+        // ── Fallback retry ──────────────────────────────────────────
+        // If `onError` triggered a model fallback, re-run the step
+        // with the next model in the preset's fallback list. This
+        // takes priority over the normal continuation decision.
+        if (this._pendingFallbackRetry) {
+          this._pendingFallbackRetry = false;
+          this._pendingContinue = null;
+          this.host.logger.debug(
+            `[BaseAgent:${this.instanceId}] Fallback retry scheduled — ` +
+              `re-invoking runStep via setTimeout(0).`,
+          );
           setTimeout(() => void this.runStep(), 0);
-        } else if (pending === false) {
-          // Mark unread only if history contains at least one assistant
-          // message (covers fresh-session edge case).
-          const hasAssistantMessage = this.state
-            .get()
-            .history.some((m) => m.role === 'assistant');
-          this.state.commands.recordStepError({
-            error: undefined,
-            markUnread: 'if-assistant-history',
-          });
-          this.onIdle();
-          // Only notify "done" for a genuine turn completion: there must
-          // be an assistant message and the agent must not be paused on an
-          // open approval request (that's a `question`, emitted elsewhere).
-          if (hasAssistantMessage && !stepHasApprovalRequest) {
-            this.emitNotificationEvent('done');
+        } else {
+          // Capture and clear atomically. The explicit cast breaks
+          // TypeScript's control-flow narrowing which would otherwise
+          // narrow `pending` to `never` after the null assignment to
+          // the backing field.
+          const pending = this._pendingContinue as {
+            shouldRun: boolean;
+            flushQueue: boolean;
+          } | null;
+          this._pendingContinue = null;
+          if (pending !== null) {
+            if (pending.shouldRun) {
+              // setTimeout to keep the call stack clean (unbounded recursion).
+              setTimeout(() => void this.runStep(false, pending.flushQueue), 0);
+            } else {
+              // Mark unread only if history contains at least one assistant
+              // message (covers fresh-session edge case).
+              const hasAssistantMessage = this.state
+                .get()
+                .history.some((m) => m.role === 'assistant');
+              this.state.commands.recordStepError({
+                error: undefined,
+                markUnread: 'if-assistant-history',
+              });
+              this.onIdle();
+              // Only notify "done" for a genuine turn completion: there must
+              // be an assistant message and the agent must not be paused on an
+              // open approval request (that's a `question`, emitted elsewhere).
+              if (hasAssistantMessage && !stepHasApprovalRequest) {
+                this.emitNotificationEvent('done');
+              }
+            }
           }
+          // pending === null → onFinish never set a decision (error path,
+          // aborted, or superseded step). Nothing to do; the onError /
+          // onAbort / catch handlers own state cleanup.
         }
-        // pending === null → onFinish never set a decision (error path,
-        // aborted, or superseded step). Nothing to do; the onError /
-        // onAbort / catch handlers own state cleanup.
       } else {
-        // Superseded — just clear the flag so nothing leaks.
+        // Superseded — just clear the flags so nothing leaks.
         this._pendingContinue = null;
+        this._pendingFallbackRetry = false;
       }
     } catch (err) {
       const raw = err;
@@ -2041,6 +2187,28 @@ export abstract class BaseAgent<
       // the next step or fire onIdle after an error here.
       this._pendingContinue = null;
       this._pendingSyntheticContinuation = null;
+      // If onError already triggered a fallback retry, honor it instead
+      // of surfacing the error.
+      if (this._pendingFallbackRetry) {
+        this._pendingFallbackRetry = false;
+        // Force-terminate any non-terminal tool parts from the aborted
+        // step so canRunStep() does not block the retry. Without this,
+        // partial tool-call parts left in "input-streaming"/
+        // "input-available" state by the aborted stream would cause
+        // the fallback retry to be silently dropped.
+        this.state.commands.denyAllNonTerminalToolPartsInHistory({
+          approvalDenyReason:
+            'Model fallback triggered — retrying with fallback model.',
+          forceErrorText:
+            'Tool execution interrupted — upstream overload triggered model fallback.',
+        });
+        try {
+          this.stepAbortController?.abort();
+        } catch {}
+        this.stepAbortController = null;
+        setTimeout(() => void this.runStep(false, false), 0);
+        return;
+      }
       try {
         this.stepAbortController?.abort();
       } catch {}
@@ -2099,7 +2267,9 @@ export abstract class BaseAgent<
       let contextWindowSize: number;
       try {
         contextWindowSize = (
-          await this.host.models.getWithOptions(state.activeModelId, '')
+          await this.host.models.getWithOptions(state.activeModelId, '', {
+            [PROVIDER_INSTANCE_ID_METADATA_KEY]: state.activeProviderInstanceId,
+          })
         ).contextWindowSize;
       } catch {
         // Model may have been deleted — fall back to a conservative size
@@ -2309,15 +2479,10 @@ export abstract class BaseAgent<
    *
    * @returns Whether the agent should run a new step based on the given conditions.
    */
-  private shouldRunNewStep(
-    r: StepResult<ToolSet>,
-    userWantsToContinue: boolean,
-  ): boolean {
-    if (this.state.get().queuedMessages.length > 0) {
-      // We should always continue if the user queued a message
-      return true;
-    }
-
+  private shouldRunNewStep(r: StepResult<ToolSet>): {
+    shouldRun: boolean;
+    flushQueue: boolean;
+  } {
     let stepsSinceLastMessage = 0;
     let lastUserMessageTime = 0;
     const historySnapshot = this.state.get().history;
@@ -2334,12 +2499,15 @@ export abstract class BaseAgent<
       }
     }
 
+    const hasQueuedMessages = this.state.get().queuedMessages.length > 0;
+
     // Check if the maximum number of steps has been reached
     if (this.config.maxSteps && stepsSinceLastMessage >= this.config.maxSteps) {
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Maximum number of steps reached: ${stepsSinceLastMessage} >= ${this.config.maxSteps}`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
     // Check if the maximum time has been reached
@@ -2350,7 +2518,8 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Maximum time reached: ${Date.now() - lastUserMessageTime} >= ${this.config.maxTime}`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
     //Also return a no-continue if one of the called tools is a "finish" tool and only the "finish" tool was called
@@ -2358,7 +2527,8 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Only the "finish" tool was called`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
     // Check if there are any open tool approval requests
@@ -2366,11 +2536,8 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] There are open tool approval requests`,
       );
-      return false;
+      return { shouldRun: false, flushQueue: false };
     }
-
-    // If the user does not want to continue, we don't run a new step
-    if (!userWantsToContinue) return false;
 
     // We assume that approved tool calls are executed and results are attached,
     // because this is what AI-SDK with controlled tool execution promises us
@@ -2384,7 +2551,7 @@ export abstract class BaseAgent<
       this.host.logger.warn(
         `[BaseAgent:${this.instanceId}] Output truncated (finishReason=length). Model will see error results and retry.`,
       );
-      return true;
+      return { shouldRun: true, flushQueue: false };
     }
 
     // Check if the finish reason is not tool-calls (which means user intervention is needed)
@@ -2392,10 +2559,11 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] The finish reason is not "tool-calls", but "${r.finishReason}"`,
       );
-      return false;
+      if (hasQueuedMessages) return { shouldRun: true, flushQueue: true };
+      return { shouldRun: false, flushQueue: false };
     }
 
-    return true;
+    return { shouldRun: true, flushQueue: false };
   }
 
   /**
@@ -2403,7 +2571,9 @@ export abstract class BaseAgent<
    *
    * @returns Whether the agent should run a new step based on the given conditions.
    */
-  private async handlePostStep(result: StepResult<ToolSet>): Promise<boolean> {
+  private async handlePostStep(
+    result: StepResult<ToolSet>,
+  ): Promise<{ shouldRun: boolean; flushQueue: boolean }> {
     this.state.commands.recordUsage({
       totalTokens: result.usage.totalTokens ?? 0,
     });
@@ -2442,6 +2612,7 @@ export abstract class BaseAgent<
       model_id: this.state.get().activeModelId,
       provider_mode: this._stepProviderMode,
       coding_plan_id: this._stepCodingPlanId,
+      provider_type: this._stepProviderType,
       input_tokens: result.usage.inputTokens ?? 0,
       output_tokens: result.usage.outputTokens ?? 0,
       tool_call_count: result.toolCalls.length,
@@ -2457,11 +2628,12 @@ export abstract class BaseAgent<
     // far more tokens than the fractional sweet-spot tuned for 200k models.
     const compactionThreshold = this.config.historyCompressionThreshold ?? 0.65;
     try {
+      const postStepState = this.state.get();
       const contextWindowSize = (
-        await this.host.models.getWithOptions(
-          this.state.get().activeModelId,
-          '',
-        )
+        await this.host.models.getWithOptions(postStepState.activeModelId, '', {
+          [PROVIDER_INSTANCE_ID_METADATA_KEY]:
+            postStepState.activeProviderInstanceId,
+        })
       ).contextWindowSize;
       const fractionalTriggerTokens = compactionThreshold * contextWindowSize;
       const effectiveTriggerTokens = Math.min(
@@ -2479,20 +2651,21 @@ export abstract class BaseAgent<
     }
 
     const userWantsToContinue = (await this.onStepFinished(result)) ?? true;
-    const shouldRunNewStep = this.shouldRunNewStep(result, userWantsToContinue);
 
-    if (!shouldRunNewStep) {
-      this.host.logger.debug(
-        `[BaseAgent:${this.instanceId}] Not running new step. Agent Type: ${this.agentType}`,
-      );
-      return false;
+    if (!userWantsToContinue) {
+      if (this.state.get().queuedMessages.length > 0) {
+        return { shouldRun: true, flushQueue: true };
+      }
+      return { shouldRun: false, flushQueue: false };
     }
+
+    const shouldRunNewStep = this.shouldRunNewStep(result);
 
     this.host.logger.debug(
       `[BaseAgent:${this.instanceId}] Running new step. Agent Type: ${this.agentType}`,
     );
 
-    return true;
+    return shouldRunNewStep;
   }
 
   /**
@@ -2913,6 +3086,17 @@ export abstract class BaseAgent<
     }
   }
 
+  private applyStepProviderMetadataIfCurrent(
+    modelWithOptions: ModelWithOptions,
+    stepGeneration: number,
+  ): void {
+    if (this._stepGeneration !== stepGeneration) return;
+
+    this._stepProviderMode = modelWithOptions.providerMode;
+    this._stepCodingPlanId = modelWithOptions.connectedCodingPlanId;
+    this._stepProviderType = modelWithOptions.providerType;
+  }
+
   private async internalStop(
     stopReason:
       | 'user-stopped'
@@ -2928,6 +3112,7 @@ export abstract class BaseAgent<
     // recovery path sets a fresh one after calling internalStop().
     this._pendingContinue = null;
     this._pendingSyntheticContinuation = null;
+    this._pendingFallbackRetry = false;
     try {
       this.stepAbortController?.abort();
     } catch {}

@@ -80,7 +80,5 @@ export function createTestAgentHost(
     telemetry: partial?.telemetry,
     desktop: partial?.desktop,
     environmentSources: partial?.environmentSources,
-    readWorkspaceMdFromDisk: partial?.readWorkspaceMdFromDisk,
-    workspaceMdRelativePath: partial?.workspaceMdRelativePath,
   });
 }

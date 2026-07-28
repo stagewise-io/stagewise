@@ -7,7 +7,7 @@ import type {
   MountPermission,
   MentionFileCandidate,
   AttachmentMetadata,
-  ShellSessionSnapshot,
+  ShellSnapshot,
 } from './agent/metadata';
 import type {
   MountEntry,
@@ -16,9 +16,14 @@ import type {
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
-import type { FileDiff } from './shared-types';
+import type { ExternalIde, FileDiff } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
+export type {
+  UIEventName,
+  UIEventProperties,
+  TrackUIEvent,
+} from './telemetry';
 import type {
   FilePickerRequest,
   GlobalConfig,
@@ -57,7 +62,6 @@ import type {
   RemoveSearchEngineResult,
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
-  ContextFilesResult,
   CurrentUsageResponse,
   UsageHistoryResponse,
 } from '../pages-api/types';
@@ -757,10 +761,20 @@ export type FileTreeOperationResult = {
   relativePath?: string;
 };
 
+export type DeviceEmulation = {
+  presetId: string;
+  width: number;
+  height: number;
+  deviceScaleFactor: number;
+  mobile: boolean;
+  scale: number;
+  fitScale: number;
+};
+
 export type TabState = {
   id: string;
-  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs, 'file' for workspace file previews. */
-  type?: 'browser' | 'terminal' | 'file';
+  /** Discriminator for the content hosted by this tab. */
+  type?: 'browser' | 'terminal' | 'file' | 'side-chat';
   title: string;
   url: string;
   faviconUrls: string[];
@@ -771,6 +785,8 @@ export type TabState = {
   isPlayingAudio: boolean;
   isMuted: boolean;
   colorScheme: ColorScheme;
+  /** Per-tab device viewport emulation. `null` means the normal browser viewport. */
+  deviceEmulation: DeviceEmulation | null;
   error: {
     code: number;
     message?: string;
@@ -810,6 +826,8 @@ export type TabState = {
   terminalRunningProcess?: string | null;
   /** File-preview-specific fields (present when type === 'file') */
   file?: FileTabMetadata;
+  /** Side-chat agent rendered by this tab (present when type === 'side-chat'). */
+  sideChatAgentInstanceId?: string;
   /** Transient notice banner for file tabs (move / delete). */
   fileNotice?: FileTabNotice;
   createdAt?: number;
@@ -833,6 +851,7 @@ export function getTerminalTabDefaults(): Omit<
     isPlayingAudio: false,
     isMuted: false,
     colorScheme: 'system' as TabState['colorScheme'],
+    deviceEmulation: null,
     error: null,
     navigationHistory: { canGoBack: false, canGoForward: false },
     devTools: { open: false, chromeOpen: false },
@@ -866,6 +885,7 @@ export function getFileTabDefaults(): Omit<
     isPlayingAudio: false,
     isMuted: false,
     colorScheme: 'system' as TabState['colorScheme'],
+    deviceEmulation: null,
     error: null,
     navigationHistory: { canGoBack: false, canGoForward: false },
     devTools: { open: false, chromeOpen: false },
@@ -879,6 +899,16 @@ export function getFileTabDefaults(): Omit<
     isContentFullscreen: false,
     authenticationRequest: null,
     lifecycle: { kind: 'permanent' },
+  };
+}
+
+export function getSideChatTabDefaults(): Omit<
+  TabState,
+  'id' | 'title' | 'lastFocusedAt' | 'sideChatAgentInstanceId'
+> {
+  return {
+    ...getFileTabDefaults(),
+    type: 'side-chat',
   };
 }
 
@@ -1030,6 +1060,7 @@ export type AppState = {
         requiredModelCapabilities: ModelSettings['capabilities'];
         allowUserInput: boolean;
         parentAgentInstanceId: string | null;
+        sideChatParentId: string | null;
         state: AgentState;
       };
     };
@@ -1059,7 +1090,7 @@ export type AppState = {
       /** Maps toolCallId → sessionId for in-flight shell commands. */
       pendingShellSessionIds?: Record<string, string>;
       /** Live shell session manifest — pushed eagerly on lifecycle events. */
-      shells?: { sessions: ShellSessionSnapshot[] };
+      shells?: ShellSnapshot;
 
       activeApp?: {
         appId: string;
@@ -1162,6 +1193,7 @@ export type AppState = {
     title: string | null;
     message: string | null;
     type: 'info' | 'warning' | 'error';
+    icon?: 'spinner';
     duration?: number; // Duration in milliseconds. Will never auto-dismiss if not set.
     actions: {
       label: string;
@@ -1250,10 +1282,10 @@ export type AppState = {
   // Current system theme (light or dark) based on OS preference
   systemTheme: 'light' | 'dark';
 
+  installedIdes: ExternalIde[];
+
   /** Deduplicated workspace mounts from all agent instances */
   workspaceMounts: MountEntry[];
-  /** Workspace paths where a WORKSPACE.md agent is currently running */
-  workspaceMdGenerating: Record<string, boolean>;
   /** Bundled plugin definitions (static, pushed once at startup) */
   plugins: PluginDefinition[];
 
@@ -1283,6 +1315,15 @@ export type AppState = {
   logIngest: { port: number; token: string } | null;
 };
 
+export type OnboardingCompletionSummary = {
+  onboarding_run_id: string;
+  total_duration_ms: number;
+  connected_provider_keys: string[];
+  connected_provider_count: number;
+  provider_step_skipped: boolean;
+  personalization_changed: boolean;
+};
+
 export type AuthStatus =
   | 'authenticated'
   | 'unauthenticated'
@@ -1306,6 +1347,9 @@ export type KartonContract = {
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,
       ) => Promise<string>;
+      createSideChat: (sourceAgentId: string) => Promise<string>;
+      promoteSideChat: (agentId: string) => Promise<void>;
+      discardSideChat: (agentId: string) => Promise<void>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
       delete: (agentId: string) => Promise<void>;
@@ -1489,14 +1533,6 @@ export type KartonContract = {
         mountPrefix: string,
         options: WorkspaceGitCreateWorktreeOptions,
       ) => Promise<WorkspaceGitCreateWorktreeResult>;
-      generateWorkspaceMd: (
-        agentInstanceId: string,
-        mountPrefix: string,
-      ) => Promise<void>;
-      /** Get context files for all workspaces */
-      getContextFiles: () => Promise<ContextFilesResult>;
-      /** Generate WORKSPACE.md for a workspace path (does not require agent instance) */
-      generateWorkspaceMdForPath: (workspacePath: string) => Promise<void>;
       submitUserQuestionStep: (
         agentInstanceId: string,
         questionId: string,
@@ -1601,10 +1637,11 @@ export type KartonContract = {
                   | 'glm-coding-plan'
                   | 'kimi-plan'
                   | 'qwen-plan'
+                  | 'qwen-token-plan'
                   | 'minimax-plan'
                   | 'mimo-plan';
               };
-              suggestion?: { id: string; url: string; prompt: string };
+              summary?: OnboardingCompletionSummary;
             },
       ) => Promise<void>;
       clearPendingOnboardingSuggestion: () => Promise<void>;
@@ -1657,6 +1694,12 @@ export type KartonContract = {
       /** Quit the app and install the downloaded update */
       quitAndInstall: () => Promise<void>;
     };
+    appData: {
+      /** Open the OS-specific Electron userData directory. */
+      openFolder: () => Promise<void>;
+      /** Delete app data on restart while retaining the installation ID. */
+      reset: () => Promise<void>;
+    };
     config: {
       set: (config: Partial<GlobalConfig>) => Promise<void>;
       previewSoundPack: (
@@ -1679,6 +1722,10 @@ export type KartonContract = {
         url?: string,
         setActive?: boolean,
         agentInstanceId?: string | null,
+      ) => Promise<string | undefined>;
+      createSideChatTab: (
+        parentAgentInstanceId: string,
+        sideChatAgentInstanceId: string,
       ) => Promise<string | undefined>;
       closeTab: (tabId: string) => Promise<void>;
       clearFileNotice: (tabId: string) => Promise<void>;
@@ -1767,6 +1814,11 @@ export type KartonContract = {
       toggleAudioMuted: (tabId?: string) => Promise<void>;
       setColorScheme: (scheme: ColorScheme, tabId?: string) => Promise<void>;
       cycleColorScheme: (tabId?: string) => Promise<void>;
+      setDeviceEmulation: (
+        emulation: DeviceEmulation | null,
+        tabId?: string,
+        transient?: boolean,
+      ) => Promise<void>;
       setZoomPercentage: (percentage: number, tabId?: string) => Promise<void>;
       /** Set the agent instance ID this tab is attached to (null = globally visible) */
       setTabAgentInstance: (
@@ -2357,8 +2409,8 @@ export const defaultState: KartonContract['state'] = {
   preferences: defaultUserPreferences,
   searchEngines: [],
   systemTheme: 'light', // Will be set correctly by backend on init
+  installedIdes: [],
   workspaceMounts: [],
-  workspaceMdGenerating: {},
   plugins: [],
   skills: [],
   globalSkills: [],

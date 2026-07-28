@@ -8,13 +8,7 @@ import { setAgentMounts } from './mount-state';
 import { watch, type FSWatcher } from '../../fs';
 import type { WorkspaceSnapshot } from '../../types/metadata';
 import type { MountManagerHostHooks } from './types';
-import {
-  DEFAULT_WORKSPACE_MD_RELATIVE_PATH,
-  getSkills,
-  readAgentsMd,
-  readWorkspaceMd,
-  splitWorkspaceMdRelativePath,
-} from './workspace-info';
+import { getSkills, readAgentsMd } from './workspace-info';
 import { pickOwningWorkspace } from '../../workspace';
 
 type AgentInstanceId = string;
@@ -46,14 +40,6 @@ export interface MountManagerOptions {
    * Returns `'unknown'` when unknown.
    */
   getAgentType?: (agentInstanceId: string) => string;
-  /**
-   * Mount-relative path to the WORKSPACE.md memo, sourced from
-   * `AgentHost.workspaceMdRelativePath()`. Defaults to
-   * `.stagewise/WORKSPACE.md`. Determines (a) which file the
-   * registry reads and (b) which `<dir>/<file>` pair the workspace
-   * watcher whitelists.
-   */
-  workspaceMdRelativePath?: string;
 }
 
 /**
@@ -74,9 +60,6 @@ export class MountManager {
   private readonly hooks: MountManagerHostHooks;
   private readonly store: AgentStore;
   private readonly getAgentType: (agentInstanceId: string) => string;
-  private readonly workspaceMdRelativePath: string;
-  private readonly workspaceMdDir: string;
-  private readonly workspaceMdFile: string;
 
   private agentMounts: Map<AgentInstanceId, Set<MountPrefix>> = new Map();
   private workspacePathsPerMount: Map<MountPrefix, WorkspacePath> = new Map();
@@ -86,6 +69,7 @@ export class MountManager {
   > = new Map();
 
   private watchersPerPath: Map<WorkspacePath, FSWatcher> = new Map();
+  private watcherReadinessPerPath = new Map<WorkspacePath, Promise<void>>();
   private watcherDebounceTimers: Map<
     WorkspacePath,
     ReturnType<typeof setTimeout>
@@ -97,11 +81,6 @@ export class MountManager {
     this.hooks = options.hooks;
     this.store = options.store;
     this.getAgentType = options.getAgentType ?? (() => 'unknown');
-    this.workspaceMdRelativePath =
-      options.workspaceMdRelativePath ?? DEFAULT_WORKSPACE_MD_RELATIVE_PATH;
-    const split = splitWorkspaceMdRelativePath(this.workspaceMdRelativePath);
-    this.workspaceMdDir = split.dir;
-    this.workspaceMdFile = split.file;
   }
 
   /**
@@ -128,22 +107,22 @@ export class MountManager {
       // (and watcher refreshes) find a ready runtime.
       await this.hooks.onWorkspaceAttached?.(workspacePath);
       this.workspacePathsPerMount.set(prefix, workspacePath);
-      this.startWorkspaceWatcher(workspacePath);
     }
+
+    // Prevent writes between mounting and Chokidar's completed initial scan.
+    await this.startWorkspaceWatcher(workspacePath);
 
     const mounts = existing ?? new Set<MountPrefix>();
     mounts.add(prefix);
     this.agentMounts.set(agentInstanceId, mounts);
 
-    const [workspaceMdContent, agentsMdContent, skills, git] =
-      await Promise.all([
-        readWorkspaceMd(workspacePath),
-        readAgentsMd(workspacePath),
-        getSkills(workspacePath),
-        Promise.resolve(
-          this.hooks.getWorkspaceGitSummary?.(workspacePath),
-        ).then((summary) => summary ?? null),
-      ]);
+    const [agentsMdContent, skills, git] = await Promise.all([
+      readAgentsMd(workspacePath),
+      getSkills(workspacePath),
+      Promise.resolve(this.hooks.getWorkspaceGitSummary?.(workspacePath)).then(
+        (summary) => summary ?? null,
+      ),
+    ]);
 
     const entry: MountEntry = {
       prefix,
@@ -153,7 +132,6 @@ export class MountManager {
         name: s.name,
         description: s.description,
       })),
-      workspaceMdContent,
       agentsMdContent,
     };
     let agentEntries = this.mountEntriesPerAgent.get(agentInstanceId);
@@ -205,27 +183,6 @@ export class MountManager {
     this.mountEntriesPerAgent.delete(agentInstanceId);
     if (!mounts) return;
     for (const prefix of mounts) this.releaseMountIfUnused(prefix);
-  }
-
-  /**
-   * Replace the in-memory `workspaceMdContent` for every mount that
-   * points at `workspacePath`. Host-side `WorkspaceMdAgent` uses this
-   * after writing a new workspace document so the Karton-mirrored
-   * state reflects the new content immediately.
-   */
-  public setWorkspaceMdContent(
-    workspacePath: string,
-    content: string | null,
-  ): void {
-    const dirtyAgents = new Set<AgentInstanceId>();
-    for (const [agentId, entries] of this.mountEntriesPerAgent) {
-      for (const [prefix, entry] of entries) {
-        if (entry.path !== workspacePath) continue;
-        entries.set(prefix, { ...entry, workspaceMdContent: content });
-        dirtyAgents.add(agentId);
-      }
-    }
-    for (const agentId of dirtyAgents) this.rebuildMountsFor(agentId);
   }
 
   public findWorkspaceForFile(
@@ -308,41 +265,31 @@ export class MountManager {
     this.hooks.onWorkspaceReleased?.(workspacePath);
   }
 
-  private startWorkspaceWatcher(wsPath: WorkspacePath): void {
-    if (this.watchersPerPath.has(wsPath)) return;
+  private startWorkspaceWatcher(wsPath: WorkspacePath): Promise<void> {
+    const existingReadiness = this.watcherReadinessPerPath.get(wsPath);
+    if (existingReadiness) return existingReadiness;
 
-    // Always include `.stagewise` so the legacy skills dir keeps
-    // working. When the host-configured workspaceMd dir is something
-    // else (e.g. `.agents`), it's added too so the watcher fires on
-    // file changes there.
+    // Always include `.stagewise` so the legacy skills dir keeps working.
     const allowedTopLevel = new Set([
       '.stagewise',
       '.agents',
       '.git',
       'AGENTS.md',
-      this.workspaceMdDir,
     ]);
     const allowedChildren: Record<string, Set<string>> = {
       '.stagewise': new Set(['skills']),
       '.agents': new Set(['skills']),
       '.git': new Set(['HEAD']),
     };
-    // Add the host-configured workspace-md file under its dir.
-    if (!allowedChildren[this.workspaceMdDir]) {
-      allowedChildren[this.workspaceMdDir] = new Set();
-    }
-    allowedChildren[this.workspaceMdDir]!.add(this.workspaceMdFile);
-
-    const workspaceMdPath = path.join(wsPath, this.workspaceMdRelativePath);
-    const watcher = watch([wsPath, workspaceMdPath], {
+    const watcher = watch([wsPath], {
       persistent: true,
       ignoreInitial: true,
       // depth 4 = .stagewise/skills/<skill-name>/SKILL.md
       depth: 4,
       awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
       ignored: (filePath: string) => {
-        if (filePath === wsPath) return false;
         const rel = path.relative(wsPath, filePath);
+        if (rel === '') return false;
         const segments = rel.split(path.sep);
         const first = segments[0] ?? '';
         const second = segments[1] ?? '';
@@ -383,10 +330,16 @@ export class MountManager {
         });
       });
 
+    const readiness = new Promise<void>((resolve) => {
+      watcher.once('ready', resolve);
+    });
+
     this.watchersPerPath.set(wsPath, watcher);
+    this.watcherReadinessPerPath.set(wsPath, readiness);
     this.logger.debug('[MountManager] Started workspace watcher', {
       path: wsPath,
     });
+    return readiness;
   }
 
   private stopWorkspaceWatcher(wsPath: WorkspacePath): void {
@@ -395,6 +348,7 @@ export class MountManager {
       clearTimeout(timer);
       this.watcherDebounceTimers.delete(wsPath);
     }
+    this.watcherReadinessPerPath.delete(wsPath);
     const watcher = this.watchersPerPath.get(wsPath);
     if (watcher) {
       void watcher.close();
@@ -405,18 +359,16 @@ export class MountManager {
     }
   }
 
-  /** Re-reads skills and MD files, then pushes updates through the store. */
+  /** Re-reads skills and AGENTS.md, then pushes updates through the store. */
   private async refreshWorkspaceInfo(wsPath: WorkspacePath): Promise<void> {
     try {
-      const [workspaceMdContent, agentsMdContent, skills, git] =
-        await Promise.all([
-          readWorkspaceMd(wsPath),
-          readAgentsMd(wsPath),
-          getSkills(wsPath),
-          Promise.resolve(this.hooks.getWorkspaceGitSummary?.(wsPath)).then(
-            (summary) => summary ?? null,
-          ),
-        ]);
+      const [agentsMdContent, skills, git] = await Promise.all([
+        readAgentsMd(wsPath),
+        getSkills(wsPath),
+        Promise.resolve(this.hooks.getWorkspaceGitSummary?.(wsPath)).then(
+          (summary) => summary ?? null,
+        ),
+      ]);
 
       const skillEntries = skills.map((s) => ({
         name: s.name,
@@ -431,7 +383,6 @@ export class MountManager {
             ...entry,
             skills: skillEntries,
             git,
-            workspaceMdContent,
             agentsMdContent,
           });
           dirtyAgents.add(agentId);

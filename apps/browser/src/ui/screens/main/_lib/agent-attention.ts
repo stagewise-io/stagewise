@@ -29,7 +29,10 @@ export function buildAgentAttentionEntries(
   toolbox: AppState['toolbox'],
 ): AgentAttentionEntry[] {
   return Object.entries(instances)
-    .filter(([, instance]) => instance.type === AgentTypes.CHAT)
+    .filter(
+      ([, instance]) =>
+        instance.type === AgentTypes.CHAT && !instance.sideChatParentId,
+    )
     .map(([id, instance]) => ({
       id,
       title: instance.state.title || 'Untitled Agent',

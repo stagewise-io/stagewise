@@ -19,6 +19,11 @@ import type { TelemetryService } from './telemetry';
 
 const persistedData = new Map<string, unknown>();
 const existingPaths = new Set<string>();
+const procedureHandlers = new Map<
+  string,
+  (...args: unknown[]) => Promise<void>
+>();
+const telemetryCapture = vi.fn();
 
 vi.mock('node:fs/promises', () => ({
   default: {
@@ -131,14 +136,18 @@ function createService(
     }),
     registerStateChangeCallback: vi.fn(),
     unregisterStateChangeCallback: vi.fn(),
-    registerServerProcedureHandler: vi.fn(),
+    registerServerProcedureHandler: vi.fn(
+      (name: string, handler: (...args: unknown[]) => Promise<void>) => {
+        procedureHandlers.set(name, handler);
+      },
+    ),
   } as unknown as KartonService;
   const logger = {
     debug: vi.fn(),
     error: vi.fn(),
   } as unknown as Logger;
   const telemetryService = {
-    capture: vi.fn(),
+    capture: telemetryCapture,
     captureException: vi.fn(),
   } as unknown as TelemetryService;
 
@@ -175,7 +184,66 @@ describe('UserExperienceService recent workspace normalization', () => {
   beforeEach(() => {
     persistedData.clear();
     existingPaths.clear();
+    procedureHandlers.clear();
+    telemetryCapture.mockReset();
     persistedData.set('onboarding-state', { hasSeenOnboardingFlow: false });
+  });
+
+  it('rejects untrusted onboarding completion properties at the procedure boundary', async () => {
+    await createService(createGitService({}));
+    const handler = procedureHandlers.get(
+      'userExperience.setHasSeenOnboardingFlow',
+    );
+
+    await expect(
+      handler?.('client-id', {
+        value: true,
+        summary: {
+          onboarding_run_id: 'run-1',
+          total_duration_ms: 100,
+          connected_provider_keys: ['openai-api'],
+          connected_provider_count: 1,
+          provider_step_skipped: false,
+          personalization_changed: true,
+          skipped: true,
+        },
+      }),
+    ).rejects.toThrow();
+    expect(telemetryCapture).not.toHaveBeenCalled();
+  });
+
+  it('allowlists onboarding completion fields before telemetry capture', async () => {
+    await createService(createGitService({}));
+    const handler = procedureHandlers.get(
+      'userExperience.setHasSeenOnboardingFlow',
+    );
+
+    await handler?.('client-id', {
+      value: true,
+      auth: { auth_method: 'api-keys', provider: 'openai' },
+      summary: {
+        onboarding_run_id: 'run-1',
+        total_duration_ms: 100,
+        connected_provider_keys: ['openai-api'],
+        connected_provider_count: 1,
+        provider_step_skipped: false,
+        personalization_changed: true,
+      },
+    });
+
+    expect(telemetryCapture).toHaveBeenCalledWith('onboarding-completed', {
+      skipped: false,
+      telemetry_level: undefined,
+      auth_method: 'api-keys',
+      provider: 'openai',
+      plan_id: undefined,
+      onboarding_run_id: 'run-1',
+      total_duration_ms: 100,
+      connected_provider_keys: ['openai-api'],
+      connected_provider_count: 1,
+      provider_step_skipped: false,
+      personalization_changed: true,
+    });
   });
 
   it('normalizes linked worktree recents to the main worktree path', async () => {

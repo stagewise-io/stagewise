@@ -10,7 +10,7 @@
  *   from the Karton preferences tree, keyed by absolute workspace
  *   path so `AgentsMdProvider` can correlate with `MountManager`.
  * - `getGlobalSkillsMounts` — returns the static global-skills mount
- *   descriptors (`~/.stagewise/skills`, `~/.agents/skills`) with a
+ *   descriptors (`~/.stagewise/skills`, `~/.agents`) with a
  *   live `exists` flag computed against disk.
  *
  * This adapter stays thin on purpose — the orchestrator invokes it on

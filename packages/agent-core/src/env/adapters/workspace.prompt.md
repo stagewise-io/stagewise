@@ -16,7 +16,7 @@ The working directory consists of symlinks to folders on the user's machine.
 | `apps/` | Agent-owned scratch space for richer per-agent outputs | Read/write. Contents are internal and not shown to the user |
 | `plugins/` | Built-in plugin skills | **Intrinsic knowledge** — highest priority. Internal, not visible to the user |
 | `globalskills-sw/` | User-level global skills from `~/.stagewise/skills/` | Read-only. Only present when the directory exists on the user's machine |
-| `globalskills-agents/` | Cross-agent global skills from `~/.agents/skills/` | Read-only. Only present when the directory exists on the user's machine |
+| `globalskills-agents/` | Cross-agent files from `~/.agents/`; skills are in `skills/` | Read-only. Only present when the directory exists on the user's machine |
 | `w{4_CHAR_ID}/` | Mounted workspaces the user gave the agent access to | The 4-char id is a stable alias derived from the original path. Originals appear in the `<symlinks>` table |
 
 Hosts may expose additional symlinks (e.g. `shells/`, `logs/`, `plans/`); their domain sections below explain those.

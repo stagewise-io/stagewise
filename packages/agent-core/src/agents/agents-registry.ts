@@ -13,12 +13,10 @@ import type { AgentTypes } from '../types/agent';
  * ```ts
  * import { AgentTypes } from '@stagewise/agent-core/types/agent';
  * import { ChatAgent } from './chat';
- * import { WorkspaceMdAgent } from './workspace-md';
  *
  * declare module '@stagewise/agent-core/agents' {
  *   interface AgentTypeMap {
  *     [AgentTypes.CHAT]: typeof ChatAgent;
- *     [AgentTypes.WORKSPACE_MD]: typeof WorkspaceMdAgent;
  *   }
  * }
  * ```

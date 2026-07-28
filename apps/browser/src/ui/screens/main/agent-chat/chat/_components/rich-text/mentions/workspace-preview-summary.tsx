@@ -47,22 +47,6 @@ export function WorkspacePreviewSummary({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {mount.workspaceMdContent !== null ? (
-            <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
-          ) : (
-            <XIcon className="size-3 shrink-0 text-subtle-foreground" />
-          )}
-          <span
-            className={
-              mount.workspaceMdContent !== null
-                ? 'flex-1 px-0 text-muted-foreground text-xs'
-                : 'flex-1 px-0 text-subtle-foreground text-xs'
-            }
-          >
-            WORKSPACE.md
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
           {mount.agentsMdContent !== null ? (
             <CheckIcon className="size-3 shrink-0 text-muted-foreground" />
           ) : (

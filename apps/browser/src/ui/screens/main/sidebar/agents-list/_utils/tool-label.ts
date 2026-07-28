@@ -10,7 +10,6 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-executeSandboxJs': 'Running script',
   'tool-readConsoleLogs': 'Reading console',
   'tool-getLintingDiagnostics': 'Checking lint',
-  'tool-updateWorkspaceMd': 'Updating workspace',
   'tool-searchInLibraryDocs': 'Searching docs',
   'tool-listLibraryDocs': 'Looking up docs',
   'tool-askUserQuestions': 'Asking questions',

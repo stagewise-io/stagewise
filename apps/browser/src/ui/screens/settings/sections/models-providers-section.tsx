@@ -17,7 +17,6 @@ import {
   DEFAULT_INSTANCE_ID,
   INSTANCE_TYPE_ID_TO_API_SPEC,
   getInstanceDisabledModelIds,
-  getInstanceModelCount,
   getInstanceModelThinkingOverride,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
@@ -39,7 +38,11 @@ import {
   type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
-import { CODING_PLANS, type CodingPlanId } from '@shared/coding-plans';
+import {
+  CODING_PLANS,
+  validateCodingPlanBaseUrl,
+  type CodingPlanId,
+} from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
@@ -53,6 +56,7 @@ import {
   endpointSaveDataToInstanceArgs,
   type EndpointSaveData,
 } from './custom-providers-section';
+import { ModelPresetsSection } from './model-presets-section';
 import {
   useEffect,
   useState,
@@ -67,6 +71,11 @@ import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { Input } from '@stagewise/stage-ui/components/input';
 import { Button, buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Switch } from '@stagewise/stage-ui/components/switch';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@stagewise/stage-ui/components/tabs';
 import {
   Dialog,
   DialogContent,
@@ -90,6 +99,9 @@ import {
   IconArrowUpRightOutline18,
   IconDotsOutline18,
   IconRefreshAnticlockwiseOutline18,
+  IconLoader6Outline18,
+  IconCheck2Outline18,
+  IconBanOutline18,
 } from '@stagewise/icons';
 import { Logo } from '@stagewise/stage-ui/components/logo';
 import {
@@ -107,6 +119,8 @@ const consoleUrl =
 enablePatches();
 
 const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
+
+type ModelVisibility = 'all' | 'enabled';
 
 // =============================================================================
 // Provider Instance Logo
@@ -531,6 +545,7 @@ function AddProviderGrid({
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [selected, setSelected] = useState<SelectionKey | null>(null);
   const [apiKey, setApiKey] = useState('');
+  const [endpoint, setEndpoint] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -576,11 +591,23 @@ function AddProviderGrid({
         const isSelfHosted = ADDABLE_SELF_HOSTED_TYPES.includes(
           key as ProviderInstanceTypeId,
         );
+        const endpointResult = plan?.configurableEndpoint
+          ? validateCodingPlanBaseUrl(endpoint)
+          : undefined;
+        if (endpointResult && !endpointResult.success) {
+          setError(endpointResult.error);
+          return;
+        }
 
         const result = await addProviderInstance({
           typeId: plan ? 'coding-plan' : key,
           config: plan
-            ? { planId: plan.id, baseUrl: plan.baseUrl }
+            ? {
+                planId: plan.id,
+                baseUrl: endpointResult?.success
+                  ? endpointResult.baseUrl
+                  : plan.baseUrl,
+              }
             : isSelfHosted
               ? { baseUrl: value.trim() }
               : {},
@@ -597,7 +624,7 @@ function AddProviderGrid({
         setIsConnecting(false);
       }
     },
-    [addProviderInstance, onConnected],
+    [addProviderInstance, endpoint, onConnected],
   );
 
   // Resolve display info for the current selection
@@ -636,6 +663,7 @@ function AddProviderGrid({
   const handleBack = useCallback(() => {
     setSelected(null);
     setApiKey('');
+    setEndpoint('');
     setSearchQuery('');
     setError(null);
   }, []);
@@ -761,6 +789,33 @@ function AddProviderGrid({
                 </div>
               </div>
 
+              {selectedPlan?.configurableEndpoint && (
+                <div className="space-y-1">
+                  <p className="font-medium text-muted-foreground text-xs">
+                    {selectedPlan.configurableEndpoint.label}
+                  </p>
+                  <Input
+                    type="url"
+                    placeholder={
+                      selectedPlan.configurableEndpoint.placeholder ??
+                      'https://example.com/v1'
+                    }
+                    value={endpoint}
+                    onValueChange={(value) => {
+                      setEndpoint(value);
+                      setError(null);
+                    }}
+                    disabled={isConnecting}
+                    aria-invalid={error ? true : undefined}
+                    size="sm"
+                    style={{ maxWidth: 'none' }}
+                  />
+                  <p className="text-subtle-foreground text-xs">
+                    {selectedPlan.configurableEndpoint.helpText}
+                  </p>
+                </div>
+              )}
+
               <Input
                 autoFocus
                 type={isSelfHosted ? 'text' : 'password'}
@@ -834,7 +889,11 @@ function AddProviderGrid({
               <Button
                 variant="primary"
                 size="sm"
-                disabled={!apiKey.trim() || isConnecting}
+                disabled={
+                  !apiKey.trim() ||
+                  isConnecting ||
+                  (!!selectedPlan?.configurableEndpoint && !endpoint.trim())
+                }
                 onClick={() => void handleConnect(selected, apiKey)}
               >
                 {isConnecting
@@ -884,6 +943,7 @@ function AddProviderGrid({
                             onClick={() => {
                               setSelected(planKey);
                               setApiKey('');
+                              setEndpoint(plan.baseUrl ?? '');
                               setError(null);
                             }}
                             className={cn(
@@ -1163,6 +1223,7 @@ function CustomModelDialog({
   onSave,
   existingModelIds,
   providerInstances,
+  defaultProviderInstanceId,
 }: {
   model?: CustomModel;
   open: boolean;
@@ -1172,13 +1233,22 @@ function CustomModelDialog({
       providerOptions: Record<string, unknown>;
       headers: Record<string, string>;
     },
-  ) => void;
+  ) => Promise<void>;
   existingModelIds: Set<string>;
   providerInstances: ProviderInstance[];
+  defaultProviderInstanceId?: string;
 }) {
   const track = useTrack();
+  const telemetryLevel = useKartonState(
+    (state) => state.preferences.privacy.telemetryLevel,
+  );
   const isAddMode = !model;
   const savedRef = useRef(false);
+  const initialProviderInstanceId =
+    model?.providerInstanceId ??
+    model?.endpointId ??
+    defaultProviderInstanceId ??
+    '';
 
   const [modelId, setModelId] = useState(model?.modelId ?? '');
   const [displayName, setDisplayName] = useState(model?.displayName ?? '');
@@ -1187,7 +1257,7 @@ function CustomModelDialog({
     model?.contextWindowSize ?? 128000,
   );
   const [providerInstanceId, setProviderInstanceId] = useState(
-    model?.providerInstanceId ?? model?.endpointId ?? '',
+    initialProviderInstanceId,
   );
   const [thinkingEnabled, setThinkingEnabled] = useState(
     model?.thinkingEnabled ?? false,
@@ -1224,6 +1294,8 @@ function CustomModelDialog({
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -1231,7 +1303,7 @@ function CustomModelDialog({
     setDisplayName(model?.displayName ?? '');
     setDescription(model?.description ?? '');
     setContextWindowSize(model?.contextWindowSize ?? 128000);
-    setProviderInstanceId(model?.providerInstanceId ?? model?.endpointId ?? '');
+    setProviderInstanceId(initialProviderInstanceId);
     setThinkingEnabled(model?.thinkingEnabled ?? false);
     setCapabilities(model?.capabilities ?? defaultCaps);
     setProviderOptionsJson(
@@ -1246,9 +1318,17 @@ function CustomModelDialog({
     );
     setShowAdvanced(false);
     setJsonError(null);
+    setSaveError(null);
+    setIsSaving(false);
     savedRef.current = false;
     if (isAddMode) {
-      track('custom-model-add-started');
+      const providerType =
+        providerInstances.find(
+          (instance) => instance.id === defaultProviderInstanceId,
+        )?.typeId ?? 'unknown';
+      track('custom-model-add-started', {
+        initial_provider_type: providerType,
+      });
     }
   }, [open]);
 
@@ -1269,8 +1349,7 @@ function CustomModelDialog({
     displayName !== (model?.displayName ?? '') ||
     description !== (model?.description ?? '') ||
     contextWindowSize !== (model?.contextWindowSize ?? 128000) ||
-    providerInstanceId !==
-      (model?.providerInstanceId ?? model?.endpointId ?? '') ||
+    providerInstanceId !== initialProviderInstanceId ||
     thinkingEnabled !== (model?.thinkingEnabled ?? false) ||
     providerOptionsJson !==
       (model?.providerOptions && Object.keys(model.providerOptions).length > 0
@@ -1284,12 +1363,17 @@ function CustomModelDialog({
       JSON.stringify(model?.capabilities ?? defaultCaps);
 
   const hadValidationErrors = isDuplicate || jsonError !== null;
+  const selectedProviderType =
+    providerInstances.find((instance) => instance.id === providerInstanceId)
+      ?.typeId ?? 'unknown';
 
   const handleDialogOpenChange = (next: boolean) => {
+    if (!next && isSaving) return;
     if (!next && open && isAddMode && !savedRef.current) {
       track('custom-model-add-aborted', {
         had_validation_errors: hadValidationErrors,
         any_field_touched: anyFieldTouched,
+        provider_type: selectedProviderType,
       });
     }
     onOpenChange(next);
@@ -1309,7 +1393,8 @@ function CustomModelDialog({
       }));
   }, [providerInstances]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaveError(null);
     let providerOptions: Record<string, unknown> = {};
     let headers: Record<string, string> = {};
 
@@ -1330,22 +1415,34 @@ function CustomModelDialog({
       }
     }
 
-    onSave({
-      modelId: modelId.trim(),
-      displayName: displayName.trim(),
-      description: description.trim(),
-      contextWindowSize,
-      providerInstanceId,
-      thinkingEnabled,
-      capabilities,
-      providerOptions,
-      headers,
-    });
-    if (isAddMode) {
-      track('custom-model-add-finished');
+    setIsSaving(true);
+    try {
+      await onSave({
+        modelId: modelId.trim(),
+        displayName: displayName.trim(),
+        description: description.trim(),
+        contextWindowSize,
+        providerInstanceId,
+        thinkingEnabled,
+        capabilities,
+        providerOptions,
+        headers,
+      });
+      if (isAddMode) {
+        track('custom-model-add-finished', {
+          ...(telemetryLevel === 'full' && { model_id: modelId.trim() }),
+          provider_type: selectedProviderType,
+        });
+      }
+      savedRef.current = true;
+      onOpenChange(false);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : 'Failed to save model.',
+      );
+    } finally {
+      setIsSaving(false);
     }
-    savedRef.current = true;
-    onOpenChange(false);
   };
 
   return (
@@ -1579,18 +1676,20 @@ function CustomModelDialog({
           </div>
         </OverlayScrollbar>
 
+        {saveError && <TruncatedErrorText text={saveError} />}
         <DialogFooter>
           <Button
             variant="primary"
             size="sm"
-            disabled={!canSave}
-            onClick={handleSave}
+            disabled={!canSave || isSaving}
+            onClick={() => void handleSave()}
           >
-            {model ? 'Save Changes' : 'Add Model'}
+            {isSaving ? 'Saving...' : model ? 'Save Changes' : 'Add Model'}
           </Button>
           <Button
             variant="ghost"
             size="sm"
+            disabled={isSaving}
             onClick={() => handleDialogOpenChange(false)}
           >
             Cancel
@@ -1998,10 +2097,10 @@ function InstanceModelGroup({
 }
 
 // =============================================================================
-// Collapsible Model Section (reusable for enabled/disabled model groups)
+// Model Card List
 // =============================================================================
 
-function CollapsibleModelSection({
+function ModelCardList({
   instance,
   entries,
   preferences,
@@ -2009,9 +2108,7 @@ function CollapsibleModelSection({
   onEditThinking,
   onEditCustomModel,
   onDeleteCustomModel,
-  label = 'Enabled',
-  defaultExpanded = true,
-  emptyMessage,
+  vendorLabelOverride,
 }: {
   instance: ProviderInstance;
   entries: ModelSelectorEntry[];
@@ -2022,17 +2119,25 @@ function CollapsibleModelSection({
     modelId: string,
     event: React.MouseEvent<HTMLElement>,
   ) => void;
-  onEditCustomModel?: (model: CustomModel) => void;
-  onDeleteCustomModel?: (modelId: string) => void;
-  label?: string;
-  defaultExpanded?: boolean;
-  emptyMessage?: string;
+  onEditCustomModel: (model: CustomModel) => void;
+  onDeleteCustomModel: (modelId: string) => void;
+  vendorLabelOverride?: string;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
   const disabledSet = useMemo(
     () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
     [preferences, instance.id],
   );
+  const customModelsById = useMemo(() => {
+    const models = preferences.customModels ?? EMPTY_CUSTOM_MODELS;
+    return new Map(
+      models
+        .filter(
+          (model) =>
+            (model.providerInstanceId ?? model.endpointId) === instance.id,
+        )
+        .map((model) => [model.modelId, model]),
+    );
+  }, [preferences.customModels, instance.id]);
 
   const thinkingDefaultOptions = useMemo(
     () => getInstanceThinkingDefaultOptions(instance),
@@ -2046,87 +2151,40 @@ function CollapsibleModelSection({
     [instance.id, onEditThinking],
   );
 
-  if (entries.length === 0) {
-    if (!emptyMessage) return null;
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 px-3 py-2">
-          <span className="font-medium text-muted-foreground text-xs">
-            {label}
-          </span>
-          <span className="text-2xs text-muted-foreground/60">0 models</span>
-        </div>
-        <p className="px-3 py-1 text-2xs text-muted-foreground">
-          {emptyMessage}
-        </p>
-      </div>
-    );
-  }
-
-  // Sort enabled entries alphabetically by display name
-  const sortedEntries = [...entries].sort((a, b) =>
-    a.displayName.localeCompare(b.displayName),
-  );
-
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground text-xs transition-colors group-hover:text-foreground">
-          {label}
-        </span>
-        <span className="shrink-0 text-2xs text-muted-foreground transition-colors group-hover:text-foreground">
-          {entries.length} models
-        </span>
-        <IconChevronDownOutline18
-          className={cn(
-            'size-3.5 shrink-0 text-muted-foreground transition-colors transition-transform group-hover:text-foreground',
-            !expanded && '-rotate-90',
-          )}
-        />
-      </button>
-      {expanded && (
-        <div className="space-y-2 pl-1">
-          {sortedEntries.map((entry) => {
-            const customModel = preferences.customModels?.find(
-              (model) =>
-                (model.providerInstanceId ?? model.endpointId) ===
-                  instance.id && model.modelId === entry.modelId,
-            );
-            return customModel && onEditCustomModel && onDeleteCustomModel ? (
-              <CustomModelCard
-                key={entry.modelId}
-                model={customModel}
-                endpointName={resolveCustomModelInstanceName(preferences, {
-                  providerInstanceId: customModel.providerInstanceId,
-                  endpointId: customModel.endpointId,
-                })}
-                isEnabled={!disabledSet.has(entry.modelId)}
-                onToggle={() => onToggleModel(instance.id, entry.modelId)}
-                onEdit={() => onEditCustomModel(customModel)}
-                onDelete={() => onDeleteCustomModel(customModel.modelId)}
-              />
-            ) : (
-              <BuiltInModelCard
-                key={entry.modelId}
-                model={entry}
-                isEnabled={!disabledSet.has(entry.modelId)}
-                thinkingDisplay={computeEntryThinkingDisplay(
-                  entry,
-                  instance,
-                  preferences,
-                  thinkingDefaultOptions,
-                )}
-                onToggle={() => onToggleModel(instance.id, entry.modelId)}
-                onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
-              />
-            );
-          })}
-        </div>
-      )}
+      {entries.map((entry) => {
+        const customModel = customModelsById.get(entry.modelId);
+        return customModel ? (
+          <CustomModelCard
+            key={entry.modelId}
+            model={customModel}
+            endpointName={resolveCustomModelInstanceName(preferences, {
+              providerInstanceId: customModel.providerInstanceId,
+              endpointId: customModel.endpointId,
+            })}
+            isEnabled={!disabledSet.has(entry.modelId)}
+            onToggle={() => onToggleModel(instance.id, entry.modelId)}
+            onEdit={() => onEditCustomModel(customModel)}
+            onDelete={() => onDeleteCustomModel(customModel.modelId)}
+          />
+        ) : (
+          <BuiltInModelCard
+            key={entry.modelId}
+            model={entry}
+            isEnabled={!disabledSet.has(entry.modelId)}
+            thinkingDisplay={computeEntryThinkingDisplay(
+              entry,
+              instance,
+              preferences,
+              thinkingDefaultOptions,
+            )}
+            onToggle={() => onToggleModel(instance.id, entry.modelId)}
+            onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
+            vendorLabelOverride={vendorLabelOverride}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -2144,6 +2202,7 @@ function VendorModelGroup({
   onEditCustomModel,
   onDeleteCustomModel,
   defaultExpanded,
+  onlyEnabled = false,
 }: {
   instance: ProviderInstance;
   group: VendorGroup;
@@ -2157,24 +2216,18 @@ function VendorModelGroup({
   onEditCustomModel: (model: CustomModel) => void;
   onDeleteCustomModel: (modelId: string) => void;
   defaultExpanded?: boolean;
+  onlyEnabled?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded ?? true);
   const disabledSet = useMemo(
     () => new Set(getInstanceDisabledModelIds(preferences, instance.id)),
     [preferences, instance.id],
   );
-
-  const thinkingDefaultOptions = useMemo(
-    () => getInstanceThinkingDefaultOptions(instance),
-    [instance],
+  const enabledEntries = group.entries.filter(
+    (entry) => !disabledSet.has(entry.modelId),
   );
-
-  const handleEditThinking = useCallback(
-    (modelId: string, event: React.MouseEvent<HTMLElement>) => {
-      onEditThinking(instance.id, modelId, event);
-    },
-    [instance.id, onEditThinking],
-  );
+  const enabledCount = enabledEntries.length;
+  const visibleEntries = onlyEnabled ? enabledEntries : group.entries;
 
   const VendorLogo = group.logo;
 
@@ -2197,7 +2250,7 @@ function VendorModelGroup({
           {group.displayName}
         </span>
         <span className="shrink-0 text-2xs text-muted-foreground transition-colors group-hover:text-foreground">
-          {group.entries.length} models
+          {enabledCount} of {group.entries.length} enabled
         </span>
         <IconChevronDownOutline18
           className={cn(
@@ -2209,44 +2262,16 @@ function VendorModelGroup({
 
       {/* Model list */}
       {expanded && (
-        <div className="space-y-2 pl-1">
-          {group.entries.map((entry) => {
-            const customModel = preferences.customModels?.find(
-              (model) =>
-                (model.providerInstanceId ?? model.endpointId) ===
-                  instance.id && model.modelId === entry.modelId,
-            );
-            return customModel ? (
-              <CustomModelCard
-                key={entry.modelId}
-                model={customModel}
-                endpointName={resolveCustomModelInstanceName(preferences, {
-                  providerInstanceId: customModel.providerInstanceId,
-                  endpointId: customModel.endpointId,
-                })}
-                isEnabled={!disabledSet.has(entry.modelId)}
-                onToggle={() => onToggleModel(instance.id, entry.modelId)}
-                onEdit={() => onEditCustomModel(customModel)}
-                onDelete={() => onDeleteCustomModel(customModel.modelId)}
-              />
-            ) : (
-              <BuiltInModelCard
-                key={entry.modelId}
-                model={entry}
-                isEnabled={!disabledSet.has(entry.modelId)}
-                thinkingDisplay={computeEntryThinkingDisplay(
-                  entry,
-                  instance,
-                  preferences,
-                  thinkingDefaultOptions,
-                )}
-                onToggle={() => onToggleModel(instance.id, entry.modelId)}
-                onEditThinking={(e) => handleEditThinking(entry.modelId, e)}
-                vendorLabelOverride={group.displayName}
-              />
-            );
-          })}
-        </div>
+        <ModelCardList
+          instance={instance}
+          entries={visibleEntries}
+          preferences={preferences}
+          onToggleModel={onToggleModel}
+          onEditThinking={onEditThinking}
+          onEditCustomModel={onEditCustomModel}
+          onDeleteCustomModel={onDeleteCustomModel}
+          vendorLabelOverride={group.displayName}
+        />
       )}
     </div>
   );
@@ -2303,12 +2328,41 @@ function ModelsSection({
   );
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [modelVisibility, setModelVisibility] =
+    useState<ModelVisibility>('all');
 
   // Group selectable entries by instance
   const allEntries = useMemo(
     () => getSelectableModelEntries(preferences, { includeDisabled: true }),
     [preferences],
   );
+  const instanceEntries = useMemo(
+    () =>
+      filterInstanceId
+        ? allEntries.filter((entry) => entry.instanceId === filterInstanceId)
+        : [],
+    [allEntries, filterInstanceId],
+  );
+  const instanceDisabledSet = useMemo(
+    () =>
+      new Set(
+        filterInstanceId
+          ? getInstanceDisabledModelIds(preferences, filterInstanceId)
+          : [],
+      ),
+    [preferences, filterInstanceId],
+  );
+  const hasInstanceModels = instanceEntries.length > 0;
+  const allInstanceModelsEnabled =
+    hasInstanceModels &&
+    instanceEntries.every((entry) => !instanceDisabledSet.has(entry.modelId));
+  const allInstanceModelsDisabled =
+    hasInstanceModels &&
+    instanceEntries.every((entry) => instanceDisabledSet.has(entry.modelId));
+  const showEnabledOnly = modelVisibility === 'enabled';
+  const hasSearch = searchQuery.trim().length > 0;
+  const isModelEnabled = (entry: ModelSelectorEntry) =>
+    !instanceDisabledSet.has(entry.modelId);
 
   const groupedByInstance = useMemo(() => {
     const groups = new Map<
@@ -2347,8 +2401,16 @@ function ModelsSection({
       .filter((g) => g.entries.length > 0);
   }, [groupedByInstance, searchQuery, filterInstanceId]);
 
-  const noResults =
-    searchQuery.trim().length > 0 && filteredGroups.length === 0;
+  const noResults = !filteredGroups.some((group) =>
+    group.entries.some((entry) => !showEnabledOnly || isModelEnabled(entry)),
+  );
+  const noResultsMessage = !hasInstanceModels
+    ? 'No models are available for this provider.'
+    : showEnabledOnly
+      ? hasSearch
+        ? 'No enabled models match your search. Switch to All to include disabled models.'
+        : 'No models are enabled. Switch to All to enable models.'
+      : 'No models match your search. Try a different model name or ID.';
 
   // --- Thinking panel state ---
   const [listScrollViewport, setListScrollViewport] =
@@ -2519,13 +2581,22 @@ function ModelsSection({
   useEffect(() => {
     if (!thinkingPanelModelId) return;
     const stillVisible = filteredGroups.some((g) =>
-      g.entries.some((e) => e.modelId === thinkingPanelModelId),
+      g.entries.some(
+        (e) =>
+          e.modelId === thinkingPanelModelId &&
+          (!showEnabledOnly || !instanceDisabledSet.has(e.modelId)),
+      ),
     );
     if (!stillVisible) {
       setThinkingPanelModelId(null);
       setThinkingPanelInstanceId(null);
     }
-  }, [filteredGroups, thinkingPanelModelId]);
+  }, [
+    filteredGroups,
+    thinkingPanelModelId,
+    showEnabledOnly,
+    instanceDisabledSet,
+  ]);
 
   // Close thinking panel on outside click
   useEffect(() => {
@@ -2613,6 +2684,23 @@ function ModelsSection({
       await updatePreferences(patches);
     },
     [preferences, updatePreferences],
+  );
+
+  const handleSetAllModelsEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!filterInstanceId) return;
+      const disabledModelIds = enabled
+        ? []
+        : Array.from(new Set(instanceEntries.map((entry) => entry.modelId)));
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        const instance = draft.providerInstances.find(
+          (item) => item.id === filterInstanceId,
+        );
+        if (instance) instance.disabledModelIds = disabledModelIds;
+      });
+      await updatePreferences(patches);
+    },
+    [filterInstanceId, instanceEntries, preferences, updatePreferences],
   );
 
   const resolveThinkingModel = useCallback(
@@ -2769,7 +2857,17 @@ function ModelsSection({
 
   return (
     <div className="flex flex-col space-y-3">
-      <div className="flex items-center gap-3">
+      <Tabs
+        value={modelVisibility}
+        onValueChange={(value) => setModelVisibility(value as ModelVisibility)}
+      >
+        <TabsList className="w-auto">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="enabled">Enabled only</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex items-center gap-2">
         <Input
           placeholder="Filter models..."
           value={searchQuery}
@@ -2778,24 +2876,59 @@ function ModelsSection({
           className="flex-1"
           style={{ maxWidth: 'none' }}
         />
-        {isTrulyCustom ? (
+        {isTrulyCustom && (
           <Button variant="secondary" size="sm" onClick={handleAdd}>
             <IconPlusOutline18 className="size-3.5" />
             Add Model
           </Button>
-        ) : filterInstance ? (
+        )}
+        {!isTrulyCustom && filterInstance && (
           <Button
             variant="secondary"
             size="sm"
             disabled={isReloading}
             onClick={() => void handleReloadModels()}
           >
-            <IconRefreshAnticlockwiseOutline18
-              className={cn('size-3.5', isReloading && 'animate-spin')}
-            />
-            {isReloading ? 'Reloading...' : 'Reload models'}
+            {isReloading ? (
+              <IconLoader6Outline18 className="size-3.5 animate-spin" />
+            ) : (
+              <IconRefreshAnticlockwiseOutline18 className="size-3.5" />
+            )}
+            Reload models
           </Button>
-        ) : null}
+        )}
+        {filterInstance && (
+          <Menu>
+            <MenuTrigger>
+              <Button
+                variant="secondary"
+                size="icon-sm"
+                className="rounded-md"
+                aria-label="Bulk model actions"
+              >
+                <IconDotsOutline18 className="size-4 rotate-90" />
+              </Button>
+            </MenuTrigger>
+            <MenuContent side="bottom" align="end" size="sm">
+              <MenuItem
+                disabled={!hasInstanceModels || allInstanceModelsEnabled}
+                className="data-disabled:opacity-50"
+                onClick={() => void handleSetAllModelsEnabled(true)}
+              >
+                <IconCheck2Outline18 className="size-3.5 shrink-0" />
+                Enable all models
+              </MenuItem>
+              <MenuItem
+                disabled={!hasInstanceModels || allInstanceModelsDisabled}
+                className="data-disabled:opacity-50"
+                onClick={() => void handleSetAllModelsEnabled(false)}
+              >
+                <IconBanOutline18 className="size-3.5 shrink-0" />
+                Disable all models
+              </MenuItem>
+            </MenuContent>
+          </Menu>
+        )}
       </div>
 
       {reloadError && <TruncatedErrorText text={reloadError} />}
@@ -2811,140 +2944,52 @@ function ModelsSection({
             ? (() => {
                 const filteredGroup = filteredGroups[0];
                 if (!filteredGroup) return null;
-                const disabledIds = new Set(
-                  getInstanceDisabledModelIds(
-                    preferences,
-                    filteredGroup.instance.id,
-                  ),
-                );
-
-                // Keep the enabled/disabled overview consistent across every
-                // provider. While searching, show a flat set of matching
-                // results instead of splitting matches across sections.
-                const hasSearch = searchQuery.trim().length > 0;
-                const useEnabledSplit = !hasSearch;
-
                 const vendorGroups = groupEntriesByVendor(
                   filteredGroup.entries,
                   filterInstance,
+                )?.filter(
+                  (group) =>
+                    !showEnabledOnly || group.entries.some(isModelEnabled),
                 );
-                if (!vendorGroups) {
-                  // No vendor grouping for this provider type.
-                  if (useEnabledSplit) {
-                    const enabledEntries = filteredGroup.entries.filter(
-                      (e) => !disabledIds.has(e.modelId),
-                    );
-                    return (
-                      <div className="space-y-2">
-                        <CollapsibleModelSection
-                          instance={filteredGroup.instance}
-                          entries={enabledEntries}
-                          preferences={preferences}
-                          onToggleModel={handleToggleModel}
-                          onEditThinking={handleEditThinking}
-                          onEditCustomModel={handleEdit}
-                          onDeleteCustomModel={handleDelete}
-                          emptyMessage="No models enabled — enable models from below."
-                        />
-                        {filteredGroup.entries.length > 0 && (
-                          <CollapsibleModelSection
-                            instance={filteredGroup.instance}
-                            entries={filteredGroup.entries}
-                            preferences={preferences}
-                            onToggleModel={handleToggleModel}
-                            onEditThinking={handleEditThinking}
-                            onEditCustomModel={handleEdit}
-                            onDeleteCustomModel={handleDelete}
-                            label="Other models"
-                            defaultExpanded={false}
-                          />
-                        )}
-                      </div>
-                    );
-                  }
-                  // Fall through to the default InstanceModelGroup path.
-                  return filteredGroups.map(({ instance, entries }) => (
-                    <InstanceModelGroup
-                      key={instance.id}
-                      instance={instance}
-                      entries={entries}
-                      preferences={preferences}
-                      onToggleModel={handleToggleModel}
-                      onEditThinking={handleEditThinking}
-                      onEditCustomModel={handleEdit}
-                      onDeleteCustomModel={handleDelete}
-                    />
-                  ));
-                }
 
-                if (useEnabledSplit) {
-                  const enabledEntries = filteredGroup.entries.filter(
-                    (e) => !disabledIds.has(e.modelId),
-                  );
+                // Search results are intentionally flat. Outside of search,
+                // multi-vendor providers retain their catalog grouping and
+                // every model keeps its original position when toggled.
+                if (!hasSearch && vendorGroups) {
                   return (
                     <div className="space-y-2">
-                      <CollapsibleModelSection
-                        instance={filteredGroup.instance}
-                        entries={enabledEntries}
-                        preferences={preferences}
-                        onToggleModel={handleToggleModel}
-                        onEditThinking={handleEditThinking}
-                        onEditCustomModel={handleEdit}
-                        onDeleteCustomModel={handleDelete}
-                        emptyMessage="No models enabled — enable models from below."
-                      />
-
-                      {/* The enabled section is a summary. Keep every model
-                          available in its regular vendor section as well. */}
-                      {vendorGroups ? (
-                        <div className="space-y-2">
-                          {vendorGroups.map((vg) => (
-                            <VendorModelGroup
-                              key={vg.prefix || 'other'}
-                              instance={filteredGroup.instance}
-                              group={vg}
-                              preferences={preferences}
-                              onToggleModel={handleToggleModel}
-                              onEditThinking={handleEditThinking}
-                              onEditCustomModel={handleEdit}
-                              onDeleteCustomModel={handleDelete}
-                              defaultExpanded={false}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <CollapsibleModelSection
+                      {vendorGroups.map((group) => (
+                        <VendorModelGroup
+                          key={`${modelVisibility}-${group.prefix || 'other'}`}
                           instance={filteredGroup.instance}
-                          entries={filteredGroup.entries}
+                          group={group}
                           preferences={preferences}
                           onToggleModel={handleToggleModel}
                           onEditThinking={handleEditThinking}
                           onEditCustomModel={handleEdit}
                           onDeleteCustomModel={handleDelete}
-                          label="Other models"
-                          defaultExpanded={false}
+                          defaultExpanded={showEnabledOnly}
+                          onlyEnabled={showEnabledOnly}
                         />
-                      )}
+                      ))}
                     </div>
                   );
                 }
 
-                // Search results stay grouped by vendor when supported.
                 return (
-                  <>
-                    {vendorGroups.map((vg) => (
-                      <VendorModelGroup
-                        key={vg.prefix || 'other'}
-                        instance={filteredGroup.instance}
-                        group={vg}
-                        preferences={preferences}
-                        onToggleModel={handleToggleModel}
-                        onEditThinking={handleEditThinking}
-                        onEditCustomModel={handleEdit}
-                        onDeleteCustomModel={handleDelete}
-                      />
-                    ))}
-                  </>
+                  <ModelCardList
+                    instance={filteredGroup.instance}
+                    entries={
+                      showEnabledOnly
+                        ? filteredGroup.entries.filter(isModelEnabled)
+                        : filteredGroup.entries
+                    }
+                    preferences={preferences}
+                    onToggleModel={handleToggleModel}
+                    onEditThinking={handleEditThinking}
+                    onEditCustomModel={handleEdit}
+                    onDeleteCustomModel={handleDelete}
+                  />
                 );
               })()
             : filteredGroups.map(({ instance, entries }) => (
@@ -2963,7 +3008,7 @@ function ModelsSection({
           {noResults && (
             <div className="rounded-lg border border-derived-subtle p-4">
               <p className="text-center text-muted-foreground text-sm">
-                No models match your filter.
+                {noResultsMessage}
               </p>
             </div>
           )}
@@ -3019,6 +3064,7 @@ function ModelsSection({
         onSave={handleSave}
         existingModelIds={existingModelIds}
         providerInstances={providerInstances}
+        defaultProviderInstanceId={filterInstanceId}
       />
     </div>
   );
@@ -3198,6 +3244,117 @@ function ProviderNameEditor({
 }
 
 // =============================================================================
+// Configurable Coding Plan Endpoint (detail page)
+// =============================================================================
+
+export function CodingPlanEndpointConnection({
+  instance,
+}: {
+  instance: ProviderInstance;
+}) {
+  const updateProviderInstance = useKartonProcedure(
+    (p) => p.preferences.updateProviderInstance,
+  );
+  const refreshInstanceModels = useKartonProcedure(
+    (p) => p.preferences.refreshInstanceModels,
+  );
+  const planId = (instance.config as { planId?: CodingPlanId }).planId;
+  const plan = planId ? CODING_PLANS[planId] : undefined;
+  const metadata = plan?.configurableEndpoint;
+  const savedBaseUrl =
+    (instance.config as { baseUrl?: string }).baseUrl ?? plan?.baseUrl ?? '';
+  const [baseUrl, setBaseUrl] = useState(savedBaseUrl);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setBaseUrl(savedBaseUrl), [savedBaseUrl]);
+
+  if (!metadata) return null;
+
+  const handleSave = async () => {
+    const validation = validateCodingPlanBaseUrl(baseUrl);
+    if (!validation.success) {
+      setError(validation.error);
+      return;
+    }
+    if (validation.baseUrl === savedBaseUrl) return;
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await updateProviderInstance(instance.id, {
+        baseUrl: validation.baseUrl,
+      });
+      await refreshInstanceModels(instance.id);
+      setBaseUrl(validation.baseUrl);
+    } catch (cause) {
+      const failureMessage =
+        cause instanceof Error
+          ? cause.message
+          : 'Failed to refresh models from this endpoint.';
+      let rollbackMessage: string | undefined;
+      try {
+        await updateProviderInstance(instance.id, { baseUrl: savedBaseUrl });
+      } catch (rollbackCause) {
+        rollbackMessage =
+          rollbackCause instanceof Error
+            ? rollbackCause.message
+            : 'unknown rollback error';
+      }
+      setBaseUrl(savedBaseUrl);
+      setError(
+        rollbackMessage
+          ? `${failureMessage} Failed to restore the previous endpoint: ${rollbackMessage}`
+          : failureMessage,
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isDirty = baseUrl.trim() !== savedBaseUrl;
+  return (
+    <div className="space-y-2 rounded-lg border border-derived p-3">
+      <p className="font-medium text-muted-foreground text-xs">
+        {metadata.label}
+      </p>
+      <div className="flex gap-2">
+        <Input
+          type="url"
+          value={baseUrl}
+          placeholder={metadata.placeholder}
+          onValueChange={(value) => {
+            setBaseUrl(value);
+            setError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && isDirty && !isSaving) {
+              void handleSave();
+            }
+          }}
+          disabled={isSaving}
+          size="sm"
+          style={{ maxWidth: 'none' }}
+          className="flex-1"
+        />
+        {isDirty && (
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!baseUrl.trim() || isSaving}
+            onClick={() => void handleSave()}
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+        )}
+      </div>
+      <p className="text-subtle-foreground text-xs">{metadata.helpText}</p>
+      {error && <TruncatedErrorText text={error} />}
+    </div>
+  );
+}
+
+// =============================================================================
 // Self-Hosted Connection (detail page)
 // =============================================================================
 
@@ -3315,6 +3472,22 @@ export function ModelsProvidersSection() {
         (i) => i.id === detailInstanceId,
       )
     : undefined;
+  const detailModelCounts = useMemo(() => {
+    if (!detailInstance) return { enabled: 0, total: 0 };
+    const entries = getSelectableModelEntries(preferences, {
+      includeDisabled: true,
+    }).filter((entry) => entry.instanceId === detailInstance.id);
+    const disabledSet = new Set(
+      getInstanceDisabledModelIds(preferences, detailInstance.id),
+    );
+    return {
+      enabled: entries.reduce(
+        (count, entry) => count + Number(!disabledSet.has(entry.modelId)),
+        0,
+      ),
+      total: entries.length,
+    };
+  }, [detailInstance, preferences]);
 
   // Intercept Escape on the capture phase when a detail page is open.
   // This fires before the global bubble-phase handler in
@@ -3346,7 +3519,7 @@ export function ModelsProvidersSection() {
   if (detailInstance) {
     const displayInfo = getTypeDisplayInfo(detailInstance.typeId);
     const credentialType = displayInfo?.credentialType ?? 'none';
-    const modelCount = getInstanceModelCount(detailInstance, preferences);
+    const modelCount = detailModelCounts.total;
     const canDelete = detailInstance.id !== DEFAULT_INSTANCE_ID;
     const canRename = detailInstance.typeId !== 'stagewise';
 
@@ -3440,6 +3613,10 @@ export function ModelsProvidersSection() {
                 </div>
               )}
 
+              {detailInstance.typeId === 'coding-plan' && (
+                <CodingPlanEndpointConnection instance={detailInstance} />
+              )}
+
               {credentialType === 'base-url' && (
                 <SelfHostedConnection instance={detailInstance} />
               )}
@@ -3460,8 +3637,12 @@ export function ModelsProvidersSection() {
 
             {/* Models Section */}
             <section className="flex flex-col space-y-6">
-              <div>
+              <div className="flex items-baseline gap-2">
                 <h2 className="font-medium text-foreground text-lg">Models</h2>
+                <span className="text-muted-foreground text-xs">
+                  {detailModelCounts.enabled} of {detailModelCounts.total}{' '}
+                  enabled
+                </span>
               </div>
 
               <ModelsSection
@@ -3506,6 +3687,9 @@ export function ModelsProvidersSection() {
               onDelete={(id) => void handleDeleteInstance(id)}
             />
           </section>
+
+          {/* Model Presets & Utility Models */}
+          <ModelPresetsSection />
         </div>
       </OverlayScrollbar>
     </div>

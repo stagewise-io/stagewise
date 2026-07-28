@@ -507,7 +507,7 @@ function WorkspaceGroupHeader({
   onCreateAgent?: () => void;
   hideActions?: boolean;
 }) {
-  const openInFileManagerLabel = `Open in ${IDE_SELECTION_ITEMS.other}`;
+  const openInFileManagerLabel = `Open in ${IDE_SELECTION_ITEMS.fileManager}`;
   const remoteRepositoryLabel =
     openRemoteRepositoryLabel ?? 'Open remote repository';
 
@@ -787,7 +787,10 @@ export function AgentsList() {
     useComparingSelector(
       (s): ActiveAgentCardData[] =>
         Object.entries(s.agents.instances)
-          .filter(([_, agent]) => agent.type === AgentTypes.CHAT)
+          .filter(
+            ([, agent]) =>
+              agent.type === AgentTypes.CHAT && !agent.sideChatParentId,
+          )
           .map(([id, agent]) => {
             const history = agent.state.history;
             const lastMsg = history[history.length - 1]!;
@@ -1171,7 +1174,10 @@ export function AgentsList() {
 
   const activeAgentIds = useKartonState(
     useComparingSelector(
-      (s) => Object.keys(s.agents.instances),
+      (s) =>
+        Object.entries(s.agents.instances)
+          .filter(([, agent]) => !agent.sideChatParentId)
+          .map(([id]) => id),
       stringArraysEqual,
     ),
   );

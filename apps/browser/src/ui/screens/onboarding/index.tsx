@@ -1,4 +1,10 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { Button } from '@stagewise/stage-ui/components/button';
 import {
   Tooltip,
@@ -6,37 +12,114 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { IconArrowLeftFill18, IconArrowRightFill18 } from '@stagewise/icons';
-import { useKartonProcedure } from '@ui/hooks/use-karton';
+import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
+import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@ui/utils';
 import { StepLogin } from './steps/01-login';
 import type { OnboardingAuthCompletion } from './steps/01-login';
-import { StepConfigureProviders } from './steps/06-configure-providers';
+import {
+  StepConfigureProviders,
+  type ProviderStepSummary,
+} from './steps/06-configure-providers';
 import { StepTheme } from './steps/07-theme';
 
-type ScreenId = 'login' | 'configure-providers' | 'theme';
+type ScreenId = 'login' | 'configure-providers' | 'personalization';
+type NavigationAction = 'next' | 'back' | 'skip' | 'finish';
 
 export function OnboardingWizard() {
   const [screen, setScreen] = useState<ScreenId>('login');
-  const [prevScreen, setPrevScreen] = useState<ScreenId>('configure-providers');
+  const [onboardingRunId] = useState(() => crypto.randomUUID());
   const [authCompletion, setAuthCompletion] =
     useState<OnboardingAuthCompletion | null>(null);
+  const providerSummaryRef = useRef<ProviderStepSummary | null>(null);
+  const personalizationChangedRef = useRef(false);
+  const track = useTrack();
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const connectedProviderCount = useKartonState(
+    (s) => s.preferences.providerInstances?.length ?? 0,
+  );
+  const runStartedAtRef = useRef(performance.now());
+  const stepEnteredAtRef = useRef(runStartedAtRef.current);
+  const currentStepRef = useRef<ScreenId>('login');
+  const previousStepRef = useRef<ScreenId | undefined>(undefined);
+  const visitCountsRef = useRef<Record<ScreenId, number>>({
+    login: 0,
+    'configure-providers': 0,
+    personalization: 0,
+  });
+  const startedTrackedRef = useRef(false);
+  const lastViewedStepRef = useRef<ScreenId | null>(null);
   const setHasSeenOnboardingFlow = useKartonProcedure(
     (p) => p.userExperience.setHasSeenOnboardingFlow,
   );
 
-  const navigate = useCallback((next: ScreenId) => {
-    setScreen((current) => {
-      setPrevScreen(current);
-      return next;
+  useEffect(() => {
+    if (!startedTrackedRef.current) {
+      startedTrackedRef.current = true;
+      void track('onboarding-started', {
+        onboarding_run_id: onboardingRunId,
+        already_authenticated:
+          authStatus === 'authenticated' || authStatus === 'server_unreachable',
+        connected_provider_count: connectedProviderCount,
+      });
+    }
+
+    if (lastViewedStepRef.current === screen) return;
+
+    const now = performance.now();
+    visitCountsRef.current[screen] += 1;
+    stepEnteredAtRef.current = now;
+    currentStepRef.current = screen;
+    lastViewedStepRef.current = screen;
+    void track('onboarding-step-viewed', {
+      onboarding_run_id: onboardingRunId,
+      step: screen,
+      previous_step: previousStepRef.current,
+      visit_index: visitCountsRef.current[screen],
+      elapsed_ms_since_start: now - runStartedAtRef.current,
     });
-  }, []);
+  }, [authStatus, connectedProviderCount, onboardingRunId, screen, track]);
+
+  const navigate = useCallback(
+    (next: ScreenId, action: NavigationAction) => {
+      const current = currentStepRef.current;
+      void track('onboarding-step-exited', {
+        onboarding_run_id: onboardingRunId,
+        step: current,
+        destination: next,
+        action,
+        duration_ms: performance.now() - stepEnteredAtRef.current,
+      });
+      previousStepRef.current = current;
+      setScreen(next);
+    },
+    [onboardingRunId, track],
+  );
 
   const complete = useCallback(() => {
+    const current = currentStepRef.current;
+    void track('onboarding-step-exited', {
+      onboarding_run_id: onboardingRunId,
+      step: current,
+      destination: 'completed',
+      action: 'finish',
+      duration_ms: performance.now() - stepEnteredAtRef.current,
+    });
+    const providerSummary = providerSummaryRef.current;
     setHasSeenOnboardingFlow({
       value: true,
       auth: authCompletion ?? { auth_method: 'unknown' },
+      summary: {
+        onboarding_run_id: onboardingRunId,
+        total_duration_ms: performance.now() - runStartedAtRef.current,
+        connected_provider_keys: providerSummary?.connected_provider_keys ?? [],
+        connected_provider_count:
+          providerSummary?.connected_provider_count ?? 0,
+        provider_step_skipped: providerSummary?.provider_step_skipped ?? true,
+        personalization_changed: personalizationChangedRef.current,
+      },
     });
-  }, [authCompletion, setHasSeenOnboardingFlow]);
+  }, [authCompletion, onboardingRunId, setHasSeenOnboardingFlow, track]);
 
   return (
     <div
@@ -51,21 +134,38 @@ export function OnboardingWizard() {
       <div className="flex flex-1 flex-col overflow-hidden">
         {screen === 'login' && (
           <StepLogin
-            onSkip={() => navigate('configure-providers')}
+            onboardingRunId={onboardingRunId}
+            onSkip={() => navigate('configure-providers', 'skip')}
             onAuthenticated={(completion) => {
               setAuthCompletion(completion);
-              navigate('configure-providers');
+              navigate('configure-providers', 'next');
             }}
           />
         )}
         {screen === 'configure-providers' && (
           <StepConfigureProviders
-            onNext={() => navigate('theme')}
-            onBack={() => navigate('login')}
+            onboardingRunId={onboardingRunId}
+            onSummary={(summary) => {
+              const previousSummary = providerSummaryRef.current;
+              providerSummaryRef.current = {
+                ...summary,
+                provider_step_skipped:
+                  (previousSummary?.provider_step_skipped ?? true) &&
+                  summary.provider_step_skipped,
+              };
+            }}
+            onNext={() => navigate('personalization', 'next')}
+            onBack={() => navigate('login', 'back')}
           />
         )}
-        {screen === 'theme' && (
-          <StepTheme onNext={complete} onBack={() => navigate(prevScreen)} />
+        {screen === 'personalization' && (
+          <StepTheme
+            onNext={complete}
+            onBack={() => navigate('configure-providers', 'back')}
+            onPersonalizationChanged={() => {
+              personalizationChangedRef.current = true;
+            }}
+          />
         )}
       </div>
     </div>

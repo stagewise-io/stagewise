@@ -23,11 +23,15 @@ export type {
 export type { Logger } from './logger';
 export {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PRESET_THINKING_OVERRIDE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
+  UTILITY_THINKING_OVERRIDE_METADATA_KEY,
   type HostModels,
   type ModelRequestPurpose,
   type ModelWithOptions,
   type ProviderMode,
+  type UtilityModelEntry,
+  type UtilityModelThinkingOverride,
 } from './models';
 export type { ModelCapabilities } from '../types/models';
 export type { HostPaths } from './paths';

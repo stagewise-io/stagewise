@@ -32,8 +32,6 @@ import type { TelemetryService } from '@/services/telemetry';
 import { createBrowserHostModels } from './host-models';
 import { createBrowserHostPaths } from './host-paths';
 import { createBrowserTelemetrySink } from './host-telemetry';
-import { readWorkspaceMd } from '@/agents/shared/prompts/utils/read-workspace-md';
-import { DEFAULT_WORKSPACE_MD_RELATIVE_PATH } from '@stagewise/agent-core/mount-manager';
 import { shell } from 'electron';
 import { existsSync } from 'node:fs';
 import browserIntroPrompt from '@/agents/chat/prompts/intro.md?raw';
@@ -113,9 +111,6 @@ export function createBrowserAgentHost(deps: BrowserAgentHostDeps): AgentHost {
         return await shell.openPath(absolutePath);
       },
     },
-    readWorkspaceMdFromDisk: (workspacePath) =>
-      readWorkspaceMd(workspacePath, BROWSER_WORKSPACE_MD_RELATIVE_PATH),
-    workspaceMdRelativePath: BROWSER_WORKSPACE_MD_RELATIVE_PATH,
   });
   host.registerFileReadTransformers(BROWSER_FILE_READ_TRANSFORMERS);
   host.registerToolPartSerializers(browserToolPartSerializers);
@@ -134,15 +129,6 @@ export function createBrowserAgentHost(deps: BrowserAgentHostDeps): AgentHost {
       soul: browserSoulPrompt,
       environmentPreamble: browserEnvironmentPreamblePrompt,
     },
-  });
-
-  // WORKSPACE_MD — the thin "edit `.stagewise/WORKSPACE.md` only"
-  // agent. It supplies its own system prompt (so prompt fragments
-  // are inert here) and only needs the workspace snapshot to
-  // resolve mount prefixes against; everything else (browser tabs,
-  // shells, sandbox, diffs, plans, ...) is intentionally absent.
-  host.defineAgentProfile(AgentTypes.WORKSPACE_MD, {
-    envDomainIds: [WORKSPACE_DOMAIN_ID],
   });
 
   return host;
@@ -183,13 +169,6 @@ const BROWSER_FILE_READ_TRANSFORMERS: Readonly<
   '.textclip': textBlobTransformer,
   '.swdomelement': textBlobTransformer,
 };
-
-/**
- * Mount-relative path for the project memo on this host. Reuses the
- * core default (`.stagewise/WORKSPACE.md`) so existing workspaces keep
- * working unchanged.
- */
-const BROWSER_WORKSPACE_MD_RELATIVE_PATH = DEFAULT_WORKSPACE_MD_RELATIVE_PATH;
 
 /**
  * Markdown link protocols the browser host's renderer understands

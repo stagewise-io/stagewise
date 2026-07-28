@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CodingPlan } from '@shared/coding-plans';
+import { CODING_PLANS, type CodingPlan } from '@shared/coding-plans';
 import { generateText } from 'ai';
 import { validateCodingPlanApiKey } from './validate-api-keys';
 
@@ -59,6 +59,55 @@ describe('validateCodingPlanApiKey', () => {
       baseURL: 'https://validation.example/v1',
     });
     expect(openAiMock.chat).toHaveBeenCalledWith('glm-validation');
+  });
+
+  it.each([
+    ['qwen-plan', 'https://coding-intl.dashscope.aliyuncs.com/v1'],
+    [
+      'qwen-token-plan',
+      'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+    ],
+  ] as const)('validates %s against its dedicated endpoint', async (planId, baseURL) => {
+    const result = await validateCodingPlanApiKey(
+      CODING_PLANS[planId],
+      'test-key',
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(createOpenAIMock).toHaveBeenCalledWith({
+      apiKey: 'test-key',
+      baseURL,
+    });
+    expect(openAiMock.chat).toHaveBeenCalledWith('qwen3.7-plus');
+  });
+
+  it('prefers a custom instance endpoint for validation', async () => {
+    const result = await validateCodingPlanApiKey(
+      CODING_PLANS['qwen-token-plan'],
+      'test-key',
+      ' https://token-plan.eu.example.com/compatible-mode/v1/ ',
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(createOpenAIMock).toHaveBeenCalledWith({
+      apiKey: 'test-key',
+      baseURL: 'https://token-plan.eu.example.com/compatible-mode/v1',
+    });
+  });
+
+  it('rejects an invalid endpoint before making a request', async () => {
+    const result = await validateCodingPlanApiKey(
+      CODING_PLANS['qwen-token-plan'],
+      'test-key',
+      'http://token-plan.example.com/v1',
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: 'The API endpoint must use HTTPS.',
+    });
+    expect(createOpenAIMock).not.toHaveBeenCalled();
+    expect(generateText).not.toHaveBeenCalled();
   });
 
   it('falls back to provider validation when custom validation metadata is incomplete', async () => {

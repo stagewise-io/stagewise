@@ -106,21 +106,25 @@ function getLoadingIndicatorVariant(
   }
 }
 
+type AgentChatEvent<T> = CustomEvent<T & { agentId: string }>;
+
 // Custom event types for optimistic messaging
 declare global {
   interface WindowEventMap {
-    'chat-message-sent': CustomEvent<{ message: AgentMessage }>;
-    'chat-message-failed': CustomEvent<{ clientId: string }>;
-    'chat-workspace-preparation-started': CustomEvent<{
+    'chat-message-sent': AgentChatEvent<{ message: AgentMessage }>;
+    'chat-message-failed': AgentChatEvent<{ clientId: string }>;
+    'chat-workspace-preparation-started': AgentChatEvent<{
       clientId: string;
       kind: 'worktree' | 'branch';
     }>;
-    'chat-workspace-preparation-finished': CustomEvent<{ clientId: string }>;
-    'chat-message-edited': CustomEvent<{
+    'chat-workspace-preparation-finished': AgentChatEvent<{
+      clientId: string;
+    }>;
+    'chat-message-edited': AgentChatEvent<{
       replacedMessageId: string;
       newMessage: AgentMessage;
     }>;
-    'chat-restore-checkpoint': CustomEvent<{
+    'chat-restore-checkpoint': AgentChatEvent<{
       assistantMessageId: string;
       undoToolCalls: boolean;
     }>;
@@ -184,7 +188,8 @@ function isEventFromEditableTarget(event: KeyboardEvent) {
   );
 }
 
-export const ChatHistory = () => {
+export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
+  const topInset = flushTop ? 0 : CHAT_TOP_INSET;
   const [containerHeight, setContainerHeight] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const scrollbarWidth = useScrollbarWidth();
@@ -252,38 +257,27 @@ export const ChatHistory = () => {
     [updateSpacerHeight],
   );
 
-  // Auto-scroll hook
+  // Virtuoso-specific auto-scroll controller. Virtuoso reports measured list
+  // height changes, so streaming and other layout growth do not need a DOM
+  // MutationObserver.
   const {
-    scrollerRef: autoScrollRef,
-    isAutoScrollEnabled,
-    scrollToBottom,
+    scroller,
+    scrollerRef,
     forceEnableAutoScroll,
-  } = useAutoScroll({
-    scrollEndThreshold: 100,
-  });
+    disableAutoScroll,
+    isAutoScrollEnabled,
+    followOutput,
+  } = useAutoScroll({ mode: 'virtuoso', scrollEndThreshold: 100 });
 
-  // Track scroller element for spacerHeight calculation
-  const [scroller, setScroller] = useState<HTMLElement | null>(null);
   // Track scroll offset to drive the top fade overlay. We only need an
   // approximate value (used to fade between 0 and 16px) so no throttling.
   const [scrollTop, setScrollTop] = useState(0);
-  const scrollerRef = useCallback(
-    (element: HTMLElement | Window | null) => {
-      // Chain to auto-scroll hook
-      autoScrollRef(element);
-      // Store element for local use (spacerHeight, etc.)
-      if (element instanceof HTMLElement) {
-        setScroller(element);
-      } else {
-        setScroller(null);
-      }
-    },
-    [autoScrollRef],
-  );
 
   const scrollChatHistoryByPage = useCallback(
     (direction: ChatHistoryScrollDirection) => {
       if (!scroller) return;
+
+      if (direction === 'up') disableAutoScroll();
 
       const amount = Math.max(
         CHAT_PAGE_SCROLL_MIN,
@@ -294,7 +288,7 @@ export const ChatHistory = () => {
         behavior: 'smooth',
       });
     },
-    [scroller],
+    [disableAutoScroll, scroller],
   );
 
   useEffect(() => {
@@ -400,7 +394,7 @@ export const ChatHistory = () => {
       cancelAnimationFrame(rafId);
       disconnectResizeObserver?.();
     };
-  }, [isAutoScrollEnabled, scrollToBottom, scroller]);
+  }, [isAutoScrollEnabled, scroller, updateSpacerHeight]);
 
   const handleRemoveSuggestion = (id: string) => {
     // State update first — telemetry is fire-and-forget and must never be
@@ -717,9 +711,6 @@ export const ChatHistory = () => {
 
   // Calculate average estimated height for defaultItemHeight
 
-  // Track when user sends a message - we'll enable auto-scroll once the message is in DOM
-  const pendingAutoScrollRef = useRef(false);
-  const prevMessagesLengthRef = useRef(filteredMessages.length);
   const serverUserMessageCountRef = useRef(0);
   serverUserMessageCountRef.current = serverMessages.filter(
     (message) => message.role === 'user',
@@ -727,7 +718,8 @@ export const ChatHistory = () => {
 
   // Listen for message-sent event with message data - add to optimistic state immediately
   useEffect(() => {
-    const handleMessageSent = (e: CustomEvent<{ message: AgentMessage }>) => {
+    const handleMessageSent = (e: WindowEventMap['chat-message-sent']) => {
+      if (e.detail.agentId !== openAgent) return;
       const message = e.detail.message;
       // Add to optimistic messages immediately for instant rendering.
       setOptimisticMessages((prev) => [
@@ -740,11 +732,12 @@ export const ChatHistory = () => {
             serverUserMessageCountRef.current + prev.length,
         },
       ]);
-      pendingAutoScrollRef.current = true;
+      forceEnableAutoScroll();
       pendingWorkingRef.current = true;
     };
 
-    const handleMessageFailed = (e: CustomEvent<{ clientId: string }>) => {
+    const handleMessageFailed = (e: WindowEventMap['chat-message-failed']) => {
+      if (e.detail.agentId !== openAgent) return;
       // Remove failed optimistic message and clear replaced state
       setOptimisticMessages((prev) =>
         prev.filter((m) => m._clientId !== e.detail.clientId),
@@ -757,22 +750,23 @@ export const ChatHistory = () => {
     };
 
     const handleWorkspacePreparationStarted = (
-      e: CustomEvent<{ clientId: string; kind: WorkspacePreparationKind }>,
+      e: WindowEventMap['chat-workspace-preparation-started'],
     ) => {
+      if (e.detail.agentId !== openAgent) return;
       setWorkspacePreparation(e.detail);
     };
 
     const handleWorkspacePreparationFinished = (
-      e: CustomEvent<{ clientId: string }>,
+      e: WindowEventMap['chat-workspace-preparation-finished'],
     ) => {
+      if (e.detail.agentId !== openAgent) return;
       setWorkspacePreparation((current) =>
         current?.clientId === e.detail.clientId ? null : current,
       );
     };
 
-    const handleMessageEdited = (
-      e: CustomEvent<{ replacedMessageId: string; newMessage: AgentMessage }>,
-    ) => {
+    const handleMessageEdited = (e: WindowEventMap['chat-message-edited']) => {
+      if (e.detail.agentId !== openAgent) return;
       const { replacedMessageId: replaceId, newMessage } = e.detail;
       // Mark the old message (and all after it) for hiding
       setReplacedMessageId(replaceId);
@@ -787,7 +781,7 @@ export const ChatHistory = () => {
         _replacedMessageId: replaceId,
       };
       setOptimisticMessages((prev) => [...prev, optimisticMsg]);
-      pendingAutoScrollRef.current = true;
+      forceEnableAutoScroll();
       pendingWorkingRef.current = true;
     };
 
@@ -815,43 +809,14 @@ export const ChatHistory = () => {
       );
       window.removeEventListener('chat-message-edited', handleMessageEdited);
     };
-  }, []);
-
-  // Enable auto-scroll ONLY when new message is actually in the DOM
-  useLayoutEffect(() => {
-    const prevLength = prevMessagesLengthRef.current;
-    const currentLength = filteredMessages.length;
-    prevMessagesLengthRef.current = currentLength;
-
-    // Trigger auto-scroll when:
-    // 1. Messages increased (new message added) AND we were waiting to auto-scroll
-    // 2. OR we're in edit mode (replacedMessageId set) AND pending scroll
-    //    (edit mode may decrease length but we still want to scroll)
-    const shouldTrigger =
-      pendingAutoScrollRef.current &&
-      (currentLength > prevLength || replacedMessageId !== null);
-
-    if (shouldTrigger) {
-      pendingAutoScrollRef.current = false;
-      forceEnableAutoScroll();
-      // Also scroll immediately - the MutationObserver may have already fired
-      // while auto-scroll was disabled, so we need to scroll manually
-      scrollToBottom();
-    }
-  }, [
-    filteredMessages.length,
-    replacedMessageId,
-    forceEnableAutoScroll,
-    scrollToBottom,
-  ]);
+  }, [forceEnableAutoScroll, openAgent]);
 
   // Scroll to bottom when an error appears so it's always visible
   useEffect(() => {
     if (error) {
       forceEnableAutoScroll();
-      scrollToBottom();
     }
-  }, [error, forceEnableAutoScroll, scrollToBottom]);
+  }, [error, forceEnableAutoScroll]);
 
   // Clear pending-working bridge once isWorking catches up.
   useEffect(() => {
@@ -968,7 +933,6 @@ export const ChatHistory = () => {
   errorRef.current = error;
   const isWorkingRef = useRef(isWorking);
   isWorkingRef.current = isWorking;
-
   // Cache browser context per message ID so the same value object is reused
   // across streaming chunks.  Environment snapshots are baked into message
   // metadata and never change for a given position, so the cache is safe.
@@ -1130,6 +1094,7 @@ export const ChatHistory = () => {
             />
           ) : (
             <MessageAssistant
+              agentId={openAgent!}
               message={message as AgentMessage & { role: 'assistant' }}
               isLastMessage={isLastMessage}
               isWorking={curIsWorking}
@@ -1283,6 +1248,9 @@ export const ChatHistory = () => {
       </div>
     );
   }, [removedSuggestionIds]);
+  const topMask = topInset
+    ? `linear-gradient(to bottom, transparent 0, black ${Math.min(CHAT_FADE, scrollTop)}px, black 100%)`
+    : undefined;
 
   // If no messages, show empty state directly
   if (filteredMessages.length === 0) {
@@ -1294,7 +1262,7 @@ export const ChatHistory = () => {
             className={cn(
               'pointer-events-auto block h-max min-h-[inherit] text-foreground text-sm focus-within:outline-none focus:outline-none',
             )}
-            style={{ paddingTop: CHAT_TOP_INSET }}
+            style={{ paddingTop: topInset }}
           >
             {EmptyPlaceholder()}
           </section>
@@ -1310,11 +1278,13 @@ export const ChatHistory = () => {
           {/* Sibling spacer above Virtuoso. Reserves the chrome band so
               items never paint into the titlebar area. Kept transparent —
               the parent's bg-background shows through. */}
-          <div
-            aria-hidden
-            className="shrink-0"
-            style={{ height: CHAT_TOP_INSET }}
-          />
+          {topInset > 0 && (
+            <div
+              aria-hidden
+              className="shrink-0"
+              style={{ height: topInset }}
+            />
+          )}
           <Virtuoso
             initialTopMostItemIndex={Math.max(0, filteredMessages.length - 2)}
             style={{
@@ -1325,8 +1295,8 @@ export const ChatHistory = () => {
               // scrollTop (clamped to CHAT_FADE), so at scrollTop=0 the
               // mask is identity (no fade on the first item) and scrolling
               // smoothly reveals the fade without any hard cut.
-              maskImage: `linear-gradient(to bottom, transparent 0, black ${Math.min(CHAT_FADE, scrollTop)}px, black 100%)`,
-              WebkitMaskImage: `linear-gradient(to bottom, transparent 0, black ${Math.min(CHAT_FADE, scrollTop)}px, black 100%)`,
+              maskImage: topMask,
+              WebkitMaskImage: topMask,
             }}
             key={openAgent ?? 'no-chat'}
             data={filteredMessages}
@@ -1335,7 +1305,8 @@ export const ChatHistory = () => {
             increaseViewportBy={{ top: 400, bottom: 400 }} // Render items above and below viewport
             heightEstimates={estimatedHeights}
             itemContent={itemContent}
-            followOutput={false} // We use our own auto-scroll logic
+            atBottomThreshold={100}
+            followOutput={followOutput}
             computeItemKey={(_, message) => message.id}
             totalCount={filteredMessages.length}
           />
