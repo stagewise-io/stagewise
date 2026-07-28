@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { Channel, LinuxFormat } from './config.js';
 import { config } from './config.js';
+import { parseVersion } from './version.js';
 import {
   findMacOSUpdateAsset,
   findMacOSDownloadAsset,
@@ -82,7 +83,8 @@ router.get(
 
     if (
       !isValidChannel(channel) ||
-      (platform !== 'macos' && platform !== 'win')
+      (platform !== 'macos' && platform !== 'win') ||
+      !parseVersion(version)
     ) {
       res.status(400).send('Invalid update request');
       return;

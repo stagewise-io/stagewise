@@ -142,6 +142,10 @@ function AppUpdateStatus() {
 function UpdateChannelSetting() {
   const preferences = useKartonState((s) => s.preferences);
   const appInfo = useKartonState((s) => s.appInfo);
+  const channelLocked = useKartonState(
+    (s) =>
+      s.autoUpdate.status === 'downloading' || s.autoUpdate.status === 'ready',
+  );
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const inferredChannel: UpdateChannel = appInfo.version.includes('-alpha')
@@ -169,7 +173,11 @@ function UpdateChannelSetting() {
         </p>
       </div>
 
-      <RadioGroup value={currentChannel} onValueChange={handleChannelChange}>
+      <RadioGroup
+        value={currentChannel}
+        onValueChange={handleChannelChange}
+        disabled={channelLocked}
+      >
         <RadioLabel>
           <Radio value="beta" />
           <div className="flex flex-col">

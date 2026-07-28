@@ -9,7 +9,7 @@ import {
 } from '@stagewise/stage-ui/components/dialog';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import releaseNotesMarkdown from '../../../../../.release-notes.md?raw';
 
 const LAST_SEEN_VERSION_KEY = 'stagewise-whats-new-version';
@@ -17,6 +17,11 @@ const releaseNotes = releaseNotesMarkdown.trim();
 const hasCurrentReleaseNotes = releaseNotes.startsWith(
   `## ${__APP_VERSION__} (`,
 );
+const releaseNotesComponents: Components = {
+  a: ({ node: _node, ...props }) => (
+    <a {...props} target="_blank" rel="noopener noreferrer" />
+  ),
+};
 
 function wasCurrentVersionSeen(): boolean {
   try {
@@ -46,7 +51,9 @@ export function ReleaseNotes({
         className,
       )}
     >
-      <ReactMarkdown>{children}</ReactMarkdown>
+      <ReactMarkdown components={releaseNotesComponents}>
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }
