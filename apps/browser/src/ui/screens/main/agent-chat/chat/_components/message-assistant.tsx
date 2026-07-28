@@ -222,12 +222,14 @@ const SinglePartRenderer = memo(
 
 export const MessageAssistant = memo(
   function MessageAssistant({
+    agentId,
     message: msg,
     isLastMessage,
     isWorking,
     showBetweenStepsIndicator,
     hasSubsequentFileModifications,
   }: {
+    agentId: string;
     message: AssistantMessage;
     isLastMessage: boolean;
     isWorking: boolean;
@@ -263,13 +265,14 @@ export const MessageAssistant = memo(
         window.dispatchEvent(
           new CustomEvent('chat-restore-checkpoint', {
             detail: {
+              agentId,
               assistantMessageId: msg.id,
               undoToolCalls,
             },
           }),
         );
       },
-      [msg.id],
+      [agentId, msg.id],
     );
 
     const handleRestoreCheckpoint = useCallback(() => {

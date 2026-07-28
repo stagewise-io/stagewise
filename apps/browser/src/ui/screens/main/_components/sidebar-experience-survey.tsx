@@ -61,6 +61,7 @@ export function SidebarExperienceSurvey() {
   const totalUserMessages = useKartonState((s) => {
     let count = 0;
     for (const instance of Object.values(s.agents.instances)) {
+      if (instance.sideChatParentId) continue;
       count += instance.state.history.filter((m) => m.role === 'user').length;
     }
     return count;

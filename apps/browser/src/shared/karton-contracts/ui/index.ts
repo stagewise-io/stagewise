@@ -773,8 +773,8 @@ export type DeviceEmulation = {
 
 export type TabState = {
   id: string;
-  /** Discriminator: 'browser' for web-content tabs, 'terminal' for PTY tabs, 'file' for workspace file previews. */
-  type?: 'browser' | 'terminal' | 'file';
+  /** Discriminator for the content hosted by this tab. */
+  type?: 'browser' | 'terminal' | 'file' | 'side-chat';
   title: string;
   url: string;
   faviconUrls: string[];
@@ -826,6 +826,8 @@ export type TabState = {
   terminalRunningProcess?: string | null;
   /** File-preview-specific fields (present when type === 'file') */
   file?: FileTabMetadata;
+  /** Side-chat agent rendered by this tab (present when type === 'side-chat'). */
+  sideChatAgentInstanceId?: string;
   /** Transient notice banner for file tabs (move / delete). */
   fileNotice?: FileTabNotice;
   createdAt?: number;
@@ -897,6 +899,16 @@ export function getFileTabDefaults(): Omit<
     isContentFullscreen: false,
     authenticationRequest: null,
     lifecycle: { kind: 'permanent' },
+  };
+}
+
+export function getSideChatTabDefaults(): Omit<
+  TabState,
+  'id' | 'title' | 'lastFocusedAt' | 'sideChatAgentInstanceId'
+> {
+  return {
+    ...getFileTabDefaults(),
+    type: 'side-chat',
   };
 }
 
@@ -1048,6 +1060,7 @@ export type AppState = {
         requiredModelCapabilities: ModelSettings['capabilities'];
         allowUserInput: boolean;
         parentAgentInstanceId: string | null;
+        sideChatParentId: string | null;
         state: AgentState;
       };
     };
@@ -1334,6 +1347,9 @@ export type KartonContract = {
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,
       ) => Promise<string>;
+      createSideChat: (sourceAgentId: string) => Promise<string>;
+      promoteSideChat: (agentId: string) => Promise<void>;
+      discardSideChat: (agentId: string) => Promise<void>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
       delete: (agentId: string) => Promise<void>;
@@ -1706,6 +1722,10 @@ export type KartonContract = {
         url?: string,
         setActive?: boolean,
         agentInstanceId?: string | null,
+      ) => Promise<string | undefined>;
+      createSideChatTab: (
+        parentAgentInstanceId: string,
+        sideChatAgentInstanceId: string,
       ) => Promise<string | undefined>;
       closeTab: (tabId: string) => Promise<void>;
       clearFileNotice: (tabId: string) => Promise<void>;

@@ -2,7 +2,7 @@ import Mention from '@tiptap/extension-mention';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { SlashNodeView } from './slash-node-view';
 import { createSlashSuggestionRenderer } from './suggestion-renderer';
-import { querySlashItems } from './provider';
+import { querySlashItems, slashOpenSideChatRef } from './provider';
 import type { SlashItem } from './types';
 
 const SLASH_PROTOCOL = 'slash';
@@ -92,6 +92,11 @@ export const SlashExtension = Mention.extend({
     },
     command: ({ editor, range, props }: any) => {
       const item = props as SlashItem;
+      if (item.id === 'command:side') {
+        editor.chain().deleteRange(range).run();
+        slashOpenSideChatRef.current?.();
+        return;
+      }
       editor
         .chain()
         .focus()

@@ -34,6 +34,7 @@ import {
   PermissionSetting,
   configurablePermissionTypes,
   getFileTabDefaults,
+  getSideChatTabDefaults,
   getTerminalTabDefaults,
 } from '@shared/karton-contracts/ui';
 import { THEME_COLORS } from '@/shared/theme-colors';
@@ -99,6 +100,13 @@ const tabEntrySchema = z.discriminatedUnion('type', [
     title: z.string(),
     file: fileTabMetadataSchema,
     agentInstanceId: z.string().nullable(),
+  }),
+  z.object({
+    type: z.literal('side-chat'),
+    id: z.string(),
+    title: z.string(),
+    agentInstanceId: z.string().nullable(),
+    sideChatAgentInstanceId: z.string(),
   }),
 ]);
 
@@ -182,11 +190,20 @@ export class WindowLayoutService extends DisposableService {
   /** Callback wired by ToolboxService — invoked when a terminal tab is
    *  closed so TerminalService can kill the PTY and clean up buffers. */
   private onCloseTerminal: ((terminalId: string) => void) | null = null;
+  private onCloseSideChat:
+    | ((agentInstanceId: string) => Promise<void> | void)
+    | null = null;
 
   /** Register a callback that WindowLayoutService uses to delegate PTY
    *  teardown to TerminalService when the user closes a terminal tab. */
   public setOnCloseTerminal(fn: (terminalId: string) => void): void {
     this.onCloseTerminal = fn;
+  }
+
+  public setOnCloseSideChat(
+    fn: (agentInstanceId: string) => Promise<void> | void,
+  ): void {
+    this.onCloseSideChat = fn;
   }
 
   /** Callback invoked before tab state persistence so TerminalService
@@ -769,6 +786,32 @@ export class WindowLayoutService extends DisposableService {
     void this.handleCloseTab(tabId);
   }
 
+  public async removeDeletedSideChatTabs(
+    deletedAgentIds: readonly string[],
+  ): Promise<void> {
+    const deletedIds = new Set(deletedAgentIds);
+    const tabIds = Object.values(this.uiKarton.state.contentTabs.tabs).flatMap(
+      (tab) =>
+        tab.type === 'side-chat' &&
+        tab.sideChatAgentInstanceId &&
+        deletedIds.has(tab.sideChatAgentInstanceId)
+          ? [tab.id]
+          : [],
+    );
+    for (const tabId of tabIds) await this.handleCloseTab(tabId);
+
+    for (const [agentId, configs] of this.deferredTabConfigs) {
+      const remaining = configs.filter(
+        (tab) =>
+          tab.type !== 'side-chat' ||
+          !deletedIds.has(tab.sideChatAgentInstanceId),
+      );
+      if (remaining.length > 0) this.deferredTabConfigs.set(agentId, remaining);
+      else this.deferredTabConfigs.delete(agentId);
+    }
+    this.saveTabState();
+  }
+
   public hasTab(tabId: string): boolean {
     return Boolean(this.tabs[tabId]);
   }
@@ -1171,6 +1214,7 @@ export class WindowLayoutService extends DisposableService {
     this.uiController.on('uiReady', this.handleUIReady);
     this.uiController.on('domReady', this.handleDomReady);
     this.uiController.on('createTab', this.handleCreateTab);
+    this.uiController.on('createSideChatTab', this.handleCreateSideChatTab);
     this.uiController.on('closeTab', this.handleCloseTab);
     this.uiController.on('switchTab', this.handleSwitchTab);
     this.uiController.on('reorderTabs', this.handleReorderTabs);
@@ -1434,6 +1478,47 @@ export class WindowLayoutService extends DisposableService {
     }
   };
 
+  private insertSideChatTab(
+    id: string,
+    title: string,
+    parentAgentInstanceId: string | null,
+    sideChatAgentInstanceId: string,
+    addToOrder = false,
+  ) {
+    const now = Date.now();
+    this.uiKarton.setState((draft) => {
+      draft.contentTabs.tabs[id] ??= {
+        ...getSideChatTabDefaults(),
+        id,
+        title,
+        agentInstanceId: parentAgentInstanceId,
+        sideChatAgentInstanceId,
+        createdAt: now,
+        lastFocusedAt: now,
+      };
+      if (addToOrder)
+        this.addToTabOrder(draft.contentTabs, id, parentAgentInstanceId);
+    });
+  }
+
+  private handleCreateSideChatTab = async (
+    parentAgentInstanceId: string,
+    sideChatAgentInstanceId: string,
+    onCreated: (tabId: string) => void,
+  ): Promise<void> => {
+    const id = generateTabId();
+    this.insertSideChatTab(
+      id,
+      'Side chat',
+      parentAgentInstanceId,
+      sideChatAgentInstanceId,
+      true,
+    );
+    await this.handleSwitchTab(id);
+    this.saveTabState();
+    onCreated(id);
+  };
+
   private async createTab(
     url: string | undefined,
     setActive: boolean,
@@ -1652,7 +1737,9 @@ export class WindowLayoutService extends DisposableService {
       ? this.uiKarton.state.contentTabs.tabs[tabId]
       : undefined;
     const isStateOnlyTab =
-      stateOnlyTab?.type === 'terminal' || stateOnlyTab?.type === 'file';
+      stateOnlyTab?.type === 'terminal' ||
+      stateOnlyTab?.type === 'file' ||
+      stateOnlyTab?.type === 'side-chat';
 
     if (isStateOnlyTab) {
       // Terminal tabs delegate PTY teardown and buffer cleanup to
@@ -1664,6 +1751,9 @@ export class WindowLayoutService extends DisposableService {
       if (stateOnlyTab.type === 'terminal') {
         this.onCloseTerminal?.(tabId);
       } else {
+        if (stateOnlyTab.sideChatAgentInstanceId) {
+          await this.onCloseSideChat?.(stateOnlyTab.sideChatAgentInstanceId);
+        }
         this.uiKarton.setState((draft) => {
           delete draft.contentTabs.tabs[tabId];
           this.removeFromTabOrders(draft.contentTabs, tabId);
@@ -1787,7 +1877,9 @@ export class WindowLayoutService extends DisposableService {
     // BrowsingTabController views. They have no WebContentsView.
     const contentTab = this.uiKarton.state.contentTabs.tabs[tabId];
     const isStateOnlyTab =
-      contentTab?.type === 'terminal' || contentTab?.type === 'file';
+      contentTab?.type === 'terminal' ||
+      contentTab?.type === 'file' ||
+      contentTab?.type === 'side-chat';
     if (!this.tabs[tabId] && !isStateOnlyTab) return;
     if (this.activeTabId === tabId) return;
 
@@ -2318,10 +2410,7 @@ export class WindowLayoutService extends DisposableService {
       return;
     }
 
-    const tab = this.tabs[tabId];
-    if (contentTab.type !== 'terminal') {
-      tab?.setAgentInstance(agentInstanceId);
-    }
+    this.tabs[tabId]?.setAgentInstance(agentInstanceId);
 
     this.uiKarton.setState((draft) => {
       const t = draft.contentTabs.tabs[tabId];
@@ -2378,6 +2467,14 @@ export class WindowLayoutService extends DisposableService {
             lastFocusedAt: Date.now(),
           };
         });
+        restoredIds.set(cfg, cfg.id);
+      } else if (cfg.type === 'side-chat') {
+        this.insertSideChatTab(
+          cfg.id,
+          cfg.title,
+          cfg.agentInstanceId,
+          cfg.sideChatAgentInstanceId,
+        );
         restoredIds.set(cfg, cfg.id);
       } else if (cfg.type === 'terminal') {
         this.uiKarton.setState((draft) => {
@@ -2978,6 +3075,18 @@ export class WindowLayoutService extends DisposableService {
               agentInstanceId: terminalTab.agentInstanceId,
             };
           }
+          if (
+            terminalTab?.type === 'side-chat' &&
+            terminalTab.sideChatAgentInstanceId
+          ) {
+            return {
+              type: 'side-chat' as const,
+              id: terminalTab.id,
+              title: terminalTab.title,
+              agentInstanceId: terminalTab.agentInstanceId,
+              sideChatAgentInstanceId: terminalTab.sideChatAgentInstanceId,
+            };
+          }
           const tabState = this.tabs[id]!.getState();
           return {
             type: 'browser' as const,
@@ -3059,6 +3168,14 @@ export class WindowLayoutService extends DisposableService {
             lastFocusedAt: Date.now(),
           };
         });
+        restoredIds.set(savedTab, savedTab.id);
+      } else if (savedTab.type === 'side-chat') {
+        this.insertSideChatTab(
+          savedTab.id,
+          savedTab.title,
+          savedTab.agentInstanceId,
+          savedTab.sideChatAgentInstanceId,
+        );
         restoredIds.set(savedTab, savedTab.id);
       } else if (savedTab.type === 'terminal') {
         this.uiKarton.setState((draft) => {

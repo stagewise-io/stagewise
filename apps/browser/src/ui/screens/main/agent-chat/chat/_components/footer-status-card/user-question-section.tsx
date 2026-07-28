@@ -297,7 +297,7 @@ function UserQuestionForm({
   /** Redirect focus to the chat input when Tab moves past the form. */
   const focusChatInput = useCallback(() => {
     formRef.current
-      ?.closest('#chat-input-container-box')
+      ?.closest('[data-chat-input-container]')
       ?.querySelector<HTMLElement>('[contenteditable]')
       ?.focus();
   }, []);

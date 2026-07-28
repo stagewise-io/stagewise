@@ -14,7 +14,7 @@ export function useEmptyAgentId() {
   const emptyAgentId = useKartonState((s) => {
     for (const [id, agent] of Object.entries(s.agents.instances)) {
       if (agent.type !== AgentTypes.CHAT) continue;
-      if (agent.parentAgentInstanceId) continue;
+      if (agent.parentAgentInstanceId || agent.sideChatParentId) continue;
       if (agent.state.history.length > 0) continue;
       const inputText = agent.state.inputState
         ? extractTipTapText(agent.state.inputState).trim()

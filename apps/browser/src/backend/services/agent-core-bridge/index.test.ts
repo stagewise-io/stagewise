@@ -1029,6 +1029,7 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
       },
       allowUserInput: true,
       parentAgentInstanceId: null,
+      sideChatParentId: null,
       state: baseState,
       ...overrides,
     };
