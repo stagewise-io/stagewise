@@ -910,6 +910,7 @@ export function AgentsList() {
       void forkAgent(sourceAgentId)
         .then((forkId) => {
           pendingScrollToCreatedAgentRef.current = forkId;
+          window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
           setOpenAgent(forkId);
           void setLastOpenAgentId(forkId);
         })
