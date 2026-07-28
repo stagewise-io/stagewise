@@ -305,9 +305,11 @@ export class AutoUpdateService extends DisposableService {
       'update-downloaded',
       (_event, releaseNotes, releaseName, releaseDate, updateURL) => {
         this.pendingUpdate = {
-          releaseName: this.downloadingUpdate?.releaseName || releaseName,
+          releaseName,
           releaseNotes:
-            this.downloadingUpdate?.releaseNotes || releaseNotes || undefined,
+            this.downloadingUpdate?.releaseName === releaseName
+              ? this.downloadingUpdate.releaseNotes || releaseNotes || undefined
+              : releaseNotes || undefined,
         };
         this.updateCheckInProgress = false;
         this.downloadingUpdate = null;
@@ -414,6 +416,7 @@ export class AutoUpdateService extends DisposableService {
     try {
       const response = await fetch(updateInfoURL, {
         headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (requestId !== this.updateCheckRequestId || this.disposed) return;
@@ -428,9 +431,13 @@ export class AutoUpdateService extends DisposableService {
       }
 
       const metadata = (await response.json()) as {
-        version: string;
+        version?: unknown;
         notes?: string;
       };
+      if (requestId !== this.updateCheckRequestId || this.disposed) return;
+      if (typeof metadata.version !== 'string' || !metadata.version) {
+        throw new Error('Update info response missing version');
+      }
 
       this.downloadingUpdate = {
         releaseName: metadata.version,
@@ -506,7 +513,7 @@ export class AutoUpdateService extends DisposableService {
         cancelId: 1,
         noLink: true,
       });
-      if (response !== 0) return;
+      if (response !== 0 || this.downloadingUpdate) return;
     }
 
     this.logger.debug(
