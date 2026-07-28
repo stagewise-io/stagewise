@@ -34,6 +34,7 @@ export { IconCopyIdOutline18 } from './IconCopyIdOutline18';
 export { IconCopyOutline18 } from './IconCopyOutline18';
 export { IconDatabaseSearchOutline18 } from './IconDatabaseSearchOutline18';
 export { IconDotsOutline18 } from './IconDotsOutline18';
+export { IconDownload4Outline18 } from './IconDownload4Outline18';
 export { IconEarthOutline18 } from './IconEarthOutline18';
 export { IconEarthSearchOutline18 } from './IconEarthSearchOutline18';
 export { IconEnvelopeOutline18 } from './IconEnvelopeOutline18';

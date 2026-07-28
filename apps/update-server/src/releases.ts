@@ -9,6 +9,8 @@ export interface AssetMatch {
   asset: GitHubAsset;
 }
 
+type UpdatePlatform = 'macos' | 'win';
+
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -55,6 +57,57 @@ function buildMacOSZipPattern(
 
   const pattern = `^${escapedAppName}(?:-[a-zA-Z0-9]+)?-darwin-${escapedArch}-${escapedVersion}\\.zip$`;
   return new RegExp(pattern, 'i');
+}
+
+function findMacOSUpdateAssetInRelease(
+  release: Release,
+  arch: string,
+): GitHubAsset | null {
+  const pattern = buildMacOSZipPattern(config.appName, release.version, arch);
+  return findAsset(release, pattern);
+}
+
+function findWindowsReleasesAsset(
+  release: Release,
+  arch: string,
+): GitHubAsset | null {
+  const releasesFileName = `RELEASES-win32-${arch}`;
+  const releasesAsset = release.assets.find(
+    (asset) => asset.name === releasesFileName,
+  );
+
+  if (!releasesAsset) return null;
+
+  const nupkgPattern = buildAssetPattern(
+    config.appName,
+    release.version,
+    arch,
+    '-full.nupkg',
+  );
+  return findAsset(release, nupkgPattern) ? releasesAsset : null;
+}
+
+export async function findUpdateRelease(
+  channel: Channel,
+  platform: UpdatePlatform,
+  arch: string,
+  currentVersion: string,
+): Promise<Release | null> {
+  const releases = await getReleases();
+
+  for (const release of releases) {
+    if (!matchesChannel(release.parsedVersion, channel)) continue;
+    if (!isNewerVersion(release.version, currentVersion)) continue;
+
+    const hasUpdateAsset =
+      platform === 'macos'
+        ? findMacOSUpdateAssetInRelease(release, arch) !== null
+        : findWindowsReleasesAsset(release, arch) !== null;
+
+    if (hasUpdateAsset) return release;
+  }
+
+  return null;
 }
 
 // Arch aliases: .deb uses "amd64" while .rpm uses "x86_64" for the same arch.
@@ -106,8 +159,7 @@ export async function findMacOSUpdateAsset(
 
     // Look for .zip file for macOS updates
     // Format: appName[-suffix]-darwin-arch-version.zip
-    const pattern = buildMacOSZipPattern(config.appName, release.version, arch);
-    const asset = findAsset(release, pattern);
+    const asset = findMacOSUpdateAssetInRelease(release, arch);
 
     if (asset) {
       return { release, asset };
@@ -176,24 +228,8 @@ export async function findWindowsUpdateAsset(
   for (const release of releases) {
     if (!matchesChannel(release.parsedVersion, channel)) continue;
 
-    // Look for RELEASES file
-    const releasesFileName = `RELEASES-win32-${arch}`;
-    const releasesAsset = release.assets.find(
-      (a) => a.name === releasesFileName,
-    );
-
+    const releasesAsset = findWindowsReleasesAsset(release, arch);
     if (!releasesAsset) continue;
-
-    // Also check that the nupkg file exists (raw extension)
-    const nupkgPattern = buildAssetPattern(
-      config.appName,
-      release.version,
-      arch,
-      '-full.nupkg',
-    );
-    const nupkgAsset = findAsset(release, nupkgPattern);
-
-    if (!nupkgAsset) continue;
 
     // Fetch and transform the RELEASES content
     try {

@@ -54,12 +54,13 @@ export function NotificationBanners() {
             </div>
           </div>
           {notification.actions.length > 0 && (
-            <div className="flex flex-row-reverse items-center gap-2">
+            <div className="flex flex-row-reverse flex-wrap items-center gap-2">
               {notification.actions.slice(0, 3).map((action, index) => (
                 <Button
                   key={action.label}
                   variant={index === 0 ? action.type : 'ghost'}
                   size="xs"
+                  className="whitespace-nowrap"
                   onClick={() => {
                     triggerAction(notification.id, index);
                     dismissNotification(notification.id);

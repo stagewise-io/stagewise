@@ -7,6 +7,7 @@ import {
 import { Logo } from '@ui/components/ui/logo';
 import { WebContentsBoundsSyncer } from '@ui/components/web-contents-bounds-syncer';
 import { TutorialOverlay } from '@ui/components/tutorial/tutorial-overlay';
+import { WhatsNewDialog } from '@ui/components/release-notes';
 
 // Lazy-load the heavy screen trees. Both `DefaultLayout` and `OnboardingWizard`
 // only render *after* the karton connection is established, yet importing them
@@ -73,6 +74,7 @@ export function ScreenRouter() {
         <Suspense fallback={<LoadingScreen reconnectState={reconnectState} />}>
           <DefaultLayout show />
           <WebContentsBoundsSyncer />
+          <WhatsNewDialog />
         </Suspense>
       ) : (
         <Suspense fallback={<LoadingScreen reconnectState={reconnectState} />}>

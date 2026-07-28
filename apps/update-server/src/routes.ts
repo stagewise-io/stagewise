@@ -8,6 +8,7 @@ import {
   findWindowsDownloadAsset,
   findLinuxDownloadAsset,
   findNupkgAsset,
+  findUpdateRelease,
 } from './releases.js';
 
 /**
@@ -67,6 +68,45 @@ function truncateNotes(notes: string, maxLength = 512): string {
   if (notes.length <= maxLength) return notes;
   return `${notes.slice(0, maxLength).trim()}...`;
 }
+
+// GET /update-info/:appName/:channel/:platform/:arch/:version
+router.get(
+  '/update-info/:appName/:channel/:platform/:arch/:version',
+  async (req: Request, res: Response) => {
+    const { appName, channel, platform, arch, version } = req.params;
+
+    if (appName !== config.appName) {
+      res.status(404).send('App not found');
+      return;
+    }
+
+    if (
+      !isValidChannel(channel) ||
+      (platform !== 'macos' && platform !== 'win')
+    ) {
+      res.status(400).send('Invalid update request');
+      return;
+    }
+
+    try {
+      const release = await findUpdateRelease(channel, platform, arch, version);
+
+      res.setHeader('Cache-Control', 'no-store');
+      if (!release) {
+        res.status(204).send();
+        return;
+      }
+
+      res.json({
+        version: release.version,
+        notes: release.notes,
+      });
+    } catch (error) {
+      console.error('Error in update info endpoint:', error);
+      res.status(500).send('Internal server error');
+    }
+  },
+);
 
 // macOS update endpoint
 // GET /update/:appName/:channel/macos/:arch/:version

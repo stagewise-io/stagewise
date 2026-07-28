@@ -7,8 +7,10 @@ import {
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
+import { LoaderCircleIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import {
+  IconDownload4Outline18,
   IconGear3Outline18,
   IconHotDrinkOutline18,
   IconOpenRectArrowInOutline18,
@@ -26,11 +28,16 @@ export function SidebarAuthFooter() {
   const toggleClosedLidSleep = useKartonProcedure(
     (p) => p.closedLidSleep.toggle,
   );
+  const quitAndInstall = useKartonProcedure((p) => p.autoUpdate.quitAndInstall);
 
   const appScreenMode = useKartonState((s) => s.appScreen.mode);
   const userAccount = useKartonState((s) => s.userAccount);
   const isMacOs = useKartonState((s) => s.appInfo.platform === 'darwin');
   const closedLidSleep = useKartonState((s) => s.closedLidSleep);
+  const updateStatus = useKartonState((s) => s.autoUpdate.status);
+  const updateVersion = useKartonState(
+    (s) => s.autoUpdate.updateInfo?.releaseName,
+  );
 
   const isAuthenticated =
     userAccount.status === 'authenticated' ||
@@ -39,6 +46,11 @@ export function SidebarAuthFooter() {
   const plan = userAccount.subscription?.plan;
   const avatarChar = email ? email[0]!.toUpperCase() : null;
   const isSettingsOpen = appScreenMode === 'settings';
+  const isUpdateReady = updateStatus === 'ready';
+  const updateVersionLabel = updateVersion ? ` ${updateVersion}` : '';
+  const updateLabel = isUpdateReady
+    ? `Update${updateVersionLabel} ready, restart and install`
+    : `Downloading update${updateVersionLabel}...`;
 
   const handleToggleSettings = useCallback(() => {
     if (isSettingsOpen) {
@@ -106,6 +118,30 @@ export function SidebarAuthFooter() {
         )}
 
         <div className="flex shrink-0 flex-row items-center gap-1">
+          {(updateStatus === 'downloading' || isUpdateReady) && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={updateLabel}
+                  aria-disabled={!isUpdateReady}
+                  className="app-no-drag shrink-0"
+                  onClick={
+                    isUpdateReady ? () => void quitAndInstall() : undefined
+                  }
+                >
+                  {isUpdateReady ? (
+                    <IconDownload4Outline18 className="size-4 text-primary-foreground" />
+                  ) : (
+                    <LoaderCircleIcon className="size-4 animate-spin text-primary-foreground" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{updateLabel}</TooltipContent>
+            </Tooltip>
+          )}
+
           {isMacOs && (
             <Tooltip>
               <TooltipTrigger>
