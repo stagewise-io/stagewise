@@ -32,6 +32,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
+import { ReleaseNotes } from '@ui/components/release-notes';
 
 enablePatches();
 
@@ -109,11 +110,16 @@ function AppUpdateStatus() {
     }
   };
 
+  const updateInfo = autoUpdate.updateInfo;
+
   return (
-    <div className="flex flex-col gap-2">
-      {autoUpdate.status === 'ready' && autoUpdate.updateInfo?.releaseName && (
+    <div className="flex flex-col gap-3">
+      {updateInfo?.releaseName && (
         <p className="text-muted-foreground text-sm">
-          Version {autoUpdate.updateInfo.releaseName} available
+          Update {updateInfo.releaseName}{' '}
+          {autoUpdate.status === 'downloading'
+            ? 'is downloading'
+            : 'is ready to install'}
         </p>
       )}
       {autoUpdate.status === 'error' && autoUpdate.errorMessage && (
@@ -122,6 +128,13 @@ function AppUpdateStatus() {
         </p>
       )}
       <div className="flex items-center gap-3">{renderButton()}</div>
+      {updateInfo?.releaseNotes && (
+        <div className="max-h-56 overflow-y-auto rounded-lg border border-derived-subtle bg-surface-1 p-3">
+          <ReleaseNotes className="text-xs">
+            {updateInfo.releaseNotes}
+          </ReleaseNotes>
+        </div>
+      )}
     </div>
   );
 }

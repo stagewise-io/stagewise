@@ -88,7 +88,7 @@ export function Sidebar() {
           >
             <AgentsList />
 
-            <div className="mt-8 flex shrink-0 flex-col gap-2">
+            <div className="mt-2 flex shrink-0 flex-col gap-2 empty:hidden">
               <SidebarExperienceSurvey />
               <NotificationBanners />
               <UsageWarningBadge />

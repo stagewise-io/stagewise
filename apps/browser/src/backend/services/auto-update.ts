@@ -10,7 +10,7 @@
  * Platform support: macOS and Windows only (Linux is not supported by Electron's autoUpdater)
  */
 
-import { autoUpdater } from 'electron';
+import { autoUpdater, dialog } from 'electron';
 import { DisposableService } from './disposable';
 import type { Logger } from './logger';
 import type { NotificationService } from './notification';
@@ -28,20 +28,22 @@ declare const __APP_VERSION__: string;
 declare const __APP_PLATFORM__: string;
 declare const __APP_ARCH__: string;
 
+type UpdateInfo = {
+  releaseName: string;
+  releaseNotes?: string;
+};
+
 export class AutoUpdateService extends DisposableService {
   private readonly logger: Logger;
   private readonly notificationService: NotificationService;
   private readonly telemetryService: TelemetryService;
   private readonly preferencesService: PreferencesService;
   private readonly uiKarton: KartonService;
-  private updateDownloaded = false;
+  private pendingUpdate: UpdateInfo | null = null;
+  private downloadingUpdate: UpdateInfo | null = null;
+  private updateCheckInProgress = false;
+  private updateCheckRequestId = 0;
   private updateNotificationId: string | null = null;
-  private updateInfo: {
-    releaseName?: string;
-    releaseNotes?: string;
-    releaseDate?: Date;
-    updateURL?: string;
-  } | null = null;
 
   // Check for updates every 30 minutes
   private readonly UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
@@ -103,20 +105,20 @@ export class AutoUpdateService extends DisposableService {
       return;
     }
 
-    // Don't run in dev builds - they shouldn't auto-update
     if (__APP_RELEASE_CHANNEL__ === 'dev') {
       this.logger.debug(
-        '[AutoUpdateService] Auto-updates disabled for dev builds, skipping initialization',
+        '[AutoUpdateService] Auto-updates disabled for dev builds',
       );
       this.setAutoUpdateState('unsupported');
       return;
     }
 
-    const feedURL = this.buildFeedURL();
+    const feedURL = this.buildUpdateURL('update');
     if (!feedURL) {
       this.logger.warn(
         '[AutoUpdateService] Could not build feed URL, auto-updates disabled',
       );
+      this.setAutoUpdateState('unsupported');
       return;
     }
 
@@ -155,26 +157,26 @@ export class AutoUpdateService extends DisposableService {
         }
       });
 
-      // Register Karton procedure handlers
-      this.uiKarton.registerServerProcedureHandler(
-        'autoUpdate.checkForUpdates',
-        async (_callingClientId: string) => {
-          this.checkForUpdates();
-        },
-      );
-      this.uiKarton.registerServerProcedureHandler(
-        'autoUpdate.quitAndInstall',
-        async (_callingClientId: string) => {
-          this.quitAndInstall();
-        },
-      );
+      this.registerProcedureHandlers();
     } catch (error) {
       this.logger.error(
         '[AutoUpdateService] Failed to initialize auto-updater',
         error,
       );
       this.report(error as Error, 'initialize');
+      this.setAutoUpdateState('unsupported');
     }
+  }
+
+  private registerProcedureHandlers(): void {
+    this.uiKarton.registerServerProcedureHandler(
+      'autoUpdate.checkForUpdates',
+      async () => this.checkForUpdates(),
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'autoUpdate.quitAndInstall',
+      async () => this.quitAndInstall(),
+    );
   }
 
   /**
@@ -182,7 +184,7 @@ export class AutoUpdateService extends DisposableService {
    * Re-configures the feed URL and triggers an immediate update check.
    */
   private onUpdateChannelChanged(): void {
-    const feedURL = this.buildFeedURL();
+    const feedURL = this.buildUpdateURL('update');
     if (!feedURL) {
       this.logger.warn(
         '[AutoUpdateService] Could not build feed URL after channel change',
@@ -197,22 +199,13 @@ export class AutoUpdateService extends DisposableService {
     try {
       autoUpdater.setFeedURL({ url: feedURL });
 
-      // Reset downloaded state so the guard in checkForUpdates() allows
-      // re-checking against the new channel's update feed.
-      this.dismissUpdateNotification();
-      this.updateDownloaded = false;
-      this.updateInfo = null;
-      this.setAutoUpdateState('idle');
-
-      // Re-start periodic checks if they were stopped after a previous download
-      if (!this.updateCheckIntervalId) {
-        this.updateCheckIntervalId = setInterval(() => {
-          if (!this.disposed) this.checkForUpdates();
-        }, this.UPDATE_CHECK_INTERVAL_MS);
+      // Let an active Electron download finish; otherwise restart the preflight
+      // against the new channel while preserving any installable update.
+      if (!this.downloadingUpdate) {
+        this.updateCheckRequestId += 1;
+        this.updateCheckInProgress = false;
+        this.checkForUpdates();
       }
-
-      // Trigger an immediate check with the new channel
-      this.checkForUpdates();
     } catch (error) {
       this.logger.error(
         '[AutoUpdateService] Failed to reconfigure feed URL after channel change',
@@ -267,7 +260,10 @@ export class AutoUpdateService extends DisposableService {
     }
   }
 
-  private buildFeedURL(): string | null {
+  private buildUpdateURL(
+    endpoint: 'update' | 'update-info',
+    version = __APP_VERSION__,
+  ): string | null {
     const updateServerOrigin = process.env.UPDATE_SERVER_ORIGIN;
 
     if (!updateServerOrigin) {
@@ -280,16 +276,13 @@ export class AutoUpdateService extends DisposableService {
     const platform = this.getPlatform();
     const arch = this.getArch();
     const channel = this.getReleaseChannel();
-    const version = __APP_VERSION__;
-
-    // Format: ${UPDATE_SERVER_ORIGIN}/update/stagewise/${RELEASE_CHANNEL}/${PLATFORM}/${ARCH}/${CURRENT_APP_VERSION}
-    const feedURL = `${updateServerOrigin}/update/stagewise/${channel}/${platform}/${arch}/${version}`;
+    const url = `${updateServerOrigin}/${endpoint}/stagewise/${channel}/${platform}/${arch}/${version}`;
 
     this.logger.debug(
-      `[AutoUpdateService] Built feed URL: ${feedURL} (platform: ${platform}, arch: ${arch}, channel: ${channel}, version: ${version})`,
+      `[AutoUpdateService] Built ${endpoint} URL: ${url} (platform: ${platform}, arch: ${arch}, channel: ${channel}, version: ${version})`,
     );
 
-    return feedURL;
+    return url;
   }
 
   private setupEventHandlers(): void {
@@ -298,73 +291,39 @@ export class AutoUpdateService extends DisposableService {
       this.logger.debug(`[AutoUpdateService] Error message: ${error.message}`);
       this.logger.debug(`[AutoUpdateService] Error stack: ${error.stack}`);
       this.report(error, 'autoUpdaterError');
-
-      // Keep the ready-to-install update visible.
-      if (this.updateDownloaded) return;
-
-      this.dismissUpdateNotification();
-      this.setAutoUpdateState('error', null, error.message);
-    });
-
-    autoUpdater.on('checking-for-update', () => {
-      this.logger.debug('[AutoUpdateService] Checking for updates...');
-      this.setAutoUpdateState('checking');
-    });
-
-    autoUpdater.on('update-available', () => {
-      this.logger.debug(
-        '[AutoUpdateService] Update available, download starting automatically',
-      );
-      this.dismissUpdateNotification();
-      this.updateNotificationId = this.notificationService.showNotification({
-        title: 'Update Available',
-        message: 'A new version is being downloaded.',
-        type: 'info',
-        icon: 'spinner',
-        actions: [],
-      });
-      this.setAutoUpdateState('downloading');
+      this.finishFailedUpdateAttempt('error', error.message);
     });
 
     autoUpdater.on('update-not-available', () => {
       this.logger.debug(
         '[AutoUpdateService] No update available, app is up to date',
       );
-      this.dismissUpdateNotification();
-      this.setAutoUpdateState('not-available');
+      this.finishFailedUpdateAttempt('not-available');
     });
 
     autoUpdater.on(
       'update-downloaded',
       (_event, releaseNotes, releaseName, releaseDate, updateURL) => {
-        this.updateDownloaded = true;
-        this.updateInfo = {
-          releaseName,
-          releaseNotes,
-          releaseDate,
-          updateURL,
+        this.pendingUpdate = {
+          releaseName: this.downloadingUpdate?.releaseName || releaseName,
+          releaseNotes:
+            this.downloadingUpdate?.releaseNotes || releaseNotes || undefined,
         };
+        this.updateCheckInProgress = false;
+        this.downloadingUpdate = null;
 
         this.logger.debug('[AutoUpdateService] Update downloaded successfully');
-        this.logger.debug(`[AutoUpdateService] Release name: ${releaseName}`);
-        this.logger.debug(`[AutoUpdateService] Release notes: ${releaseNotes}`);
+        this.logger.debug(
+          `[AutoUpdateService] Release name: ${this.pendingUpdate.releaseName}`,
+        );
+        this.logger.debug(
+          `[AutoUpdateService] Release notes: ${this.pendingUpdate.releaseNotes}`,
+        );
         this.logger.debug(`[AutoUpdateService] Release date: ${releaseDate}`);
         this.logger.debug(`[AutoUpdateService] Update URL: ${updateURL}`);
 
-        // Stop periodic checks — no need to re-check once an update is ready
-        if (this.updateCheckIntervalId) {
-          clearInterval(this.updateCheckIntervalId);
-          this.updateCheckIntervalId = null;
-        }
-
-        // Show notification to user
-        this.showUpdateReadyNotification(releaseName);
-
-        // Sync state to UI
-        this.setAutoUpdateState('ready', {
-          releaseName,
-          releaseNotes,
-        });
+        this.showUpdateNotification(true, this.pendingUpdate);
+        this.setAutoUpdateState('ready', this.pendingUpdate);
       },
     );
 
@@ -382,35 +341,117 @@ export class AutoUpdateService extends DisposableService {
     this.updateNotificationId = null;
   }
 
-  private showUpdateReadyNotification(releaseName: string): void {
-    const versionDisplay = releaseName || 'a new version';
+  private showUpdateNotification(ready: boolean, update: UpdateInfo): void {
+    const viewChangelogAction = {
+      label: 'View Changelog',
+      type: 'secondary' as const,
+      onClick: () => {
+        this.uiKarton.setState((draft) => {
+          draft.appScreen.mode = 'settings';
+          draft.appScreen.settingsRoute = { section: 'about' };
+        });
+      },
+    };
 
-    // Dismiss any previous update notification before showing a new one
     this.dismissUpdateNotification();
-
     this.updateNotificationId = this.notificationService.showNotification({
-      title: 'Update Ready',
-      message: `${versionDisplay} has been downloaded and is ready to install.`,
+      title: ready
+        ? `Update ${update.releaseName} is ready`
+        : `Update ${update.releaseName} is available`,
+      message: ready
+        ? 'Downloaded and ready to install.'
+        : 'Downloading in the background.',
       type: 'info',
-      actions: [
-        {
-          label: 'Restart & Install Now',
-          type: 'primary',
-          onClick: () => {
-            this.quitAndInstall();
-          },
-        },
-        {
-          label: 'Later',
-          type: 'secondary',
-          onClick: () => {
-            this.logger.debug(
-              '[AutoUpdateService] User chose to install update later',
-            );
-          },
-        },
-      ],
+      icon: ready ? undefined : 'spinner',
+      actions: ready
+        ? [
+            {
+              label: 'Restart & Install Now',
+              type: 'primary',
+              onClick: () => void this.quitAndInstall(),
+            },
+            viewChangelogAction,
+          ]
+        : [viewChangelogAction],
     });
+  }
+
+  private finishFailedUpdateAttempt(
+    fallbackStatus: 'not-available' | 'error',
+    errorMessage?: string,
+  ): void {
+    const replacementDownloadStarted = Boolean(this.downloadingUpdate);
+    this.updateCheckInProgress = false;
+    this.downloadingUpdate = null;
+
+    if (this.pendingUpdate) {
+      if (replacementDownloadStarted) {
+        this.showUpdateNotification(true, this.pendingUpdate);
+        this.setAutoUpdateState('ready', this.pendingUpdate);
+      }
+      return;
+    }
+
+    this.dismissUpdateNotification();
+    this.setAutoUpdateState(fallbackStatus, null, errorMessage);
+  }
+
+  // Preflight because Electron downloads immediately from checkForUpdates().
+  private async checkForNewerVersion(): Promise<void> {
+    const currentVersion = this.pendingUpdate?.releaseName ?? __APP_VERSION__;
+    const updateInfoURL = this.buildUpdateURL('update-info', currentVersion);
+    if (!updateInfoURL) {
+      this.logger.warn(
+        '[AutoUpdateService] Could not build update info URL, skipping check',
+      );
+      return;
+    }
+
+    const requestId = ++this.updateCheckRequestId;
+    this.updateCheckInProgress = true;
+    if (!this.pendingUpdate) this.setAutoUpdateState('checking', null);
+
+    try {
+      const response = await fetch(updateInfoURL, {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (requestId !== this.updateCheckRequestId || this.disposed) return;
+      if (response.status === 204) {
+        this.finishFailedUpdateAttempt('not-available');
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(
+          `Update info request failed: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const metadata = (await response.json()) as {
+        version: string;
+        notes?: string;
+      };
+
+      this.downloadingUpdate = {
+        releaseName: metadata.version,
+        releaseNotes: metadata.notes,
+      };
+
+      this.logger.debug(
+        `[AutoUpdateService] Newer version ${metadata.version} found, starting Electron updater`,
+      );
+      this.showUpdateNotification(false, this.downloadingUpdate);
+      this.setAutoUpdateState('downloading', this.downloadingUpdate);
+      autoUpdater.checkForUpdates();
+    } catch (error) {
+      if (requestId !== this.updateCheckRequestId || this.disposed) return;
+      this.logger.error(
+        '[AutoUpdateService] Error checking update metadata:',
+        error,
+      );
+      this.report(error as Error, 'checkUpdateMetadata', { currentVersion });
+      this.finishFailedUpdateAttempt('error', (error as Error).message);
+    }
   }
 
   /**
@@ -419,64 +460,59 @@ export class AutoUpdateService extends DisposableService {
   public checkForUpdates(): void {
     this.assertNotDisposed();
 
-    if (this.updateDownloaded) {
+    if (this.updateCheckInProgress) {
       this.logger.debug(
-        '[AutoUpdateService] Skipping update check - update already downloaded and ready to install',
-      );
-      return;
-    }
-
-    const platform = this.getPlatform();
-    if (platform !== 'macos' && platform !== 'win') {
-      this.logger.debug(
-        '[AutoUpdateService] Cannot check for updates on unsupported platform',
+        '[AutoUpdateService] Skipping update check - another check is in progress',
       );
       return;
     }
 
     this.logger.debug('[AutoUpdateService] Manually triggering update check');
-    try {
-      autoUpdater.checkForUpdates();
-    } catch (error) {
-      this.logger.error(
-        '[AutoUpdateService] Error checking for updates:',
-        error,
-      );
-      this.report(error as Error, 'checkForUpdates');
-    }
+    void this.checkForNewerVersion();
   }
 
   /**
    * Quit the app and install the downloaded update
    */
-  public quitAndInstall(): void {
+  public async quitAndInstall(): Promise<void> {
     this.assertNotDisposed();
 
-    if (!this.updateDownloaded) {
+    if (!this.pendingUpdate) {
       this.logger.warn(
         '[AutoUpdateService] Cannot quit and install - no update has been downloaded',
       );
       return;
     }
 
+    if (this.downloadingUpdate) {
+      this.logger.warn(
+        '[AutoUpdateService] Cannot install while a newer update is downloading',
+      );
+      return;
+    }
+
+    const hasWorkingAgents = Object.values(
+      this.uiKarton.state.agents.instances,
+    ).some((agent) => agent.state.isWorking);
+
+    if (hasWorkingAgents) {
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Install Update',
+        message: 'Agents are still working',
+        detail: 'Restarting now will stop them. Install the update anyway?',
+        buttons: ['Restart & Install', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (response !== 0) return;
+    }
+
     this.logger.debug(
       '[AutoUpdateService] Quitting app and installing update...',
     );
     autoUpdater.quitAndInstall();
-  }
-
-  /**
-   * Check if an update has been downloaded and is ready to install
-   */
-  public isUpdateReady(): boolean {
-    return this.updateDownloaded;
-  }
-
-  /**
-   * Get information about the downloaded update
-   */
-  public getUpdateInfo(): typeof this.updateInfo {
-    return this.updateInfo;
   }
 
   /**
@@ -491,7 +527,7 @@ export class AutoUpdateService extends DisposableService {
       | 'not-available'
       | 'error'
       | 'unsupported',
-    updateInfo?: { releaseName?: string; releaseNotes?: string } | null,
+    updateInfo?: UpdateInfo | null,
     errorMessage?: string | null,
   ): void {
     this.uiKarton.setState((draft) => {
@@ -504,6 +540,7 @@ export class AutoUpdateService extends DisposableService {
   }
 
   protected onTeardown(): void {
+    this.updateCheckRequestId += 1;
     if (this.updateCheckIntervalId) {
       clearInterval(this.updateCheckIntervalId);
       this.updateCheckIntervalId = null;

@@ -83,6 +83,24 @@ The update response should look like this:
 - `notes`: The release notes of the release (max. first 512 chracters)
 - `pub_date`: The timestamp of the release (formatted like in the example)
 
+## Update metadata endpoint handling
+
+The metadata endpoint lets the application avoid downloading the same pending
+update again and show release notes while a newer update downloads.
+
+`GET /update-info/:appName/:channel/:platform/:arch/:version`
+
+When a newer release with compatible update assets exists, return:
+
+```json
+{
+  "version": "1.2.3",
+  "notes": "Release notes in Markdown"
+}
+```
+
+If no compatible newer update exists, respond with HTTP 204 (No Content).
+
 ## Windows update endpoint handling
 
 The update endpoint for Windows should offer the latest update for the given arch, channel and version. If there is no release at all available for the given arch, respond with an rempty response.
