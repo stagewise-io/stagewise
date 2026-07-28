@@ -27,6 +27,7 @@ import { renderBrowserExtraMention } from '@/agents/shared/base-agent/utils';
 
 const AGENT_RPC_COMMANDS = [
   'agents.create',
+  'agents.fork',
   'agents.createSideChat',
   'agents.promoteSideChat',
   'agents.discardSideChat',

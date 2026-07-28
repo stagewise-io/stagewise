@@ -319,3 +319,48 @@ describe('AgentManager agents.create handler', () => {
     await manager.teardown();
   });
 });
+
+describe('AgentManager agents.fork handler', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('resumes the source and promotes a titled side-chat clone', async () => {
+    const deps = createDeps();
+    const sourceEnvelope = {
+      type: AgentTypes.CHAT,
+      sideChatParentId: null,
+      state: { title: 'Original chat' },
+    };
+    deps.agentStore.get.mockReturnValue({
+      agents: { instances: { source: sourceEnvelope } },
+      toolbox: {},
+    });
+    const manager = buildManager(deps);
+    const resumeSpy = vi
+      .spyOn(manager, 'resumeAgent')
+      .mockResolvedValue({} as any);
+    const createSideChatSpy = vi
+      .spyOn(manager as any, 'createSideChat')
+      .mockResolvedValue('fork-1');
+    const promoteSpy = vi
+      .spyOn(manager as any, 'promoteSideChat')
+      .mockResolvedValue(undefined);
+
+    const forkId = await deps.registry.dispatch<unknown[], string>(
+      'agents.fork',
+      { callerId: 'test' },
+      ['source'],
+    );
+
+    expect(forkId).toBe('fork-1');
+    expect(resumeSpy).toHaveBeenCalledWith('source');
+    expect(createSideChatSpy).toHaveBeenCalledWith('source', {
+      title: 'Fork: Original chat',
+      titleLockedByUser: true,
+    });
+    expect(promoteSpy).toHaveBeenCalledWith('fork-1');
+
+    await manager.teardown();
+  });
+});

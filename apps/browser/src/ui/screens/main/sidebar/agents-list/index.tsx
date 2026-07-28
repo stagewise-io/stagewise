@@ -78,6 +78,7 @@ import type {
   ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { toast } from '@stagewise/stage-ui/components/toaster';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import {
   Tooltip,
@@ -685,6 +686,7 @@ export function AgentsList() {
   const [openAgent, setOpenAgent] = useOpenAgent();
   const { previewAgentId } = useAgentSwitcher();
   const createAgent = useKartonProcedure((p) => p.agents.create);
+  const forkAgent = useKartonProcedure((p) => p.agents.fork);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const setLastOpenAgentId = useKartonProcedure(
     (p) => p.browser.setLastOpenAgentId,
@@ -892,6 +894,27 @@ export function AgentsList() {
   }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent, track]);
 
   const pendingScrollToCreatedAgentRef = useRef<string | null>(null);
+
+  const handleFork = useCallback(
+    (sourceAgentId: string) => {
+      void forkAgent(sourceAgentId)
+        .then((forkId) => {
+          pendingScrollToCreatedAgentRef.current = forkId;
+          setOpenAgent(forkId);
+          void setLastOpenAgentId(forkId);
+        })
+        .catch((error) => {
+          toast({
+            id: `agent-fork-error-${sourceAgentId}`,
+            title: 'Could not fork chat',
+            message: error instanceof Error ? error.message : String(error),
+            type: 'error',
+            actions: [],
+          });
+        });
+    },
+    [forkAgent, setLastOpenAgentId, setOpenAgent],
+  );
 
   const handleOpenWorkspaceInFileManager = useCallback(
     (workspacePath: string) => {
@@ -2529,6 +2552,7 @@ export function AgentsList() {
       <SharedAgentContextMenuHost
         target={ctxMenuTarget}
         onClose={handleCtxMenuClose}
+        onForkRequest={handleFork}
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover
