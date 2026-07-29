@@ -65,7 +65,10 @@ import { normalizePath } from '@shared/path-utils';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
-import { useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useNextAgentRequiringAttention } from '@ui/hooks/use-next-agent-requiring-attention';
+import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
+import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
 import { useContentCollapsed } from '../../../_components/content-collapsed-context';
 import { getAvailableModel } from '@shared/available-models';
 import {
@@ -87,11 +90,16 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import { Button } from '@stagewise/stage-ui/components/button';
 import { toast } from '@stagewise/stage-ui/components/toaster';
-import { IconArrowUpRightOutline18 } from '@stagewise/icons';
 import {
   getPromptHistoryStep,
   type PromptHistoryDirection,
 } from './prompt-history';
+import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { AgentStatusDot } from '../../../_components/agent-status-dot';
+import {
+  IconArrowRightOutline18,
+  IconArrowUpRightOutline18,
+} from '@stagewise/icons';
 import { useOpenSideChat } from '@ui/hooks/use-open-side-chat';
 
 // Stable empty arrays to avoid new-reference re-renders
@@ -208,6 +216,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [registerDraftGetter]);
 
   const [openAgent, setOpenAgent] = useOpenAgent();
+  const { focusAgentFromHotkey } = useAgentSwitcher();
+  const nextAttentionTarget = useNextAgentRequiringAttention(openAgent);
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const { collapsed: contentCollapsed } = useContentCollapsed();
   const sideChatParentId = useKartonState((s) =>
@@ -1155,6 +1165,22 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
     setFileAttachments,
   ]);
 
+  const handleNextAttentionAgentClick = () => {
+    if (!nextAttentionTarget) return;
+
+    focusAgentFromHotkey(nextAttentionTarget.id);
+    void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
+  };
+  const canUseNextAttention =
+    isActiveChatSurface && !sideChatParentId && !!nextAttentionTarget;
+  const { setRef: nextAttentionRef, isWinner: nextAttentionIsCmdEnterWinner } =
+    useCmdEnterTarget({
+      id: 'next-attention-chat',
+      priority: CmdEnterPriority.NEXT_ATTENTION_CHAT,
+      action: handleNextAttentionAgentClick,
+      enabled: canUseNextAttention,
+    });
+
   // Quantize to nearest 1 000 tokens so the value only changes when
   // crossing a 1K boundary — prevents ChatInput memo-busting on every
   // streaming chunk.
@@ -1956,7 +1982,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             onWorkspaceActionConfigChange={handleWorkspaceActionConfigChange}
           />
         </div>
-        {sideChatTabId && (
+        {sideChatTabId ? (
           <Button
             variant="ghost"
             size="xs"
@@ -1967,7 +1993,36 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
             <IconArrowUpRightOutline18 className="size-3.5" />
             Keep as main chat
           </Button>
-        )}
+        ) : canUseNextAttention && nextAttentionTarget ? (
+          <div className="flex shrink-0 items-center">
+            {nextAttentionIsCmdEnterWinner ? (
+              <HotkeyCombo
+                action={HotkeyActions.CMD_ENTER}
+                size="xs"
+                className="shrink-0 text-muted-foreground"
+              />
+            ) : null}
+            <Button
+              ref={nextAttentionRef}
+              variant="ghost"
+              size="xs"
+              className="max-w-64 shrink-0 text-muted-foreground"
+              onClick={handleNextAttentionAgentClick}
+              aria-label={`Open ${nextAttentionTarget.title}, another chat that needs your attention`}
+            >
+              <span className="shrink-0 text-muted-foreground/50">
+                Next Chat:
+              </span>
+              <span className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125">
+                <AgentStatusDot severity={nextAttentionTarget.status} />
+              </span>
+              <span className="min-w-0 truncate">
+                {nextAttentionTarget.title}
+              </span>
+              <IconArrowRightOutline18 className="size-3 shrink-0" />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </footer>
   );

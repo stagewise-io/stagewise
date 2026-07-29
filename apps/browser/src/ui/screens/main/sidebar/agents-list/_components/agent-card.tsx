@@ -10,6 +10,8 @@ import {
   type SharedAgentContextMenuState,
   buildAgentContextMenuHandler,
 } from '../../../_components/shared-agent-context-menu';
+import { AgentStatusDot } from '../../../_components/agent-status-dot';
+import { getAgentStateSeverity } from '../../../_lib/agent-list-model';
 import {
   IconPinTackOutline18,
   IconPinTackSlashOutline18,
@@ -106,6 +108,12 @@ export const AgentCard = memo(
       commitEdit,
       cancelEdit,
     } = useInlineTitleEdit({ title, onCommit: handleCommitRename });
+    const severity = getAgentStateSeverity({
+      hasError,
+      isWaitingForUser,
+      isWorking,
+      unread: hasUnseen,
+    });
 
     return (
       <div
@@ -154,77 +162,51 @@ export const AgentCard = memo(
           isActive && 'bg-foreground/5 text-foreground',
         )}
       >
-        {(() => {
-          // Priority: error > waitingForUser > working > unseen > idle
-          const dotColor = hasError
-            ? 'bg-error-solid'
-            : isWaitingForUser
-              ? 'bg-warning-solid'
-              : isWorking
-                ? 'bg-primary-solid'
-                : hasUnseen
-                  ? 'bg-success-solid'
-                  : null;
-          return (
-            <div
-              data-tutorial="agent-status-indicator"
-              className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125"
-            >
-              {dotColor ? (
-                <div
-                  data-tutorial="agent-status-dot"
-                  className={cn(
-                    'relative size-2 shrink-0 transition-opacity',
-                    onTogglePinned && 'group-hover/card:opacity-0',
-                  )}
-                >
-                  <div className={cn('size-full rounded-full', dotColor)} />
-                  <div
+        <div
+          data-tutorial="agent-status-indicator"
+          className="relative flex size-4 shrink-0 items-center justify-center dark:brightness-125"
+        >
+          <AgentStatusDot
+            severity={severity}
+            data-tutorial="agent-status-dot"
+            className={cn(onTogglePinned && 'group-hover/card:opacity-0')}
+          />
+          {onTogglePinned ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    data-no-dnd="true"
+                    aria-label={isPinned ? 'Unpin' : 'Pin globally'}
                     className={cn(
-                      'absolute inset-0 size-full animate-ping rounded-full',
-                      dotColor,
+                      'absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm',
+                      'text-muted-foreground/60 opacity-0 outline-none transition-[color,opacity]',
+                      'hover:text-foreground focus-visible:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100',
                     )}
-                  />
-                </div>
-              ) : null}
-              {onTogglePinned ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        data-no-dnd="true"
-                        aria-label={isPinned ? 'Unpin' : 'Pin globally'}
-                        className={cn(
-                          'absolute inset-0 flex cursor-pointer items-center justify-center rounded-sm',
-                          'text-muted-foreground/60 opacity-0 outline-none transition-[color,opacity]',
-                          'hover:text-foreground focus-visible:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100',
-                        )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onTogglePinned(id);
-                        }}
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        {isPinned ? (
-                          <IconPinTackSlashOutline18 className="size-3.5" />
-                        ) : (
-                          <IconPinTackOutline18 className="size-3.5" />
-                        )}
-                      </button>
-                    }
-                  />
-                  <TooltipContent side="bottom">
-                    {isPinned ? 'Unpin' : 'Pin globally'}
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-            </div>
-          );
-        })()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onTogglePinned(id);
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    {isPinned ? (
+                      <IconPinTackSlashOutline18 className="size-3.5" />
+                    ) : (
+                      <IconPinTackOutline18 className="size-3.5" />
+                    )}
+                  </button>
+                }
+              />
+              <TooltipContent side="bottom">
+                {isPinned ? 'Unpin' : 'Pin globally'}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
         <div className="mask-alpha mask-l-from-black mask-l-to-black group-hover/card:mask-l-from-transparent mask-l-from-12 mask-l-to-18 min-w-0 flex-1">
           {isEditing ? (
             <span
