@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.26.0 (2026-07-29)
+
+### Features
+
+* improve auto-update flow and release notes (3a75997)
+* add device emulation toolbar (5a3d1da)
+* add terminals to command center (59c9fb2)
+* add side chats (add04fa)
+* append active preset models as fallbacks for utility tasks (cb38225)
+* add model presets and user-configurable utility models (6f497f0)
+
+### Bug Fixes
+
+* address auto-update review feedback (b6726e5)
+* stop event propagation on queue dropdown send now button (e370b92)
+* account for emulation scale in element screenshots (4f24067)
+* refine device emulation toolbar (7f60604)
+* select terminal before switching agents (676ece3)
+* sort inference models last (c34c56a)
+* fix chat input hitbox around stop button (57008a6)
+* sync promoted side chat as active agent (55a2579)
+* align history-compression tests with post-rebase signature and model list (50f4f47)
+* resolve preset clear race and disable thinking hotkey for active presets (3ae6e37)
+* address second round of PR review findings (57d861a)
+* resolve type errors and syntax issues in model presets (ee3490f)
+
 ## 1.25.0 (2026-07-25)
 
 ### Features
