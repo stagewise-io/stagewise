@@ -3121,6 +3121,7 @@ export class WindowLayoutService extends DisposableService {
     );
     if (!state || state.tabs.length === 0) return;
 
+    const lastOpenAgentId = state.lastOpenAgentId;
     const previouslyActiveTab = state.tabs[state.activeTabIndex];
     state.tabs = state.tabs.filter(
       (tab) =>
@@ -3133,11 +3134,10 @@ export class WindowLayoutService extends DisposableService {
     state.activeTabIndex =
       restoredActiveIndex >= 0
         ? restoredActiveIndex
-        : state.tabs.length > 0
-          ? 0
-          : -1;
-
-    const lastOpenAgentId = state.lastOpenAgentId;
+        : state.tabs.findIndex(
+            (tab) =>
+              !tab.agentInstanceId || tab.agentInstanceId === lastOpenAgentId,
+          );
 
     this.logger.debug(
       `[WindowLayoutService] Restoring tabs (lastOpenAgentId=${lastOpenAgentId})`,
