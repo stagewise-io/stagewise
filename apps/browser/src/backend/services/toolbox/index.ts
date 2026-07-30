@@ -13,8 +13,10 @@ import {
   ShellService,
   type DetectedShell,
   type SmartApprovalDeps,
+  type WatcherEvent,
   executeShellCommand as executeShellCommandTool,
   createShellSession as createShellSessionTool,
+  createWatcherSession as createWatcherSessionTool,
 } from '@stagewise/agent-shell';
 import { createKartonShellStreamSink } from './services/shell/karton-stream-sink';
 import { classifyShellCommand } from './tools/shell/smart-approval';
@@ -158,7 +160,6 @@ export class ToolboxService
         agentId: string,
       ) => void | Promise<void>)
     | null = null;
-
   /** Cached API client - recreated when auth changes */
   private apiClient: ApiClient | null = null;
 
@@ -372,6 +373,12 @@ export class ToolboxService
     this.notificationEventHandler = handler;
   }
 
+  public setWatcherEventHandler(
+    handler: (event: WatcherEvent) => void | Promise<void>,
+  ): void {
+    this.shellService?.setWatcherEventHandler(handler);
+  }
+
   public setWorkspaceLastUsedAtResolver(
     resolver: (workspacePaths: string[]) => Promise<Map<string, number>>,
   ): void {
@@ -578,6 +585,36 @@ export class ToolboxService
       this.uiKarton.state.agents.instances[agentInstanceId]?.state
         .toolApprovalMode ?? DEFAULT_TOOL_APPROVAL_MODE;
 
+    const smartApproval: SmartApprovalDeps = {
+      classify: (input) =>
+        classifyShellCommand(
+          input,
+          {
+            getModelWithOptions: (modelId, traceId, props) => {
+              if (!this.modelProviderService) {
+                throw new Error(
+                  'ModelProviderService not yet initialized; smart-approval classification unavailable.',
+                );
+              }
+              return this.modelProviderService.getModelWithOptions(
+                modelId,
+                traceId,
+                props,
+              );
+            },
+          },
+          agentInstanceId,
+          this.telemetryService,
+        ),
+      recordPendingApproval: (toolCallId, explanation) => {
+        this.hostAgentStateMutations.recordPendingApproval(
+          agentInstanceId,
+          toolCallId,
+          explanation,
+        );
+      },
+    };
+
     switch (tool) {
       case 'write':
       case 'read':
@@ -626,45 +663,18 @@ export class ToolboxService
           this.getMountedPathsForAgent(agentInstanceId),
         );
       }
+      case 'createWatcherSession': {
+        if (!this.shellService?.isAvailable()) return null;
+        return createWatcherSessionTool(
+          this.shellService,
+          agentInstanceId,
+          getToolApprovalMode,
+          () => this.getMountedPathsForAgent(agentInstanceId),
+          smartApproval,
+        );
+      }
       case 'executeShellCommand': {
         if (!this.shellService?.isAvailable()) return null;
-        const smartApproval: SmartApprovalDeps = {
-          // The classifier lives in the browser host (model provider +
-          // telemetry); the package only calls `classify`. Use a thin
-          // forwarding shim so a late `setModelProviderService` call is
-          // still honored (closure captures `this`, not the possibly-null
-          // field at case-match time).
-          classify: (input) =>
-            classifyShellCommand(
-              input,
-              {
-                getModelWithOptions: (modelId, traceId, props) => {
-                  if (!this.modelProviderService) {
-                    throw new Error(
-                      'ModelProviderService not yet initialized; smart-approval classification unavailable.',
-                    );
-                  }
-                  return this.modelProviderService.getModelWithOptions(
-                    modelId,
-                    traceId,
-                    props,
-                  );
-                },
-              },
-              agentInstanceId,
-              this.telemetryService,
-            ),
-          recordPendingApproval: (toolCallId, explanation) => {
-            // Legacy field name: this is smart-approval explanation metadata,
-            // not the canonical approval-pending state. The canonical state
-            // is the assistant tool part with state === 'approval-requested'.
-            this.hostAgentStateMutations.recordPendingApproval(
-              agentInstanceId,
-              toolCallId,
-              explanation,
-            );
-          },
-        };
         return executeShellCommandTool(
           this.shellService,
           agentInstanceId,
@@ -1514,7 +1524,6 @@ export class ToolboxService
       this.detectedShell,
       resolvedEnv,
     );
-
     // Create TerminalService for user-controllable terminal tabs.
     // Requires a detected shell — if no shell is available, terminal
     // creation will silently fail (procedure handler not registered).

@@ -60,6 +60,7 @@ const CHAT_INPUT_PAGE_SCROLL_FACTOR = 0.6;
 const CHAT_INPUT_PAGE_SCROLL_MIN = 120;
 const SLASH_CYCLE_BUILTIN_IDS = new Set([
   'command:plan',
+  'command:watch',
   'command:preview',
   'command:debug',
   'command:learn',

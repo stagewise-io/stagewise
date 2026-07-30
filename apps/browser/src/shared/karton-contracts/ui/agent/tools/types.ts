@@ -420,6 +420,9 @@ export {
   createShellSessionToolInputSchema,
   createShellSessionToolOutputSchema,
   createShellSessionToolSchema,
+  createWatcherSessionToolInputSchema,
+  createWatcherSessionToolOutputSchema,
+  createWatcherSessionToolSchema,
   executeShellCommandToolInputSchema,
   executeShellCommandToolOutputSchema,
   executeShellCommandToolSchema,
@@ -427,6 +430,8 @@ export {
 export type {
   CreateShellSessionToolInput,
   CreateShellSessionToolOutput,
+  CreateWatcherSessionToolInput,
+  CreateWatcherSessionToolOutput,
   ExecuteShellCommandToolInput,
   ExecuteShellCommandToolOutput,
 } from '@stagewise/agent-shell/schemas';
@@ -434,6 +439,7 @@ export type {
 // reference them in local module scope.
 import {
   createShellSessionToolSchema,
+  createWatcherSessionToolSchema,
   executeShellCommandToolSchema,
 } from '@stagewise/agent-shell/schemas';
 
@@ -446,6 +452,7 @@ export const allToolSchemas = {
   searchInLibraryDocs: searchInLibraryDocsToolSchema,
   askUserQuestions: askUserQuestionsToolSchema,
   createShellSession: createShellSessionToolSchema,
+  createWatcherSession: createWatcherSessionToolSchema,
   executeShellCommand: executeShellCommandToolSchema,
 } as const;
 

@@ -24,6 +24,17 @@ export type ShellSessionSummary = {
   lastLine?: string;
   cwd: string;
   createdAt: number;
+  watcher?: {
+    title: string;
+    description?: string;
+    command: string;
+    startedAt: number;
+    expiresAt: number;
+  };
+  watcherResult?: {
+    outcome: 'triggered' | 'timed_out' | 'failed';
+    finishedAt: number;
+  };
 };
 
 /**

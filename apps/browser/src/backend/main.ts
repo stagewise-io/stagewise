@@ -548,9 +548,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // Display order for builtin slash commands (unlisted ones sort last).
   const BUILTIN_ORDER: Record<string, number> = {
     plan: 0,
-    debug: 1,
-    preview: 2,
-    learn: 3,
+    watch: 1,
+    debug: 2,
+    preview: 3,
+    learn: 4,
   };
 
   discoverSkills(getBuiltinSkillsPath()).then((skills: Skill[]) => {
@@ -649,6 +650,10 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         (workspacePath) => gitService.getMountedWorkspaceSummary(workspacePath),
         logger,
       ),
+  );
+
+  toolboxService.setWatcherEventHandler((event) =>
+    agentManagerService.handleWatcherEvent(event),
   );
 
   toolboxService.setWorkspaceLastUsedAtResolver(
