@@ -51,6 +51,14 @@ import { TurnFileEdits, useTurnFileEdits } from './turn-file-edits';
 
 type AssistantMessage = AgentMessage & { role: 'assistant' };
 
+const summarizedFileToolTypes = new Set([
+  'tool-copy',
+  'tool-mkdir',
+  'tool-delete',
+  'tool-multiEdit',
+  'tool-write',
+]);
+
 /**
  * Fast deep equality optimised for streaming tool parts.
  * Short-circuits on string-length differences (O(1) for growing content)
@@ -384,6 +392,8 @@ export const MessageAssistant = memo(
                   const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
                   if (
                     isToolPart(part) &&
+                    part.state === 'output-available' &&
+                    summarizedFileToolTypes.has(part.type) &&
                     summarizedToolCallIds.has(part.toolCallId)
                   )
                     return null;

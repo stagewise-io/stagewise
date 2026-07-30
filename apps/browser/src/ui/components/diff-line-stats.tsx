@@ -24,12 +24,12 @@ export function DiffLineStats({
         className,
       )}
     >
-      {(stacked || added > 0) && (
+      {added > 0 && (
         <span className="text-success-foreground">
           +{formatDiffCount(added)}
         </span>
       )}
-      {(stacked || removed > 0) && (
+      {removed > 0 && (
         <span className="text-error-foreground">
           -{formatDiffCount(removed)}
         </span>
