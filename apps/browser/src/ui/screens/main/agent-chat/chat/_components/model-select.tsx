@@ -1,6 +1,24 @@
-import { Combobox as ComboboxBase } from '@base-ui/react/combobox';
-import { IconXmarkOutline18, IconBrainOutline18 } from '@stagewise/icons';
+import {
+  Combobox as ComboboxBase,
+  type ComboboxRootChangeEventDetails,
+  type ComboboxRootHighlightEventDetails,
+} from '@base-ui/react/combobox';
+import {
+  IconBrainOutline18,
+  IconChevronDownFill18,
+  IconGear3Outline18,
+  IconXmarkOutline18,
+} from '@stagewise/icons';
 import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Radio,
+  RadioGroup,
+  RadioLabel,
+} from '@stagewise/stage-ui/components/radio';
+import {
+  Popover,
+  PopoverContent,
+} from '@stagewise/stage-ui/components/popover';
 import {
   Combobox,
   ComboboxGroup,
@@ -16,16 +34,15 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import type { ModelId } from '@shared/available-models';
-import { IconChevronDownFill18 } from '@stagewise/icons';
 import { getAvailableModel, getModelAlias } from '@shared/available-models';
 import { HotkeyActions } from '@shared/hotkeys';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import {
+  type ComponentProps,
   memo,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -33,9 +50,8 @@ import {
 import { cn } from '@ui/utils';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
-import { ModelThinkingPanel } from '@ui/components/model-thinking-panel';
 import {
-  getEnabledModelThinkingOption,
+  getDefaultThinkingOption,
   getModelThinkingDisplayState,
   getNextModelThinkingOption,
   getModelThinkingOptions,
@@ -91,6 +107,8 @@ function decodePresetKey(value: string): string | null {
   return value.slice(PRESET_VALUE_PREFIX.length);
 }
 
+const DISABLED_THINKING_VALUE = '@@thinking-off@@';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -107,37 +125,131 @@ interface InstanceGroup {
   entries: SelectableEntry[];
 }
 
+type PopoverOpenChangeHandler = NonNullable<
+  ComponentProps<typeof Popover>['onOpenChange']
+>;
+
 // ---------------------------------------------------------------------------
 // Components
 // ---------------------------------------------------------------------------
 
-function ModelTooltipContent({
-  model,
-  description,
-  context,
-  pricingMultiplier,
+function ModelDetailCard({
+  entry,
+  thinkingModel,
+  thinkingOverride,
+  thinkingDefaultOptions,
+  onThinkingChange,
 }: {
-  model: string;
-  description: string;
-  context: string;
-  pricingMultiplier?: number;
+  entry: SelectableEntry;
+  thinkingModel?: ThinkingPanelModel;
+  thinkingOverride?: ModelThinkingOverride;
+  thinkingDefaultOptions?: ModelThinkingDefaultOptions;
+  onThinkingChange: (override: ModelThinkingOverride) => void;
 }): React.ReactNode {
+  const { displayName, description, contextLabel, pricingMultiplier, isAlias } =
+    entry;
+  const thinkingDisplay = thinkingModel
+    ? getModelThinkingDisplayState(
+        thinkingModel,
+        thinkingOverride,
+        thinkingDefaultOptions,
+      )
+    : null;
+  const allThinkingOptions = thinkingModel
+    ? getModelThinkingOptions(thinkingModel, thinkingDefaultOptions)
+    : [];
+  const thinkingOptions = allThinkingOptions.filter((option) => option.enabled);
+  const defaultThinkingOption = thinkingModel
+    ? getDefaultThinkingOption(thinkingModel, thinkingDefaultOptions)
+    : undefined;
+  const radioLabelClassName = cn(
+    'w-full rounded-md px-1 py-0.5',
+    isAlias ? 'cursor-default' : 'cursor-pointer hover:bg-hover-derived',
+  );
+
   return (
-    <div className="flex w-48 flex-col gap-1.5">
-      <div className="font-semibold">{model}</div>
-      <div className="text-muted-foreground">{description}</div>
-      <div className="text-[10px] text-muted-foreground/70">
-        {context}
-        {pricingMultiplier != null && (
-          <>
-            {' · '}
-            <span className="inline-inline-flex items-center">
-              {pricingMultiplier}
-              <IconXmarkOutline18 className="inline size-2" />$
-            </span>
-          </>
-        )}
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-1.5 p-2.5">
+        <div className="font-semibold">{displayName}</div>
+        <div className="text-muted-foreground">{description}</div>
+        <div className="text-[10px] text-muted-foreground/70">
+          {contextLabel}
+          {pricingMultiplier != null && (
+            <>
+              {' · '}
+              <span className="inline-inline-flex items-center">
+                {pricingMultiplier}
+                <IconXmarkOutline18 className="inline size-2" />$
+              </span>
+            </>
+          )}
+        </div>
       </div>
+
+      {thinkingDisplay && (
+        <div className="border-derived-subtle border-t px-2.5 py-2">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className="font-medium text-foreground">
+              Reasoning effort
+            </span>
+            {isAlias && <span className="text-muted-foreground">Fixed</span>}
+          </div>
+          <RadioGroup
+            value={
+              thinkingDisplay.enabled
+                ? thinkingDisplay.value
+                : DISABLED_THINKING_VALUE
+            }
+            disabled={isAlias}
+            aria-label={`Reasoning effort for ${displayName}`}
+            className="gap-1"
+            onValueChange={(value) => {
+              if (typeof value !== 'string') return;
+              if (value === DISABLED_THINKING_VALUE) {
+                const disabledOption = allThinkingOptions.find(
+                  (option) => !option.enabled,
+                );
+                onThinkingChange({
+                  enabled: false,
+                  provider:
+                    disabledOption?.provider ?? thinkingDisplay.provider,
+                  value: disabledOption?.value ?? thinkingDisplay.value,
+                });
+                return;
+              }
+              const option = thinkingOptions.find(
+                (thinkingOption) => thinkingOption.value === value,
+              );
+              if (!option) return;
+              onThinkingChange({
+                enabled: true,
+                provider: option.provider,
+                value: option.value,
+              });
+            }}
+          >
+            <RadioLabel size="xs" className={radioLabelClassName}>
+              <Radio value={DISABLED_THINKING_VALUE} size="xs" />
+              <span>Off</span>
+            </RadioLabel>
+            {thinkingOptions.map((option) => (
+              <RadioLabel
+                key={option.value}
+                size="xs"
+                className={radioLabelClassName}
+              >
+                <Radio value={option.value} size="xs" />
+                <span>{option.label}</span>
+                {option.value === defaultThinkingOption?.value && (
+                  <span className="ml-auto text-[10px] text-subtle-foreground">
+                    Default
+                  </span>
+                )}
+              </RadioLabel>
+            ))}
+          </RadioGroup>
+        </div>
+      )}
     </div>
   );
 }
@@ -145,9 +257,6 @@ function ModelTooltipContent({
 interface ModelSelectProps {
   onModelChange?: () => void;
 }
-
-// Sentinel value for the "Open model settings" row.
-const OPEN_MODEL_SETTINGS_VALUE = '@@open model settings@@';
 
 const EMPTY_MODEL_THINKING_OVERRIDES: UserPreferences['agent']['modelThinkingOverrides'] =
   {};
@@ -376,14 +485,8 @@ export const ModelSelect = memo(function ModelSelect({
   const filteredItemValues = useMemo(
     () =>
       query.trim() === ''
-        ? [...presetKeys, ...allEntryKeys, OPEN_MODEL_SETTINGS_VALUE]
-        : filteredPresetKeys.length > 0 || filteredEntryKeys.length > 0
-          ? [
-              ...filteredPresetKeys,
-              ...filteredEntryKeys,
-              OPEN_MODEL_SETTINGS_VALUE,
-            ]
-          : [],
+        ? [...presetKeys, ...allEntryKeys]
+        : [...filteredPresetKeys, ...filteredEntryKeys],
     [allEntryKeys, filteredEntryKeys, presetKeys, filteredPresetKeys, query],
   );
 
@@ -424,16 +527,11 @@ export const ModelSelect = memo(function ModelSelect({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Side-panel hover state
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sidePanelRef = useRef<HTMLDivElement>(null);
+  const popupAnchorRef = useRef<HTMLDivElement>(null);
+  const detailPopupRef = useRef<HTMLDivElement>(null);
   const [hoveredEntry, setHoveredEntry] = useState<SelectableEntry | null>(
     null,
   );
-  const [editingEntry, setEditingEntry] = useState<SelectableEntry | null>(
-    null,
-  );
-  const [itemCenterY, setItemCenterY] = useState(0);
-  const [sidePanelOffset, setSidePanelOffset] = useState(0);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const cancelPendingClear = useCallback(() => {
@@ -447,99 +545,65 @@ export const ModelSelect = memo(function ModelSelect({
     cancelPendingClear();
     clearTimerRef.current = setTimeout(() => {
       setHoveredEntry(null);
-      setEditingEntry(null);
       clearTimerRef.current = undefined;
     }, 150);
   }, [cancelPendingClear]);
 
   useEffect(() => () => cancelPendingClear(), [cancelPendingClear]);
 
-  const editingThinkingModel = useMemo<ThinkingPanelModel | undefined>(() => {
-    if (!editingEntry) return undefined;
-    const catalogModel = getAvailableModel(editingEntry.targetModelId);
-    if (catalogModel) return catalogModel;
-    // Discovered model — build a ThinkingPanelModel from the entry
-    if (editingEntry.thinkingEnabled) {
-      const instance = instanceMap.get(editingEntry.instanceId);
-      const vendor = instance ? getVendorForInstance(instance) : undefined;
-      return {
-        modelId: editingEntry.targetModelId,
-        modelDisplayName: editingEntry.displayName,
-        providerOptions: {},
-        officialProvider: vendor,
-        thinkingEnabled: true,
-      };
-    }
-    return undefined;
-  }, [editingEntry, instanceMap]);
+  const hoveredThinking = useMemo(() => {
+    if (!hoveredEntry) return null;
+    const instance = instanceMap.get(hoveredEntry.instanceId);
+    const catalogModel = getAvailableModel(hoveredEntry.targetModelId);
+    const model: ThinkingPanelModel | undefined =
+      catalogModel ??
+      (hoveredEntry.thinkingEnabled
+        ? {
+            modelId: hoveredEntry.targetModelId,
+            modelDisplayName: hoveredEntry.displayName,
+            providerOptions: {},
+            officialProvider: instance
+              ? getVendorForInstance(instance)
+              : undefined,
+            thinkingEnabled: true,
+          }
+        : undefined);
 
-  const editingThinkingOverride = useMemo<
-    ModelThinkingOverride | undefined
-  >(() => {
-    if (!editingEntry) return undefined;
-    return modelThinkingOverrides[editingEntry.instanceId]?.[
-      editingEntry.targetModelId
-    ];
-  }, [editingEntry, modelThinkingOverrides]);
+    return {
+      model,
+      override: hoveredEntry.isAlias
+        ? getModelAlias(hoveredEntry.modelId)?.thinkingPreset
+        : modelThinkingOverrides[hoveredEntry.instanceId]?.[
+            hoveredEntry.targetModelId
+          ],
+      defaultOptions: instance
+        ? getInstanceThinkingDefaultOptions(instance)
+        : undefined,
+    };
+  }, [hoveredEntry, instanceMap, modelThinkingOverrides]);
 
-  const editingThinkingDefaultOptions = useMemo<
-    ModelThinkingDefaultOptions | undefined
-  >(() => {
-    if (!editingEntry) return undefined;
-    const instance = instanceMap.get(editingEntry.instanceId);
-    return instance ? getInstanceThinkingDefaultOptions(instance) : undefined;
-  }, [editingEntry, instanceMap]);
-
-  useLayoutEffect(() => {
-    if (!hoveredEntry || !sidePanelRef.current || !containerRef.current) return;
-    const panelHeight = sidePanelRef.current.offsetHeight;
-    const containerHeight = containerRef.current.offsetHeight;
-
-    let offset = itemCenterY - panelHeight / 2;
-    offset = Math.max(0, offset);
-    offset = Math.min(offset, Math.max(0, containerHeight - panelHeight));
-
-    setSidePanelOffset(offset);
-  }, [hoveredEntry, itemCenterY, editingEntry]);
-
-  const handleItemHover = useCallback(
-    (entry: SelectableEntry, element: HTMLElement) => {
-      cancelPendingClear();
-      const container = containerRef.current;
-      if (!container) {
+  const handleItemHighlighted = useCallback(
+    (
+      value: string | undefined,
+      eventDetails: ComboboxRootHighlightEventDetails,
+    ) => {
+      const entry = value ? entryMap.get(value) : undefined;
+      if (entry) {
+        cancelPendingClear();
         setHoveredEntry(entry);
-        setEditingEntry((current) =>
-          current?.instanceId === entry.instanceId &&
-          current?.modelId === entry.modelId
-            ? current
-            : null,
-        );
-        return;
+      } else if (value !== undefined || eventDetails.reason !== 'pointer') {
+        cancelPendingClear();
+        setHoveredEntry(null);
+      } else {
+        scheduleClear();
       }
-
-      const containerRect = container.getBoundingClientRect();
-      const itemRect = element.getBoundingClientRect();
-      const centerY = itemRect.top + itemRect.height / 2 - containerRect.top;
-
-      setItemCenterY(centerY);
-      setHoveredEntry(entry);
-      setEditingEntry((current) =>
-        current?.instanceId === entry.instanceId &&
-        current?.modelId === entry.modelId
-          ? current
-          : null,
-      );
     },
-    [cancelPendingClear],
+    [cancelPendingClear, entryMap, scheduleClear],
   );
 
   const handleValueChange = useCallback(
     async (value: string | null) => {
       if (!value) return;
-      if (value === OPEN_MODEL_SETTINGS_VALUE) {
-        void openSettings({ section: 'models-providers' });
-        return;
-      }
       // Check for preset selection
       const presetId = decodePresetKey(value);
       if (presetId) {
@@ -589,7 +653,6 @@ export const ModelSelect = memo(function ModelSelect({
     },
     [
       openAgent,
-      openSettings,
       setSelectedModel,
       onModelChange,
       modelPresets,
@@ -598,140 +661,74 @@ export const ModelSelect = memo(function ModelSelect({
     ],
   );
 
+  const closeSelect = useCallback(() => {
+    cancelPendingClear();
+    setOpen(false);
+    setHoveredEntry(null);
+    setQuery('');
+  }, [cancelPendingClear]);
+
   const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      setOpen(nextOpen);
-      if (!nextOpen) {
-        cancelPendingClear();
-        setHoveredEntry(null);
-        setEditingEntry(null);
-        setQuery('');
+    (nextOpen: boolean, eventDetails: ComboboxRootChangeEventDetails) => {
+      if (!nextOpen && eventDetails.reason === 'item-press') {
+        eventDetails.cancel();
+        return;
       }
+
+      const detailPopup = detailPopupRef.current;
+      const isDetailPopupInteraction =
+        detailPopup &&
+        ((eventDetails.reason === 'outside-press' &&
+          eventDetails.event.composedPath().includes(detailPopup)) ||
+          (eventDetails.reason === 'focus-out' &&
+            eventDetails.event instanceof FocusEvent &&
+            eventDetails.event.relatedTarget instanceof Node &&
+            detailPopup.contains(eventDetails.event.relatedTarget)));
+
+      if (!nextOpen && isDetailPopupInteraction) {
+        eventDetails.cancel();
+        return;
+      }
+
+      if (nextOpen) setOpen(true);
+      else closeSelect();
     },
-    [cancelPendingClear],
+    [closeSelect],
   );
 
-  const handleEditThinking = useCallback(
-    (entry: SelectableEntry, event: React.MouseEvent<HTMLElement>) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setEditingEntry((current) =>
-        current?.instanceId === entry.instanceId &&
-        current?.modelId === entry.modelId
-          ? null
-          : entry,
-      );
-    },
-    [],
+  const handleDetailOpenChange = useCallback(
+    ((nextOpen, eventDetails) => {
+      if (!nextOpen && eventDetails.reason === 'escape-key') closeSelect();
+    }) satisfies PopoverOpenChangeHandler,
+    [closeSelect],
   );
 
-  // Resolve a ThinkingPanelModel from either the catalog or a discovered entry.
-  const resolveThinkingModel = useCallback(
-    (
-      instanceId: string,
-      targetModelId: string,
-    ): ThinkingPanelModel | undefined => {
-      const catalogModel = getAvailableModel(targetModelId);
-      if (catalogModel) return catalogModel;
-      // Discovered model — construct a ThinkingPanelModel from the entry
-      const entry = entryMap.get(encodeKey(instanceId, targetModelId));
-      if (!entry?.thinkingEnabled) return undefined;
-      const instance = instanceMap.get(instanceId);
-      const vendor = instance ? getVendorForInstance(instance) : undefined;
-      return {
-        modelId: targetModelId,
-        modelDisplayName: entry.displayName,
-        providerOptions: {},
-        officialProvider: vendor,
-        thinkingEnabled: true,
-      };
-    },
-    [entryMap, instanceMap],
-  );
-
-  const handleSetThinkingEnabled = useCallback(
-    async (instanceId: string, targetModelId: string, enabled: boolean) => {
-      const model = resolveThinkingModel(instanceId, targetModelId);
-      if (!model) return;
-
-      const instance = instanceMap.get(instanceId);
-      const route: ModelThinkingDefaultOptions = instance
-        ? getInstanceThinkingDefaultOptions(instance)
-        : { providerMode: 'stagewise' };
-
-      const option = enabled
-        ? getEnabledModelThinkingOption(
-            model,
-            modelThinkingOverrides[instanceId]?.[targetModelId]?.value,
-            route,
-          )
-        : (getModelThinkingOptions(model, route).find(
-            (item) =>
-              item.value ===
-              modelThinkingOverrides[instanceId]?.[targetModelId]?.value,
-          ) ?? getModelThinkingOptions(model, route)[0]);
-      if (!option) return;
+  const handleSelectThinkingOption = useCallback(
+    async (entry: SelectableEntry, override: ModelThinkingOverride) => {
+      if (!openAgent || entry.isAlias) return;
 
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        if (!draft.agent.modelThinkingOverrides[instanceId]) {
-          draft.agent.modelThinkingOverrides[instanceId] = {};
+        draft.agent.activePresetId = undefined;
+        let instanceOverrides =
+          draft.agent.modelThinkingOverrides[entry.instanceId];
+        if (!instanceOverrides) {
+          instanceOverrides = {};
+          draft.agent.modelThinkingOverrides[entry.instanceId] =
+            instanceOverrides;
         }
-        draft.agent.modelThinkingOverrides[instanceId][targetModelId] = {
-          ...draft.agent.modelThinkingOverrides[instanceId][targetModelId],
-          enabled,
-          provider: option.provider,
-          value: option.value,
-        };
+        instanceOverrides[entry.targetModelId] = override;
       });
       await updatePreferences(patches);
+      setSelectedModel(openAgent, entry.modelId as ModelId, entry.instanceId);
+      onModelChange?.();
     },
     [
-      modelThinkingOverrides,
+      onModelChange,
+      openAgent,
       preferences,
+      setSelectedModel,
       updatePreferences,
-      instanceMap,
-      resolveThinkingModel,
     ],
-  );
-
-  const handleSetThinkingValue = useCallback(
-    async (instanceId: string, targetModelId: string, value: string) => {
-      const model = resolveThinkingModel(instanceId, targetModelId);
-      if (!model) return;
-
-      const instance = instanceMap.get(instanceId);
-      const route: ModelThinkingDefaultOptions = instance
-        ? getInstanceThinkingDefaultOptions(instance)
-        : { providerMode: 'stagewise' };
-
-      const option = getModelThinkingOptions(model, route).find(
-        (item) => item.value === value,
-      );
-      if (!option) return;
-
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        if (!draft.agent.modelThinkingOverrides[instanceId]) {
-          draft.agent.modelThinkingOverrides[instanceId] = {};
-        }
-        draft.agent.modelThinkingOverrides[instanceId][targetModelId] = {
-          enabled: true,
-          provider: option.provider,
-          value: option.value,
-        };
-      });
-      await updatePreferences(patches);
-    },
-    [preferences, updatePreferences, instanceMap, resolveThinkingModel],
-  );
-
-  const handleResetThinkingOverride = useCallback(
-    async (instanceId: string, targetModelId: string) => {
-      const [, patches] = produceWithPatches(preferences, (draft) => {
-        delete draft.agent.modelThinkingOverrides[instanceId]?.[targetModelId];
-      });
-      await updatePreferences(patches);
-    },
-    [preferences, updatePreferences],
   );
 
   const handleCycleThinkingEffort = useCallback(() => {
@@ -808,11 +805,12 @@ export const ModelSelect = memo(function ModelSelect({
       value={selectedKey}
       open={open}
       inputValue={query}
-      items={[...presetKeys, ...allEntryKeys, OPEN_MODEL_SETTINGS_VALUE]}
+      items={[...presetKeys, ...allEntryKeys]}
       filteredItems={filteredItemValues}
       autoHighlight
       onValueChange={handleValueChange}
       onOpenChange={handleOpenChange}
+      onItemHighlighted={handleItemHighlighted}
       onInputValueChange={setQuery}
       filter={null}
     >
@@ -864,21 +862,43 @@ export const ModelSelect = memo(function ModelSelect({
           className="z-50"
         >
           <div
-            ref={containerRef}
-            className="relative flex flex-row items-start gap-1"
+            ref={popupAnchorRef}
+            className="relative"
             onMouseLeave={scheduleClear}
           >
             <ComboboxBase.Popup
               className={cn(
-                'flex max-w-72 origin-(--transform-origin) flex-col items-stretch gap-0.5 text-xs',
+                'flex min-w-64 max-w-72 origin-(--transform-origin) flex-col items-stretch text-xs',
                 'rounded-lg border border-border-subtle bg-background p-1 shadow-lg',
                 'transition-[transform,scale,opacity] duration-150 ease-out',
                 'data-ending-style:scale-90 data-ending-style:opacity-0',
                 'data-starting-style:scale-90 data-starting-style:opacity-0',
               )}
             >
-              <div className="mb-1 rounded-md">
-                <ComboboxInput ref={inputRef} size="xs" placeholder="Search…" />
+              <div className="mb-1 flex items-center gap-1 rounded-md">
+                <ComboboxInput
+                  ref={inputRef}
+                  size="xs"
+                  placeholder="Search…"
+                  className="min-w-0 flex-1"
+                />
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Open model settings"
+                      className="shrink-0"
+                      onClick={() =>
+                        void openSettings({ section: 'models-providers' })
+                      }
+                    >
+                      <IconGear3Outline18 className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Model settings</TooltipContent>
+                </Tooltip>
               </div>
 
               <ComboboxList>
@@ -892,7 +912,6 @@ export const ModelSelect = memo(function ModelSelect({
                         <PresetItem
                           key={encodePresetKey(preset.id)}
                           preset={preset}
-                          onHoverClear={scheduleClear}
                         />
                       ))}
                     </ComboboxGroup>
@@ -909,8 +928,6 @@ export const ModelSelect = memo(function ModelSelect({
                         <ModelItem
                           key={encodeKey(entry.instanceId, entry.modelId)}
                           entry={entry}
-                          onHighlight={handleItemHover}
-                          onEditThinking={handleEditThinking}
                         />
                       ))}
                     </ComboboxGroup>
@@ -922,104 +939,66 @@ export const ModelSelect = memo(function ModelSelect({
                     No results
                   </div>
                 )}
-
-                <ComboboxItem value={OPEN_MODEL_SETTINGS_VALUE} size="xs">
-                  <ComboboxItemIndicator />
-                  <span className="col-start-2 truncate">Model settings</span>
-                </ComboboxItem>
               </ComboboxList>
             </ComboboxBase.Popup>
-
-            {/* Animated side panel for model details */}
-            {hoveredEntry && (
-              <div
-                ref={sidePanelRef}
-                onMouseEnter={cancelPendingClear}
-                className={cn(
-                  'absolute left-full ml-1 flex w-64 flex-col rounded-lg border border-derived bg-background text-foreground text-xs shadow-lg transition-[top] duration-100 ease-out',
-                  'fade-in-0 slide-in-from-left-1 animate-in duration-150',
-                )}
-                style={{ top: sidePanelOffset }}
-              >
-                {editingThinkingModel && editingEntry ? (
-                  <ModelThinkingPanel
-                    model={editingThinkingModel}
-                    override={editingThinkingOverride}
-                    defaultOptions={editingThinkingDefaultOptions}
-                    onEnabledChange={(enabled) =>
-                      handleSetThinkingEnabled(
-                        editingEntry.instanceId,
-                        editingEntry.targetModelId,
-                        enabled,
-                      )
-                    }
-                    onValueChange={(value) =>
-                      handleSetThinkingValue(
-                        editingEntry.instanceId,
-                        editingEntry.targetModelId,
-                        value,
-                      )
-                    }
-                    onReset={() =>
-                      handleResetThinkingOverride(
-                        editingEntry.instanceId,
-                        editingEntry.targetModelId,
-                      )
-                    }
-                  />
-                ) : (
-                  <div className="p-2.5">
-                    <ModelTooltipContent
-                      model={hoveredEntry.displayName}
-                      description={hoveredEntry.description}
-                      context={hoveredEntry.contextLabel}
-                      pricingMultiplier={hoveredEntry.pricingMultiplier}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </ComboboxBase.Positioner>
       </ComboboxBase.Portal>
+
+      <Popover
+        open={hoveredEntry !== null}
+        onOpenChange={handleDetailOpenChange}
+      >
+        {hoveredEntry && (
+          <PopoverContent
+            ref={detailPopupRef}
+            anchor={popupAnchorRef.current}
+            side="right"
+            sideOffset={4}
+            align="end"
+            collisionPadding={4}
+            collisionAvoidance={{
+              side: 'flip',
+              align: 'shift',
+              fallbackAxisSide: 'none',
+            }}
+            initialFocus={false}
+            finalFocus={false}
+            aria-label={`Model details for ${hoveredEntry.displayName}`}
+            onMouseEnter={cancelPendingClear}
+            onMouseLeave={scheduleClear}
+            className={cn(
+              'scrollbar-subtle max-h-[var(--available-height)] w-64 gap-0 overflow-y-auto p-0 text-xs',
+              'border-derived',
+              'data-ending-style:scale-95 data-starting-style:scale-95',
+            )}
+          >
+            <ModelDetailCard
+              key={encodeKey(hoveredEntry.instanceId, hoveredEntry.modelId)}
+              entry={hoveredEntry}
+              thinkingModel={hoveredThinking?.model}
+              thinkingOverride={hoveredThinking?.override}
+              thinkingDefaultOptions={hoveredThinking?.defaultOptions}
+              onThinkingChange={(override) =>
+                handleSelectThinkingOption(hoveredEntry, override)
+              }
+            />
+          </PopoverContent>
+        )}
+      </Popover>
     </Combobox>
   );
 });
 
 const ModelItem = memo(function ModelItem({
   entry,
-  onHighlight,
-  onEditThinking,
 }: {
   entry: SelectableEntry;
-  onHighlight: (entry: SelectableEntry, element: HTMLElement) => void;
-  onEditThinking: (
-    entry: SelectableEntry,
-    event: React.MouseEvent<HTMLElement>,
-  ) => void;
 }) {
-  const itemRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = itemRef.current;
-    if (!el) return;
-
-    const observer = new MutationObserver(() => {
-      if (el.hasAttribute('data-highlighted')) onHighlight(entry, el);
-    });
-
-    observer.observe(el, {
-      attributes: true,
-      attributeFilter: ['data-highlighted'],
-    });
-
-    return () => observer.disconnect();
-  }, [entry, onHighlight]);
-
   const itemValue = encodeKey(entry.instanceId, entry.modelId);
 
   return (
-    <ComboboxItem ref={itemRef} value={itemValue} size="xs">
+    <ComboboxItem value={itemValue} size="xs">
       <ComboboxItemIndicator />
       <span className="col-start-2 flex min-w-0 flex-row items-center justify-between gap-4 text-xs">
         <div className="flex flex-row items-center gap-1.5">
@@ -1032,27 +1011,10 @@ const ModelItem = memo(function ModelItem({
               entry.isAlias ? 'min-w-3' : 'min-w-14',
             )}
           >
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 text-subtle-foreground',
-                !entry.isAlias && 'group-data-[highlighted]/item:opacity-0',
-              )}
-            >
+            <span className="inline-flex items-center gap-1 text-subtle-foreground">
               <IconBrainOutline18 className="size-2.75" />
               {!entry.isAlias && entry.thinkingLabel}
             </span>
-            {(entry.catalogModel || entry.thinkingEnabled) &&
-              !entry.isAlias && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="absolute right-0 h-auto px-0 py-0 text-[10px] opacity-0 group-data-[highlighted]/item:opacity-100"
-                  onClick={(event) => onEditThinking(entry, event)}
-                >
-                  Edit
-                </Button>
-              )}
           </span>
         )}
       </span>
@@ -1062,14 +1024,12 @@ const ModelItem = memo(function ModelItem({
 
 const PresetItem = memo(function PresetItem({
   preset,
-  onHoverClear,
 }: {
   preset: PresetEntry;
-  onHoverClear: () => void;
 }) {
   const itemValue = encodePresetKey(preset.id);
   return (
-    <ComboboxItem value={itemValue} size="xs" onMouseEnter={onHoverClear}>
+    <ComboboxItem value={itemValue} size="xs">
       <ComboboxItemIndicator />
       <span className="col-start-2 flex min-w-0 flex-col gap-0 text-xs">
         <span className="truncate font-medium">{preset.name}</span>

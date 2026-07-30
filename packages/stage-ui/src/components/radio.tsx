@@ -15,7 +15,7 @@ export const RadioGroup = ({ className, ...props }: RadioGroupProps) => {
     <RadioGroupBase
       className={(state) =>
         cn(
-          'flex shrink-0 flex-col items-start justify-start gap-2 disabled:opacity-50',
+          'flex shrink-0 flex-col items-start justify-start gap-2 data-disabled:opacity-50',
           typeof className === 'function' ? className(state) : className,
         )
       }
@@ -33,9 +33,9 @@ export const radioVariants = cva(
     'flex shrink-0 items-center justify-center rounded-full',
     'border border-derived bg-surface-1',
     'transition-colors duration-100 ease-out',
-    'not-data-checked:not-disabled:cursor-pointer',
-    'hover:bg-hover-derived active:bg-active-derived',
-    'disabled:opacity-50',
+    'not-data-checked:not-data-disabled:cursor-pointer',
+    'not-data-disabled:hover:bg-hover-derived not-data-disabled:active:bg-active-derived',
+    'data-disabled:cursor-not-allowed',
     'data-checked:bg-primary-foreground',
   ],
   {
