@@ -60,7 +60,11 @@ function isPartSettled(
 
   if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
     const state = (part as AgentToolUIPart | DynamicToolUIPart).state;
-    return state === 'output-available' || state === 'output-error';
+    return (
+      state === 'output-available' ||
+      state === 'output-error' ||
+      state === 'output-denied'
+    );
   }
 
   return true;
