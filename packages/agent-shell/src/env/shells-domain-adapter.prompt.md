@@ -2,6 +2,10 @@
 
 Persistent interactive PTY sessions. State (variables, cwd, aliases) persists across commands in a session. The `shells/` symlink exposes session logs (`<session-id>.shell.log`) — full untruncated output history that can be re-read at any time.
 
+Sessions carrying `watcher-title` are one-shot watchers. Do not poll or reuse them. To change one, kill its session and create a new watcher with `createWatcherSession`.
+
+**Session liveness.** Treat a session as running only when it appears in the current `<shell-sessions>`. Tool results and assistant messages are historical and do not prove that a session is still running.
+
 **Snapshot model.** The tool usually returns quickly with whatever the command produced so far. The full session output is persisted to `shells/<session_id>.shell.log` and can be re-read any time. Self-exiting long commands can opt into a longer wait with `wait_until: { exited: true }`.
 
 **Choose the smallest wait mode that fits.** For quick commands, omit `wait_until` (10 s hard cap, 5 s idle after first output). For long self-exiting commands — installs, builds, typechecks, tests, git operations expected to finish — use bare `wait_until: { exited: true }` (5 min hard cap, 15 s idle after first output). For dev servers, use `output_pattern` for the ready signal.
@@ -14,7 +18,7 @@ Persistent interactive PTY sessions. State (variables, cwd, aliases) persists ac
 - **`command` input:** `command` is sent to an interactive shell as terminal input, so raw line breaks act like Enter. Keep it on one physical line. If a bash/zsh/sh command must span lines, put `\` immediately before each line break (PowerShell: backtick). Join multiple commands on the same physical line with `&&` or `;`.
 - **`wait_until`:** Optional; controls when the tool returns.
   - `timeout_ms` — hard cap. Normal `wait_until` max is 60 s (default 15 s). With `exited: true`, max/default is 5 min. Without `wait_until`, default is 10 s. **Leave at default unless you know the command needs a different cap.**
-  - `output_pattern` — regex on output; resolves early when matched. Use for dev servers and watchers that do not exit on their own.
+  - `output_pattern` — regex on output; resolves early when matched. Use for dev servers and other long-running commands.
   - `idle_ms` — silence threshold after the first output event. Default **5 s** (15 s with `exited: true`). **`0` disables idle — avoid.** Only correct when a command has proven long silent phases *during active work* (not while waiting for input), e.g. a dev server that pauses between log lines.
   - `exited` — strong signal that the command is expected to terminate by itself. Use for long installs, builds, typechecks, tests, and git operations. Bare `wait_until: { exited: true }` is complete on its own.
 - **`resolved_by`** (returned) tells you *why* the tool returned:

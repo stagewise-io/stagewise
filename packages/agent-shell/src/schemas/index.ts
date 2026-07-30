@@ -11,16 +11,17 @@ import { z } from 'zod';
 // Create Shell Session Tool
 // ============================================================================
 
+const shellCwdSchema = z
+  .string()
+  .refine((value) => value !== '.', {
+    message: 'cwd must be a mount prefix, not ".".',
+  })
+  .describe(
+    'Shell working directory as a mount prefix from the environment snapshot (for example "wXXXX" or "wXXXX/apps/browser"), never ".".',
+  );
+
 export const createShellSessionToolInputSchema = z.object({
-  cwd: z
-    .string()
-    .refine((v) => v !== '.', {
-      message:
-        'cwd must be a mount prefix from the environment snapshot, not ".".',
-    })
-    .describe(
-      'Mount prefix for the initial working directory. Must be a mount prefix from the environment snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".',
-    ),
+  cwd: shellCwdSchema,
 });
 
 export const createShellSessionToolOutputSchema = z.object({
@@ -38,6 +39,62 @@ export type CreateShellSessionToolOutput = z.infer<
 export const createShellSessionToolSchema = {
   inputSchema: createShellSessionToolInputSchema,
   outputSchema: createShellSessionToolOutputSchema,
+} as const;
+
+// ============================================================================
+// Create Watcher Session Tool
+// ============================================================================
+
+export const MIN_WATCHER_TIMEOUT_MS = 10_000;
+export const MAX_WATCHER_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1_000;
+
+export const createWatcherSessionToolInputSchema = z.object({
+  cwd: shellCwdSchema,
+  command: z
+    .string()
+    .min(1)
+    .describe(
+      'Foreground polling command or inline script. It must be read-only, print the matched condition and exit 0, or exit non-zero with a diagnostic on permanent failure.',
+    ),
+  title: z
+    .string()
+    .min(1)
+    .max(120)
+    .describe(
+      'Short user-facing title shown in the watcher UI, ideally 2–8 words.',
+    ),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_000)
+    .optional()
+    .describe(
+      'Optional durable context in one concise sentence: state what is being watched and what should happen after it triggers. Include only user intent not clear from the title and expected final command output.',
+    ),
+  timeout_ms: z
+    .number()
+    .int()
+    .min(MIN_WATCHER_TIMEOUT_MS)
+    .max(MAX_WATCHER_TIMEOUT_MS)
+    .describe('Outer watcher lifetime in milliseconds.'),
+});
+
+export const createWatcherSessionToolOutputSchema =
+  createShellSessionToolOutputSchema.extend({
+    expires_at: z.number(),
+  });
+
+export type CreateWatcherSessionToolInput = z.infer<
+  typeof createWatcherSessionToolInputSchema
+>;
+export type CreateWatcherSessionToolOutput = z.infer<
+  typeof createWatcherSessionToolOutputSchema
+>;
+
+export const createWatcherSessionToolSchema = {
+  inputSchema: createWatcherSessionToolInputSchema,
+  outputSchema: createWatcherSessionToolOutputSchema,
 } as const;
 
 // ============================================================================
@@ -98,7 +155,7 @@ export const executeShellCommandToolInputSchema = z
           .string()
           .optional()
           .describe(
-            'Return early when stdout/stderr matches this regex. Use for dev servers and watchers that never exit.',
+            'Return early when stdout/stderr matches this regex. Use for dev servers and other long-running commands.',
           ),
         idle_ms: z
           .number()
@@ -196,6 +253,21 @@ export const shellSessionSnapshotSchema = z.object({
   lastLine: z.string().optional(),
   cwd: z.string(),
   createdAt: z.number(),
+  watcher: z
+    .object({
+      title: z.string(),
+      description: z.string().optional(),
+      command: z.string(),
+      startedAt: z.number(),
+      expiresAt: z.number(),
+    })
+    .optional(),
+  watcherResult: z
+    .object({
+      outcome: z.enum(['triggered', 'timed_out', 'failed']),
+      finishedAt: z.number(),
+    })
+    .optional(),
 });
 export type ShellSessionSnapshot = z.infer<typeof shellSessionSnapshotSchema>;
 

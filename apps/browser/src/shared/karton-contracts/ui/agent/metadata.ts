@@ -19,6 +19,7 @@ import {
   fileMentionMetaSchema,
   mentionFileCandidateSchema,
   textClipAttachmentSchema,
+  watcherEventMetadataSchema,
   workspaceMentionMetaSchema,
 } from '@stagewise/agent-core/types/metadata';
 import type {
@@ -38,6 +39,7 @@ import type {
   FileMentionMeta,
   MentionFileCandidate,
   TextClipAttachment,
+  WatcherEventMetadata,
   WorkspaceMentionMeta,
   UserMessageMetadata as CoreUserMessageMetadata,
 } from '@stagewise/agent-core/types/metadata';
@@ -88,6 +90,7 @@ export {
   shellSnapshotSchema,
   taskGroupSchema,
   textClipAttachmentSchema,
+  watcherEventMetadataSchema,
   workspaceMentionMetaSchema,
   workspaceSnapshotSchema,
 };
@@ -112,6 +115,7 @@ export type {
   ShellSessionSnapshot,
   ShellSnapshot,
   TextClipAttachment,
+  WatcherEventMetadata,
   WorkspaceMentionMeta,
   WorkspaceSnapshot,
 };
@@ -196,6 +200,7 @@ export const metadataSchema = z.object({
   envState: z.record(z.string(), envStateEntrySchema).optional(),
   mentions: z.array(mentionSchema).optional(),
   pathReferences: z.record(z.string(), z.string()).optional(),
+  watcherEvent: watcherEventMetadataSchema.optional(),
   /**
    * Provider-owned signed `reasoning_details` captured from the provider
    * response. Re-injected only when the outbound model route matches the

@@ -50,6 +50,7 @@ import { useContentCollapsed } from '../../../_components/content-collapsed-cont
 import type { Content } from '@tiptap/core';
 import { IconMagicWandSparkle } from '@stagewise/icons';
 import { MessageUserPlanAction } from './message-user-plan-action';
+import { MessageUserWatcherEvent } from './message-user-watcher-event';
 
 type UserMessage = AgentMessage & { role: 'user' };
 
@@ -673,8 +674,15 @@ export const MessageUser = memo(
         typeof p.text === 'string' &&
         /\(slash:command:implement\)/.test(p.text),
     );
+    const watcherEvent = msg.metadata?.watcherEvent;
 
-    if (isEmptyMessage && !hasImplementCommand && !isLastMessage) return null;
+    if (
+      isEmptyMessage &&
+      !hasImplementCommand &&
+      !watcherEvent &&
+      !isLastMessage
+    )
+      return null;
 
     // Conditional rendering: view-only mode uses lightweight renderer, edit mode uses full TipTap
     return (
@@ -701,6 +709,9 @@ export const MessageUser = memo(
             </div>
           )}
           <div ref={measureRef} className="w-full">
+            {watcherEvent ? (
+              <MessageUserWatcherEvent event={watcherEvent} />
+            ) : null}
             {/* Implement command card — compact full-width indicator */}
             {hasImplementCommand && !isEditing && (
               <MessageUserPlanAction
@@ -710,7 +721,8 @@ export const MessageUser = memo(
             <div
               className={cn(
                 'mt-2 flex w-full shrink-0 flex-row-reverse items-stretch justify-start gap-1',
-                isEmptyMessage || (hasImplementCommand && !isEditing)
+                isEmptyMessage ||
+                  (!isEditing && (hasImplementCommand || watcherEvent))
                   ? 'hidden'
                   : '',
               )}

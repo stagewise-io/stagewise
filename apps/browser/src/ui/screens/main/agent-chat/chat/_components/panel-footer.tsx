@@ -1243,7 +1243,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
       if (!openAgent) return false;
 
       const entries = historyRef.current.filter(
-        (message) => message.role === 'user',
+        (message) => message.role === 'user' && !message.metadata?.watcherEvent,
       );
 
       const step = getPromptHistoryStep({

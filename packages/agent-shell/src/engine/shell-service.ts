@@ -11,6 +11,7 @@ import type {
   DetectedShell,
   SessionCommandRequest,
   SessionCommandResult,
+  WatcherEvent,
 } from './types';
 
 export class ShellService extends DisposableService {
@@ -41,7 +42,6 @@ export class ShellService extends DisposableService {
 
   /** Per-agent throttle timers for pushing the shells manifest to the sink. */
   private readonly shellManifestTimers = new Map<string, NodeJS.Timeout>();
-
   private static readonly FLUSH_DEBOUNCE_MS = 100;
   private static readonly FLUSH_MAX_INTERVAL_MS = 300;
   /**
@@ -140,6 +140,22 @@ export class ShellService extends DisposableService {
     return this.shell;
   }
 
+  setWatcherEventHandler(
+    handler: (event: WatcherEvent) => void | Promise<void>,
+  ): void {
+    if (!this.sessionManager) return;
+    this.sessionManager.onWatcherEvent = (event) => {
+      void Promise.resolve()
+        .then(() => handler(event))
+        .catch((error) => {
+          this.logger.warn('[ShellService] Watcher event handler failed', {
+            error,
+            sessionId: event.sessionId,
+          });
+        });
+    };
+  }
+
   /**
    * Create a new PTY session without executing any command.
    * Returns immediately with the session ID — does not wait for shell init.
@@ -186,6 +202,33 @@ export class ShellService extends DisposableService {
     this.sink?.publishSessionId(agentInstanceId, toolCallId, sessionId);
 
     return sessionId;
+  }
+
+  async createWatcherSession(
+    agentInstanceId: string,
+    cwd: string,
+    input: {
+      title: string;
+      description?: string;
+      command: string;
+      timeoutMs: number;
+    },
+  ): Promise<{ sessionId: string; expiresAt: number }> {
+    this.assertNotDisposed();
+    if (!this.shell || !this.sessionManager) {
+      throw new Error('Shell service is not available — no shell detected.');
+    }
+
+    const env = sanitizeEnv(this.resolvedEnv, this.shell.type);
+    const result = await this.sessionManager.createWatcherSession(
+      agentInstanceId,
+      cwd,
+      env,
+      input,
+      () => this.scheduleShellManifestPush(agentInstanceId),
+    );
+    this.pushShellsToSink(agentInstanceId);
+    return result;
   }
 
   /**
@@ -375,6 +418,21 @@ export class ShellService extends DisposableService {
           lastLine: s.logger?.getLastLine() || undefined,
           cwd: s.cwd,
           createdAt: s.createdAt,
+          watcher: s.watcher
+            ? {
+                title: s.watcher.title,
+                description: s.watcher.description,
+                command: s.lastCommand ?? '',
+                startedAt: s.watcher.startedAt,
+                expiresAt: s.watcher.expiresAt,
+              }
+            : undefined,
+          watcherResult: s.watcherResult
+            ? {
+                outcome: s.watcherResult.outcome,
+                finishedAt: s.watcherResult.finishedAt,
+              }
+            : undefined,
         };
       }),
     };

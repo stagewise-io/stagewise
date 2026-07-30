@@ -1,13 +1,17 @@
 import {
   IconLoader6Outline18,
   IconTerminalOutline18,
-  IconTriangleWarningOutline18,
   IconXmarkOutline18,
 } from '@stagewise/icons';
 import { useCallback, useMemo, useRef } from 'react';
 import { ToolPartUI } from './shared/tool-part-ui';
 import { ToolPartUINotCollapsible } from './shared/tool-part-ui-not-collapsible';
 import { useToolAutoExpand } from './shared/use-tool-auto-expand';
+import { ShellCommandPreview } from './shared/shell-command-preview';
+import {
+  ShellToolApprovalFooter,
+  useShellToolApproval,
+} from './shared/shell-tool-approval';
 import { useIsTruncated } from '@ui/hooks/use-is-truncated';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
@@ -24,10 +28,6 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { ShortcutCombo } from '@stagewise/stage-ui/components/shortcut-key';
-import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
-import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
-import { HotkeyCombo } from '@ui/components/hotkey-combo';
-import { HotkeyActions } from '@shared/hotkeys';
 
 export const ExecuteShellCommandToolPart = ({
   part,
@@ -35,19 +35,15 @@ export const ExecuteShellCommandToolPart = ({
 }: {
   part: Extract<
     AgentToolUIPart,
-    { type: 'tool-executeShellCommand' | 'tool-createShellSession' }
+    {
+      type: 'tool-executeShellCommand' | 'tool-createShellSession';
+    }
   >;
   isLastPart?: boolean;
 }) => {
   const [openAgentId] = useOpenAgent();
-  const sendApproval = useKartonProcedure(
-    (p) => p.agents.sendToolApprovalResponse,
-  );
   const killShellSession = useKartonProcedure(
     (p) => p.toolbox.killShellSession,
-  );
-  const setToolApprovalMode = useKartonProcedure(
-    (p) => p.agents.setToolApprovalMode,
   );
 
   const finished = useMemo(
@@ -101,12 +97,13 @@ export const ExecuteShellCommandToolPart = ({
   }, [part.state, pendingOutputs]);
 
   const isCreateSession = part.type === 'tool-createShellSession';
-  const isExecute = part.type === 'tool-executeShellCommand';
-  const command = isCreateSession ? '' : (part.input?.command ?? '');
-  const explanation = isCreateSession ? '' : (part.input?.explanation ?? '');
-  const stdin = isExecute ? part.input?.stdin : undefined;
-  const isStdin = isCreateSession ? false : !!stdin && !command;
-  const isKill = isCreateSession ? false : !!part.input?.kill;
+  const executeInput =
+    part.type === 'tool-executeShellCommand' ? part.input : undefined;
+  const command = executeInput?.command ?? '';
+  const explanation = executeInput?.explanation ?? '';
+  const stdin = executeInput?.stdin;
+  const isStdin = !!stdin && !command;
+  const isKill = !!executeInput?.kill;
   const killFailed =
     isKill &&
     output &&
@@ -129,95 +126,15 @@ export const ExecuteShellCommandToolPart = ({
     isStreaming: state === 'streaming' || state === 'approval',
     isLastPart,
   });
-
-  const handleApprove = useCallback(() => {
-    if (
-      !openAgentId ||
-      part.state !== 'approval-requested' ||
-      !part.approval?.id
-    )
-      return;
-    sendApproval(openAgentId, part.approval.id, true);
-  }, [openAgentId, part.state, part.approval, sendApproval]);
-
-  const { setRef: allowRef, isWinner: allowIsWinner } = useCmdEnterTarget({
-    id: `shell-approval-${part.toolCallId}`,
-    priority: CmdEnterPriority.SHELL_APPROVAL,
-    action: handleApprove,
-    enabled: state === 'approval' && part.state !== 'input-streaming',
-  });
+  const approval = useShellToolApproval(part);
 
   const sessionId =
-    output?.session_id ??
-    pendingSessionId ??
-    (isCreateSession ? undefined : part.input?.session_id);
+    output?.session_id ?? pendingSessionId ?? executeInput?.session_id;
 
   const handleCancel = useCallback(() => {
     if (!openAgentId || !sessionId) return;
     killShellSession(openAgentId, sessionId);
   }, [openAgentId, sessionId, killShellSession]);
-
-  const handleDeny = useCallback(() => {
-    if (
-      !openAgentId ||
-      part.state !== 'approval-requested' ||
-      !part.approval?.id
-    )
-      return;
-    sendApproval(openAgentId, part.approval.id, false, 'User denied');
-  }, [openAgentId, part.state, part.approval, sendApproval]);
-
-  const handleSmartAllow = useCallback(async () => {
-    if (
-      !openAgentId ||
-      part.state !== 'approval-requested' ||
-      !part.approval?.id
-    )
-      return;
-    try {
-      // Pass source + approval-context so the backend
-      // `tool-approval-mode-changed` event can distinguish this
-      // inline/impulsive path from the panel-combobox path and correlate
-      // it with the specific approval request the user was answering.
-      // The contract signature takes `source` as the 3rd arg; we can't
-      // pass tool metadata through the RPC, so the backend won't know
-      // `tool_name`/`tool_call_id` for this path — that's OK, analytics
-      // can join on the adjacent `tool-approved` event via
-      // `agent_instance_id` + timestamp if needed.
-      await setToolApprovalMode(openAgentId, 'smart', 'inline-approval-button');
-    } catch (error) {
-      // Abort the whole action: the user asked for "switch to smart AND
-      // approve this one". If the mode flip failed, approving silently
-      // would contradict that intent. The regular "Allow" button remains
-      // available.
-      console.error(
-        '[ExecuteShellCommand] Failed to switch to smart approval; not approving the current call',
-        error,
-      );
-      return;
-    }
-    sendApproval(openAgentId, part.approval.id, true);
-  }, [
-    openAgentId,
-    part.state,
-    part.approval,
-    sendApproval,
-    setToolApprovalMode,
-  ]);
-
-  const classifierExplanation = useKartonState((s) =>
-    openAgentId
-      ? s.agents.instances[openAgentId]?.state.pendingApprovals?.[
-          part.toolCallId
-        ]?.explanation
-      : undefined,
-  );
-
-  const currentApprovalMode = useKartonState((s) =>
-    openAgentId
-      ? s.agents.instances[openAgentId]?.state.toolApprovalMode
-      : undefined,
-  );
 
   // Minimal display for successful/in-progress create / kill — like copy/move
   // UI. Approval and denial states must fall through to the standard shell UI:
@@ -380,123 +297,27 @@ export const ExecuteShellCommandToolPart = ({
         : effectiveOutputText || null;
 
     return (
-      <div className="px-2 py-1">
-        <div
-          className={cn(
-            'whitespace-pre-wrap break-all pb-1 font-mono text-muted-foreground text-xs',
-            outputText && 'pb-4',
-          )}
-        >
-          {isStdin ? (
-            <>
-              <span className="select-none text-subtle-foreground">→ </span>
-              <HumanizedStdin value={stdin ?? ''} />
-            </>
-          ) : isKill ? (
-            <>
-              <span className="select-none text-subtle-foreground">$ </span>
-              close terminal {sessionId}
-            </>
-          ) : (
-            <>
-              <span className="select-none text-subtle-foreground">$ </span>
-              {command}
-            </>
-          )}
-        </div>
-        {outputText && (
-          <div className="mt-1 whitespace-pre-wrap break-all font-mono font-normal text-subtle-foreground text-xs">
-            {outputText}
-          </div>
+      <ShellCommandPreview prefix={isStdin ? '→' : '$'} output={outputText}>
+        {isStdin ? (
+          <HumanizedStdin value={stdin ?? ''} />
+        ) : isKill ? (
+          <>close terminal {sessionId}</>
+        ) : (
+          command
         )}
-      </div>
+      </ShellCommandPreview>
     );
   }, [state, effectiveOutputText, command, isStdin, isKill, sessionId, stdin]);
 
-  const contentFooter = useMemo(() => {
-    if (
-      (state === 'approval' || state === 'approval-responded') &&
-      part.state !== 'input-streaming'
-    )
-      return (
-        <div className="flex w-full flex-col gap-2.5">
-          {classifierExplanation && (
-            // <div className="mx-2 flex flex-row items-start gap-1.5 rounded-md border border-derived px-2 py-1.5 text-foreground text-xs leading-snug">
-            <div className="mx-2 flex flex-row items-start gap-1.5 rounded-md px-1 py-0 text-warning-foreground text-xs leading-snug">
-              <IconTriangleWarningOutline18 className="mt-[2px] size-3 shrink-0" />
-              <div className="min-w-0 flex-1">{classifierExplanation}</div>
-            </div>
-          )}
-          <div className="flex w-full flex-row items-center justify-end gap-1.5">
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={handleDeny}
-              disabled={state === 'approval-responded'}
-            >
-              Skip
-            </Button>
-            {currentApprovalMode !== 'smart' && (
-              <Tooltip>
-                <TooltipTrigger delay={250}>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={handleSmartAllow}
-                    disabled={state === 'approval-responded'}
-                  >
-                    Smart allow
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="end">
-                  <div className="flex max-w-64 flex-col gap-1 py-1">
-                    <div className="font-medium">
-                      Ask only for risky commands
-                    </div>
-                    <div className="text-muted-foreground">
-                      Switches this agent to smart approval. A fast classifier
-                      decides per command — destructive or system-level commands
-                      still require your approval.
-                    </div>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            )}
-            <Button
-              ref={allowRef}
-              variant="primary"
-              size="xs"
-              onClick={handleApprove}
-              disabled={state === 'approval-responded'}
-            >
-              {state === 'approval-responded' && (
-                <IconLoader6Outline18 className="size-3 shrink-0 animate-spin" />
-              )}
-              Allow
-              {allowIsWinner && (
-                <HotkeyCombo
-                  action={HotkeyActions.CMD_ENTER}
-                  size="xs"
-                  variant="solid"
-                  className="ml-0.5"
-                />
-              )}
-            </Button>
-          </div>
-        </div>
-      );
-    return undefined;
-  }, [
-    state,
-    handleApprove,
-    handleDeny,
-    handleSmartAllow,
-    currentApprovalMode,
-    classifierExplanation,
-    part.state,
-    allowRef,
-    allowIsWinner,
-  ]);
+  const showApprovalFooter =
+    (state === 'approval' || state === 'approval-responded') &&
+    part.state !== 'input-streaming';
+  const contentFooter = showApprovalFooter ? (
+    <ShellToolApprovalFooter
+      approval={approval}
+      isResponded={state === 'approval-responded'}
+    />
+  ) : undefined;
 
   if (useMinimalShellRow) {
     return (
@@ -531,9 +352,9 @@ export const ExecuteShellCommandToolPart = ({
       trigger={trigger}
       content={content}
       contentFooter={contentFooter}
-      contentFooterStatic={!!classifierExplanation}
+      contentFooterStatic={!!approval.classifierExplanation}
       contentFooterClassName={cn(
-        classifierExplanation ? 'px-2 py-1' : 'h-8 border-none px-1',
+        approval.classifierExplanation ? 'px-2 py-1' : 'h-8 border-none px-1',
       )}
       contentClassName={cn(
         state === 'approval' || state === 'approval-responded'

@@ -157,8 +157,40 @@ export interface PtySession {
    * parent shell's cwd.
    */
   currentCwd: string | null;
-  /** Path to the temp init script file, for cleanup. */
-  initScriptPath: string | null;
+  /** Path to the current temporary shell script, for cleanup. */
+  tempScriptPath: string | null;
+  /** Optional watcher role; the PTY remains an otherwise normal shell session. */
+  watcher?: WatcherRuntimeState;
+  /** Completion metadata retained after the active watcher state is cleared. */
+  watcherResult?: WatcherResult;
+}
+
+export interface WatcherRuntimeState {
+  title: string;
+  description?: string;
+  startedAt: number;
+  expiresAt: number;
+  output: string;
+  timeoutHandle: NodeJS.Timeout | null;
+}
+
+export type WatcherOutcome = 'triggered' | 'timed_out' | 'failed';
+
+export interface WatcherResult {
+  outcome: WatcherOutcome;
+  finishedAt: number;
+}
+
+export interface WatcherEvent {
+  agentInstanceId: string;
+  sessionId: string;
+  title: string;
+  description?: string;
+  outcome: WatcherOutcome;
+  startedAt: number;
+  finishedAt: number;
+  exitCode: number | null;
+  output: string;
 }
 
 export interface SessionCommandRequest {

@@ -88,6 +88,13 @@ export const browserToolPartSerializers = defineToolPartSerializers(
       return `[shell: new session ${sid} in ${cwd}${err ?? ''}]`;
     },
 
+    createWatcherSession: ({ input, output, err }) => {
+      const title = esc(input.title ?? 'watcher');
+      if (err) return `[watcher creation failed: ${title}${err}]`;
+      if (!output) return `[watcher requested: ${title}]`;
+      return `[watcher created: ${title} → session ${esc(output.session_id)}]`;
+    },
+
     executeShellCommand: ({ input, output, err }) => {
       const label = esc(
         String(input.explanation ?? input.command ?? '').slice(0, 80),

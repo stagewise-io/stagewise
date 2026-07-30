@@ -22,6 +22,7 @@ const HOST_TOOL_IDS = [
   'readConsoleLogs',
   'askUserQuestions',
   'createShellSession',
+  'createWatcherSession',
   'executeShellCommand',
 ] as const;
 
