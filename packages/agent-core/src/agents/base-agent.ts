@@ -765,6 +765,7 @@ export abstract class BaseAgent<
   /**
    * Send a message to the agent. If the agent is busy, the message will be queued.
    * @param message - The message to send to the agent
+   * @param options.queueIfBlocked - Queue instead of interrupting unfinished tool interactions.
    *
    * @note If the agent is waiting for one or more tool approvals or not every tool call has been finished, the message will be queued and sent once the current step is finished.
    *
@@ -775,14 +776,20 @@ export abstract class BaseAgent<
    */
   public async sendUserMessage(
     message: AgentMessage & { role: 'user' },
+    options: { queueIfBlocked?: boolean } = {},
   ): Promise<MessageId> {
     // We override the message id with a random UUID to ensure it's unique.
     const id = crypto.randomUUID();
 
     const msg = { ...message, id: id };
 
-    // If the agent is running, we queue the message
-    if (this.state.get().isWorking) {
+    // Background messages must not interrupt pending approvals or other
+    // unfinished tool interactions. Explicit user messages keep their
+    // existing interrupt behavior unless the caller opts into queueing.
+    if (
+      this.state.get().isWorking ||
+      (options.queueIfBlocked && !this.canRunStep())
+    ) {
       const { queuedModelId, queueLengthAfter } =
         this.state.commands.enqueueUserMessage({ message: msg });
 

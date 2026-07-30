@@ -21,6 +21,7 @@ uniform vec3 uResolution;
 uniform float uSpeed;
 uniform float uScale;
 uniform float uRingCount;
+uniform float uRingSpeed;
 uniform float uSpokeCount;
 uniform float uRingThickness;
 uniform float uSpokeThickness;
@@ -54,7 +55,7 @@ void main() {
   float angle = atan(st.y, st.x);
   float time = uTime * uSpeed;
 
-  float ringPhase = distanceFromCenter * uRingCount - time;
+  float ringPhase = distanceFromCenter * uRingCount - time * uRingSpeed;
   float ringDistance = abs(fract(ringPhase) - 0.5);
   float ringGlow = 1.0 - smoothstep(0.0, uRingThickness, ringDistance);
 
@@ -86,13 +87,25 @@ void main() {
 }
 `;
 
-function hexToRgb(hex: string): [number, number, number] {
-  const value = hex.replace('#', '');
-  return [
-    Number.parseInt(value.slice(0, 2), 16) / 255,
-    Number.parseInt(value.slice(2, 4), 16) / 255,
-    Number.parseInt(value.slice(4, 6), 16) / 255,
-  ];
+function cssColorToRgb(
+  color: string,
+  container: HTMLElement,
+): [number, number, number] {
+  const probe = document.createElement('span');
+  probe.style.color = color;
+  container.appendChild(probe);
+  const resolvedColor = getComputedStyle(probe).color;
+  probe.remove();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext('2d');
+  if (!context) return [1, 1, 1];
+  context.fillStyle = resolvedColor;
+  context.fillRect(0, 0, 1, 1);
+  const data = context.getImageData(0, 0, 1, 1).data;
+  return [(data[0] ?? 0) / 255, (data[1] ?? 0) / 255, (data[2] ?? 0) / 255];
 }
 
 export function Radar({
@@ -105,6 +118,7 @@ export function Radar({
   falloff = 2,
   mouseInfluence = 0.1,
   ringCount = 10,
+  ringSpeed = 1,
   ringThickness = 0.05,
   scale = 0.5,
   speed = 1,
@@ -123,6 +137,7 @@ export function Radar({
   falloff?: number;
   mouseInfluence?: number;
   ringCount?: number;
+  ringSpeed?: number;
   ringThickness?: number;
   scale?: number;
   speed?: number;
@@ -158,14 +173,15 @@ export function Radar({
         uSpeed: { value: speed },
         uScale: { value: scale },
         uRingCount: { value: ringCount },
+        uRingSpeed: { value: ringSpeed },
         uSpokeCount: { value: spokeCount },
         uRingThickness: { value: ringThickness },
         uSpokeThickness: { value: spokeThickness },
         uSweepSpeed: { value: sweepSpeed },
         uSweepWidth: { value: sweepWidth },
         uSweepLobes: { value: sweepLobes },
-        uColor: { value: hexToRgb(color) },
-        uBgColor: { value: hexToRgb(backgroundColor) },
+        uColor: { value: cssColorToRgb(color, container) },
+        uBgColor: { value: cssColorToRgb(backgroundColor, container) },
         uFalloff: { value: falloff },
         uBrightness: { value: brightness },
         uMouse: { value: new Float32Array([0.5, 0.5]) },
@@ -193,6 +209,16 @@ export function Radar({
     resizeObserver.observe(container);
     container.appendChild(gl.canvas);
     resize();
+
+    const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const updateColors = () => {
+      program.uniforms.uColor.value = cssColorToRgb(color, container);
+      program.uniforms.uBgColor.value = cssColorToRgb(
+        backgroundColor,
+        container,
+      );
+    };
+    colorScheme.addEventListener('change', updateColors);
 
     const currentMouse: [number, number] = [0.5, 0.5];
     let targetMouse: [number, number] = [0.5, 0.5];
@@ -236,6 +262,7 @@ export function Radar({
       if (animationFrameId !== undefined)
         cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
+      colorScheme.removeEventListener('change', updateColors);
       if (enableMouseInteraction) {
         gl.canvas.removeEventListener('mousemove', handleMouseMove);
         gl.canvas.removeEventListener('mouseleave', handleMouseLeave);
@@ -252,6 +279,7 @@ export function Radar({
     falloff,
     mouseInfluence,
     ringCount,
+    ringSpeed,
     ringThickness,
     scale,
     speed,
