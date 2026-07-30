@@ -66,6 +66,10 @@ function isPartSettled(
   return true;
 }
 
+export function hasUnfinishedParts(msg: AgentMessage): boolean {
+  return msg.parts.some((part) => !isPartSettled(part));
+}
+
 /**
  * Check if all parts in a message have reached a terminal state
  * AND the indicator would not be redundant. Returns false when:

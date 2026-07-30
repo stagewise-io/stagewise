@@ -31,8 +31,9 @@ import { ExecuteSandboxJsToolPart } from './message-part-ui/tools/execute-sandbo
 import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-logs';
 import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-questions';
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
-import { isToolOrReasoningPart } from './message-utils';
+import { hasUnfinishedParts, isToolOrReasoningPart } from './message-utils';
 import { MessageBetweenSteps } from './message-between-steps';
+import { MessageStalledStream } from './message-stalled-stream';
 import { IconDotsOutline18 } from '@stagewise/icons';
 import {
   Menu,
@@ -371,6 +372,9 @@ export const MessageAssistant = memo(
                   );
                 });
               })()}
+              {isWorking && isLastMessage && hasUnfinishedParts(msg) ? (
+                <MessageStalledStream parts={msg.parts} />
+              ) : null}
               {showBetweenStepsIndicator && <MessageBetweenSteps />}
               {/* Actions menu — hidden on last message (restore would be a noop) and while streaming */}
               {!isLastMessage && (
