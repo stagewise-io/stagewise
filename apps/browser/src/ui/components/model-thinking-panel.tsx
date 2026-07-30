@@ -7,7 +7,6 @@ import {
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import type { ModelThinkingOverride } from '@shared/karton-contracts/ui/shared-types';
 import { useId } from 'react';
-import { cn } from '@ui/utils';
 import {
   getDefaultThinkingOption,
   getModelThinkingDisplayState,
@@ -83,12 +82,7 @@ export function ModelThinkingPanel({
           />
         </div>
 
-        <div
-          className={cn(
-            'space-y-2 transition-opacity',
-            !display.enabled && 'opacity-50',
-          )}
-        >
+        <div className="space-y-2">
           <div>
             <p className="font-medium text-foreground">Effort</p>
             <p className="text-muted-foreground">

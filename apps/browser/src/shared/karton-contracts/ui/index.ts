@@ -1345,6 +1345,7 @@ export type KartonContract = {
         workspacePaths?: string[],
         preserveWorkspacePaths?: boolean,
       ) => Promise<string>;
+      fork: (sourceAgentId: string) => Promise<string>;
       createSideChat: (sourceAgentId: string) => Promise<string>;
       promoteSideChat: (agentId: string) => Promise<void>;
       discardSideChat: (agentId: string) => Promise<void>;

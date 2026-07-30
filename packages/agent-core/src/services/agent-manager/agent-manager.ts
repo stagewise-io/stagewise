@@ -496,6 +496,9 @@ export class AgentManager extends DisposableService {
         return agent.instanceId;
       },
     );
+    this.wrapAgentRpc('agents.fork', (sourceAgentId: string) =>
+      this.forkChat(sourceAgentId),
+    );
     this.wrapAgentRpc('agents.createSideChat', (sourceAgentId: string) =>
       this.createSideChat(sourceAgentId),
     );
@@ -1291,7 +1294,35 @@ export class AgentManager extends DisposableService {
     );
   }
 
-  private async createSideChat(sourceAgentId: string): Promise<string> {
+  private async forkChat(sourceAgentId: string): Promise<string> {
+    // History rows are not necessarily hydrated. Reuse the resume path first
+    // so forking behaves identically for active and persisted chats.
+    await this.resumeAgent(sourceAgentId);
+
+    const sourceEnvelope = getAgentInstance(this.agentStore, sourceAgentId);
+    if (!sourceEnvelope) {
+      throw new Error(`Agent with instance id ${sourceAgentId} not found`);
+    }
+
+    const originalTitle = sourceEnvelope.state.title || 'New chat';
+    const forkId = await this.createSideChat(sourceAgentId, {
+      title: `Fork: ${originalTitle}`,
+      titleLockedByUser: true,
+    });
+
+    try {
+      await this.promoteSideChat(forkId);
+      return forkId;
+    } catch (error) {
+      await this.deleteAgent(forkId);
+      throw error;
+    }
+  }
+
+  private async createSideChat(
+    sourceAgentId: string,
+    titleOverride?: { title: string; titleLockedByUser: boolean },
+  ): Promise<string> {
     const sourceEnvelope = getAgentInstance(this.agentStore, sourceAgentId);
     if (!sourceEnvelope) {
       throw new Error(`Agent with instance id ${sourceAgentId} not found`);
@@ -1311,9 +1342,12 @@ export class AgentManager extends DisposableService {
       undefined,
       undefined,
       {
-        title: sourceEnvelope.state.title
-          ? `Side chat: ${sourceEnvelope.state.title}`
-          : 'Side chat',
+        title:
+          titleOverride?.title ??
+          (sourceEnvelope.state.title
+            ? `Side chat: ${sourceEnvelope.state.title}`
+            : 'Side chat'),
+        titleLockedByUser: titleOverride?.titleLockedByUser,
         history: sourceEnvelope.state.history.slice(),
         activeModelId: sourceEnvelope.state.activeModelId,
         activeProviderInstanceId: sourceEnvelope.state.activeProviderInstanceId,

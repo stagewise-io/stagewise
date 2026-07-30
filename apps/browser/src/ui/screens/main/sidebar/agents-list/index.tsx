@@ -47,6 +47,7 @@ import type { AgentHistoryEntry } from '@shared/karton-contracts/ui/agent';
 import {
   activeAgentCardsEqual,
   buildWorkspaceAgentGroups,
+  getActiveAgentStateIndicators,
   getAgentStateSeverity,
   getSeverityDotClass,
   maxSeverity,
@@ -77,6 +78,7 @@ import type {
   ToolApprovalMode,
 } from '@shared/karton-contracts/ui/shared-types';
 import { Button } from '@stagewise/stage-ui/components/button';
+import { toast } from '@stagewise/stage-ui/components/toaster';
 import { Checkbox } from '@stagewise/stage-ui/components/checkbox';
 import {
   Tooltip,
@@ -684,6 +686,7 @@ export function AgentsList() {
   const [openAgent, setOpenAgent] = useOpenAgent();
   const { previewAgentId } = useAgentSwitcher();
   const createAgent = useKartonProcedure((p) => p.agents.create);
+  const forkAgent = useKartonProcedure((p) => p.agents.fork);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const setLastOpenAgentId = useKartonProcedure(
     (p) => p.browser.setLastOpenAgentId,
@@ -794,19 +797,10 @@ export function AgentsList() {
             const history = agent.state.history;
             const lastMsg = history[history.length - 1]!;
             const hasPendingQuestion = !!s.toolbox[id]?.pendingUserQuestion;
-            // Detect any open tool-approval requests in the last assistant message.
-            const hasPendingToolApproval = (() => {
-              const h = agent.state.history;
-              for (let i = h.length - 1; i >= 0; i--) {
-                const msg = h[i]!;
-                if (msg.role !== 'assistant') continue;
-                return msg.parts.some(
-                  (p: { type: string; state?: string }) =>
-                    p.state === 'approval-requested',
-                );
-              }
-              return false;
-            })();
+            const stateIndicators = getActiveAgentStateIndicators(
+              agent,
+              s.toolbox[id],
+            );
             const isWorking = agent.state.isWorking;
             const rawActivity = hasPendingQuestion
               ? { text: 'Waiting for response...', isUserInput: false }
@@ -826,14 +820,12 @@ export function AgentsList() {
             return {
               id,
               title: agent.state.title,
-              isWorking: agent.state.isWorking,
-              isWaitingForUser: hasPendingQuestion || hasPendingToolApproval,
+              isWorking: stateIndicators.isWorking,
+              isWaitingForUser: stateIndicators.isWaitingForUser,
               activityText: activity.text,
               activityIsUserInput: activity.isUserInput,
-              hasError:
-                !!agent.state.error &&
-                agent.state.error.kind !== 'plan-limit-exceeded',
-              unread: !!agent.state.unread,
+              hasError: stateIndicators.hasError,
+              unread: stateIndicators.unread,
               lastMessageAt: lastMsg?.metadata?.createdAt
                 ? new Date(lastMsg.metadata.createdAt).getTime()
                 : 0,
@@ -902,6 +894,28 @@ export function AgentsList() {
   }, [agents.length, createAgent, emptyAgentIdRef, setOpenAgent, track]);
 
   const pendingScrollToCreatedAgentRef = useRef<string | null>(null);
+
+  const handleFork = useCallback(
+    (sourceAgentId: string) => {
+      void forkAgent(sourceAgentId)
+        .then((forkId) => {
+          pendingScrollToCreatedAgentRef.current = forkId;
+          window.dispatchEvent(new Event('sidebar-chat-panel-opened'));
+          setOpenAgent(forkId);
+          void setLastOpenAgentId(forkId);
+        })
+        .catch((error) => {
+          toast({
+            id: `agent-fork-error-${sourceAgentId}`,
+            title: 'Could not fork chat',
+            message: error instanceof Error ? error.message : String(error),
+            type: 'error',
+            actions: [],
+          });
+        });
+    },
+    [forkAgent, setLastOpenAgentId, setOpenAgent],
+  );
 
   const handleOpenWorkspaceInFileManager = useCallback(
     (workspacePath: string) => {
@@ -2539,6 +2553,7 @@ export function AgentsList() {
       <SharedAgentContextMenuHost
         target={ctxMenuTarget}
         onClose={handleCtxMenuClose}
+        onForkRequest={handleFork}
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover

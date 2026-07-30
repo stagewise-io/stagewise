@@ -21,13 +21,20 @@ describe('useAutoScroll', () => {
   const createViewport = (height = 1_000) => {
     const viewport = document.createElement('div');
     let scrollHeight = height;
+    let clientHeight = 0;
     Object.defineProperty(viewport, 'scrollHeight', {
       get: () => scrollHeight,
+    });
+    Object.defineProperty(viewport, 'clientHeight', {
+      get: () => clientHeight,
     });
     return {
       viewport,
       setHeight: (nextHeight: number) => {
         scrollHeight = nextHeight;
+      },
+      setClientHeight: (nextHeight: number) => {
+        clientHeight = nextHeight;
       },
     };
   };
@@ -54,6 +61,36 @@ describe('useAutoScroll', () => {
     expect(result.current.followOutput).toBe('auto');
   });
 
+  it('does not pause on wheel-up without scrollable overflow', () => {
+    const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
+    const { viewport, setClientHeight } = createViewport();
+
+    setClientHeight(1_000);
+    act(() => result.current.scrollerRef(viewport));
+    flushScroll();
+    act(() => viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -1 })));
+
+    expect(result.current.isAutoScrollEnabled()).toBe(true);
+    expect(result.current.followOutput).toBe('auto');
+  });
+
+  it('resumes following when Virtuoso reports the bottom', () => {
+    const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
+    const { viewport, setClientHeight } = createViewport();
+
+    setClientHeight(500);
+    act(() => result.current.scrollerRef(viewport));
+    flushScroll();
+    act(() => viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -1 })));
+    expect(result.current.isAutoScrollEnabled()).toBe(false);
+
+    act(() => result.current.atBottomStateChange(true));
+
+    expect(result.current.isAtBottom).toBe(true);
+    expect(result.current.isAutoScrollEnabled()).toBe(true);
+    expect(result.current.followOutput).toBe('auto');
+  });
+
   it('follows content growth but pauses when scrolling upward', () => {
     const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
     const { viewport, setHeight } = createViewport();
@@ -75,6 +112,28 @@ describe('useAutoScroll', () => {
     act(() => viewport.dispatchEvent(new Event('scroll')));
     act(() => viewport.dispatchEvent(new Event('scrollend')));
     expect(result.current.isAutoScrollEnabled()).toBe(true);
+  });
+
+  it('keeps following when a resize lowers scrollTop at the bottom', () => {
+    const { result } = renderHook(() =>
+      useAutoScroll({ mode: 'virtuoso', scrollEndThreshold: 100 }),
+    );
+    const { viewport, setHeight, setClientHeight } = createViewport();
+
+    act(() => result.current.scrollerRef(viewport));
+    flushScroll();
+
+    setHeight(1_500);
+    setClientHeight(500);
+    viewport.scrollTop = 1_000;
+    act(() => viewport.dispatchEvent(new Event('scroll')));
+
+    setClientHeight(600);
+    viewport.scrollTop = 900;
+    act(() => viewport.dispatchEvent(new Event('scroll')));
+
+    expect(result.current.isAutoScrollEnabled()).toBe(true);
+    expect(result.current.followOutput).toBe('auto');
   });
 
   it('starts following when Virtuoso mounts a new scroller', () => {

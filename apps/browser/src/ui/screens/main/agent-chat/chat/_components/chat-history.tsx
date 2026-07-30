@@ -43,6 +43,13 @@ import {
   getWorkspaceMountsFromMessage,
   resolveBrowserContextFromMessages,
 } from '@shared/env-metadata';
+import { IconChevronDownOutline18 } from '@stagewise/icons';
+import { Button } from '@stagewise/stage-ui/components/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@stagewise/stage-ui/components/tooltip';
 
 // Top inset reserved for titlebar-level chrome (sidebar toggle, future
 // top-right buttons). Sits as a sibling spacer ABOVE Virtuoso so items can
@@ -267,6 +274,8 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
     disableAutoScroll,
     isAutoScrollEnabled,
     followOutput,
+    isAtBottom,
+    atBottomStateChange,
   } = useAutoScroll({ mode: 'virtuoso', scrollEndThreshold: 100 });
 
   // Track scroll offset to drive the top fade overlay. We only need an
@@ -1306,10 +1315,29 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
             heightEstimates={estimatedHeights}
             itemContent={itemContent}
             atBottomThreshold={100}
+            atBottomStateChange={atBottomStateChange}
             followOutput={followOutput}
             computeItemKey={(_, message) => message.id}
             totalCount={filteredMessages.length}
           />
+          {!isAtBottom && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-[calc(12px+var(--status-card-height,0px))] z-10 flex justify-center">
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    aria-label="Scroll to bottom"
+                    className="pointer-events-auto shadow-elevation-1"
+                    size="icon-sm"
+                    variant="secondary"
+                    onClick={forceEnableAutoScroll}
+                  >
+                    <IconChevronDownOutline18 className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Scroll to bottom</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
         </div>
       </AttachmentMetadataProvider>
     </MountedPathsProvider>
