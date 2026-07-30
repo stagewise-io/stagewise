@@ -30,6 +30,7 @@ import {
 import {
   type FileDiff,
   type FileResult,
+  type ToolCallFileEdit,
   MAX_DIFF_TEXT_FILE_SIZE,
 } from '../../types/diff-history';
 import {
@@ -45,6 +46,7 @@ import {
   retrieveContentForOid,
   copyOperationsUpToInitBaseline,
   getUndoTargetForToolCallsByFilePath,
+  getOperationsForToolCalls,
   storeFileContent,
   storeLargeContent,
   hasPendingEditsForFilepath,
@@ -1117,6 +1119,97 @@ export class DiffHistoryService extends DisposableService {
   }
 
   /**
+   * Compute the net changes made by a set of tool calls. Unlike the agent-wide
+   * edit summary, the baseline for every file is the state immediately before
+   * the first selected tool call and the current state is the final selected
+   * tool call's snapshot.
+   */
+  public async getFileEditsForToolCalls(
+    agentInstanceId: string,
+    toolCallIds: string[],
+  ): Promise<ToolCallFileEdit[]> {
+    const uniqueToolCallIds = [...new Set(toolCallIds)];
+    if (uniqueToolCallIds.length === 0) return [];
+
+    const toolOperations = await getOperationsForToolCalls(
+      this.db,
+      uniqueToolCallIds,
+      agentInstanceId,
+    );
+    if (toolOperations.length === 0) return [];
+
+    const visibleToolOperations = toolOperations.filter(
+      (operation) =>
+        !this.isInternalFilepath(agentInstanceId, operation.filepath),
+    );
+    if (visibleToolOperations.length === 0) return [];
+
+    const undoTargets = await getUndoTargetForToolCallsByFilePath(
+      this.db,
+      uniqueToolCallIds,
+      agentInstanceId,
+      visibleToolOperations,
+    );
+    const baselineOperations = Object.values(undoTargets).map(
+      (operation): OperationWithExternal => ({
+        ...operation,
+        operation: 'baseline',
+        contributor: 'user',
+        reason: 'init',
+      }),
+    );
+    const relevantOperations = [
+      ...baselineOperations,
+      ...visibleToolOperations,
+    ].sort((a, b) => Number(a.idx) - Number(b.idx));
+
+    const toolCallIdsByPath = new Map<string, string[]>();
+    for (const operation of visibleToolOperations) {
+      const ids = toolCallIdsByPath.get(operation.filepath) ?? [];
+      const toolCallId = operation.reason.slice(5);
+      if (!ids.includes(toolCallId)) ids.push(toolCallId);
+      toolCallIdsByPath.set(operation.filepath, ids);
+    }
+
+    // Turn summaries intentionally exclude operations outside this tool-call
+    // set, so they must not share incremental state with agent-wide summaries.
+    const diffs = await this.computeFileDiffsUncached(
+      null,
+      relevantOperations,
+      'summary',
+    );
+
+    return diffs.flatMap<ToolCallFileEdit>((diff) => {
+      const toolCallIds = toolCallIdsByPath.get(diff.path);
+      const hasChanges = diff.isExternal
+        ? diff.baselineOid !== diff.currentOid
+        : diff.lineChanges.some((change) => change.added || change.removed) ||
+          diff.baselineOid !== diff.currentOid;
+      if (!toolCallIds || !hasChanges) return [];
+
+      if (diff.isExternal) {
+        return [
+          {
+            path: diff.path,
+            added: 0,
+            removed: 0,
+            toolCallIds,
+            changeType: diff.changeType,
+          },
+        ];
+      }
+
+      let added = 0;
+      let removed = 0;
+      for (const change of diff.lineChanges) {
+        if (change.added) added += change.count ?? 0;
+        if (change.removed) removed += change.count ?? 0;
+      }
+      return [{ path: diff.path, added, removed, toolCallIds }];
+    });
+  }
+
+  /**
    * Accepts all pending diff hunks for a given agent instance.
    * Should be called before an agent is deleted to ensure no
    * "hanging" pending diffs remain in the system.
@@ -1563,9 +1656,8 @@ export class DiffHistoryService extends DisposableService {
 
   /**
    * Runs the full diff-compute pipeline over the given operations with no
-   * caching and no internal-path filtering. Used by the global accept/reject
-   * path (acceptAndRejectHunks) which passes ops spanning all agents, and as
-   * the inner implementation for per-filepath recomputation on cache misses.
+   * internal-path filtering. Passing no agent skips the incremental cache,
+   * which is required for operation subsets and cross-agent computations.
    */
   private async computeFileDiffsUncached(
     agentInstanceId: string | null,

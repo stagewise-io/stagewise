@@ -1566,6 +1566,18 @@ export class ToolboxService
       async (_callingClientId: string, owner: RunningServerOwner) =>
         this.stopRunningServer(owner),
     );
+    this.uiKarton.registerServerProcedureHandler(
+      'toolbox.getFileEditsForToolCalls',
+      async (
+        _callingClientId: string,
+        agentInstanceId: string,
+        toolCallIds: string[],
+      ) =>
+        this.diffHistoryService.getFileEditsForToolCalls(
+          agentInstanceId,
+          toolCallIds,
+        ),
+    );
 
     // Use arrow function to preserve `this` binding when called as callback
     this.authService.registerAuthStateChangeCallback(() =>

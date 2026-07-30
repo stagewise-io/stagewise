@@ -16,7 +16,7 @@ import type {
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
-import type { ExternalIde, FileDiff } from './shared-types';
+import type { ExternalIde, FileDiff, ToolCallFileEdit } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
 export type {
@@ -1445,6 +1445,10 @@ export type KartonContract = {
     toolbox: {
       acceptHunks: (hunkIds: string[]) => Promise<void>;
       rejectHunks: (hunkIds: string[]) => Promise<void>;
+      getFileEditsForToolCalls: (
+        agentInstanceId: string,
+        toolCallIds: string[],
+      ) => Promise<ToolCallFileEdit[]>;
       mountWorkspace: (
         agentInstanceId: string,
         workspacePath?: string,

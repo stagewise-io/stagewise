@@ -31,7 +31,7 @@ import { ExecuteSandboxJsToolPart } from './message-part-ui/tools/execute-sandbo
 import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-logs';
 import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-questions';
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
-import { isToolOrReasoningPart } from './message-utils';
+import { isToolOrReasoningPart, isToolPart } from './message-utils';
 import { MessageBetweenSteps } from './message-between-steps';
 import { IconDotsOutline18 } from '@stagewise/icons';
 import {
@@ -42,6 +42,7 @@ import {
 } from '@stagewise/stage-ui/components/menu';
 import { HistoryIcon } from 'lucide-react';
 import { RevertConfirmPopover } from './revert-confirm-popover';
+import { TurnFileEdits, useTurnFileEdits } from './turn-file-edits';
 
 type AssistantMessage = AgentMessage & { role: 'assistant' };
 
@@ -258,6 +259,30 @@ export const MessageAssistant = memo(
     }, [msg.parts]);
 
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const completedToolCallIds = useMemo(() => {
+      const ids: string[] = [];
+      for (const part of msg.parts) {
+        if (
+          !isToolPart(part) ||
+          isReadOnlyToolPart(part) ||
+          (part.state !== 'output-available' && part.state !== 'output-error')
+        )
+          continue;
+        ids.push(part.toolCallId);
+      }
+      return ids;
+    }, [msg.parts]);
+    const showTurnFileEdits =
+      completedToolCallIds.length > 0 && (!isLastMessage || !isWorking);
+    const turnFileEdits = useTurnFileEdits(
+      agentId,
+      completedToolCallIds,
+      showTurnFileEdits,
+    );
+    const summarizedToolCallIds = useMemo(
+      () => new Set(turnFileEdits?.flatMap((edit) => edit.toolCallIds) ?? []),
+      [turnFileEdits],
+    );
 
     const dispatchRestore = useCallback(
       (undoToolCalls: boolean) => {
@@ -352,6 +377,11 @@ export const MessageAssistant = memo(
                   const currentTypeIndex = typeCounters[part.type] ?? 0;
                   typeCounters[part.type] = currentTypeIndex + 1;
                   const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
+                  if (
+                    isToolPart(part) &&
+                    summarizedToolCallIds.has(part.toolCallId)
+                  )
+                    return null;
 
                   return (
                     <SinglePartRenderer
@@ -372,6 +402,9 @@ export const MessageAssistant = memo(
                 });
               })()}
               {showBetweenStepsIndicator && <MessageBetweenSteps />}
+              {turnFileEdits && turnFileEdits.length > 0 && (
+                <TurnFileEdits agentId={agentId} edits={turnFileEdits} />
+              )}
               {/* Actions menu — hidden on last message (restore would be a noop) and while streaming */}
               {!isLastMessage && (
                 <div className="flex justify-end">

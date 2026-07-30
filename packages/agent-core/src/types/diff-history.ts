@@ -48,6 +48,15 @@ export type ExternalFileDiff = FileDiffBase & {
 
 export type FileDiff = TextFileDiff | ExternalFileDiff;
 
+/** Compact file-edit summary for a set of tool calls. */
+export type ToolCallFileEdit = {
+  path: string;
+  added: number;
+  removed: number;
+  toolCallIds: string[];
+  changeType?: ExternalFileDiff['changeType'];
+};
+
 import { z } from 'zod';
 
 export const fileDiffSnapshotSchema = z.object({

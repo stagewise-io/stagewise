@@ -18,6 +18,7 @@ import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
 import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { HotkeyActions } from '@shared/hotkeys';
+import { resolveWorkspaceFileLocation } from '@ui/utils/workspace-path';
 import {
   type StatusCardSection,
   type FormattedFileDiff,
@@ -53,17 +54,10 @@ export function formatFileDiff(fileDiff: FileDiff): FormattedFileDiff {
  * when the file sits at the workspace root.
  */
 function getRelativeDir(absoluteFilePath: string, mounts: Mount[]): string {
-  const normalized = normalizePath(absoluteFilePath);
-  const parentDir = getParentPath(normalized);
-  for (const mount of mounts) {
-    const mountRoot = normalizePath(mount.path);
-    if (parentDir.startsWith(`${mountRoot}/`)) {
-      return parentDir.slice(mountRoot.length + 1);
-    }
-    if (parentDir === mountRoot) return '';
-  }
-  // Fallback: just show parent dir as-is
-  return parentDir;
+  const location = resolveWorkspaceFileLocation(absoluteFilePath, mounts);
+  return location
+    ? getParentPath(location.relativePath)
+    : getParentPath(normalizePath(absoluteFilePath));
 }
 
 /**
@@ -102,18 +96,11 @@ function groupDiffsByMount(
   }
 
   for (const diff of diffs) {
-    const normalized = normalizePath(diff.path);
-    let matched = false;
-    for (const mount of mounts) {
-      const mountRoot = normalizePath(mount.path);
-      if (normalized.startsWith(`${mountRoot}/`) || normalized === mountRoot) {
-        groups.get(mount.path)!.diffs.push(diff);
-        matched = true;
-        break;
-      }
-    }
+    const location = resolveWorkspaceFileLocation(diff.path, mounts);
+    if (location) groups.get(location.mount.path)?.diffs.push(diff);
+
     // Fallback: assign to first mount if no match
-    if (!matched && mounts.length > 0) {
+    if (!location && mounts.length > 0) {
       const firstMount = mounts[0];
       if (firstMount) {
         groups.get(firstMount.path)?.diffs.push(diff);

@@ -24,6 +24,7 @@ export type {
   StagewiseProviderOptions,
   TextFileDiff,
   TextFileResult,
+  ToolCallFileEdit,
 } from '@stagewise/agent-core/types';
 
 // ============================================================================
