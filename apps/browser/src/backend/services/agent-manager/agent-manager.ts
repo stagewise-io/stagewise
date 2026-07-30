@@ -200,7 +200,9 @@ export class AgentManagerService extends DisposableService {
         },
       },
     };
-    await this.manager.sendUserMessage(event.agentInstanceId, message);
+    await this.manager.sendUserMessage(event.agentInstanceId, message, {
+      queueIfBlocked: true,
+    });
   }
 
   private registerKartonForwarders(): void {

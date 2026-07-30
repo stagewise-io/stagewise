@@ -156,7 +156,7 @@ export function CreateWatcherSessionToolPart({
             isCreating && 'text-warning-foreground',
             state === 'success' &&
               (watcherActive
-                ? 'text-success-foreground'
+                ? 'text-primary-foreground'
                 : 'text-muted-foreground'),
             state === 'error' && 'text-error-foreground',
             state === 'denied' && 'text-muted-foreground',
@@ -196,7 +196,7 @@ export function CreateWatcherSessionToolPart({
       </div>
       {state === 'success' && watcherActive ? (
         <div
-          className="absolute -top-24 -right-16 size-72 opacity-80"
+          className="absolute -right-[15rem] -bottom-[18.75rem] size-[40rem] opacity-40 blur-[0.5px]"
           style={{
             maskImage:
               'radial-gradient(circle, black 35%, rgb(0 0 0 / 75%) 55%, transparent 72%)',
@@ -206,9 +206,10 @@ export function CreateWatcherSessionToolPart({
         >
           <Radar
             brightness={0.8}
-            color="#42e68b"
-            mouseInfluence={0.05}
-            ringCount={12}
+            color="var(--color-primary-foreground)"
+            enableMouseInteraction={false}
+            ringCount={16}
+            ringSpeed={0}
             ringThickness={0.03}
             scale={0.65}
             speed={1}
