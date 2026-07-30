@@ -1,4 +1,3 @@
-import type { FileDiff } from '../ui/shared-types';
 // Enum for how the user arrived at the page (matches Chrome's internal integers)
 // Core transition types are stored in the lower 8 bits
 export enum PageTransition {
@@ -203,14 +202,6 @@ export interface ClearBrowsingDataResult {
   error?: string;
 }
 
-// Result of getting pending edits for a chat
-export interface PendingEditsResult {
-  /** Whether the chat was found */
-  found: boolean;
-  /** Pending file diffs */
-  edits: FileDiff[];
-}
-
 // Re-export search engine types from shared-types
 export type {
   SearchEngine,
@@ -231,14 +222,6 @@ export interface RemoveSearchEngineResult {
 export interface LocalPortEntry {
   port: number;
   url: string;
-}
-
-/** Result of getExternalFileContent procedure */
-export interface ExternalFileContentResult {
-  /** Base64-encoded file content */
-  content: string;
-  /** MIME type inferred from file extension (null if unknown) */
-  mimeType: string | null;
 }
 
 // ─── Usage Types ─────────────────────────────────────────────────────────────

@@ -23,8 +23,6 @@ function ensureToolboxEntry(
   if (!draft.toolbox[agentInstanceId]) {
     draft.toolbox[agentInstanceId] = {
       workspace: { mounts: [] },
-      pendingFileDiffs: [],
-      editSummary: [],
       pendingUserQuestion: null,
     };
   }

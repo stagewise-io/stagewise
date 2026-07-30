@@ -17,15 +17,12 @@ import {
   type WorkspaceMountInfo,
 } from '@shared/karton-contracts/pages-api';
 import type { PlanEntry } from '@shared/karton-contracts/ui';
-import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
 import type { GlobalConfig } from '@shared/karton-contracts/ui/shared-types';
 import type { HistoryService } from './history';
 import type { FaviconService } from './favicon';
 import type {
   ClearBrowsingDataOptions,
   ClearBrowsingDataResult,
-  PendingEditsResult,
-  ExternalFileContentResult,
   HistoryFilter,
   HistoryResult,
   FaviconBitmapResult,
@@ -41,7 +38,7 @@ declare const PAGES_VITE_NAME: string;
 
 /**
  * Service responsible for the stagewise:// protocol handler for the pages
- * renderer (internal pages: history, downloads, diff-review, plans) and the
+ * renderer (internal pages: history, downloads, plans) and the
  * PagesApi Karton contract for communication with those pages.
  */
 export class PagesService extends DisposableService {
@@ -52,9 +49,6 @@ export class PagesService extends DisposableService {
   private transport: ElectronServerTransport;
   private portCloseListeners = new Map<MessagePortMain, () => void>();
   private openTabHandler?: (url: string, setActive?: boolean) => Promise<void>;
-  private getPendingEditsHandler?: (
-    agentInstanceId: string,
-  ) => Promise<PendingEditsResult>;
   private forwardAppMessageHandler?: (
     agentInstanceId: string,
     appId: string,
@@ -64,28 +58,11 @@ export class PagesService extends DisposableService {
   private clearPendingAppMessageHandler?: (
     agentInstanceId: string,
   ) => Promise<void>;
-  private acceptAllPendingEditsHandler?: (
-    agentInstanceId: string,
-  ) => Promise<void>;
-  private rejectAllPendingEditsHandler?: (
-    agentInstanceId: string,
-  ) => Promise<void>;
-  private acceptPendingEditHandler?: (
-    agentInstanceId: string,
-    path: string,
-  ) => Promise<void>;
-  private rejectPendingEditHandler?: (
-    agentInstanceId: string,
-    fileId: string,
-  ) => Promise<void>;
   private clearPermissionExceptionsHandler?: () => Promise<void>;
   private trustCertificateAndReloadHandler?: (
     tabId: string,
     origin: string,
   ) => Promise<void>;
-  private getExternalFileContentHandler?: (
-    oid: string,
-  ) => Promise<ExternalFileContentResult | null>;
 
   private readonly telemetryService: TelemetryService;
 
@@ -455,104 +432,6 @@ export class PagesService extends DisposableService {
     );
 
     this.kartonServer.registerServerProcedureHandler(
-      'getPendingEdits',
-      async (
-        _callingClientId: string,
-        agentInstanceId: string,
-      ): Promise<PendingEditsResult> => {
-        if (!this.getPendingEditsHandler) {
-          this.logger.warn(
-            '[PagesService] getPendingEdits called but no handler is set',
-          );
-          return { found: false, edits: [] };
-        }
-        return this.getPendingEditsHandler(agentInstanceId);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'acceptAllPendingEdits',
-      async (
-        _callingClientId: string,
-        agentInstanceId: string,
-      ): Promise<void> => {
-        if (!this.acceptAllPendingEditsHandler) {
-          this.logger.warn(
-            '[PagesService] acceptAllPendingEdits called but no handler is set',
-          );
-          return;
-        }
-        await this.acceptAllPendingEditsHandler(agentInstanceId);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'rejectAllPendingEdits',
-      async (
-        _callingClientId: string,
-        agentInstanceId: string,
-      ): Promise<void> => {
-        if (!this.rejectAllPendingEditsHandler) {
-          this.logger.warn(
-            '[PagesService] rejectAllPendingEdits called but no handler is set',
-          );
-          return;
-        }
-        await this.rejectAllPendingEditsHandler(agentInstanceId);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'acceptPendingEdit',
-      async (
-        _callingClientId: string,
-        agentInstanceId: string,
-        fileId: string,
-      ): Promise<void> => {
-        if (!this.acceptPendingEditHandler) {
-          this.logger.warn(
-            '[PagesService] acceptPendingEdit called but no handler is set',
-          );
-          return;
-        }
-        await this.acceptPendingEditHandler(agentInstanceId, fileId);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'rejectPendingEdit',
-      async (
-        _callingClientId: string,
-        agentInstanceId: string,
-        fileId: string,
-      ): Promise<void> => {
-        if (!this.rejectPendingEditHandler) {
-          this.logger.warn(
-            '[PagesService] rejectPendingEdit called but no handler is set',
-          );
-          return;
-        }
-        await this.rejectPendingEditHandler(agentInstanceId, fileId);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
-      'getExternalFileContent',
-      async (
-        _callingClientId: string,
-        oid: string,
-      ): Promise<ExternalFileContentResult | null> => {
-        if (!this.getExternalFileContentHandler) {
-          this.logger.warn(
-            '[PagesService] getExternalFileContent called but no handler is set',
-          );
-          return null;
-        }
-        return this.getExternalFileContentHandler(oid);
-      },
-    );
-
-    this.kartonServer.registerServerProcedureHandler(
       'trustCertificateAndReload',
       async (
         _callingClientId: string,
@@ -578,12 +457,6 @@ export class PagesService extends DisposableService {
     this.openTabHandler = handler;
   }
 
-  public setGetPendingEditsHandler(
-    handler: (agentInstanceId: string) => Promise<PendingEditsResult>,
-  ): void {
-    this.getPendingEditsHandler = handler;
-  }
-
   public setForwardAppMessageHandler(
     handler: (
       agentInstanceId: string,
@@ -599,36 +472,6 @@ export class PagesService extends DisposableService {
     handler: (agentInstanceId: string) => Promise<void>,
   ): void {
     this.clearPendingAppMessageHandler = handler;
-  }
-
-  public setAcceptAllPendingEditsHandler(
-    handler: (agentInstanceId: string) => Promise<void>,
-  ): void {
-    this.acceptAllPendingEditsHandler = handler;
-  }
-
-  public setRejectAllPendingEditsHandler(
-    handler: (agentInstanceId: string) => Promise<void>,
-  ): void {
-    this.rejectAllPendingEditsHandler = handler;
-  }
-
-  public setAcceptPendingEditHandler(
-    handler: (agentInstanceId: string, fileId: string) => Promise<void>,
-  ): void {
-    this.acceptPendingEditHandler = handler;
-  }
-
-  public setRejectPendingEditHandler(
-    handler: (agentInstanceId: string, fileId: string) => Promise<void>,
-  ): void {
-    this.rejectPendingEditHandler = handler;
-  }
-
-  public setGetExternalFileContentHandler(
-    handler: (oid: string) => Promise<ExternalFileContentResult | null>,
-  ): void {
-    this.getExternalFileContentHandler = handler;
   }
 
   public setTrustCertificateAndReloadHandler(
@@ -660,15 +503,6 @@ export class PagesService extends DisposableService {
   public syncPlansState(plans: PlanEntry[]): void {
     this.kartonServer.setState((draft) => {
       draft.plans = plans;
-    });
-  }
-
-  public updatePendingEditsState(
-    agentInstanceId: string,
-    edits: FileDiff[],
-  ): void {
-    this.kartonServer.setState((draft) => {
-      draft.pendingEditsByAgentInstanceId[agentInstanceId] = edits;
     });
   }
 
@@ -859,14 +693,8 @@ export class PagesService extends DisposableService {
     this.kartonServer.removeServerProcedureHandler('openTab');
     this.kartonServer.removeServerProcedureHandler('openExternalUrl');
     this.kartonServer.removeServerProcedureHandler('captureTelemetry');
-    this.kartonServer.removeServerProcedureHandler('getPendingEdits');
     this.kartonServer.removeServerProcedureHandler('forwardAppMessage');
     this.kartonServer.removeServerProcedureHandler('clearPendingAppMessage');
-    this.kartonServer.removeServerProcedureHandler('acceptAllPendingEdits');
-    this.kartonServer.removeServerProcedureHandler('rejectAllPendingEdits');
-    this.kartonServer.removeServerProcedureHandler('acceptPendingEdit');
-    this.kartonServer.removeServerProcedureHandler('rejectPendingEdit');
-    this.kartonServer.removeServerProcedureHandler('getExternalFileContent');
     this.kartonServer.removeServerProcedureHandler('trustCertificateAndReload');
 
     const ses = session.fromPartition('persist:browser-content');
@@ -881,7 +709,6 @@ export class PagesService extends DisposableService {
     this.portCloseListeners.clear();
     this.openTabHandler = undefined;
     this.trustCertificateAndReloadHandler = undefined;
-    this.getExternalFileContentHandler = undefined;
     this.forwardAppMessageHandler = undefined;
     this.clearPendingAppMessageHandler = undefined;
 

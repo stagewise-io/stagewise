@@ -176,8 +176,6 @@ export const askUserQuestions = (
         uiKarton.setState((draft) => {
           draft.toolbox[agentInstanceId] = {
             workspace: { mounts: [] },
-            pendingFileDiffs: [],
-            editSummary: [],
             pendingUserQuestion: null,
           };
         });

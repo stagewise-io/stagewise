@@ -7,9 +7,8 @@ Authoritative reference for the shape, persistence, and parity of
 This document closes the SPEC's Phase 0 / S4 pre-spike. It has three
 jobs:
 
-1. Prove `AgentSystemState` matches the Karton `AppState.agents` and
-   `AppState.toolbox` slices field-for-field, with every delta named and
-   justified.
+1. Document how `AgentSystemState` maps to the Karton `AppState.agents`
+   and `AppState.toolbox` slices, with every delta named and justified.
 2. Classify every field as persisted vs ephemeral so slice migrations
    and resume-after-restart code have a single source of truth.
 3. Lock the child-agent invariants (D13) so future slice migrations do
@@ -50,8 +49,8 @@ No missing or extra fields.
 | Karton field                | agent-core field            | Status | Notes                                                                                       |
 | --------------------------- | --------------------------- | ------ | ------------------------------------------------------------------------------------------- |
 | `workspace.mounts`          | `workspace.mounts`          | match  | Both are `MountEntry[]` from `@stagewise/agent-core/types/metadata`.                        |
-| `pendingFileDiffs`          | `pendingFileDiffs`          | match  | `FileDiff[]`. Karton re-exports `FileDiff` from `@stagewise/agent-core/types/diff-history`. |
-| `editSummary`               | `editSummary`               | match  | `FileDiff[]`.                                                                               |
+| —                           | `pendingFileDiffs`          | core-only | Internal diff history used for checkpoint/undo and edited-file context; no longer mirrored to UI Karton. |
+| —                           | `editSummary`               | core-only | Internal diff history used for checkpoint/undo and edited-file context; no longer mirrored to UI Karton. |
 | `pendingUserQuestion`       | `pendingUserQuestion`       | delta  | Karton specializes the generic with `QuestionField`/`QuestionAnswerValue` (host-owned tool schema); agent-core keeps it generic. See §3. |
 | `pendingSandboxOutputs`     | `pendingSandboxOutputs`     | match  | `Record<string, string[]> \| undefined`.                                                    |
 | `pendingSandboxAttachments` | `pendingSandboxAttachments` | match  | `Record<string, AttachmentMetadata[]> \| undefined`.                                        |
@@ -61,7 +60,8 @@ No missing or extra fields.
 | `activeApp`                 | `activeApp`                 | match  | Same object shape both sides.                                                               |
 | `pendingAppMessage`         | `pendingAppMessage`         | match  | Same object shape both sides.                                                               |
 
-No missing or extra fields.
+The two core-only diff-history fields are intentionally omitted from the UI
+contract. There are no accidental missing or extra fields.
 
 ---
 
@@ -114,7 +114,7 @@ As of Phase 6 (see §3.2), `toolApprovalMode` is store-canonical and
 typed as `string` in `AgentState`; the host narrows the string union
 via its `AgentState` overlay.
 
-### `ToolboxAgentState` (host-projected per-agent toolbox slice)
+### `ToolboxAgentState` (per-agent toolbox state)
 
 None of the toolbox fields live on the agent row. Fields that survive
 restart do so because a dedicated service re-derives them from its own
@@ -123,8 +123,8 @@ storage on load.
 | Field                       | Class          | Source on resume                                                                                                                                                                            | Reset on resume         |
 | --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | `workspace.mounts`          | persisted-core | Remounted via `MountManager.mountWorkspace(instanceId, path, permissions)` (core, `@stagewise/agent-core/mount-manager`) using `agentInstances.mounted_workspaces`. Host shell (`MountManagerService`) wraps it for file-picker + `ClientRuntimeNode`/LSP orchestration. The toolbox slice is populated via the colocated `setAgentMounts` writer as a side effect. | no (recreated)          |
-| `pendingFileDiffs`          | persisted-side | `DiffHistoryService` at `<userData>/stagewise/diff-history/data.sqlite` (`snapshots` + `operations` tables, plus on-disk blob dir).                                                         | no (recreated)          |
-| `editSummary`               | persisted-side | Same DB as `pendingFileDiffs`; accepted-but-still-relevant diffs.                                                                                                                           | no (recreated)          |
+| `pendingFileDiffs`          | persisted-side | Core-only. Rebuilt by `DiffHistoryService` from `<userData>/stagewise/diff-history/data.sqlite` (`snapshots` + `operations` tables, plus on-disk blob dir).                                 | no (recreated)          |
+| `editSummary`               | persisted-side | Core-only. Same DB as `pendingFileDiffs`; finalized-but-still-relevant diffs.                                                                                                                | no (recreated)          |
 | `pendingUserQuestion`       | ephemeral      | Not stored; in-flight `askUserQuestions` state.                                                                                                                                             | yes — cleared           |
 | `pendingSandboxOutputs`     | ephemeral      | Not stored.                                                                                                                                                                                 | yes — cleared           |
 | `pendingSandboxAttachments` | ephemeral      | Not stored. Note: the underlying attachment blobs at `<userData>/stagewise/agents/<id>/data-attachments/<blobKey>` *are* persisted — only the in-flight "pending" index is ephemeral.       | yes — cleared           |
@@ -150,10 +150,15 @@ Per D15, none of the persisted paths or schemas may change during Phase
 
 ## 3. Intentional deltas
 
-Three structural deltas are locked decisions, not drift. Each is
+The structural deltas below are locked decisions, not drift. Each is
 bridged at the Karton boundary so the compile-time parity assertion in
 [](path:w787f/apps/browser/src/shared/karton-contracts/ui/agent-core-parity.ts)
 still passes.
+
+`ToolboxAgentState.pendingFileDiffs` and `editSummary` are an additional
+core-only service detail. They remain available to checkpoint/undo and
+environment-context code, but are intentionally omitted from the Karton UI
+projection now that pending-edit review has been removed.
 
 ### 3.1 `requiredModelCapabilities` (D14)
 

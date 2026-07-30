@@ -1431,12 +1431,12 @@ export class AgentManager extends DisposableService {
       new Error("Agent was stopped and deleted before finishing it's task."),
     );
 
-    // Accept all pending diffs before archiving so no "hanging" diffs remain
+    // Finalize pending diffs before archiving so they do not reappear on resume.
     try {
-      await this.managerToolbox.acceptAllPendingEditsForAgent(instanceId);
+      await this.managerToolbox.finalizePendingEditsForAgent(instanceId);
     } catch (error) {
       this.logger.error(
-        `[AgentManager] Failed to accept pending edits for agent ${instanceId}`,
+        `[AgentManager] Failed to finalize edits for agent ${instanceId}`,
         error,
       );
     }

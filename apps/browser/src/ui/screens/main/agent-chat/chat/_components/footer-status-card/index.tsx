@@ -1,11 +1,4 @@
-import {
-  useMemo,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useCallback,
-} from 'react';
+import { useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   useKartonState,
   useKartonProcedure,
@@ -13,16 +6,9 @@ import {
 } from '@ui/hooks/use-karton';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import type { Mount } from '@shared/karton-contracts/ui/agent/metadata';
-import { EMPTY_MOUNTS } from '@shared/karton-contracts/ui';
 import { getWorkspaceMountsFromMessage } from '@shared/env-metadata';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import {
-  type StatusCardSection,
-  type FormattedFileDiff,
-  StatusCardComponent,
-  getHunkIds,
-} from './shared';
-import { FileDiffSection, formatFileDiff } from './file-diff-section';
+import { type StatusCardSection, StatusCardComponent } from './shared';
 import { MessageQueueSection } from './message-queue-section';
 import { AttachmentMetadataProvider } from '@ui/hooks/use-attachment-metadata';
 import { createRafResizeObserver } from '@ui/utils/resize-observer';
@@ -46,27 +32,12 @@ import { useContentCollapsed } from '@ui/screens/main/_components/content-collap
 const EMPTY_HISTORY: AgentMessage[] = [];
 const EMPTY_QUEUE: (AgentMessage & { role: 'user' })[] = [];
 const EMPTY_MOUNTS_SNAPSHOT: Mount[] = [];
-const EMPTY_SET = new Set<string>();
 
 export function StatusCard() {
   const cardRef = useRef<HTMLDivElement>(null);
   const previousHeightRef = useRef(0);
   const [openAgentId] = useOpenAgent();
-  const pendingDiffs = useKartonState((s) =>
-    openAgentId ? s.toolbox[openAgentId]?.pendingFileDiffs : undefined,
-  );
-  const diffSummary = useKartonState((s) =>
-    openAgentId ? s.toolbox[openAgentId]?.editSummary : undefined,
-  );
-
-  const rejectAllPendingEdits = useKartonProcedure(
-    (p) => p.toolbox.rejectHunks,
-  );
-  const acceptAllPendingEdits = useKartonProcedure(
-    (p) => p.toolbox.acceptHunks,
-  );
   const createTab = useKartonProcedure((p) => p.browser.createTab);
-  const _openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const switchTab = useKartonProcedure((p) => p.browser.switchTab);
   const goToUrl = useKartonProcedure((p) => p.browser.goto);
   const tabs = useKartonState((s) => s.contentTabs.tabs);
@@ -79,12 +50,6 @@ export function StatusCard() {
     openAgentId
       ? (s.agents.instances[openAgentId]?.state.queuedMessages ?? EMPTY_QUEUE)
       : EMPTY_QUEUE,
-  );
-
-  const workspaceMounts = useKartonState((s) =>
-    openAgentId
-      ? (s.toolbox[openAgentId]?.workspace?.mounts ?? EMPTY_MOUNTS)
-      : EMPTY_MOUNTS,
   );
 
   const globalPlans = useKartonState((s) => s.plans);
@@ -114,7 +79,6 @@ export function StatusCard() {
       ? (s.agents.instances[openAgentId]?.state.isWorking ?? false)
       : false,
   );
-
   // All mounts ever seen in env snapshots (survives workspace disconnects).
   // Extraction is done inside the selector so we don't subscribe to the
   // full history array (which gets a new Immer reference on every streaming
@@ -152,12 +116,6 @@ export function StatusCard() {
     ),
   );
 
-  // Set of currently connected mount paths
-  const activeMountPaths = useMemo(() => {
-    if (workspaceMounts.length === 0) return EMPTY_SET;
-    return new Set(workspaceMounts.map((m) => m.path));
-  }, [workspaceMounts]);
-
   // Procedure to remove a queued message
   const deleteQueuedMessage = useKartonProcedure(
     (p) => p.agents.deleteQueuedMessage,
@@ -179,73 +137,6 @@ export function StatusCard() {
   const goBackUserQuestion = useKartonProcedure(
     (p) => p.toolbox.goBackUserQuestion,
   );
-
-  const openDiffReviewPage = useCallback(
-    (fileId: string) => {
-      if (!openAgentId) return;
-      const baseUrl = `stagewise://internal/diff-review/${openAgentId}`;
-      const fragment = fileId ? `#${encodeURIComponent(fileId)}` : '';
-      const fullUrl = `${baseUrl}${fragment}`;
-
-      // Reuse existing diff-review tab for this agent if one is already open
-      const existingTab = Object.values(tabs).find((tab) =>
-        tab.url.startsWith(baseUrl),
-      );
-
-      if (existingTab) {
-        void switchTab(existingTab.id);
-        // Navigate to updated URL (with new fragment) so the page
-        // reloads and scrolls to the clicked file
-        void goToUrl(fullUrl, existingTab.id);
-      } else void createTab(fullUrl, true);
-    },
-    [openAgentId, createTab, switchTab, goToUrl, tabs],
-  );
-
-  const formattedPendingDiffs = useMemo(() => {
-    const edits: FormattedFileDiff[] = [];
-    for (const edit of pendingDiffs ?? []) edits.push(formatFileDiff(edit));
-
-    return edits;
-  }, [pendingDiffs]);
-
-  const formattedDiffSummary = useMemo(() => {
-    const edits: FormattedFileDiff[] = [];
-    for (const edit of diffSummary ?? []) edits.push(formatFileDiff(edit));
-
-    return edits;
-  }, [diffSummary]);
-
-  // --- Optimistic accept/reject ---
-  const [optimisticHunkIds, setOptimisticHunkIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-
-  // Filter out diffs whose hunks have all been optimistically acted upon
-  const effectivePendingDiffs = useMemo(() => {
-    if (optimisticHunkIds.size === 0) return formattedPendingDiffs;
-    return formattedPendingDiffs.filter(
-      (diff) => !getHunkIds(diff).every((id) => optimisticHunkIds.has(id)),
-    );
-  }, [formattedPendingDiffs, optimisticHunkIds]);
-
-  // Reconcile: once the server state no longer contains any of our
-  // optimistic IDs, clear them so we stop filtering.
-  useLayoutEffect(() => {
-    if (optimisticHunkIds.size === 0) return;
-    const serverHunkIds = new Set(
-      formattedPendingDiffs.flatMap((d) => getHunkIds(d)),
-    );
-    const allConfirmed = Array.from(optimisticHunkIds).every(
-      (id) => !serverHunkIds.has(id),
-    );
-    if (allConfirmed) setOptimisticHunkIds(new Set());
-  }, [formattedPendingDiffs, optimisticHunkIds]);
-
-  // Clear optimistic state on agent switch
-  useEffect(() => {
-    setOptimisticHunkIds(new Set());
-  }, [openAgentId]);
 
   // Active plans owned by this agent (excluding dismissed and just-created)
   const ownedPlans = useMemo(() => {
@@ -383,44 +274,6 @@ export function StatusCard() {
     });
     for (const section of logSections) result.push(section);
 
-    const fileDiffSection = FileDiffSection({
-      pendingDiffs: effectivePendingDiffs,
-      diffSummary: formattedDiffSummary,
-      resolvedMounts,
-      activeMounts: workspaceMounts,
-      activeMountPaths,
-      onRejectAll: (hunkIds: string[]) => {
-        setOptimisticHunkIds((prev) => {
-          const next = new Set(prev);
-          for (const id of hunkIds) next.add(id);
-          return next;
-        });
-        rejectAllPendingEdits(hunkIds).catch(() => {
-          setOptimisticHunkIds((prev) => {
-            const next = new Set(prev);
-            for (const id of hunkIds) next.delete(id);
-            return next;
-          });
-        });
-      },
-      onAcceptAll: (hunkIds: string[]) => {
-        setOptimisticHunkIds((prev) => {
-          const next = new Set(prev);
-          for (const id of hunkIds) next.add(id);
-          return next;
-        });
-        acceptAllPendingEdits(hunkIds).catch(() => {
-          setOptimisticHunkIds((prev) => {
-            const next = new Set(prev);
-            for (const id of hunkIds) next.delete(id);
-            return next;
-          });
-        });
-      },
-      onOpenDiffReview: openDiffReviewPage,
-    });
-    if (fileDiffSection) result.push(fileDiffSection);
-
     return result;
   }, [
     ownedPlans,
@@ -432,13 +285,6 @@ export function StatusCard() {
     messageQueue,
     deleteQueuedMessage,
     flushQueue,
-    effectivePendingDiffs,
-    formattedDiffSummary,
-    resolvedMounts,
-    activeMountPaths,
-    rejectAllPendingEdits,
-    acceptAllPendingEdits,
-    openDiffReviewPage,
     pendingUserQuestion,
     submitUserQuestionStep,
     cancelUserQuestion,

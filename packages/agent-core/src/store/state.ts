@@ -171,10 +171,10 @@ export type ToolboxAgentState<
 /**
  * Canonical in-memory agent system state owned by `AgentStore`.
  *
- * Shape is a 1:1 mirror of the `agents` + `toolbox` slices of
- * `AppState` in the Karton contract. The `KartonBridge` projects this
- * state onto Karton verbatim; all other surfaces (CLI, ACP, remote Split-
- * Brain) read the same canonical shape directly from the store.
+ * The `agents` slice mirrors the Karton contract. Most of `toolbox` is also
+ * projected there, while service-owned fields such as diff-history state may
+ * remain core-only. Other surfaces (CLI, ACP, remote Split-Brain) read the
+ * canonical shape directly from the store.
  *
  * See `state-annotation.md` for:
  * - a field-by-field parity table against `AppState.agents` and

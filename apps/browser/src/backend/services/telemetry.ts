@@ -360,9 +360,6 @@ export type BackendEventProperties = {
     duration_ms?: number;
   };
 
-  // Edits
-  'edits-accepted': { hunk_count: number };
-  'edits-rejected': { hunk_count: number };
   'diff-history-fanout-cap-hit': {
     tool_call_id: string;
     agent_instance_id: string;

@@ -9,7 +9,6 @@ import {
   deleteAgentInstance,
   type AgentInstanceEnvelope,
   type AgentSystemState,
-  type FileDiff,
   type MountEntry,
 } from '@stagewise/agent-core';
 import { produce } from 'immer';
@@ -39,8 +38,6 @@ import type { AgentState } from '@shared/karton-contracts/ui/agent';
  */
 type MockKartonToolboxEntry = {
   workspace: { mounts: unknown[] };
-  pendingFileDiffs: unknown[];
-  editSummary: unknown[];
   pendingUserQuestion: unknown;
   activeApp?: unknown;
   pendingAppMessage?: unknown;
@@ -128,23 +125,10 @@ function registerAllMigratedNoOps(registry: CommandRegistry): void {
     'toolbox.clearPendingAppMessage',
     async () => {},
   );
-  registerAttachHandlerNoOps(registry);
+  registerMarkAsReadNoOp(registry);
 }
 
-/**
- * Registers no-op handlers for the attach-phase toolbox commands
- * (`toolbox.acceptHunks`, `toolbox.rejectHunks`) so the bridge's drift
- * guard passes in tests that only exercise seam-phase behaviour.
- */
-function registerAttachHandlerNoOps(registry: CommandRegistry): void {
-  registry.registerCommand<[hunkIds: string[]], void>(
-    'toolbox.acceptHunks',
-    async () => {},
-  );
-  registry.registerCommand<[hunkIds: string[]], void>(
-    'toolbox.rejectHunks',
-    async () => {},
-  );
+function registerMarkAsReadNoOp(registry: CommandRegistry): void {
   registry.registerCommand<[agentInstanceId: string], void>(
     'agents.markAsRead',
     async () => {},
@@ -172,21 +156,13 @@ describe('AgentCoreBridge', () => {
       const bridge = new AgentCoreBridge({ karton, store, registry });
       bridge.attach();
 
-      expect(register).toHaveBeenCalledTimes(5);
+      expect(register).toHaveBeenCalledTimes(3);
       expect(register).toHaveBeenCalledWith(
         'toolbox.dismissActiveApp',
         expect.any(Function),
       );
       expect(register).toHaveBeenCalledWith(
         'toolbox.clearPendingAppMessage',
-        expect.any(Function),
-      );
-      expect(register).toHaveBeenCalledWith(
-        'toolbox.acceptHunks',
-        expect.any(Function),
-      );
-      expect(register).toHaveBeenCalledWith(
-        'toolbox.rejectHunks',
         expect.any(Function),
       );
       expect(register).toHaveBeenCalledWith(
@@ -387,7 +363,7 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
     const controller = createActiveAppStateController(store);
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp: controller });
-    registerAttachHandlerNoOps(registry);
+    registerMarkAsReadNoOp(registry);
 
     const bridge = new AgentCoreBridge({
       karton: mock.karton,
@@ -529,8 +505,6 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
         toolbox: {
           'agent-a': {
             workspace: { mounts: ['w:/workspaces/a'] },
-            pendingFileDiffs: [{ id: 'diff-1' }],
-            editSummary: [{ id: 'edit-1' }],
             pendingUserQuestion: { id: 'q-1' },
             mountsVersion: 7,
           },
@@ -540,7 +514,7 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
       const controller = createActiveAppStateController(store);
       const registry = new CommandRegistry();
       registerToolboxSeamHandlers(registry, { activeApp: controller });
-      registerAttachHandlerNoOps(registry);
+      registerMarkAsReadNoOp(registry);
       new AgentCoreBridge({
         karton: mock.karton,
         store,
@@ -556,8 +530,6 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
 
       const entry = mock.getState().toolbox['agent-a']!;
       expect(entry.workspace).toEqual({ mounts: ['w:/workspaces/a'] });
-      expect(entry.pendingFileDiffs).toEqual([{ id: 'diff-1' }]);
-      expect(entry.editSummary).toEqual([{ id: 'edit-1' }]);
       expect(entry.pendingUserQuestion).toEqual({ id: 'q-1' });
       expect(entry.mountsVersion).toBe(7);
       expect(entry.activeApp).toEqual({
@@ -621,205 +593,6 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
 });
 
 /**
- * Phase 3a mirror coverage: `pendingFileDiffs` and `editSummary` ownership
- * moved into `AgentStore`, and the bridge projects both slices back into
- * Karton per-agent with reference-identity dedup.
- */
-describe('AgentCoreBridge (Phase 3a file-diffs mirror)', () => {
-  function makeDiff(id: string, path = `/w/${id}.ts`): FileDiff {
-    return {
-      isExternal: false,
-      fileId: id,
-      path,
-      baseline: '',
-      current: 'x',
-      baselineOid: null,
-      currentOid: 'oid',
-      lineChanges: [],
-      hunks: [],
-    };
-  }
-
-  /**
-   * Phase 5 migrated ownership of the file-diff slices to the package-side
-   * `DiffHistoryService`, which writes the store directly through a
-   * transactional `store.update(...)`. The mirror coverage below
-   * exercises that same write path — a tiny local helper that mirrors
-   * how `DiffHistoryService` mutates `pendingFileDiffs`/`editSummary`.
-   */
-  function setFileDiffs(
-    store: AgentStore,
-    agentInstanceId: string,
-    value: { pendingFileDiffs: FileDiff[]; editSummary: FileDiff[] },
-  ): void {
-    store.update((draft) => {
-      const entry = ensureToolboxEntry(
-        draft as AgentSystemState,
-        agentInstanceId,
-      );
-      entry.pendingFileDiffs = value.pendingFileDiffs;
-      entry.editSummary = value.editSummary;
-    });
-  }
-
-  function createFileDiffsMirrorHarness(initialState?: MockKartonState) {
-    const mock = createKartonMock(initialState);
-    const store = new AgentStore(createInitialAgentSystemState());
-    const activeApp = createActiveAppStateController(store);
-    const registry = new CommandRegistry();
-    registerToolboxSeamHandlers(registry, { activeApp });
-    registerAttachHandlerNoOps(registry);
-
-    const bridge = new AgentCoreBridge({
-      karton: mock.karton,
-      store,
-      registry,
-    });
-    bridge.attach();
-
-    return {
-      store,
-      activeApp,
-      setState: mock.setState,
-      getKartonState: mock.getState,
-      bridge,
-    };
-  }
-
-  it('seeds Karton toolbox entry on first write and mirrors both arrays', () => {
-    const { store, getKartonState } = createFileDiffsMirrorHarness();
-
-    const d1 = makeDiff('d1');
-    const s1 = makeDiff('s1');
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: [d1],
-      editSummary: [s1],
-    });
-
-    const entry = getKartonState().toolbox.a1;
-    expect(entry).toBeDefined();
-    // Karton scaffolding defaults are present.
-    expect(entry!.workspace).toEqual({ mounts: [] });
-    expect(entry!.pendingUserQuestion).toBeNull();
-    // Mirrored slices.
-    expect(entry!.pendingFileDiffs).toEqual([d1]);
-    expect(entry!.editSummary).toEqual([s1]);
-  });
-
-  it('skips karton.setState when both arrays keep the same reference', () => {
-    const { store, setState } = createFileDiffsMirrorHarness();
-
-    const pending = [makeDiff('d1')];
-    const summary = [makeDiff('s1')];
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: pending,
-      editSummary: summary,
-    });
-    const callsAfterFirst = setState.mock.calls.length;
-
-    // Same references — fast-path replay.
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: pending,
-      editSummary: summary,
-    });
-
-    expect(setState.mock.calls.length).toBe(callsAfterFirst);
-  });
-
-  it('mirrors on new array reference even when content is equivalent', () => {
-    const { store, setState, getKartonState } = createFileDiffsMirrorHarness();
-
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: [makeDiff('d1')],
-      editSummary: [makeDiff('s1')],
-    });
-    const callsAfterFirst = setState.mock.calls.length;
-
-    // Fresh reference; identity-based diff must trigger a mirror write.
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: [makeDiff('d1')],
-      editSummary: [makeDiff('s1')],
-    });
-
-    expect(setState.mock.calls.length).toBeGreaterThan(callsAfterFirst);
-    expect(
-      (getKartonState().toolbox.a1!.pendingFileDiffs as FileDiff[]).length,
-    ).toBe(1);
-  });
-
-  it('mirrors a clear (empty arrays) through to Karton', () => {
-    const { store, getKartonState } = createFileDiffsMirrorHarness();
-
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: [makeDiff('d1')],
-      editSummary: [makeDiff('s1')],
-    });
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: [],
-      editSummary: [],
-    });
-
-    const entry = getKartonState().toolbox.a1!;
-    expect(entry.pendingFileDiffs).toEqual([]);
-    expect(entry.editSummary).toEqual([]);
-  });
-
-  it('does not touch file-diff fields when only activeApp changes', () => {
-    const { store, activeApp, setState, getKartonState } =
-      createFileDiffsMirrorHarness();
-
-    const pending = [makeDiff('d1')];
-    const summary = [makeDiff('s1')];
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: pending,
-      editSummary: summary,
-    });
-    const callsAfterSeed = setState.mock.calls.length;
-
-    activeApp.setActiveApp('a1', {
-      appId: 'app-1',
-      pluginId: 'p',
-      src: 'blob:1',
-      height: 100,
-    });
-
-    // A Karton write happened for `activeApp`, but the arrays on the
-    // Karton entry must still be the exact references we seeded — the
-    // mirror must not have replayed them.
-    expect(setState.mock.calls.length).toBeGreaterThan(callsAfterSeed);
-    const entry = getKartonState().toolbox.a1!;
-    expect(entry.pendingFileDiffs).toBe(pending);
-    expect(entry.editSummary).toBe(summary);
-  });
-
-  it('preserves non-migrated Karton toolbox fields across file-diff mirror writes', () => {
-    const { store, getKartonState } = createFileDiffsMirrorHarness({
-      toolbox: {
-        a1: {
-          workspace: { mounts: ['w:/mount/a'] },
-          pendingFileDiffs: [],
-          editSummary: [],
-          pendingUserQuestion: { id: 'q-1' },
-          mountsVersion: 9,
-        },
-      },
-    });
-
-    setFileDiffs(store, 'a1', {
-      pendingFileDiffs: [makeDiff('d1')],
-      editSummary: [makeDiff('s1')],
-    });
-
-    const entry = getKartonState().toolbox.a1!;
-    expect(entry.workspace).toEqual({ mounts: ['w:/mount/a'] });
-    expect(entry.pendingUserQuestion).toEqual({ id: 'q-1' });
-    expect(entry.mountsVersion).toBe(9);
-    expect(entry.pendingFileDiffs).toHaveLength(1);
-    expect(entry.editSummary).toHaveLength(1);
-  });
-});
-
-/**
  * Phase 3b mirror coverage: `workspace.mounts` ownership moved into
  * `AgentStore`, and the bridge projects the slice back into Karton
  * per-agent with reference-identity dedup.
@@ -846,7 +619,7 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
     };
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp });
-    registerAttachHandlerNoOps(registry);
+    registerMarkAsReadNoOp(registry);
 
     const bridge = new AgentCoreBridge({
       karton: mock.karton,
@@ -874,8 +647,6 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
     const entry = getKartonState().toolbox.a1;
     expect(entry).toBeDefined();
     // Karton scaffolding defaults are present.
-    expect(entry!.pendingFileDiffs).toEqual([]);
-    expect(entry!.editSummary).toEqual([]);
     expect(entry!.pendingUserQuestion).toBeNull();
     // Mirrored mounts slice.
     expect(entry!.workspace).toEqual({ mounts: [m1] });
@@ -964,8 +735,6 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
       toolbox: {
         a1: {
           workspace: { mounts: [] },
-          pendingFileDiffs: [],
-          editSummary: [],
           pendingUserQuestion: { id: 'q-1' },
           mountsVersion: 11,
         },
@@ -1041,7 +810,7 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     const activeApp = createActiveAppStateController(store);
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp });
-    registerAttachHandlerNoOps(registry);
+    registerMarkAsReadNoOp(registry);
 
     const bridge = new AgentCoreBridge({
       karton: mock.karton,

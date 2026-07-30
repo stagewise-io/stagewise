@@ -18,13 +18,7 @@ function generateDeterministicHunkId(
   );
   return hash.digest('hex').slice(0, 32);
 }
-import {
-  diffLines,
-  structuredPatch,
-  formatPatch,
-  reversePatch,
-  applyPatch,
-} from 'diff';
+import { diffLines, structuredPatch } from 'diff';
 import type { Contributor } from '../schema';
 import type {
   FileDiff,
@@ -32,8 +26,6 @@ import type {
   ExternalFileDiff,
   BlamedLineChange,
   BlamedHunk,
-  FileResult,
-  ExternalFileResult,
   FileDiffSnapshot,
   EnvironmentDiffSnapshot,
 } from '../../../types/diff-history';
@@ -83,10 +75,8 @@ export function segmentFileOperationsIntoGenerations<
 
   const result: Record<FileId, T[]> = {};
   for (const fileOps of Object.values(opsByFilepath)) {
-    // Deterministic fileId (sha256 of filepath, 16 hex chars) so that cached
-    // FileDiff output can be safely reused across invocations. UI code uses
-    // fileId as a React key (see diff-review/$agentInstanceId.tsx), so
-    // stability across cache hits/misses is required.
+    // Deterministic fileId (sha256 of filepath, 16 hex chars) so cached
+    // FileDiff output can be safely reused across invocations.
     const fileId = createHash('sha256')
       .update(fileOps[0]!.filepath)
       .digest('hex')
@@ -552,15 +542,14 @@ export function createFileDiffsFromGenerations(
 
     // Step 7a: Synthesize an empty-transition hunk for state changes that
     // produce no structural hunks (e.g. empty file creation null -> "", or
-    // deletion of an empty file "" -> null). Without this, the UI has no
-    // hunk id to pass to accept/reject and the file stays pending forever.
+    // deletion of an empty file "" -> null). This preserves a contributor
+    // fingerprint for otherwise invisible file-state transitions.
     //
-    // The condition mirrors the UI's `hasRealChanges` predicate: we treat a
-    // diff as requiring a synthetic hunk whenever either the text differs or
+    // Treat a diff as requiring a synthetic hunk whenever the text differs or
     // the snapshot OIDs differ. Under the content-addressable OID contract
     // these are equivalent, but keeping both arms guards against future
     // cases where OIDs carry metadata beyond text (encoding, BOM, etc.) and
-    // keeps backend/UI predicates structurally aligned.
+    // keeps snapshot predicates structurally aligned.
     const baselineOid = startsWithBaseline ? firstOp.snapshot_oid : null;
     const currentOid = lastOp.snapshot_oid;
     if (
@@ -599,235 +588,6 @@ export function createFileDiffsFromGenerations(
   }
 
   return result;
-}
-
-type FilePath = string;
-/**
- * Accepts and rejects hunks for each file in the fileDiffs and return the new baseline and current for each file.
- * Accepted hunks will move the baseline closer to the current and rejected hunks will move the current closer to the baseline.
- *
- * For text files: applies patches to compute new content.
- * For external files: returns oid swaps (accept = baseline adopts current oid, reject = current reverts to baseline oid).
- *
- * Hunks will be accepted/ rejected in order of the fileDiffs first, and then by the order of the hunkIdsToAccept and hunkIdsToReject. If the same ID is accepted and rejected, the hunk will be accepted.
- * If accepted hunks of different generations (file-ids) modify the same file-path, the latest accept/ reject will win.
- * - example:
- *   - FileDiff 1 with hunkId '1' deletes readme.md
- *   - FileDiff 2 with hunkId '2' creates readme.md with content 'Hello, world!'
- *   - acceptedHunkIds: ['1', '2']
- *   - result: { '/readme.md': { isExternal: false, newBaseline: 'Hello, world!' } }
- *
- */
-export function acceptAndRejectHunks(
-  fileDiffs: FileDiff[],
-  hunkIdsToAccept: string[],
-  hunkIdsToReject: string[],
-): {
-  result: Record<FilePath, FileResult>;
-  failedAcceptedHunkIds?: string[];
-  failedRejectedHunkIds?: string[];
-} {
-  // Step 1: Build accept/reject sets with precedence (accept wins)
-  const acceptSet = new Set(hunkIdsToAccept);
-  const rejectSet = new Set(hunkIdsToReject.filter((id) => !acceptSet.has(id)));
-
-  // Result tracking
-  const pathResults: Record<FilePath, FileResult> = {};
-  const failedAcceptedHunkIds: string[] = [];
-  const failedRejectedHunkIds: string[] = [];
-
-  // Process each FileDiff in order
-  for (const fileDiff of fileDiffs) {
-    // Handle external files (binary/large files)
-    if (isExternalFileDiff(fileDiff)) {
-      const shouldAccept = acceptSet.has(fileDiff.hunkId);
-      const shouldReject = rejectSet.has(fileDiff.hunkId);
-
-      if (!shouldAccept && !shouldReject) continue;
-
-      // For external files, accept = baseline adopts current, reject = current reverts to baseline
-      const existingResult = pathResults[fileDiff.path];
-      const isExistingExternal =
-        existingResult && 'isExternal' in existingResult
-          ? existingResult.isExternal
-          : false;
-
-      if (shouldAccept) {
-        pathResults[fileDiff.path] = {
-          isExternal: true,
-          ...(isExistingExternal ? (existingResult as ExternalFileResult) : {}),
-          newBaselineOid: fileDiff.currentOid,
-        };
-      }
-      if (shouldReject) {
-        pathResults[fileDiff.path] = {
-          isExternal: true,
-          ...(isExistingExternal ? (existingResult as ExternalFileResult) : {}),
-          newCurrentOid: fileDiff.baselineOid,
-        };
-      }
-      continue; // Skip text processing
-    }
-
-    // Handle text files (existing logic)
-    const textFileDiff = fileDiff; // Type narrowed to TextFileDiff
-
-    // Get hunks to accept/reject for this FileDiff, preserving original order
-    const hunksToAccept = textFileDiff.hunks.filter((h) => acceptSet.has(h.id));
-    const hunksToReject = textFileDiff.hunks.filter((h) => rejectSet.has(h.id));
-
-    // Skip if no hunks to process for this FileDiff
-    if (hunksToAccept.length === 0 && hunksToReject.length === 0) continue;
-
-    // Synthetic empty-transition hunks (oldLines=0 && newLines=0 && lines=[])
-    // cannot be processed via applyPatch. They represent a whole-state
-    // transition (e.g. null -> "" empty file creation) and must promote/revert
-    // baseline/current directly. Split them out from the real hunk set.
-    const isEmptyTransitionHunk = (h: BlamedHunk) =>
-      h.oldLines === 0 && h.newLines === 0 && h.lines.length === 0;
-    const syntheticAccepts = hunksToAccept.filter(isEmptyTransitionHunk);
-    const syntheticRejects = hunksToReject.filter(isEmptyTransitionHunk);
-    const realAccepts = hunksToAccept.filter((h) => !isEmptyTransitionHunk(h));
-    const realRejects = hunksToReject.filter((h) => !isEmptyTransitionHunk(h));
-
-    // Get working copies of baseline/current (convert null to '' for diffing)
-    const diffBaseline = textFileDiff.baseline ?? '';
-    const diffCurrent = textFileDiff.current ?? '';
-
-    // Track whether we've modified baseline/current
-    let workingBaseline: string | null = textFileDiff.baseline;
-    let workingCurrent: string | null = textFileDiff.current;
-    let baselineChanged = false;
-    let currentChanged = false;
-
-    // Apply synthetic empty-transition accepts/rejects first. Accept promotes
-    // baseline wholesale to the current state; reject reverts current to the
-    // baseline state. These bypass applyPatch because there is nothing to
-    // patch structurally.
-    if (syntheticAccepts.length > 0) {
-      workingBaseline = textFileDiff.current;
-      baselineChanged = true;
-    }
-    if (syntheticRejects.length > 0) {
-      workingCurrent = textFileDiff.baseline;
-      currentChanged = true;
-    }
-
-    // Apply accepts (batch with fallback)
-    if (realAccepts.length > 0) {
-      // Build patch structure for accepted hunks
-      const basePatch = structuredPatch(
-        '',
-        '',
-        diffBaseline,
-        diffCurrent,
-        '',
-        '',
-      );
-      const acceptPatch = { ...basePatch, hunks: realAccepts };
-      const patchString = formatPatch(acceptPatch);
-
-      // Try batch apply first
-      const workingBaselineStr = workingBaseline ?? '';
-      const result = applyPatch(workingBaselineStr, patchString);
-
-      if (result !== false) {
-        workingBaseline = result;
-        baselineChanged = true;
-      } else {
-        // Fallback: apply one-by-one to identify failures
-        let currentWorkingBaseline = workingBaselineStr;
-        for (const hunk of realAccepts) {
-          const singlePatch = { ...basePatch, hunks: [hunk] };
-          const singlePatchString = formatPatch(singlePatch);
-          const singleResult = applyPatch(
-            currentWorkingBaseline,
-            singlePatchString,
-          );
-
-          if (singleResult !== false) {
-            currentWorkingBaseline = singleResult;
-            baselineChanged = true;
-          } else failedAcceptedHunkIds.push(hunk.id);
-        }
-        workingBaseline = currentWorkingBaseline;
-      }
-    }
-
-    // Apply rejects (batch with fallback)
-    if (realRejects.length > 0) {
-      // Build reversed patch structure for rejected hunks
-      const basePatch = structuredPatch(
-        '',
-        '',
-        diffBaseline,
-        diffCurrent,
-        '',
-        '',
-      );
-      const rejectPatch = { ...basePatch, hunks: realRejects };
-      const reversedPatch = reversePatch(rejectPatch);
-      const patchString = formatPatch(reversedPatch);
-
-      // Try batch apply first
-      const workingCurrentStr = workingCurrent ?? '';
-      const result = applyPatch(workingCurrentStr, patchString);
-
-      if (result !== false) {
-        workingCurrent = result;
-        currentChanged = true;
-      } else {
-        // Fallback: apply one-by-one to identify failures
-        let currentWorkingCurrent = workingCurrentStr;
-        for (const hunk of realRejects) {
-          const singlePatch = { ...basePatch, hunks: [hunk] };
-          const reversedSingle = reversePatch(singlePatch);
-          const singlePatchString = formatPatch(reversedSingle);
-          const singleResult = applyPatch(
-            currentWorkingCurrent,
-            singlePatchString,
-          );
-
-          if (singleResult !== false) {
-            currentWorkingCurrent = singleResult;
-            currentChanged = true;
-          } else {
-            failedRejectedHunkIds.push(hunk.id);
-          }
-        }
-        workingCurrent = currentWorkingCurrent;
-      }
-    }
-
-    // Handle file creation revert: if baseline was null and we reverted to '',
-    // convert back to null to indicate the file should be deleted
-    if (textFileDiff.baseline === null && workingCurrent === '')
-      workingCurrent = null;
-
-    // Handle file deletion revert: if current was null and we reverted baseline to '',
-    // the file should be restored from the original baseline
-    if (textFileDiff.current === null && workingBaseline === '')
-      workingBaseline = null;
-
-    // Store results per filepath (later FileDiffs overwrite earlier)
-    if (baselineChanged || currentChanged) {
-      pathResults[fileDiff.path] = {
-        isExternal: false,
-        ...(baselineChanged && { newBaseline: workingBaseline }),
-        ...(currentChanged && { newCurrent: workingCurrent }),
-      };
-    }
-  }
-
-  // Build final result with optional failure arrays
-  const finalResult: Record<FilePath, FileResult> & {
-    failedAcceptedHunkIds?: string[];
-    failedRejectedHunkIds?: string[];
-  } = {
-    ...pathResults,
-  };
-
-  return { result: finalResult, failedAcceptedHunkIds, failedRejectedHunkIds };
 }
 
 /**

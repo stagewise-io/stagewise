@@ -19,7 +19,6 @@
  */
 import type {
   AgentInstanceState as CoreAgentInstanceState,
-  AgentSystemState as CoreAgentSystemState,
   PendingUserQuestion as CorePendingUserQuestion,
   ShellSessionSummary as CoreShellSessionSummary,
   ToolboxAgentState as CoreToolboxAgentState,
@@ -83,10 +82,13 @@ type BridgedAgentInstanceState = Omit<
  *
  * Delta D14 — `PendingUserQuestion` is generic in the package and
  * specialized with `QuestionField` / `QuestionAnswerValue` in Karton.
+ *
+ * Diff-history state remains core-only now that pending-edit review is no
+ * longer part of the Karton UI contract.
  */
-type BridgedToolboxAgentState = CoreToolboxAgentState<
-  QuestionField,
-  QuestionAnswerValue
+type BridgedToolboxAgentState = Omit<
+  CoreToolboxAgentState<QuestionField, QuestionAnswerValue>,
+  'pendingFileDiffs' | 'editSummary'
 >;
 
 /**
@@ -172,18 +174,4 @@ type _AgentsSliceParity = Assert<
 
 type _ToolboxSliceParity = Assert<
   AssertEqual<AppState['toolbox'], BridgedCoreSystemState['toolbox']>
->;
-
-/**
- * Convenience composite — asserts the agents+toolbox slice pair in one go.
- * Not strictly necessary given the two assertions above, but it keeps the
- * "full surface" story visible at a glance.
- */
-type _SystemStateParity = Assert<
-  AssertEqual<
-    Pick<AppState, 'agents' | 'toolbox'>,
-    Pick<CoreAgentSystemState, never> extends never
-      ? Pick<BridgedCoreSystemState, 'agents' | 'toolbox'>
-      : never
-  >
 >;
