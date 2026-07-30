@@ -18,6 +18,7 @@ export function useAutoScroll({
   const scrollFrameRef = useRef<number | null>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [followOutput, setFollowOutput] = useState<'auto' | false>('auto');
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   const setShouldFollow = useCallback((shouldFollow: boolean) => {
     if (shouldFollowRef.current === shouldFollow) return;
@@ -59,21 +60,37 @@ export function useAutoScroll({
 
   const isAutoScrollEnabled = useCallback(() => shouldFollowRef.current, []);
 
+  const atBottomStateChange = useCallback(
+    (atBottom: boolean) => {
+      setIsAtBottom(atBottom);
+      if (atBottom) setShouldFollow(true);
+    },
+    [setShouldFollow],
+  );
+
   useEffect(() => {
     if (!scroller || !enabled) return;
 
+    const getDistanceFromBottom = () =>
+      scroller.scrollHeight - (scroller.scrollTop + scroller.clientHeight);
+
     let previousScrollTop = scroller.scrollTop;
     const handleScroll = () => {
-      if (scroller.scrollTop < previousScrollTop) setShouldFollow(false);
-      previousScrollTop = scroller.scrollTop;
+      const currentScrollTop = scroller.scrollTop;
+      if (
+        currentScrollTop < previousScrollTop &&
+        getDistanceFromBottom() > scrollEndThreshold
+      ) {
+        setShouldFollow(false);
+      }
+      previousScrollTop = currentScrollTop;
     };
     const handleScrollEnd = () => {
-      const distanceFromBottom =
-        scroller.scrollHeight - (scroller.scrollTop + scroller.clientHeight);
-      if (distanceFromBottom <= scrollEndThreshold) setShouldFollow(true);
+      if (getDistanceFromBottom() <= scrollEndThreshold) setShouldFollow(true);
     };
     const handleWheel = (event: WheelEvent) => {
-      if (event.deltaY < 0) setShouldFollow(false);
+      if (event.deltaY < 0 && scroller.scrollHeight > scroller.clientHeight)
+        setShouldFollow(false);
     };
 
     scroller.addEventListener('wheel', handleWheel, { passive: true });
@@ -118,5 +135,7 @@ export function useAutoScroll({
     disableAutoScroll,
     isAutoScrollEnabled,
     followOutput,
+    isAtBottom,
+    atBottomStateChange,
   };
 }

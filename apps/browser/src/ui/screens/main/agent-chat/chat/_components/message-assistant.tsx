@@ -31,8 +31,13 @@ import { ExecuteSandboxJsToolPart } from './message-part-ui/tools/execute-sandbo
 import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-logs';
 import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-questions';
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
-import { isToolOrReasoningPart, isToolPart } from './message-utils';
+import {
+  hasUnfinishedParts,
+  isToolOrReasoningPart,
+  isToolPart,
+} from './message-utils';
 import { MessageBetweenSteps } from './message-between-steps';
+import { MessageStalledStream } from './message-stalled-stream';
 import { IconDotsOutline18 } from '@stagewise/icons';
 import {
   Menu,
@@ -401,6 +406,9 @@ export const MessageAssistant = memo(
                   );
                 });
               })()}
+              {isWorking && isLastMessage && hasUnfinishedParts(msg) ? (
+                <MessageStalledStream parts={msg.parts} />
+              ) : null}
               {showBetweenStepsIndicator && <MessageBetweenSteps />}
               {turnFileEdits && turnFileEdits.length > 0 && (
                 <TurnFileEdits agentId={agentId} edits={turnFileEdits} />
