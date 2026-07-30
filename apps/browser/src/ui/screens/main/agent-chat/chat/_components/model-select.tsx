@@ -177,7 +177,7 @@ function ModelDetailCard({
           {pricingMultiplier != null && (
             <>
               {' · '}
-              <span className="inline-inline-flex items-center">
+              <span className="inline-flex items-center">
                 {pricingMultiplier}
                 <IconXmarkOutline18 className="inline size-2" />$
               </span>
