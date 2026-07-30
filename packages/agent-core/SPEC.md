@@ -1124,7 +1124,7 @@ Representative commands:
 - `agents.getStoredInstance`
 - `toolbox.mountWorkspace`
 - `toolbox.unmountWorkspace`
-- `toolbox.getEditedFilePaths`
+- `agents.getTouchedFiles`
 - question/interaction commands currently owned by toolbox user-interaction tools
 
 The exact command list should be derived from current `AgentManagerService.registerKartonHandlers()`, `DiffHistoryService.initialize()`, and `MountManagerService.initialize()`.

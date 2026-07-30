@@ -49,8 +49,8 @@ No missing or extra fields.
 | Karton field                | agent-core field            | Status | Notes                                                                                       |
 | --------------------------- | --------------------------- | ------ | ------------------------------------------------------------------------------------------- |
 | `workspace.mounts`          | `workspace.mounts`          | match  | Both are `MountEntry[]` from `@stagewise/agent-core/types/metadata`.                        |
-| —                           | `pendingFileDiffs`          | core-only | Internal diff history used for checkpoint/undo and edited-file context; no longer mirrored to UI Karton. |
-| —                           | `editSummary`               | core-only | Internal diff history used for checkpoint/undo and edited-file context; no longer mirrored to UI Karton. |
+| —                           | `pendingFileDiffs`          | delta  | Internal diff history used for checkpoint/undo and edited-file context; no longer mirrored to UI Karton. |
+| —                           | `editSummary`               | delta  | Internal diff history used for checkpoint/undo and edited-file context; no longer mirrored to UI Karton. |
 | `pendingUserQuestion`       | `pendingUserQuestion`       | delta  | Karton specializes the generic with `QuestionField`/`QuestionAnswerValue` (host-owned tool schema); agent-core keeps it generic. See §3. |
 | `pendingSandboxOutputs`     | `pendingSandboxOutputs`     | match  | `Record<string, string[]> \| undefined`.                                                    |
 | `pendingSandboxAttachments` | `pendingSandboxAttachments` | match  | `Record<string, AttachmentMetadata[]> \| undefined`.                                        |
