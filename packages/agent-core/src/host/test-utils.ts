@@ -23,15 +23,23 @@ const noopLogger: Logger = {
  * unhandled access fails loudly with a recognisable error so the
  * failing test points at the specific method that was missed.
  */
-const throwingPaths: HostPaths = new Proxy({} as HostPaths, {
-  get(_target, prop) {
-    return () => {
-      throw new Error(
-        `[createTestAgentHost] HostPaths.${String(prop)}() not stubbed`,
-      );
-    };
-  },
-});
+export function createTestHostPaths(
+  overrides: Partial<HostPaths> = {},
+): HostPaths {
+  return new Proxy(overrides as HostPaths, {
+    get(target, prop, receiver) {
+      const override = Reflect.get(target, prop, receiver);
+      if (override !== undefined) return override;
+      return () => {
+        throw new Error(
+          `[createTestAgentHost] HostPaths.${String(prop)}() not stubbed`,
+        );
+      };
+    },
+  });
+}
+
+const throwingPaths = createTestHostPaths();
 
 /**
  * Throwing model resolver. Tests that exercise model resolution must

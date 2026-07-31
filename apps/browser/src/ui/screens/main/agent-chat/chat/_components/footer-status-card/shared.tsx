@@ -6,7 +6,6 @@ import {
   CollapsibleTrigger,
 } from '@stagewise/stage-ui/components/collapsible';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
-import type { FileDiff } from '@shared/karton-contracts/ui/shared-types';
 
 /** Extract text content from a AgentMessage's parts */
 export function getMessageText(message: {
@@ -14,44 +13,6 @@ export function getMessageText(message: {
 }): string {
   const textPart = message.parts.find((p) => p.type === 'text');
   return textPart && 'text' in textPart ? (textPart.text ?? '') : '';
-}
-
-/** Extends FileDiff, only adds derived display prop */
-export type FormattedFileDiff = FileDiff & {
-  fileName: string;
-};
-
-/** Compute line stats on-demand from lineChanges */
-export function getLineStats(diff: FormattedFileDiff): {
-  added: number;
-  removed: number;
-} {
-  if (diff.isExternal) return { added: 0, removed: 0 };
-  return {
-    added: diff.lineChanges.reduce(
-      (acc, c) => acc + (c.added ? (c.count ?? 0) : 0),
-      0,
-    ),
-    removed: diff.lineChanges.reduce(
-      (acc, c) => acc + (c.removed ? (c.count ?? 0) : 0),
-      0,
-    ),
-  };
-}
-
-/** Check if diff represents a real change (not a noop) */
-export function hasRealChanges(diff: FormattedFileDiff): boolean {
-  if (diff.isExternal) return diff.baselineOid !== diff.currentOid;
-  // Line changes alone miss empty-file transitions (null -> "" / "" -> null)
-  // where diffLines produces no add/remove entries. Fall back to the oid
-  // transition, which matches the backend's synthetic-hunk criterion.
-  if (diff.lineChanges.some((c) => c.added || c.removed)) return true;
-  return diff.baselineOid !== diff.currentOid;
-}
-
-/** Get hunk IDs for accept/reject operations */
-export function getHunkIds(diff: FormattedFileDiff): string[] {
-  return diff.isExternal ? [diff.hunkId] : diff.hunks.map((h) => h.id);
 }
 
 export interface StatusCardSection {

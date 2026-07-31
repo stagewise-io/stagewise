@@ -131,6 +131,8 @@ const tabStateSchema = z.object({
 
 type PersistedTabState = z.infer<typeof tabStateSchema>;
 
+const LEGACY_DIFF_REVIEW_URL_PREFIX = 'stagewise://internal/diff-review/';
+
 /**
  * Anonymous URL classification for telemetry. Returns coarse booleans
  * (`isLocal`, `isHttps`) without exposing the host or path, so events can
@@ -3120,6 +3122,22 @@ export class WindowLayoutService extends DisposableService {
     if (!state || state.tabs.length === 0) return;
 
     const lastOpenAgentId = state.lastOpenAgentId;
+    const previouslyActiveTab = state.tabs[state.activeTabIndex];
+    state.tabs = state.tabs.filter(
+      (tab) =>
+        tab.type !== 'browser' ||
+        !tab.url.startsWith(LEGACY_DIFF_REVIEW_URL_PREFIX),
+    );
+    const restoredActiveIndex = previouslyActiveTab
+      ? state.tabs.indexOf(previouslyActiveTab)
+      : -1;
+    state.activeTabIndex =
+      restoredActiveIndex >= 0
+        ? restoredActiveIndex
+        : state.tabs.findIndex(
+            (tab) =>
+              !tab.agentInstanceId || tab.agentInstanceId === lastOpenAgentId,
+          );
 
     this.logger.debug(
       `[WindowLayoutService] Restoring tabs (lastOpenAgentId=${lastOpenAgentId})`,

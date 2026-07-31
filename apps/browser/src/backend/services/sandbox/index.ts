@@ -726,8 +726,6 @@ export class SandboxService extends DisposableService {
       if (!draft.toolbox[agentId]) {
         draft.toolbox[agentId] = {
           workspace: { mounts: [] },
-          pendingFileDiffs: [],
-          editSummary: [],
           pendingUserQuestion: null,
         };
       }
@@ -762,8 +760,6 @@ export class SandboxService extends DisposableService {
         if (!draft.toolbox[agentId]) {
           draft.toolbox[agentId] = {
             workspace: { mounts: [] },
-            pendingFileDiffs: [],
-            editSummary: [],
             pendingUserQuestion: null,
           };
         }

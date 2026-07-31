@@ -1327,12 +1327,10 @@ export class ToolboxService
     this.apiClient = this.getOrCreateApiClient();
   }
 
-  public async acceptAllPendingEditsForAgent(
+  public async finalizePendingEditsForAgent(
     agentInstanceId: string,
   ): Promise<void> {
-    await this.diffHistoryService.acceptAllPendingEditsForAgent(
-      agentInstanceId,
-    );
+    await this.diffHistoryService.finalizePendingEditsForAgent(agentInstanceId);
   }
 
   /**

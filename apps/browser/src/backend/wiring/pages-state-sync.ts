@@ -3,7 +3,6 @@ import type { KartonService } from '../services/karton';
 import type { PagesService } from '../services/pages';
 import type { GlobalConfigService } from '../services/global-config';
 import type { Logger } from '../services/logger';
-import type { FileDiff } from '@stagewise/agent-core/types/diff-history';
 
 export async function wirePagesStateSync(deps: {
   uiKarton: KartonService;
@@ -12,51 +11,6 @@ export async function wirePagesStateSync(deps: {
   logger: Logger;
 }): Promise<void> {
   const { uiKarton, pagesService, globalConfigService, logger } = deps;
-
-  // --- Pending edits sync (uiKarton -> pages) ---
-  // Uses syncDerivedState with a lightweight custom snapshot function that
-  // mirrors the original hash-based comparison, avoiding JSON.stringify on
-  // potentially large file-diff contents. The selector derives a per-agent
-  // map of pending diffs; the consumer only fires when the snapshot changes.
-  const hashContent = (s: string | null | undefined): string => {
-    if (!s) return '0';
-    const mid = Math.floor(s.length / 2);
-    return `${s.length}:${s.slice(0, 8)}:${s.slice(-8)}:${s[mid] ?? ''}`;
-  };
-
-  const pendingEditsSnapshot = (diffs: Record<string, FileDiff[]>): string =>
-    Object.keys(diffs)
-      .sort()
-      .map((agentId) => {
-        const entries = diffs[agentId];
-        const key = entries
-          .map(
-            (e) =>
-              `${e.path}|${e.isExternal ? `${e.baselineOid}|${e.currentOid}` : `${hashContent(e.baseline)}|${hashContent(e.current)}`}`,
-          )
-          .join('||');
-        return `${agentId}:${key}`;
-      })
-      .join('\n');
-
-  syncDerivedState(
-    uiKarton,
-    (state) => {
-      const result: Record<string, FileDiff[]> = {};
-      for (const agentInstanceId of Object.keys(state.agents.instances)) {
-        const pendingEdits =
-          state.toolbox[agentInstanceId]?.pendingFileDiffs ?? [];
-        result[agentInstanceId] = pendingEdits;
-      }
-      return result;
-    },
-    (diffs) => {
-      for (const [agentInstanceId, pendingEdits] of Object.entries(diffs)) {
-        pagesService.updatePendingEditsState(agentInstanceId, pendingEdits);
-      }
-    },
-    { snapshotFn: pendingEditsSnapshot },
-  );
 
   // --- Pending app message sync (uiKarton -> pages) ---
   syncDerivedState(

@@ -14,16 +14,13 @@ export type {
   BlamedLineChange,
   EnvironmentDiffSnapshot,
   ExternalFileDiff,
-  ExternalFileResult,
   FileDiff,
   FileDiffSnapshot,
-  FileResult,
   ModelCapabilities,
   ModelSettings,
   ModalityConstraint,
   StagewiseProviderOptions,
   TextFileDiff,
-  TextFileResult,
   ToolCallFileEdit,
 } from '@stagewise/agent-core/types';
 

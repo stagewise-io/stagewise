@@ -80,18 +80,4 @@ export type EnvironmentDiffSnapshot = z.infer<
   typeof environmentDiffSnapshotSchema
 >;
 
-export type TextFileResult = {
-  isExternal: false;
-  newBaseline?: string | null;
-  newCurrent?: string | null;
-};
-
-export type ExternalFileResult = {
-  isExternal: true;
-  newBaselineOid?: string | null;
-  newCurrentOid?: string | null;
-};
-
-export type FileResult = TextFileResult | ExternalFileResult;
-
 export const MAX_DIFF_TEXT_FILE_SIZE = 2 * 1024 * 1024;

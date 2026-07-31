@@ -42,8 +42,6 @@ function createHarness() {
     toolbox: {
       agent1: {
         workspace: { mounts: [] },
-        pendingFileDiffs: [],
-        editSummary: [],
         pendingUserQuestion: null,
       },
     },

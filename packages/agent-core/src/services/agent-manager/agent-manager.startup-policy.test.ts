@@ -15,7 +15,7 @@ function createDeps() {
     handleMountWorkspace: vi.fn(async () => {}),
     cancelQuestion: vi.fn(),
     getWorkspaceSnapshotForPersistence: vi.fn(() => []),
-    acceptAllPendingEditsForAgent: vi.fn(async () => {}),
+    finalizePendingEditsForAgent: vi.fn(async () => {}),
     getEditedFilePathsForAgent: vi.fn(async () => []),
   };
   return {

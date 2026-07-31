@@ -29,7 +29,6 @@ import {
 } from '../../workspace';
 import {
   type FileDiff,
-  type FileResult,
   type ToolCallFileEdit,
   MAX_DIFF_TEXT_FILE_SIZE,
 } from '../../types/diff-history';
@@ -50,12 +49,10 @@ import {
   storeFileContent,
   storeLargeContent,
   hasPendingEditsForFilepath,
-  streamContent,
   getLatestOperationIdxPerFilepath,
   getAgentInstanceIdsWithOperationsForFilepath,
 } from './utils/db';
 import {
-  acceptAndRejectHunks as acceptAndRejectHunksUtils,
   buildContributorMap,
   buildContributorMapIncremental,
   type ContributorMapState,
@@ -157,9 +154,8 @@ export function categorizeFanoutPath(filepath: string): FanoutPathCategory {
  *
  * Phase 5 removes the previous `KartonService` dependency; the service
  * now owns its `toolbox[agentId].pendingFileDiffs` and
- * `toolbox[agentId].editSummary` state directly in `AgentStore`. The host
- * adapter in `apps/browser` mirrors these fields back into Karton via
- * `AgentCoreBridge`.
+ * `toolbox[agentId].editSummary` state directly in `AgentStore`. These fields
+ * remain internal to agent-core for checkpoint/undo and environment context.
  */
 export interface DiffHistoryServiceDeps {
   host: AgentHost;
@@ -228,13 +224,13 @@ export class DiffHistoryService extends DisposableService {
 
   /**
    * Monotonically increasing counter bumped on every operations-table
-   * mutation. Used by `updateDiffKartonState` to skip DB queries when
+   * mutation. Used by `updateAgentDiffState` to skip DB queries when
    * the table has not changed since the last computation for a given agent.
    */
   private _opsSeq = 0;
 
   /**
-   * Per-agent snapshot of the last `updateDiffKartonState` result, keyed
+   * Per-agent snapshot of the last `updateAgentDiffState` result, keyed
    * by `agentInstanceId`. Entries are valid while `opsSeq` matches
    * `this._opsSeq`. Cleared on agent removal and teardown.
    */
@@ -376,12 +372,6 @@ export class DiffHistoryService extends DisposableService {
       throw error;
     }
 
-    // Phase 5 (D1): `toolbox.acceptHunks` / `toolbox.rejectHunks` are
-    // no longer registered here. Package code must not reach into
-    // `KartonService`. The host-side `AgentCoreBridge` routes both
-    // procedures through `CommandRegistry` and dispatches to this
-    // service's `acceptAndRejectHunks(...)`.
-
     const storeFileAndAddOperation = async (
       path: string,
       meta: OperationMeta,
@@ -486,14 +476,10 @@ export class DiffHistoryService extends DisposableService {
     for (const id of currentIds) {
       if (this.hydratedAgentInstanceIds.has(id)) continue;
       this.hydratedAgentInstanceIds.add(id);
-      // Synchronously seed the toolbox entry so that downstream UI
-      // consumers (and the mirror into Karton) observe an empty but
-      // well-formed shape for newly-hydrated agents immediately —
-      // without having to wait for the async ops-table scan below
-      // to complete. The async `updateDiffKartonState` call that
-      // follows will overwrite these values with the real diffs.
+      // Seed an empty internal diff state synchronously. The asynchronous
+      // operations-table scan below replaces it with the hydrated values.
       this.writeFileDiffs(id, { pendingFileDiffs: [], editSummary: [] });
-      this.updateDiffKartonState(id)
+      this.updateAgentDiffState(id)
         .then((result) => {
           for (const diff of result.pendingFileDiffs) {
             this.ensureWatched(diff.path);
@@ -880,7 +866,7 @@ export class DiffHistoryService extends DisposableService {
     this._opsSeq++;
     // Scoped update: only the editing agent is affected by its own tool call,
     // and we know exactly which file changed — pass the hint so
-    // `updateDiffKartonState` can take the targeted-patch fast path.
+    // `updateAgentDiffState` can take the targeted-patch fast path.
     await this.updateHydratedAgentState(edit.agentInstanceId, [edit.path]);
     this.ensureWatched(edit.path);
   }
@@ -895,7 +881,7 @@ export class DiffHistoryService extends DisposableService {
     changedFilepaths?: string[],
   ): Promise<void> {
     if (!this.hydratedAgentInstanceIds.has(agentInstanceId)) return;
-    await this.updateDiffKartonState(agentInstanceId, changedFilepaths);
+    await this.updateAgentDiffState(agentInstanceId, changedFilepaths);
   }
 
   /**
@@ -923,22 +909,17 @@ export class DiffHistoryService extends DisposableService {
 
   private async updateAllHydratedAgentStates(): Promise<void> {
     for (const id of this.hydratedAgentInstanceIds)
-      await this.updateDiffKartonState(id);
+      await this.updateAgentDiffState(id);
     await this.updateWatcher();
   }
 
-  private async updateDiffKartonState(
+  private async updateAgentDiffState(
     agentInstanceId: string,
     changedFilepaths?: string[],
   ): Promise<{
     pendingFileDiffs: FileDiff[];
     editSummary: FileDiff[];
   }> {
-    // Phase 3a / Phase 5: `writeFileDiffs` seeds the toolbox entry on
-    // every write via `ensureToolboxEntry`, and the bridge mirror
-    // creates the Karton-side entry when needed. No explicit
-    // seed-if-missing block is required here.
-
     // Fast path: if the operations table has not changed since the last
     // computation for this agent, replay the cached result without any
     // DB queries (~0ms instead of ~80ms).
@@ -963,7 +944,8 @@ export class DiffHistoryService extends DisposableService {
       const nextSummary = [...snapshot.editSummary];
 
       for (const filepath of changedFilepaths) {
-        // Internal paths (apps/, plans/, logs/) never make it into the UI.
+        // Internal paths (apps/, plans/, logs/) never enter agent-visible
+        // diff state.
         if (this.isInternalFilepath(agentInstanceId, filepath)) {
           // Still drop any lingering entry for this filepath in case the
           // classification changed (extremely unlikely, but safe).
@@ -1081,7 +1063,7 @@ export class DiffHistoryService extends DisposableService {
   /**
    * Full watcher reconciliation: queries all pending operations to build
    * the authoritative watch set, adding new files and removing resolved ones.
-   * Use only on cold paths (accept/reject/undo) where files may need unwatching.
+   * Use only on cold paths (finalization/undo) where files may need unwatching.
    */
   private async updateWatcher(): Promise<void> {
     const pendingDiffs = await getAllPendingOperations(this.db);
@@ -1104,8 +1086,8 @@ export class DiffHistoryService extends DisposableService {
 
   /**
    * Return distinct filepaths that an agent has edited, excluding internal
-   * paths (apps/, plans/, logs/) to stay consistent with the rest of the
-   * diff UI (see `computeFileDiffs` / targeted-patch path).
+   * paths (apps/, plans/, logs/) to stay consistent with agent-visible diff
+   * state (see `computeFileDiffs` / targeted-patch path).
    * Lightweight query — does not load operations or snapshots.
    */
   public async getEditedFilePathsForAgent(
@@ -1210,72 +1192,44 @@ export class DiffHistoryService extends DisposableService {
   }
 
   /**
-   * Accepts all pending diff hunks for a given agent instance.
-   * Should be called before an agent is deleted to ensure no
-   * "hanging" pending diffs remain in the system.
+   * Finalizes an agent's pending diffs before it is archived.
    */
-  public async acceptAllPendingEditsForAgent(
+  public async finalizePendingEditsForAgent(
     agentInstanceId: string,
   ): Promise<void> {
-    const pendingDiffs =
-      await this.getPendingFileDiffsForAgentInstanceId(agentInstanceId);
-    if (pendingDiffs.length === 0) return;
-
-    const hunkIds = pendingDiffs.flatMap((e) =>
-      !e.isExternal ? e.hunks.map((h) => h.id) : [e.hunkId],
+    const pendingOperations = await getPendingOperationsForAgentInstanceId(
+      this.db,
+      agentInstanceId,
     );
-    if (hunkIds.length === 0) return;
+    const latestEditOids = new Map<string, string | null>();
+    for (const operation of pendingOperations) {
+      if (
+        operation.operation === 'edit' &&
+        !this.isInternalFilepath(agentInstanceId, operation.filepath)
+      ) {
+        latestEditOids.set(operation.filepath, operation.snapshot_oid);
+      }
+    }
+    if (latestEditOids.size === 0) return;
 
     this.logDebug(
-      `Accepting all ${hunkIds.length} pending hunks for agent ${agentInstanceId}`,
+      `Finalizing ${latestEditOids.size} pending files for agent ${agentInstanceId}`,
     );
-    await this.acceptAndRejectHunks(hunkIds, []);
-  }
-
-  public async acceptAndRejectHunks(
-    hunkIdsToAccept: string[],
-    hunkIdsToReject: string[],
-  ) {
-    const pendingOperations = await getAllPendingOperations(this.db);
-    // Uncached: this path aggregates pending ops across ALL agents for hunk
-    // lookup (not per-agent), so it does not share a cache key with the
-    // per-agent computation. This call fires only on explicit user
-    // accept/reject actions, which are infrequent.
-    const pendingDiffs = await this.computeFileDiffsUncached(
-      null,
-      pendingOperations,
-      'pending',
-    );
-
-    const { result, failedAcceptedHunkIds, failedRejectedHunkIds } =
-      acceptAndRejectHunksUtils(pendingDiffs, hunkIdsToAccept, hunkIdsToReject);
-    if ((failedAcceptedHunkIds?.length ?? 0) > 0)
-      this.logError(
-        `Failed to accept hunks: ${failedAcceptedHunkIds?.join(', ')}`,
-        failedAcceptedHunkIds,
-      );
-    if ((failedRejectedHunkIds?.length ?? 0) > 0)
-      this.logError(
-        `Failed to reject hunks: ${failedRejectedHunkIds?.join(', ')}`,
-        failedRejectedHunkIds,
-      );
-    const changedFilepaths: string[] = [];
-    for (const [filePath, fileResult] of Object.entries(result)) {
-      await this.doAccept(filePath, fileResult);
-      await this.doReject(filePath, fileResult);
-      changedFilepaths.push(filePath);
+    const baselineMeta: OperationMeta = {
+      operation: 'baseline',
+      contributor: 'user',
+      reason: 'accept',
+    };
+    for (const [filepath, oid] of latestEditOids) {
+      await insertOperation(this.db, filepath, oid, baselineMeta);
     }
 
     this._opsSeq++;
-    // Scoped update: we know exactly which files were affected. Rather than
-    // recomputing every hydrated agent's full state (O(agents × files)),
-    // only patch the affected files in each hydrated agent's cached snapshot.
-    // Accept/reject can affect multiple agents because operations for a given
-    // filepath may have been created by different agents, so we still iterate
-    // all hydrated agents — but pass the filepath hint so each one takes the
-    // targeted-patch fast path instead of a full recompute.
+    const changedFilepaths = [...latestEditOids.keys()];
+    // A file may contain edits from multiple agents, so refresh every hydrated
+    // agent's cached view of the finalized paths.
     for (const id of this.hydratedAgentInstanceIds) {
-      await this.updateDiffKartonState(id, changedFilepaths);
+      await this.updateAgentDiffState(id, changedFilepaths);
     }
     await this.unwatchResolvedFiles(changedFilepaths);
   }
@@ -1290,83 +1244,6 @@ export class DiffHistoryService extends DisposableService {
       meta,
     );
     return oid;
-  }
-
-  private async doReject(filePath: string, fileResult: FileResult) {
-    if (fileResult.isExternal && fileResult.newCurrentOid === undefined) return;
-    if (!fileResult.isExternal && fileResult.newCurrent === undefined) return;
-    // Lock file to prevent watcher from treating this write as a user change
-    this.ignoreFileForWatcher(filePath);
-    const isExternal = fileResult.isExternal;
-    let newCurrentOid: string | null;
-
-    try {
-      // Copy content from blob to file system
-      if (isExternal && typeof fileResult.newCurrentOid === 'string') {
-        // Recreate any parent directories the rejected hunks may have
-        // removed; symmetric with the `undoToolCalls` restore path.
-        await mkdir(path.dirname(filePath), { recursive: true });
-        await copyContentToPath(
-          this.blobsDir,
-          fileResult.newCurrentOid,
-          filePath,
-        );
-        newCurrentOid = fileResult.newCurrentOid;
-      } else if (!isExternal && typeof fileResult.newCurrent === 'string') {
-        await mkdir(path.dirname(filePath), { recursive: true });
-        await writeFile(filePath, fileResult.newCurrent, 'utf8');
-        newCurrentOid = await storeFileContent(
-          this.db,
-          filePath,
-          Buffer.from(fileResult.newCurrent),
-        );
-      } else {
-        await unlink(filePath);
-        newCurrentOid = null;
-      }
-    } catch (error) {
-      newCurrentOid = null;
-      this.logError(`Failed to write file: ${filePath}`, error);
-    } finally {
-      // Unlock after a small delay to allow chokidar to see and ignore the event
-      setTimeout(() => this.unignoreFileForWatcher(filePath), 500);
-    }
-
-    await insertOperation(this.db, filePath, newCurrentOid, {
-      operation: 'edit',
-      contributor: 'user',
-      reason: 'reject',
-    });
-  }
-
-  private async doAccept(filePath: string, fileResult: FileResult) {
-    if (!fileResult.isExternal && fileResult.newBaseline === undefined) return;
-    if (fileResult.isExternal && fileResult.newBaselineOid === undefined)
-      return;
-
-    const newContentIsNull =
-      !fileResult.isExternal && fileResult.newBaseline === null;
-    const isExternal = fileResult.isExternal;
-
-    // Not necessary to store new content if it's null or if it's an external file
-    if (newContentIsNull || isExternal)
-      return await insertOperation(
-        this.db,
-        filePath,
-        isExternal ? (fileResult.newBaselineOid ?? null) : null,
-        {
-          operation: 'baseline',
-          contributor: 'user',
-          reason: 'accept',
-        },
-      );
-
-    await storeFileContent(
-      this.db,
-      filePath,
-      Buffer.from(fileResult.newBaseline!, 'utf8'),
-      { operation: 'baseline', contributor: 'user', reason: 'accept' },
-    );
   }
 
   /**
@@ -1458,7 +1335,7 @@ export class DiffHistoryService extends DisposableService {
     this._opsSeq++;
     // Fan out to all hydrated agents — other agents may also have
     // pending/edit-summary state for the same files that the undo touched.
-    // This mirrors the cross-agent invalidation in acceptAndRejectHunks.
+    // This mirrors the cross-agent invalidation when diffs are finalized.
     if (agentInstanceId) {
       const changedFiles = Object.keys(undoTargets);
       for (const id of this.hydratedAgentInstanceIds) {
@@ -1468,117 +1345,6 @@ export class DiffHistoryService extends DisposableService {
     } else {
       await this.updateAllHydratedAgentStates();
     }
-  }
-
-  /**
-   * Retrieves the content of an external (binary/large) file by its blob OID.
-   * Returns base64-encoded content and inferred MIME type based on common file extensions.
-   *
-   * @param oid - The blob OID (SHA-256 hash) of the external file
-   * @returns Object with base64 content and MIME type, or null if blob not found
-   */
-  public async getExternalFileContent(
-    oid: string,
-  ): Promise<{ content: string; mimeType: string | null } | null> {
-    try {
-      const chunks: Buffer[] = [];
-      for await (const chunk of streamContent(this.blobsDir, oid))
-        chunks.push(chunk);
-
-      const content = Buffer.concat(chunks).toString('base64');
-
-      // Infer MIME type from content magic bytes (first few bytes)
-      const mimeType = this.inferMimeTypeFromBuffer(
-        chunks[0] ?? Buffer.alloc(0),
-      );
-
-      return { content, mimeType };
-    } catch (error) {
-      // Blob file doesn't exist or can't be read
-      this.logError(
-        `Failed to read external file content for oid ${oid}`,
-        error,
-      );
-      return null;
-    }
-  }
-
-  /**
-   * Infers MIME type from buffer magic bytes.
-   * Supports common image and document formats.
-   */
-  private inferMimeTypeFromBuffer(buffer: Buffer): string | null {
-    if (buffer.length < 4) return null;
-
-    // Check magic bytes for common formats
-    // PNG: 89 50 4E 47
-    if (
-      buffer[0] === 0x89 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x4e &&
-      buffer[3] === 0x47
-    ) {
-      return 'image/png';
-    }
-    // JPEG: FF D8 FF
-    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-      return 'image/jpeg';
-    }
-    // GIF: 47 49 46 38
-    if (
-      buffer[0] === 0x47 &&
-      buffer[1] === 0x49 &&
-      buffer[2] === 0x46 &&
-      buffer[3] === 0x38
-    ) {
-      return 'image/gif';
-    }
-    // WebP: 52 49 46 46 ... 57 45 42 50
-    if (
-      buffer[0] === 0x52 &&
-      buffer[1] === 0x49 &&
-      buffer[2] === 0x46 &&
-      buffer[3] === 0x46 &&
-      buffer.length >= 12 &&
-      buffer[8] === 0x57 &&
-      buffer[9] === 0x45 &&
-      buffer[10] === 0x42 &&
-      buffer[11] === 0x50
-    ) {
-      return 'image/webp';
-    }
-    // BMP: 42 4D
-    if (buffer[0] === 0x42 && buffer[1] === 0x4d) {
-      return 'image/bmp';
-    }
-    // ICO: 00 00 01 00
-    if (
-      buffer[0] === 0x00 &&
-      buffer[1] === 0x00 &&
-      buffer[2] === 0x01 &&
-      buffer[3] === 0x00
-    ) {
-      return 'image/x-icon';
-    }
-    // PDF: 25 50 44 46
-    if (
-      buffer[0] === 0x25 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x44 &&
-      buffer[3] === 0x46
-    ) {
-      return 'application/pdf';
-    }
-    // SVG starts with "<?xml" or "<svg" (text-based)
-    const textStart = buffer.toString('utf8', 0, Math.min(buffer.length, 100));
-    if (
-      textStart.includes('<svg') ||
-      (textStart.includes('<?xml') && textStart.includes('svg'))
-    ) {
-      return 'image/svg+xml';
-    }
-
-    return null;
   }
 
   private async getEditSummaryForAgentInstanceId(
@@ -1607,7 +1373,7 @@ export class DiffHistoryService extends DisposableService {
 
   /**
    * Returns true if the given filepath is an internal path (apps/, plans/, logs/)
-   * that should not be surfaced to the UI.
+   * that should not be included in agent-visible diff state.
    */
   private isInternalFilepath(
     agentInstanceId: string,
@@ -1683,11 +1449,6 @@ export class DiffHistoryService extends DisposableService {
     );
     const generations = segmentFileOperationsIntoGenerations(mergedOps);
 
-    // When agentInstanceId is null (e.g. acceptAndRejectHunks processing
-    // pending ops across all agents), we skip the per-agent incremental
-    // cache and fall back to a from-scratch build. This keeps the cache
-    // contract simple: one cache entry per (agent, filepath, mode,
-    // firstOpIdx).
     if (agentInstanceId === null) {
       const contributorMap = buildContributorMap(generations);
       return createFileDiffsFromGenerations(generations, contributorMap);

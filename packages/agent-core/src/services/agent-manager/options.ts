@@ -48,7 +48,7 @@ export interface AgentManagerStorageOptions {
  *
  * - `managerToolbox` is called by lifecycle paths inside `AgentManager`
  *   itself (mount workspace, cancel question, snapshot for persistence,
- *   accept pending edits...).
+ *   finalize pending edits...).
  * - `agentToolbox` is handed down to every spawned `BaseAgent` so it
  *   can list tools, drain attachments, fetch workspace metadata, etc.
  *

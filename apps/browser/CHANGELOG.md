@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.27.0 (2026-07-30)
+
+### Features
+
+* expose reasoning effort in model selector (d55651b)
+* show status for stalled message streams (bffcd22)
+* add chat forking from sidebar (5997ce3)
+* reuse Cmd+Enter for next-chat navigation (bfe656f)
+* add next-chat attention navigation (17243d3)
+
+### Bug Fixes
+
+* correct model pricing alignment (0d3f904)
+* treat denied tool output as settled (c13f8b3)
+* improve chat auto-scroll behavior (839dcf3)
+* open chat panel after forking (ecaff3b)
+
 ## 1.26.0 (2026-07-29)
 
 ### Features

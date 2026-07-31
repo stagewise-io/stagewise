@@ -15,7 +15,7 @@ function createDeps() {
     handleMountWorkspace: vi.fn(async () => {}),
     cancelQuestion: vi.fn(),
     getWorkspaceSnapshotForPersistence: vi.fn(() => []),
-    acceptAllPendingEditsForAgent: vi.fn(async () => {}),
+    finalizePendingEditsForAgent: vi.fn(async () => {}),
     getEditedFilePathsForAgent: vi.fn(async () => []),
     // Default to identity mapping; specific tests override per-call.
     resolveNewAgentMountPath: vi.fn(async (p: string) => `MAIN(${p})`),
@@ -361,6 +361,39 @@ describe('AgentManager agents.fork handler', () => {
     });
     expect(promoteSpy).toHaveBeenCalledWith('fork-1');
 
+    await manager.teardown();
+  });
+});
+
+describe('AgentManager agents.archive handler', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('finalizes pending edits before tearing down the agent', async () => {
+    const deps = createDeps();
+    const manager = buildManager(deps);
+    const agent = {
+      stop: vi.fn(async () => {}),
+      reportErrorToParent: vi.fn(async () => {}),
+      onTeardown: vi.fn(async () => {}),
+      agentType: AgentTypes.CHAT,
+    };
+    (manager as any).activeAgents.set('agent-1', agent);
+    await flush();
+
+    await deps.registry.dispatch<unknown[], void>(
+      'agents.archive',
+      { callerId: 'test' },
+      ['agent-1'],
+    );
+
+    expect(deps.toolbox.finalizePendingEditsForAgent).toHaveBeenCalledWith(
+      'agent-1',
+    );
+    expect(
+      deps.toolbox.finalizePendingEditsForAgent.mock.invocationCallOrder[0],
+    ).toBeLessThan(agent.onTeardown.mock.invocationCallOrder[0]!);
     await manager.teardown();
   });
 });

@@ -29,7 +29,7 @@ export function createCliToolboxPort(deps: {
       }));
     },
 
-    async acceptAllPendingEditsForAgent() {},
+    async finalizePendingEditsForAgent() {},
 
     async getEditedFilePathsForAgent() {
       return [];

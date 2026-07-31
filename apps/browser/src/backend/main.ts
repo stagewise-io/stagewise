@@ -53,7 +53,6 @@ import { CredentialsService } from './services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { ModelProviderService } from './agents/model-provider';
 import { wirePagesStateSync } from './wiring/pages-state-sync';
-import { wirePagesHandlers } from './wiring/pages-handler-wiring';
 import {
   ensureDataDirectories,
   getPluginsPath,
@@ -672,12 +671,11 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // that consults `host.models` sees a ready adapter.
   lazyHostModels.setModelProviderService(modelProviderService);
 
-  // Phase 1c+1d+5: attach the bridge. Bridges every migrated Karton
+  // Attach the bridge. Bridges every migrated Karton
   // procedure (`toolbox.dismissActiveApp`, `toolbox.clearPendingAppMessage`,
-  // `toolbox.acceptHunks`, `toolbox.rejectHunks`) through the
-  // `CommandRegistry`, and starts mirroring the AgentStore-canonical
-  // `activeApp`, `pendingAppMessage`, `pendingFileDiffs`, `editSummary`,
-  // and `workspace.mounts` slices into Karton for the UI.
+  // `agents.markAsRead`) through the `CommandRegistry`, and starts mirroring
+  // the AgentStore-canonical `activeApp`, `pendingAppMessage`, and
+  // `workspace.mounts` slices into Karton for the UI.
   //
   // Must run AFTER every legacy service has finished registering its own
   // Karton handlers — the bridge's drift guard runs against the final
@@ -685,7 +683,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   // alive for the host lifetime.
   const agentCoreBridge = attachAgentCoreBridge(agentCoreSeam, {
     host: agentCoreHost,
-    diffHistory: diffHistoryService,
   });
   // Phase 1d: route `SandboxService` app-lifecycle writes through the
   // AgentStore-backed controller instead of Karton.
@@ -795,8 +792,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     getMountedWorkspacePaths: () => toolboxService.getAllMountedPaths(),
   });
 
-  // Wire all uiKarton-to-pages state syncs (pending edits, mounts,
-  // search engines, global config, auth)
+  // Wire all uiKarton-to-pages state syncs.
   await wirePagesStateSync({
     uiKarton,
     pagesService,
@@ -804,17 +800,18 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
   });
 
-  // Wire all pages-api handler setters (pending edits accept/reject,
-  // context files, certificate trust, auth, home page, etc.)
-  wirePagesHandlers({
-    uiKarton,
-    pagesService,
-    diffHistoryService,
-    windowLayoutService,
-    getSandboxService: () => toolboxService.getSandboxService(),
-    activeAppController: agentCoreBridge.activeAppController,
-    logger,
-  });
+  pagesService.setForwardAppMessageHandler(
+    async (agentInstanceId, appId, pluginId, data) =>
+      toolboxService
+        .getSandboxService()
+        ?.forwardAppMessage(agentInstanceId, appId, pluginId, data),
+  );
+  pagesService.setClearPendingAppMessageHandler(async (agentInstanceId) =>
+    agentCoreBridge.activeAppController.clearPendingAppMessage(agentInstanceId),
+  );
+  pagesService.setTrustCertificateAndReloadHandler(async (tabId, origin) =>
+    windowLayoutService.trustCertificateAndReload(tabId, origin),
+  );
 
   // Wire permission-exceptions clear handler (used by clearBrowsingData)
   pagesService.setClearPermissionExceptionsHandler(() =>

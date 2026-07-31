@@ -57,8 +57,6 @@ function createHarness({ recentPaths = [] }: { recentPaths?: string[] } = {}) {
             agentsMdContent: string | null;
           }>,
         },
-        pendingFileDiffs: [],
-        editSummary: [],
         pendingUserQuestion: null,
       },
     },

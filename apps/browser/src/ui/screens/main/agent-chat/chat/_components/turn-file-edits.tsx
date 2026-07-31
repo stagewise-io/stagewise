@@ -268,7 +268,7 @@ export const TurnFileEdits = memo(function TurnFileEdits({
             <Tooltip>
               <TooltipTrigger>
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="icon-xs"
                   aria-label={allCollapsed ? 'Expand all' : 'Collapse all'}
                   onClick={() =>
