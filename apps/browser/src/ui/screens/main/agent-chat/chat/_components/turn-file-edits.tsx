@@ -222,7 +222,11 @@ export const TurnFileEdits = memo(function TurnFileEdits({
             (candidate.oldPath !== undefined &&
               normalizePath(candidate.oldPath) === location.relativePath),
         );
-        if (!entry || entry.changeType === 'deleted') return;
+        if (!entry) {
+          await openFileTab(workspaceKey, location.relativePath, agentId);
+          return;
+        }
+        if (entry.changeType === 'deleted') return;
 
         await openFileTab(workspaceKey, entry.path, agentId, {
           showDiff: true,
