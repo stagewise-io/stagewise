@@ -648,13 +648,18 @@ export class SessionManager {
       command: string;
       timeoutMs: number;
     },
+    abortSignal?: AbortSignal,
     onData?: (sessionId: string, data: string) => void,
   ): Promise<{ sessionId: string; expiresAt: number }> {
+    abortSignal?.throwIfAborted();
     const sessionId = this.createSession(agentInstanceId, cwd, env, onData);
     const session = this.sessions.get(sessionId)!;
+    const onAbort = () => this.markReady(session);
+    abortSignal?.addEventListener('abort', onAbort, { once: true });
 
     try {
       await session.readyPromise;
+      abortSignal?.throwIfAborted();
       if (session.exited) {
         throw new Error(
           `Watcher session exited during initialization (code ${session.exitCode}).`,
@@ -693,7 +698,10 @@ export class SessionManager {
       return { sessionId, expiresAt: watcher.expiresAt };
     } catch (error) {
       this.removeSession(session);
+      this.onSessionStateChange?.(agentInstanceId);
       throw error;
+    } finally {
+      abortSignal?.removeEventListener('abort', onAbort);
     }
   }
 

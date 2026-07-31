@@ -391,7 +391,7 @@ export const createWatcherSession = (
         smartApproval,
       });
     },
-    execute: async (params: CreateWatcherSessionToolInput) => {
+    execute: async (params: CreateWatcherSessionToolInput, { abortSignal }) => {
       const cwd = resolveCwd(params.cwd, getMountedPaths);
       const result = await shellService.createWatcherSession(
         agentInstanceId,
@@ -402,6 +402,7 @@ export const createWatcherSession = (
           command: params.command,
           timeoutMs: params.timeout_ms,
         },
+        abortSignal,
       );
       return {
         session_id: result.sessionId,

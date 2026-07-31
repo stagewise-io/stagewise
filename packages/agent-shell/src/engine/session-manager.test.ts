@@ -859,6 +859,27 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
     expect(events).toEqual([]);
   });
 
+  it('removes a watcher session when creation is aborted', async () => {
+    sm = createSM();
+    const abortController = new AbortController();
+    const creation = sm.createWatcherSession(
+      'agent-watcher',
+      cwd,
+      env,
+      {
+        title: 'Cancelled during setup',
+        command: 'sleep 60',
+        timeoutMs: 5_000,
+      },
+      abortController.signal,
+    );
+
+    abortController.abort();
+
+    await expect(creation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sm.getSessionsForAgent('agent-watcher')).toEqual([]);
+  });
+
   it('destroyAgent kills all sessions for that agent', async () => {
     sm = createSM();
     const sid1 = sm.createSession('agent-destroy', cwd, env);
