@@ -135,6 +135,8 @@ export function useTurnFileEdits(
     const cachedResult = turnFileEditsCache.get(cacheKey);
     if (cachedResult) {
       setTurnFileEditsCache(cacheKey, cachedResult);
+      if (cachedResult !== cached)
+        setLoaded({ key: cacheKey, edits: cachedResult });
       return;
     }
 
@@ -168,7 +170,7 @@ export function useTurnFileEdits(
     return () => {
       cancelled = true;
     };
-  }, [agentId, cacheKey, getFileEditsForToolCalls, toolCallIds]);
+  }, [agentId, cacheKey, cached, getFileEditsForToolCalls, toolCallIds]);
 
   if (!cacheKey) return null;
   if (cached) return cached;
@@ -216,7 +218,9 @@ export const TurnFileEdits = memo(function TurnFileEdits({
         ]);
         const entry = summary?.entries.find(
           (candidate) =>
-            normalizePath(candidate.path) === location.relativePath,
+            normalizePath(candidate.path) === location.relativePath ||
+            (candidate.oldPath !== undefined &&
+              normalizePath(candidate.oldPath) === location.relativePath),
         );
         if (!entry || entry.changeType === 'deleted') return;
 
