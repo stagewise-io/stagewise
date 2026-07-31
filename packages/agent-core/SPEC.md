@@ -348,7 +348,7 @@ Affected types include:
 - all tool input/output Zod schemas and inferred types (`writeToolSchema`, `multiEditToolSchema`, ...), `StagewiseToolSet`, `ToolName`, `ToolOutputDiff`, `WithDiff`
 - `MountPermission`, `MountEntry`, `MentionFileCandidate`
 - `Attachment`, `AttachmentMetadata`, `AttachmentMeta` variants
-- `FileDiff`, `TextFileDiff`, `ExternalFileDiff`, `FileDiffSnapshot`, `EnvironmentDiffSnapshot`, `FileResult`
+- `FileDiff`, `TextFileDiff`, `ExternalFileDiff`, `FileDiffSnapshot`, `EnvironmentDiffSnapshot`
 - `ModelCapabilities`, `ModalityConstraint`, `ModelSettings`, `StagewiseProviderOptions`
 - `WorkspaceSnapshot`, `AgentsMdSnapshot`, `PlansSnapshot`, `LogsSnapshot`, `EnabledSkillsSnapshot`, `BrowserSnapshot`, `ShellSnapshot`, `ActiveAppSnapshot`, `LogIngestSnapshot`, and the other keys of **`FullEnvironmentSnapshot`** — canonical Zod schemas and inferred TypeScript types live in **`packages/agent-core/src/env/types.ts`** (Phase 8, D23). Package-built environment providers live in `packages/agent-core/src/env/providers/`; Electron registers additional providers under `apps/browser/src/backend/env-providers/`. Host-owned *capabilities* supply runtime values for host-sourced sections; they do not maintain a parallel wire-schema type fork in the browser.
 - `PendingUserQuestion`, `QuestionField`, `QuestionAnswerValue`
@@ -993,9 +993,9 @@ The state shape distinguishes persisted from ephemeral fields so resume-after-re
 Summary:
 
 - **Persisted per agent** (round-trips through SQLite): history, title, title lock, active model ID, tool approval mode, input state, usage tallies, parent/child relationships, mount list. The persistence column and classifier for tool approval remain host-owned (D22); only the field location moved into core state.
-- **Ephemeral per agent** (process-lifetime only, rebuilt on resume): working/idling flag, pending approvals, pending user question, pending sandbox/shell outputs, active app, pending app message. `pendingFileDiffs` and `editSummary` are host-side-derived on load from the diff-history side table.
+- **Ephemeral per agent** (process-lifetime only, rebuilt on resume): working/idling flag, pending approvals, pending user question, pending sandbox/shell outputs, active app, pending app message. `pendingFileDiffs` and `editSummary` are agent-core-derived on load from the diff-history side table.
 
-`@persistence` JSDoc tags on every field in `packages/agent-core/src/store/state.ts` and `packages/agent-core/src/types/agent.ts` carry the same information at the type level. A compile-time parity assertion at `apps/browser/src/shared/karton-contracts/ui/agent-core-parity.ts` enforces that the package state shape stays in sync with the Karton `AppState.agents` / `AppState.toolbox` slices — including the three bridged deltas.
+`@persistence` JSDoc tags on every field in `packages/agent-core/src/store/state.ts` and `packages/agent-core/src/types/agent.ts` carry the same information at the type level. Compile-time parity assertions at `apps/browser/src/shared/karton-contracts/ui/agent-core-parity.ts` enforce the documented Karton projections and core-only deltas.
 
 ---
 
@@ -1124,10 +1124,7 @@ Representative commands:
 - `agents.getStoredInstance`
 - `toolbox.mountWorkspace`
 - `toolbox.unmountWorkspace`
-- `toolbox.acceptHunks`
-- `toolbox.rejectHunks`
-- `toolbox.acceptAllPendingEdits`
-- `toolbox.getEditedFilePaths`
+- `agents.getTouchedFiles`
 - question/interaction commands currently owned by toolbox user-interaction tools
 
 The exact command list should be derived from current `AgentManagerService.registerKartonHandlers()`, `DiffHistoryService.initialize()`, and `MountManagerService.initialize()`.
@@ -1422,7 +1419,7 @@ Keep SQLite/LibSQL internal.
 
 Maintain existing undo/revert behavior.
 
-- Phase 5 complete: `DiffHistoryService` lives at `packages/agent-core/src/services/diff-history/` and is constructed by the host with `{ host, store }`. It writes `pendingFileDiffs` / `editSummary` through transactional `store.update(...)` calls (via `ensureToolboxEntry`) and subscribes to `AgentStore` for hydration/pruning — no `KartonService` dependency remains. `toolbox.acceptHunks` and `toolbox.rejectHunks` route through `AgentCoreBridge` and `CommandRegistry`, and the browser `FileDiffsStateController` shim plus its browser-side service directory have been deleted. Schema, migrations, and blob storage continue to resolve through `host.paths.diffHistoryDbPath()` / `diffHistoryBlobsDir()`, preserving existing DB compatibility. Remaining work is a manual startup smoke-test against a pre-migration user-data directory.
+- Phase 5 complete: `DiffHistoryService` lives at `packages/agent-core/src/services/diff-history/` and is constructed by the host with `{ host, store }`. It writes `pendingFileDiffs` / `editSummary` through transactional `store.update(...)` calls (via `ensureToolboxEntry`) and subscribes to `AgentStore` for hydration/pruning — no `KartonService` dependency remains. Those fields now stay internal to agent-core for checkpoint/undo and edited-file context; the pending-edit UI, its Karton procedures, and its browser mirror have been removed. Schema, migrations, and blob storage continue to resolve through `host.paths.diffHistoryDbPath()` / `diffHistoryBlobsDir()`, preserving existing DB compatibility. Remaining work is a manual startup smoke-test against a pre-migration user-data directory.
 - Phase 6 (agent instances ownership) complete: `agents.instances[id]` is now `AgentStore`-canonical. The per-instance write surface lives in `packages/agent-core/src/services/agent-manager/state-mutations/` ([](path:w787f/packages/agent-core/src/services/agent-manager/state-mutations/index.ts)) — a folder of pure `(store, agentInstanceId, args)` functions plus `upsertAgentInstance` / `deleteAgentInstance` / `getAgentInstance` / `setToolApprovalMode` CRUD. `AgentManager` calls them directly against its `AgentStore`. Hosts that need extra setters (browser's `setUnread`, `recordPendingApproval`) build them with the exported `updateAgentInstanceState(store, id, mutate)` helper — see `createHostAgentStateMutations` ([](path:w787f/apps/browser/src/backend/services/agent-core-bridge/state/agent-instances.ts)). A vitest guardrail in `state-mutations/store-mutation-guard.test.ts` fails any new direct `store.update(...)` call outside an explicit allowlist (state-mutations, diff-history, mounts/active-app controllers), pinning every agent-instance write to these utilities.
 
 - Phase 7 (API narrowing) complete: the opaque `applyStateRecipe(agentInstanceId, recipe)` escape hatch has been replaced by the per-intent functions in `state-mutations/` (lifecycle / queue / history / approvals / streaming / metadata / simple buckets) covering every former `BaseAgent.state.set(recipe)` intent — hydrate, title/user-title updates, queue append/remove/clear/flush, history tool-part transitions (deny-all vs last-assistant), approval resolution, history replace/truncate, `inputState`/`activeModelId` writes, `beginStep` / `setIsWorkingFalse` / `recordStepError` (with `always` / `mark-unread` / `if-assistant-history` modes), usage recording, sandbox-attachment draining, environment-snapshot attachment, user and assistant path-reference merges, the stream-merge hot path (`mergeUIMessageStream`), `storeCompressedHistory`, and `setUsageWarning`. `AgentManager` builds a per-agent bound bundle via `bindStateMutations(store, agentInstanceId)` (inferred type `AgentStateMutations`); `BaseAgent` receives it as `{ get; commands; persist }`. The recipe channel, `applyStateRecipe`, and `BaseAgent.state.set` are deleted. Every state-mutation is serializable by shape and discrete enough to journal for checkpointing. The bridge forward-mirror in `AgentCoreBridge` projects the `agents.instances` branch into `uiKarton` via reference-identity diffing with per-id envelope reuse; legacy Karton readers observe unchanged shapes. `agents.markAsRead` is the only `agents.*` procedure routed through `CommandRegistry` today. The temporary Karton → AgentStore reverse-mirror that existed to unblock `DiffHistoryService` hydration has been removed. All persisted/service-owned `AgentSystemState` slices are now store-canonical, closing the last reverse-direction gap before the Sprint 6 Split-Brain cut. Per Phase 6's D22 amendment, `toolApprovalMode` is now promoted into `AgentState` in `@stagewise/agent-core` as `string` and narrowed to the branded `ToolApprovalMode` union on the host; the classifier, persistence column, and policy semantics stay host-owned.
@@ -1489,15 +1486,15 @@ Run focused checks:
 - sandbox tests if touched;
 - path-equivalence assertion between Electron host and current `utils/paths.ts` (per R8);
 - Karton-procedure-to-command coverage check (per "Karton contract / command registry drift");
-- pages-api smoke test (per "Pages-API consumer"): toolbar receives agent diffs and mount changes after the bridge is live;
+- pages-api smoke test (per "Pages-API consumer"): toolbar receives mount changes after the bridge is live;
 - upgrade-path smoke test: launch the build on a pre-migration user-data directory with existing agents and diff-history, confirm full readback;
 - manual smoke test in Electron:
   - create agent;
   - mount workspace;
   - send message;
   - use read/write/multiEdit;
-  - inspect pending diffs;
-  - accept/reject hunks;
+  - inspect Git changes in the file-tree diff view;
+  - archive the agent and verify edits remain on disk;
   - revert to prior message;
   - use sandbox output/attachment;
   - use shell tool (including its smart-approval classifier path — host-internal);

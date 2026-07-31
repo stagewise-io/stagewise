@@ -16,7 +16,7 @@ import type {
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
-import type { ExternalIde, FileDiff } from './shared-types';
+import type { ExternalIde } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
 export type {
@@ -1081,8 +1081,6 @@ export type AppState = {
       workspace: {
         mounts: MountEntry[];
       };
-      pendingFileDiffs: FileDiff[];
-      editSummary: FileDiff[];
       pendingUserQuestion: PendingUserQuestion | null;
       pendingSandboxOutputs?: Record<string, string[]>;
       pendingSandboxAttachments?: Record<string, AttachmentMetadata[]>;
@@ -1444,8 +1442,6 @@ export type KartonContract = {
       ) => Promise<{ success: boolean; error?: string }>;
     };
     toolbox: {
-      acceptHunks: (hunkIds: string[]) => Promise<void>;
-      rejectHunks: (hunkIds: string[]) => Promise<void>;
       mountWorkspace: (
         agentInstanceId: string,
         workspacePath?: string,

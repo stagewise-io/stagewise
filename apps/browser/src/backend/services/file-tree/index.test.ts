@@ -147,8 +147,6 @@ describe('FileTreeService', () => {
           },
         ],
       },
-      pendingFileDiffs: [],
-      editSummary: [],
       pendingUserQuestion: null,
     };
     await writeFile(path.join(toolboxRoot, 'file.txt'), 'hello');

@@ -386,7 +386,7 @@ export async function getPendingOperationsForAgentInstanceId(
 
 /**
  * Like `getPendingOperationsForAgentInstanceId` but scoped to a single
- * filepath. Used by the targeted-update path in `updateDiffKartonState`
+ * filepath. Used by the targeted-update path in `updateAgentDiffState`
  * when a specific file is known to have changed.
  */
 export async function getPendingOperationsForAgentInstanceIdAndFilepath(

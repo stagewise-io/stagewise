@@ -69,8 +69,6 @@ type KartonStateDraft = {
     string,
     {
       workspace: { mounts: MountEntry[] };
-      pendingFileDiffs: unknown[];
-      editSummary: unknown[];
       pendingUserQuestion: unknown;
     }
   >;
@@ -294,7 +292,7 @@ export class MountManagerService extends DisposableService {
         return wsPath ? this.clientRuntimesPerPath.get(wsPath) : undefined;
       },
       getToolboxState: (agentInstanceId) =>
-        this.uiKarton.state.toolbox[agentInstanceId],
+        agentStore.get().toolbox[agentInstanceId],
       getMountPrefixes: (agentInstanceId) =>
         this.core.getMountPrefixes(agentInstanceId),
     };

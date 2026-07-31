@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as PreviewAppIdRouteImport } from './routes/preview/$appId'
 import { Route as PlanFilenameRouteImport } from './routes/plan/$filename'
-import { Route as DiffReviewAgentInstanceIdRouteImport } from './routes/diff-review/$agentInstanceId'
 import { Route as ErrorPagesErrorPageLoadFailedRouteImport } from './routes/_error-pages/error.page-load-failed'
 
 const HomeRoute = HomeRouteImport.update({
@@ -30,12 +29,6 @@ const PlanFilenameRoute = PlanFilenameRouteImport.update({
   path: '/plan/$filename',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DiffReviewAgentInstanceIdRoute =
-  DiffReviewAgentInstanceIdRouteImport.update({
-    id: '/diff-review/$agentInstanceId',
-    path: '/diff-review/$agentInstanceId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ErrorPagesErrorPageLoadFailedRoute =
   ErrorPagesErrorPageLoadFailedRouteImport.update({
     id: '/_error-pages/error/page-load-failed',
@@ -45,14 +38,12 @@ const ErrorPagesErrorPageLoadFailedRoute =
 
 export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
-  '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
   '/preview/$appId': typeof PreviewAppIdRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
 }
 export interface FileRoutesByTo {
   '/home': typeof HomeRoute
-  '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
   '/preview/$appId': typeof PreviewAppIdRoute
   '/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
@@ -60,7 +51,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/home': typeof HomeRoute
-  '/diff-review/$agentInstanceId': typeof DiffReviewAgentInstanceIdRoute
   '/plan/$filename': typeof PlanFilenameRoute
   '/preview/$appId': typeof PreviewAppIdRoute
   '/_error-pages/error/page-load-failed': typeof ErrorPagesErrorPageLoadFailedRoute
@@ -69,21 +59,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/home'
-    | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
     | '/preview/$appId'
     | '/error/page-load-failed'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/home'
-    | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
     | '/preview/$appId'
     | '/error/page-load-failed'
   id:
     | '__root__'
     | '/home'
-    | '/diff-review/$agentInstanceId'
     | '/plan/$filename'
     | '/preview/$appId'
     | '/_error-pages/error/page-load-failed'
@@ -91,7 +78,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
-  DiffReviewAgentInstanceIdRoute: typeof DiffReviewAgentInstanceIdRoute
   PlanFilenameRoute: typeof PlanFilenameRoute
   PreviewAppIdRoute: typeof PreviewAppIdRoute
   ErrorPagesErrorPageLoadFailedRoute: typeof ErrorPagesErrorPageLoadFailedRoute
@@ -120,13 +106,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanFilenameRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/diff-review/$agentInstanceId': {
-      id: '/diff-review/$agentInstanceId'
-      path: '/diff-review/$agentInstanceId'
-      fullPath: '/diff-review/$agentInstanceId'
-      preLoaderRoute: typeof DiffReviewAgentInstanceIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_error-pages/error/page-load-failed': {
       id: '/_error-pages/error/page-load-failed'
       path: '/error/page-load-failed'
@@ -139,7 +118,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
-  DiffReviewAgentInstanceIdRoute: DiffReviewAgentInstanceIdRoute,
   PlanFilenameRoute: PlanFilenameRoute,
   PreviewAppIdRoute: PreviewAppIdRoute,
   ErrorPagesErrorPageLoadFailedRoute: ErrorPagesErrorPageLoadFailedRoute,

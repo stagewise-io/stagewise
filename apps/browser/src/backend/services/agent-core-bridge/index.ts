@@ -35,8 +35,6 @@ export interface AgentCoreBridgeOptions {
 type ToolboxEntry = AgentSystemState['toolbox'][string];
 type ActiveAppValue = ToolboxEntry['activeApp'];
 type PendingAppMessageValue = ToolboxEntry['pendingAppMessage'];
-type PendingFileDiffsValue = ToolboxEntry['pendingFileDiffs'];
-type EditSummaryValue = ToolboxEntry['editSummary'];
 type MountsValue = ToolboxEntry['workspace']['mounts'];
 
 /**
@@ -186,15 +184,12 @@ export class AgentCoreBridge {
    * proportional to real state changes.
    *
    * Toolbox (per-field diff): only fields for which the store is
-   * canonical (`activeApp`, `pendingAppMessage`, `pendingFileDiffs`,
-   * `editSummary`, `workspace.mounts`) are written.
+   * canonical (`activeApp`, `pendingAppMessage`, `workspace.mounts`) are
+   * written.
    *   - `activeApp` / `pendingAppMessage`: shallow structural compare
    *     (fields that matter for the UI).
-   *   - `pendingFileDiffs` / `editSummary` / `workspace.mounts`:
-   *     reference identity. Writers (`DiffHistoryService.updateDiffKartonState`,
-   *     `MountManagerService.rebuildMountsFor`) produce fresh array
-   *     references only when content changes, so identity-based dedup is
-   *     both correct and O(1).
+   *   - `workspace.mounts`: reference identity. Its writer produces a fresh
+   *     array only when content changes, so identity-based dedup is O(1).
    *
    * `agents.instances` (patch forwarding): the Immer patches generated
    * by `store.update()` are filtered to the `agents.*` subtree and
@@ -225,8 +220,6 @@ export class AgentCoreBridge {
       agentId: string;
       activeApp?: ActiveAppValue;
       pendingAppMessage?: PendingAppMessageValue;
-      pendingFileDiffs?: PendingFileDiffsValue;
-      editSummary?: EditSummaryValue;
       mounts?: MountsValue;
     }> = [];
 
@@ -238,10 +231,6 @@ export class AgentCoreBridge {
       const nextActive = nextEntry?.activeApp;
       const prevPending = prevEntry?.pendingAppMessage;
       const nextPending = nextEntry?.pendingAppMessage;
-      const prevDiffs = prevEntry?.pendingFileDiffs;
-      const nextDiffs = nextEntry?.pendingFileDiffs;
-      const prevSummary = prevEntry?.editSummary;
-      const nextSummary = nextEntry?.editSummary;
       const prevMounts = prevEntry?.workspace.mounts;
       const nextMounts = nextEntry?.workspace.mounts;
 
@@ -250,45 +239,23 @@ export class AgentCoreBridge {
         prevPending,
         nextPending,
       );
-      // Reference identity: writers allocate fresh arrays on content
-      // change. Treat `undefined` (missing entry) and an existing empty
-      // array as equivalent — a mirror write for an agent that is
-      // gaining its toolbox entry solely because the store picked up an
-      // empty diff set would be a wasted round-trip.
-      const diffsChanged =
-        prevDiffs !== nextDiffs &&
-        !(prevDiffs === undefined && nextDiffs?.length === 0) &&
-        !(nextDiffs === undefined && prevDiffs?.length === 0);
-      const summaryChanged =
-        prevSummary !== nextSummary &&
-        !(prevSummary === undefined && nextSummary?.length === 0) &&
-        !(nextSummary === undefined && prevSummary?.length === 0);
+      // Treat a missing entry and an existing empty array as equivalent so
+      // creating a store-side toolbox entry does not cause a wasted write.
       const mountsChanged =
         prevMounts !== nextMounts &&
         !(prevMounts === undefined && nextMounts?.length === 0) &&
         !(nextMounts === undefined && prevMounts?.length === 0);
 
-      if (
-        !activeChanged &&
-        !pendingChanged &&
-        !diffsChanged &&
-        !summaryChanged &&
-        !mountsChanged
-      )
-        continue;
+      if (!activeChanged && !pendingChanged && !mountsChanged) continue;
 
       const entry: {
         agentId: string;
         activeApp?: ActiveAppValue;
         pendingAppMessage?: PendingAppMessageValue;
-        pendingFileDiffs?: PendingFileDiffsValue;
-        editSummary?: EditSummaryValue;
         mounts?: MountsValue;
       } = { agentId };
       if (activeChanged) entry.activeApp = nextActive ?? null;
       if (pendingChanged) entry.pendingAppMessage = nextPending ?? null;
-      if (diffsChanged) entry.pendingFileDiffs = nextDiffs ?? [];
-      if (summaryChanged) entry.editSummary = nextSummary ?? [];
       if (mountsChanged) entry.mounts = nextMounts ?? [];
       changes.push(entry);
     }
@@ -327,8 +294,6 @@ export class AgentCoreBridge {
           // populate the rest.
           kartonEntry = {
             workspace: { mounts: [] },
-            pendingFileDiffs: [],
-            editSummary: [],
             pendingUserQuestion: null,
           } as typeof kartonEntry;
           draft.toolbox[change.agentId] = kartonEntry;
@@ -338,14 +303,6 @@ export class AgentCoreBridge {
         }
         if ('pendingAppMessage' in change) {
           kartonEntry.pendingAppMessage = change.pendingAppMessage ?? null;
-        }
-        if ('pendingFileDiffs' in change) {
-          kartonEntry.pendingFileDiffs = (change.pendingFileDiffs ??
-            []) as typeof kartonEntry.pendingFileDiffs;
-        }
-        if ('editSummary' in change) {
-          kartonEntry.editSummary = (change.editSummary ??
-            []) as typeof kartonEntry.editSummary;
         }
         if ('mounts' in change) {
           // Replace the whole `workspace` object so Karton subscribers

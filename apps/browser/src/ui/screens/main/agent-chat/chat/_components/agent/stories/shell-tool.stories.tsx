@@ -149,8 +149,6 @@ export const ShellStreamingWithOutput: Story = {
           toolbox: {
             [DEFAULT_STORY_AGENT_ID]: {
               workspace: { mounts: [] },
-              pendingFileDiffs: [],
-              editSummary: [],
               pendingUserQuestion: null,
               pendingShellOutputs: {
                 [SHELL_TOOL_CALL_ID]: [

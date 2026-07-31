@@ -4,13 +4,9 @@ import {
   createInitialAgentSystemState,
   type AgentHost,
 } from '@stagewise/agent-core';
-import type { DiffHistoryService } from '@stagewise/agent-core/diff-history';
 import type { KartonService } from '../karton';
 import { AgentCoreBridge } from './index';
-import {
-  registerToolboxSeamHandlers,
-  registerToolboxAttachHandlers,
-} from './handlers/toolbox';
+import { registerToolboxSeamHandlers } from './handlers/toolbox';
 import { registerAgentsSeamHandlers } from './handlers/agents';
 import {
   createActiveAppStateController,
@@ -70,9 +66,8 @@ export interface AgentCoreBridgeHandles extends AgentCoreSeamHandles {
 /**
  * Builds the agent-core seam — store, controllers, registry — without
  * attaching the bridge. Must be invoked exactly once, early in the boot
- * sequence (after `uiKarton` is available) so that services like
- * `DiffHistoryService` can receive the file-diffs controller as an
- * injected dependency.
+ * sequence after `uiKarton` is available so package-owned services can use
+ * the canonical store before the Karton projection is attached.
  *
  * Registers every migrated `toolbox.*` command handler on the registry.
  * Does NOT register Karton procedures — that happens in
@@ -118,7 +113,7 @@ export function createAgentCoreSeam(ctx: {
  */
 export function attachAgentCoreBridge(
   seam: AgentCoreSeamHandles & { karton: KartonService },
-  ctx: { host: AgentHost; diffHistory: DiffHistoryService },
+  ctx: { host: AgentHost },
 ): AgentCoreBridgeHandles {
   const {
     karton,
@@ -127,16 +122,7 @@ export function attachAgentCoreBridge(
     activeAppController,
     hostAgentStateMutations,
   } = seam;
-  const { host, diffHistory } = ctx;
-
-  // Phase 5: register the attach-phase toolbox handlers (`acceptHunks`,
-  // `rejectHunks`) now that `DiffHistoryService` and the full host
-  // (including `telemetry`) are available. Must happen before
-  // `bridge.attach()` so the drift guard sees the final registry.
-  registerToolboxAttachHandlers(registry, {
-    diffHistory,
-    telemetry: host.telemetry,
-  });
+  const { host } = ctx;
 
   const bridge = new AgentCoreBridge({ karton, store, registry });
   bridge.attach();
@@ -164,11 +150,10 @@ export function attachAgentCoreBridge(
  * `AgentHost` for paths + telemetry before it can be constructed.
  */
 export function createAgentCoreBridge(
-  ctx: AgentCoreBridgeContext & { diffHistory: DiffHistoryService },
+  ctx: AgentCoreBridgeContext,
 ): AgentCoreBridgeHandles {
   const seam = createAgentCoreSeam({ karton: ctx.karton });
   return attachAgentCoreBridge(seam, {
     host: ctx.host,
-    diffHistory: ctx.diffHistory,
   });
 }

@@ -2,6 +2,13 @@ Note: **Never** let an agent modify this file without careful review, this is **
 
 # Diff history
 
+> **Current product note:** The per-hunk pending-edits UI and its manual
+> accept/reject commands have been removed. The sections below document the
+> original storage model and remain useful for understanding legacy database
+> rows. The current product keeps this history for checkpoint/undo and
+> environment context, and finalizes pending baselines when an agent is
+> archived.
+
 In the stagewise application, coding agents can perform file edits via tool calls.
 
 To allow users to see, accept, reject, undo and redo single edits at any given time, we need a persistent, reliable system that provides exactly this functionality.
