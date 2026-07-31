@@ -7,12 +7,20 @@ import { GenericWriteToolPart } from './generic-write';
 
 export type WritePart = Extract<AgentToolUIPart, { type: 'tool-write' }>;
 
-export const WriteToolPart = ({ part }: { part: WritePart }) => {
+export const WriteToolPart = ({
+  part,
+  initiallyCollapsed = false,
+}: {
+  part: WritePart;
+  initiallyCollapsed?: boolean;
+}) => {
   if (isPlanPath(part.input?.path ?? ''))
     return <CreatePlanToolPart part={part} />;
 
   if (isLogPath(part.input?.path ?? ''))
     return <CreateLogToolPart part={part} />;
 
-  return <GenericWriteToolPart part={part} />;
+  return (
+    <GenericWriteToolPart part={part} initiallyCollapsed={initiallyCollapsed} />
+  );
 };

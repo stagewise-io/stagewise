@@ -51,13 +51,7 @@ import { TurnFileEdits, useTurnFileEdits } from './turn-file-edits';
 
 type AssistantMessage = AgentMessage & { role: 'assistant' };
 
-const summarizedFileToolTypes = new Set([
-  'tool-copy',
-  'tool-mkdir',
-  'tool-delete',
-  'tool-multiEdit',
-  'tool-write',
-]);
+const collapsibleFileToolTypes = new Set(['tool-multiEdit', 'tool-write']);
 
 /**
  * Fast deep equality optimised for streaming tool parts.
@@ -111,6 +105,7 @@ const SinglePartRenderer = memo(
     isLastPart,
     isWorking,
     isLastMessage,
+    initiallyCollapsed,
     msg,
   }: {
     item: {
@@ -121,6 +116,7 @@ const SinglePartRenderer = memo(
     isLastPart: boolean;
     isWorking: boolean;
     isLastMessage: boolean;
+    initiallyCollapsed: boolean;
     msg: AssistantMessage;
   }) {
     const { part, originalIndex } = item;
@@ -167,7 +163,13 @@ const SinglePartRenderer = memo(
       case 'tool-delete':
         return <DeleteFileToolPart key={stableKey} part={part} />;
       case 'tool-multiEdit':
-        return <MultiEditToolPart key={stableKey} part={part} />;
+        return (
+          <MultiEditToolPart
+            key={stableKey}
+            part={part}
+            initiallyCollapsed={initiallyCollapsed}
+          />
+        );
       case 'tool-executeSandboxJs':
         return (
           <ExecuteSandboxJsToolPart
@@ -186,7 +188,13 @@ const SinglePartRenderer = memo(
           />
         );
       case 'tool-write':
-        return <WriteToolPart key={stableKey} part={part} />;
+        return (
+          <WriteToolPart
+            key={stableKey}
+            part={part}
+            initiallyCollapsed={initiallyCollapsed}
+          />
+        );
       case 'tool-askUserQuestions':
         return <AskUserQuestionsToolPart key={stableKey} part={part} />;
       case 'tool-createShellSession':
@@ -390,17 +398,15 @@ export const MessageAssistant = memo(
                   const currentTypeIndex = typeCounters[part.type] ?? 0;
                   typeCounters[part.type] = currentTypeIndex + 1;
                   const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
-                  if (
+                  const initiallyCollapsed =
                     isToolPart(part) &&
                     part.state === 'output-available' &&
-                    summarizedFileToolTypes.has(part.type) &&
-                    summarizedToolCallIds.has(part.toolCallId)
-                  )
-                    return null;
+                    collapsibleFileToolTypes.has(part.type) &&
+                    summarizedToolCallIds.has(part.toolCallId);
 
                   return (
                     <SinglePartRenderer
-                      key={stableKey}
+                      key={`${stableKey}:${initiallyCollapsed ? 'summary' : 'inline'}`}
                       item={
                         item as {
                           part: UIMessagePart<UIDataTypes, UIAgentTools>;
@@ -411,6 +417,7 @@ export const MessageAssistant = memo(
                       isLastPart={isLastPart}
                       isWorking={isWorking}
                       isLastMessage={isLastMessage}
+                      initiallyCollapsed={initiallyCollapsed}
                       msg={msg}
                     />
                   );
