@@ -37,6 +37,27 @@ const visualAssetChannel =
     ? 'nightly'
     : buildConstants.__APP_RELEASE_CHANNEL__;
 
+const getAuthCallbackScheme = (): string => {
+  switch (buildConstants.__APP_RELEASE_CHANNEL__) {
+    case 'release':
+      return 'stagewise';
+    case 'prerelease':
+      return 'stagewise-prerelease';
+    case 'nightly':
+      return 'stagewise-nightly';
+    default:
+      return 'stagewise-dev';
+  }
+};
+
+const protocolSchemes = Array.from(
+  new Set(['stagewise', getAuthCallbackScheme()]),
+);
+
+const linuxMimeTypes = protocolSchemes.map(
+  (scheme) => `x-scheme-handler/${scheme}`,
+);
+
 // DMG volume name (shown when mounted)
 const dmgVolumeName = 'Install stagewise';
 
@@ -380,6 +401,7 @@ const config: ForgeConfig = {
         icon: `./assets/icons/${visualAssetChannel}/icon.png`,
         homepage: 'https://stagewise.io',
         categories: ['Development', 'Network', 'Utility'],
+        mimeType: linuxMimeTypes,
       },
     }),
     new MakerDeb({
@@ -393,6 +415,7 @@ const config: ForgeConfig = {
         categories: ['Development', 'Network', 'Utility'],
         section: 'devel',
         priority: 'standard',
+        mimeType: linuxMimeTypes,
       },
     }),
     new MakerDMG({
