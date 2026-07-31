@@ -210,15 +210,19 @@ export function Radar({
     container.appendChild(gl.canvas);
     resize();
 
-    const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
     const updateColors = () => {
       program.uniforms.uColor.value = cssColorToRgb(color, container);
       program.uniforms.uBgColor.value = cssColorToRgb(
         backgroundColor,
         container,
       );
+      renderer.render({ scene: mesh });
     };
-    colorScheme.addEventListener('change', updateColors);
+    const themeObserver = new MutationObserver(updateColors);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
 
     const currentMouse: [number, number] = [0.5, 0.5];
     let targetMouse: [number, number] = [0.5, 0.5];
@@ -262,7 +266,7 @@ export function Radar({
       if (animationFrameId !== undefined)
         cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
-      colorScheme.removeEventListener('change', updateColors);
+      themeObserver.disconnect();
       if (enableMouseInteraction) {
         gl.canvas.removeEventListener('mousemove', handleMouseMove);
         gl.canvas.removeEventListener('mouseleave', handleMouseLeave);

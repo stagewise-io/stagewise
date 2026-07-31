@@ -213,6 +213,7 @@ export class ShellService extends DisposableService {
       command: string;
       timeoutMs: number;
     },
+    abortSignal?: AbortSignal,
   ): Promise<{ sessionId: string; expiresAt: number }> {
     this.assertNotDisposed();
     if (!this.shell || !this.sessionManager) {
@@ -225,6 +226,7 @@ export class ShellService extends DisposableService {
       cwd,
       env,
       input,
+      abortSignal,
       () => this.scheduleShellManifestPush(agentInstanceId),
     );
     this.pushShellsToSink(agentInstanceId);
