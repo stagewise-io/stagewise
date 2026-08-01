@@ -11,7 +11,7 @@
 
 [![加入 Discord](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) [![X (前 Twitter) 关注](https://img.shields.io/twitter/follow/stagewise_io)](https://x.com/stagewise_io)
 
-![stagewise 演示](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/(home)/_components/feature-images/full-demo-dark.png)
+![stagewise 演示](../apps/website/src/app/(home)/_components/feature-images/full-demo-dark.webp)
 
 ## 关于项目
 

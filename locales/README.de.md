@@ -11,7 +11,7 @@
 
 [![Discord beitreten](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) [![X (ehemals Twitter) folgen](https://img.shields.io/twitter/follow/stagewise_io)](https://x.com/stagewise_io)
 
-![stagewise Demo](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/(home)/_components/feature-images/full-demo-dark.png)
+![stagewise Demo](../apps/website/src/app/(home)/_components/feature-images/full-demo-dark.webp)
 
 ## Über das Projekt
 

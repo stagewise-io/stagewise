@@ -38,7 +38,7 @@
 
 </div>
 
-![stagewise demo](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/(home)/_components/feature-images/full-demo-dark.png)
+![stagewise demo](./apps/website/src/app/(home)/_components/feature-images/full-demo-dark.webp)
 
 <br />
 
