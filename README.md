@@ -8,7 +8,7 @@
 <br />
 <br />
 
-<strong>The Agentic IDE for Open-Source Models</strong>
+<h3>The Agentic IDE for Open-Source Models</h3>
 
 <br />
 <br />
