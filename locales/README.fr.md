@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/main/logo-combo-dark.svg">
-  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/main/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset="../.github/assets/logo-combo-dark.svg">
+  <img src="../.github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
 <h3>L'IDE agentique pour les modèles open source</h3>
@@ -31,7 +31,7 @@
 
 </div>
 
-![stagewise demo](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/%28home%29/_components/feature-images/full-demo-dark.webp)
+![stagewise demo](../apps/website/src/app/%28home%29/_components/feature-images/full-demo-dark.webp)
 
 ## À propos du projet
 
