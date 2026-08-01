@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../.github/assets/logo-combo-dark.svg">
-  <img src="../.github/assets/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/main/.github/assets/logo-combo-dark.svg">
+  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/main/.github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
 ### オープンソースモデル向けの Agentic IDE
@@ -11,7 +11,7 @@
 
 [![Discordに参加](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) [![X (旧Twitter) フォロー](https://img.shields.io/twitter/follow/stagewise_io)](https://x.com/stagewise_io)
 
-![stagewise デモ](../apps/website/src/app/(home)/_components/feature-images/full-demo-dark.webp)
+![stagewise デモ](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/%28home%29/_components/feature-images/full-demo-dark.webp)
 
 ## プロジェクトについて
 
