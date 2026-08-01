@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../.github/assets/logo-combo-dark.svg">
-  <img src="../.github/assets/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/main/.github/assets/logo-combo-dark.svg">
+  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/main/.github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
 ### L'IDE agentica per i modelli open-source
@@ -11,7 +11,7 @@
 
 [![Unisciti su Discord](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) [![Segui su X (ex Twitter)](https://img.shields.io/twitter/follow/stagewise_io)](https://x.com/stagewise_io)
 
-![stagewise demo](../apps/website/src/app/(home)/_components/feature-images/full-demo-dark.webp)
+![stagewise demo](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/%28home%29/_components/feature-images/full-demo-dark.webp)
 
 ## Informazioni sul progetto
 
