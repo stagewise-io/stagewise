@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/main/.github/assets/logo-combo-dark.svg">
-  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/main/.github/assets/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/main/logo-combo-dark.svg">
+  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/main/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
 ### Агентна IDE для open-source моделей
