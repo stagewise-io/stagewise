@@ -5,13 +5,7 @@
   <img src=".github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
-<br />
-<br />
-
 <h3>The Agentic IDE for Open-Source Models</h3>
-
-<br />
-<br />
 
 <p>
   <a href="./locales/README.zh-CN.md">简体中文</a> ·
@@ -33,8 +27,6 @@
   <a href="https://discord.gg/gkdGsDYaKA"><img alt="Discord" src="https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white" /></a>
   <a href="https://x.com/stagewise_io"><img alt="X Follow" src="https://img.shields.io/twitter/follow/stagewise_io" /></a>
 </p>
-
-<br />
 
 </div>
 
