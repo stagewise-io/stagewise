@@ -1,11 +1,11 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo-dark.svg">
-  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset="../.github/assets/logo-combo-dark.svg">
+  <img src="../.github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
 ### L'IDE agentica per i modelli open-source
 
-[English](./README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | [Français](./README.fr.md) | Italiano | [हिन्दी](./README.hi.md) | [Русский](./README.ru.md) | [Українська](./README.uk.md)
+[English](../README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | [Français](./README.fr.md) | Italiano | [हिन्दी](./README.hi.md) | [Русский](./README.ru.md) | [Українська](./README.uk.md)
 
  ![NPM License](https://img.shields.io/npm/l/stagewise) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise)
 
