@@ -1,15 +1,35 @@
+<div align="center">
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/main/logo-combo-dark.svg">
   <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/main/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
-### L'IDE agentique pour les modèles open source
+<h3>L'IDE agentique pour les modèles open source</h3>
 
-[English](../README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | Français | [Italiano](./README.it.md) | [हिन्दी](./README.hi.md) | [Русский](./README.ru.md) | [Українська](./README.uk.md)
+<p>
+  <a href="../README.md">English</a> ·
+  <a href="./README.zh-CN.md">简体中文</a> ·
+  <a href="./README.de.md">Deutsch</a> ·
+  <a href="./README.ja.md">日本語</a> ·
+  <a href="./README.es.md">Español</a> ·
+  <a href="./README.ko.md">한국어</a> ·
+  <a href="./README.pt.md">Português</a> ·
+  Français ·
+  <a href="./README.it.md">Italiano</a> ·
+  <a href="./README.hi.md">हिन्दी</a> ·
+  <a href="./README.ru.md">Русский</a> ·
+  <a href="./README.uk.md">Українська</a>
+</p>
 
- ![NPM License](https://img.shields.io/npm/l/stagewise) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise)
+<p>
+  <a href="https://github.com/stagewise-io/stagewise/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/stagewise" /></a>
+  <a href="https://github.com/stagewise-io/stagewise/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/stagewise-io/stagewise" /></a>
+  <a href="https://discord.gg/gkdGsDYaKA"><img alt="Rejoindre Discord" src="https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white" /></a>
+  <a href="https://x.com/stagewise_io"><img alt="Suivre sur X (anciennement Twitter)" src="https://img.shields.io/twitter/follow/stagewise_io" /></a>
+</p>
 
-[![Rejoindre Discord](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) [![Suivre sur X (anciennement Twitter)](https://img.shields.io/twitter/follow/stagewise_io)](https://x.com/stagewise_io)
+</div>
 
 ![stagewise demo](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/%28home%29/_components/feature-images/full-demo-dark.webp)
 
