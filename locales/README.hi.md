@@ -1,11 +1,11 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo-dark.svg">
-  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset="../.github/assets/logo-combo-dark.svg">
+  <img src="../.github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
 ### ओपन-सोर्स मॉडल के लिए एजेंटिक IDE
 
-[English](./README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | हिन्दी | [Русский](./README.ru.md) | [Українська](./README.uk.md)
+[English](../README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | हिन्दी | [Русский](./README.ru.md) | [Українська](./README.uk.md)
 
  ![NPM License](https://img.shields.io/npm/l/stagewise) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise)
 
