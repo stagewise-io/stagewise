@@ -16,6 +16,7 @@ import { ChatPanelFooter } from './panel-footer';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import {
+  useAgentSwitcher,
   useOpenAgent,
   OpenAgentContext,
   noopAgentSwitcher,
@@ -34,6 +35,7 @@ export function ChatPanel({ agentId }: { agentId?: string }) {
 function ChatPanelInner({ agentId }: { agentId?: string }) {
   const { forwardDropEvent } = useMessageEditState();
   const [openAgent, setOpenAgent, removeFromHistory] = useOpenAgent();
+  const { focusAgentFromHotkey } = useAgentSwitcher();
   const requestedAgent = agentId ?? openAgent;
 
   const openAgentExists = useKartonState((s) =>
@@ -147,7 +149,10 @@ function ChatPanelInner({ agentId }: { agentId?: string }) {
           <ChatHistory flushTop={Boolean(agentId)} />
         )}
         <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
-          <ChatPanelFooter key={requestedAgent} />
+          <ChatPanelFooter
+            key={requestedAgent}
+            focusAgent={focusAgentFromHotkey}
+          />
         </div>
       </OpenAgentContext.Provider>
     </div>
