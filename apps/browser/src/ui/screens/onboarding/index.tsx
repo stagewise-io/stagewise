@@ -12,6 +12,7 @@ import {
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
 import { IconArrowLeftFill18, IconArrowRightFill18 } from '@stagewise/icons';
+import { markCurrentReleaseNotesSeen } from '@ui/components/release-notes';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@ui/utils';
@@ -106,6 +107,7 @@ export function OnboardingWizard() {
       duration_ms: performance.now() - stepEnteredAtRef.current,
     });
     const providerSummary = providerSummaryRef.current;
+    markCurrentReleaseNotesSeen();
     setHasSeenOnboardingFlow({
       value: true,
       auth: authCompletion ?? { auth_method: 'unknown' },
