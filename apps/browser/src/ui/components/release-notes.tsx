@@ -31,6 +31,14 @@ function wasCurrentVersionSeen(): boolean {
   }
 }
 
+export function markCurrentReleaseNotesSeen(): void {
+  try {
+    localStorage.setItem(LAST_SEEN_VERSION_KEY, __APP_VERSION__);
+  } catch {
+    // Show them again on the next launch if storage is unavailable.
+  }
+}
+
 export function ReleaseNotes({
   children,
   className,
@@ -67,11 +75,7 @@ export function WhatsNewDialog() {
     setOpen(nextOpen);
     if (nextOpen) return;
 
-    try {
-      localStorage.setItem(LAST_SEEN_VERSION_KEY, __APP_VERSION__);
-    } catch {
-      // Show it again on the next launch if storage is unavailable.
-    }
+    markCurrentReleaseNotesSeen();
   };
 
   return (

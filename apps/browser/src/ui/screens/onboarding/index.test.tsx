@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   track: vi.fn(),
   setHasSeenOnboardingFlow: vi.fn(),
+  markCurrentReleaseNotesSeen: vi.fn(),
   state: {
     userAccount: { status: 'unauthenticated' },
     preferences: { providerInstances: [] as unknown[] },
@@ -11,6 +12,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@ui/hooks/use-track', () => ({ useTrack: () => mocks.track }));
+vi.mock('@ui/components/release-notes', () => ({
+  markCurrentReleaseNotesSeen: mocks.markCurrentReleaseNotesSeen,
+}));
 vi.mock('@ui/hooks/use-karton', () => ({
   useKartonState: vi.fn((selector) => selector(mocks.state)),
   useKartonProcedure: vi.fn((selector) =>
@@ -98,6 +102,7 @@ describe('OnboardingWizard telemetry', () => {
     mocks.track.mockReset();
     mocks.track.mockResolvedValue(undefined);
     mocks.setHasSeenOnboardingFlow.mockReset();
+    mocks.markCurrentReleaseNotesSeen.mockReset();
     mocks.state.userAccount.status = 'unauthenticated';
     mocks.state.preferences.providerInstances = [];
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
@@ -173,7 +178,13 @@ describe('OnboardingWizard telemetry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Change theme' }));
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
 
+    expect(mocks.markCurrentReleaseNotesSeen).toHaveBeenCalledOnce();
     expect(mocks.setHasSeenOnboardingFlow).toHaveBeenCalledOnce();
+    expect(
+      mocks.markCurrentReleaseNotesSeen.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      mocks.setHasSeenOnboardingFlow.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(mocks.setHasSeenOnboardingFlow).toHaveBeenCalledWith({
       value: true,
       auth: { auth_method: 'stagewise' },
