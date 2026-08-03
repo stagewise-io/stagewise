@@ -64,8 +64,9 @@ export function useAutoScroll({
     (atBottom: boolean) => {
       setIsAtBottom(atBottom);
       if (atBottom) setShouldFollow(true);
+      else if (shouldFollowRef.current) scrollToBottom();
     },
-    [setShouldFollow],
+    [scrollToBottom, setShouldFollow],
   );
 
   useEffect(() => {

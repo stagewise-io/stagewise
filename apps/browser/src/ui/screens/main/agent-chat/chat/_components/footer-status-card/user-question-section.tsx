@@ -325,9 +325,7 @@ function UserQuestionForm({
       >
         {currentStepData.description && (
           <span className="shrink-0 text-muted-foreground text-xs [&_p]:m-0 [&_p]:inline">
-            <Streamdown isAnimating={false}>
-              {currentStepData.description}
-            </Streamdown>
+            <Streamdown>{currentStepData.description}</Streamdown>
           </span>
         )}
 

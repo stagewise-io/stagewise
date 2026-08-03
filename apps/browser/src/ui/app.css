@@ -5,7 +5,6 @@
 
 @import "../shared/tailwind/browser-base.css";
 
-@import "../../../../node_modules/streamdown/styles.css";
 @import "../../../../node_modules/katex/dist/katex.min.css";
 
 /* Source paths for Tailwind to scan for class usage */
@@ -13,4 +12,3 @@
 @source "../../node_modules/streamdown/dist/*.js";
 @source "../../node_modules/@streamdown/math/dist/*.js";
 @source ".";
- 

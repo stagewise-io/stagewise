@@ -32,10 +32,12 @@ import {
 
 export const GenericMultiEditToolPart = ({
   part,
+  initiallyCollapsed = false,
 }: {
   part: Extract<AgentToolUIPart, { type: 'tool-multiEdit' }>;
+  initiallyCollapsed?: boolean;
 }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!initiallyCollapsed);
   const [openAgent] = useOpenAgent();
   const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
   const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);

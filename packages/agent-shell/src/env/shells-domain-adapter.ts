@@ -67,9 +67,12 @@ function renderFullShells(state: ShellsDomainState): string {
   }
   const activeSessions = state.shells.sessions.filter((s) => !s.exited);
   if (activeSessions.length > 0) {
-    const sessionTags = activeSessions.map(
-      (s) => `  <session id="${escAttr(s.id)}" cwd="${escAttr(s.cwd)}" />`,
-    );
+    const sessionTags = activeSessions.map((s) => {
+      const watcherAttributes = s.watcher
+        ? ` watcher-title="${escAttr(s.watcher.title)}"${s.watcher.description ? ` watcher-description="${escAttr(s.watcher.description)}"` : ''} watcher-expires-at="${s.watcher.expiresAt}"`
+        : '';
+      return `  <session id="${escAttr(s.id)}" cwd="${escAttr(s.cwd)}"${watcherAttributes} />`;
+    });
     parts.push(
       `<shell-sessions>\n${sessionTags.join('\n')}\n</shell-sessions>`,
     );
@@ -103,6 +106,15 @@ function computeShellsChanges(
           sessionId: id,
           lineCount: String(curr.lineCount),
           logPath: curr.logPath,
+          ...(curr.watcher
+            ? {
+                watcherTitle: curr.watcher.title,
+                ...(curr.watcher.description
+                  ? { watcherDescription: curr.watcher.description }
+                  : {}),
+                watcherExpiresAt: String(curr.watcher.expiresAt),
+              }
+            : {}),
         },
       });
       continue;
@@ -175,7 +187,11 @@ export function createShellsDomainAdapter(
           sa.lineCount !== sb.lineCount ||
           sa.cwd !== sb.cwd ||
           sa.createdAt !== sb.createdAt ||
-          sa.logPath !== sb.logPath
+          sa.logPath !== sb.logPath ||
+          sa.watcher?.title !== sb.watcher?.title ||
+          sa.watcher?.description !== sb.watcher?.description ||
+          sa.watcher?.command !== sb.watcher?.command ||
+          sa.watcher?.expiresAt !== sb.watcher?.expiresAt
         )
           return false;
       }

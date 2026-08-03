@@ -25,6 +25,7 @@ import {
   retrieveContentsForOids,
   copyOperationsUpToInitBaseline,
   getUndoTargetForToolCallsByFilePath,
+  getOperationsForToolCalls,
 } from './db';
 
 type SnapshotDb = LibSQLDatabase<typeof schema>;
@@ -1788,6 +1789,47 @@ describe('diff-history db utilities', () => {
   // ===========================================================================
   // getUndoTargetForToolCallsByFilePath
   // ===========================================================================
+
+  describe('getOperationsForToolCalls', () => {
+    it('returns only operations for the selected agent and tool calls', async () => {
+      const createSnapshot = (content: string) => {
+        const buffer = Buffer.from(content);
+        const oid = computeOid(buffer);
+        insertKeyframe(db, oid, buffer);
+        return oid;
+      };
+      const firstOid = createSnapshot('first');
+      const secondOid = createSnapshot('second');
+      const otherOid = createSnapshot('other');
+
+      await insertOperation(db, '/a.ts', firstOid, {
+        operation: 'edit',
+        reason: 'tool-first',
+        contributor: 'agent-1',
+      });
+      await insertOperation(db, '/a.ts', otherOid, {
+        operation: 'edit',
+        reason: 'tool-first',
+        contributor: 'agent-2',
+      });
+      await insertOperation(db, '/b.ts', secondOid, {
+        operation: 'edit',
+        reason: 'tool-second',
+        contributor: 'agent-1',
+      });
+
+      const operations = await getOperationsForToolCalls(
+        db,
+        ['first', 'second'],
+        '1',
+      );
+
+      expect(operations.map((operation) => operation.filepath)).toEqual([
+        '/a.ts',
+        '/b.ts',
+      ]);
+    });
+  });
 
   describe('getUndoTargetForToolCallsByFilePath', () => {
     /**

@@ -11,7 +11,7 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
-import { XIcon, GitBranchIcon } from 'lucide-react';
+import { XIcon } from 'lucide-react';
 import type { MountedWorkspaceGitDiffSummary } from '@shared/karton-contracts/ui';
 import {
   IconFileSearchOutline18,
@@ -25,7 +25,7 @@ import { useCommandCenter } from '../command-center';
 import { FileTreePreviewCoordinator } from './file-tree-preview-coordinator';
 import { FileTreeWorkspaceView } from './file-tree-workspace-view';
 import { FileTreeDiffView } from './file-tree-diff-view';
-import { formatDiffCount } from './format-diff-count';
+import { DiffButtonContent } from '@ui/components/diff-button-content';
 import {
   areFileTreeWorkspaceMountsEqual,
   getFileTreeWorkspaceKey,
@@ -312,18 +312,11 @@ export function FileTreeSidebar() {
                     )}
                     onClick={() => setViewMode('diff')}
                   >
-                    <GitBranchIcon className="size-3.5" />
-                    {viewMode === 'diff' && <span>Diff</span>}
-                    {(diffTotals.added > 0 || diffTotals.deleted > 0) && (
-                      <span className="flex flex-col font-mono text-[0.5rem] tabular-nums leading-none">
-                        <span className="text-success-foreground">
-                          +{formatDiffCount(diffTotals.added)}
-                        </span>
-                        <span className="text-error-foreground">
-                          -{formatDiffCount(diffTotals.deleted)}
-                        </span>
-                      </span>
-                    )}
+                    <DiffButtonContent
+                      added={diffTotals.added}
+                      removed={diffTotals.deleted}
+                      showLabel={viewMode === 'diff'}
+                    />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>

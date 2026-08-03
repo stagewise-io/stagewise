@@ -27,6 +27,8 @@ import {
   type PtySession,
   type SessionCommandRequest,
   type SessionCommandResult,
+  type WatcherEvent,
+  type WatcherRuntimeState,
 } from './types';
 
 /** Cap for rawOutput accumulator used only for pattern matching. */
@@ -376,6 +378,8 @@ export class SessionManager {
    * (created, exited, killed). Receives the agentInstanceId affected.
    */
   onSessionStateChange: ((agentInstanceId: string) => void) | null = null;
+  /** Emits one-shot watcher completion, failure, and timeout events. */
+  onWatcherEvent: ((event: WatcherEvent) => void) | null = null;
 
   /**
    * Grace period (ms) to wait for OSC 133 integration detection before
@@ -485,7 +489,7 @@ export class SessionManager {
             ),
           )
         : null,
-      initScriptPath: null,
+      tempScriptPath: null,
     };
 
     // Wire ready promise
@@ -604,6 +608,11 @@ export class SessionManager {
         session.ready &&
         (parser.inCommandOutput || parser.currentMode === 'sentinel')
       ) {
+        if (session.watcher) {
+          session.watcher.output = (
+            session.watcher.output + stripAnsi(data)
+          ).slice(-SHELL_RESPONSE_TAIL_MAX_CHARS);
+        }
         session.onData?.(sessionId, data);
       }
       this.appendToCommandOutput(sessionId, data);
@@ -622,6 +631,78 @@ export class SessionManager {
     this.sourceShellIntegration(session);
 
     return sessionId;
+  }
+
+  /**
+   * Create a normal PTY session carrying watcher metadata, stage the complete
+   * command in a private temporary file, and start it. The parent shell exits
+   * with the command's code so the PTY lifecycle is the watcher signal.
+   */
+  async createWatcherSession(
+    agentInstanceId: string,
+    cwd: string,
+    env: Record<string, string>,
+    input: {
+      title: string;
+      description?: string;
+      command: string;
+      timeoutMs: number;
+    },
+    abortSignal?: AbortSignal,
+    onData?: (sessionId: string, data: string) => void,
+  ): Promise<{ sessionId: string; expiresAt: number }> {
+    abortSignal?.throwIfAborted();
+    const sessionId = this.createSession(agentInstanceId, cwd, env, onData);
+    const session = this.sessions.get(sessionId)!;
+    const onAbort = () => this.markReady(session);
+    abortSignal?.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      await session.readyPromise;
+      abortSignal?.throwIfAborted();
+      if (session.exited) {
+        throw new Error(
+          `Watcher session exited during initialization (code ${session.exitCode}).`,
+        );
+      }
+
+      const startedAt = Date.now();
+      const watcher: WatcherRuntimeState = {
+        title: input.title,
+        description: input.description,
+        startedAt,
+        expiresAt: startedAt + input.timeoutMs,
+        output: '',
+        timeoutHandle: null,
+      };
+      const extension = this.shell.type === 'powershell' ? 'ps1' : 'sh';
+      const scriptPath = path.join(
+        tmpdir(),
+        `sw-watcher-${sessionId}.${extension}`,
+      );
+      this.cleanupTempScript(session);
+      fs.writeFileSync(scriptPath, input.command, { mode: 0o700 });
+      session.tempScriptPath = scriptPath;
+      session.lastCommand = input.command;
+      session.watcher = watcher;
+
+      const wrapper = this.buildWatcherWrapper(scriptPath);
+      const remainingMs = Math.max(0, watcher.expiresAt - Date.now());
+      watcher.timeoutHandle = setTimeout(() => {
+        this.handleWatcherTimeout(sessionId);
+      }, remainingMs);
+      session.pty.write(`${wrapper}\r`);
+      session.lastActivityAt = Date.now();
+      this.onSessionStateChange?.(agentInstanceId);
+
+      return { sessionId, expiresAt: watcher.expiresAt };
+    } catch (error) {
+      this.removeSession(session);
+      this.onSessionStateChange?.(agentInstanceId);
+      throw error;
+    } finally {
+      abortSignal?.removeEventListener('abort', onAbort);
+    }
   }
 
   // ─── Command execution ───────────────────────────────────────
@@ -814,6 +895,7 @@ export class SessionManager {
     if (!session) return false;
 
     const { agentInstanceId } = session;
+    this.cancelWatcher(session);
 
     // Resolve any pending commands. A user/agent-initiated kill is
     // semantically an abort, not a natural session exit.
@@ -1185,6 +1267,14 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    if (session.watcher) {
+      this.finalizeWatcher(
+        session,
+        exitCode === 0 ? 'triggered' : 'failed',
+        exitCode,
+      );
+    }
+
     session.exited = true;
     session.exitCode = exitCode;
     this.onSessionStateChange?.(session.agentInstanceId);
@@ -1229,20 +1319,81 @@ export class SessionManager {
     session.parser.reset();
     this.sessionCommandMap.delete(session.id);
 
-    // Best-effort cleanup of temp init script (may already be removed by the shell)
-    if (session.initScriptPath) {
-      try {
-        fs.unlinkSync(session.initScriptPath);
-      } catch {
-        // Already removed by the shell's `rm -f`
-      }
-      session.initScriptPath = null;
-    }
+    this.cleanupTempScript(session);
   }
 
   private removeSession(session: PtySession): void {
+    this.cancelWatcher(session);
     this.deactivateSession(session);
     this.sessions.delete(session.id);
+  }
+
+  private cleanupTempScript(session: PtySession): void {
+    if (!session.tempScriptPath) return;
+    try {
+      fs.unlinkSync(session.tempScriptPath);
+    } catch {
+      // The shell may already have removed it.
+    }
+    session.tempScriptPath = null;
+  }
+
+  private buildWatcherWrapper(scriptPath: string): string {
+    if (this.shell.type === 'powershell') {
+      const quotedPath = scriptPath.replace(/'/g, "''");
+      return (
+        `$global:LASTEXITCODE = $null; ` +
+        `$__stagewiseWatcherSource = Get-Content -Raw -LiteralPath '${quotedPath}'; ` +
+        `& ([ScriptBlock]::Create($__stagewiseWatcherSource)); ` +
+        `$__stagewiseWatcherCode = if ($null -ne $global:LASTEXITCODE) ` +
+        `{ $global:LASTEXITCODE } elseif ($?) { 0 } else { 1 }; ` +
+        `exit $__stagewiseWatcherCode`
+      );
+    }
+
+    const quotedShell = quotePosix(toMsysPath(this.shell.path));
+    const quotedPath = quotePosix(toMsysPath(scriptPath));
+    return `${quotedShell} ${quotedPath}; __stagewise_watcher_code=$?; exit "$__stagewise_watcher_code"`;
+  }
+
+  private handleWatcherTimeout(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session?.watcher) return;
+    this.finalizeWatcher(session, 'timed_out', null);
+    this.killSession(sessionId);
+  }
+
+  private finalizeWatcher(
+    session: PtySession,
+    outcome: WatcherEvent['outcome'],
+    exitCode: number | null,
+  ): void {
+    const watcher = session.watcher;
+    if (!watcher) return;
+    const finishedAt = Date.now();
+    session.watcherResult = { outcome, finishedAt };
+    this.cancelWatcher(session);
+    this.onWatcherEvent?.({
+      agentInstanceId: session.agentInstanceId,
+      sessionId: session.id,
+      title: watcher.title,
+      description: watcher.description,
+      outcome,
+      startedAt: watcher.startedAt,
+      finishedAt,
+      exitCode,
+      output: watcher.output.trimEnd() || this.collectRecentOutput(session.id),
+    });
+  }
+
+  private cancelWatcher(session: PtySession): void {
+    const watcher = session.watcher;
+    if (!watcher) return;
+    session.watcher = undefined;
+    if (watcher.timeoutHandle) {
+      clearTimeout(watcher.timeoutHandle);
+      watcher.timeoutHandle = null;
+    }
   }
 
   private sourceShellIntegration(session: PtySession): void {
@@ -1281,7 +1432,7 @@ export class SessionManager {
           injectBoundaryToken(script, session.parser.boundaryToken),
           { mode: 0o600 },
         );
-        session.initScriptPath = nativeTempPath;
+        session.tempScriptPath = nativeTempPath;
         // Dot-source is POSIX (cannot be aliased). Cleanup handled by deactivateSession.
         // Single-quote to survive paths containing spaces (e.g. Windows
         // usernames with spaces → `/c/Users/Some Name/...`). Node's
@@ -1342,6 +1493,11 @@ function escapeForShell(s: string): string {
   // must be escaped; \n becomes a real newline inside $'...'.
   // Dollar signs and backticks are literal in $'...' — no escaping needed.
   return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+}
+
+/** Quote an arbitrary string as one POSIX shell word. */
+function quotePosix(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 /**

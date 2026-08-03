@@ -6,7 +6,11 @@ type FileTreeMountState = Pick<
   'contentTabs' | 'toolbox' | 'workspaceMounts'
 >;
 
-export function getFileTreeWorkspaceKey(mount: MountEntry): string {
+type FileTreeWorkspaceIdentity = Pick<MountEntry, 'prefix' | 'path'>;
+
+export function getFileTreeWorkspaceKey(
+  mount: FileTreeWorkspaceIdentity,
+): string {
   return `${mount.prefix}:${normalizePath(mount.path)}`;
 }
 
@@ -20,7 +24,9 @@ export function isReadOnlyWorkspaceKey(workspaceKey: string): boolean {
   return READONLY_WORKSPACE_PREFIXES.has(prefix);
 }
 
-export function getFileTreeWorkspaceName(mount: MountEntry): string {
+export function getFileTreeWorkspaceName(
+  mount: FileTreeWorkspaceIdentity,
+): string {
   return getBaseName(mount.path) || mount.prefix;
 }
 

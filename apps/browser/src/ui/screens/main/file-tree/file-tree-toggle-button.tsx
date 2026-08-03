@@ -19,7 +19,7 @@ import {
   getFileTreeWorkspaceKey,
   getFileTreeWorkspaceMountsForAgent,
 } from './file-tree-utils';
-import { formatDiffCount } from './format-diff-count';
+import { DiffLineStats } from '@ui/components/diff-line-stats';
 
 // Cache diff totals per workspace across mount/unmount cycles to
 // prevent flicker when the toggle button moves between containers.
@@ -127,14 +127,11 @@ export function FileTreeToggleButton() {
         >
           <Icon className="size-4 shrink-0" />
           {showDiff && (
-            <span className="flex min-w-0 shrink-0 flex-col font-mono text-[0.5rem] tabular-nums leading-none">
-              <span className="text-success-foreground">
-                +{formatDiffCount(diffTotals.added)}
-              </span>
-              <span className="text-error-foreground">
-                -{formatDiffCount(diffTotals.deleted)}
-              </span>
-            </span>
+            <DiffLineStats
+              added={diffTotals.added}
+              removed={diffTotals.deleted}
+              stacked
+            />
           )}
         </Button>
       </TooltipTrigger>

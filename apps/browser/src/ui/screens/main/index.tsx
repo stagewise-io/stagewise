@@ -48,6 +48,7 @@ import {
 } from './_components/sidebar-panel-config';
 import { LocalServersPopover } from './_components/local-servers-popover';
 import { AgentAttentionProvider } from './_components/agent-attention-context';
+import { WatcherPopover } from './_components/watcher-popover';
 
 // Reuse the same autoSaveId as the settings screen so the root panel layout
 // (sidebar width, content width) persists when switching between screens.
@@ -240,6 +241,7 @@ function DefaultLayoutInner({ show }: { show: boolean }) {
 
   const chatTopRightActions = (
     <>
+      <WatcherPopover />
       <LocalServersPopover
         trailingContent={!showContent ? <ActionDivider /> : null}
       />

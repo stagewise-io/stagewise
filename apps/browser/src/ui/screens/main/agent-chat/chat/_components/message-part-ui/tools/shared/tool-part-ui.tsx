@@ -10,6 +10,8 @@ import { ChevronDownIcon } from 'lucide-react';
 import { useAutoScroll } from '@ui/hooks/use-auto-scroll';
 
 type ToolPartUIProps = {
+  className?: string;
+  triggerClassName?: string;
   trigger?: React.ReactNode;
   content?: React.ReactNode;
   contentClassName?: string;
@@ -29,6 +31,8 @@ type ToolPartUIProps = {
   autoScroll?: boolean;
   isShimmering?: boolean;
   hideChevron?: boolean;
+  /** Remove the content inset and wrap instead of scrolling horizontally. */
+  flushContent?: boolean;
 };
 
 export const ToolPartUI = (props: ToolPartUIProps) => {
@@ -39,6 +43,7 @@ export const ToolPartUI = (props: ToolPartUIProps) => {
           'flex h-6 w-full items-center gap-1 truncate font-normal text-muted-foreground',
           props.showBorder &&
             'rounded-lg border border-border-subtle bg-background px-2.5 shadow-xs dark:border-border dark:bg-surface-1',
+          props.className,
         )}
       >
         {props.trigger}
@@ -55,6 +60,8 @@ export const ToolPartUI = (props: ToolPartUIProps) => {
  */
 const ToolPartUIWithContent = ({
   trigger,
+  className,
+  triggerClassName,
   content,
   contentClassName,
   contentFooter,
@@ -66,6 +73,7 @@ const ToolPartUIWithContent = ({
   autoScroll = true,
   isShimmering = false,
   hideChevron = false,
+  flushContent = false,
 }: Omit<ToolPartUIProps, 'content'> & { content: React.ReactNode }) => {
   // Internal state for uncontrolled mode
   const [internalExpanded, setInternalExpanded] = useState(true);
@@ -96,17 +104,21 @@ const ToolPartUIWithContent = ({
         'block w-full overflow-hidden',
         showBorder &&
           'rounded-lg border border-border-subtle bg-background dark:border-border dark:bg-surface-1',
-        showBorder && 'shadow-xs',
+        showBorder &&
+          'shadow-xs has-[[data-tool-part-trigger]:focus-visible]:outline-2 has-[[data-tool-part-trigger]:focus-visible]:outline-primary-solid',
+        className,
       )}
     >
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <CollapsibleTrigger
+          data-tool-part-trigger
           size="condensed"
           className={cn(
             `group/trigger select-none gap-1 px-0 font-normal text-muted-foreground`,
             'cursor-pointer',
             showBorder &&
               'h-6 rounded-t-lg rounded-b-none border-b bg-background px-2.5 dark:bg-surface-1',
+            showBorder && 'focus-visible:outline-none',
             // Always have border-b, toggle color to avoid transition-all animating border
             showBorder &&
               (expanded
@@ -114,6 +126,7 @@ const ToolPartUIWithContent = ({
                 : 'border-transparent'),
             !showBorder &&
               'justify-start py-0 hover:bg-transparent active:bg-transparent',
+            triggerClassName,
           )}
           style={
             showBorder
@@ -138,25 +151,32 @@ const ToolPartUIWithContent = ({
           className={cn(
             'relative pb-0 text-xs duration-0!',
             !showBorder && 'pt-1',
+            flushContent && 'px-0!',
+            flushContent &&
+              expanded &&
+              'border-border/30 border-t dark:border-border/70',
           )}
         >
-          <div
+          <OverlayScrollbar
             className={cn(
               showBorder ? 'max-h-64' : 'max-h-none',
               contentFooter && !contentFooterStatic && 'mb-6',
             )}
+            viewportClassName={cn(
+              flushContent ? 'scroll-fade-b' : 'scroll-fade-both',
+              'scroll-fade-4',
+            )}
+            contentClassName={cn('py-0.5', contentClassName)}
+            options={{
+              overflow: {
+                x: flushContent ? 'hidden' : 'scroll',
+                y: 'scroll',
+              },
+            }}
+            onViewportRef={handleViewportRef}
           >
-            <OverlayScrollbar
-              viewportClassName="scroll-fade-both scroll-fade-4"
-              contentClassName={cn('py-0.5', contentClassName)}
-              options={{
-                overflow: { x: 'scroll', y: 'scroll' },
-              }}
-              onViewportRef={handleViewportRef}
-            >
-              {content}
-            </OverlayScrollbar>
-          </div>
+            {content}
+          </OverlayScrollbar>
           {contentFooter && (
             <div
               className={cn(
@@ -165,9 +185,9 @@ const ToolPartUIWithContent = ({
                 // Default (absolute) mode: pin to bottom and add separator
                 !contentFooterStatic &&
                   'absolute right-0 bottom-0 left-0 h-6 border-border/30 border-t dark:border-border/70',
-                // Static mode: negate CollapsibleContent's outer px-2 so the
-                // footer spans the full card width, matching the absolute variant.
-                contentFooterStatic && '-mx-2',
+                // Only inset content needs its outer px-2 negated. Flush
+                // content already spans the card and keeps the footer padding.
+                contentFooterStatic && !flushContent && '-mx-2',
                 contentFooterClassName,
               )}
             >

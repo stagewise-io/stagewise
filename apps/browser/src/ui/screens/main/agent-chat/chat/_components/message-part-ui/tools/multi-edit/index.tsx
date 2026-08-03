@@ -68,7 +68,13 @@ function isPureCheckboxToggle(
   return true;
 }
 
-export const MultiEditToolPart = ({ part }: { part: MultiEditPart }) => {
+export const MultiEditToolPart = ({
+  part,
+  initiallyCollapsed = false,
+}: {
+  part: MultiEditPart;
+  initiallyCollapsed?: boolean;
+}) => {
   const relativePath = part.input?.path ?? '';
 
   // Route to compact log-edit UI for log channel files
@@ -91,5 +97,10 @@ export const MultiEditToolPart = ({ part }: { part: MultiEditPart }) => {
     return <PlanCheckoffToolPart part={part} />;
   }
 
-  return <GenericMultiEditToolPart part={part} />;
+  return (
+    <GenericMultiEditToolPart
+      part={part}
+      initiallyCollapsed={initiallyCollapsed}
+    />
+  );
 };

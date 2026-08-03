@@ -1558,6 +1558,7 @@ export class AgentManager extends DisposableService {
   public async sendUserMessage(
     instanceId: string,
     message: AgentMessage & { role: 'user' },
+    options: { queueIfBlocked?: boolean } = {},
   ) {
     const agent = this.activeAgents.get(instanceId);
 
@@ -1609,7 +1610,7 @@ export class AgentManager extends DisposableService {
     // Host `AgentMessage` carries narrowed `UserMessageMetadata`
     // (browser-specific mention kinds) while the core default widens
     // these. Cast at the seam — the runtime shape is identical.
-    await agent.sendUserMessage(message as any);
+    await agent.sendUserMessage(message as any, options);
   }
 
   /**

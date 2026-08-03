@@ -905,6 +905,7 @@ export async function getUndoTargetForToolCallsByFilePath(
   db: SnapshotDb,
   toolcallIds: ToolCallId[],
   agentInstanceId?: string,
+  preselectedOperations?: ReadonlyArray<Pick<Operation, 'idx' | 'filepath'>>,
 ): Promise<Record<FilePath, OperationWithExternal>> {
   if (toolcallIds.length === 0) return {};
 
@@ -914,22 +915,24 @@ export async function getUndoTargetForToolCallsByFilePath(
   // Step 1: Find the earliest tool-call operation for each file
   // Query all operations matching these tool-call reasons, joined with snapshots for isExternal
   // Ordered by filepath then idx so we can easily pick the earliest per file
-  const toolCallRows = await db
-    .select({
-      idx: schema.operations.idx,
-      filepath: schema.operations.filepath,
-    })
-    .from(schema.operations)
-    .where(
-      and(
-        agentInstanceId
-          ? eq(schema.operations.contributor, `agent-${agentInstanceId}`)
-          : undefined,
-        inArray(schema.operations.reason, reasons),
-      ),
-    )
-    .orderBy(schema.operations.filepath, schema.operations.idx)
-    .all();
+  const toolCallRows =
+    preselectedOperations ??
+    (await db
+      .select({
+        idx: schema.operations.idx,
+        filepath: schema.operations.filepath,
+      })
+      .from(schema.operations)
+      .where(
+        and(
+          agentInstanceId
+            ? eq(schema.operations.contributor, `agent-${agentInstanceId}`)
+            : undefined,
+          inArray(schema.operations.reason, reasons),
+        ),
+      )
+      .orderBy(schema.operations.filepath, schema.operations.idx)
+      .all());
 
   // Group by filepath and keep only the earliest (first) idx per file
   const earliestIdxPerFile: Record<FilePath, number> = {};
@@ -988,6 +991,53 @@ export async function getUndoTargetForToolCallsByFilePath(
   }
 
   return result;
+}
+
+/**
+ * Return every edit operation created by the supplied tool calls. Results are
+ * ordered chronologically and include the snapshot's external-file marker.
+ */
+export async function getOperationsForToolCalls(
+  db: SnapshotDb,
+  toolcallIds: ToolCallId[],
+  agentInstanceId?: string,
+): Promise<OperationWithExternal[]> {
+  if (toolcallIds.length === 0) return [];
+
+  const reasons = toolcallIds.map((id) => `tool-${id}` as `tool-${ToolCallId}`);
+  const rows = await db
+    .select({
+      idx: schema.operations.idx,
+      filepath: schema.operations.filepath,
+      operation: schema.operations.operation,
+      snapshot_oid: schema.operations.snapshot_oid,
+      reason: schema.operations.reason,
+      contributor: schema.operations.contributor,
+      isExternal: schema.snapshots.is_external,
+    })
+    .from(schema.operations)
+    .leftJoin(
+      schema.snapshots,
+      eq(schema.operations.snapshot_oid, schema.snapshots.oid),
+    )
+    .where(
+      and(
+        agentInstanceId
+          ? eq(schema.operations.contributor, `agent-${agentInstanceId}`)
+          : undefined,
+        inArray(schema.operations.reason, reasons),
+      ),
+    )
+    .orderBy(schema.operations.idx)
+    .all();
+
+  return rows.map(
+    (row) =>
+      ({
+        ...row,
+        isExternal: row.isExternal ?? false,
+      }) as OperationWithExternal,
+  );
 }
 
 /**

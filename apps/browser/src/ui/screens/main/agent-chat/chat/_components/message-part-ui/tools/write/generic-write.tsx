@@ -31,9 +31,15 @@ import {
 } from '@ui/components/ui/streaming-code-block';
 
 export const GenericWriteToolPart = memo(
-  function GenericWriteToolPart({ part }: { part: WritePart }) {
+  function GenericWriteToolPart({
+    part,
+    initiallyCollapsed = false,
+  }: {
+    part: WritePart;
+    initiallyCollapsed?: boolean;
+  }) {
     const [codeDiffCollapsed, setCodeDiffCollapsed] = useState(true);
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(!initiallyCollapsed);
     const [openAgent] = useOpenAgent();
     const openFileTab = useKartonProcedure((p) => p.fileTree.openFileTab);
     const revealInFolder = useKartonProcedure((p) => p.fileTree.revealInFolder);

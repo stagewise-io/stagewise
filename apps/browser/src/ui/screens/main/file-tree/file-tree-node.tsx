@@ -1,12 +1,13 @@
-import { FileIcon } from '@ui/components/file-icon';
-import { cn } from '@ui/utils';
+import {
+  FileTreeNodeIcon,
+  FileTreeNodeRow,
+} from '@ui/components/file-tree-node-row';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import type { FileTreeEntry } from '@shared/karton-contracts/ui';
-import { ChevronRightIcon, FolderIcon, Loader2Icon } from 'lucide-react';
 import {
   memo,
   useEffect,
@@ -88,25 +89,20 @@ export const FileTreeNode = memo(function FileTreeNode({
   }
 
   const button = (
-    <button
-      type="button"
-      className={cn(
-        'flex h-6 w-full select-none items-center gap-1 rounded px-1 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset',
-        entry.isIgnored
-          ? 'text-muted-foreground opacity-45'
-          : 'text-foreground',
-        // When the row is already selected, darken the selection background on
-        // hover (translucent overlay blends with the selected bg behind it)
-        // instead of replacing it with the neutral gray hover.
-        selected ? 'hover:bg-foreground/[0.06]' : 'hover:bg-hover-derived',
-        cut && 'opacity-45',
-        dropTarget && 'bg-primary-solid/15 ring-1 ring-primary-solid/50',
-      )}
+    <FileTreeNodeRow
+      kind={entry.kind}
+      name={entry.name}
+      depth={depth}
+      expanded={expanded}
+      loading={loading}
+      selected={selected}
+      muted={entry.isIgnored}
+      cut={cut}
+      dropTarget={dropTarget}
       data-file-tree-entry-path={entry.relativePath}
       data-file-tree-row-index={rowIndex}
       tabIndex={focused ? 0 : -1}
       draggable
-      style={{ paddingLeft: 4 + depth * 14 }}
       onContextMenu={onFocus}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move';
@@ -147,10 +143,7 @@ export const FileTreeNode = memo(function FileTreeNode({
         if (!isDirectory) onOpen();
       }}
       onFocus={onFocus}
-    >
-      <TreeNodeIcon entry={entry} expanded={expanded} loading={loading} />
-      <span className="min-w-0 truncate">{entry.name}</span>
-    </button>
+    />
   );
 
   // Only files get the rich name/path tooltip; directories keep no tooltip.
@@ -170,41 +163,6 @@ export const FileTreeNode = memo(function FileTreeNode({
     </Tooltip>
   );
 });
-
-function TreeNodeIcon({
-  entry,
-  expanded,
-  loading,
-}: {
-  entry: FileTreeEntry;
-  expanded: boolean;
-  loading?: boolean;
-}) {
-  const isDirectory = entry.kind === 'directory';
-  return (
-    <>
-      <span className="flex size-4 shrink-0 items-center justify-center">
-        {isDirectory ? (
-          loading ? (
-            <Loader2Icon className="size-3 animate-spin text-muted-foreground" />
-          ) : (
-            <ChevronRightIcon
-              className={cn(
-                'size-3 transition-transform',
-                expanded && 'rotate-90',
-              )}
-            />
-          )
-        ) : null}
-      </span>
-      {isDirectory ? (
-        <FolderIcon className="m-[0.0625rem] size-3.5 shrink-0 text-[oklch(0.72_0.09_78)]" />
-      ) : (
-        <FileIcon filePath={entry.name} className="size-4" />
-      )}
-    </>
-  );
-}
 
 function RenameRow({
   entry,
@@ -257,7 +215,12 @@ function RenameRow({
       data-file-tree-row-index={rowIndex}
       style={{ paddingLeft: 4 + depth * 14 }}
     >
-      <TreeNodeIcon entry={entry} expanded={expanded} loading={loading} />
+      <FileTreeNodeIcon
+        kind={entry.kind}
+        name={entry.name}
+        expanded={expanded}
+        loading={loading}
+      />
       <input
         ref={inputRef}
         className="h-5 min-w-0 flex-1 rounded-sm border border-primary-solid bg-background px-1 text-foreground outline-none"

@@ -1,6 +1,8 @@
 import {
   type CreateShellSessionToolInput,
   createShellSessionToolInputSchema,
+  type CreateWatcherSessionToolInput,
+  createWatcherSessionToolInputSchema,
   type ExecuteShellCommandToolInput,
   type ExecuteShellCommandToolOutput,
   executeShellCommandToolInputSchema,
@@ -86,13 +88,51 @@ export interface SmartApprovalDeps {
   recordPendingApproval: (toolCallId: string, explanation: string) => void;
 }
 
+async function classifyCommandApproval(input: {
+  command: string;
+  cwdPrefix: string;
+  agentExplanation: string;
+  shellTail: string;
+  toolCallId: string;
+  mode: ToolApprovalMode;
+  smartApproval?: SmartApprovalDeps;
+}): Promise<boolean> {
+  if (input.mode === 'alwaysAllow') return false;
+  if (input.mode === 'alwaysAsk') return true;
+  if (!input.smartApproval) return true;
+
+  let result: SmartApprovalClassifyResult;
+  try {
+    result = await input.smartApproval.classify({
+      command: input.command,
+      cwdPrefix: input.cwdPrefix,
+      agentExplanation: input.agentExplanation,
+      shellTail: input.shellTail,
+    });
+  } catch {
+    input.smartApproval.recordPendingApproval(
+      input.toolCallId,
+      'Smart-approval classifier failed. Approving manually to stay safe.',
+    );
+    return true;
+  }
+
+  if (result.needsApproval) {
+    input.smartApproval.recordPendingApproval(
+      input.toolCallId,
+      result.explanation,
+    );
+  }
+  return result.needsApproval;
+}
+
 export const CREATE_SHELL_SESSION_DESCRIPTION = `Create new persistent shell (PTY) session on user machine.
 
 ## When to create
 
 Sessions stateful — vars, cwd, running processes persist across commands. Only create new session when need multiple independent terminal states:
 
-- Long-running process (dev server, watcher) occupies one session, need run other commands.
+- Long-running process (dev server) occupies one session, need run other commands.
 - Set env vars in one session that later commands depend on, while doing unrelated work.
 - Working in two different directories simultaneously.
 
@@ -103,6 +143,23 @@ Active sessions listed in \`<shell-sessions>\` in env-snapshot — check first. 
 ## Parameters
 
 - \`cwd\` (string, required) — initial working directory as mount prefix from env-snapshot (e.g. "wXXXX" or "wXXXX/apps/browser"), never ".".`;
+
+export const CREATE_WATCHER_SESSION_DESCRIPTION = `Start a one-shot watcher in a dedicated shell session.
+
+Use this when a local or remote condition must be checked periodically in the background, such as waiting for a file change, pull-request review, CI run, deployment, or remote job.
+
+The tool returns as soon as the watcher is armed. The runtime later sends a new chat message when the command exits or the required timeout elapses. If the agent is busy, that message is queued normally.
+
+Watchers run only in the current app process. An app restart stops them; they are not restored automatically. Only watchers listed in the current <shell-sessions> are active.
+
+Rules:
+- Keep every poll read-only and side-effect-free. Perform requested mutations only after the watcher wakes the agent.
+- Define the exact completion signal before polling. For a new event or change, compare against an explicit baseline captured before the watcher is armed.
+- For multiple targets, track each independently and trigger when any or all complete as requested. The final result must identify completed and remaining targets.
+- Prefer existing authenticated CLIs or environment credentials. Never embed credentials in the command, title, or description.
+- Keep the command in the foreground. Never use &, nohup, disown, or another detached process.
+- Keep routine polls quiet. Retry transient errors with a reasonable interval or backoff. When the condition occurs, print a concise result and exit 0; on permanent failure, print a useful diagnostic and exit non-zero.
+- Watchers are one-shot. To change the condition, stop the old session and create a new watcher.`;
 
 export const EXECUTE_SHELL_COMMAND_DESCRIPTION = `Send input to existing persistent shell session. Session MUST already exist — use \`createShellSession\` first if no \`session_id\`.
 
@@ -308,6 +365,54 @@ export const createShellSession = (
   });
 };
 
+export const createWatcherSession = (
+  shellService: ShellService,
+  agentInstanceId: string,
+  getToolApprovalMode: () => ToolApprovalMode,
+  getMountedPaths: MountedPathsGetter,
+  smartApproval?: SmartApprovalDeps,
+) => {
+  return tool({
+    description: CREATE_WATCHER_SESSION_DESCRIPTION,
+    inputSchema: createWatcherSessionToolInputSchema,
+    strict: false,
+    needsApproval: async (
+      input: CreateWatcherSessionToolInput,
+      { toolCallId },
+    ) => {
+      const cwd = resolveCwd(input.cwd, getMountedPaths);
+      return await classifyCommandApproval({
+        command: input.command,
+        cwdPrefix: toClassifierCwdPrefix(cwd, getMountedPaths),
+        agentExplanation: input.description ?? input.title,
+        shellTail: '',
+        toolCallId,
+        mode: getToolApprovalMode(),
+        smartApproval,
+      });
+    },
+    execute: async (params: CreateWatcherSessionToolInput, { abortSignal }) => {
+      const cwd = resolveCwd(params.cwd, getMountedPaths);
+      const result = await shellService.createWatcherSession(
+        agentInstanceId,
+        cwd,
+        {
+          title: params.title,
+          description: params.description,
+          command: params.command,
+          timeoutMs: params.timeout_ms,
+        },
+        abortSignal,
+      );
+      return {
+        session_id: result.sessionId,
+        expires_at: result.expiresAt,
+        message: `Watcher "${params.title}" started.`,
+      };
+    },
+  });
+};
+
 export const executeShellCommand = (
   shellService: ShellService,
   agentInstanceId: string,
@@ -360,31 +465,15 @@ export const executeShellCommand = (
       }
       const cwdPrefix = toClassifierCwdPrefix(currentCwd, getMountedPaths);
 
-      // No classifier available — fail closed (require manual approval).
-      if (!smartApproval) return true;
-
-      // The package accepts an arbitrary host `classify`; if it throws, fail
-      // closed rather than letting the exception propagate out of the tool.
-      let result: SmartApprovalClassifyResult;
-      try {
-        result = await smartApproval.classify({
-          command: classifierCommand,
-          cwdPrefix,
-          agentExplanation: input.explanation ?? '',
-          shellTail,
-        });
-      } catch {
-        smartApproval.recordPendingApproval(
-          toolCallId,
-          'Smart-approval classifier failed. Approving manually to stay safe.',
-        );
-        return true;
-      }
-
-      if (result.needsApproval)
-        smartApproval.recordPendingApproval(toolCallId, result.explanation);
-
-      return result.needsApproval;
+      return await classifyCommandApproval({
+        command: classifierCommand,
+        cwdPrefix,
+        agentExplanation: input.explanation ?? '',
+        shellTail,
+        toolCallId,
+        mode,
+        smartApproval,
+      });
     },
     execute: async (
       params: ExecuteShellCommandToolInput,

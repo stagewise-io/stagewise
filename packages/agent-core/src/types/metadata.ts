@@ -145,6 +145,18 @@ export const ownedReasoningDetailsSchema = z.object({
 
 export type OwnedReasoningDetails = z.infer<typeof ownedReasoningDetailsSchema>;
 
+export const watcherEventMetadataSchema = z.object({
+  sessionId: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  outcome: z.enum(['triggered', 'failed', 'timed_out']),
+  elapsedMs: z.number().nonnegative(),
+  exitCode: z.number().int().nullable(),
+  output: z.string(),
+});
+
+export type WatcherEventMetadata = z.infer<typeof watcherEventMetadataSchema>;
+
 export const metadataSchema = z.object({
   createdAt: z.date(),
   partsMetadata: z.array(
@@ -165,6 +177,7 @@ export const metadataSchema = z.object({
   envState: z.record(z.string(), envStateEntrySchema).optional(),
   mentions: z.array(mentionSchema).optional(),
   pathReferences: z.record(z.string(), z.string()).optional(),
+  watcherEvent: watcherEventMetadataSchema.optional(),
   /**
    * Provider-owned signed `reasoning_details` captured from the provider
    * response. Re-injected only when the outbound model route matches the

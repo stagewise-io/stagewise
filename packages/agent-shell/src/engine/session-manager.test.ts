@@ -782,6 +782,104 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
     expect(session?.deactivated).toBe(true);
   });
 
+  it('emits one triggered event when a watcher exits successfully', async () => {
+    sm = createSM();
+    const events: Array<{
+      outcome: string;
+      output: string;
+      description?: string;
+      finishedAt: number;
+    }> = [];
+    sm.onWatcherEvent = (event) => events.push(event);
+
+    const { sessionId } = await sm.createWatcherSession(
+      'agent-watcher',
+      cwd,
+      env,
+      {
+        title: 'Wait for result',
+        description: 'Inspect the result when it arrives.',
+        command: 'printf "watcher-result\\n"',
+        timeoutMs: 5_000,
+      },
+    );
+    await waitForSessionExit(sm, sessionId);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.outcome).toBe('triggered');
+    expect(events[0]?.output).toContain('watcher-result');
+    expect(events[0]?.description).toBe('Inspect the result when it arrives.');
+    expect(sm.getSession(sessionId)?.watcherResult).toEqual({
+      outcome: 'triggered',
+      finishedAt: events[0]?.finishedAt,
+    });
+    expect(sm.getSession(sessionId)?.lastCommand).toBe(
+      'printf "watcher-result\\n"',
+    );
+  });
+
+  it('emits a timeout event exactly once', async () => {
+    sm = createSM();
+    const events: Array<{ outcome: string }> = [];
+    sm.onWatcherEvent = (event) => events.push(event);
+
+    const { sessionId } = await sm.createWatcherSession(
+      'agent-watcher',
+      cwd,
+      env,
+      {
+        title: 'Slow watcher',
+        command: 'sleep 60',
+        timeoutMs: 100,
+      },
+    );
+    await waitForSessionExit(sm, sessionId);
+
+    expect(events.map((event) => event.outcome)).toEqual(['timed_out']);
+  });
+
+  it('does not emit a watcher event after manual cancellation', async () => {
+    sm = createSM();
+    const events: unknown[] = [];
+    sm.onWatcherEvent = (event) => events.push(event);
+
+    const { sessionId } = await sm.createWatcherSession(
+      'agent-watcher',
+      cwd,
+      env,
+      {
+        title: 'Cancelled watcher',
+        command: 'sleep 60',
+        timeoutMs: 5_000,
+      },
+    );
+    expect(sm.killSession(sessionId)).toBe(true);
+    await waitForSessionExit(sm, sessionId);
+
+    expect(events).toEqual([]);
+  });
+
+  it('removes a watcher session when creation is aborted', async () => {
+    sm = createSM();
+    const abortController = new AbortController();
+    const creation = sm.createWatcherSession(
+      'agent-watcher',
+      cwd,
+      env,
+      {
+        title: 'Cancelled during setup',
+        command: 'sleep 60',
+        timeoutMs: 5_000,
+      },
+      abortController.signal,
+    );
+
+    abortController.abort();
+
+    await expect(creation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sm.getSessionsForAgent('agent-watcher')).toEqual([]);
+  });
+
   it('destroyAgent kills all sessions for that agent', async () => {
     sm = createSM();
     const sid1 = sm.createSession('agent-destroy', cwd, env);

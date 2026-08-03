@@ -32,6 +32,7 @@ export class BrowserChatAgent extends ChatAgent {
       readConsoleLogs: await box.getTool('readConsoleLogs', id),
       askUserQuestions: await box.getTool('askUserQuestions', id),
       createShellSession: await box.getTool('createShellSession', id),
+      createWatcherSession: await box.getTool('createWatcherSession', id),
       executeShellCommand: await box.getTool('executeShellCommand', id),
     };
   }

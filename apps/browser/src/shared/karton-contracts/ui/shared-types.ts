@@ -21,6 +21,7 @@ export type {
   ModalityConstraint,
   StagewiseProviderOptions,
   TextFileDiff,
+  ToolCallFileEdit,
 } from '@stagewise/agent-core/types';
 
 // ============================================================================
