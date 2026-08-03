@@ -1,5 +1,6 @@
 import {
   getAgentInstance,
+  setUnread as setAgentUnread,
   updateAgentInstanceState,
   type AgentInstanceEnvelope,
   type AgentStore,
@@ -27,17 +28,14 @@ export type HostAgentInstanceEnvelope = Omit<
 };
 
 /**
- * Host-only setters that extend the core `state-mutations` surface
- * with browser-specific intents (`setUnread`, `recordPendingApproval`)
- * and a typed `getInstance` peek. Each setter is built on the
- * exported {@link updateAgentInstanceState} helper so it preserves the
- * D18 one-`store.update`-per-intent transactional guarantee.
+ * Host adapter for the core `setUnread` mutation, the browser-specific
+ * `recordPendingApproval` intent, and a typed `getInstance` peek. Each write
+ * preserves the D18 one-`store.update`-per-intent transactional guarantee.
  */
 export interface HostAgentStateMutations {
   /**
-   * Field-level write for the `agents.markAsRead` procedure and for
-   * the unread-on-question side effect in the `askUserQuestions`
-   * tool. No-op if the agent id is not present.
+   * Field-level write for the unread-on-question side effect in the
+   * `askUserQuestions` tool. No-op if the agent id is not present.
    */
   setUnread(agentInstanceId: string, value: boolean): void;
   /**
@@ -62,21 +60,18 @@ export interface HostAgentStateMutations {
 /**
  * Build the bundle of host-specific agent-state mutations.
  *
- * Stays separate from the core `state-mutations` barrel because
- * `setUnread` / `recordPendingApproval` back browser-only call sites
- * (`agents.markAsRead`, `askUserQuestions`, smart-approval metadata)
- * and have no counterpart in the CLI. CRUD + per-instance intents
- * live on `@stagewise/agent-core` and `AgentManager` calls them
- * directly against the same `AgentStore`.
+ * Stays separate from the core `state-mutations` barrel because it adapts
+ * browser-only call sites (`askUserQuestions`, smart-approval metadata) to
+ * the shared store. CRUD + per-instance intents live on
+ * `@stagewise/agent-core` and `AgentManager` calls them directly against the
+ * same `AgentStore`.
  */
 export function createHostAgentStateMutations(
   store: AgentStore,
 ): HostAgentStateMutations {
   return {
     setUnread(agentInstanceId, value) {
-      updateAgentInstanceState(store, agentInstanceId, (state) => {
-        state.unread = value;
-      });
+      setAgentUnread(store, agentInstanceId, { unread: value });
     },
     recordPendingApproval(agentInstanceId, toolCallId, explanation) {
       updateAgentInstanceState(store, agentInstanceId, (state) => {

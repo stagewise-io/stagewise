@@ -7,7 +7,6 @@ import {
 import type { KartonService } from '../karton';
 import { AgentCoreBridge } from './index';
 import { registerToolboxSeamHandlers } from './handlers/toolbox';
-import { registerAgentsSeamHandlers } from './handlers/agents';
 import {
   createActiveAppStateController,
   type ActiveAppStateController,
@@ -42,12 +41,10 @@ export interface AgentCoreSeamHandles {
   registry: CommandRegistry;
   activeAppController: ActiveAppStateController;
   /**
-   * Browser-only setters that extend the core `state-mutations`
-   * surface (`setUnread`, `recordPendingApproval`, plus a typed
-   * `getInstance` peek). Threaded into `AgentManagerService` and
-   * `ToolboxService` via `main.ts`, plus the seam-phase
-   * `agents.markAsRead` handler. CRUD and per-instance intents go
-   * through `AgentManager` directly against the same `AgentStore`.
+   * Browser adapter for `setUnread`, `recordPendingApproval`, and a typed
+   * `getInstance` peek. Threaded into `AgentManagerService` and
+   * `ToolboxService` via `main.ts`. CRUD and per-instance intents go through
+   * `AgentManager` directly against the same `AgentStore`.
    */
   hostAgentStateMutations: HostAgentStateMutations;
 }
@@ -88,9 +85,6 @@ export function createAgentCoreSeam(ctx: {
   const registry = new CommandRegistry();
 
   registerToolboxSeamHandlers(registry, { activeApp: activeAppController });
-  registerAgentsSeamHandlers(registry, {
-    hostAgentStateMutations,
-  });
 
   return {
     store,

@@ -107,7 +107,7 @@ Source of truth for rehydration:
 | `inputState`            | persisted-core | `agentInstances.input_state` (JSON-encoded string).                                                                                                           | no                                                        |
 | `usedTokens`            | persisted-core | `agentInstances.used_tokens`.                                                                                                                                 | no                                                        |
 | `error`                 | ephemeral      | Not stored. Set by the runloop on failure.                                                                                                                    | yes — cleared                                             |
-| `unread`                | ephemeral      | Not stored. Maintained by UI unread-marker logic.                                                                                                             | yes — cleared                                             |
+| `unread`                | persisted-core | `agentInstances.unread`.                                                                                                                                       | restored                                                  |
 | `usageWarning`          | ephemeral      | Not stored. Populated by the model provider on soft-limit proximity.                                                                                          | yes — cleared                                             |
 
 As of Phase 6 (see §3.2), `toolApprovalMode` is store-canonical and

@@ -125,14 +125,6 @@ function registerAllMigratedNoOps(registry: CommandRegistry): void {
     'toolbox.clearPendingAppMessage',
     async () => {},
   );
-  registerMarkAsReadNoOp(registry);
-}
-
-function registerMarkAsReadNoOp(registry: CommandRegistry): void {
-  registry.registerCommand<[agentInstanceId: string], void>(
-    'agents.markAsRead',
-    async () => {},
-  );
 }
 
 describe('AgentCoreBridge', () => {
@@ -156,17 +148,13 @@ describe('AgentCoreBridge', () => {
       const bridge = new AgentCoreBridge({ karton, store, registry });
       bridge.attach();
 
-      expect(register).toHaveBeenCalledTimes(3);
+      expect(register).toHaveBeenCalledTimes(2);
       expect(register).toHaveBeenCalledWith(
         'toolbox.dismissActiveApp',
         expect.any(Function),
       );
       expect(register).toHaveBeenCalledWith(
         'toolbox.clearPendingAppMessage',
-        expect.any(Function),
-      );
-      expect(register).toHaveBeenCalledWith(
-        'agents.markAsRead',
         expect.any(Function),
       );
 
@@ -363,7 +351,6 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
     const controller = createActiveAppStateController(store);
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp: controller });
-    registerMarkAsReadNoOp(registry);
 
     const bridge = new AgentCoreBridge({
       karton: mock.karton,
@@ -514,7 +501,6 @@ describe('AgentCoreBridge (Phase 1d mirror + ownership)', () => {
       const controller = createActiveAppStateController(store);
       const registry = new CommandRegistry();
       registerToolboxSeamHandlers(registry, { activeApp: controller });
-      registerMarkAsReadNoOp(registry);
       new AgentCoreBridge({
         karton: mock.karton,
         store,
@@ -619,7 +605,6 @@ describe('AgentCoreBridge (Phase 3b workspace mounts mirror)', () => {
     };
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp });
-    registerMarkAsReadNoOp(registry);
 
     const bridge = new AgentCoreBridge({
       karton: mock.karton,
@@ -810,7 +795,6 @@ describe('AgentCoreBridge (Phase 6 agent instances mirror)', () => {
     const activeApp = createActiveAppStateController(store);
     const registry = new CommandRegistry();
     registerToolboxSeamHandlers(registry, { activeApp });
-    registerMarkAsReadNoOp(registry);
 
     const bridge = new AgentCoreBridge({
       karton: mock.karton,

@@ -42,7 +42,7 @@ export interface AgentCardProps {
   isWorking: boolean;
   isWaitingForUser: boolean;
   hasError: boolean;
-  hasUnseen: boolean;
+  unread: boolean;
   activityText: string;
   activityIsUserInput: boolean;
   lastMessageAt: number;
@@ -83,7 +83,7 @@ export const AgentCard = memo(
       isWorking,
       isWaitingForUser,
       hasError,
-      hasUnseen,
+      unread,
       lastMessageAt,
       contextMenuState,
       onClick,
@@ -108,6 +108,7 @@ export const AgentCard = memo(
       commitEdit,
       cancelEdit,
     } = useInlineTitleEdit({ title, onCommit: handleCommitRename });
+    const hasUnseen = unread && !isActive;
     const severity = getAgentStateSeverity({
       hasError,
       isWaitingForUser,
@@ -129,6 +130,7 @@ export const AgentCard = memo(
           isPinned,
           onTogglePinned,
           !isWorking,
+          !unread,
         )}
         onClick={() => onClick(id)}
         onMouseEnter={onMouseEnter}
@@ -295,7 +297,7 @@ export const AgentCard = memo(
     prev.isWorking === next.isWorking &&
     prev.isWaitingForUser === next.isWaitingForUser &&
     prev.hasError === next.hasError &&
-    prev.hasUnseen === next.hasUnseen &&
+    prev.unread === next.unread &&
     prev.activityText === next.activityText &&
     prev.activityIsUserInput === next.activityIsUserInput &&
     prev.lastMessageAt === next.lastMessageAt &&

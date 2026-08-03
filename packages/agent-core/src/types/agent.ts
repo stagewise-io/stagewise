@@ -115,7 +115,7 @@ export type AgentState<TMessage = AgentMessage> = {
   usedTokens: number;
   /** @persistence ephemeral — reset on resume; set by the runloop on failure. */
   error?: AgentRuntimeError;
-  /** @persistence ephemeral — reset on resume; maintained by the UI unread-marker logic. */
+  /** @persistence persisted-core — stored in `agentInstances.unread`. */
   unread?: boolean;
   /** @persistence ephemeral — reset on resume; populated by the model provider when a soft-limit window is approaching. */
   usageWarning?: {
@@ -142,6 +142,7 @@ export type AgentHistoryEntry = {
   lastMessageAt: Date;
   messageCount: number;
   parentAgentInstanceId: string | null;
+  unread: boolean;
   mountedWorkspaces?: AgentHistoryWorkspaceEntry[] | null;
 };
 

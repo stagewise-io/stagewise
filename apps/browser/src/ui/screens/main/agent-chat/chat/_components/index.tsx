@@ -146,10 +146,10 @@ function ChatPanelInner({ agentId }: { agentId?: string }) {
         ) : (
           <ChatHistory flushTop={Boolean(agentId)} />
         )}
-        <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
-          <ChatPanelFooter key={requestedAgent} />
-        </div>
       </OpenAgentContext.Provider>
+      <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col items-stretch">
+        <ChatPanelFooter key={requestedAgent} />
+      </div>
     </div>
   );
 }

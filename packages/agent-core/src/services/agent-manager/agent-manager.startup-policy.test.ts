@@ -21,13 +21,12 @@ function createDeps() {
   return {
     registry: new CommandRegistry(),
     toolbox,
-    // Minimal `AgentStore`-shaped stub. `AgentManager` only reaches
-    // `get` / `update` on the store via the `state-mutations` helpers,
-    // and the startup-policy paths covered here never call the
-    // per-instance setters — so no-op `update` is sufficient.
+    // Minimal `AgentStore`-shaped stub. Startup-policy paths do not mutate
+    // unread state, so the subscription and update can both be no-ops.
     agentStore: {
       get: vi.fn(() => ({ agents: { instances: {} }, toolbox: {} })),
       update: vi.fn(),
+      subscribe: vi.fn(() => () => {}),
     },
     host: createTestAgentHost(),
     agentTypeRegistry: new AgentTypeRegistry(),

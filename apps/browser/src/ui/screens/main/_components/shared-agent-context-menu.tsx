@@ -6,6 +6,7 @@ import { IconTrash2Outline24 } from '@stagewise/icons';
 import {
   IconCopyOutline18,
   IconCopyIdOutline18,
+  IconEnvelopeOutline18,
   IconFolderOpenOutline18,
   IconPen2Outline18,
   IconPinTackOutline18,
@@ -39,6 +40,7 @@ export interface AgentContextMenuTarget {
   isPinned?: boolean;
   togglePinned?: (id: string) => void;
   canDelete?: boolean;
+  canMarkAsUnread?: boolean;
 }
 
 export interface SharedAgentContextMenuState {
@@ -77,6 +79,7 @@ export function buildAgentContextMenuHandler(
   isPinned?: boolean,
   togglePinned?: (id: string) => void,
   canDelete?: boolean,
+  canMarkAsUnread?: boolean,
 ): (e: React.MouseEvent) => void {
   return (e) => {
     e.preventDefault();
@@ -90,6 +93,7 @@ export function buildAgentContextMenuHandler(
       isPinned,
       togglePinned,
       canDelete,
+      canMarkAsUnread,
     });
   };
 }
@@ -99,6 +103,8 @@ export interface SharedAgentContextMenuHostProps {
   onClose: () => void;
   /** Duplicate the selected chat, including its history and workspace state. */
   onForkRequest: (id: string) => void;
+  /** Persistently mark the selected chat unread. */
+  onMarkAsUnreadRequest: (id: string) => void;
   /** User picked "Permanently delete" — caller is expected to show a confirm dialog.
    * Cursor coordinates are forwarded so the confirm popover can anchor
    * right above the click position. */
@@ -110,6 +116,7 @@ export const SharedAgentContextMenuHost = memo(
     target,
     onClose,
     onForkRequest,
+    onMarkAsUnreadRequest,
     onDeleteRequest,
   }: SharedAgentContextMenuHostProps) {
     const revealWorkingDirectory = useKartonProcedure(
@@ -173,8 +180,15 @@ export const SharedAgentContextMenuHost = memo(
     );
 
     if (!activeTarget) return null;
-    const { agentId, showDev, rename, isPinned, togglePinned, canDelete } =
-      activeTarget;
+    const {
+      agentId,
+      showDev,
+      rename,
+      isPinned,
+      togglePinned,
+      canDelete,
+      canMarkAsUnread,
+    } = activeTarget;
 
     return (
       <MenuBase.Root open={open} onOpenChange={handleOpenChange}>
@@ -216,6 +230,17 @@ export const SharedAgentContextMenuHost = memo(
                 <IconCopyOutline18 className="size-3.5 shrink-0" />
                 <span>Fork chat</span>
               </AgentMenuItem>
+              {canMarkAsUnread && (
+                <AgentMenuItem
+                  onClick={() => {
+                    onMarkAsUnreadRequest(agentId);
+                    onClose();
+                  }}
+                >
+                  <IconEnvelopeOutline18 className="size-3.5 shrink-0" />
+                  <span>Mark as unread</span>
+                </AgentMenuItem>
+              )}
               {togglePinned && (
                 <AgentMenuItem
                   onClick={() => {
