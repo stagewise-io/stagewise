@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "^0.0.27",
-    "@libsql/client": "^0.17.3",
+    "@libsql/client": "^0.17.4",
     "@monaco-editor/react": "^4.7.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@streamdown/math": "^1.0.2",
