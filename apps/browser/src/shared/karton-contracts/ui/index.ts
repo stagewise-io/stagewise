@@ -16,7 +16,7 @@ import type {
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
-import type { ExternalIde } from './shared-types';
+import type { ExternalIde, ToolCallFileEdit } from './shared-types';
 import type { QuestionField, QuestionAnswerValue } from './agent/tools/types';
 import type { WorktreeSetupScriptVariant } from '@shared/worktree-setup';
 export type {
@@ -1442,6 +1442,10 @@ export type KartonContract = {
       ) => Promise<{ success: boolean; error?: string }>;
     };
     toolbox: {
+      getFileEditsForToolCalls: (
+        agentInstanceId: string,
+        toolCallIds: string[],
+      ) => Promise<ToolCallFileEdit[]>;
       mountWorkspace: (
         agentInstanceId: string,
         workspacePath?: string,

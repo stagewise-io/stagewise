@@ -32,7 +32,11 @@ import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-lo
 import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-questions';
 import { CreateWatcherSessionToolPart } from './message-part-ui/tools/create-watcher-session';
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
-import { hasUnfinishedParts, isToolOrReasoningPart } from './message-utils';
+import {
+  hasUnfinishedParts,
+  isToolOrReasoningPart,
+  isToolPart,
+} from './message-utils';
 import { MessageBetweenSteps } from './message-between-steps';
 import { MessageStalledStream } from './message-stalled-stream';
 import { IconDotsOutline18 } from '@stagewise/icons';
@@ -44,8 +48,11 @@ import {
 } from '@stagewise/stage-ui/components/menu';
 import { HistoryIcon } from 'lucide-react';
 import { RevertConfirmPopover } from './revert-confirm-popover';
+import { TurnFileEdits, useTurnFileEdits } from './turn-file-edits';
 
 type AssistantMessage = AgentMessage & { role: 'assistant' };
+
+const collapsibleFileToolTypes = new Set(['tool-multiEdit', 'tool-write']);
 
 /**
  * Fast deep equality optimised for streaming tool parts.
@@ -99,6 +106,7 @@ const SinglePartRenderer = memo(
     isLastPart,
     isWorking,
     isLastMessage,
+    initiallyCollapsed,
     msg,
   }: {
     item: {
@@ -109,6 +117,7 @@ const SinglePartRenderer = memo(
     isLastPart: boolean;
     isWorking: boolean;
     isLastMessage: boolean;
+    initiallyCollapsed: boolean;
     msg: AssistantMessage;
   }) {
     const { part, originalIndex } = item;
@@ -155,7 +164,13 @@ const SinglePartRenderer = memo(
       case 'tool-delete':
         return <DeleteFileToolPart key={stableKey} part={part} />;
       case 'tool-multiEdit':
-        return <MultiEditToolPart key={stableKey} part={part} />;
+        return (
+          <MultiEditToolPart
+            key={stableKey}
+            part={part}
+            initiallyCollapsed={initiallyCollapsed}
+          />
+        );
       case 'tool-executeSandboxJs':
         return (
           <ExecuteSandboxJsToolPart
@@ -174,7 +189,13 @@ const SinglePartRenderer = memo(
           />
         );
       case 'tool-write':
-        return <WriteToolPart key={stableKey} part={part} />;
+        return (
+          <WriteToolPart
+            key={stableKey}
+            part={part}
+            initiallyCollapsed={initiallyCollapsed}
+          />
+        );
       case 'tool-askUserQuestions':
         return <AskUserQuestionsToolPart key={stableKey} part={part} />;
       case 'tool-createWatcherSession':
@@ -268,6 +289,30 @@ export const MessageAssistant = memo(
     }, [msg.parts]);
 
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const completedToolCallIds = useMemo(() => {
+      const ids: string[] = [];
+      for (const part of msg.parts) {
+        if (
+          !isToolPart(part) ||
+          isReadOnlyToolPart(part) ||
+          (part.state !== 'output-available' && part.state !== 'output-error')
+        )
+          continue;
+        ids.push(part.toolCallId);
+      }
+      return ids;
+    }, [msg.parts]);
+    const showTurnFileEdits =
+      completedToolCallIds.length > 0 && (!isLastMessage || !isWorking);
+    const turnFileEdits = useTurnFileEdits(
+      agentId,
+      completedToolCallIds,
+      showTurnFileEdits,
+    );
+    const summarizedToolCallIds = useMemo(
+      () => new Set(turnFileEdits?.flatMap((edit) => edit.toolCallIds) ?? []),
+      [turnFileEdits],
+    );
 
     const dispatchRestore = useCallback(
       (undoToolCalls: boolean) => {
@@ -362,10 +407,15 @@ export const MessageAssistant = memo(
                   const currentTypeIndex = typeCounters[part.type] ?? 0;
                   typeCounters[part.type] = currentTypeIndex + 1;
                   const stableKey = `${msg.id}:${part.type}:${currentTypeIndex}`;
+                  const initiallyCollapsed =
+                    isToolPart(part) &&
+                    part.state === 'output-available' &&
+                    collapsibleFileToolTypes.has(part.type) &&
+                    summarizedToolCallIds.has(part.toolCallId);
 
                   return (
                     <SinglePartRenderer
-                      key={stableKey}
+                      key={`${stableKey}:${initiallyCollapsed ? 'summary' : 'inline'}`}
                       item={
                         item as {
                           part: UIMessagePart<UIDataTypes, UIAgentTools>;
@@ -376,6 +426,7 @@ export const MessageAssistant = memo(
                       isLastPart={isLastPart}
                       isWorking={isWorking}
                       isLastMessage={isLastMessage}
+                      initiallyCollapsed={initiallyCollapsed}
                       msg={msg}
                     />
                   );
@@ -385,6 +436,9 @@ export const MessageAssistant = memo(
                 <MessageStalledStream parts={msg.parts} />
               ) : null}
               {showBetweenStepsIndicator && <MessageBetweenSteps />}
+              {turnFileEdits && turnFileEdits.length > 0 && (
+                <TurnFileEdits agentId={agentId} edits={turnFileEdits} />
+              )}
               {/* Actions menu — hidden on last message (restore would be a noop) and while streaming */}
               {!isLastMessage && (
                 <div className="flex justify-end">

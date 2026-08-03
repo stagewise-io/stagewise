@@ -2,7 +2,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { cn } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
 import type { MountedWorkspaceGitDiffSummary } from '@shared/karton-contracts/ui';
-import { formatDiffCount } from './format-diff-count';
+import { DiffLineStats } from '@ui/components/diff-line-stats';
 
 type DiffRow = {
   path: string;
@@ -47,17 +47,14 @@ function DiffRowItem({
       : row.path.slice(0, -fileName.length).replace(/\/$/, '');
 
   return (
-    <div
-      className={
-        selected ? 'mx-1 mb-px rounded bg-active-derived' : 'mx-1 mb-px'
-      }
-    >
+    <div className={cn('mx-1 mb-px rounded', selected && 'bg-active-derived')}>
       <button
         type="button"
         className={cn(
-          'flex w-full cursor-pointer items-center gap-1.5 px-2 py-1',
+          'flex w-full items-center gap-1.5 rounded px-2 py-1',
           'border-derived-weak/40 border-b text-left text-xs transition-colors duration-75 last:border-b-0',
-          selected ? 'hover:bg-foreground/[0.06]' : 'hover:bg-surface-1',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset',
+          selected ? 'hover:bg-foreground/[0.06]' : 'hover:bg-hover-derived',
         )}
         onClick={() => onClick(row)}
         title={row.oldPath ? `${row.oldPath} → ${row.path}` : row.path}
@@ -87,18 +84,7 @@ function DiffRowItem({
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums">
-          {row.added > 0 && (
-            <span className="text-success-foreground">
-              +{formatDiffCount(row.added)}
-            </span>
-          )}
-          {row.deleted > 0 && (
-            <span className="text-error-foreground">
-              -{formatDiffCount(row.deleted)}
-            </span>
-          )}
-        </span>
+        <DiffLineStats added={row.added} removed={row.deleted} />
       </button>
     </div>
   );
