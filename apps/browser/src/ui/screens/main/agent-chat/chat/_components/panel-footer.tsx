@@ -65,7 +65,7 @@ import { normalizePath } from '@shared/path-utils';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
-import { useAgentSwitcher, useOpenAgent } from '@ui/hooks/use-open-chat';
+import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useNextAgentRequiringAttention } from '@ui/hooks/use-next-agent-requiring-attention';
 import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
 import { CmdEnterPriority } from '@ui/utils/cmd-enter-registry';
@@ -216,7 +216,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   }, [registerDraftGetter]);
 
   const [openAgent, setOpenAgent] = useOpenAgent();
-  const { focusAgentFromHotkey } = useAgentSwitcher();
   const nextAttentionTarget = useNextAgentRequiringAttention(openAgent);
   const { isOpen: isCommandCenterOpen } = useCommandCenter();
   const { collapsed: contentCollapsed } = useContentCollapsed();
@@ -1168,7 +1167,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const handleNextAttentionAgentClick = () => {
     if (!nextAttentionTarget) return;
 
-    focusAgentFromHotkey(nextAttentionTarget.id);
+    setOpenAgent(nextAttentionTarget.id);
     void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
   };
   const canUseNextAttention =
