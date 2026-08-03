@@ -2528,7 +2528,7 @@ function MarkdownPreview({
       <div className="min-h-0 flex-1">
         {mode === 'preview' ? (
           <div className="[&_[data-streamdown=image-wrapper]]:!items-start scrollbar-subtle size-full overflow-auto p-6 text-foreground [&_[data-streamdown=image-wrapper]>div:first-child]:hidden">
-            <Streamdown isAnimating={false}>{text}</Streamdown>
+            <Streamdown>{text}</Streamdown>
           </div>
         ) : (
           <div

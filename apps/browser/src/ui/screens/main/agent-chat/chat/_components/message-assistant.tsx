@@ -129,7 +129,12 @@ const SinglePartRenderer = memo(
           <TextPart
             key={stableKey}
             part={part as TextUIPart}
-            messageRole="assistant"
+            isStreaming={
+              isWorking &&
+              isLastMessage &&
+              isLastPart &&
+              part.state === 'streaming'
+            }
           />
         );
       case 'reasoning':

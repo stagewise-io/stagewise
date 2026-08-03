@@ -69,9 +69,7 @@ export const ThinkingPart = ({
       }
       content={
         <div className={cn('pb-1 opacity-75', capMaxHeight ? 'max-h-24!' : '')}>
-          <Streamdown isAnimating={part.state === 'streaming'}>
-            {part.text}
-          </Streamdown>
+          <Streamdown isStreaming={isStreaming}>{part.text}</Streamdown>
         </div>
       }
     />

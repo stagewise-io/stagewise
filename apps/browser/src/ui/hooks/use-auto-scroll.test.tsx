@@ -150,6 +150,30 @@ describe('useAutoScroll', () => {
     expect(second.viewport.scrollTop).toBe(2_000);
   });
 
+  it('realigns after Virtuoso finishes measuring a new scroller', () => {
+    const { result } = renderHook(() => useAutoScroll({ mode: 'virtuoso' }));
+    const { viewport, setHeight } = createViewport();
+
+    act(() => result.current.scrollerRef(viewport));
+    flushScroll();
+    expect(viewport.scrollTop).toBe(1_000);
+
+    setHeight(2_000);
+    act(() => result.current.atBottomStateChange(false));
+    flushScroll();
+
+    expect(viewport.scrollTop).toBe(2_000);
+    expect(result.current.followOutput).toBe('auto');
+
+    viewport.scrollTop = 400;
+    act(() => viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -1 })));
+    setHeight(3_000);
+    act(() => result.current.atBottomStateChange(false));
+    flushScroll();
+
+    expect(viewport.scrollTop).toBe(400);
+  });
+
   it('follows mutations in a regular scroll container', async () => {
     const { result } = renderHook(() =>
       useAutoScroll({ initializeAtBottom: false }),
