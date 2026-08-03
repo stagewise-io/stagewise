@@ -50,7 +50,7 @@ import {
 import { Switch } from '@stagewise/stage-ui/components/switch';
 import { OverlayScrollbar } from '@stagewise/stage-ui/components/overlay-scrollbar';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
 
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
@@ -2663,7 +2663,7 @@ type ConnectInlineActionSelectProps = {
   sourceBranchItems: SelectItem<string>[];
   checkoutBranchItems: SelectItem<string>[];
   worktreeItems: SelectItem<string>[];
-  onOpen?: () => void;
+  loading: boolean;
   onUpdate: (partial: Partial<ConnectActionState>) => void;
 };
 
@@ -2672,7 +2672,7 @@ function ConnectInlineActionSelect({
   sourceBranchItems,
   checkoutBranchItems,
   worktreeItems,
-  onOpen,
+  loading,
   onUpdate,
 }: ConnectInlineActionSelectProps) {
   const [open, setOpen] = useState(false);
@@ -2693,16 +2693,8 @@ function ConnectInlineActionSelect({
     [handleActionUpdate],
   );
 
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      setOpen(next);
-      if (next) onOpen?.();
-    },
-    [onOpen],
-  );
-
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger>
         <button
           type="button"
@@ -2752,15 +2744,22 @@ function ConnectInlineActionSelect({
             )}
           >
             <div data-connect-action-popup="">
-              <WorkspaceActionPickerContent
-                config={state}
-                sourceBranchItems={sourceBranchItems}
-                checkoutBranchItems={checkoutBranchItems}
-                worktreeItems={worktreeItems}
-                branchSelectPortalContainer={popupRef}
-                onCommit={handleSelect}
-                onUpdateAction={handleActionUpdate}
-              />
+              {loading ? (
+                <div className="flex items-center gap-2 px-2.5 py-2 text-muted-foreground text-xs">
+                  <Loader2Icon className="size-3.5 shrink-0 animate-spin" />
+                  <span>Loading branches and worktrees…</span>
+                </div>
+              ) : (
+                <WorkspaceActionPickerContent
+                  config={state}
+                  sourceBranchItems={sourceBranchItems}
+                  checkoutBranchItems={checkoutBranchItems}
+                  worktreeItems={worktreeItems}
+                  branchSelectPortalContainer={popupRef}
+                  onCommit={handleSelect}
+                  onUpdateAction={handleActionUpdate}
+                />
+              )}
             </div>
           </PopoverBase.Popup>
         </PopoverBase.Positioner>
@@ -3407,18 +3406,13 @@ const ConnectWorkspaceSelect = memo(function ConnectWorkspaceSelectInner({
                               : null,
                           )}
                         >
-                          {gitCapability === 'git' && (
+                          {gitCapability !== 'not-git' && (
                             <ConnectInlineActionSelect
                               state={rowState}
                               sourceBranchItems={sourceBranchItems}
                               checkoutBranchItems={checkoutBranchItems}
                               worktreeItems={worktreeItems}
-                              onOpen={() =>
-                                void loadGitOptionsForPath(
-                                  workspace.path,
-                                  rowKey,
-                                )
-                              }
+                              loading={gitCapability !== 'git'}
                               onUpdate={(partial) =>
                                 updateRowState(rowKey, partial)
                               }
