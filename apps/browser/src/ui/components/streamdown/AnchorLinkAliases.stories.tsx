@@ -29,7 +29,6 @@ type Story = StoryObj<typeof Streamdown>;
  */
 export const AllAliases: Story = {
   args: {
-    isAnimating: false,
     children: [
       'Here are all the link aliases:',
       '',
@@ -50,7 +49,6 @@ export const AllAliases: Story = {
  */
 export const AgentIssueLink: Story = {
   args: {
-    isAnimating: false,
     children:
       "If something isn't working right, you can [report the issue here](report-agent-issue).",
   },
@@ -64,7 +62,6 @@ export const AgentIssueLink: Story = {
  */
 export const FeatureRequestLink: Story = {
   args: {
-    isAnimating: false,
     children:
       "I can't do that yet, but you can [request this feature](request-new-feature) and the team will consider it!",
   },
@@ -78,7 +75,6 @@ export const FeatureRequestLink: Story = {
  */
 export const SocialLinks: Story = {
   args: {
-    isAnimating: false,
     children: [
       'Connect with us:',
       '',
@@ -97,7 +93,6 @@ export const SocialLinks: Story = {
  */
 export const MixedContent: Story = {
   args: {
-    isAnimating: false,
     children: [
       '## Help & Resources',
       '',

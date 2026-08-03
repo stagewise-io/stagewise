@@ -291,7 +291,7 @@ const preprocessMarkdown = (markdown: string): string => {
 export function InlineMarkdown({ children }: { children: string }) {
   return (
     <span className="inline [&>div]:inline [&_p]:m-0 [&_p]:inline">
-      <Streamdown isAnimating={false}>{children}</Streamdown>
+      <Streamdown>{children}</Streamdown>
     </span>
   );
 }
@@ -999,13 +999,6 @@ MemoInput.displayName = 'MarkdownInput';
 
 // ── Static Streamdown config (hoisted here so Memo* consts are initialized) ──
 
-const STREAMDOWN_ANIMATED = {
-  animation: 'fadeIn',
-  duration: 100,
-  easing: 'ease-out',
-  sep: 'word',
-} as const;
-
 const STREAMDOWN_SHIKI_THEME: ['light-plus', 'dark-plus'] = [
   'light-plus',
   'dark-plus',
@@ -1047,7 +1040,13 @@ const STREAMDOWN_COMPONENTS = {
 const STREAMDOWN_REHYPE_PLUGINS = [defaultRehypePlugins.raw!];
 
 export const Streamdown = memo(
-  ({ isAnimating, children }: { isAnimating: boolean; children: string }) => {
+  ({
+    isStreaming = false,
+    children,
+  }: {
+    isStreaming?: boolean;
+    children: string;
+  }) => {
     const processed = useMemo(() => preprocessMarkdown(children), [children]);
     const createTab = useKartonProcedure((p) => p.browser.createTab);
     const isAltPressed = useChatLinkAltPressed();
@@ -1081,16 +1080,15 @@ export const Streamdown = memo(
     );
 
     return (
-      <StreamdownProvider isStreaming={isAnimating}>
+      <StreamdownProvider isStreaming={isStreaming}>
         <ChatLinkModifierContext.Provider value={isAltPressed}>
           <div
             onClickCapture={handleClickCapture}
             onMouseMoveCapture={handleMouseMoveCapture}
           >
             <StreamdownBase
-              animated={STREAMDOWN_ANIMATED}
-              isAnimating={isAnimating}
-              mode={isAnimating ? 'streaming' : 'static'}
+              isAnimating={isStreaming}
+              mode={isStreaming ? 'streaming' : 'static'}
               shikiTheme={STREAMDOWN_SHIKI_THEME}
               controls={STREAMDOWN_CONTROLS}
               plugins={STREAMDOWN_PLUGINS}
