@@ -202,7 +202,11 @@ function getPendingWorkspacePreparationKind(
   return preparationKind;
 }
 
-export const ChatPanelFooter = memo(function ChatPanelFooter() {
+export const ChatPanelFooter = memo(function ChatPanelFooter({
+  focusAgent,
+}: {
+  focusAgent: (id: string | null) => void;
+}) {
   const chatInputRef = useRef<ChatInputHandle>(null);
   const chatInputContainerRef = useRef<HTMLDivElement>(null);
   const { registerDraftGetter } = useChatDraft();
@@ -1167,7 +1171,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
   const handleNextAttentionAgentClick = () => {
     if (!nextAttentionTarget) return;
 
-    setOpenAgent(nextAttentionTarget.id);
+    focusAgent(nextAttentionTarget.id);
     void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
   };
   const canUseNextAttention =
