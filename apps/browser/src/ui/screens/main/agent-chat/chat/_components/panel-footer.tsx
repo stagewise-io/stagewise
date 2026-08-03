@@ -1171,6 +1171,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter() {
 
     focusAgentFromHotkey(nextAttentionTarget.id);
     void setLastOpenAgentId(nextAttentionTarget.id)
+      .catch(() => undefined)
       .then(() => resumeAgent(nextAttentionTarget.id))
       .catch(() => undefined);
   };
