@@ -267,7 +267,7 @@ export function getSeverityDotClass(
     case 'success':
       return 'bg-success-solid';
     case 'info':
-      return 'bg-primary-solid';
+      return 'bg-info-solid';
     default:
       return null;
   }
