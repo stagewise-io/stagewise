@@ -744,6 +744,7 @@ export const MessageUser = memo(
                 data-editable-user-message-id={
                   !isEditing && canEdit ? msg.id : undefined
                 }
+                onClick={!isEditing && canEdit ? handleStartEditing : undefined}
               >
                 {/* View mode: lightweight static renderer */}
                 {!isEditing && (
