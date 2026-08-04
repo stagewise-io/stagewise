@@ -6,6 +6,12 @@ import {
 import { MentionNodeView } from './rich-text/mentions';
 import { SlashNodeView } from './rich-text/slash/slash-node-view';
 import type { Content } from '@tiptap/core';
+import { IconChevronDownOutline18 } from '@stagewise/icons';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { createRafResizeObserver } from '@ui/utils/resize-observer';
+import { Button } from '@stagewise/stage-ui/components/button';
+
+const COLLAPSED_CONTENT_HEIGHT_PX = 174;
 
 /**
  * TipTap document structure types for parsing JSON content.
@@ -27,6 +33,8 @@ export interface ChatInputViewOnlyProps {
   tipTapContent?: Content;
   /** Additional CSS classes */
   className?: string;
+  /** Opens the message editor when the content area is activated. */
+  onEdit?: () => void;
 }
 
 /**
@@ -45,37 +53,90 @@ export interface ChatInputViewOnlyProps {
 export function ChatInputViewOnly({
   tipTapContent,
   className,
+  onEdit,
 }: ChatInputViewOnlyProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isCollapsible, setIsCollapsible] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+
+    const checkIsCollapsible = () => {
+      const nextIsCollapsible =
+        content.scrollHeight > COLLAPSED_CONTENT_HEIGHT_PX;
+      setIsCollapsible(nextIsCollapsible);
+
+      if (!nextIsCollapsible) setIsExpanded(false);
+    };
+
+    checkIsCollapsible();
+
+    const { observer, disconnect } =
+      createRafResizeObserver(checkIsCollapsible);
+    observer.observe(content);
+
+    return () => disconnect();
+  }, [tipTapContent]);
+
+  const handleToggleExpanded = () => {
+    setIsExpanded((expanded) => !expanded);
+  };
+
+  const handleContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onEdit || (event.key !== 'Enter' && event.key !== ' ')) return;
+
+    event.preventDefault();
+    onEdit();
+  };
+
   // If no valid JSON content, render plain text fallback
   if (!tipTapContent) return null;
-  else if (typeof tipTapContent === 'string') {
-    return (
-      <div
-        className={cn(
-          'scroll-fade-b scroll-fade-4 max-h-43.5 w-full overflow-y-hidden',
-          className,
-        )}
-      >
-        <p className="m-0 min-h-[1.5em] leading-relaxed">{tipTapContent}</p>
-      </div>
-    );
-  }
 
   return (
-    <div
-      className={cn(
-        // Max height with overflow fade
-        'scroll-fade-b scroll-fade-4 max-h-43.5 overflow-y-hidden',
-        // Match ChatInput prose styling
-        'h-full w-full text-foreground text-sm',
-        'prose prose-sm max-w-none',
-        '[&_p]:m-0 [&_p]:leading-relaxed',
-        className,
-      )}
-    >
-      {(tipTapContent as TiptapDoc)?.content?.map((node, index) => (
-        <RenderNode key={getNodeKey(node, index)} node={node} />
-      ))}
+    <div className={cn('w-full', className)}>
+      <div
+        className={cn(
+          !isExpanded && 'max-h-43.5 overflow-y-hidden',
+          !isExpanded && isCollapsible && 'scroll-fade-b scroll-fade-4',
+        )}
+        onClick={onEdit}
+        onKeyDown={handleContentKeyDown}
+        role={onEdit ? 'button' : undefined}
+        tabIndex={onEdit ? 0 : undefined}
+      >
+        <div
+          ref={contentRef}
+          className="prose prose-sm h-full w-full max-w-none text-foreground text-sm [&_p]:m-0 [&_p]:leading-relaxed"
+        >
+          {typeof tipTapContent === 'string' ? (
+            <p className="m-0 min-h-[1.5em] leading-relaxed">{tipTapContent}</p>
+          ) : (
+            (tipTapContent as TiptapDoc)?.content?.map((node, index) => (
+              <RenderNode key={getNodeKey(node, index)} node={node} />
+            ))
+          )}
+        </div>
+      </div>
+      {isCollapsible ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="mt-1 h-auto px-0 py-0"
+          aria-expanded={isExpanded}
+          onClick={handleToggleExpanded}
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+          <IconChevronDownOutline18
+            className={cn(
+              'size-3 transition-transform duration-150',
+              isExpanded && 'rotate-180',
+            )}
+          />
+        </Button>
+      ) : null}
     </div>
   );
 }

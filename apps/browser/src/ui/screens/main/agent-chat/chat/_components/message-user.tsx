@@ -744,25 +744,13 @@ export const MessageUser = memo(
                 data-editable-user-message-id={
                   !isEditing && canEdit ? msg.id : undefined
                 }
-                onClick={!isEditing && canEdit ? handleStartEditing : undefined}
-                role={!isEditing && canEdit ? 'button' : undefined}
-                tabIndex={!isEditing && canEdit ? 0 : undefined}
-                onKeyDown={
-                  !isEditing && canEdit
-                    ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleStartEditing();
-                        }
-                      }
-                    : undefined
-                }
               >
                 {/* View mode: lightweight static renderer */}
                 {!isEditing && (
                   <ChatInputViewOnly
                     tipTapContent={viewModeTipTapContent}
                     className="w-full"
+                    onEdit={canEdit ? handleStartEditing : undefined}
                   />
                 )}
                 {/* Edit mode: full TipTap editor */}
