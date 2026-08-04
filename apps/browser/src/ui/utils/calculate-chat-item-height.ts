@@ -25,6 +25,7 @@ const HEIGHTS = {
   // User message
   USER_PADDING_V: 6, // py-1.5 - user message vertical padding
   USER_MAX_HEIGHT: 174, // max-h-43.5 - user message max content height
+  USER_COLLAPSE_TOGGLE_HEIGHT: 20, // mt-1 + text-xs line height
   USER_MARGIN_TOP: 8, // mt-2 - user message top margin
 
   // Assistant message
@@ -339,10 +340,14 @@ function estimateUserMessageHeight(
 
   // Apply max-height cap (user messages are capped at 174px content height)
   const cappedTextHeight = Math.min(textHeight, HEIGHTS.USER_MAX_HEIGHT);
+  const isCollapsible = textHeight > HEIGHTS.USER_MAX_HEIGHT;
 
   // Add padding and margins
   return (
-    HEIGHTS.USER_MARGIN_TOP + cappedTextHeight + HEIGHTS.USER_PADDING_V * 2
+    HEIGHTS.USER_MARGIN_TOP +
+    cappedTextHeight +
+    (isCollapsible ? HEIGHTS.USER_COLLAPSE_TOGGLE_HEIGHT : 0) +
+    HEIGHTS.USER_PADDING_V * 2
   );
 }
 

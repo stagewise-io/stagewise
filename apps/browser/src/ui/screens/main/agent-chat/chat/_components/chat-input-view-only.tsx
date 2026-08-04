@@ -80,8 +80,14 @@ export function ChatInputViewOnly({
     return () => disconnect();
   }, [tipTapContent]);
 
-  const handleToggleExpanded = () => {
+  const handleToggleExpanded = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
     setIsExpanded((expanded) => !expanded);
+  };
+
+  const handleContentClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    onEdit?.();
   };
 
   const handleContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -101,7 +107,7 @@ export function ChatInputViewOnly({
           !isExpanded && 'max-h-43.5 overflow-y-hidden',
           !isExpanded && isCollapsible && 'scroll-fade-b scroll-fade-4',
         )}
-        onClick={onEdit}
+        onClick={onEdit ? handleContentClick : undefined}
         onKeyDown={handleContentKeyDown}
         role={onEdit ? 'button' : undefined}
         tabIndex={onEdit ? 0 : undefined}

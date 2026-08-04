@@ -43,8 +43,13 @@ describe('ChatInputViewOnly', () => {
   it('toggles overflowing content without triggering the message action', () => {
     vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(175);
     const onEdit = vi.fn();
+    const onBubbleClick = vi.fn();
 
-    render(<ChatInputViewOnly tipTapContent="Long message" onEdit={onEdit} />);
+    render(
+      <div onClick={onBubbleClick}>
+        <ChatInputViewOnly tipTapContent="Long message" onEdit={onEdit} />
+      </div>,
+    );
 
     const showMoreButton = screen.getByRole('button', { name: 'Show more' });
     expect(showMoreButton.getAttribute('aria-expanded')).toBe('false');
@@ -54,6 +59,7 @@ describe('ChatInputViewOnly', () => {
     const showLessButton = screen.getByRole('button', { name: 'Show less' });
     expect(showLessButton.getAttribute('aria-expanded')).toBe('true');
     expect(onEdit).not.toHaveBeenCalled();
+    expect(onBubbleClick).not.toHaveBeenCalled();
 
     const messageButton = screen.getByRole('button', { name: 'Long message' });
     fireEvent.click(messageButton);
