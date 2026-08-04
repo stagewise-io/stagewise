@@ -213,6 +213,7 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
   // Element refs for direct measurement in useLayoutEffect
   const lastUserElementRef = useRef<HTMLDivElement | null>(null);
   const lastAssistantElementRef = useRef<HTMLDivElement | null>(null);
+  const disconnectLastUserResizeObserverRef = useRef<(() => void) | null>(null);
 
   // Extracted measurement function - called from both callback ref and useLayoutEffect
   // Uses direct DOM mutation only (no state) to avoid extra re-renders and flickering
@@ -234,12 +235,21 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
   // Callback ref for last user message - stores element for measurement AND triggers height update
   const lastUserMessageRef = useCallback(
     (node: HTMLDivElement | null) => {
+      disconnectLastUserResizeObserverRef.current?.();
+      disconnectLastUserResizeObserverRef.current = null;
       lastUserElementRef.current = node;
-      // Trigger height measurement when a new element is mounted
-      if (node) updateSpacerHeight();
+      if (!node) return;
+
+      const { observer, disconnect } =
+        createRafResizeObserver(updateSpacerHeight);
+      observer.observe(node);
+      disconnectLastUserResizeObserverRef.current = disconnect;
+      updateSpacerHeight();
     },
     [updateSpacerHeight],
   );
+
+  useEffect(() => () => disconnectLastUserResizeObserverRef.current?.(), []);
 
   // Callback ref for last assistant message - stores element for measurement AND triggers height update
   const lastAssistantMessageRef = useCallback(
