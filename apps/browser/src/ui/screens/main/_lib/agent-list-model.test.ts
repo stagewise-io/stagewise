@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorkspaceAgentGroups,
   getAgentStateSeverity,
+  mergeAgentEntries,
   type MergedAgentEntry,
 } from './agent-list-model';
 
@@ -28,6 +29,27 @@ function agent(
 }
 
 describe('agent list workspace model', () => {
+  it('keeps the persistent unread marker on history-only agents', () => {
+    const [entry] = mergeAgentEntries({
+      activeAgents: [],
+      historyList: [
+        {
+          id: 'later',
+          title: 'Read later',
+          createdAt: new Date(0),
+          lastMessageAt: new Date(0),
+          messageCount: 1,
+          parentAgentInstanceId: null,
+          unread: true,
+        },
+      ],
+      pendingRemovals: new Set(),
+    });
+
+    expect(entry?.unread).toBe(true);
+    expect(entry?.isLive).toBe(false);
+  });
+
   it('orders state severity by error, waiting, unread, working', () => {
     expect(getAgentStateSeverity(agent('error', { hasError: true }))).toBe(
       'error',

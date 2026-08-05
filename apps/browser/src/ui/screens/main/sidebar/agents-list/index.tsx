@@ -127,6 +127,7 @@ import { usePendingRemovals } from '@ui/hooks/use-pending-agent-removals';
 import { useCommandCenter } from '../../command-center';
 import { IDE_SELECTION_ITEMS } from '@shared/ide-url';
 import { getBaseName } from '@shared/path-utils';
+import { useSetHistoryAttentionEntries } from '../../_components/agent-attention-context';
 
 enablePatches();
 
@@ -153,7 +154,8 @@ function agentHistoryEntriesEqual(
       ai.createdAt !== bi.createdAt ||
       ai.lastMessageAt !== bi.lastMessageAt ||
       ai.messageCount !== bi.messageCount ||
-      ai.parentAgentInstanceId !== bi.parentAgentInstanceId
+      ai.parentAgentInstanceId !== bi.parentAgentInstanceId ||
+      ai.unread !== bi.unread
     )
       return false;
   }
@@ -381,7 +383,6 @@ function SortablePinnedAgentCard({
   agent,
   isOpen,
   isPreviewOpen,
-  hasUnseen,
   contextMenuState,
   onClick,
   onRename,
@@ -391,7 +392,6 @@ function SortablePinnedAgentCard({
   agent: MergedAgentEntry;
   isOpen: boolean;
   isPreviewOpen: boolean;
-  hasUnseen: boolean;
   contextMenuState: ReturnType<typeof useSharedAgentContextMenu>[0];
   onClick: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
@@ -431,7 +431,7 @@ function SortablePinnedAgentCard({
         isWorking={agent.isWorking}
         isWaitingForUser={agent.isWaitingForUser}
         hasError={agent.hasError}
-        hasUnseen={hasUnseen}
+        unread={agent.unread}
         activityText={agent.activityText}
         activityIsUserInput={agent.activityIsUserInput}
         lastMessageAt={agent.lastMessageAt}
@@ -685,6 +685,7 @@ function AgentListGroupingToggle({
 export function AgentsList() {
   const [openAgent, setOpenAgent] = useOpenAgent();
   const { previewAgentId } = useAgentSwitcher();
+  const setHistoryAttentionEntries = useSetHistoryAttentionEntries();
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const forkAgent = useKartonProcedure((p) => p.agents.fork);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
@@ -694,6 +695,7 @@ export function AgentsList() {
   const deleteAgent = useKartonProcedure((p) => p.agents.delete);
   const setAgentTitle = useKartonProcedure((p) => p.agents.setTitle);
   const markAsRead = useKartonProcedure((p) => p.agents.markAsRead);
+  const markAsUnread = useKartonProcedure((p) => p.agents.markAsUnread);
   const getAgentsHistoryList = useKartonProcedure(
     (p) => p.agents.getAgentsHistoryList,
   );
@@ -1351,6 +1353,23 @@ export function AgentsList() {
     [activeAgentIds],
   );
 
+  const historyAttentionEntries = useMemo(
+    () =>
+      mergedHistoryList
+        .filter((entry) => entry.unread && !activeAgentIdSet.has(entry.id))
+        .map((entry) => ({
+          id: entry.id,
+          title: entry.title || 'Untitled Agent',
+          status: 'success' as const,
+        })),
+    [activeAgentIdSet, mergedHistoryList],
+  );
+
+  useEffect(() => {
+    setHistoryAttentionEntries(historyAttentionEntries);
+    return () => setHistoryAttentionEntries([]);
+  }, [historyAttentionEntries, setHistoryAttentionEntries]);
+
   const historyPinnedAgentIds = useMemo(
     () => pinnedAgentIds.filter((id) => !activeAgentIdSet.has(id)),
     [activeAgentIdSet, pinnedAgentIds],
@@ -1579,8 +1598,12 @@ export function AgentsList() {
   );
 
   const visibleUnpinnedAgents = useMemo(
-    () => filteredUnpinnedAgents.slice(0, effectiveVisible),
-    [filteredUnpinnedAgents, effectiveVisible],
+    () =>
+      filteredUnpinnedAgents.filter(
+        (agent, index) =>
+          index < effectiveVisible || agent.unread || agent.id === openAgent,
+      ),
+    [effectiveVisible, filteredUnpinnedAgents, openAgent],
   );
 
   const groupedItems = useMemo(
@@ -2023,12 +2046,38 @@ export function AgentsList() {
     if (previewAgentId) scrollCardIntoView(previewAgentId);
   }, [previewAgentId, scrollCardIntoView]);
 
-  // Clear the unread dot when the user opens an agent.
+  const setAgentUnread = useCallback(
+    async (agentId: string, unread: boolean) => {
+      try {
+        await (unread ? markAsUnread(agentId) : markAsRead(agentId));
+      } catch (err) {
+        console.error('Failed to update agent unread state:', err);
+        return;
+      }
+
+      const update = (entries: AgentHistoryEntry[]) =>
+        entries.map((entry) =>
+          entry.id === agentId ? { ...entry, unread } : entry,
+        );
+      setHistoryList(update);
+      setPinnedHistoryList(update);
+    },
+    [markAsRead, markAsUnread],
+  );
+  const setAgentUnreadRef = useRef(setAgentUnread);
+  setAgentUnreadRef.current = setAgentUnread;
+
+  // Opening a chat clears its unread state.
   useEffect(() => {
-    if (openAgent) {
-      void markAsRead(openAgent);
-    }
-  }, [openAgent, markAsRead]);
+    if (openAgent) void setAgentUnreadRef.current(openAgent, false);
+  }, [openAgent]);
+
+  const handleMarkAsUnread = useCallback(
+    (agentId: string) => {
+      void setAgentUnread(agentId, true);
+    },
+    [setAgentUnread],
+  );
 
   // When an agent finishes (isWorking → false), scroll to its card.
   const prevWorkingRef = useRef<Set<string>>(new Set());
@@ -2080,8 +2129,6 @@ export function AgentsList() {
     (agent: MergedAgentEntry, key: string) => {
       const isOpen = agent.id === openAgent;
       const isPreviewOpen = agent.id === previewAgentId;
-      const hasUnseen = !isOpen && agent.unread;
-
       return (
         <AgentCardWithPreview
           key={key}
@@ -2092,7 +2139,7 @@ export function AgentsList() {
           isWorking={agent.isWorking}
           isWaitingForUser={agent.isWaitingForUser}
           hasError={agent.hasError}
-          hasUnseen={hasUnseen}
+          unread={agent.unread}
           activityText={agent.activityText}
           activityIsUserInput={agent.activityIsUserInput}
           lastMessageAt={agent.lastMessageAt}
@@ -2439,15 +2486,12 @@ export function AgentsList() {
               {filteredPinnedAgents.map((agent) => {
                 const isOpen = agent.id === openAgent;
                 const isPreviewOpen = agent.id === previewAgentId;
-                const hasUnseen = !isOpen && agent.unread;
-
                 return (
                   <SortablePinnedAgentCard
                     key={agent.id}
                     agent={agent}
                     isOpen={isOpen}
                     isPreviewOpen={isPreviewOpen}
-                    hasUnseen={hasUnseen}
                     contextMenuState={ctxMenuState}
                     onClick={handleClick}
                     onRename={handleRename}
@@ -2467,10 +2511,7 @@ export function AgentsList() {
                     isWorking={activePinnedDragAgent.isWorking}
                     isWaitingForUser={activePinnedDragAgent.isWaitingForUser}
                     hasError={activePinnedDragAgent.hasError}
-                    hasUnseen={
-                      activePinnedDragAgent.id !== openAgent &&
-                      activePinnedDragAgent.unread
-                    }
+                    unread={activePinnedDragAgent.unread}
                     activityText={activePinnedDragAgent.activityText}
                     activityIsUserInput={
                       activePinnedDragAgent.activityIsUserInput
@@ -2554,6 +2595,7 @@ export function AgentsList() {
         target={ctxMenuTarget}
         onClose={handleCtxMenuClose}
         onForkRequest={handleFork}
+        onMarkAsUnreadRequest={handleMarkAsUnread}
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover

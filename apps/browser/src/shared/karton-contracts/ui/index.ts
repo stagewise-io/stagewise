@@ -1409,6 +1409,7 @@ export type KartonContract = {
       ) => Promise<string>;
       retryLastUserMessage: (agentId: string) => Promise<void>;
       markAsRead: (agentId: string) => Promise<void>;
+      markAsUnread: (agentId: string) => Promise<void>;
       setActiveModelId: (
         agentId: string,
         modelId: ModelId,

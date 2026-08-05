@@ -23,6 +23,7 @@ function createDeps() {
   const persistenceDb = {
     getLastChatWorkspacePaths: vi.fn(async () => null),
     getLastChatModelSelection: vi.fn(async () => null),
+    updateAgentUnread: vi.fn(async () => {}),
   };
   return {
     registry: new CommandRegistry(),
@@ -31,6 +32,7 @@ function createDeps() {
     agentStore: {
       get: vi.fn(() => ({ agents: { instances: {} }, toolbox: {} })),
       update: vi.fn(),
+      subscribe: vi.fn(() => () => {}),
     },
     host: createTestAgentHost(),
     agentTypeRegistry: new AgentTypeRegistry(),
@@ -55,6 +57,70 @@ function buildManager(deps: ReturnType<typeof createDeps>) {
     },
   });
 }
+
+describe('AgentManager unread handlers', () => {
+  it.each([
+    ['agents.markAsRead', false],
+    ['agents.markAsUnread', true],
+  ] as const)('persists %s as %s', async (command, unread) => {
+    const deps = createDeps();
+    const state = {
+      agents: {
+        instances: {
+          active: { state: { unread: !unread } },
+        },
+      },
+      toolbox: {},
+    };
+    deps.agentStore.get.mockReturnValue(state);
+    deps.agentStore.update.mockImplementation((recipe) => {
+      recipe(state);
+    });
+    const manager = buildManager(deps);
+
+    await deps.registry.dispatch<unknown[], void>(
+      command,
+      { callerId: 'test' },
+      ['active'],
+    );
+
+    expect(deps.persistenceDb.updateAgentUnread).toHaveBeenCalledWith(
+      'active',
+      unread,
+    );
+    expect(state.agents.instances.active.state.unread).toBe(unread);
+    await manager.teardown();
+  });
+
+  it('persists automatic unread state changes', async () => {
+    const deps = createDeps();
+    const manager = buildManager(deps);
+    const listener = deps.agentStore.subscribe.mock.calls[0]![0];
+
+    listener(
+      {
+        agents: {
+          instances: { active: { state: { unread: true } } },
+        },
+        toolbox: {},
+      },
+      undefined,
+      [
+        {
+          op: 'replace',
+          path: ['agents', 'instances', 'active', 'state', 'unread'],
+          value: true,
+        },
+      ],
+    );
+    await manager.teardown();
+
+    expect(deps.persistenceDb.updateAgentUnread).toHaveBeenCalledWith(
+      'active',
+      true,
+    );
+  });
+});
 
 describe('AgentManager agents.create handler', () => {
   afterEach(() => {

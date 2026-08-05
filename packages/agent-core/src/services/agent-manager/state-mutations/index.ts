@@ -13,7 +13,7 @@
  * automatically reshapes the bundle.
  *
  * Hosts that need to add their own narrow setters (e.g. browser's
- * `setUnread`, `recordPendingApproval`) should build them on top of
+ * `recordPendingApproval`) should build them on top of
  * the exported {@link updateAgentInstanceState} helper so they share
  * the same one-store-update-per-intent discipline.
  */

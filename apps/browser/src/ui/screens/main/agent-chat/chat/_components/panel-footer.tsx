@@ -267,6 +267,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     (p) => p.agents.updateInputState,
   );
   const promoteSideChat = useKartonProcedure((p) => p.agents.promoteSideChat);
+  const resumeAgent = useKartonProcedure((p) => p.agents.resume);
   const setLastOpenAgentId = useKartonProcedure(
     (p) => p.browser.setLastOpenAgentId,
   );
@@ -1172,7 +1173,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     if (!nextAttentionTarget) return;
 
     focusAgent(nextAttentionTarget.id);
-    void setLastOpenAgentId(nextAttentionTarget.id).catch(() => undefined);
+    void setLastOpenAgentId(nextAttentionTarget.id)
+      .catch(() => undefined)
+      .then(() => resumeAgent(nextAttentionTarget.id))
+      .catch(() => undefined);
   };
   const canUseNextAttention =
     isActiveChatSurface && !sideChatParentId && !!nextAttentionTarget;

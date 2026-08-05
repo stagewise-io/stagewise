@@ -47,6 +47,7 @@ import {
   SIDEBAR_PANEL_ORDER,
 } from './_components/sidebar-panel-config';
 import { LocalServersPopover } from './_components/local-servers-popover';
+import { AgentAttentionProvider } from './_components/agent-attention-context';
 import { WatcherPopover } from './_components/watcher-popover';
 
 // Reuse the same autoSaveId as the settings screen so the root panel layout
@@ -82,15 +83,17 @@ function ActionDivider() {
 export function DefaultLayout({ show }: { show: boolean }) {
   return (
     <OpenAgentProvider>
-      <SidebarCollapsedProvider>
-        <ContentCollapsedProvider>
-          <PendingRemovalsProvider>
-            <CommandCenterProvider>
-              <DefaultLayoutInner show={show} />
-            </CommandCenterProvider>
-          </PendingRemovalsProvider>
-        </ContentCollapsedProvider>
-      </SidebarCollapsedProvider>
+      <AgentAttentionProvider>
+        <SidebarCollapsedProvider>
+          <ContentCollapsedProvider>
+            <PendingRemovalsProvider>
+              <CommandCenterProvider>
+                <DefaultLayoutInner show={show} />
+              </CommandCenterProvider>
+            </PendingRemovalsProvider>
+          </ContentCollapsedProvider>
+        </SidebarCollapsedProvider>
+      </AgentAttentionProvider>
     </OpenAgentProvider>
   );
 }

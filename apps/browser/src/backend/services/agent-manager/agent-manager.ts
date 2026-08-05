@@ -48,6 +48,8 @@ const AGENT_RPC_COMMANDS = [
   'agents.replaceUserMessage',
   'agents.delete',
   'agents.archive',
+  'agents.markAsRead',
+  'agents.markAsUnread',
   'agents.setActiveModelId',
   'agents.setTitle',
   'agents.getAgentsHistoryList',

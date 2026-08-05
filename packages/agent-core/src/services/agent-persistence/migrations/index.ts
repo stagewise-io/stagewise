@@ -9,6 +9,8 @@ import { up as v008Up } from './v008-add-title-locked-by-user';
 import { up as v009Up } from './v009-add-tool-approval-mode';
 import { up as v010Up } from './v010-add-active-provider-instance-id';
 import { up as v011Up } from './v011-add-side-chats';
+import { up as v012Up } from './v012-add-marked-unread';
+import { up as v013Up } from './v013-rename-marked-unread';
 
 const registry: MigrationScript[] = [
   { version: 2, name: 'add-mounted-workspaces', up: v002Up },
@@ -21,7 +23,9 @@ const registry: MigrationScript[] = [
   { version: 9, name: 'add-tool-approval-mode', up: v009Up },
   { version: 10, name: 'add-active-provider-instance-id', up: v010Up },
   { version: 11, name: 'add-side-chats', up: v011Up },
+  { version: 12, name: 'add-marked-unread', up: v012Up },
+  { version: 13, name: 'rename-marked-unread', up: v013Up },
 ];
-const schemaVersion = 11;
+const schemaVersion = 13;
 
 export { registry, schemaVersion };

@@ -63,6 +63,16 @@ export function setIsWorkingFalse(
   });
 }
 
+export function setUnread(
+  store: AgentStore,
+  agentInstanceId: string,
+  args: { unread: boolean },
+): void {
+  updateAgentInstanceState(store, agentInstanceId, (state) => {
+    state.unread = args.unread;
+  });
+}
+
 export function setUsageWarning(
   store: AgentStore,
   agentInstanceId: string,

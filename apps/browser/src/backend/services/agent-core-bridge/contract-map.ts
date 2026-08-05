@@ -13,5 +13,4 @@ import type { CommandName } from '@stagewise/agent-core';
 export const MIGRATED_PROCEDURES: readonly CommandName[] = [
   'toolbox.dismissActiveApp',
   'toolbox.clearPendingAppMessage',
-  'agents.markAsRead',
 ] as const;

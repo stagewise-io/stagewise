@@ -677,8 +677,8 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
   lazyHostModels.setModelProviderService(modelProviderService);
 
   // Attach the bridge. Bridges every migrated Karton
-  // procedure (`toolbox.dismissActiveApp`, `toolbox.clearPendingAppMessage`,
-  // `agents.markAsRead`) through the `CommandRegistry`, and starts mirroring
+  // procedure (`toolbox.dismissActiveApp`, `toolbox.clearPendingAppMessage`)
+  // through the `CommandRegistry`, and starts mirroring
   // the AgentStore-canonical `activeApp`, `pendingAppMessage`, and
   // `workspace.mounts` slices into Karton for the UI.
   //

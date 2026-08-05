@@ -19,6 +19,7 @@ function makeEntry(
     lastMessageAt: new Date(0),
     messageCount: 0,
     parentAgentInstanceId: null,
+    unread: false,
     mountedWorkspaces,
   };
 }

@@ -27,8 +27,9 @@ export function getAgentAttentionStatus(
 export function buildAgentAttentionEntries(
   instances: AppState['agents']['instances'],
   toolbox: AppState['toolbox'],
+  historyEntries: readonly AgentAttentionEntry[] = [],
 ): AgentAttentionEntry[] {
-  return Object.entries(instances)
+  const liveEntries = Object.entries(instances)
     .filter(
       ([, instance]) =>
         instance.type === AgentTypes.CHAT && !instance.sideChatParentId,
@@ -38,6 +39,12 @@ export function buildAgentAttentionEntries(
       title: instance.state.title || 'Untitled Agent',
       status: getAgentAttentionStatus(instance, toolbox[id]),
     }));
+
+  const liveIds = new Set(liveEntries.map((entry) => entry.id));
+  return [
+    ...liveEntries,
+    ...historyEntries.filter((entry) => !liveIds.has(entry.id)),
+  ];
 }
 
 export function findNextAgentAttentionTarget(

@@ -109,6 +109,7 @@ export const agentInstances = sqliteTable(
     activeProviderInstanceId: text('active_provider_instance_id'),
     title: text('title').notNull(),
     titleLockedByUser: _sqliteBoolean('title_locked_by_user'),
+    unread: _sqliteBoolean('unread').notNull().default(false),
     /** @deprecated Kept for rollback safety. Read/write via agentMessages table instead. */
     history: _sqliteJson('history')
       .notNull()

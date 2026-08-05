@@ -42,6 +42,7 @@ import {
   bindStateMutations,
   deleteAgentInstance,
   getAgentInstance,
+  setUnread,
   setToolApprovalMode,
   upsertAgentInstance,
   type AgentInstanceEnvelope,
@@ -215,6 +216,8 @@ export class AgentManager extends DisposableService {
    * place.
    */
   private readonly agentStore: AgentStore;
+  private unreadPersistenceQueue = Promise.resolve();
+  private unregisterUnreadPersistence: () => void = () => {};
   /**
    * Skill roster for slash-command telemetry redaction. Defaults to
    * `() => []` when the host does not supply skills.
@@ -277,6 +280,43 @@ export class AgentManager extends DisposableService {
       hooks?.skillsForSlashRedaction ?? (() => []);
 
     this.domainAdapterRegistry = new DomainAdapterRegistry(host.logger);
+
+    this.unregisterUnreadPersistence = this.agentStore.subscribe(
+      (state, _previous, patches) => {
+        const changedAgentIds = new Set<string>();
+        for (const patch of patches) {
+          const path = patch.path;
+          if (
+            path[0] === 'agents' &&
+            path[1] === 'instances' &&
+            typeof path[2] === 'string' &&
+            path[3] === 'state' &&
+            path[4] === 'unread'
+          ) {
+            changedAgentIds.add(path[2]);
+          }
+        }
+        if (changedAgentIds.size === 0) return;
+
+        const updates = [...changedAgentIds].map((id) => ({
+          id,
+          unread: !!state.agents.instances[id]?.state.unread,
+        }));
+        this.unreadPersistenceQueue = this.unreadPersistenceQueue
+          .then(async () => {
+            await Promise.all(
+              updates.map(({ id, unread }) =>
+                this.persistenceDb.updateAgentUnread(id, unread),
+              ),
+            );
+          })
+          .catch((error) => {
+            this.logger.error('[AgentManager] Failed to persist unread state', {
+              error,
+            });
+          });
+      },
+    );
 
     this.unregisterCommands = this.registerCommandHandlers();
 
@@ -619,9 +659,12 @@ export class AgentManager extends DisposableService {
     this.wrapAgentRpc('agents.archive', async (instanceId: string) => {
       await this.archiveAgent(instanceId);
     });
-    // `agents.markAsRead` lives on the AgentCoreBridge — handler is
-    // in `agent-core-bridge/handlers/agents.ts` and writes through
-    // the host `HostAgentStateMutations.setUnread` helper.
+    this.wrapAgentRpc('agents.markAsRead', async (instanceId: string) => {
+      await this.updateUnread(instanceId, false);
+    });
+    this.wrapAgentRpc('agents.markAsUnread', async (instanceId: string) => {
+      await this.updateUnread(instanceId, true);
+    });
     this.wrapAgentRpc(
       'agents.setActiveModelId',
       async (
@@ -812,6 +855,8 @@ export class AgentManager extends DisposableService {
     clearInterval(this.networkRetryInterval);
     this.pendingNetworkRetries.clear();
     this.unregisterCommands();
+    this.unregisterUnreadPersistence();
+    await this.unreadPersistenceQueue;
     for (const agent of this.activeAgents.values()) {
       await agent.onTeardown();
     }
@@ -1214,6 +1259,7 @@ export class AgentManager extends DisposableService {
         inputState: agent.inputState,
         usedTokens: agent.usedTokens,
         isWorking: false,
+        unread: agent.unread,
       },
       instanceId,
       undefined,
@@ -1287,6 +1333,7 @@ export class AgentManager extends DisposableService {
         queuedMessages: agentState.queuedMessages,
         inputState: agentState.inputState,
         usedTokens: agentState.usedTokens,
+        unread: !!agentState.unread,
         mountedWorkspaces,
       },
       agentState.history,
@@ -1841,5 +1888,13 @@ export class AgentManager extends DisposableService {
     return this.enrichHistoryEntries
       ? await this.enrichHistoryEntries(entries)
       : entries;
+  }
+
+  private async updateUnread(
+    instanceId: string,
+    unread: boolean,
+  ): Promise<void> {
+    await this.persistenceDb.updateAgentUnread(instanceId, unread);
+    setUnread(this.agentStore, instanceId, { unread });
   }
 }

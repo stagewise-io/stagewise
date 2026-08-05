@@ -192,17 +192,24 @@ export class AgentPersistenceDB {
         lastMessageAt: schema.agentInstances.lastMessageAt,
         messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
+        unread: schema.agentInstances.unread,
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
-      // Order by lastMessageAt so the sidebar's time-bucket grouping
+      // Fetch unread chats before the regular recent page so an old chat that
+      // still needs attention remains available to the sidebar and switcher.
+      // The UI restores chronological order before rendering its time buckets.
+      // Otherwise order by lastMessageAt so the sidebar's time-bucket grouping
       // (Today / Yesterday / Last 7 days / ...) — which is keyed on
       // lastMessageAt — sees a contiguous, correctly-ordered page.
       // Ordering by createdAt here let agents whose latest activity was
       // recent but whose creation is older drop out of the initial page,
       // making them silently missing from groups like "Yesterday" until
       // the user clicked "Show more".
-      .orderBy(desc(schema.agentInstances.lastMessageAt))
+      .orderBy(
+        desc(schema.agentInstances.unread),
+        desc(schema.agentInstances.lastMessageAt),
+      )
       .limit(limit)
       .offset(offset)
       .where(
@@ -249,6 +256,7 @@ export class AgentPersistenceDB {
         lastMessageAt: schema.agentInstances.lastMessageAt,
         messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
+        unread: schema.agentInstances.unread,
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
@@ -581,6 +589,26 @@ export class AgentPersistenceDB {
     } catch (error) {
       this._logger.error(
         `[AgentPersistenceDB] Failed to update agent title: ${(error as Error).message}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Updates unread state without hydrating the agent.
+   */
+  public async updateAgentUnread(id: string, unread: boolean): Promise<void> {
+    this._logger.debug(
+      `[AgentPersistenceDB] Updating unread state for agent: ${id}`,
+    );
+    try {
+      await this._db
+        .update(schema.agentInstances)
+        .set({ unread })
+        .where(eq(schema.agentInstances.id, id));
+    } catch (error) {
+      this._logger.error(
+        `[AgentPersistenceDB] Failed to update unread state: ${(error as Error).message}`,
       );
       throw error;
     }

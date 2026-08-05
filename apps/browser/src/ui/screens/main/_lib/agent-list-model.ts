@@ -146,7 +146,7 @@ export function mergeAgentEntries({
       activityText: '',
       activityIsUserInput: false,
       hasError: false,
-      unread: false,
+      unread: e.unread,
       lastMessageAt: new Date(e.lastMessageAt).getTime(),
       createdAt: new Date(e.createdAt).getTime(),
       messageCount: e.messageCount,
