@@ -6,6 +6,7 @@ import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { installStartupOpenUrlListener } from './startup-url-events';
 import { applyPendingAppDataReset } from './utils/app-data-reset';
+import { seedIsolatedDevProfile } from './utils/seed-isolated-dev-profile';
 
 // CRITICAL: `main` is imported dynamically (below in the 'ready' handler)
 // instead of statically. On Windows machines without the VC++ redistributable
@@ -22,45 +23,22 @@ if (started) {
   app.quit();
 }
 
-const appBaseName = (() => {
-  switch (__APP_RELEASE_CHANNEL__) {
-    case 'release':
-      return 'stagewise';
-    case 'nightly':
-      return 'stagewise-nightly';
-    case 'prerelease':
-      return 'stagewise-prerelease';
-    case 'dev':
-    default:
-      return 'stagewise-dev';
-  }
-})();
-
-const appName = (() => {
-  switch (__APP_RELEASE_CHANNEL__) {
-    case 'release':
-      return 'stagewise';
-    case 'nightly':
-      return 'stagewise Nightly';
-    case 'prerelease':
-      return 'stagewise (Pre-Release)';
-    case 'dev':
-    default:
-      return 'stagewise (Dev-Build)';
-  }
-})();
-
-// Set the app name for macOS menu bar
-app.setName(appName);
+// Keep the dev identity stable so isolated profiles can read safeStorage data
+// copied from the default dev profile. Window titles still use __APP_NAME__.
+app.setName(
+  __APP_RELEASE_CHANNEL__ === 'dev' ? 'stagewise (Dev-Build)' : __APP_NAME__,
+);
 if (process.platform === 'win32') {
-  app.setAppUserModelId(`com.squirrel.${appBaseName}.${appBaseName}`);
+  app.setAppUserModelId(
+    `com.squirrel.${__APP_BASE_NAME__}.${__APP_BASE_NAME__}`,
+  );
 }
 app.applicationMenu = null;
 installStartupOpenUrlListener();
 
 // Set the right path structure for the app
 // We keep userData where it is, but we will put session data into a sub-folder called "session"
-app.setPath('userData', path.join(app.getPath('appData'), appBaseName));
+app.setPath('userData', path.join(app.getPath('appData'), __APP_BASE_NAME__));
 app.setPath('sessionData', path.join(app.getPath('userData'), 'session'));
 
 // Register custom protocols as privileged (must happen before app.ready)
@@ -128,6 +106,21 @@ if (!singleInstanceLock) {
     applyPendingAppDataReset(app.getPath('userData'));
   } catch (error) {
     console.error('[AppDataReset] Failed to reset app data', error);
+  }
+
+  try {
+    const copiedFileCount = seedIsolatedDevProfile(
+      app.getPath('appData'),
+      app.getPath('userData'),
+      __APP_BASE_NAME__,
+    );
+    if (copiedFileCount > 0) {
+      console.log(
+        `[DevProfile] Seeded ${copiedFileCount} file(s) from the default dev profile`,
+      );
+    }
+  } catch (error) {
+    console.error('[DevProfile] Failed to seed isolated dev profile', error);
   }
 }
 

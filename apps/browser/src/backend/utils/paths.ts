@@ -6,7 +6,12 @@ export const getDataRoot = (): string =>
   path.join(app.getPath('userData'), 'stagewise');
 
 export const getTempRoot = (): string =>
-  path.join(app.getPath('temp'), 'stagewise');
+  path.join(
+    app.getPath('temp'),
+    __APP_BASE_NAME__.startsWith('stagewise-dev-')
+      ? __APP_BASE_NAME__
+      : 'stagewise',
+  );
 
 export type DbName =
   | 'favicon'

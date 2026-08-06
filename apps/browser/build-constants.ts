@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import semver from 'semver';
@@ -20,6 +21,13 @@ export const __APP_RELEASE_CHANNEL__: ReleaseChannel = (() => {
 })();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const worktreeRoot = path.resolve(__dirname, '../..');
+
+const devInstance =
+  __APP_RELEASE_CHANNEL__ === 'dev' &&
+  process.env.STAGEWISE_DEV_INSTANCE === 'auto'
+    ? createHash('sha256').update(worktreeRoot).digest('hex').slice(0, 8)
+    : null;
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -36,7 +44,7 @@ export const __APP_BASE_NAME__ = (() => {
       return 'stagewise-prerelease';
     case 'dev':
     default:
-      return 'stagewise-dev';
+      return devInstance ? `stagewise-dev-${devInstance}` : 'stagewise-dev';
   }
 })();
 
@@ -51,7 +59,9 @@ export const __APP_NAME__ = (() => {
       return 'stagewise (Pre-Release)';
     case 'dev':
     default:
-      return 'stagewise (Dev-Build)';
+      return devInstance
+        ? `stagewise (Dev-Build ${devInstance})`
+        : 'stagewise (Dev-Build)';
   }
 })();
 
