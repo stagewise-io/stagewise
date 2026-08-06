@@ -103,43 +103,69 @@ async function cleanTempWorkspaces(tempBasePath: string): Promise<number> {
   return deletedCount;
 }
 
+async function getIsolatedDirectories(basePath: string): Promise<string[]> {
+  try {
+    return (await fs.readdir(basePath, { withFileTypes: true }))
+      .filter(
+        (entry) =>
+          entry.isDirectory() && entry.name.startsWith('stagewise-dev-'),
+      )
+      .map((entry) => path.join(basePath, entry.name));
+  } catch {
+    return [];
+  }
+}
+
 async function main() {
   log('\n🧹 Stagewise Browser Data Cleanup', colors.cyan);
   log('='.repeat(50), colors.cyan);
 
   const appDataPath = getAppDataPath();
   const tempPath = getTempPath();
+  const isolatedOnly = process.argv.includes('--isolated-only');
 
   log(`\nDetected platform: ${process.platform}`, colors.blue);
   log(`App data base path: ${appDataPath}`, colors.blue);
   log(`Temp base path: ${tempPath}`, colors.blue);
 
-  const pathsToClean = {
-    'Production userData': path.join(appDataPath, 'stagewise'),
-    'Development userData': path.join(appDataPath, 'stagewise-dev'),
-  };
-
   log('\n📂 Cleaning userData directories...', colors.cyan);
   let deletedCount = 0;
-  for (const [label, dirPath] of Object.entries(pathsToClean)) {
-    log(`\n${label}:`, colors.blue);
+  if (!isolatedOnly) {
+    const pathsToClean = {
+      'Production userData': path.join(appDataPath, 'stagewise'),
+      'Development userData': path.join(appDataPath, 'stagewise-dev'),
+    };
+    for (const [label, dirPath] of Object.entries(pathsToClean)) {
+      log(`\n${label}:`, colors.blue);
+      const deleted = await deleteDirectory(dirPath);
+      if (deleted) deletedCount++;
+    }
+  }
+  for (const dirPath of await getIsolatedDirectories(appDataPath)) {
     const deleted = await deleteDirectory(dirPath);
     if (deleted) deletedCount++;
   }
 
-  log('\n📂 Cleaning temp workspace directories...', colors.cyan);
-  log('\nProduction temp workspaces:', colors.blue);
-  const prodTempDeleted = await cleanTempWorkspaces(
-    path.join(tempPath, 'stagewise'),
-  );
-  log('\nDevelopment temp workspaces:', colors.blue);
-  const devTempDeleted = await cleanTempWorkspaces(
-    path.join(tempPath, 'stagewise-dev'),
-  );
+  log('\n📂 Cleaning temp directories...', colors.cyan);
+  let tempDeletedCount = 0;
+  if (!isolatedOnly) {
+    log('\nProduction temp workspaces:', colors.blue);
+    tempDeletedCount += await cleanTempWorkspaces(
+      path.join(tempPath, 'stagewise'),
+    );
+    log('\nDevelopment temp workspaces:', colors.blue);
+    tempDeletedCount += await cleanTempWorkspaces(
+      path.join(tempPath, 'stagewise-dev'),
+    );
+  }
+  for (const dirPath of await getIsolatedDirectories(tempPath)) {
+    const deleted = await deleteDirectory(dirPath);
+    if (deleted) tempDeletedCount++;
+  }
 
   log(`\n${'='.repeat(50)}`, colors.cyan);
   log(
-    `\n✓ Cleanup complete! Deleted ${deletedCount} userData directories and ${prodTempDeleted + devTempDeleted} temp workspace directories.`,
+    `\n✓ Cleanup complete! Deleted ${deletedCount} userData directories and ${tempDeletedCount} temp directories.`,
     colors.green,
   );
   log(
