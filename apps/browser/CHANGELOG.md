@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.28.0 (2026-08-06)
+
+### Features
+
+* allow expanding long user messages (8b738fb)
+* add persistent mark as unread for chats (3907fba)
+* add background watcher sessions (86e4505)
+* summarize file edits after agent turns (1a8f201)
+
+### Bug Fixes
+
+* address long message interaction issues (3d7b50b)
+* use explicit info color for agent in-progress status dot (85e5462)
+* show workspace action while git options load (ba58521)
+* preserve agent cycle cleanup (a7efb6a)
+* restore next-chat navigation (e210f05)
+* address chat navigation review feedback (00cd759)
+* prevent onboarding release notes overlap (85e16fb)
+* improve chat streaming behavior (a959b25)
+* fall back to opening files without active diffs (2f099ca)
+* collapse file edit tools when showing turn summary (f902db0)
+* cancel watcher creation on agent abort (1d727de)
+* preserve approvals when watcher events trigger (2075572)
+* handle cached turn edits and renamed files (5eba51d)
+* restore visible tab after legacy cleanup (c4260ae)
+* refine turn file edit summary rendering (671c3d3)
+
+### Other Changes
+
+* remove pending edits review flow (0d2f62e)
+
 ## 1.27.0 (2026-07-30)
 
 ### Features
