@@ -22,11 +22,8 @@ export function seedIsolatedDevProfile(
   if (!appBaseName.startsWith('stagewise-dev-')) return 0;
 
   const markerPath = path.join(userDataDirectory, ISOLATED_DEV_SEED_MARKER);
-  const sourceDataRoot = path.join(
-    appDataDirectory,
-    'stagewise-dev',
-    'stagewise',
-  );
+  const sourceUserData = path.join(appDataDirectory, 'stagewise-dev');
+  const sourceDataRoot = path.join(sourceUserData, 'stagewise');
   if (fs.existsSync(markerPath) || !fs.existsSync(sourceDataRoot)) return 0;
 
   const targetDataRoot = path.join(userDataDirectory, 'stagewise');
@@ -39,6 +36,16 @@ export function seedIsolatedDevProfile(
     if (!fs.existsSync(sourcePath) || fs.existsSync(targetPath)) continue;
     fs.copyFileSync(sourcePath, targetPath);
     copiedFileCount++;
+  }
+
+  if (process.platform === 'win32') {
+    const sourcePath = path.join(sourceUserData, 'session', 'Local State');
+    const targetPath = path.join(userDataDirectory, 'session', 'Local State');
+    if (fs.existsSync(sourcePath) && !fs.existsSync(targetPath)) {
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.copyFileSync(sourcePath, targetPath);
+      copiedFileCount++;
+    }
   }
 
   fs.writeFileSync(markerPath, '');

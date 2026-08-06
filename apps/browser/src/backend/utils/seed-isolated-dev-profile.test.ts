@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ISOLATED_DEV_SEED_MARKER,
   seedIsolatedDevProfile,
@@ -21,16 +21,28 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(root, { recursive: true, force: true });
 });
 
 describe('seedIsolatedDevProfile', () => {
   it('copies only allowed missing files and seeds once', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
     const targetDataRoot = path.join(userDataDirectory, 'stagewise');
+    const sourceSessionRoot = path.join(
+      appDataDirectory,
+      'stagewise-dev',
+      'session',
+    );
     fs.mkdirSync(targetDataRoot, { recursive: true });
+    fs.mkdirSync(sourceSessionRoot, { recursive: true });
     fs.writeFileSync(path.join(sourceDataRoot, 'auth-session.json'), 'auth');
     fs.writeFileSync(path.join(sourceDataRoot, 'preferences.json'), 'source');
     fs.writeFileSync(path.join(sourceDataRoot, 'window-state.json'), 'window');
+    fs.writeFileSync(
+      path.join(sourceSessionRoot, 'Local State'),
+      'local-state',
+    );
     fs.writeFileSync(path.join(targetDataRoot, 'preferences.json'), 'target');
 
     expect(
@@ -39,7 +51,7 @@ describe('seedIsolatedDevProfile', () => {
         userDataDirectory,
         'stagewise-dev-deadbeef',
       ),
-    ).toBe(1);
+    ).toBe(2);
     expect(
       fs.readFileSync(path.join(targetDataRoot, 'auth-session.json'), 'utf8'),
     ).toBe('auth');
@@ -52,6 +64,12 @@ describe('seedIsolatedDevProfile', () => {
     expect(
       fs.existsSync(path.join(userDataDirectory, ISOLATED_DEV_SEED_MARKER)),
     ).toBe(true);
+    expect(
+      fs.readFileSync(
+        path.join(userDataDirectory, 'session', 'Local State'),
+        'utf8',
+      ),
+    ).toBe('local-state');
     expect(
       seedIsolatedDevProfile(
         appDataDirectory,
