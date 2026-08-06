@@ -87,12 +87,6 @@ export default defineConfig({
   },
   server: {
     port: 5174,
-    strictPort: true,
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 5174,
-    },
   },
   cacheDir: 'node_modules/.vite/pages',
 });

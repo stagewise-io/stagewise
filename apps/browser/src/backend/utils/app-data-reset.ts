@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { ISOLATED_DEV_SEED_MARKER } from './seed-isolated-dev-profile';
 
 const RESET_MARKER = '.reset-app-data';
 
@@ -15,6 +16,7 @@ export function applyPendingAppDataReset(userDataDirectory: string): void {
   for (const entry of fs.readdirSync(userDataDirectory)) {
     if (
       entry === RESET_MARKER ||
+      entry === ISOLATED_DEV_SEED_MARKER ||
       entry === 'stagewise' ||
       entry.startsWith('Singleton')
     )

@@ -6,6 +6,7 @@ import {
   applyPendingAppDataReset,
   requestAppDataReset,
 } from './app-data-reset';
+import { ISOLATED_DEV_SEED_MARKER } from './seed-isolated-dev-profile';
 
 let userDataDirectory: string;
 const tempDirectoryPrefix = path.join(os.tmpdir(), 'stagewise-reset-');
@@ -20,7 +21,7 @@ afterEach(() => {
 });
 
 describe('app data reset', () => {
-  it('deletes user data while preserving identity.json', () => {
+  it('deletes user data while preserving identity and seed markers', () => {
     const dataRoot = path.join(userDataDirectory, 'stagewise');
     const identityPath = path.join(dataRoot, 'identity.json');
     const identity = '{"machineId":"00000000-0000-4000-8000-000000000001"}';
@@ -30,6 +31,10 @@ describe('app data reset', () => {
     fs.writeFileSync(path.join(dataRoot, 'preferences.json'), '{}');
     fs.writeFileSync(path.join(userDataDirectory, 'session', 'Cookies'), 'x');
     fs.writeFileSync(path.join(userDataDirectory, 'SingletonLock'), 'lock');
+    fs.writeFileSync(
+      path.join(userDataDirectory, ISOLATED_DEV_SEED_MARKER),
+      '',
+    );
 
     requestAppDataReset(userDataDirectory);
 
@@ -40,6 +45,9 @@ describe('app data reset', () => {
     expect(fs.existsSync(path.join(userDataDirectory, 'SingletonLock'))).toBe(
       true,
     );
+    expect(
+      fs.existsSync(path.join(userDataDirectory, ISOLATED_DEV_SEED_MARKER)),
+    ).toBe(true);
   });
 
   it('deletes user data without an identity.json', () => {

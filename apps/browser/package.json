@@ -16,6 +16,7 @@
     "package": "pnpm bundle:eslint && cross-env NODE_OPTIONS=--max-old-space-size=8192 dotenv -e ../../.env -- electron-forge package",
     "publish": "dotenv -e ../../.env -- electron-forge publish",
     "start": "concurrently -n typecheck,app -c yellow,green \"pnpm typecheck\" \"dotenv -e ../../.env.dev -- electron-forge start\"",
+    "start:isolated": "cross-env STAGEWISE_DEV_INSTANCE=auto pnpm start",
     "start:fast": "dotenv -e ../../.env.dev -- electron-forge start",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
