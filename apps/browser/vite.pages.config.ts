@@ -19,6 +19,11 @@ const _appVersion = packageJson.version;
 // Release channel: 'dev' | 'prerelease' | 'release'
 const _releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
 
+const pagesPort = buildConstants.__APP_BASE_NAME__.startsWith('stagewise-dev-')
+  ? 30000 +
+    (Number.parseInt(buildConstants.__APP_BASE_NAME__.slice(-8), 16) % 10000)
+  : 5174;
+
 // https://vite.dev/config/
 export default defineConfig({
   root: path.resolve(__dirname, './src/pages'),
@@ -86,7 +91,13 @@ export default defineConfig({
     include: ['use-sync-external-store', 'use-sync-external-store/**/*'],
   },
   server: {
-    port: 5174,
+    port: pagesPort,
+    strictPort: true,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: pagesPort,
+    },
   },
   cacheDir: 'node_modules/.vite/pages',
 });
