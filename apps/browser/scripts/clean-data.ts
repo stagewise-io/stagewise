@@ -111,8 +111,9 @@ async function getIsolatedDirectories(basePath: string): Promise<string[]> {
           entry.isDirectory() && entry.name.startsWith('stagewise-dev-'),
       )
       .map((entry) => path.join(basePath, entry.name));
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
   }
 }
 
