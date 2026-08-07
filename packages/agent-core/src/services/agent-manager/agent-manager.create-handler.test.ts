@@ -386,6 +386,47 @@ describe('AgentManager agents.create handler', () => {
   });
 });
 
+describe('AgentManager question interruption handler', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('prioritizes the message before resolving the pending question', async () => {
+    const sendUserMessageSpy = vi
+      .spyOn(AgentManager.prototype, 'sendUserMessage')
+      .mockResolvedValue(undefined);
+    const deps = createDeps();
+    const manager = buildManager(deps);
+    const message = {
+      id: 'message-1',
+      role: 'user',
+      parts: [{ type: 'text', text: 'Use my free-form answer' }],
+    } as any;
+    const draftAnswers = { framework: 'react' };
+
+    await deps.registry.dispatch<unknown[], void>(
+      'agents.interruptQuestionWithMessage',
+      { callerId: 'test' },
+      ['agent-1', 'question-1', message, draftAnswers],
+    );
+
+    expect(sendUserMessageSpy).toHaveBeenCalledWith('agent-1', message, {
+      flushQueueOnNextStep: true,
+    });
+    expect(deps.toolbox.cancelQuestion).toHaveBeenCalledWith(
+      'agent-1',
+      'question-1',
+      'user_sent_message',
+      draftAnswers,
+    );
+    expect(sendUserMessageSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.toolbox.cancelQuestion.mock.invocationCallOrder[0]!,
+    );
+
+    await manager.teardown();
+  });
+});
+
 describe('AgentManager agents.fork handler', () => {
   afterEach(() => {
     vi.restoreAllMocks();

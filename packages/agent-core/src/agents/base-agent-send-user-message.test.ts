@@ -43,6 +43,42 @@ function createTestAgent(
   });
 }
 
+function createWorkingAgent() {
+  const stateValue = {
+    isWorking: true,
+    history: [],
+    queuedMessages: [] as AgentMessage[],
+  };
+  const enqueueUserMessage = vi.fn(
+    ({
+      message,
+      position,
+    }: {
+      message: AgentMessage & { role: 'user' };
+      position?: 'front' | 'back';
+    }) => {
+      if (position === 'front') stateValue.queuedMessages.unshift(message);
+      else stateValue.queuedMessages.push(message);
+      return {
+        queuedModelId: 'test-model',
+        queueLengthAfter: stateValue.queuedMessages.length,
+      };
+    },
+  );
+  const agent = Object.create(ChatAgent.prototype) as any;
+  agent.instanceId = 'agent-1';
+  agent.state = {
+    get: () => stateValue,
+    commands: { enqueueUserMessage },
+  };
+  agent.host = {
+    logger: { debug: vi.fn() },
+    telemetry: { capture: vi.fn() },
+  };
+
+  return { agent, enqueueUserMessage };
+}
+
 function userMessage(id: string) {
   return {
     id,
@@ -91,5 +127,58 @@ describe('BaseAgent.sendUserMessage', () => {
 
     expect(agent.state.commands.enqueueUserMessage).toHaveBeenCalledOnce();
     expect(agent.runStep).toHaveBeenCalledOnce();
+  });
+
+  it('flushes a prioritized blocked message on the next tool continuation', async () => {
+    const { agent, enqueueUserMessage } = createWorkingAgent();
+
+    await agent.sendUserMessage(
+      {
+        id: 'client-message',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Use these partial answers instead' }],
+      } as AgentMessage & { role: 'user' },
+      { flushQueueOnNextStep: true },
+    );
+
+    expect(enqueueUserMessage).toHaveBeenCalledWith({
+      message: expect.objectContaining({
+        role: 'user',
+        parts: [{ type: 'text', text: 'Use these partial answers instead' }],
+      }),
+      position: 'front',
+    });
+    expect(
+      agent.shouldRunNewStep({
+        finishReason: 'tool-calls',
+        toolCalls: [{ toolName: 'askUserQuestions' }],
+        content: [{ type: 'tool-approval-request' }],
+      }),
+    ).toEqual({ shouldRun: false, flushQueue: false });
+    expect(
+      agent.shouldRunNewStep({
+        finishReason: 'tool-calls',
+        toolCalls: [{ toolName: 'askUserQuestions' }],
+        content: [],
+      }),
+    ).toEqual({ shouldRun: true, flushQueue: true });
+  });
+
+  it('does not flush an ordinary queued message during a tool chain', async () => {
+    const { agent } = createWorkingAgent();
+
+    await agent.sendUserMessage({
+      id: 'client-message',
+      role: 'user',
+      parts: [{ type: 'text', text: 'Wait until the tool chain finishes' }],
+    } as AgentMessage & { role: 'user' });
+
+    expect(
+      agent.shouldRunNewStep({
+        finishReason: 'tool-calls',
+        toolCalls: [{ toolName: 'executeShellCommand' }],
+        content: [],
+      }),
+    ).toEqual({ shouldRun: true, flushQueue: false });
   });
 });
