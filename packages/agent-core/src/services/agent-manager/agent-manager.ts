@@ -656,9 +656,12 @@ export class AgentManager extends DisposableService {
     this.wrapAgentRpc('agents.delete', async (instanceId: string) => {
       await this.deleteAgent(instanceId);
     });
-    this.wrapAgentRpc('agents.archive', async (instanceId: string) => {
-      await this.archiveAgent(instanceId);
-    });
+    this.wrapAgentRpc('agents.archive', (instanceId: string) =>
+      this.archiveAgent(instanceId, true),
+    );
+    this.wrapAgentRpc('agents.unarchive', (instanceId: string) =>
+      this.persistenceDb.setAgentArchived(instanceId, false),
+    );
     this.wrapAgentRpc('agents.markAsRead', async (instanceId: string) => {
       await this.updateUnread(instanceId, false);
     });
@@ -733,9 +736,12 @@ export class AgentManager extends DisposableService {
     );
     this.wrapAgentRpc(
       'agents.getAgentsHistoryList',
-      async (offset: number, limit: number, searchString?: string) => {
-        return await this.getAgentsHistoryList(offset, limit, searchString);
-      },
+      (
+        offset: number,
+        limit: number,
+        searchString?: string,
+        archived?: boolean,
+      ) => this.getAgentsHistoryList(offset, limit, searchString, archived),
     );
     this.wrapAgentRpc(
       'agents.getAgentHistoryEntriesByIds',
@@ -1224,6 +1230,11 @@ export class AgentManager extends DisposableService {
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
+    if (agent.archivedAt) {
+      throw new Error(
+        `Agent with instance id ${instanceId} is archived and must be unarchived before it can be resumed`,
+      );
+    }
 
     // Right now, we don't allow resuming sub-agents (because persisted agents stop all their tools calls anyway when they arew stopped and resumed - including any child agents).
     if (agent.parentAgentInstanceId) {
@@ -1303,10 +1314,6 @@ export class AgentManager extends DisposableService {
 
     if (!agent || !agentState) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
-    }
-
-    if (agentState.history.length === 0) {
-      // We don't persist empty agents.
     }
 
     const mountedWorkspaces =
@@ -1484,7 +1491,7 @@ export class AgentManager extends DisposableService {
 
     // Permanently remove on-disk attachment blobs (archive intentionally
     // preserves them so a resumed agent can still access its attachments).
-    void this.attachments.deleteAgentBlobs(instanceId);
+    await this.attachments.deleteAgentBlobs(instanceId);
 
     this.host.telemetry?.capture('agent-deleted', {
       agent_type: agentType,
@@ -1496,12 +1503,18 @@ export class AgentManager extends DisposableService {
    * Stops an agent and deletes it's active instance while keeping the persisted state intact - must be resumed when it should be opened again.
    * @param instanceId The agent instance that should be archived (stopped and only persistence kept)
    */
-  private async archiveAgent(instanceId: string) {
+  private async archiveAgent(
+    instanceId: string,
+    persistState = false,
+    markArchived = persistState,
+  ) {
     this.logger.debug(`[AgentManager] Archiving agent. ID: ${instanceId}`);
     // Stop this agent and all child agents
     const agent = this.activeAgents.get(instanceId);
 
     if (!agent) {
+      if (markArchived)
+        await this.persistenceDb.setAgentArchived(instanceId, true);
       return;
     }
 
@@ -1526,11 +1539,13 @@ export class AgentManager extends DisposableService {
     const childAgentInstanceIds =
       this.getActiveChildAgentInstanceIds(instanceId);
     for (const childAgentInstanceId of childAgentInstanceIds) {
-      const childAgent = this.activeAgents.get(childAgentInstanceId);
-      await childAgent?.onTeardown();
-      await this.archiveAgent(childAgentInstanceId);
+      await this.archiveAgent(childAgentInstanceId, persistState, false);
     }
 
+    if (persistState) await this.persistAgentState(instanceId);
+    if (markArchived) {
+      await this.persistenceDb.setAgentArchived(instanceId, true);
+    }
     await agent.onTeardown();
 
     // Clear the active agents map.
@@ -1876,6 +1891,7 @@ export class AgentManager extends DisposableService {
     offset: number,
     limit: number,
     searchString?: string,
+    archived = false,
   ): Promise<AgentHistoryEntry[]> {
     const entries = await this.persistenceDb.getAgentHistoryEntries(
       limit,
@@ -1884,6 +1900,7 @@ export class AgentManager extends DisposableService {
       searchString && searchString.trim().length > 0
         ? `%${searchString.trim()}%`
         : undefined,
+      archived,
     );
     return this.enrichHistoryEntries
       ? await this.enrichHistoryEntries(entries)

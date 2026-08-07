@@ -13,6 +13,7 @@ import { AccountSection } from './sections/account-section';
 import { AboutSection } from './sections/about-section';
 import { HistorySection } from './sections/history-section';
 import { WorktreeSetupSection } from './sections/agent-settings.worktree-setup';
+import { ArchivedAgentsSection } from './sections/archived-agents-section';
 
 export function SettingsContent() {
   const settingsRoute = useKartonState((s) => s.appScreen.settingsRoute);
@@ -45,5 +46,7 @@ export function SettingsContent() {
       return <AboutSection />;
     case 'history':
       return <HistorySection />;
+    case 'archived-agents':
+      return <ArchivedAgentsSection />;
   }
 }

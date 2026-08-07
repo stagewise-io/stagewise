@@ -125,6 +125,7 @@ export const agentInstances = sqliteTable(
     toolApprovalMode: toolApprovalMode('tool_approval_mode')
       .notNull()
       .$defaultFn(() => DEFAULT_TOOL_APPROVAL_MODE),
+    archivedAt: integer('archived_at', { mode: 'timestamp' }),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
