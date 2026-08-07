@@ -69,10 +69,13 @@ function createWorkingAgent() {
   agent.instanceId = 'agent-1';
   agent.state = {
     get: () => stateValue,
-    commands: { enqueueUserMessage },
+    commands: {
+      enqueueUserMessage,
+      setIsWorkingFalse: vi.fn(),
+    },
   };
   agent.host = {
-    logger: { debug: vi.fn() },
+    logger: { debug: vi.fn(), info: vi.fn() },
     telemetry: { capture: vi.fn() },
   };
 
@@ -180,5 +183,24 @@ describe('BaseAgent.sendUserMessage', () => {
         content: [],
       }),
     ).toEqual({ shouldRun: true, flushQueue: false });
+  });
+
+  it('flushes a prioritized message during interrupted-run recovery', async () => {
+    const { agent } = createWorkingAgent();
+    agent.internalStop = vi.fn().mockResolvedValue(undefined);
+    agent.runStep = vi.fn();
+
+    await agent.sendUserMessage(
+      {
+        id: 'client-message',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Use these partial answers instead' }],
+      } as AgentMessage & { role: 'user' },
+      { flushQueueOnNextStep: true },
+    );
+    await agent.recoverInterruptedRun('system-resumed');
+
+    expect(agent.internalStop).toHaveBeenCalledWith('system-interrupted');
+    expect(agent.runStep).toHaveBeenCalledWith(false, true);
   });
 });

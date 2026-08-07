@@ -425,6 +425,34 @@ describe('AgentManager question interruption handler', () => {
 
     await manager.teardown();
   });
+
+  it('keeps the question pending when message staging fails', async () => {
+    vi.spyOn(AgentManager.prototype, 'sendUserMessage').mockRejectedValue(
+      new Error('staging failed'),
+    );
+    const deps = createDeps();
+    const manager = buildManager(deps);
+
+    await expect(
+      deps.registry.dispatch<unknown[], void>(
+        'agents.interruptQuestionWithMessage',
+        { callerId: 'test' },
+        [
+          'agent-1',
+          'question-1',
+          {
+            id: 'message-1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Use my free-form answer' }],
+          },
+          { framework: 'react' },
+        ],
+      ),
+    ).rejects.toThrow('staging failed');
+    expect(deps.toolbox.cancelQuestion).not.toHaveBeenCalled();
+
+    await manager.teardown();
+  });
 });
 
 describe('AgentManager agents.fork handler', () => {

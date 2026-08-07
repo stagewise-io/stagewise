@@ -1001,6 +1001,10 @@ export abstract class BaseAgent<
     reason: 'system-resumed' | 'event-loop-stalled',
   ): Promise<void> {
     const historyLengthBefore = this.state.get().history.length;
+    const prioritizedMessageId = this._queuedMessageToFlushOnNextStepId;
+    const shouldFlushPrioritizedMessage =
+      prioritizedMessageId !== null &&
+      this.state.get().queuedMessages[0]?.id === prioritizedMessageId;
 
     this.host.logger.info(
       `[BaseAgent:${this.instanceId}] Recovering interrupted run with synthetic continuation. reason=${reason}, historyLength=${historyLengthBefore}`,
@@ -1010,7 +1014,7 @@ export abstract class BaseAgent<
     this.state.commands.setIsWorkingFalse();
 
     this._pendingSyntheticContinuation = { reason };
-    void this.runStep(false, false);
+    void this.runStep(false, shouldFlushPrioritizedMessage);
   }
 
   /**
