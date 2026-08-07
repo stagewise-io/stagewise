@@ -1365,7 +1365,7 @@ export type KartonContract = {
         agentId: string,
         message: AgentMessage & { role: 'user' },
       ) => Promise<void>;
-      /** Queue a user message AND resolve a pending question in one atomic call. */
+      /** Stage a user message for the next step and resolve a question atomically. */
       interruptQuestionWithMessage: (
         agentId: string,
         questionId: string,
