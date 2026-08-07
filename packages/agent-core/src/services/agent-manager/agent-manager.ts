@@ -571,18 +571,15 @@ export class AgentManager extends DisposableService {
         // Stage the message for the immediate next model step, then resolve
         // the question. Keeping both actions in one command avoids a race
         // between separate RPCs while preserving partial form answers.
-        try {
-          await this.sendUserMessage(instanceId, message, {
-            flushQueueOnNextStep: true,
-          });
-        } finally {
-          this.managerToolbox.cancelQuestion(
-            instanceId,
-            questionId,
-            'user_sent_message',
-            draftAnswers,
-          );
-        }
+        await this.sendUserMessage(instanceId, message, {
+          flushQueueOnNextStep: true,
+        });
+        this.managerToolbox.cancelQuestion(
+          instanceId,
+          questionId,
+          'user_sent_message',
+          draftAnswers,
+        );
       },
     );
     this.wrapAgentRpc(
