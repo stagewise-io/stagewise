@@ -1351,11 +1351,13 @@ export type KartonContract = {
       discardSideChat: (agentId: string) => Promise<void>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
+      unarchive: (agentId: string) => Promise<void>;
       delete: (agentId: string) => Promise<void>;
       getAgentsHistoryList: (
         offset: number,
         limit: number,
         searchString?: string,
+        archived?: boolean,
       ) => Promise<AgentHistoryEntry[]>;
       getAgentHistoryEntriesByIds: (
         ids: string[],

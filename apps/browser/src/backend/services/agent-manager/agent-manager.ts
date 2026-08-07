@@ -36,6 +36,7 @@ const AGENT_RPC_COMMANDS = [
   'agents.promoteSideChat',
   'agents.discardSideChat',
   'agents.resume',
+  'agents.unarchive',
   'agents.sendUserMessage',
   'agents.interruptQuestionWithMessage',
   'agents.sendToolApprovalResponse',

@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { IconTrash2Outline24 } from '@stagewise/icons';
+import { ArchiveIcon } from 'lucide-react';
 import {
   IconCopyOutline18,
   IconCopyIdOutline18,
@@ -105,6 +106,8 @@ export interface SharedAgentContextMenuHostProps {
   onForkRequest: (id: string) => void;
   /** Persistently mark the selected chat unread. */
   onMarkAsUnreadRequest: (id: string) => void;
+  /** Stop the agent and move it out of the normal chat list. */
+  onArchiveRequest: (id: string) => void;
   /** User picked "Permanently delete" — caller is expected to show a confirm dialog.
    * Cursor coordinates are forwarded so the confirm popover can anchor
    * right above the click position. */
@@ -117,6 +120,7 @@ export const SharedAgentContextMenuHost = memo(
     onClose,
     onForkRequest,
     onMarkAsUnreadRequest,
+    onArchiveRequest,
     onDeleteRequest,
   }: SharedAgentContextMenuHostProps) {
     const revealWorkingDirectory = useKartonProcedure(
@@ -256,6 +260,15 @@ export const SharedAgentContextMenuHost = memo(
                   <span>{isPinned ? 'Unpin' : 'Pin globally'}</span>
                 </AgentMenuItem>
               )}
+              <AgentMenuItem
+                onClick={() => {
+                  onArchiveRequest(agentId);
+                  onClose();
+                }}
+              >
+                <ArchiveIcon className="size-3.5 shrink-0" />
+                <span>Archive</span>
+              </AgentMenuItem>
               {canDelete !== false && (
                 <AgentMenuItem
                   onClick={() => {
