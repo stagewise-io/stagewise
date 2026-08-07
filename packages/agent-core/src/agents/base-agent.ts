@@ -768,8 +768,6 @@ export abstract class BaseAgent<
    * @param message - The message to send to the agent
    * @param options.queueIfBlocked - Queue instead of interrupting unfinished tool interactions.
    *
-   * @note If the agent is waiting for one or more tool approvals or not every tool call has been finished, the message will be queued and sent once the current step is finished.
-   *
    * @note On send, the chat history is converted into model context with the following pipeline:
    *        `transformMessagesBeforeStep` -> `getSystemPrompt` -> `transformMessagesToModelMessages` -> `transformModelMessagesBeforeStep`.
    *
@@ -784,11 +782,12 @@ export abstract class BaseAgent<
 
     const msg = { ...message, id: id };
 
-    // Background messages must not interrupt pending approvals or other
-    // unfinished tool interactions. Explicit user messages keep their
-    // existing interrupt behavior unless the caller opts into queueing.
+    // Preserve queue order, and only let manual input interrupt a blocked
+    // interaction when no older message is waiting.
+    const state = this.state.get();
     if (
-      this.state.get().isWorking ||
+      state.isWorking ||
+      state.queuedMessages.length > 0 ||
       (options.queueIfBlocked && !this.canRunStep())
     ) {
       const { queuedModelId, queueLengthAfter } =
@@ -803,7 +802,9 @@ export abstract class BaseAgent<
         queue_length_after: queueLengthAfter,
       });
 
-      return message.id;
+      if (!state.isWorking && this.canRunStep()) void this.runStep();
+
+      return id;
     }
 
     this.host.logger.debug(
@@ -901,6 +902,13 @@ export abstract class BaseAgent<
     return;
   }
 
+  public async moveQueuedMessage(
+    messageId: string,
+    toIndex: number,
+  ): Promise<void> {
+    this.state.commands.moveQueuedMessage({ messageId, toIndex });
+  }
+
   /**
    * Clears/Empties the queue of the agent without sending any of the queued messages.
    */
@@ -918,18 +926,22 @@ export abstract class BaseAgent<
    *
    * @note DO NOT OVERRIDE
    */
-  public async flushQueue(): Promise<void> {
-    const flushedCount = this.state.get().queuedMessages.length;
+  public async flushQueue(messageId?: string): Promise<void> {
+    if (
+      messageId &&
+      !this.state.commands.moveQueuedMessage({ messageId, toIndex: 0 })
+    ) {
+      return;
+    }
+
+    const hasQueuedMessages = this.state.get().queuedMessages.length > 0;
 
     await this.internalStop('user-flushed-queue');
 
     // Let the runStep() at the end of this method handle popping the first queued message
 
-    if (flushedCount > 0) {
+    if (hasQueuedMessages) {
       this.scheduleMemorySnapshotWrite('queued-messages');
-    }
-
-    if (flushedCount > 0) {
       this.host.telemetry?.capture('agent-queue-flushed', {
         agent_type: this.agentType,
         agent_instance_id: this.instanceId,
@@ -938,8 +950,6 @@ export abstract class BaseAgent<
     }
 
     this.runStep();
-
-    return;
   }
 
   /**

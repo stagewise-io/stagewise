@@ -611,9 +611,12 @@ export class AgentManager extends DisposableService {
     this.wrapAgentRpc('agents.stop', async (instanceId: string) => {
       await this.stopAgent(instanceId);
     });
-    this.wrapAgentRpc('agents.flushQueue', async (instanceId: string) => {
-      await this.flushQueue(instanceId);
-    });
+    this.wrapAgentRpc(
+      'agents.flushQueue',
+      async (instanceId: string, messageId?: string) => {
+        await this.flushQueue(instanceId, messageId);
+      },
+    );
     this.wrapAgentRpc('agents.clearQueue', async (instanceId: string) => {
       await this.clearQueue(instanceId);
     });
@@ -621,6 +624,12 @@ export class AgentManager extends DisposableService {
       'agents.deleteQueuedMessage',
       async (instanceId: string, messageId: string) => {
         await this.deleteQueuedMessage(instanceId, messageId);
+      },
+    );
+    this.wrapAgentRpc(
+      'agents.moveQueuedMessage',
+      async (instanceId: string, messageId: string, toIndex: number) => {
+        await this.moveQueuedMessage(instanceId, messageId, toIndex);
       },
     );
     this.wrapAgentRpc(
@@ -1737,14 +1746,14 @@ export class AgentManager extends DisposableService {
   /**
    * Flush the queue of a specific agent
    */
-  public async flushQueue(instanceId: string) {
+  public async flushQueue(instanceId: string, messageId?: string) {
     const agent = this.activeAgents.get(instanceId);
 
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
 
-    await agent.flushQueue();
+    await agent.flushQueue(messageId);
   }
 
   /**
@@ -1771,6 +1780,20 @@ export class AgentManager extends DisposableService {
     }
 
     await agent.deleteQueuedMessage(messageId);
+  }
+
+  public async moveQueuedMessage(
+    instanceId: string,
+    messageId: string,
+    toIndex: number,
+  ) {
+    const agent = this.activeAgents.get(instanceId);
+
+    if (!agent) {
+      throw new Error(`Agent with instance id ${instanceId} not found`);
+    }
+
+    await agent.moveQueuedMessage(messageId, toIndex);
   }
 
   /**

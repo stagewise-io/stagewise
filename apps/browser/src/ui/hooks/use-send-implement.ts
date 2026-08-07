@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useKartonProcedure } from './use-karton';
+import { useKartonProcedure, useKartonState } from './use-karton';
 import { useOpenAgent } from './use-open-chat';
 import { generateId } from '@ui/utils';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
@@ -18,6 +18,16 @@ import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 export function useSendImplement(): () => void {
   const [openAgentId] = useOpenAgent();
   const sendUserMessage = useKartonProcedure((p) => p.agents.sendUserMessage);
+  const shouldDispatchOptimisticMessage = useKartonState((s) => {
+    const agentState = openAgentId
+      ? s.agents.instances[openAgentId]?.state
+      : undefined;
+    return (
+      agentState !== undefined &&
+      !agentState.isWorking &&
+      agentState.queuedMessages.length === 0
+    );
+  });
 
   return useCallback(() => {
     if (!openAgentId) return;
@@ -37,13 +47,13 @@ export function useSendImplement(): () => void {
       },
     };
 
-    // Dispatch for optimistic rendering + auto-scroll
-    window.dispatchEvent(
-      new CustomEvent('chat-message-sent', {
-        detail: { agentId: openAgentId, message },
-      }),
-    );
+    if (shouldDispatchOptimisticMessage)
+      window.dispatchEvent(
+        new CustomEvent('chat-message-sent', {
+          detail: { agentId: openAgentId, message },
+        }),
+      );
 
     void sendUserMessage(openAgentId, message);
-  }, [openAgentId, sendUserMessage]);
+  }, [openAgentId, sendUserMessage, shouldDispatchOptimisticMessage]);
 }

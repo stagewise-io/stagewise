@@ -1390,11 +1390,16 @@ export type KartonContract = {
         source?: 'panel-combobox' | 'inline-approval-button',
       ) => Promise<void>;
       stop: (agentId: string) => Promise<void>;
-      flushQueue: (agentId: string) => Promise<void>;
+      flushQueue: (agentId: string, messageId?: string) => Promise<void>;
       clearQueue: (agentId: string) => Promise<void>;
       deleteQueuedMessage: (
         agentId: string,
         messageId: string,
+      ) => Promise<void>;
+      moveQueuedMessage: (
+        agentId: string,
+        messageId: string,
+        toIndex: number,
       ) => Promise<void>;
       revertToUserMessage: (
         agentId: string,

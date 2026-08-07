@@ -2,54 +2,94 @@ import type { AgentMessage } from '@stagewise/agent-interface-internal';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatAgent } from './chat/chat';
 
-describe('BaseAgent.sendUserMessage', () => {
-  it('queues a background message while a tool approval is pending', async () => {
-    const approvalMessage = {
-      id: 'assistant-message',
-      role: 'assistant',
-      parts: [
-        {
-          type: 'tool-createShellSession',
-          state: 'approval-requested',
-        },
-      ],
-    } as unknown as AgentMessage;
-    const enqueueUserMessage = vi.fn().mockReturnValue({
-      queuedModelId: 'test-model',
-      queueLengthAfter: 1,
-    });
-    const denyAllNonTerminalToolPartsInHistory = vi.fn();
-    const appendHistoryMessage = vi.fn();
-    const runStep = vi.fn();
-    const agent = Object.create(ChatAgent.prototype) as any;
-    agent.instanceId = 'agent-1';
-    agent.runStep = runStep;
-    agent.scheduleMemorySnapshotWrite = vi.fn();
-    agent.state = {
-      get: () => ({ isWorking: false, history: [approvalMessage] }),
+const approvalMessage = {
+  id: 'assistant-message',
+  role: 'assistant',
+  parts: [
+    {
+      type: 'tool-createShellSession',
+      state: 'approval-requested',
+    },
+  ],
+} as unknown as AgentMessage;
+
+function createTestAgent(
+  queuedMessages: AgentMessage[] = [],
+  history: AgentMessage[] = [approvalMessage],
+) {
+  return Object.assign(Object.create(ChatAgent.prototype), {
+    instanceId: 'agent-1',
+    runStep: vi.fn(),
+    scheduleMemorySnapshotWrite: vi.fn(),
+    state: {
+      get: () => ({
+        isWorking: false,
+        history,
+        queuedMessages,
+      }),
       commands: {
-        enqueueUserMessage,
-        denyAllNonTerminalToolPartsInHistory,
-        appendHistoryMessage,
+        enqueueUserMessage: vi.fn().mockReturnValue({
+          queuedModelId: 'test-model',
+          queueLengthAfter: queuedMessages.length + 1,
+        }),
+        denyAllNonTerminalToolPartsInHistory: vi.fn(),
+        appendHistoryMessage: vi.fn(),
       },
-    };
-    agent.host = {
+    },
+    host: {
       logger: { debug: vi.fn() },
       telemetry: { capture: vi.fn() },
-    };
+    },
+  });
+}
 
-    await agent.sendUserMessage(
-      {
-        id: 'watcher-message',
-        role: 'user',
-        parts: [{ type: 'text', text: 'Watcher triggered' }],
-      } as AgentMessage & { role: 'user' },
-      { queueIfBlocked: true },
+function userMessage(id: string) {
+  return {
+    id,
+    role: 'user',
+    parts: [{ type: 'text', text: id }],
+  } as AgentMessage & { role: 'user' };
+}
+
+describe('BaseAgent.sendUserMessage', () => {
+  it('queues a background message while a tool approval is pending', async () => {
+    const agent = createTestAgent();
+    const commands = agent.state.commands;
+
+    await agent.sendUserMessage(userMessage('watcher-message'), {
+      queueIfBlocked: true,
+    });
+
+    expect(commands.enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(
+      commands.denyAllNonTerminalToolPartsInHistory,
+    ).not.toHaveBeenCalled();
+    expect(commands.appendHistoryMessage).not.toHaveBeenCalled();
+    expect(agent.runStep).not.toHaveBeenCalled();
+  });
+
+  it('keeps a manual message queued when another message is waiting', async () => {
+    const agent = createTestAgent([userMessage('queued-message')]);
+    const commands = agent.state.commands;
+
+    const messageId = await agent.sendUserMessage(
+      userMessage('manual-message'),
     );
 
-    expect(enqueueUserMessage).toHaveBeenCalledOnce();
-    expect(denyAllNonTerminalToolPartsInHistory).not.toHaveBeenCalled();
-    expect(appendHistoryMessage).not.toHaveBeenCalled();
-    expect(runStep).not.toHaveBeenCalled();
+    expect(commands.enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(messageId).toBe(
+      commands.enqueueUserMessage.mock.calls[0]?.[0].message.id,
+    );
+    expect(commands.appendHistoryMessage).not.toHaveBeenCalled();
+    expect(agent.runStep).not.toHaveBeenCalled();
+  });
+
+  it('resumes an idle queue when a new manual message arrives', async () => {
+    const agent = createTestAgent([userMessage('queued-message')], []);
+
+    await agent.sendUserMessage(userMessage('manual-message'));
+
+    expect(agent.state.commands.enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(agent.runStep).toHaveBeenCalledOnce();
   });
 });
