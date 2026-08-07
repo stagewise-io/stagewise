@@ -13,7 +13,10 @@ const approvalMessage = {
   ],
 } as unknown as AgentMessage;
 
-function createTestAgent(queuedMessages: AgentMessage[] = []) {
+function createTestAgent(
+  queuedMessages: AgentMessage[] = [],
+  history: AgentMessage[] = [approvalMessage],
+) {
   return Object.assign(Object.create(ChatAgent.prototype), {
     instanceId: 'agent-1',
     runStep: vi.fn(),
@@ -21,7 +24,7 @@ function createTestAgent(queuedMessages: AgentMessage[] = []) {
     state: {
       get: () => ({
         isWorking: false,
-        history: [approvalMessage],
+        history,
         queuedMessages,
       }),
       commands: {
@@ -69,9 +72,24 @@ describe('BaseAgent.sendUserMessage', () => {
     const agent = createTestAgent([userMessage('queued-message')]);
     const commands = agent.state.commands;
 
-    await agent.sendUserMessage(userMessage('manual-message'));
+    const messageId = await agent.sendUserMessage(
+      userMessage('manual-message'),
+    );
 
     expect(commands.enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(messageId).toBe(
+      commands.enqueueUserMessage.mock.calls[0]?.[0].message.id,
+    );
     expect(commands.appendHistoryMessage).not.toHaveBeenCalled();
+    expect(agent.runStep).not.toHaveBeenCalled();
+  });
+
+  it('resumes an idle queue when a new manual message arrives', async () => {
+    const agent = createTestAgent([userMessage('queued-message')], []);
+
+    await agent.sendUserMessage(userMessage('manual-message'));
+
+    expect(agent.state.commands.enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(agent.runStep).toHaveBeenCalledOnce();
   });
 });
