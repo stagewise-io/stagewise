@@ -49,6 +49,32 @@ describe('state-mutations/bind', () => {
     expect(store.get().agents.instances.a1?.state.title).toBe('renamed');
   });
 
+  it('moves a queued message to the selected index', () => {
+    const store = new AgentStore(emptySystemState());
+    upsertAgentInstance(
+      store,
+      'a1',
+      makeEnvelope({
+        ...minimalState(),
+        queuedMessages: ['first', 'second', 'third'].map(
+          (id) => ({ id }) as AgentMessage & { role: 'user' },
+        ),
+      }),
+    );
+
+    const found = bindStateMutations(store, 'a1').moveQueuedMessage({
+      messageId: 'second',
+      toIndex: 2,
+    });
+
+    expect(found).toBe(true);
+    expect(
+      store
+        .get()
+        .agents.instances.a1?.state.queuedMessages.map((message) => message.id),
+    ).toEqual(['first', 'third', 'second']);
+  });
+
   it('attachEnvState writes envState entries onto the target user message', () => {
     const store = new AgentStore(emptySystemState());
     const userMsg: AgentMessage = {
