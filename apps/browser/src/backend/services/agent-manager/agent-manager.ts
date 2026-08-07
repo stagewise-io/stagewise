@@ -44,6 +44,7 @@ const AGENT_RPC_COMMANDS = [
   'agents.flushQueue',
   'agents.clearQueue',
   'agents.deleteQueuedMessage',
+  'agents.moveQueuedMessage',
   'agents.revertToUserMessage',
   'agents.replaceUserMessage',
   'agents.delete',

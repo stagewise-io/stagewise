@@ -38,6 +38,28 @@ export function removeQueuedMessage(
   });
 }
 
+export function moveQueuedMessage(
+  store: AgentStore,
+  agentInstanceId: string,
+  args: { messageId: string; toIndex: number },
+): boolean {
+  let found = false;
+  updateAgentInstanceState(store, agentInstanceId, (state) => {
+    const index = state.queuedMessages.findIndex(
+      (message) => message.id === args.messageId,
+    );
+    if (index < 0) return;
+
+    state.queuedMessages.splice(
+      args.toIndex,
+      0,
+      ...state.queuedMessages.splice(index, 1),
+    );
+    found = true;
+  });
+  return found;
+}
+
 export function clearQueuedMessages(
   store: AgentStore,
   agentInstanceId: string,
