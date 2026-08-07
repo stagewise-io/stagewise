@@ -68,7 +68,7 @@ function SortableQueuedMessage({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'relative flex w-full items-center rounded px-1 py-0.5 text-foreground hover:bg-surface-1',
+        'group/queue-item relative flex w-full items-center rounded px-1 py-0.5 text-foreground hover:bg-surface-1',
         isDragging && 'z-10 bg-surface-1 shadow-elevation-1',
       )}
       onMouseEnter={() => onHover(queuedMsg.id)}
@@ -87,7 +87,7 @@ function SortableQueuedMessage({
           'inline-flex w-full items-center gap-0.5 overflow-x-hidden text-ellipsis whitespace-nowrap text-xs transition-[mask-image] duration-200',
           showButtons
             ? 'mask-[linear-gradient(to_left,transparent_0px,transparent_104px,black_136px)]'
-            : 'mask-[linear-gradient(to_left,transparent_0px,black_24px)]',
+            : 'mask-[linear-gradient(to_left,transparent_0px,black_24px)] group-focus-within/queue-item:mask-[linear-gradient(to_left,transparent_0px,transparent_104px,black_136px)]',
         )}
       >
         {parseMessageSegments(getMessageText(queuedMsg)).map((seg) =>
@@ -102,8 +102,10 @@ function SortableQueuedMessage({
         )}
       </span>
       <div
-        className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center"
-        hidden={!showButtons}
+        className={cn(
+          'absolute top-1/2 right-1 hidden -translate-y-1/2 items-center group-focus-within/queue-item:flex',
+          showButtons && 'flex',
+        )}
       >
         <Button
           variant="ghost"

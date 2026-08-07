@@ -802,7 +802,9 @@ export abstract class BaseAgent<
         queue_length_after: queueLengthAfter,
       });
 
-      return message.id;
+      if (!state.isWorking && this.canRunStep()) void this.runStep();
+
+      return id;
     }
 
     this.host.logger.debug(
