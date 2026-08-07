@@ -16,7 +16,7 @@ import { getBaseName } from '@shared/path-utils';
 import { FolderIcon, Loader2Icon, SearchIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-const ARCHIVED_PAGE_SIZE = 100;
+const ARCHIVED_PAGE_SIZE = 25;
 
 export function ArchivedAgentsSection() {
   const getArchivedAgents = useKartonProcedure(
@@ -42,7 +42,6 @@ export function ArchivedAgentsSection() {
 
     const loadEntries = async () => {
       setLoading(true);
-      setEntries([]);
       try {
         const nextEntries = await getArchivedAgents(
           0,
@@ -140,7 +139,7 @@ export function ArchivedAgentsSection() {
           ) : null}
 
           <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-1">
-            {loading ? (
+            {loading && entries.length === 0 ? (
               <div className="flex min-h-40 items-center justify-center gap-2 text-muted-foreground text-sm">
                 <Loader2Icon className="size-5 animate-spin" />
                 <span>Loading archived chats</span>

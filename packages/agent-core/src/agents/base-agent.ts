@@ -3603,15 +3603,19 @@ export abstract class BaseAgent<
     operation: string,
     extra?: Record<string, unknown>,
   ) {
-    this.host.telemetry?.captureException(error, {
-      service: 'base-agent',
-      operation,
-      modelId: this.state.get().activeModelId,
-      agentType: this.agentType,
-      instanceId: this.instanceId,
-      ...BaseAgent.extractApiErrorContext(error),
-      ...extra,
-    });
+    try {
+      this.host.telemetry?.captureException(error, {
+        service: 'base-agent',
+        operation,
+        modelId: this.state.get().activeModelId,
+        agentType: this.agentType,
+        instanceId: this.instanceId,
+        ...BaseAgent.extractApiErrorContext(error),
+        ...extra,
+      });
+    } catch {
+      // Reporting must not surface teardown-state or telemetry failures.
+    }
   }
 
   /**
