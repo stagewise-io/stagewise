@@ -11,6 +11,7 @@ import { up as v010Up } from './v010-add-active-provider-instance-id';
 import { up as v011Up } from './v011-add-side-chats';
 import { up as v012Up } from './v012-add-marked-unread';
 import { up as v013Up } from './v013-rename-marked-unread';
+import { up as v014Up } from './v014-add-agent-archiving';
 
 const registry: MigrationScript[] = [
   { version: 2, name: 'add-mounted-workspaces', up: v002Up },
@@ -25,7 +26,8 @@ const registry: MigrationScript[] = [
   { version: 11, name: 'add-side-chats', up: v011Up },
   { version: 12, name: 'add-marked-unread', up: v012Up },
   { version: 13, name: 'rename-marked-unread', up: v013Up },
+  { version: 14, name: 'add-agent-archiving', up: v014Up },
 ];
-const schemaVersion = 13;
+const schemaVersion = 14;
 
 export { registry, schemaVersion };

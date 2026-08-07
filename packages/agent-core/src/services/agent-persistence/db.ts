@@ -8,6 +8,7 @@ import {
   desc,
   asc,
   isNull,
+  isNotNull,
   eq,
   sql,
   gte,
@@ -173,6 +174,7 @@ export class AgentPersistenceDB {
    * @param offset The offset to fetch the agents from
    * @param excludeIds The ids of the agents to exclude from the fetch
    * @param titleLike The title to filter the agents by (optional, case-insensitive)
+   * @param archived Whether to fetch archived instead of active agents
    *
    * @note This method will not fetch any agents that have a parent agent instance.
    *
@@ -183,6 +185,7 @@ export class AgentPersistenceDB {
     offset: number,
     excludeIds: string[],
     titleLike?: string,
+    archived = false,
   ): Promise<AgentHistoryEntry[]> {
     const results = await this._db
       .select({
@@ -193,6 +196,7 @@ export class AgentPersistenceDB {
         messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
         unread: schema.agentInstances.unread,
+        archivedAt: schema.agentInstances.archivedAt,
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
@@ -207,7 +211,9 @@ export class AgentPersistenceDB {
       // making them silently missing from groups like "Yesterday" until
       // the user clicked "Show more".
       .orderBy(
-        desc(schema.agentInstances.unread),
+        archived
+          ? desc(schema.agentInstances.archivedAt)
+          : desc(schema.agentInstances.unread),
         desc(schema.agentInstances.lastMessageAt),
       )
       .limit(limit)
@@ -216,6 +222,9 @@ export class AgentPersistenceDB {
         and(
           notInArray(schema.agentInstances.id, excludeIds),
           rootChatFilter,
+          archived
+            ? isNotNull(schema.agentInstances.archivedAt)
+            : isNull(schema.agentInstances.archivedAt),
           titleLike
             ? sql`lower(${schema.agentInstances.title}) like lower(${titleLike})`
             : undefined,
@@ -257,10 +266,17 @@ export class AgentPersistenceDB {
         messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
         parentAgentInstanceId: schema.agentInstances.parentAgentInstanceId,
         unread: schema.agentInstances.unread,
+        archivedAt: schema.agentInstances.archivedAt,
         mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
       })
       .from(schema.agentInstances)
-      .where(and(inArray(schema.agentInstances.id, ids), rootChatFilter));
+      .where(
+        and(
+          inArray(schema.agentInstances.id, ids),
+          rootChatFilter,
+          isNull(schema.agentInstances.archivedAt),
+        ),
+      );
 
     this._logger.debug(
       `[AgentPersistenceDB] Fetched agent history entries by ids`,
@@ -446,6 +462,7 @@ export class AgentPersistenceDB {
       this._logger.error(
         `[AgentPersistenceDB] Failed to store agent instance: ${(error as Error).message}, ${(error as Error).stack}`,
       );
+      throw error;
     }
   }
 
@@ -594,6 +611,19 @@ export class AgentPersistenceDB {
     }
   }
 
+  public async setAgentArchived(id: string, archived: boolean): Promise<void> {
+    this._logger.debug(
+      `[AgentPersistenceDB] ${archived ? 'Archiving' : 'Unarchiving'} agent: ${id}`,
+    );
+    const result = await this._db
+      .update(schema.agentInstances)
+      .set({ archivedAt: archived ? new Date() : null })
+      .where(eq(schema.agentInstances.id, id));
+    if ((result as unknown as { rowsAffected: number }).rowsAffected === 0) {
+      throw new Error(`Agent with instance id ${id} not found`);
+    }
+  }
+
   /**
    * Updates unread state without hydrating the agent.
    */
@@ -677,24 +707,14 @@ export class AgentPersistenceDB {
       await this.deleteAgentInstance(childAgentInstanceId);
     }
 
-    // Delete associated messages first
-    await this._db
-      .delete(schema.agentMessages)
-      .where(eq(schema.agentMessages.agentInstanceId, id))
-      .catch((error) => {
-        this._logger.error(
-          `[AgentPersistenceDB] Failed to delete agent messages: ${error}`,
-        );
-      });
-
-    await this._db
-      .delete(schema.agentInstances)
-      .where(eq(schema.agentInstances.id, id))
-      .catch((error) => {
-        this._logger.error(
-          `[AgentPersistenceDB] Failed to delete agent instance: ${error}`,
-        );
-      });
+    await this._db.transaction(async (tx) => {
+      await tx
+        .delete(schema.agentMessages)
+        .where(eq(schema.agentMessages.agentInstanceId, id));
+      await tx
+        .delete(schema.agentInstances)
+        .where(eq(schema.agentInstances.id, id));
+    });
 
     // Clean up dirty-tracking state
     this._lastPersistedIds.delete(id);

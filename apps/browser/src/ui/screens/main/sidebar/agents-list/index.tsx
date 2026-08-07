@@ -689,6 +689,7 @@ export function AgentsList() {
   const createAgent = useKartonProcedure((p) => p.agents.create);
   const forkAgent = useKartonProcedure((p) => p.agents.fork);
   const resumeAgent = useKartonProcedure((p) => p.agents.resume);
+  const archiveAgent = useKartonProcedure((p) => p.agents.archive);
   const setLastOpenAgentId = useKartonProcedure(
     (p) => p.browser.setLastOpenAgentId,
   );
@@ -1212,11 +1213,10 @@ export function AgentsList() {
   // Bumped by `handleShowMore` when the visible count exceeds it.
   const fetchLimitRef = useRef(INITIAL_HISTORY_FETCH);
 
-  // Fetch history once on startup (after first agent is active).
+  // Fetch history once on startup.
   const historyFetchedRef = useRef(false);
   useEffect(() => {
     if (historyFetchedRef.current) return;
-    if (activeAgentIds.length === 0) return;
     historyFetchedRef.current = true;
     getAgentsHistoryList(0, fetchLimitRef.current)
       .then((entries) => {
@@ -1226,7 +1226,7 @@ export function AgentsList() {
         console.error('Failed to fetch agent history:', err);
         historyFetchedRef.current = false;
       });
-  }, [activeAgentIds, getAgentsHistoryList]);
+  }, [getAgentsHistoryList]);
 
   // Clean up pending removals once the backend has confirmed removal.
   const prevPendingSizeRef = useRef(0);
@@ -1282,6 +1282,10 @@ export function AgentsList() {
     string[] | null
   >(null);
   const displayedPinnedAgentIds = optimisticPinnedAgentIds ?? pinnedAgentIds;
+  const displayedPinnedAgentIdsRef = useRef(displayedPinnedAgentIds);
+  displayedPinnedAgentIdsRef.current = displayedPinnedAgentIds;
+  const openAgentRef = useRef(openAgent);
+  openAgentRef.current = openAgent;
 
   const updatePinnedAgentIds = useCallback(
     async (
@@ -1326,6 +1330,38 @@ export function AgentsList() {
     (id: string) =>
       updatePinnedAgentIds((ids) => ids.filter((value) => value !== id)),
     [updatePinnedAgentIds],
+  );
+
+  const handleArchive = useCallback(
+    async (id: string) => {
+      addPendingRemoval(id);
+
+      try {
+        await archiveAgent(id);
+        if (openAgentRef.current === id) void setLastOpenAgentId(null);
+        setPinnedHistoryList((current) =>
+          current.filter((entry) => entry.id !== id),
+        );
+        setHistoryList((current) => current.filter((entry) => entry.id !== id));
+        await updatePinnedAgentIds(
+          (ids) => ids.filter((value) => value !== id),
+          displayedPinnedAgentIdsRef.current,
+        ).catch((err) => {
+          console.error('Failed to unpin archived agent:', err);
+        });
+      } catch (err) {
+        console.error('Failed to archive agent:', err);
+      } finally {
+        removePendingRemoval(id);
+      }
+    },
+    [
+      addPendingRemoval,
+      archiveAgent,
+      removePendingRemoval,
+      setLastOpenAgentId,
+      updatePinnedAgentIds,
+    ],
   );
 
   const handleTogglePinned = useCallback(
@@ -2596,6 +2632,7 @@ export function AgentsList() {
         onClose={handleCtxMenuClose}
         onForkRequest={handleFork}
         onMarkAsUnreadRequest={handleMarkAsUnread}
+        onArchiveRequest={handleArchive}
         onDeleteRequest={handleCtxDeleteRequest}
       />
       <DeleteConfirmPopover

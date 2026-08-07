@@ -8,6 +8,7 @@ export type SettingsSection =
   | 'personalization'
   | 'browsing'
   | 'history'
+  | 'archived-agents'
   | 'website-permissions'
   | 'clear-data'
   | 'account'
@@ -27,6 +28,7 @@ export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = {
   personalization: 'Personalization',
   browsing: 'General',
   history: 'History',
+  'archived-agents': 'Archived chats',
   'website-permissions': 'Website Permissions',
   'clear-data': 'Clear data',
   account: 'Account',
