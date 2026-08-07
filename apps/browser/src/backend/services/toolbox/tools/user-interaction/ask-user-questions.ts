@@ -105,7 +105,7 @@ export function cancelQuestion(
 
   if (reason === 'user_sent_message') {
     // Return partial answers with a notice instead of marking as cancelled.
-    // The user's actual message is queued in the same step.
+    // The user's actual message is consumed by the immediate next step.
     deferred.resolve({
       completed: false,
       cancelled: false,

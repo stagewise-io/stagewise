@@ -14,12 +14,19 @@ import { updateAgentInstanceState } from './internal';
 export function enqueueUserMessage(
   store: AgentStore,
   agentInstanceId: string,
-  args: { message: AgentMessage & { role: 'user' } },
+  args: {
+    message: AgentMessage & { role: 'user' };
+    position?: 'front' | 'back';
+  },
 ): { queuedModelId: string; queueLengthAfter: number } {
   let queuedModelId = 'unknown';
   let queueLengthAfter = 0;
   updateAgentInstanceState(store, agentInstanceId, (state) => {
-    state.queuedMessages.push(args.message);
+    if (args.position === 'front') {
+      state.queuedMessages.unshift(args.message);
+    } else {
+      state.queuedMessages.push(args.message);
+    }
     queuedModelId = state.activeModelId ?? 'unknown';
     queueLengthAfter = state.queuedMessages.length;
   });

@@ -1123,8 +1123,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
 
       if (openAgent) {
         if (currentPendingQuestionId) {
-          // Atomic: queue message + resolve question in a single backend call.
-          // Include the current form draft so partial answers are preserved.
+          // Atomic: stage the message for the next model step and resolve the
+          // question. Include the current draft so partial answers survive.
           await interruptQuestionWithMessage(
             openAgent,
             currentPendingQuestionId,

@@ -3,6 +3,7 @@ import type {
   BaseAgent,
   BaseAgentDependencies,
   BaseAgentToolboxView,
+  SendUserMessageOptions,
 } from '../../agents/base-agent';
 import type { AgentTypeRegistry } from '../../agents/agents-registry';
 import { toAgentsMap, type AgentsMap } from '../../agents/agents-map';
@@ -567,10 +568,13 @@ export class AgentManager extends DisposableService {
         message: AgentMessage & { role: 'user' },
         draftAnswers: Record<string, unknown>,
       ) => {
-        // Queue the message FIRST, then resolve the question — both in
-        // one backend call so there's no race between separate RPCs.
+        // Stage the message for the immediate next model step, then resolve
+        // the question. Keeping both actions in one command avoids a race
+        // between separate RPCs while preserving partial form answers.
         try {
-          await this.sendUserMessage(instanceId, message);
+          await this.sendUserMessage(instanceId, message, {
+            flushQueueOnNextStep: true,
+          });
         } finally {
           this.managerToolbox.cancelQuestion(
             instanceId,
@@ -1558,7 +1562,7 @@ export class AgentManager extends DisposableService {
   public async sendUserMessage(
     instanceId: string,
     message: AgentMessage & { role: 'user' },
-    options: { queueIfBlocked?: boolean } = {},
+    options: SendUserMessageOptions = {},
   ) {
     const agent = this.activeAgents.get(instanceId);
 
