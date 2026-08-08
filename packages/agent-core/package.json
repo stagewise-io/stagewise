@@ -157,7 +157,7 @@
     "immer": "^10.1.1",
     "superjson": "2.2.2",
     "isbinaryfile": "^5.0.4",
-    "pdfjs-dist": "^5.5.207",
+    "pdfjs-dist": "^6.2.108",
     "sharp": "^0.34.5",
     "web-tree-sitter": "^0.26.6",
     "xml": "^1.0.1",
