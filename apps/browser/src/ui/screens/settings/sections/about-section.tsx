@@ -50,7 +50,9 @@ function AppUpdateStatus() {
   const checkForUpdates = useKartonProcedure(
     (p) => p.autoUpdate.checkForUpdates,
   );
-  const quitAndInstall = useKartonProcedure((p) => p.autoUpdate.quitAndInstall);
+  const quitAndInstall = useKartonProcedure(
+    (p) => p.autoUpdate.quitAndInstall.fire,
+  );
 
   if (autoUpdate.status === 'unsupported') {
     return null;
