@@ -28,7 +28,9 @@ export function SidebarAuthFooter() {
   const toggleClosedLidSleep = useKartonProcedure(
     (p) => p.closedLidSleep.toggle,
   );
-  const quitAndInstall = useKartonProcedure((p) => p.autoUpdate.quitAndInstall);
+  const quitAndInstall = useKartonProcedure(
+    (p) => p.autoUpdate.quitAndInstall.fire,
+  );
 
   const appScreenMode = useKartonState((s) => s.appScreen.mode);
   const userAccount = useKartonState((s) => s.userAccount);
