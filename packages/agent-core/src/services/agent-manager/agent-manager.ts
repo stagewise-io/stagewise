@@ -1501,7 +1501,14 @@ export class AgentManager extends DisposableService {
 
     // Permanently remove on-disk attachment blobs (archive intentionally
     // preserves them so a resumed agent can still access its attachments).
-    await this.attachments.deleteAgentBlobs(instanceId);
+    try {
+      await this.attachments.deleteAgentBlobs(instanceId);
+    } catch (error) {
+      this.logger.error(
+        `[AgentManager] Failed to delete attachment blobs for agent ${instanceId}`,
+        error,
+      );
+    }
 
     this.host.telemetry?.capture('agent-deleted', {
       agent_type: agentType,
