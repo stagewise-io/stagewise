@@ -18,7 +18,10 @@ import {
 } from '@stagewise/stage-ui/components/tooltip';
 import type { RefObject } from 'react';
 import { SettingsScrollTabs } from '../_components/settings-scroll-tabs';
-import { ALWAYS_ENABLED_GLOBAL_SKILL_PREFIXES } from '@shared/global-skill-prefixes';
+import {
+  ALWAYS_ENABLED_GLOBAL_SKILL_PREFIXES,
+  GLOBAL_SKILL_SOURCES,
+} from '@shared/global-skill-prefixes';
 
 // =============================================================================
 // Vertical overflow detection (like useIsTruncated but for height)
@@ -236,37 +239,6 @@ function WorkspaceDetails({ mount }: { mount: MountEntry }) {
 // Global Skills Section
 // =============================================================================
 
-/** Mount prefixes that are always enabled (not toggleable in the UI). */
-/** Display metadata for each global skill directory. */
-const GLOBAL_SKILL_DIR_META: Record<string, { label: string; dir: string }> = {
-  'globalskills-sw': { label: 'Stagewise', dir: '~/.stagewise/skills' },
-  'globalskills-agents': { label: 'Agents', dir: '~/.agents/skills' },
-  'globalskills-codex': { label: 'Codex', dir: '~/.codex/skills' },
-  'globalskills-claude': { label: 'Claude Code', dir: '~/.claude/skills' },
-};
-
-/** Stable ordering for global skill directory display. */
-const GLOBAL_SKILL_DIR_ORDER = [
-  'globalskills-sw',
-  'globalskills-agents',
-  'globalskills-codex',
-  'globalskills-claude',
-] as const;
-
-/**
- * Lookup metadata for a global skill dir prefix. Throws if the prefix
- * is not in `GLOBAL_SKILL_DIR_META` — all callers use
- * `GLOBAL_SKILL_DIR_ORDER` so the key is always valid.
- */
-function getGlobalSkillDirMeta(prefix: string): {
-  label: string;
-  dir: string;
-} {
-  const meta = GLOBAL_SKILL_DIR_META[prefix];
-  if (!meta) throw new Error(`Unknown global skill dir prefix: ${prefix}`);
-  return meta;
-}
-
 type GlobalSkillEntry = AppState['globalSkills'][number];
 
 function GlobalSkillsDetails() {
@@ -338,8 +310,8 @@ function GlobalSkillsDetails() {
 
   return (
     <div className="space-y-8">
-      {GLOBAL_SKILL_DIR_ORDER.map((prefix) => {
-        const meta = getGlobalSkillDirMeta(prefix);
+      {GLOBAL_SKILL_SOURCES.map((source, index) => {
+        const prefix = source.prefix;
         const isAlwaysEnabled =
           ALWAYS_ENABLED_GLOBAL_SKILL_PREFIXES.has(prefix);
         const dirEnabled =
@@ -348,9 +320,7 @@ function GlobalSkillsDetails() {
 
         return (
           <div key={prefix}>
-            {prefix !== GLOBAL_SKILL_DIR_ORDER[0] && (
-              <hr className="border-derived-subtle border-t" />
-            )}
+            {index > 0 && <hr className="border-derived-subtle border-t" />}
             <section className="space-y-3 pt-8 first:pt-0">
               {/* Header with inline dir toggle next to name */}
               <div
@@ -373,7 +343,7 @@ function GlobalSkillsDetails() {
               >
                 <div className="flex items-center gap-3">
                   <h3 className="font-medium text-foreground text-lg">
-                    {meta.label} skills
+                    {source.label} skills
                   </h3>
                   {!isAlwaysEnabled && (
                     <div onClick={(e) => e.stopPropagation()}>
@@ -388,7 +358,7 @@ function GlobalSkillsDetails() {
                   )}
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  {meta.dir}
+                  {source.directory}
                   {skills.length > 0 &&
                     ` · ${skills.length} skill${skills.length === 1 ? '' : 's'}`}
                 </p>
