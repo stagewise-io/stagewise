@@ -230,8 +230,8 @@ describe('onboarding funnel telemetry schemas', () => {
         'onboarding-step-viewed',
         {
           onboarding_run_id: 'run-1',
-          step: 'configure-providers',
-          previous_step: 'login',
+          step: 'configure-skills',
+          previous_step: 'configure-providers',
           visit_index: 1,
           elapsed_ms_since_start: 12.5,
         },

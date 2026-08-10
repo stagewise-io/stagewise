@@ -1046,9 +1046,6 @@ export class ToolboxService
         draft.skills = cmds.map(toSkillDefinitionUI);
       });
     }
-    // Always populate the global skills index for the Settings UI,
-    // even before any agent is created.
-    void this.rebuildGlobalSkillsIndex();
   }
 
   /**
@@ -1475,7 +1472,8 @@ export class ToolboxService
       );
     }
 
-    // Start watching global skills directories (~/.stagewise/skills, ~/.agents/skills)
+    // Populate the index before onboarding can inspect it, then keep it current.
+    await this.rebuildGlobalSkillsIndex();
     this.startGlobalSkillsWatchers();
 
     const fileDiffHandler = createFileDiffHandler({
