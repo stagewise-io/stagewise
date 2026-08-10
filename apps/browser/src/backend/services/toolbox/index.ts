@@ -1084,10 +1084,25 @@ export class ToolboxService
     const gen = ++this.globalSkillsRebuildGeneration;
     const mounts = getGlobalSkillsMounts();
     const perMount = await Promise.all(
-      mounts.map(async (m) => ({
-        mount: m,
-        skills: await discoverSkills(m.skillsPath ?? m.absolutePath),
-      })),
+      mounts.map(async (mount) => {
+        try {
+          return {
+            mount,
+            skills: await discoverSkills(
+              mount.skillsPath ?? mount.absolutePath,
+            ),
+          };
+        } catch (error) {
+          this.logger.warn(
+            `[ToolboxService] Failed to discover global skills from ${mount.prefix}`,
+            { error },
+          );
+          this.report(error as Error, 'rebuildGlobalSkillsIndex', {
+            mountPrefix: mount.prefix,
+          });
+          return { mount, skills: [] };
+        }
+      }),
     );
     if (gen !== this.globalSkillsRebuildGeneration) return;
 
