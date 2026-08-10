@@ -75,6 +75,7 @@ const fileTabMetadataSchema = z.object({
   mimeType: z.string(),
   size: z.number(),
   displayName: z.string().optional(),
+  sourceUrl: z.string().optional(),
   readOnly: z.boolean().optional(),
   showDiff: z.boolean().optional(),
   diffStaged: z.boolean().optional(),
@@ -980,7 +981,7 @@ export class WindowLayoutService extends DisposableService {
   public promoteFileTab(tabId: string): void {
     this.uiKarton.setState((draft) => {
       const tab = draft.contentTabs.tabs[tabId];
-      if (tab?.type === 'file' && tab.file) {
+      if (tab?.type === 'file' && tab.file && !tab.file.sourceUrl) {
         tab.lifecycle = { kind: 'permanent' };
       }
     });
@@ -3047,9 +3048,11 @@ export class WindowLayoutService extends DisposableService {
       const contentTabsTabs = contentTabs.tabs;
       const allIds = this.getAllOrderedTabIds(contentTabs).filter((id) => {
         const tab = contentTabsTabs[id];
-        // Never persist temporary/preview file tabs — they are ephemeral by
-        // design and should not survive a restart.
-        if (tab?.type === 'file' && tab.lifecycle?.kind !== 'permanent')
+        // Preview tabs and direct media payloads are session-only.
+        if (
+          tab?.type === 'file' &&
+          (tab.lifecycle?.kind !== 'permanent' || tab.file?.sourceUrl)
+        )
           return false;
         return true;
       });

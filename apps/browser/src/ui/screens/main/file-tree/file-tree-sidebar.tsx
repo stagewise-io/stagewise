@@ -176,10 +176,6 @@ export function FileTreeSidebar() {
       : null;
   });
 
-  const _getFileDiffContent = useKartonProcedure(
-    (p) => p.toolbox.getFileDiffContent,
-  );
-
   const handleDiffOpenFile = useCallback(
     (path: string, staged: boolean, oldPath?: string) => {
       if (!selectedWorkspaceKey) return;

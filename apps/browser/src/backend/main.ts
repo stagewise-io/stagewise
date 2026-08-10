@@ -69,6 +69,7 @@ import type { SkillDefinition, SkillDefinitionUI } from '@shared/skills';
 import { AssetCacheService } from './services/asset-cache';
 import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { registerStartupUrlHandler } from './startup-url-events';
 import { requestAppDataReset } from './utils/app-data-reset';
 import { AgentPowerSaveBlockerService } from './services/agent-power-save-blocker';
@@ -886,6 +887,39 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
         agentInstanceId,
         options,
       ),
+  );
+  uiKarton.registerServerProcedureHandler(
+    'fileTree.openImageTab',
+    async (
+      _cid,
+      title: string,
+      sourceUrl: string,
+      mimeType: string,
+      agentInstanceId?: string | null,
+    ) => {
+      const id = createHash('sha256').update(sourceUrl).digest('hex');
+      const subtype =
+        mimeType === 'image/svg+xml' ? 'svg' : mimeType.split('/')[1];
+      const extension = subtype?.match(/^[a-z0-9]+$/i) ? subtype : 'img';
+      return windowLayoutService.openFileTab(
+        {
+          workspaceKey: 'media:',
+          relativePath: `${id}.${extension}`,
+          absolutePath: '',
+          kind: 'image',
+          mimeType,
+          size: 0,
+          displayName: title.trim() || 'Image',
+          sourceUrl,
+          readOnly: true,
+        },
+        agentInstanceId,
+        {
+          preview: true,
+          temporaryGroupKey: `media-preview:${agentInstanceId ?? 'global'}`,
+        },
+      );
+    },
   );
   uiKarton.registerServerProcedureHandler(
     'fileTree.promoteFileTab',
