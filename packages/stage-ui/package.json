@@ -50,7 +50,7 @@
     "esbuild": "^0.24.2",
     "glob": "^11.0.0",
     "nodemon": "^3.1.14",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.26",
     "postcss-cli": "^11.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

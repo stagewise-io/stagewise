@@ -37,7 +37,7 @@
     "tsup": "^8.0.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.26",
     "@tailwindcss/postcss": "^4.3.0"
   }
 }
