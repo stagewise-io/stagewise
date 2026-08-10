@@ -128,6 +128,44 @@ describe('PreferencesService provider instance names', () => {
   });
 });
 
+describe('PreferencesService local agent providers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it.each([
+    ['codex', 'Codex'],
+    ['codex-stagewise', 'Codex (Stagewise Agent)'],
+    ['claude-code', 'Claude Code'],
+    ['opencode', 'OpenCode'],
+  ] as const)('rejects a second %s instance', async (typeId, displayName) => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances.push({
+      id: `${typeId}-existing`,
+      typeId,
+      name: displayName,
+      config: {},
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [],
+    });
+    const service = await createServiceWithPreferences(preferences);
+
+    await expect(
+      service.addProviderInstance({ typeId, config: {} }),
+    ).resolves.toEqual({
+      success: false,
+      error: `${displayName} is already connected.`,
+    });
+    expect(
+      service
+        .get()
+        .providerInstances.filter((instance) => instance.typeId === typeId),
+    ).toHaveLength(1);
+  });
+});
+
 describe('PreferencesService provider instance deletion', () => {
   beforeEach(() => {
     vi.clearAllMocks();

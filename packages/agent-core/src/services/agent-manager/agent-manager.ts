@@ -1127,6 +1127,56 @@ export class AgentManager extends DisposableService {
     // shapes are structurally compatible but TS treats them as
     // nominally distinct. The runtime contract is enforced by
     // `BaseAgent`'s own constructor.
+    const stateCommands = bindStateMutations(this.agentStore, agentInstanceId);
+    const stateDependencies = {
+      get: () => {
+        const instance = getAgentInstance(this.agentStore, agentInstanceId);
+        if (!instance) {
+          throw new Error(
+            `AgentManager: missing agent instance ${agentInstanceId} at BaseAgent.get`,
+          );
+        }
+        return instance.state as AgentState;
+      },
+      commands: stateCommands,
+      persist: (dirtyMessageIndices?: number[]) =>
+        this.persistAgentState(agentInstanceId, dirtyMessageIndices),
+    };
+    const externalRuntime = this.host.externalAgentRuntimeFactory?.({
+      instanceId: agentInstanceId,
+      getState: stateDependencies.get,
+      upsertAssistantMessage: (message) =>
+        stateCommands.mergeUIMessageStream({ uiMessage: message }),
+      notifyApprovalRequested: (toolCallId, toolName) => {
+        this.host.telemetry?.capture('tool-approval-requested', {
+          tool_name: toolName,
+          agent_instance_id: agentInstanceId,
+          tool_call_id: toolCallId,
+        });
+        void Promise.resolve(
+          this.onAgentEvent?.('question', agentInstanceId),
+        ).catch((error) => {
+          this.logger.debug(
+            `[AgentManager] External approval notification failed: ${String(error)}`,
+          );
+        });
+      },
+      recordUsage: (totalTokens, contextWindowSize) =>
+        stateCommands.recordUsage({ totalTokens, contextWindowSize }),
+      getMountedPaths: () =>
+        this.agentToolbox.getMountedPathsForAgent(agentInstanceId),
+      writeAttachment: (attachmentId, data) =>
+        this.attachments.write(
+          agentInstanceId,
+          attachmentId,
+          Buffer.from(data),
+        ),
+      requestUserInput: (input) =>
+        this.agentToolbox.requestUserQuestions(agentInstanceId, input),
+      cancelUserInput: () =>
+        this.agentToolbox.cancelPendingAgentDialogs(agentInstanceId),
+    });
+
     const agent = new (
       Ctor as unknown as new (
         deps: BaseAgentDependencies<any, any>,
@@ -1138,25 +1188,10 @@ export class AgentManager extends DisposableService {
       // tab mentions) and the `ToolApprovalMode` literal, while
       // core's defaults are structurally narrower. The runtime shapes
       // are compatible — cast the whole `state` envelope at the seam.
-      state: {
-        // `BaseAgent.set` / `.get` route through the canonical
-        // AgentStore; readers still observe the slice through Karton
-        // via the bridge forward-mirror.
-        get: () => {
-          const instance = getAgentInstance(this.agentStore, agentInstanceId);
-          if (!instance) {
-            throw new Error(
-              `AgentManager: missing agent instance ${agentInstanceId} at BaseAgent.get`,
-            );
-          }
-          return instance.state as AgentState;
-        },
-        // The recipe channel is retired. The runloop writes through
-        // the bound state-mutation bundle built once per agent.
-        commands: bindStateMutations(this.agentStore, agentInstanceId),
-        persist: (dirtyMessageIndices?: number[]) =>
-          this.persistAgentState(agentInstanceId, dirtyMessageIndices),
-      } as unknown as BaseAgentDependencies<any, any>['state'],
+      state: stateDependencies as unknown as BaseAgentDependencies<
+        any,
+        any
+      >['state'],
       host: this.host,
       toolbox: this.agentToolbox,
       caches: {
@@ -1195,6 +1230,7 @@ export class AgentManager extends DisposableService {
       >['initialState'],
       renderExtraMention: this.renderHostMention,
       notificationEventHandler: this.onAgentEvent,
+      externalRuntime,
     });
 
     this.activeAgents.set(agentInstanceId, agent);

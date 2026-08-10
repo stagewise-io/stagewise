@@ -43,6 +43,8 @@ export type ThinkingCapableModel = {
   providerOptions: unknown;
   officialProvider?: ModelProvider;
   thinkingEnabled?: boolean;
+  thinkingEfforts?: string[];
+  defaultThinkingEffort?: string;
 };
 
 const STAGEWISE_OPTIONS = createOptions('stagewise', [
@@ -192,6 +194,17 @@ export function getSupportedThinkingOptions(
   modelOrId: ThinkingCapableModel | string,
   route?: ThinkingRoute,
 ): ThinkingOption[] {
+  if (typeof modelOrId !== 'string' && modelOrId.thinkingEfforts?.length) {
+    return modelOrId.thinkingEfforts.map((value) => ({
+      provider: 'stagewise',
+      value,
+      label:
+        value === 'xhigh'
+          ? 'Extra high'
+          : value.charAt(0).toUpperCase() + value.slice(1),
+      enabled: value !== 'none',
+    }));
+  }
   const modelId = typeof modelOrId === 'string' ? modelOrId : modelOrId.modelId;
   const provider = getThinkingProviderForRoute({
     modelProvider:
@@ -232,9 +245,10 @@ export function getDefaultThinkingSelection(
     'stagewise',
   );
   const preferredValue =
-    provider === 'stagewise'
+    model.defaultThinkingEffort ??
+    (provider === 'stagewise'
       ? (stagewiseDefault ?? providerDefault)
-      : (providerDefault ?? stagewiseDefault);
+      : (providerDefault ?? stagewiseDefault));
 
   const option =
     findSupportedOption(options, preferredValue) ??

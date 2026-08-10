@@ -793,11 +793,13 @@ export class SessionManager {
       // Abort signal handling
       if (request.abortSignal) {
         if (request.abortSignal.aborted) {
-          this.resolveCommandWithTimeout(commandId, 'abort');
+          this.killSession(sessionId);
           return;
         }
         const onAbort = () => {
-          this.resolveCommandWithTimeout(commandId, 'abort');
+          // Aborting a tool call must also stop its process. Resolving only
+          // the promise leaves the PTY command running in the background.
+          this.killSession(sessionId);
         };
         request.abortSignal.addEventListener('abort', onAbort, { once: true });
         pending.abortHandler = () => {

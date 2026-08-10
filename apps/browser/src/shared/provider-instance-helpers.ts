@@ -17,11 +17,13 @@ import type {
   ProviderEndpointMode,
   ProviderInstance,
   ProviderInstanceTypeId,
+  ProviderTypeDisplayInfo,
   UserPreferences,
 } from './karton-contracts/ui/shared-types';
 import {
+  isExternalAgentProviderType,
+  isCodexProviderType,
   PROVIDER_TYPE_DISPLAY_INFO,
-  type CredentialType,
 } from './karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from './coding-plans';
 import { getSemanticProviderForApiSpec } from './api-spec-provider';
@@ -38,14 +40,9 @@ import type { ThinkingRoute } from './model-thinking-capabilities';
  * This is the UI-facing replacement for the removed PROVIDER_DISPLAY_INFO
  * vendor-keyed constant.
  */
-export function getVendorDisplayInfo(vendor: ModelProvider): {
-  displayName: string;
-  description: string;
-  helpText?: string;
-  getApiKeyUrl?: string;
-  defaultBaseUrl?: string;
-  credentialType: CredentialType;
-} {
+export function getVendorDisplayInfo(
+  vendor: ModelProvider,
+): ProviderTypeDisplayInfo {
   const typeId = `${vendor}-api` as ProviderInstanceTypeId;
   return PROVIDER_TYPE_DISPLAY_INFO[typeId];
 }
@@ -61,14 +58,9 @@ export function getVendorOfficialUrl(vendor: ModelProvider): string {
 /**
  * Get display info for a provider instance type by its typeId.
  */
-export function getTypeDisplayInfo(typeId: ProviderInstanceTypeId): {
-  displayName: string;
-  description: string;
-  helpText?: string;
-  getApiKeyUrl?: string;
-  defaultBaseUrl?: string;
-  credentialType: CredentialType;
-} {
+export function getTypeDisplayInfo(
+  typeId: ProviderInstanceTypeId,
+): ProviderTypeDisplayInfo {
   return PROVIDER_TYPE_DISPLAY_INFO[typeId];
 }
 
@@ -407,6 +399,9 @@ export function getInstanceThinkingDefaultOptions(
       thinkingProvider: 'openai-compatible',
     };
   }
+  if (isCodexProviderType(instance.typeId)) {
+    return { providerMode: 'official', modelProvider: 'openai' };
+  }
   if (instance.typeId === 'coding-plan' || instance.typeId.endsWith('-api')) {
     return {
       providerMode: 'official',
@@ -480,6 +475,25 @@ export function getInstanceModelThinkingOverride(
   return overrides[modelId];
 }
 
+export function resolveModelThinkingOverride(
+  preferences: UserPreferences,
+  instanceId: string | undefined,
+  modelId: string,
+): ModelThinkingOverride | undefined {
+  const key = instanceId ?? DEFAULT_INSTANCE_ID;
+  const override = getInstanceModelThinkingOverride(preferences, key, modelId);
+  if (override) return override;
+
+  const defaultEffort = preferences.providerInstances
+    .find((instance) => instance.id === key)
+    ?.discoveredModels.find(
+      (model) => model.modelId === modelId,
+    )?.defaultThinkingEffort;
+  return defaultEffort
+    ? { enabled: defaultEffort !== 'none', value: defaultEffort }
+    : undefined;
+}
+
 // ===========================================================================
 // Model Selector Aggregation
 // ===========================================================================
@@ -500,6 +514,8 @@ export interface ModelSelectorEntry {
   /** Raw context window size in tokens (for the footer token bar). */
   contextWindowRaw: number;
   thinkingEnabled: boolean;
+  thinkingEfforts?: string[];
+  defaultThinkingEffort?: string;
   pricingMultiplier?: number;
   isAlias: boolean;
   /** The catalog model, if this entry is a built-in model or alias. */
@@ -544,6 +560,9 @@ function getCatalogMatchId(
 export function getVendorForInstance(
   instance: ProviderInstance,
 ): ModelProvider | undefined {
+  if (isCodexProviderType(instance.typeId)) {
+    return 'openai';
+  }
   if (instance.typeId.endsWith('-api')) {
     return instance.typeId.slice(0, -4) as ModelProvider;
   }
@@ -632,6 +651,8 @@ function makeDiscoveredEntry(
     contextLabel: `${Math.round(contextWindow / 1000)}k context`,
     contextWindowRaw: contextWindow,
     thinkingEnabled: !!model.thinkingEnabled,
+    thinkingEfforts: model.thinkingEfforts,
+    defaultThinkingEffort: model.defaultThinkingEffort,
     isAlias: false,
     targetModelId: model.modelId,
   };
@@ -833,6 +854,15 @@ export function getSelectableModelEntries(
   }
 
   return entries;
+}
+
+/** Models backed by a complete external agent cannot run AI-SDK utilities. */
+export function getSelectableUtilityModelEntries(
+  prefs: Pick<UserPreferences, 'providerInstances' | 'customModels'>,
+): ModelSelectorEntry[] {
+  return getSelectableModelEntries(prefs).filter(
+    (entry) => !isExternalAgentProviderType(entry.typeId),
+  );
 }
 
 /**

@@ -152,71 +152,67 @@ export function cleanupQuestionsForAgent(
   cancelQuestion(questionId, 'agent_stopped', uiKarton, agentInstanceId);
 }
 
+export async function requestUserQuestions(
+  uiKarton: KartonService,
+  hostAgentStateMutations: HostAgentStateMutations,
+  agentInstanceId: string,
+  input: unknown,
+  onQuestionRequested?: (agentId: string) => void | Promise<void>,
+): Promise<AskUserQuestionsToolOutput> {
+  const params = askUserQuestionsToolInputSchemaFlat.parse(
+    input,
+  ) as unknown as AskUserQuestionsToolInput;
+  cleanupQuestionsForAgent(agentInstanceId, uiKarton);
+
+  const questionId = randomUUID();
+  if (!uiKarton.state.toolbox[agentInstanceId]) {
+    uiKarton.setState((draft) => {
+      draft.toolbox[agentInstanceId] = {
+        workspace: { mounts: [] },
+        pendingUserQuestion: null,
+      };
+    });
+  }
+
+  uiKarton.setState((draft) => {
+    const entry = draft.toolbox[agentInstanceId];
+    if (entry) {
+      entry.pendingUserQuestion = {
+        id: questionId,
+        title: params.title,
+        description: params.description,
+        steps: params.steps,
+        currentStep: 0,
+        answers: {},
+      };
+    }
+  });
+  hostAgentStateMutations.setUnread(agentInstanceId, true);
+
+  void Promise.resolve(onQuestionRequested?.(agentInstanceId)).catch(() => {});
+
+  return new Promise<AskUserQuestionsToolOutput>((resolve) => {
+    pendingQuestions.set(questionId, { resolve, agentInstanceId });
+    agentQuestionMap.set(agentInstanceId, questionId);
+  });
+}
+
 export const askUserQuestions = (
   uiKarton: KartonService,
   hostAgentStateMutations: HostAgentStateMutations,
   agentInstanceId: string,
   onQuestionRequested?: (agentId: string) => void | Promise<void>,
-) => {
-  return tool({
+) =>
+  tool({
     description: DESCRIPTION,
     inputSchema: askUserQuestionsToolInputSchemaFlat,
     strict: false,
-    execute: async (flatParams) => {
-      const params = flatParams as unknown as AskUserQuestionsToolInput;
-
-      // Cancel any existing pending question for this agent before creating
-      // a new one, so the old deferred promise doesn't leak.
-      cleanupQuestionsForAgent(agentInstanceId, uiKarton);
-
-      const questionId = randomUUID();
-
-      // Ensure toolbox entry exists
-      if (!uiKarton.state.toolbox[agentInstanceId]) {
-        uiKarton.setState((draft) => {
-          draft.toolbox[agentInstanceId] = {
-            workspace: { mounts: [] },
-            pendingUserQuestion: null,
-          };
-        });
-      }
-
-      // Set the pending question on the Karton-owned `toolbox` slice and
-      // mark the agent as unread via the store-owned `agents.instances`
-      // controller (Phase 6). Two separate writes because the two slices
-      // now have different canonical owners; the `pendingUserQuestion`
-      // slice migrates in a later phase with the tool-runtime path.
-      uiKarton.setState((draft) => {
-        const entry = draft.toolbox[agentInstanceId];
-        if (entry) {
-          entry.pendingUserQuestion = {
-            id: questionId,
-            title: params.title,
-            description: params.description,
-            steps: params.steps,
-            currentStep: 0,
-            answers: {},
-          };
-        }
-      });
-      hostAgentStateMutations.setUnread(agentInstanceId, true);
-
-      void Promise.resolve(onQuestionRequested?.(agentInstanceId)).catch(
-        () => {},
-      );
-
-      // Create deferred promise
-      const result = await new Promise<AskUserQuestionsToolOutput>(
-        (resolve) => {
-          pendingQuestions.set(questionId, {
-            resolve,
-            agentInstanceId,
-          });
-          agentQuestionMap.set(agentInstanceId, questionId);
-        },
-      );
-
-      return result;
-    },
+    execute: (flatParams) =>
+      requestUserQuestions(
+        uiKarton,
+        hostAgentStateMutations,
+        agentInstanceId,
+        flatParams,
+        onQuestionRequested,
+      ),
   });
-};

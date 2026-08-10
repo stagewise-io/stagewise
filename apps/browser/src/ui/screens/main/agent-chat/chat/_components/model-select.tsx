@@ -50,6 +50,7 @@ import {
 import { cn } from '@ui/utils';
 import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
+import { ProviderInstanceLogo } from '@ui/components/provider-instance-logo';
 import {
   getDefaultThinkingOption,
   getModelThinkingDisplayState,
@@ -116,6 +117,24 @@ const DISABLED_THINKING_VALUE = '@@thinking-off@@';
 /** A selector entry with pre-computed thinking label for rendering. */
 interface SelectableEntry extends ModelSelectorEntry {
   thinkingLabel?: string;
+}
+
+function getThinkingModel(
+  entry: ModelSelectorEntry,
+  officialProvider?: ThinkingPanelModel['officialProvider'],
+): ThinkingPanelModel | undefined {
+  const catalogModel = getAvailableModel(entry.targetModelId);
+  if (!entry.thinkingEnabled) return catalogModel;
+  return {
+    ...catalogModel,
+    modelId: entry.targetModelId,
+    modelDisplayName: entry.displayName,
+    providerOptions: catalogModel?.providerOptions ?? {},
+    officialProvider: catalogModel?.officialProvider ?? officialProvider,
+    thinkingEnabled: true,
+    thinkingEfforts: entry.thinkingEfforts,
+    defaultThinkingEffort: entry.defaultThinkingEffort,
+  };
 }
 
 interface InstanceGroup {
@@ -284,6 +303,11 @@ export const ModelSelect = memo(function ModelSelect({
       ? s.agents.instances[openAgent]?.state.activeProviderInstanceId
       : null,
   );
+  const runtimeContextWindow = useKartonState((s) =>
+    openAgent
+      ? s.agents.instances[openAgent]?.state.contextWindowSize
+      : undefined,
+  );
   const setSelectedModel = useKartonProcedure((p) => p.agents.setActiveModelId);
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
@@ -314,49 +338,52 @@ export const ModelSelect = memo(function ModelSelect({
     const entries = getSelectableModelEntries(preferences);
     return entries.map((entry) => {
       let thinkingLabel: string | undefined;
-
-      if (entry.catalogModel) {
-        const instance = instanceMap.get(entry.instanceId);
-        const defaultOptions: ModelThinkingDefaultOptions | undefined = instance
-          ? getInstanceThinkingDefaultOptions(instance)
-          : undefined;
-
+      const instance = instanceMap.get(entry.instanceId);
+      const model = getThinkingModel(
+        entry,
+        instance ? getVendorForInstance(instance) : undefined,
+      );
+      if (model) {
         const alias = entry.isAlias ? getModelAlias(entry.modelId) : undefined;
-        const override: ModelThinkingOverride | undefined = alias
+        const override = alias
           ? alias.thinkingPreset
           : modelThinkingOverrides[entry.instanceId]?.[entry.targetModelId];
-
         const display = getModelThinkingDisplayState(
-          entry.catalogModel,
+          model,
           override,
-          defaultOptions,
+          instance ? getInstanceThinkingDefaultOptions(instance) : undefined,
         );
-        thinkingLabel = display?.label;
-      } else if (entry.thinkingEnabled) {
-        const instance = instanceMap.get(entry.instanceId);
-        const vendor = instance ? getVendorForInstance(instance) : undefined;
-        const defaultOptions: ModelThinkingDefaultOptions | undefined = instance
-          ? getInstanceThinkingDefaultOptions(instance)
-          : undefined;
-        const override: ModelThinkingOverride | undefined =
-          modelThinkingOverrides[entry.instanceId]?.[entry.targetModelId];
-        const display = getModelThinkingDisplayState(
-          {
-            modelId: entry.targetModelId,
-            modelDisplayName: entry.displayName,
-            providerOptions: {},
-            officialProvider: vendor,
-            thinkingEnabled: true,
-          },
-          override,
-          defaultOptions,
-        );
-        thinkingLabel = display?.label ?? 'Thinking';
+        thinkingLabel =
+          display?.label ??
+          (!entry.catalogModel && entry.thinkingEnabled
+            ? 'Thinking'
+            : undefined);
       }
 
-      return { ...entry, thinkingLabel };
+      const usesRuntimeContext =
+        runtimeContextWindow !== undefined &&
+        entry.modelId === selectedModel &&
+        entry.instanceId ===
+          (selectedProviderInstanceId ?? DEFAULT_INSTANCE_ID);
+      return {
+        ...entry,
+        ...(usesRuntimeContext
+          ? {
+              contextWindowRaw: runtimeContextWindow,
+              contextLabel: `${Math.round(runtimeContextWindow / 1000)}k context`,
+            }
+          : {}),
+        thinkingLabel,
+      };
     });
-  }, [preferences, instanceMap, modelThinkingOverrides]);
+  }, [
+    preferences,
+    instanceMap,
+    modelThinkingOverrides,
+    runtimeContextWindow,
+    selectedModel,
+    selectedProviderInstanceId,
+  ]);
 
   // Index by composite key for fast lookups
   const entryMap = useMemo(() => {
@@ -416,7 +443,8 @@ export const ModelSelect = memo(function ModelSelect({
         modelDisplayName:
           display?.displayName ?? mainModel?.modelId ?? 'Unknown',
         modelId: mainModel?.modelId ?? '',
-        providerInstanceId: mainModel?.providerInstanceId,
+        providerInstanceId:
+          display?.instanceId ?? mainModel?.providerInstanceId,
         thinkingLabel,
       };
     });
@@ -499,9 +527,9 @@ export const ModelSelect = memo(function ModelSelect({
   const activePreset = useMemo(
     () =>
       activePresetId
-        ? modelPresets.find((p) => p.id === activePresetId)
+        ? presetEntries.find((preset) => preset.id === activePresetId)
         : undefined,
-    [activePresetId, modelPresets],
+    [activePresetId, presetEntries],
   );
 
   // Currently selected entry
@@ -513,6 +541,15 @@ export const ModelSelect = memo(function ModelSelect({
   }, [selectedModel, selectedProviderInstanceId, activePreset]);
 
   const selectedEntry = selectedKey ? entryMap.get(selectedKey) : undefined;
+
+  const selectedProviderInstance = instanceMap.get(
+    activePreset?.providerInstanceId ??
+      selectedProviderInstanceId ??
+      selectedEntry?.instanceId ??
+      DEFAULT_INSTANCE_ID,
+  );
+  const selectedProviderTypeId =
+    selectedProviderInstance?.typeId ?? selectedEntry?.typeId;
 
   const selectedDisplayName = activePreset
     ? activePreset.name
@@ -554,20 +591,10 @@ export const ModelSelect = memo(function ModelSelect({
   const hoveredThinking = useMemo(() => {
     if (!hoveredEntry) return null;
     const instance = instanceMap.get(hoveredEntry.instanceId);
-    const catalogModel = getAvailableModel(hoveredEntry.targetModelId);
-    const model: ThinkingPanelModel | undefined =
-      catalogModel ??
-      (hoveredEntry.thinkingEnabled
-        ? {
-            modelId: hoveredEntry.targetModelId,
-            modelDisplayName: hoveredEntry.displayName,
-            providerOptions: {},
-            officialProvider: instance
-              ? getVendorForInstance(instance)
-              : undefined,
-            thinkingEnabled: true,
-          }
-        : undefined);
+    const model = getThinkingModel(
+      hoveredEntry,
+      instance ? getVendorForInstance(instance) : undefined,
+    );
 
     return {
       model,
@@ -744,7 +771,9 @@ export const ModelSelect = memo(function ModelSelect({
     // edit the preset's thinking in settings instead.
     if (activePresetId) return false;
 
-    const model = getAvailableModel(selectedModel);
+    const model = selectedEntry
+      ? getThinkingModel(selectedEntry)
+      : getAvailableModel(selectedModel);
     if (!model) return false;
     const targetModelId = model.modelId;
     const instanceId = selectedProviderInstanceId ?? DEFAULT_INSTANCE_ID;
@@ -777,6 +806,7 @@ export const ModelSelect = memo(function ModelSelect({
     modelThinkingOverrides,
     preferences,
     selectedModel,
+    selectedEntry,
     selectedProviderInstanceId,
     activePresetId,
     instanceMap,
@@ -825,6 +855,13 @@ export const ModelSelect = memo(function ModelSelect({
               'h-4 w-auto',
             )}
           >
+            {selectedProviderTypeId && (
+              <ProviderInstanceLogo
+                typeId={selectedProviderTypeId}
+                instance={selectedProviderInstance}
+                className="size-3 shrink-0"
+              />
+            )}
             <span className="min-w-0 truncate">{selectedDisplayName}</span>
             {selectedThinkingLabel && (
               <span className="shrink-0 text-subtle-foreground transition-colors group-hover/trigger:text-muted-foreground group-data-[popup-open]/trigger:text-muted-foreground">

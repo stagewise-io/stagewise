@@ -2202,6 +2202,9 @@ export type KartonContract = {
           }
         | { success: false; error: string }
       >;
+      getLocalAgentAvailability: (
+        typeId: ProviderInstanceTypeId,
+      ) => Promise<{ installed: boolean; error?: string }>;
       /** Remove a provider instance by id */
       removeProviderInstance: (instanceId: string) => Promise<void>;
       /**

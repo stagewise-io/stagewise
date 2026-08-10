@@ -9,6 +9,7 @@ import {
 } from '@shared/model-thinking-capabilities';
 import type {
   ApiSpec,
+  ModelProvider,
   ModelThinkingOverride,
   ProviderEndpointMode,
 } from '@shared/karton-contracts/ui/shared-types';
@@ -19,8 +20,10 @@ export type ThinkingPanelModel = {
   modelId: string;
   modelDisplayName: string;
   providerOptions: unknown;
-  officialProvider?: import('@shared/karton-contracts/ui/shared-types').ModelProvider;
+  officialProvider?: ModelProvider;
   thinkingEnabled?: boolean;
+  thinkingEfforts?: string[];
+  defaultThinkingEffort?: string;
 };
 
 export type ModelThinkingDisplayState = {

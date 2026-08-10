@@ -10,7 +10,9 @@ export function resolveModelDisplay(
   entries: ModelSelectorEntry[],
   modelId: string,
   providerInstanceId?: string,
-): { displayName: string; instanceName: string } | undefined {
+):
+  | { displayName: string; instanceName: string; instanceId?: string }
+  | undefined {
   const entry = providerInstanceId
     ? entries.find(
         (e) => e.modelId === modelId && e.instanceId === providerInstanceId,
@@ -20,6 +22,7 @@ export function resolveModelDisplay(
     return {
       displayName: entry.displayName,
       instanceName: entry.instanceName,
+      instanceId: entry.instanceId,
     };
   }
   // Check aliases FIRST — getAvailableModel() resolves aliases to their
@@ -30,6 +33,7 @@ export function resolveModelDisplay(
     return {
       displayName: alias.modelDisplayName,
       instanceName: providerInstanceId ?? 'Unknown',
+      instanceId: providerInstanceId,
     };
   }
   // Fallback to catalog (resolves aliases to concrete targets)
@@ -38,6 +42,7 @@ export function resolveModelDisplay(
     return {
       displayName: catalogModel.modelDisplayName,
       instanceName: providerInstanceId ?? 'Unknown',
+      instanceId: providerInstanceId,
     };
   }
   return undefined;

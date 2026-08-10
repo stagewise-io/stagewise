@@ -294,6 +294,10 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
 
   const scrollChatHistoryByPage = useCallback(
     (direction: ChatHistoryScrollDirection) => {
+      if (direction === 'bottom') {
+        forceEnableAutoScroll();
+        return;
+      }
       if (!scroller) return;
 
       if (direction === 'up') disableAutoScroll();
@@ -307,7 +311,7 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
         behavior: 'smooth',
       });
     },
-    [disableAutoScroll, scroller],
+    [disableAutoScroll, forceEnableAutoScroll, scroller],
   );
 
   useEffect(() => {

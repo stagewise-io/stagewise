@@ -14,6 +14,10 @@ import type {
   UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
+  externalAgentProviderTypeIds,
+  stagewiseModelProviderTypeIds,
+} from '@shared/karton-contracts/ui/shared-types';
+import {
   DEFAULT_INSTANCE_ID,
   INSTANCE_TYPE_ID_TO_API_SPEC,
   getInstanceDisabledModelIds,
@@ -44,8 +48,7 @@ import {
   type CodingPlanId,
 } from '@shared/coding-plans';
 import { ProviderLogo } from '@ui/components/provider-logos';
-import { OllamaLogo } from '@ui/components/provider-logos/ollama';
-import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
+import { ProviderInstanceLogo } from '@ui/components/provider-instance-logo';
 import {
   groupEntriesByVendor,
   type VendorGroup,
@@ -94,8 +97,6 @@ import {
   IconPenOutline18,
   IconTrashOutline18,
   IconChevronRightOutline18,
-  IconFolderCloudOutline18,
-  IconServerOutline18,
   IconArrowUpRightOutline18,
   IconDotsOutline18,
   IconRefreshAnticlockwiseOutline18,
@@ -103,7 +104,6 @@ import {
   IconCheck2Outline18,
   IconBanOutline18,
 } from '@stagewise/icons';
-import { Logo } from '@stagewise/stage-ui/components/logo';
 import {
   Menu,
   MenuTrigger,
@@ -121,62 +121,6 @@ enablePatches();
 const EMPTY_CUSTOM_MODELS: UserPreferences['customModels'] = [];
 
 type ModelVisibility = 'all' | 'enabled';
-
-// =============================================================================
-// Provider Instance Logo
-// =============================================================================
-
-function InstanceLogo({
-  typeId,
-  instance,
-  className,
-}: {
-  typeId: ProviderInstanceTypeId;
-  instance?: ProviderInstance;
-  className?: string;
-}) {
-  // Vendor API types → brand logo
-  if (typeId.endsWith('-api')) {
-    const vendor = typeId.slice(0, -4);
-    return (
-      <ProviderLogo
-        provider={vendor as Parameters<typeof ProviderLogo>[0]['provider']}
-        className={className}
-      />
-    );
-  }
-  // Stagewise → stagewise logo
-  if (typeId === 'stagewise') {
-    return <Logo className={className} />;
-  }
-  // Coding plan → resolve the plan's provider logo
-  if (typeId === 'coding-plan') {
-    const planId = (instance?.config as { planId?: string })?.planId as
-      | CodingPlanId
-      | undefined;
-    const plan = planId ? CODING_PLANS[planId] : undefined;
-    if (plan) {
-      return <ProviderLogo provider={plan.provider} className={className} />;
-    }
-    return (
-      <IconServerOutline18 className={cn(className, 'text-muted-foreground')} />
-    );
-  }
-  // Ollama self-hosted
-  if (typeId === 'ollama') {
-    return <OllamaLogo className={className} />;
-  }
-  // OpenRouter meta-provider
-  if (typeId === 'openrouter') {
-    return <OpenRouterLogo className={className} />;
-  }
-  // Cloud/custom types → cloud icon
-  return (
-    <IconFolderCloudOutline18
-      className={cn(className, 'text-muted-foreground')}
-    />
-  );
-}
 
 // =============================================================================
 // Vendor API Key Input (inline)
@@ -395,7 +339,7 @@ function ProviderInstanceCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center">
-            <InstanceLogo
+            <ProviderInstanceLogo
               typeId={instance.typeId}
               instance={instance}
               className="size-5 text-foreground"
@@ -525,6 +469,62 @@ const ADDABLE_SELF_HOSTED_TYPES: ProviderInstanceTypeId[] = ['ollama'];
 
 /** Unified selection key — a provider typeId, coding plan, or custom flow. */
 type SelectionKey = ProviderInstanceTypeId | `plan:${string}` | 'custom';
+type LocalAgentStatus = 'checking' | 'installed' | 'missing';
+
+function ProviderTypeSection({
+  title,
+  types,
+  instanceCountByType,
+  onSelect,
+}: {
+  title: string;
+  types: readonly ProviderInstanceTypeId[];
+  instanceCountByType: Map<string, number>;
+  onSelect: (typeId: ProviderInstanceTypeId) => void;
+}) {
+  if (types.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="font-medium text-foreground text-xs">{title}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {types.map((typeId) => {
+          const info = getTypeDisplayInfo(typeId);
+          const instanceCount = instanceCountByType.get(typeId) ?? 0;
+          const isConnectedLocalAgent = !!info.localAgent && instanceCount > 0;
+          return (
+            <button
+              key={typeId}
+              type="button"
+              disabled={isConnectedLocalAgent}
+              onClick={() => onSelect(typeId)}
+              className={cn(
+                'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
+                'disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent',
+              )}
+            >
+              <ProviderInstanceLogo
+                typeId={typeId}
+                className="size-4 shrink-0 text-foreground"
+              />
+              <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                {info.displayName}
+              </span>
+              {instanceCount > 0 && (
+                <span className="shrink-0 text-2xs text-subtle-foreground">
+                  {isConnectedLocalAgent && instanceCount === 1
+                    ? 'Connected'
+                    : `${instanceCount} connected`}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function AddProviderGrid({
   onClose,
@@ -535,6 +535,9 @@ function AddProviderGrid({
 }) {
   const addProviderInstance = useKartonProcedure(
     (p) => p.preferences.addProviderInstance,
+  );
+  const getLocalAgentAvailability = useKartonProcedure(
+    (p) => p.preferences.getLocalAgentAvailability,
   );
   const setProviderInstanceSecretKey = useKartonProcedure(
     (p) => p.preferences.setProviderInstanceSecretKey,
@@ -550,6 +553,10 @@ function AddProviderGrid({
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [localAgentStatus, setLocalAgentStatus] =
+    useState<LocalAgentStatus | null>(null);
+  const [localAgentError, setLocalAgentError] = useState<string | null>(null);
+  const [availabilityCheck, setAvailabilityCheck] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus the search input when the dialog opens.
@@ -581,7 +588,11 @@ function AddProviderGrid({
 
   const handleConnect = useCallback(
     async (key: SelectionKey, value: string) => {
-      if (!value.trim()) return;
+      const typeInfo =
+        key !== 'custom' && !key.startsWith('plan:')
+          ? getTypeDisplayInfo(key as ProviderInstanceTypeId)
+          : undefined;
+      if (!value.trim() && typeInfo?.credentialType !== 'none') return;
       setIsConnecting(true);
       setError(null);
       try {
@@ -660,6 +671,42 @@ function AddProviderGrid({
   const isSelfHosted =
     selectedVendorType &&
     ADDABLE_SELF_HOSTED_TYPES.includes(selectedVendorType);
+  const isCredentialless = selectedVendorInfo?.credentialType === 'none';
+  const localAgent = selectedVendorInfo?.localAgent;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedVendorType || !localAgent) {
+      setLocalAgentStatus(null);
+      setLocalAgentError(null);
+      return;
+    }
+
+    setLocalAgentStatus('checking');
+    setLocalAgentError(null);
+    void getLocalAgentAvailability(selectedVendorType)
+      .then(({ installed, error }) => {
+        if (!cancelled) {
+          setLocalAgentStatus(installed ? 'installed' : 'missing');
+          setLocalAgentError(error ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocalAgentStatus('missing');
+          setLocalAgentError(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    availabilityCheck,
+    getLocalAgentAvailability,
+    localAgent,
+    selectedVendorType,
+  ]);
 
   const handleBack = useCallback(() => {
     setSelected(null);
@@ -667,11 +714,26 @@ function AddProviderGrid({
     setEndpoint('');
     setSearchQuery('');
     setError(null);
+    setLocalAgentStatus(null);
+    setLocalAgentError(null);
+  }, []);
+
+  const selectProviderType = useCallback((typeId: ProviderInstanceTypeId) => {
+    const typeInfo = getTypeDisplayInfo(typeId);
+    setSelected(typeId);
+    setApiKey(
+      ADDABLE_SELF_HOSTED_TYPES.includes(typeId)
+        ? (typeInfo.defaultBaseUrl ?? '')
+        : '',
+    );
+    setError(null);
+    setLocalAgentStatus(typeInfo.localAgent ? 'checking' : null);
+    setLocalAgentError(null);
   }, []);
 
   // Filter providers by search query.
   const query = searchQuery.trim().toLowerCase();
-  const filterTypes = (types: ProviderInstanceTypeId[]) =>
+  const filterTypes = (types: readonly ProviderInstanceTypeId[]) =>
     query
       ? types.filter((typeId) => {
           const info = getTypeDisplayInfo(typeId);
@@ -686,6 +748,10 @@ function AddProviderGrid({
       )
     : codingPlans;
   const filteredSelfHostedTypes = filterTypes(ADDABLE_SELF_HOSTED_TYPES);
+  const filteredExternalAgentTypes = filterTypes(externalAgentProviderTypeIds);
+  const filteredStagewiseModelTypes = filterTypes(
+    stagewiseModelProviderTypeIds,
+  );
   const customProviderMatches =
     !query ||
     'custom provider'.includes(query) ||
@@ -696,6 +762,8 @@ function AddProviderGrid({
     filteredCodingPlans.length === 0 &&
     filteredGatewayTypes.length === 0 &&
     filteredSelfHostedTypes.length === 0 &&
+    filteredExternalAgentTypes.length === 0 &&
+    filteredStagewiseModelTypes.length === 0 &&
     !customProviderMatches;
 
   const handleAddCustomProvider = useCallback(
@@ -747,7 +815,7 @@ function AddProviderGrid({
             <>
               <DialogTitle>Add Provider</DialogTitle>
               <DialogDescription>
-                Connect an API key, coding plan, or custom endpoint.
+                Connect a provider, coding plan, or custom endpoint.
               </DialogDescription>
             </>
           )}
@@ -767,7 +835,7 @@ function AddProviderGrid({
               <div className="flex items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-1">
                   {selectedVendorType ? (
-                    <InstanceLogo
+                    <ProviderInstanceLogo
                       typeId={selectedVendorType}
                       className="size-5 text-foreground"
                     />
@@ -817,57 +885,99 @@ function AddProviderGrid({
                 </div>
               )}
 
-              <Input
-                autoFocus
-                type={isSelfHosted ? 'text' : 'password'}
-                placeholder={
-                  isSelfHosted ? 'Enter base URL...' : 'Enter API key...'
-                }
-                value={apiKey}
-                onValueChange={(v) => {
-                  setApiKey(v);
-                  setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && apiKey.trim()) {
-                    void handleConnect(selected, apiKey);
+              {!isCredentialless && (
+                <Input
+                  autoFocus
+                  type={isSelfHosted ? 'text' : 'password'}
+                  placeholder={
+                    isSelfHosted ? 'Enter base URL...' : 'Enter API key...'
                   }
-                }}
-                disabled={isConnecting}
-                aria-invalid={error ? true : undefined}
-                size="sm"
-                style={{ maxWidth: 'none' }}
-                className={cn(error && 'border-error-foreground')}
-              />
+                  value={apiKey}
+                  onValueChange={(v) => {
+                    setApiKey(v);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && apiKey.trim()) {
+                      void handleConnect(selected, apiKey);
+                    }
+                  }}
+                  disabled={isConnecting}
+                  aria-invalid={error ? true : undefined}
+                  size="sm"
+                  style={{ maxWidth: 'none' }}
+                  className={cn(error && 'border-error-foreground')}
+                />
+              )}
 
               {error && <TruncatedErrorText text={error} />}
 
-              {!error && !isSelfHosted && selectedHelpText && (
-                <p className="text-subtle-foreground text-xs">
-                  <span className="inline-flex items-center gap-1">
-                    {selectedHelpText}
-                    {selectedGetApiKeyUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void openExternalUrl(selectedGetApiKeyUrl)
-                        }
-                        className={cn(
-                          buttonVariants({ variant: 'link', size: 'xs' }),
-                          'shrink-0',
-                        )}
-                      >
-                        Create key
-                      </button>
-                    )}
-                  </span>
-                  {selectedEndpointHelpText && (
-                    <span className="mt-0.5 block text-2xs text-subtle-foreground">
-                      {selectedEndpointHelpText}
-                    </span>
-                  )}
-                </p>
+              {localAgent && localAgentStatus === 'missing' && (
+                <div
+                  className="rounded-md bg-warning-background p-2 text-xs ring-1 ring-warning-solid/30"
+                  aria-live="polite"
+                >
+                  <p className="text-warning-foreground">
+                    {localAgentError ??
+                      `${selectedDisplayName} is not installed or could not be found in your shell PATH.`}
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void openExternalUrl(localAgent.installationDocsUrl)
+                      }
+                      className={buttonVariants({
+                        variant: 'link',
+                        size: 'xs',
+                      })}
+                    >
+                      Installation guide
+                      <IconArrowUpRightOutline18 className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvailabilityCheck((value) => value + 1)}
+                      className={buttonVariants({
+                        variant: 'link',
+                        size: 'xs',
+                      })}
+                    >
+                      Check again
+                    </button>
+                  </div>
+                </div>
               )}
+
+              {!error &&
+                !isSelfHosted &&
+                selectedHelpText &&
+                (!localAgent || localAgentStatus === 'installed') && (
+                  <p className="text-subtle-foreground text-xs">
+                    <span className="inline-flex items-center gap-1">
+                      {selectedHelpText}
+                      {selectedGetApiKeyUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void openExternalUrl(selectedGetApiKeyUrl)
+                          }
+                          className={cn(
+                            buttonVariants({ variant: 'link', size: 'xs' }),
+                            'shrink-0',
+                          )}
+                        >
+                          Create key
+                        </button>
+                      )}
+                    </span>
+                    {selectedEndpointHelpText && (
+                      <span className="mt-0.5 block text-2xs text-subtle-foreground">
+                        {selectedEndpointHelpText}
+                      </span>
+                    )}
+                  </p>
+                )}
 
               {!error && isSelfHosted && (
                 <p className="text-subtle-foreground text-xs">
@@ -891,17 +1001,20 @@ function AddProviderGrid({
                 variant="primary"
                 size="sm"
                 disabled={
-                  !apiKey.trim() ||
+                  (!apiKey.trim() && !isCredentialless) ||
                   isConnecting ||
+                  (!!localAgent && localAgentStatus !== 'installed') ||
                   (!!selectedPlan?.configurableEndpoint && !endpoint.trim())
                 }
                 onClick={() => void handleConnect(selected, apiKey)}
               >
                 {isConnecting
                   ? 'Connecting...'
-                  : isSelfHosted
-                    ? 'Discover'
-                    : 'Connect'}
+                  : localAgentStatus === 'checking'
+                    ? 'Checking...'
+                    : isSelfHosted
+                      ? 'Discover'
+                      : 'Connect'}
               </Button>
             </div>
           </div>
@@ -925,6 +1038,20 @@ function AddProviderGrid({
                     No providers match &quot;{query}&quot;
                   </p>
                 )}
+
+                <ProviderTypeSection
+                  title="Coding Agents"
+                  types={filteredExternalAgentTypes}
+                  instanceCountByType={instanceCountByType}
+                  onSelect={selectProviderType}
+                />
+
+                <ProviderTypeSection
+                  title="Models for Stagewise"
+                  types={filteredStagewiseModelTypes}
+                  instanceCountByType={instanceCountByType}
+                  onSelect={selectProviderType}
+                />
 
                 {/* Coding Plans */}
                 {filteredCodingPlans.length > 0 && (
@@ -971,137 +1098,26 @@ function AddProviderGrid({
                   </div>
                 )}
 
-                {/* Gateways */}
-                {filteredGatewayTypes.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-medium text-foreground text-xs">
-                      Gateways
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {filteredGatewayTypes.map((typeId) => {
-                        const info = getTypeDisplayInfo(typeId);
-                        const instanceCount =
-                          instanceCountByType.get(typeId) ?? 0;
-                        return (
-                          <button
-                            key={typeId}
-                            type="button"
-                            onClick={() => {
-                              setSelected(typeId);
-                              setApiKey('');
-                              setError(null);
-                            }}
-                            className={cn(
-                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
-                            )}
-                          >
-                            <InstanceLogo
-                              typeId={typeId}
-                              className="size-4 shrink-0 text-foreground"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
-                              {info.displayName}
-                            </span>
-                            {instanceCount > 0 && (
-                              <span className="shrink-0 text-2xs text-subtle-foreground">
-                                {instanceCount} connected
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <ProviderTypeSection
+                  title="Gateways"
+                  types={filteredGatewayTypes}
+                  instanceCountByType={instanceCountByType}
+                  onSelect={selectProviderType}
+                />
 
-                {/* Self-Hosted */}
-                {filteredSelfHostedTypes.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-medium text-foreground text-xs">
-                      Self-Hosted
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {filteredSelfHostedTypes.map((typeId) => {
-                        const info = getTypeDisplayInfo(typeId);
-                        const instanceCount =
-                          instanceCountByType.get(typeId) ?? 0;
-                        return (
-                          <button
-                            key={typeId}
-                            type="button"
-                            onClick={() => {
-                              setSelected(typeId);
-                              setApiKey(info.defaultBaseUrl ?? '');
-                              setError(null);
-                            }}
-                            className={cn(
-                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
-                            )}
-                          >
-                            <InstanceLogo
-                              typeId={typeId}
-                              className="size-4 shrink-0 text-foreground"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
-                              {info.displayName}
-                            </span>
-                            {instanceCount > 0 && (
-                              <span className="shrink-0 text-2xs text-subtle-foreground">
-                                {instanceCount} connected
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <ProviderTypeSection
+                  title="Self-Hosted"
+                  types={filteredSelfHostedTypes}
+                  instanceCountByType={instanceCountByType}
+                  onSelect={selectProviderType}
+                />
 
-                {/* Vendor API types */}
-                {filteredVendorTypes.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-medium text-foreground text-xs">
-                      Official API Keys
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {filteredVendorTypes.map((typeId) => {
-                        const info = getTypeDisplayInfo(typeId);
-                        const instanceCount =
-                          instanceCountByType.get(typeId) ?? 0;
-                        return (
-                          <button
-                            key={typeId}
-                            type="button"
-                            onClick={() => {
-                              setSelected(typeId);
-                              setApiKey('');
-                              setError(null);
-                            }}
-                            className={cn(
-                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
-                            )}
-                          >
-                            <InstanceLogo
-                              typeId={typeId}
-                              className="size-4 shrink-0 text-foreground"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
-                              {info.displayName}
-                            </span>
-                            {instanceCount > 0 && (
-                              <span className="shrink-0 text-2xs text-subtle-foreground">
-                                {instanceCount} connected
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <ProviderTypeSection
+                  title="Official API Keys"
+                  types={filteredVendorTypes}
+                  instanceCountByType={instanceCountByType}
+                  onSelect={selectProviderType}
+                />
 
                 {customProviderMatches && (
                   <div className="space-y-2">
@@ -1988,7 +2004,7 @@ function InstanceModelGroup({
         className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
-        <InstanceLogo
+        <ProviderInstanceLogo
           typeId={instance.typeId}
           instance={instance}
           className={cn(
@@ -3555,7 +3571,7 @@ export function ModelsProvidersSection() {
             {/* Provider info */}
             <div className="flex items-start gap-4">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-surface-1">
-                <InstanceLogo
+                <ProviderInstanceLogo
                   typeId={detailInstance.typeId}
                   instance={detailInstance}
                   className="size-6 text-foreground"

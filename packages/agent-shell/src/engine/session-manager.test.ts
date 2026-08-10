@@ -701,7 +701,7 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
 
   // ─── Abort ───────────────────────────────────────────────────
 
-  it('aborts via AbortSignal', async () => {
+  it('aborts the running session via AbortSignal', async () => {
     sm = createSM();
     const sid = sm.createSession('agent-test', cwd, env);
     await waitForReady(sm, sid);
@@ -717,6 +717,8 @@ describeIfShell('SessionManager (integration)', { retry: 2 }, () => {
 
     expect(r.timedOut).toBe(false);
     expect(r.resolvedBy).toBe('abort');
+    expect(r.sessionExited).toBe(true);
+    expect(sm.getSession(sid)?.deactivated).toBe(true);
   });
 
   // ─── Streaming ───────────────────────────────────────────────

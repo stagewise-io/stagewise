@@ -1,6 +1,6 @@
 export const CHAT_HISTORY_SCROLL_EVENT = 'chat-history-scroll';
 
-export type ChatHistoryScrollDirection = 'up' | 'down';
+export type ChatHistoryScrollDirection = 'up' | 'down' | 'bottom';
 
 export interface ChatHistoryScrollEventDetail {
   direction: ChatHistoryScrollDirection;
