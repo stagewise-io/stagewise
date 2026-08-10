@@ -473,20 +473,29 @@ type LocalAgentStatus = 'checking' | 'installed' | 'missing';
 
 function ProviderTypeSection({
   title,
+  description,
   types,
   instanceCountByType,
   onSelect,
+  children,
 }: {
   title: string;
+  description?: string;
   types: readonly ProviderInstanceTypeId[];
   instanceCountByType: Map<string, number>;
   onSelect: (typeId: ProviderInstanceTypeId) => void;
+  children?: React.ReactNode;
 }) {
-  if (types.length === 0) return null;
+  if (types.length === 0 && !children) return null;
 
   return (
     <div className="space-y-2">
-      <p className="font-medium text-foreground text-xs">{title}</p>
+      <div className="space-y-1">
+        <p className="font-medium text-foreground text-xs">{title}</p>
+        {description && (
+          <p className="text-muted-foreground text-xs">{description}</p>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         {types.map((typeId) => {
           const info = getTypeDisplayInfo(typeId);
@@ -521,6 +530,7 @@ function ProviderTypeSection({
             </button>
           );
         })}
+        {children}
       </div>
     </div>
   );
@@ -742,6 +752,7 @@ function AddProviderGrid({
       : types;
   const filteredVendorTypes = filterTypes(ADDABLE_VENDOR_TYPES);
   const filteredGatewayTypes = filterTypes(ADDABLE_GATEWAY_TYPES);
+  const filteredApiKeyTypes = [...filteredGatewayTypes, ...filteredVendorTypes];
   const filteredCodingPlans = query
     ? codingPlans.filter((plan) =>
         plan.displayName.toLowerCase().includes(query),
@@ -756,15 +767,16 @@ function AddProviderGrid({
     !query ||
     'custom provider'.includes(query) ||
     'custom endpoint'.includes(query);
+  const hasStagewiseResults =
+    filteredStagewiseModelTypes.length > 0 ||
+    filteredCodingPlans.length > 0 ||
+    filteredApiKeyTypes.length > 0 ||
+    filteredSelfHostedTypes.length > 0 ||
+    customProviderMatches;
   const noResults =
     query.length > 0 &&
-    filteredVendorTypes.length === 0 &&
-    filteredCodingPlans.length === 0 &&
-    filteredGatewayTypes.length === 0 &&
-    filteredSelfHostedTypes.length === 0 &&
     filteredExternalAgentTypes.length === 0 &&
-    filteredStagewiseModelTypes.length === 0 &&
-    !customProviderMatches;
+    !hasStagewiseResults;
 
   const handleAddCustomProvider = useCallback(
     async (data: EndpointSaveData) => {
@@ -808,14 +820,14 @@ function AddProviderGrid({
                 <IconChevronLeftOutline18 className="size-4" />
               </Button>
               {selected === 'custom'
-                ? 'Add Custom Provider'
+                ? 'Add Custom Endpoint'
                 : `Connect ${selectedDisplayName}`}
             </DialogTitle>
           ) : (
             <>
               <DialogTitle>Add Provider</DialogTitle>
               <DialogDescription>
-                Connect a provider, coding plan, or custom endpoint.
+                Connect a coding agent or model source.
               </DialogDescription>
             </>
           )}
@@ -1041,66 +1053,77 @@ function AddProviderGrid({
 
                 <ProviderTypeSection
                   title="Coding Agents"
+                  description="Use an external coding agent and its native harness."
                   types={filteredExternalAgentTypes}
                   instanceCountByType={instanceCountByType}
                   onSelect={selectProviderType}
                 />
 
-                <ProviderTypeSection
-                  title="Models for Stagewise"
-                  types={filteredStagewiseModelTypes}
-                  instanceCountByType={instanceCountByType}
-                  onSelect={selectProviderType}
-                />
-
-                {/* Coding Plans */}
-                {filteredCodingPlans.length > 0 && (
-                  <div className="space-y-2">
+                {hasStagewiseResults && (
+                  <div
+                    className={cn(
+                      'space-y-1',
+                      filteredExternalAgentTypes.length > 0 &&
+                        'border-derived border-t pt-4',
+                    )}
+                  >
                     <p className="font-medium text-foreground text-xs">
-                      Coding Plans
+                      Stagewise Agent
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {filteredCodingPlans.map((plan) => {
-                        const instanceCount =
-                          instanceCountByPlan.get(plan.id) ?? 0;
-                        const planKey = `plan:${plan.id}` as SelectionKey;
-                        return (
-                          <button
-                            key={plan.id}
-                            type="button"
-                            onClick={() => {
-                              setSelected(planKey);
-                              setApiKey('');
-                              setEndpoint(plan.baseUrl ?? '');
-                              setError(null);
-                            }}
-                            className={cn(
-                              'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
-                              'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
-                            )}
-                          >
-                            <ProviderLogo
-                              provider={plan.provider}
-                              className="size-4 shrink-0 text-foreground"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-foreground text-xs">
-                              {plan.displayName}
-                            </span>
-                            {instanceCount > 0 && (
-                              <span className="shrink-0 text-2xs text-subtle-foreground">
-                                {instanceCount} connected
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Choose what model powers the stagewise harness.
+                    </p>
                   </div>
                 )}
 
+                {(filteredStagewiseModelTypes.length > 0 ||
+                  filteredCodingPlans.length > 0) && (
+                  <ProviderTypeSection
+                    title="Subscriptions & Plans"
+                    types={filteredStagewiseModelTypes}
+                    instanceCountByType={instanceCountByType}
+                    onSelect={selectProviderType}
+                  >
+                    {filteredCodingPlans.map((plan) => {
+                      const instanceCount =
+                        instanceCountByPlan.get(plan.id) ?? 0;
+                      const planKey = `plan:${plan.id}` as SelectionKey;
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => {
+                            setSelected(planKey);
+                            setApiKey('');
+                            setEndpoint(plan.baseUrl ?? '');
+                            setError(null);
+                          }}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors',
+                            'border-derived hover:bg-hover-derived focus-visible:bg-hover-derived active:bg-active-derived',
+                          )}
+                        >
+                          <ProviderLogo
+                            provider={plan.provider}
+                            className="size-4 shrink-0 text-foreground"
+                          />
+                          <span className="min-w-0 flex-1 truncate text-foreground text-xs">
+                            {plan.displayName}
+                          </span>
+                          {instanceCount > 0 && (
+                            <span className="shrink-0 text-2xs text-subtle-foreground">
+                              {instanceCount} connected
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </ProviderTypeSection>
+                )}
+
                 <ProviderTypeSection
-                  title="Gateways"
-                  types={filteredGatewayTypes}
+                  title="API Keys"
+                  types={filteredApiKeyTypes}
                   instanceCountByType={instanceCountByType}
                   onSelect={selectProviderType}
                 />
@@ -1112,17 +1135,10 @@ function AddProviderGrid({
                   onSelect={selectProviderType}
                 />
 
-                <ProviderTypeSection
-                  title="Official API Keys"
-                  types={filteredVendorTypes}
-                  instanceCountByType={instanceCountByType}
-                  onSelect={selectProviderType}
-                />
-
                 {customProviderMatches && (
                   <div className="space-y-2">
                     <p className="font-medium text-foreground text-xs">
-                      Custom endpoint
+                      Custom Endpoints
                     </p>
                     <button
                       type="button"
@@ -1137,7 +1153,7 @@ function AddProviderGrid({
                     >
                       <IconPlusOutline18 className="size-4 shrink-0 text-foreground" />
                       <span className="min-w-0 flex-1 text-foreground text-xs">
-                        Add custom provider
+                        Add custom endpoint
                       </span>
                     </button>
                   </div>

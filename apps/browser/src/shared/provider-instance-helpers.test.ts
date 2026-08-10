@@ -55,7 +55,7 @@ const ollamaInstance: ProviderInstance = {
 const codexStagewiseInstance: ProviderInstance = {
   id: 'codex-stagewise-default',
   typeId: 'codex-stagewise',
-  name: 'Codex (Stagewise Agent)',
+  name: 'Codex (Stagewise)',
   config: {},
   enabledModelIds: [],
   disabledModelIds: [],
