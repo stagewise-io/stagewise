@@ -24,13 +24,19 @@ function createDeps() {
     getLastChatWorkspacePaths: vi.fn(async () => null),
     getLastChatModelSelection: vi.fn(async () => null),
     getAgentHistoryEntries: vi.fn(async () => []),
+    getChildAgentInstanceIds: vi.fn(async () => []),
+    deleteAgentInstance: vi.fn(async () => {}),
     updateAgentUnread: vi.fn(async () => {}),
     setAgentArchived: vi.fn(async () => {}),
+  };
+  const attachments = {
+    deleteAgentBlobs: vi.fn(async () => {}),
   };
   return {
     registry: new CommandRegistry(),
     toolbox,
     persistenceDb,
+    attachments,
     agentStore: {
       get: vi.fn(() => ({ agents: { instances: {} }, toolbox: {} })),
       update: vi.fn(),
@@ -50,7 +56,7 @@ function buildManager(deps: ReturnType<typeof createDeps>) {
     state: { store: deps.agentStore as any },
     storage: {
       persistenceDb: deps.persistenceDb as any,
-      attachments: {} as any,
+      attachments: deps.attachments as any,
       fileReadCache: {} as any,
     },
     tools: {
@@ -121,6 +127,24 @@ describe('AgentManager unread handlers', () => {
       'active',
       true,
     );
+  });
+});
+
+describe('AgentManager agents.delete handler', () => {
+  it('completes after attachment cleanup fails', async () => {
+    const deps = createDeps();
+    deps.attachments.deleteAgentBlobs.mockRejectedValueOnce(
+      new Error('filesystem unavailable'),
+    );
+    const manager = buildManager(deps);
+
+    await deps.registry.dispatch<unknown[], void>(
+      'agents.delete',
+      { callerId: 'test' },
+      ['agent-1'],
+    );
+    expect(deps.attachments.deleteAgentBlobs).toHaveBeenCalledWith('agent-1');
+    await manager.teardown();
   });
 });
 
