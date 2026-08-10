@@ -22,6 +22,8 @@ type UseZoomableViewportOptions = {
   onInteract?: () => void;
 };
 
+const FIT_PADDING = 24;
+
 export function useZoomableViewport({
   hotkeysEnabled = false,
   onInteract,
@@ -55,15 +57,25 @@ export function useZoomableViewport({
     const wrapper = viewport?.instance.wrapperComponent;
     const content = viewport?.instance.contentComponent;
     if (!viewport || !wrapper || !content) return;
-    if (!wrapper.clientWidth || !wrapper.clientHeight) return;
-    if (!content.offsetWidth || !content.offsetHeight) return;
+
+    const image = content.firstElementChild;
+    if (
+      image instanceof HTMLImageElement &&
+      image.naturalWidth &&
+      image.naturalHeight
+    ) {
+      image.style.width = `${image.naturalWidth}px`;
+      image.style.height = `${image.naturalHeight}px`;
+    }
+
+    const availableWidth = wrapper.clientWidth - FIT_PADDING * 2;
+    const availableHeight = wrapper.clientHeight - FIT_PADDING * 2;
+    const { offsetWidth, offsetHeight } = content;
+    if (availableWidth <= 0 || availableHeight <= 0) return;
+    if (!offsetWidth || !offsetHeight) return;
 
     const scale = Math.max(
-      Math.min(
-        wrapper.clientWidth / content.offsetWidth,
-        wrapper.clientHeight / content.offsetHeight,
-        1,
-      ),
+      Math.min(availableWidth / offsetWidth, availableHeight / offsetHeight, 1),
       viewport.instance.setup.minScale,
     );
     viewport.centerView(scale, animationTime);
@@ -77,6 +89,7 @@ export function useZoomableViewport({
   useHotKeyListener(zoomIn, HotkeyActions.ZOOM_IN, hotkeysEnabled);
   useHotKeyListener(zoomOut, HotkeyActions.ZOOM_OUT, hotkeysEnabled);
   useHotKeyListener(resetZoom, HotkeyActions.ZOOM_RESET, hotkeysEnabled);
+  useHotKeyListener(fitToView, HotkeyActions.CENTER_IMAGE, hotkeysEnabled);
 
   return {
     ref,
