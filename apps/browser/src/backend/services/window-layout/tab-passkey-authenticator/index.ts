@@ -54,6 +54,8 @@ export class TabPasskeyAuthenticator {
   private destroyed = false;
   /** In-flight install, so overlapping triggers don't add two authenticators. */
   private installing: Promise<void> | null = null;
+  /** A trigger arrived mid-install, so the one being built is already stale. */
+  private reinstallQueued = false;
 
   private readonly boundHandleDetach: () => void;
   private readonly boundHandleMessage: (
@@ -91,12 +93,22 @@ export class TabPasskeyAuthenticator {
 
   /**
    * Installs the virtual authenticator and seeds it with stored credentials.
-   * Safe to call repeatedly; a no-op while one is already installed.
+   * Safe to call repeatedly; calls made during an install are coalesced into a
+   * single follow-up run.
    */
   public async install(): Promise<void> {
-    if (this.installing) return this.installing;
+    if (this.installing) {
+      // Whatever this install ends up with was already destroyed by the event
+      // that got us here, so it has to run again rather than be waited on.
+      this.reinstallQueued = true;
+      return this.installing;
+    }
     this.installing = this.doInstall().finally(() => {
       this.installing = null;
+      if (this.reinstallQueued) {
+        this.reinstallQueued = false;
+        void this.install();
+      }
     });
     return this.installing;
   }

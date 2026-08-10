@@ -36,10 +36,12 @@ function createWebContents(url = 'https://app.example.com/login') {
   // reinstall which forgets to clean up is a test failure, not a silent one.
   let live: string | null = null;
   let nextId = 1;
+  let gate: Promise<void> | null = null;
   const dbg = Object.assign(new EventEmitter(), {
     isAttached: vi.fn(() => true),
     attach: vi.fn(),
     sendCommand: vi.fn(async (method: string, params?: unknown) => {
+      if (gate) await gate;
       if (method === 'WebAuthn.addVirtualAuthenticator') {
         if (live)
           throw new Error(
@@ -57,6 +59,17 @@ function createWebContents(url = 'https://app.example.com/login') {
       return {};
     }),
     liveAuthenticatorId: () => live,
+    /** Holds every CDP command open until the returned function is called. */
+    blockCommands: () => {
+      let release!: () => void;
+      gate = new Promise<void>((resolve) => {
+        release = () => {
+          gate = null;
+          resolve();
+        };
+      });
+      return release;
+    },
   });
   const wc = Object.assign(new EventEmitter(), {
     debugger: dbg,
@@ -254,6 +267,32 @@ describe('TabPasskeyAuthenticator', () => {
 
     // stored credentials get seeded onto the replacement too
     expect(callsFor(wc, 'WebAuthn.addCredential')).toHaveLength(2);
+
+    authenticator.destroy();
+  });
+
+  it('runs a reinstall requested while an install is still in flight', async () => {
+    const wc = createWebContents();
+    const { store } = createStore();
+
+    const authenticator = new TabPasskeyAuthenticator(
+      wc,
+      store,
+      logger as never,
+    );
+
+    const release = wc.debugger.blockCommands();
+    const inFlight = authenticator.install();
+    // The tab loses the authenticator this install is still building, so the
+    // finished one is stale the moment it lands.
+    wc.emit('did-navigate', {}, 'https://other.example.org/');
+    release();
+    await inFlight;
+
+    await vi.waitFor(() =>
+      expect(callsFor(wc, 'WebAuthn.addVirtualAuthenticator')).toHaveLength(2),
+    );
+    expect(logger.error).not.toHaveBeenCalled();
 
     authenticator.destroy();
   });
