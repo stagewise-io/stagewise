@@ -699,6 +699,8 @@ export type FileTabMetadata = {
    * file name should be shown to the user.
    */
   displayName?: string;
+  /** Direct image URL for read-only media tabs that do not have a file path. */
+  sourceUrl?: string;
   /** When true, the tab content is read-only (e.g. attachment blobs). */
   readOnly?: boolean;
   /**
@@ -2025,6 +2027,12 @@ export type KartonContract = {
         displayName?: string,
         agentInstanceId?: string | null,
         options?: OpenFileTabOptions,
+      ) => Promise<string | null>;
+      openImageTab: (
+        title: string,
+        sourceUrl: string,
+        mimeType: string,
+        agentInstanceId?: string | null,
       ) => Promise<string | null>;
       promoteFileTab: (tabId: string) => Promise<void>;
       renameEntry: (

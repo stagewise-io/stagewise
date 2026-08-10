@@ -1,17 +1,13 @@
 import { Virtuoso } from 'react-virtuoso';
 import { cn } from '@ui/utils';
 import { getBaseName } from '@shared/path-utils';
-import type { MountedWorkspaceGitDiffSummary } from '@shared/karton-contracts/ui';
+import type {
+  MountedWorkspaceGitDiffEntry,
+  MountedWorkspaceGitDiffSummary,
+} from '@shared/karton-contracts/ui';
 import { DiffLineStats } from '@ui/components/diff-line-stats';
 
-type DiffRow = {
-  path: string;
-  added: number;
-  deleted: number;
-  changeType: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
-  oldPath?: string;
-  staged: boolean;
-};
+type DiffRow = MountedWorkspaceGitDiffEntry;
 
 const CHANGE_LABELS: Record<DiffRow['changeType'], string> = {
   modified: 'M',

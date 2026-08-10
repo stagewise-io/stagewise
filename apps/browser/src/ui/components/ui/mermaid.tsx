@@ -3,6 +3,7 @@ import type { MermaidConfig } from 'mermaid';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@ui/utils';
 import { getMermaidCache } from '@ui/hooks/use-mermaid-cache';
+import { useOpenImageTab } from '@ui/hooks/use-open-image-tab';
 
 const initializeMermaid = async (customConfig?: MermaidConfig) => {
   const defaultConfig: MermaidConfig = {
@@ -29,9 +30,16 @@ type MermaidProps = {
   chart: string;
   className?: string;
   config?: MermaidConfig;
+  openInTab?: boolean;
 };
 
-export const Mermaid = ({ chart, className, config }: MermaidProps) => {
+export const Mermaid = ({
+  chart,
+  className,
+  config,
+  openInTab = false,
+}: MermaidProps) => {
+  const openImageTab = useOpenImageTab();
   const cachedEntry = mermaidCache.get(chart, config);
 
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +50,6 @@ export const Mermaid = ({ chart, className, config }: MermaidProps) => {
   const [lastValidSvg, setLastValidSvg] = useState<string>(
     cachedEntry?.svgHtml ?? '',
   );
-
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -139,6 +146,40 @@ export const Mermaid = ({ chart, className, config }: MermaidProps) => {
   }
 
   const displaySvg = svgContent || lastValidSvg;
+
+  if (openInTab) {
+    return (
+      <button
+        type="button"
+        aria-label="Open Mermaid chart in tab"
+        className={cn(
+          'my-4 flex cursor-pointer justify-center rounded-md',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid',
+          className,
+        )}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          const svg = event.currentTarget.querySelector('svg');
+          if (!svg) return;
+          const exportedSvg = svg.cloneNode(true) as SVGSVGElement;
+          const { width, height } = svg.viewBox.baseVal;
+          if (width && height) {
+            exportedSvg.setAttribute('width', String(width));
+            exportedSvg.setAttribute('height', String(height));
+          }
+          openImageTab(
+            'Mermaid chart',
+            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+              new XMLSerializer().serializeToString(exportedSvg),
+            )}`,
+            'image/svg+xml',
+          );
+        }}
+        dangerouslySetInnerHTML={{ __html: displaySvg }}
+      />
+    );
+  }
 
   return (
     <div
