@@ -514,7 +514,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     credentialType: 'none',
   },
   'codex-stagewise': {
-    displayName: 'Codex (Stagewise Agent)',
+    displayName: 'Codex (Stagewise)',
     description:
       'Codex models using your ChatGPT sign-in and the Stagewise agent',
     helpText: 'Uses the account already signed in through Codex CLI.',

@@ -136,7 +136,7 @@ describe('PreferencesService local agent providers', () => {
 
   it.each([
     ['codex', 'Codex'],
-    ['codex-stagewise', 'Codex (Stagewise Agent)'],
+    ['codex-stagewise', 'Codex (Stagewise)'],
     ['claude-code', 'Claude Code'],
     ['opencode', 'OpenCode'],
   ] as const)('rejects a second %s instance', async (typeId, displayName) => {
