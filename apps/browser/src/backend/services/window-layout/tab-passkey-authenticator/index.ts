@@ -40,8 +40,9 @@ const VIRTUAL_AUTHENTICATOR_OPTIONS = {
  * Chromium still enforces the usual origin/RP-ID binding on top of it.
  *
  * The authenticator is bound to the tab's CDP session, so it is lost on
- * debugger detach and on cross-origin navigation (both measured); it is
- * reinstalled on each, with the stored credentials seeded back in.
+ * debugger detach, on cross-origin navigation and when DevTools closes (all
+ * measured); it is reinstalled on each, with the stored credentials seeded
+ * back in.
  */
 export class TabPasskeyAuthenticator {
   private readonly webContents: WebContents;
@@ -64,6 +65,7 @@ export class TabPasskeyAuthenticator {
     event: Electron.Event,
     url: string,
   ) => void;
+  private readonly boundHandleDevToolsClosed: () => void;
 
   constructor(
     webContents: WebContents,
@@ -79,10 +81,12 @@ export class TabPasskeyAuthenticator {
     this.boundHandleMessage = (_event, method, params) =>
       this.handleCdpMessage(method, params);
     this.boundHandleDidNavigate = (_event, url) => this.handleDidNavigate(url);
+    this.boundHandleDevToolsClosed = () => this.handleDevToolsClosed();
 
     this.webContents.debugger.on('detach', this.boundHandleDetach);
     this.webContents.debugger.on('message', this.boundHandleMessage);
     this.webContents.on('did-navigate', this.boundHandleDidNavigate);
+    this.webContents.on('devtools-closed', this.boundHandleDevToolsClosed);
   }
 
   /**
@@ -172,6 +176,17 @@ export class TabPasskeyAuthenticator {
     void this.install();
   }
 
+  /**
+   * Closing DevTools disables the virtual authenticator environment for the
+   * whole session — `WebAuthn.getCredentials` then fails with "The Virtual
+   * Authenticator Environment has not been enabled for this session". The
+   * debugger stays attached and no `detach` fires, so nothing else notices.
+   */
+  private handleDevToolsClosed(): void {
+    if (this.destroyed) return;
+    void this.install();
+  }
+
   private handleDidNavigate(url: string): void {
     const origin = this.originOf(url);
     if (origin === this.currentOrigin) return;
@@ -232,5 +247,6 @@ export class TabPasskeyAuthenticator {
     this.webContents.debugger.off('detach', this.boundHandleDetach);
     this.webContents.debugger.off('message', this.boundHandleMessage);
     this.webContents.off('did-navigate', this.boundHandleDidNavigate);
+    this.webContents.off('devtools-closed', this.boundHandleDevToolsClosed);
   }
 }

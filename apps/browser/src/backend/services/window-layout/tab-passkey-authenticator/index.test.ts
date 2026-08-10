@@ -180,6 +180,28 @@ describe('TabPasskeyAuthenticator', () => {
     authenticator.destroy();
   });
 
+  it('reinstalls after DevTools closes', async () => {
+    const wc = createWebContents();
+    const { store } = createStore();
+
+    const authenticator = new TabPasskeyAuthenticator(
+      wc,
+      store,
+      logger as never,
+    );
+    await authenticator.install();
+    expect(callsFor(wc, 'WebAuthn.addVirtualAuthenticator')).toHaveLength(1);
+
+    // Closing DevTools disables the virtual authenticator environment without
+    // detaching the debugger or navigating, so nothing else triggers a rebuild.
+    wc.emit('devtools-closed');
+    await vi.waitFor(() =>
+      expect(callsFor(wc, 'WebAuthn.addVirtualAuthenticator')).toHaveLength(2),
+    );
+
+    authenticator.destroy();
+  });
+
   it('reinstalls after a cross-origin navigation but not a same-origin one', async () => {
     const wc = createWebContents('https://app.example.com/login');
     const { store } = createStore();
