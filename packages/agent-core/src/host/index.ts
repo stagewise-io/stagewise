@@ -36,3 +36,8 @@ export {
 export type { ModelCapabilities } from '../types/models';
 export type { HostPaths } from './paths';
 export type { TelemetrySink } from './telemetry';
+export type {
+  ExternalAgentRuntime,
+  ExternalAgentRuntimeContext,
+  ExternalAgentRuntimeFactory,
+} from './external-agent-runtime';

@@ -86,6 +86,13 @@ export function createUniversalToolbox(
 
     cancelPendingAgentDialogs(_agentInstanceId: string): void {},
 
+    async requestUserQuestions(
+      _agentInstanceId: string,
+      _input: unknown,
+    ): Promise<never> {
+      throw new Error('This host does not provide a user-question UI');
+    },
+
     clearAgentTracking(_agentInstanceId: string): void {},
 
     async getSkillsList(_agentInstanceId: string): Promise<SkillDefinition[]> {

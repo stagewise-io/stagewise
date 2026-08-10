@@ -22,6 +22,9 @@ function formatAnswerValue(
   value: unknown,
 ): string {
   if (value === undefined || value === null || value === '') return '(empty)';
+  if (field?.type === 'input' && field.inputType === 'password') {
+    return '••••••';
+  }
 
   // Handle "Other" radio values
   if (typeof value === 'string' && value.startsWith('__other__:')) {

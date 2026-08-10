@@ -205,6 +205,28 @@ export type CustomModel = z.infer<typeof customModelSchema>;
  * routing behavior of a provider instance. See `API_PROVIDER_SPEC.md` for
  * the full architecture.
  */
+export const externalAgentProviderTypeIds = [
+  'codex',
+  'claude-code',
+  'opencode',
+] as const;
+export type ExternalAgentProviderTypeId =
+  (typeof externalAgentProviderTypeIds)[number];
+
+export const stagewiseModelProviderTypeIds = ['codex-stagewise'] as const;
+
+export function isExternalAgentProviderType(
+  value: unknown,
+): value is ExternalAgentProviderTypeId {
+  return externalAgentProviderTypeIds.some((typeId) => typeId === value);
+}
+
+export function isCodexProviderType(
+  value: unknown,
+): value is 'codex' | 'codex-stagewise' {
+  return value === 'codex' || value === 'codex-stagewise';
+}
+
 export const providerInstanceTypeIds = [
   'stagewise',
   'anthropic-api',
@@ -228,11 +250,13 @@ export const providerInstanceTypeIds = [
   'vertex',
   'ollama',
   'openrouter',
+  ...stagewiseModelProviderTypeIds,
+  ...externalAgentProviderTypeIds,
 ] as const;
 export type ProviderInstanceTypeId = (typeof providerInstanceTypeIds)[number];
 
 /** Stagewise — no stored credentials (auth service token injected at request time) */
-const stagewiseConfigSchema = z.object({}).strict();
+const emptyProviderConfigSchema = z.object({}).strict();
 
 /** Official vendor API — encrypted key + optional base URL override */
 const officialApiConfigSchema = z.object({
@@ -312,6 +336,8 @@ export const discoveredModelSchema = z.object({
     .optional(),
   capabilities: modelCapabilitiesSchema.optional(),
   thinkingEnabled: z.boolean().optional(),
+  thinkingEfforts: z.array(z.string()).optional(),
+  defaultThinkingEffort: z.string().optional(),
   recommended: z.boolean().optional(),
 });
 export type DiscoveredModel = z.infer<typeof discoveredModelSchema>;
@@ -335,7 +361,7 @@ const providerInstanceBaseSchema = z.object({
 export const providerInstanceSchema = z.discriminatedUnion('typeId', [
   providerInstanceBaseSchema.extend({
     typeId: z.literal('stagewise'),
-    config: stagewiseConfigSchema,
+    config: emptyProviderConfigSchema,
   }),
   providerInstanceBaseSchema.extend({
     typeId: z.literal('anthropic-api'),
@@ -421,6 +447,22 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
     typeId: z.literal('openrouter'),
     config: openrouterConfigSchema,
   }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('codex-stagewise'),
+    config: emptyProviderConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('codex'),
+    config: emptyProviderConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('claude-code'),
+    config: emptyProviderConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('opencode'),
+    config: emptyProviderConfigSchema,
+  }),
 ]);
 export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
 
@@ -431,7 +473,7 @@ export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
  * instead of pattern-matching on `typeId` strings.
  */
 export type CredentialType =
-  | 'none' // No credentials needed (stagewise)
+  | 'none' // No credentials entered in Stagewise (built-in or external login)
   | 'api-key' // API key input + validation (vendor APIs, coding plans, openrouter)
   | 'base-url' // Base URL input + model discovery (ollama)
   | 'custom-endpoint'; // Full custom endpoint form (custom-*, azure, bedrock, vertex)
@@ -446,23 +488,74 @@ export type CredentialType =
  * populate their `displayName`, `description`, `getApiKeyUrl`, and
  * `defaultBaseUrl` fields, eliminating duplication.
  */
+export type ProviderTypeDisplayInfo = {
+  displayName: string;
+  description: string;
+  /** Short instruction shown next to the "Create key" link. */
+  helpText?: string;
+  getApiKeyUrl?: string;
+  defaultBaseUrl?: string;
+  localAgent?: {
+    executable: 'codex' | 'claude' | 'opencode';
+    installationDocsUrl: string;
+  };
+  /** Which credential input UI to render on the detail page. */
+  credentialType: CredentialType;
+};
+
 export const PROVIDER_TYPE_DISPLAY_INFO: Record<
   ProviderInstanceTypeId,
-  {
-    displayName: string;
-    description: string;
-    /** Short instruction shown next to the "Create key" link. */
-    helpText?: string;
-    getApiKeyUrl?: string;
-    defaultBaseUrl?: string;
-    /** Which credential input UI to render on the detail page. */
-    credentialType: CredentialType;
-  }
+  ProviderTypeDisplayInfo
 > = {
   stagewise: {
     displayName: 'Stagewise Inference',
     description: 'Managed inference through stagewise subscription',
     defaultBaseUrl: 'https://llm.stagewise.io',
+    credentialType: 'none',
+  },
+  'codex-stagewise': {
+    displayName: 'Codex (Stagewise Agent)',
+    description:
+      'Codex models using your ChatGPT sign-in and the Stagewise agent',
+    helpText: 'Uses the account already signed in through Codex CLI.',
+    localAgent: {
+      executable: 'codex',
+      installationDocsUrl: 'https://learn.chatgpt.com/docs/codex/cli',
+    },
+    credentialType: 'none',
+  },
+  codex: {
+    displayName: 'Codex',
+    description:
+      'Codex agent harness using your existing ChatGPT Codex sign-in',
+    helpText: 'Uses the account already signed in through Codex CLI.',
+    localAgent: {
+      executable: 'codex',
+      installationDocsUrl: 'https://learn.chatgpt.com/docs/codex/cli',
+    },
+    credentialType: 'none',
+  },
+  'claude-code': {
+    displayName: 'Claude Code',
+    description:
+      'Claude Code agent harness using your existing Claude subscription',
+    helpText: 'Uses the account already signed in through Claude Code.',
+    localAgent: {
+      executable: 'claude',
+      installationDocsUrl: 'https://code.claude.com/docs/en/installation',
+    },
+    credentialType: 'none',
+  },
+  opencode: {
+    displayName: 'OpenCode',
+    description:
+      'OpenCode agent harness using your existing Go, Zen, or provider sign-in',
+    helpText:
+      'Install OpenCode, then connect Go, Zen, or another provider in its TUI.',
+    localAgent: {
+      executable: 'opencode',
+      installationDocsUrl: 'https://opencode.ai/docs',
+    },
     credentialType: 'none',
   },
   'anthropic-api': {

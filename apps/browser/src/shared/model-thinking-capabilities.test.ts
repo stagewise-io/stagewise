@@ -295,4 +295,19 @@ describe('model thinking capabilities', () => {
       ).toEqual(['none', 'low', 'medium', 'high', 'xhigh']);
     }
   });
+
+  it('uses reasoning efforts reported by a discovered runtime', () => {
+    const model: ThinkingCapableModel = {
+      modelId: 'gpt-5.6-sol',
+      providerOptions: {},
+      thinkingEnabled: true,
+      thinkingEfforts: ['low', 'medium', 'high', 'max', 'ultra'],
+      defaultThinkingEffort: 'high',
+    };
+
+    expect(
+      getSupportedThinkingOptions(model).map((option) => option.value),
+    ).toEqual(['low', 'medium', 'high', 'max', 'ultra']);
+    expect(getEffectiveThinkingSelection(model)?.value).toBe('high');
+  });
 });

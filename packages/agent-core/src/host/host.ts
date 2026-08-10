@@ -6,6 +6,7 @@ import type { Logger } from './logger';
 import type { HostModels } from './models';
 import type { HostPaths } from './paths';
 import type { TelemetrySink } from './telemetry';
+import type { ExternalAgentRuntimeFactory } from './external-agent-runtime';
 
 /**
  * OS shell integration for paths on the host machine (e.g. reveal in file
@@ -166,6 +167,7 @@ export interface AgentHostConfig {
    * early bring-up) can omit it; providers null-check before use.
    */
   environmentSources?: HostEnvironmentSources;
+  externalAgentRuntimeFactory?: ExternalAgentRuntimeFactory;
 }
 
 /**
@@ -200,6 +202,7 @@ export class AgentHost {
    * Readers must null-check.
    */
   environmentSources: HostEnvironmentSources | undefined;
+  externalAgentRuntimeFactory: ExternalAgentRuntimeFactory | undefined;
   private readonly fileReadTransformers: Record<string, FileTransformer> = {};
   private readonly toolPartSerializers: Record<string, ToolPartSerializer> = {};
   private readonly profiles = new Map<AgentTypes, AgentProfile>();
@@ -211,6 +214,7 @@ export class AgentHost {
     this.telemetry = cfg.telemetry;
     this.desktop = cfg.desktop;
     this.environmentSources = cfg.environmentSources;
+    this.externalAgentRuntimeFactory = cfg.externalAgentRuntimeFactory;
   }
 
   /**

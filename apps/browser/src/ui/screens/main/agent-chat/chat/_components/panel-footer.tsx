@@ -65,6 +65,7 @@ import { normalizePath } from '@shared/path-utils';
 import { selectedElementToSwDomElement } from '@shared/selected-elements/swdomelement';
 import type { AgentMessage } from '@shared/karton-contracts/ui/agent';
 import { EMPTY_MOUNTS, type MountEntry } from '@shared/karton-contracts/ui';
+import { isExternalAgentProviderType } from '@shared/karton-contracts/ui/shared-types';
 import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { useNextAgentRequiringAttention } from '@ui/hooks/use-next-agent-requiring-attention';
 import { useCmdEnterTarget } from '@ui/hooks/use-cmd-enter-target';
@@ -1203,6 +1204,11 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
       : 0;
     return Math.round(raw / 1000) * 1000;
   });
+  const runtimeContextWindow = useKartonState((s) =>
+    openAgent
+      ? s.agents.instances[openAgent]?.state.contextWindowSize
+      : undefined,
+  );
   const activeModelId = useKartonState((s) =>
     openAgent ? s.agents.instances[openAgent]?.state.activeModelId : null,
   );
@@ -1217,7 +1223,17 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
       customModels: s.preferences.customModels,
     })),
   );
+  const isExternalAgentRuntime = preferences.providerInstances.some(
+    (instance) =>
+      instance.id === activeProviderInstanceId &&
+      isExternalAgentProviderType(instance.typeId),
+  );
+  const displayedUsedTokens =
+    isExternalAgentRuntime && runtimeContextWindow === undefined
+      ? 0
+      : usedTokens;
   const maxTokens = useMemo(() => {
+    if (runtimeContextWindow !== undefined) return runtimeContextWindow;
     if (!activeModelId) return 200000;
     // Use the instance-aware selector entry to resolve context window.
     const instanceId = activeProviderInstanceId ?? DEFAULT_INSTANCE_ID;
@@ -1237,13 +1253,17 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     const builtIn = getAvailableModel(activeModelId);
     if (builtIn) return builtIn.modelContextRaw;
     return 200000;
-  }, [activeModelId, activeProviderInstanceId, preferences]);
+  }, [
+    activeModelId,
+    activeProviderInstanceId,
+    preferences,
+    runtimeContextWindow,
+  ]);
 
-  const contextUsed = useMemo(() => {
-    const used = usedTokens ?? 0;
-    const max = maxTokens ?? 1;
-    return Math.min(100, Math.round((used / max) * 100));
-  }, [usedTokens, maxTokens]);
+  const contextUsed = Math.min(
+    100,
+    Math.round((displayedUsedTokens / maxTokens) * 100),
+  );
 
   const handlePromptHistoryNavigationRequest = useCallback(
     (direction: PromptHistoryDirection) => {
@@ -1947,10 +1967,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
             onModelChange={handleModelChange}
             onStop={canStopAgent ? stableAbortAgent : undefined}
             showContextUsageRing={
-              !!usedTokens && (isVerboseMode || contextUsed > 80)
+              !!displayedUsedTokens && (isVerboseMode || contextUsed > 80)
             }
             contextUsedPercentage={contextUsed}
-            contextUsedKb={usedTokens ? usedTokens / 1000 : 0}
+            contextUsedKb={displayedUsedTokens ? displayedUsedTokens / 1000 : 0}
             contextMaxKb={maxTokens ? maxTokens / 1000 : 0}
             hasQueuedMessages={hasQueuedMessages}
             onFlushQueue={handleFlushQueue}

@@ -6,7 +6,10 @@ import {
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   type UtilityModelEntry as CoreUtilityModelEntry,
 } from '@stagewise/agent-core/host';
-import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
+import {
+  isExternalAgentProviderType,
+  type UserPreferences,
+} from '@shared/karton-contracts/ui/shared-types';
 
 /**
  * Thin `HostModels` adapter over the browser's `ModelProviderService`.
@@ -37,10 +40,23 @@ import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
  * Includes `activePresetId` and `modelPresets` so per-preset utility
  * model overrides and the active preset's main model can be resolved.
  */
-export type UtilityModelsGetter = () => Pick<
+type UtilityModelsSnapshot = Pick<
   UserPreferences['agent'],
   'utilityModels' | 'activePresetId' | 'modelPresets'
->;
+> &
+  Pick<UserPreferences, 'providerInstances'>;
+
+export type UtilityModelsGetter = () => UtilityModelsSnapshot;
+
+function supportsUtilityCalls(
+  entry: { providerInstanceId?: string },
+  prefs: UtilityModelsSnapshot,
+): boolean {
+  const instance = prefs.providerInstances.find(
+    (candidate) => candidate.id === entry.providerInstanceId,
+  );
+  return !instance || !isExternalAgentProviderType(instance.typeId);
+}
 
 /**
  * Resolves the ordered utility model entries for a given task,
@@ -51,10 +67,7 @@ export type UtilityModelsGetter = () => Pick<
  */
 function resolveUtilityEntries(
   task: 'title-generation' | 'context-compression',
-  prefs: Pick<
-    UserPreferences['agent'],
-    'utilityModels' | 'activePresetId' | 'modelPresets'
-  >,
+  prefs: UtilityModelsSnapshot,
 ): CoreUtilityModelEntry[] | undefined {
   const { utilityModels, activePresetId, modelPresets } = prefs;
   // If an active preset exists, its utility model lists take
@@ -70,7 +83,9 @@ function resolveUtilityEntries(
           ? preset.titleGeneration
           : preset.contextCompression;
       if (presetList && presetList.length > 0) {
-        return presetList.map(toCoreEntry);
+        return presetList
+          .filter((entry) => supportsUtilityCalls(entry, prefs))
+          .map(toCoreEntry);
       }
       return [];
     }
@@ -82,7 +97,9 @@ function resolveUtilityEntries(
     task === 'title-generation'
       ? utilityModels.titleGeneration
       : utilityModels.contextCompression;
-  return globalList?.map(toCoreEntry);
+  return globalList
+    ?.filter((entry) => supportsUtilityCalls(entry, prefs))
+    .map(toCoreEntry);
 }
 
 /**
@@ -103,7 +120,7 @@ function resolveActivePresetId(
  * `thinkingOverride` so the agent can cycle through them on failure.
  */
 function resolveActivePresetModels(
-  prefs: Pick<UserPreferences['agent'], 'activePresetId' | 'modelPresets'>,
+  prefs: UtilityModelsSnapshot,
 ): CoreUtilityModelEntry[] | undefined {
   const { activePresetId, modelPresets } = prefs;
   if (!activePresetId) return undefined;

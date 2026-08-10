@@ -49,6 +49,13 @@ export function setActiveModel(
   },
 ): void {
   updateAgentInstanceState(store, agentInstanceId, (state) => {
+    if (
+      state.activeModelId !== args.modelId ||
+      state.activeProviderInstanceId !== args.providerInstanceId
+    ) {
+      state.usedTokens = 0;
+      state.contextWindowSize = undefined;
+    }
     state.activeModelId = args.modelId;
     state.activeProviderInstanceId = args.providerInstanceId;
   });
@@ -90,9 +97,12 @@ export function setUsageWarning(
 export function recordUsage(
   store: AgentStore,
   agentInstanceId: string,
-  args: { totalTokens: number },
+  args: { totalTokens: number; contextWindowSize?: number },
 ): void {
   updateAgentInstanceState(store, agentInstanceId, (state) => {
     state.usedTokens = args.totalTokens;
+    if (args.contextWindowSize !== undefined) {
+      state.contextWindowSize = args.contextWindowSize;
+    }
   });
 }

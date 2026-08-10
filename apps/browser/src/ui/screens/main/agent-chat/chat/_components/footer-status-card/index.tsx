@@ -27,6 +27,7 @@ import {
 import { getPlanUIPhases, type LivePlanData } from '@shared/plan-lifecycle';
 import { useSendImplement } from '@ui/hooks/use-send-implement';
 import { useContentCollapsed } from '@ui/screens/main/_components/content-collapsed-context';
+import { dispatchChatHistoryScroll } from '../../_lib/chat-history-scroll-event';
 
 // Stable empty arrays/sets to avoid infinite loop with useSyncExternalStore
 const EMPTY_HISTORY: AgentMessage[] = [];
@@ -237,6 +238,7 @@ export function StatusCard() {
       onSubmitStep: async (questionId, answers) => {
         if (!openAgentId) return;
         await submitUserQuestionStep(openAgentId, questionId, answers);
+        dispatchChatHistoryScroll('bottom');
       },
       onCancel: async (questionId) => {
         if (!openAgentId) return;
