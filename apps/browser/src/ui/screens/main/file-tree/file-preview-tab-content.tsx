@@ -1580,6 +1580,64 @@ function getCanvasStyle(
     : getCheckerboardStyle(background);
 }
 
+function ZoomControls({
+  controller,
+}: {
+  controller: ReturnType<typeof useZoomableViewport>;
+}) {
+  return (
+    <>
+      <div className="flex items-center px-1">
+        <ToolbarTooltip
+          label="Fit image to view"
+          shortcut={HotkeyActions.CENTER_IMAGE}
+        >
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Fit image to view"
+            onClick={controller.fitToView}
+          >
+            <IconArrowsToCenterOutline18 className="size-4" />
+          </Button>
+        </ToolbarTooltip>
+      </div>
+      <div className="flex items-center gap-0.5 px-1">
+        <ToolbarTooltip label="Zoom out" shortcut={HotkeyActions.ZOOM_OUT}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Zoom out"
+            onClick={controller.zoomOut}
+          >
+            <MinusIcon className="size-4" />
+          </Button>
+        </ToolbarTooltip>
+        <ToolbarTooltip label="Reset zoom" shortcut={HotkeyActions.ZOOM_RESET}>
+          <button
+            type="button"
+            className="min-w-10 cursor-pointer text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
+            aria-label="Reset zoom"
+            onClick={controller.resetZoom}
+          >
+            {Math.round(controller.scale * 100)}%
+          </button>
+        </ToolbarTooltip>
+        <ToolbarTooltip label="Zoom in" shortcut={HotkeyActions.ZOOM_IN}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Zoom in"
+            onClick={controller.zoomIn}
+          >
+            <PlusIcon className="size-4" />
+          </Button>
+        </ToolbarTooltip>
+      </div>
+    </>
+  );
+}
+
 function ImagePreview({
   src,
   alt,
@@ -1612,45 +1670,7 @@ function ImagePreview({
         openExternalPath={openExternalPath}
         right={
           <>
-            <div className="flex items-center px-1">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Fit image to view"
-                onClick={zoomController.fitToView}
-              >
-                <IconArrowsToCenterOutline18 className="size-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-0.5 px-1">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Zoom out"
-                title="Zoom out"
-                onClick={zoomController.zoomOut}
-              >
-                <MinusIcon className="size-4" />
-              </Button>
-              <button
-                type="button"
-                className="min-w-10 text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
-                aria-label="Reset zoom"
-                title="Reset zoom"
-                onClick={zoomController.resetZoom}
-              >
-                {Math.round(zoomController.scale * 100)}%
-              </button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Zoom in"
-                title="Zoom in"
-                onClick={zoomController.zoomIn}
-              >
-                <PlusIcon className="size-4" />
-              </Button>
-            </div>
+            <ZoomControls controller={zoomController} />
             <div className="h-5 w-px bg-border-subtle" />
             <div className="flex items-center px-1">
               <Popover>
@@ -1913,21 +1933,12 @@ function SvgPreview({
       mode === 'preview' && tabUiState[tabId]?.focusedPanel === 'tab-content',
     onInteract: markPreviewFocused,
   });
-  const { scale: zoom } = zoomController;
 
   // Hotkeys scoped to this SVG tab when it has focus.
   const bgRef = useRef(background);
   bgRef.current = background;
   const fgRef = useRef(currentColorMode);
   fgRef.current = currentColorMode;
-
-  const handleFitImage = useCallback(() => {
-    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
-      return false;
-    if (modeRef.current !== 'preview') return false;
-    zoomController.fitToView();
-  }, [tabId, zoomController.fitToView]);
-  useHotKeyListener(handleFitImage, HotkeyActions.CENTER_IMAGE);
 
   const handleCycleBg = useCallback(() => {
     if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
@@ -1962,64 +1973,7 @@ function SvgPreview({
         right={
           <>
             {mode === 'preview' ? (
-              <div className="flex items-center pr-2 pl-1">
-                <ToolbarTooltip
-                  label="Fit image to view"
-                  shortcut={HotkeyActions.CENTER_IMAGE}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Fit image to view"
-                    onClick={zoomController.fitToView}
-                  >
-                    <IconArrowsToCenterOutline18 className="size-4" />
-                  </Button>
-                </ToolbarTooltip>
-              </div>
-            ) : null}
-            {mode === 'preview' ? (
-              <div className="flex items-center gap-0.5 px-1">
-                <ToolbarTooltip
-                  label="Zoom out"
-                  shortcut={HotkeyActions.ZOOM_OUT}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Zoom out"
-                    onClick={zoomController.zoomOut}
-                  >
-                    <MinusIcon className="size-4" />
-                  </Button>
-                </ToolbarTooltip>
-                <ToolbarTooltip
-                  label="Reset zoom"
-                  shortcut={HotkeyActions.ZOOM_RESET}
-                >
-                  <button
-                    type="button"
-                    className="min-w-10 cursor-pointer text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
-                    onClick={zoomController.resetZoom}
-                    aria-label="Reset zoom"
-                  >
-                    {Math.round(zoom * 100)}%
-                  </button>
-                </ToolbarTooltip>
-                <ToolbarTooltip
-                  label="Zoom in"
-                  shortcut={HotkeyActions.ZOOM_IN}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Zoom in"
-                    onClick={zoomController.zoomIn}
-                  >
-                    <PlusIcon className="size-4" />
-                  </Button>
-                </ToolbarTooltip>
-              </div>
+              <ZoomControls controller={zoomController} />
             ) : null}
             {mode === 'preview' ? (
               <>
