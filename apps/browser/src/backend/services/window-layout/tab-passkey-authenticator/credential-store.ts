@@ -13,7 +13,7 @@ export const storedPasskeyCredentialSchema = z.object({
   credentialId: z.string(),
   rpId: z.string(),
   isResidentCredential: z.boolean(),
-  /** Base64 PKCS#8 private key. Persisted encrypted via safeStorage. */
+  /** Base64 PKCS#8 private key. */
   privateKey: z.string(),
   userHandle: z.string().optional(),
   signCount: z.number(),
@@ -44,7 +44,8 @@ export interface PasskeyCredentialStore {
  * `persist:browser-content` session, so this is a single process-wide store.
  *
  * Private keys are written through safeStorage, matching how the app persists
- * its other credentials.
+ * its other credentials — which also means they fall back to plaintext on
+ * systems where no OS keyring is available.
  */
 export class PersistedPasskeyCredentialStore implements PasskeyCredentialStore {
   private static instance: PersistedPasskeyCredentialStore | null = null;
