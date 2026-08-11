@@ -67,6 +67,7 @@ export class ContextMenuWebContent {
 
     const allItems: MenuItem[] = allItems2D.reduce((acc, curr) => {
       const visibleItems = curr.filter((item) => item.visible !== false);
+      if (visibleItems.at(-1)?.type === 'separator') visibleItems.pop();
       if (visibleItems.length === 0) return acc;
       if (acc.length > 0) acc.push({ type: 'separator' });
       acc.push(...visibleItems);
