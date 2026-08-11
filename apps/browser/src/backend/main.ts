@@ -1454,6 +1454,7 @@ function openIncomingUrl(
     }
     return;
   }
+  if (!windowLayoutService.getBaseWindow()) return;
   logger.debug(`[Main] Opening incoming URL: ${describeIncomingUrl(url)}`);
   void windowLayoutService.openUrlInNewTab(url);
 }
