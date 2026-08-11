@@ -205,7 +205,7 @@ export interface HostModels {
     task: 'title-generation' | 'context-compression',
   ): UtilityModelEntry[] | undefined;
 
-  /** Returns whether an entry can serve internal utility requests. */
+  /** Only `false` rejects an entry; omission or `undefined` means supported. */
   supportsUtilityCalls?(entry: UtilityModelEntry): boolean;
 
   /**
