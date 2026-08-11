@@ -28,26 +28,22 @@ function fileDiff(value: unknown) {
   if (typeof filePath !== 'string' || typeof patch !== 'string') return [];
 
   try {
-    const lines = parsePatch(patch).flatMap((entry) =>
-      entry.hunks.flatMap((hunk) => hunk.lines),
-    );
-    const side = (excluded: '+' | '-') => {
-      const text = lines.flatMap((line) =>
-        line.startsWith(excluded) || line.startsWith('\\')
-          ? []
-          : [line.slice(1)],
-      );
-      return text.length ? `${text.join('\n')}\n` : '';
-    };
-    return [
-      {
+    return parsePatch(patch).flatMap((entry) =>
+      entry.hunks.map((hunk) => ({
         type: 'diff' as const,
         path: filePath,
-        oldText: type === 'add' ? null : side('+'),
-        newText: side('-'),
-      },
-    ];
+        oldText: type === 'add' ? null : hunkSide(hunk.lines, '+'),
+        newText: hunkSide(hunk.lines, '-'),
+      })),
+    );
   } catch {
     return [];
   }
+}
+
+function hunkSide(lines: string[], excluded: '+' | '-'): string {
+  const text = lines.flatMap((line) =>
+    line.startsWith(excluded) || line.startsWith('\\') ? [] : [line.slice(1)],
+  );
+  return text.length ? `${text.join('\n')}\n` : '';
 }

@@ -881,9 +881,19 @@ export abstract class BaseAgent<
     const approved = toolCallResponse.approved;
     const reason = toolCallResponse.reason;
 
-    const handledExternally =
-      (await this.externalRuntime?.respondToApproval(toolCallResponse)) ??
-      false;
+    let handledExternally = false;
+    let externalError: unknown;
+    try {
+      handledExternally =
+        (await this.externalRuntime?.respondToApproval(toolCallResponse)) ??
+        false;
+    } catch (error) {
+      externalError = error;
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External approval response failed`,
+        error,
+      );
+    }
     this.state.commands.resolveApproval({ approvalId, approved, reason });
 
     // Find the tool name from the approval for telemetry
@@ -920,6 +930,7 @@ export abstract class BaseAgent<
       });
     }
 
+    if (externalError) throw externalError;
     if (handledExternally) return;
 
     this.runStep(true);
@@ -2374,6 +2385,8 @@ export abstract class BaseAgent<
       await this.saveState(
         queueFlushIndex === undefined ? undefined : [queueFlushIndex],
       );
+      if (this._stepGeneration !== stepGeneration) return;
+      this.scheduleMemorySnapshotWrite('post-step');
     } catch (rawError) {
       if (this._stepGeneration !== stepGeneration) return;
       const error =
@@ -2387,6 +2400,7 @@ export abstract class BaseAgent<
       });
       this.emitNotificationEvent('error');
       await this.saveState();
+      if (this._stepGeneration !== stepGeneration) return;
       if (this.state.get().queuedMessages.length > 0) {
         setTimeout(() => void this.runStep(), 0);
       }
@@ -3296,8 +3310,6 @@ export abstract class BaseAgent<
       | 'user-flushed-queue'
       | 'system-interrupted' = 'user-stopped',
   ): Promise<void> {
-    const externalStop = this.externalRuntime?.stop();
-
     // Invalidate pending callbacks BEFORE firing abort — onAbort fires
     // synchronously and must see the new generation to be ignored.
     this._stepGeneration++;
@@ -3341,7 +3353,14 @@ export abstract class BaseAgent<
       outputErrorText: toolCallAbortReason,
     });
 
-    await externalStop;
+    try {
+      await this.externalRuntime?.stop();
+    } catch (error) {
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External runtime stop failed`,
+        error,
+      );
+    }
   }
 
   /**
@@ -3933,7 +3952,14 @@ export abstract class BaseAgent<
       }
     }
     void this.toolbox.clearAgentTracking(this.instanceId);
-    await this.externalRuntime?.teardown();
+    try {
+      await this.externalRuntime?.teardown();
+    } catch (error) {
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External runtime teardown failed`,
+        error,
+      );
+    }
     // NOTE: `fileReadCacheService` is app-wide and owned by bootstrap;
     // do not tear it down from an individual agent instance.
   }

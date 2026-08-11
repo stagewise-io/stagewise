@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { Readable, Writable } from 'node:stream';
 import {
@@ -25,7 +25,13 @@ import {
 } from '@agentclientprotocol/sdk';
 import type { Logger } from '@/services/logger';
 import type { AcpAdapter } from './adapter';
-import { prepareAcpProcess } from './adapter';
+import {
+  prepareAcpProcess,
+  spawnAgentProcess,
+  terminateProcessTree,
+} from './adapter';
+
+const INITIALIZE_TIMEOUT_MS = 30_000;
 
 interface AcpProcessHandlers {
   onSessionUpdate(notification: SessionNotification): void;
@@ -62,11 +68,10 @@ export class AcpProcessClient {
       approvalMode,
     );
     this.nodeExecutable = nodeExecutable;
-    const child = spawn(launch.command, launch.args, {
+    const child = spawnAgentProcess(launch.command, launch.args, {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
-      shell: launch.shell,
     });
     this.child = child;
     createInterface({ input: child.stderr }).on('line', (line) => {
@@ -91,10 +96,11 @@ export class AcpProcessClient {
     );
     const connection = app.connect(stream);
     this.connection = connection;
-    child.once('error', (error) => connection.close(error));
+    child.once('error', (error) => this.handleExit(child, connection, error));
     child.once('exit', (code, signal) => {
-      if (this.child !== child) return;
-      connection.close(
+      this.handleExit(
+        child,
+        connection,
         new Error(
           `${this.adapter.displayName} ACP exited (${signal ?? `code ${String(code)}`})`,
         ),
@@ -106,19 +112,28 @@ export class AcpProcessClient {
       });
     });
 
-    return connection.agent.request(methods.agent.initialize, {
-      protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: {
-        plan: {},
-        elicitation: { form: {} },
-        session: { configOptions: { boolean: {} } },
-      },
-      clientInfo: {
-        name: 'stagewise',
-        title: 'stagewise',
-        version: __APP_VERSION__,
-      },
-    });
+    try {
+      return await withTimeout(
+        connection.agent.request(methods.agent.initialize, {
+          protocolVersion: PROTOCOL_VERSION,
+          clientCapabilities: {
+            plan: {},
+            elicitation: { form: {} },
+            session: { configOptions: { boolean: {} } },
+          },
+          clientInfo: {
+            name: 'stagewise',
+            title: 'stagewise',
+            version: __APP_VERSION__,
+          },
+        }),
+        INITIALIZE_TIMEOUT_MS,
+        `${this.adapter.displayName} ACP initialization timed out`,
+      );
+    } catch (error) {
+      this.close();
+      throw error;
+    }
   }
 
   public newSession(request: NewSessionRequest): Promise<NewSessionResponse> {
@@ -158,13 +173,11 @@ export class AcpProcessClient {
     this.nodeExecutable = null;
     child?.stdin.end();
     if (!child) return;
-    if (process.platform !== 'win32' && child.pid != null) {
-      try {
-        process.kill(-child.pid, 'SIGTERM');
-        return;
-      } catch {}
-    }
-    child.kill();
+    terminateProcessTree(child);
+  }
+
+  public isRunning(): boolean {
+    return this.child !== null && this.connection !== null;
   }
 
   public getNodeExecutable(): string {
@@ -175,5 +188,35 @@ export class AcpProcessClient {
   private requireAgent(): ClientContext {
     if (!this.connection) throw new Error('ACP process is not connected');
     return this.connection.agent;
+  }
+
+  private handleExit(
+    child: ChildProcessWithoutNullStreams,
+    connection: ClientConnection,
+    error: Error,
+  ): void {
+    if (this.child !== child) return;
+    this.child = null;
+    this.connection = null;
+    this.nodeExecutable = null;
+    connection.close(error);
+  }
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

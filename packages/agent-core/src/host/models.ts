@@ -205,6 +205,9 @@ export interface HostModels {
     task: 'title-generation' | 'context-compression',
   ): UtilityModelEntry[] | undefined;
 
+  /** Returns whether an entry can serve internal utility requests. */
+  supportsUtilityCalls?(entry: UtilityModelEntry): boolean;
+
   /**
    * Returns the active preset's ID from user preferences, or
    * `undefined` when no preset is active.

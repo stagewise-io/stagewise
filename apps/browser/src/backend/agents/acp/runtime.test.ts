@@ -13,6 +13,7 @@ import type {
   UtilityModelEntry,
 } from '@stagewise/agent-core/host';
 import type { AgentMessage } from '@stagewise/agent-core/types';
+import { homedir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 import type { Logger } from '@/services/logger';
 import type { AcpAdapter } from './adapter';
@@ -29,6 +30,7 @@ type RuntimeInternals = {
   client: {
     cancel(sessionId: string): Promise<void>;
     close(): void;
+    isRunning?(): boolean;
     getNodeExecutable?(): string;
     prompt?(input?: unknown): Promise<unknown>;
     setConfigOption(input: {
@@ -124,6 +126,7 @@ describe('AcpAgentRuntime translation', () => {
     Object.assign(runtime, {
       client: {
         close,
+        isRunning: () => true,
         getNodeExecutable: () => process.execPath,
         prompt: vi.fn().mockRejectedValue(new Error('Authentication required')),
       },
@@ -435,7 +438,7 @@ describe('AcpAgentRuntime translation', () => {
               filePath: '/repo/src/b.ts',
               type: 'update',
               patch:
-                '--- /repo/src/b.ts\n+++ /repo/src/b.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n context\n',
+                '--- /repo/src/b.ts\n+++ /repo/src/b.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n context\n@@ -10 +10 @@\n-old two\n+new two\n',
             },
           ],
         },
@@ -448,6 +451,12 @@ describe('AcpAgentRuntime translation', () => {
         path: '/repo/src/b.ts',
         oldText: 'old\ncontext\n',
         newText: 'new\ncontext\n',
+      },
+      {
+        type: 'diff',
+        path: '/repo/src/b.ts',
+        oldText: 'old two\n',
+        newText: 'new two\n',
       },
     ]);
   });
@@ -620,19 +629,18 @@ describe('AcpAgentRuntime translation', () => {
   it('hides Claude internal plan files', () => {
     const { runtime, messages } = createRuntime();
     runtime.adapter = ACP_ADAPTERS['claude-code'];
+    const planPath = `${homedir()}/.claude/plans/test.md`;
 
     runtime.upsertTool({
       toolCallId: 'plan-write',
       title: 'Write plan',
       kind: 'edit',
       status: 'completed',
-      locations: [
-        { path: `${process.env.HOME ?? '/Users/test'}/.claude/plans/test.md` },
-      ],
+      locations: [{ path: planPath }],
       content: [
         {
           type: 'diff',
-          path: `${process.env.HOME ?? '/Users/test'}/.claude/plans/test.md`,
+          path: planPath,
           newText: '# Internal plan',
         },
       ],
@@ -756,6 +764,7 @@ describe('AcpAgentRuntime translation', () => {
       answers: { mode: 'Full', notes: 'ready' },
     });
     const { runtime, messages } = createRuntime(requestUserInput);
+    runtime.sessionId = 'session-1';
 
     const response = await runtime.handleElicitation({
       sessionId: 'session-1',
@@ -810,6 +819,41 @@ describe('AcpAgentRuntime translation', () => {
     });
   });
 
+  it('cancels stale and oversized ACP forms without opening the UI', async () => {
+    const requestUserInput = vi.fn();
+    const { runtime } = createRuntime(requestUserInput);
+    runtime.sessionId = 'session-1';
+
+    await expect(
+      runtime.handleElicitation({
+        sessionId: 'stale-session',
+        toolCallId: 'stale-question',
+        mode: 'form',
+        message: 'Stale',
+        requestedSchema: { type: 'object', properties: {} },
+      }),
+    ).resolves.toEqual({ action: 'cancel' });
+
+    await expect(
+      runtime.handleElicitation({
+        sessionId: 'session-1',
+        toolCallId: 'large-question',
+        mode: 'form',
+        message: 'Too large',
+        requestedSchema: {
+          type: 'object',
+          properties: Object.fromEntries(
+            Array.from({ length: 51 }, (_, index) => [
+              `field-${index}`,
+              { type: 'string' },
+            ]),
+          ),
+        },
+      }),
+    ).resolves.toEqual({ action: 'cancel' });
+    expect(requestUserInput).not.toHaveBeenCalled();
+  });
+
   it('closes a pending Stagewise form when its MCP request is aborted', async () => {
     const requestUserInput = vi.fn(() => new Promise(() => {}));
     const { runtime, messages, context } = createRuntime(requestUserInput);
@@ -831,6 +875,27 @@ describe('AcpAgentRuntime translation', () => {
       output: { cancelled: true },
     });
     expect(context.cancelUserInput).toHaveBeenCalledOnce();
+  });
+
+  it('rejects concurrent Stagewise forms without closing the active one', async () => {
+    const requestUserInput = vi.fn(() => new Promise(() => {}));
+    const { runtime, context } = createRuntime(requestUserInput);
+    const controller = new AbortController();
+    const active = runtime.handleStagewiseToolRequest(
+      { title: 'Active', steps: [{ fields: [] }] },
+      controller.signal,
+    );
+
+    await expect(
+      runtime.handleStagewiseToolRequest({
+        title: 'Concurrent',
+        steps: [{ fields: [] }],
+      }),
+    ).resolves.toMatchObject({ completed: false, cancelled: true });
+    expect(context.cancelUserInput).not.toHaveBeenCalled();
+
+    controller.abort();
+    await active;
   });
 
   it('uses Stagewise smart approval for ACP shell commands', async () => {

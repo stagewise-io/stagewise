@@ -275,14 +275,16 @@ describe('createBrowserHostModels', () => {
     ]);
   });
 
-  it('preserves external agent models in the active chat preset', () => {
+  it('uses global utilities for an external-only active preset', () => {
     const mp = { modelExists: vi.fn(), getModelWithOptions: vi.fn() };
     const models = createBrowserHostModels(
       mp as unknown as ModelProviderService,
       () =>
         ({
           utilityModels: {
-            titleGeneration: [],
+            titleGeneration: [
+              { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+            ],
             contextCompression: [],
           },
           activePresetId: 'external-preset',
@@ -293,12 +295,18 @@ describe('createBrowserHostModels', () => {
               models: [{ modelId: 'agent', providerInstanceId: 'codex-1' }],
             },
           ],
-          providerInstances: [{ id: 'codex-1', typeId: 'codex' }],
+          providerInstances: [
+            { id: 'codex-1', typeId: 'codex' },
+            { id: 'stagewise-1', typeId: 'stagewise' },
+          ],
         }) as never,
     );
 
     expect(models.getActivePresetModels?.()).toEqual([
       { modelId: 'agent', providerInstanceId: 'codex-1' },
+    ]);
+    expect(models.getUtilityModelEntries?.('title-generation')).toEqual([
+      { modelId: 'utility', providerInstanceId: 'stagewise-1' },
     ]);
   });
 });

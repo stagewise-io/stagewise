@@ -1,8 +1,8 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildAcpPrompt } from './prompt-builder';
+import { buildAcpPrompt, MAX_INLINE_IMAGE_BYTES } from './prompt-builder';
 
 describe('buildAcpPrompt', () => {
   it('uses compressed history instead of replaying older raw messages', async () => {
@@ -66,6 +66,44 @@ describe('buildAcpPrompt', () => {
         uri: expect.stringMatching(/^file:/),
         size: 2,
       });
+    } finally {
+      await rm(root, { recursive: true });
+    }
+  });
+
+  it('does not inline oversized images', async () => {
+    const root = await mkdtemp(nodePath.join(tmpdir(), 'stagewise-acp-'));
+    try {
+      const path = nodePath.join(root, 'large.png');
+      await writeFile(path, '');
+      await truncate(path, MAX_INLINE_IMAGE_BYTES + 1);
+      const prompt = await buildAcpPrompt(
+        [
+          {
+            id: 'user-1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Inspect this image' }],
+            metadata: {
+              createdAt: new Date(),
+              partsMetadata: [undefined],
+              attachments: [{ path: 'workspace/large.png' }],
+            },
+          },
+        ],
+        new Map([['workspace', root]]),
+        [],
+        { image: true },
+      );
+
+      expect(prompt).toContainEqual(
+        expect.objectContaining({
+          type: 'resource_link',
+          size: MAX_INLINE_IMAGE_BYTES + 1,
+        }),
+      );
+      expect(prompt).not.toContainEqual(
+        expect.objectContaining({ type: 'image' }),
+      );
     } finally {
       await rm(root, { recursive: true });
     }

@@ -180,9 +180,7 @@ function createToolPart(
         session_exited: completed,
         timed_out: false,
       },
-      ...(tool.status === 'failed'
-        ? { errorText: outputText || `${tool.title ?? 'Command'} failed` }
-        : {}),
+      ...toolFailure(tool, outputText),
     };
   }
   if (tool.kind === 'read' && tool.locations?.[0]?.path) {
@@ -192,6 +190,7 @@ function createToolPart(
       state,
       input: { path: toMountedPath(tool.locations[0].path, mountedPaths) },
       ...(completed ? { output: { message: outputText } } : {}),
+      ...toolFailure(tool, outputText),
     };
   }
   if (tool.kind === 'read' && tool.title?.startsWith('List ')) {
@@ -201,6 +200,7 @@ function createToolPart(
       toolCallId: tool.toolCallId,
       state,
       input: { path: toInputPath(path ?? '', mountedPaths) },
+      ...toolFailure(tool, outputText),
     };
   }
   if (tool.kind === 'search') {
@@ -222,6 +222,7 @@ function createToolPart(
             },
           }
         : undefined,
+      ...toolFailure(tool, outputText),
     };
   }
   const locations = toolLocations(tool, input).map((path) =>
@@ -238,7 +239,7 @@ function createToolPart(
       ...(locations.length ? { locations } : {}),
     },
     ...(tool.status === 'failed'
-      ? { errorText: outputText || `${tool.title ?? 'Tool'} failed` }
+      ? toolFailure(tool, outputText)
       : completed && outputText
         ? { output: { text: outputText } }
         : completed
@@ -262,6 +263,7 @@ function createDiffToolPart(
       state,
       input: { path },
       output: { _diff: { before: diff.oldText ?? '', after: null } },
+      ...toolFailure(tool, toolOutputText(tool)),
     };
   }
   if (diff.oldText == null) {
@@ -271,6 +273,7 @@ function createDiffToolPart(
       state,
       input: { path, content: diff.newText },
       output: { _diff: { before: null, after: diff.newText } },
+      ...toolFailure(tool, toolOutputText(tool)),
     };
   }
   return {
@@ -285,7 +288,14 @@ function createDiffToolPart(
       result: { editsApplied: 1 },
       _diff: { before: diff.oldText, after: diff.newText },
     },
+    ...toolFailure(tool, toolOutputText(tool)),
   };
+}
+
+function toolFailure(tool: ToolState, outputText: string): JsonObject {
+  return tool.status === 'failed'
+    ? { errorText: outputText || `${tool.title ?? 'Tool'} failed` }
+    : {};
 }
 
 function toolDiffs(tool: ToolState) {

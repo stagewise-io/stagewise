@@ -71,25 +71,35 @@ const questionFieldFlatSchema = z.object({
   defaultValues: z.array(z.string()).optional(),
 });
 
-const form = <T extends z.ZodType>(field: T) =>
-  z.object({
-    title: z.string().describe('Form title shown in the collapsible header.'),
-    description: z
-      .string()
-      .optional()
-      .describe('Optional top-level description.'),
-    steps: z
-      .array(
-        z.object({
-          title: z.string().optional(),
-          description: z.string().optional(),
-          fields: z.array(field).min(1).max(10),
-        }),
-      )
-      .min(1)
-      .max(5)
-      .describe('Array of form steps. Single-step forms have one entry.'),
-  });
+const form = <T extends z.ZodType<{ questionId: string }>>(field: T) =>
+  z
+    .object({
+      title: z.string().describe('Form title shown in the collapsible header.'),
+      description: z
+        .string()
+        .optional()
+        .describe('Optional top-level description.'),
+      steps: z
+        .array(
+          z.object({
+            title: z.string().optional(),
+            description: z.string().optional(),
+            fields: z.array(field).min(1).max(10),
+          }),
+        )
+        .min(1)
+        .max(5)
+        .describe('Array of form steps. Single-step forms have one entry.'),
+    })
+    .refine(
+      (value) => {
+        const ids = value.steps.flatMap((step) =>
+          step.fields.map((question) => question.questionId),
+        );
+        return new Set(ids).size === ids.length;
+      },
+      { message: 'questionId values must be unique' },
+    );
 
 export const askUserQuestionsToolInputSchemaFlat = form(
   questionFieldFlatSchema,

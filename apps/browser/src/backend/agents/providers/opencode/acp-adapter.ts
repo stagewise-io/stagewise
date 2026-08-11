@@ -1,8 +1,4 @@
-import {
-  needsShell,
-  resolveAgentExecutable,
-  type AcpAdapter,
-} from '../../acp/adapter';
+import { resolveAgentExecutable, type AcpAdapter } from '../../acp/adapter';
 import { normalizeOpenCodeTool } from './tool-normalizer';
 
 export const openCodeAcpAdapter: AcpAdapter = {
@@ -18,7 +14,6 @@ export const openCodeAcpAdapter: AcpAdapter = {
     return {
       command: executable,
       args: ['acp'],
-      shell: needsShell(executable),
     };
   },
   async environment(env, approvalMode) {
