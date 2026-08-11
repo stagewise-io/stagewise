@@ -13,7 +13,9 @@ import type {
   UtilityModelEntry,
 } from '@stagewise/agent-core/host';
 import type { AgentMessage } from '@stagewise/agent-core/types';
-import { homedir } from 'node:os';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import nodePath from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { Logger } from '@/services/logger';
 import type { AcpAdapter } from './adapter';
@@ -83,6 +85,7 @@ function createRuntime(
   providerTypeForInstance: (
     providerInstanceId?: string,
   ) => 'codex' | 'stagewise' = () => 'codex',
+  agentDirectory = '/agent',
 ) {
   const messages: Array<AgentMessage & { role: 'assistant' }> = [];
   const context = {
@@ -101,7 +104,7 @@ function createRuntime(
     { debug: vi.fn(), warn: vi.fn() } as unknown as Logger,
     providerTypeForInstance,
     () => undefined,
-    '/agent',
+    agentDirectory,
     () => Promise.resolve({}),
     '/stagewise-mcp-server.mjs',
     classifyCommand,
@@ -199,6 +202,30 @@ describe('AcpAgentRuntime translation', () => {
     expect(prompt.map((part) => part.text ?? '').join('\n')).toContain(
       'Native provider result',
     );
+  });
+
+  it('invalidates a persisted ACP session after a native-agent turn', () => {
+    const agentDirectory = mkdtempSync(
+      nodePath.join(tmpdir(), 'stagewise-acp-'),
+    );
+    const sessionFile = nodePath.join(agentDirectory, 'acp-session.json');
+    try {
+      writeFileSync(sessionFile, '{}');
+      const { runtime } = createRuntime(
+        vi.fn(),
+        vi.fn().mockResolvedValue(undefined),
+        vi.fn(),
+        (instanceId) => (instanceId === 'native' ? 'stagewise' : 'codex'),
+        agentDirectory,
+      );
+
+      expect(
+        runtime.handles({ modelId: 'native', providerInstanceId: 'native' }),
+      ).toBe(false);
+      expect(existsSync(sessionFile)).toBe(false);
+    } finally {
+      rmSync(agentDirectory, { recursive: true, force: true });
+    }
   });
 
   it('renders Codex image generation as a native image', async () => {
@@ -660,6 +687,18 @@ describe('AcpAgentRuntime translation', () => {
         kind: 'edit',
         status: 'pending',
         locations: [{ path: '/outside.txt' }],
+        content: [
+          {
+            type: 'diff',
+            path: '/outside-a.txt',
+            newText: 'a',
+          },
+          {
+            type: 'diff',
+            path: '/outside-b.txt',
+            newText: 'b',
+          },
+        ],
       },
       options: permissionOptions,
     };
@@ -678,6 +717,10 @@ describe('AcpAgentRuntime translation', () => {
       approvalId: 'write-1',
       approved: false,
     });
+    expect(messages.at(-1)?.parts).toMatchObject([
+      { state: 'approval-responded' },
+      { state: 'approval-responded' },
+    ]);
     await expect(permission).resolves.toEqual({
       outcome: { outcome: 'selected', optionId: 'reject' },
     });

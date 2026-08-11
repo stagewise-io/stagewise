@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { unlinkSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import nodePath from 'node:path';
 import type {
@@ -135,7 +136,12 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     const handled = typeId
       ? adapterForProviderType(typeId) !== undefined
       : false;
-    if (!handled) this.historyDiverged = true;
+    if (!handled) {
+      this.historyDiverged = true;
+      try {
+        unlinkSync(this.sessionFilePath);
+      } catch {}
+    }
     return handled;
   }
 
@@ -656,17 +662,18 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     id: string,
     response: ToolApprovalResponse,
   ): void {
-    const part = this.parts.get(id);
-    if (!part || !('state' in part)) return;
-    this.upsertPart(id, {
-      ...part,
-      state: 'approval-responded',
-      approval: {
-        id,
-        approved: response.approved,
-        reason: response.reason,
-      },
-    });
+    for (const [partId, part] of this.parts) {
+      if (!('approval' in part) || part.approval?.id !== id) continue;
+      this.upsertPart(partId, {
+        ...part,
+        state: 'approval-responded',
+        approval: {
+          id,
+          approved: response.approved,
+          reason: response.reason,
+        },
+      });
+    }
   }
 
   private finalizeParts(): void {
