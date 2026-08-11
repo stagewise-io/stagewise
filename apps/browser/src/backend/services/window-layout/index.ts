@@ -660,7 +660,7 @@ export class WindowLayoutService extends DisposableService {
     });
 
     app.on('second-instance', () => {
-      if (this.baseWindow) {
+      if (this.baseWindow && !this.baseWindow.isDestroyed()) {
         if (this.baseWindow.isMinimized()) this.baseWindow.restore();
         this.baseWindow.focus();
       }
