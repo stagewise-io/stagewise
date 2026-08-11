@@ -1,8 +1,8 @@
 import { tool } from 'ai';
 import { randomUUID } from 'node:crypto';
 import {
+  askUserQuestionsToolInputSchema,
   askUserQuestionsToolInputSchemaFlat,
-  type AskUserQuestionsToolInput,
   type AskUserQuestionsToolOutput,
   type QuestionAnswerValue,
 } from '@shared/karton-contracts/ui/agent/tools/types';
@@ -159,9 +159,7 @@ export async function requestUserQuestions(
   input: unknown,
   onQuestionRequested?: (agentId: string) => void | Promise<void>,
 ): Promise<AskUserQuestionsToolOutput> {
-  const params = askUserQuestionsToolInputSchemaFlat.parse(
-    input,
-  ) as unknown as AskUserQuestionsToolInput;
+  const params = askUserQuestionsToolInputSchema.parse(input);
   cleanupQuestionsForAgent(agentInstanceId, uiKarton);
 
   const questionId = randomUUID();

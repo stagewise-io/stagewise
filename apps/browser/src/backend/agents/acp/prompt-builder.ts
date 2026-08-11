@@ -15,6 +15,7 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.webp': 'image/webp',
 };
+export const MAX_INLINE_IMAGE_BYTES = 20 * 1024 * 1024;
 
 const STAGEWISE_AGENT_INSTRUCTIONS =
   '<stagewise-agent-instructions>\n' +
@@ -92,7 +93,12 @@ export async function buildAcpPrompt(
       const extension = nodePath.extname(path).toLowerCase();
       const mimeType = IMAGE_MIME_TYPES[extension];
       try {
-        if (mimeType && capabilities.image) {
+        const file = await stat(path);
+        if (
+          mimeType &&
+          capabilities.image &&
+          file.size <= MAX_INLINE_IMAGE_BYTES
+        ) {
           const data = await readFile(path);
           blocks.push({
             type: 'image',
@@ -100,7 +106,6 @@ export async function buildAcpPrompt(
             mimeType,
           });
         } else {
-          const file = await stat(path);
           blocks.push({
             type: 'resource_link',
             name: nodePath.basename(path),

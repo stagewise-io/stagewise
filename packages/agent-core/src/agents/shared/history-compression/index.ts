@@ -269,6 +269,7 @@ export const generateSimpleCompressedHistory = async (
   const attemptedKeys = new Set<string>();
 
   for (const entry of entries) {
+    if (hostModels.supportsUtilityCalls?.(entry) === false) continue;
     // Skip models that are no longer available (deleted provider, etc.)
     // Pass `providerInstanceId` so discovered models (which only exist
     // on a specific instance) are not falsely rejected.
@@ -300,7 +301,13 @@ export const generateSimpleCompressedHistory = async (
   // Last resort: try the active chat model if it wasn't already
   // attempted (e.g. when no preset models were available).
   const fallbackKey = `${fallbackModelId}::${fallbackProviderInstanceId ?? ''}`;
-  if (fallbackModelId && !attemptedKeys.has(fallbackKey)) {
+  if (
+    fallbackModelId &&
+    !attemptedKeys.has(fallbackKey) &&
+    hostModels.supportsUtilityCalls?.(
+      fallbackEntry ?? { modelId: fallbackModelId },
+    ) !== false
+  ) {
     host?.logger.warn(
       `History compression: all preferred models failed, falling back to active model: ${fallbackModelId}`,
     );

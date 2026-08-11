@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { findExecutable, needsShell } from './adapter';
+import { findExecutable } from './adapter';
 import { ACP_ADAPTERS } from './adapter-registry';
 
 describe('ACP adapters', () => {
@@ -15,7 +15,6 @@ describe('ACP adapters', () => {
       await expect(
         findExecutable('codex', { PATH: root }, 'win32'),
       ).resolves.toBe(shim);
-      expect(needsShell(shim, 'win32')).toBe(true);
     } finally {
       await rm(root, { recursive: true });
     }

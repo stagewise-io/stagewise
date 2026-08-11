@@ -21,7 +21,7 @@ export function elicitationForm(
   const fields = Object.entries(properties).map(([id, property]) =>
     elicitationField(id, property, required.has(id)),
   );
-  if (fields.length === 0) return null;
+  if (fields.length === 0 || fields.length > 50) return null;
   const steps = [];
   for (let index = 0; index < fields.length; index += 10) {
     steps.push({ fields: fields.slice(index, index + 10) });

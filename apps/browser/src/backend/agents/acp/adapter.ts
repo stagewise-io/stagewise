@@ -1,4 +1,8 @@
-import { execFile } from 'node:child_process';
+import {
+  execFile,
+  spawn,
+  type ChildProcessWithoutNullStreams,
+} from 'node:child_process';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -12,7 +16,6 @@ import type { ExternalAgentProviderTypeId } from '@shared/karton-contracts/ui/sh
 export interface AcpLaunchCommand {
   command: string;
   args: string[];
-  shell?: boolean;
 }
 
 export interface PreparedAcpProcess {
@@ -48,6 +51,8 @@ export interface AcpAdapter {
 
 const require = createRequire(import.meta.url);
 const execFileAsync = promisify(execFile);
+const crossSpawn = require('cross-spawn') as typeof spawn;
+export const spawnAgentProcess = crossSpawn;
 
 export async function resolveBundledAdapterLaunch(
   node: string,
@@ -108,11 +113,27 @@ export async function findExecutable(
   return undefined;
 }
 
-export function needsShell(
-  command: string,
-  platform: NodeJS.Platform = process.platform,
-): boolean {
-  return platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
+export function terminateProcessTree(
+  child: ChildProcessWithoutNullStreams,
+): void {
+  if (child.pid == null) return;
+  if (process.platform === 'win32') {
+    const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    killer.once('error', () => child.kill());
+    killer.once('exit', (code) => {
+      if (code !== 0) child.kill();
+    });
+    killer.unref();
+    return;
+  }
+  try {
+    process.kill(-child.pid, 'SIGTERM');
+  } catch {
+    child.kill('SIGTERM');
+  }
 }
 
 export async function prepareAcpProcess(

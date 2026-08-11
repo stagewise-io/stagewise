@@ -102,7 +102,8 @@ export function recordUsage(
   updateAgentInstanceState(store, agentInstanceId, (state) => {
     state.usedTokens = args.totalTokens;
     if (args.contextWindowSize !== undefined) {
-      state.contextWindowSize = args.contextWindowSize;
+      state.contextWindowSize =
+        args.contextWindowSize > 0 ? args.contextWindowSize : undefined;
     }
   });
 }

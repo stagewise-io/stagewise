@@ -163,6 +163,7 @@ export const generateSimpleTitle = async (
 
   for (const entry of entries) {
     const modelId = entry.modelId;
+    if (hostModels.supportsUtilityCalls?.(entry) === false) continue;
     // Skip models that are no longer available (deleted provider, etc.)
     // Pass `providerInstanceId` so discovered models (which only exist
     // on a specific instance) are not falsely rejected.

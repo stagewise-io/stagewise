@@ -15,7 +15,7 @@ const CANCELLED_RESULT: StagewiseInputResult = {
 };
 
 export class StagewiseFormLifecycle {
-  private readonly pending = new Map<string, () => void>();
+  private active: { toolCallId: string; cancel(): void } | null = null;
 
   public constructor(
     private readonly requestUserInput: (input: unknown) => Promise<unknown>,
@@ -31,6 +31,9 @@ export class StagewiseFormLifecycle {
     toolCallId: string,
     signal?: AbortSignal,
   ): Promise<StagewiseInputResult> {
+    if (signal?.aborted || this.active) {
+      return this.publishResult(toolCallId, formInput, CANCELLED_RESULT);
+    }
     this.updatePart(toolCallId, {
       type: 'tool-askUserQuestions',
       toolCallId,
@@ -43,27 +46,34 @@ export class StagewiseFormLifecycle {
       cancel = () => resolve(CANCELLED_RESULT);
     });
     const abort = () => {
-      this.cancelUserInput();
+      if (this.active?.toolCallId === toolCallId) this.cancelUserInput();
       cancel();
     };
-    this.pending.set(toolCallId, cancel);
+    this.active = { toolCallId, cancel };
     signal?.addEventListener('abort', abort, { once: true });
-    if (signal?.aborted) abort();
 
     let result: StagewiseInputResult;
     try {
-      const userInput = signal?.aborted
-        ? cancelled
-        : (this.requestUserInput(formInput) as Promise<StagewiseInputResult>);
+      const userInput = this.requestUserInput(
+        formInput,
+      ) as Promise<StagewiseInputResult>;
       result = (await Promise.race([
         userInput,
         cancelled,
       ])) as StagewiseInputResult;
     } finally {
       signal?.removeEventListener('abort', abort);
-      this.pending.delete(toolCallId);
+      if (this.active?.toolCallId === toolCallId) this.active = null;
     }
 
+    return this.publishResult(toolCallId, formInput, result);
+  }
+
+  private publishResult(
+    toolCallId: string,
+    formInput: JsonObject,
+    result: StagewiseInputResult,
+  ): StagewiseInputResult {
     const normalized = {
       ...result,
       completedSteps:
@@ -83,8 +93,9 @@ export class StagewiseFormLifecycle {
   }
 
   public cancelAll(): void {
+    if (!this.active) return;
     this.cancelUserInput();
-    for (const cancel of this.pending.values()) cancel();
-    this.pending.clear();
+    this.active.cancel();
+    this.active = null;
   }
 }

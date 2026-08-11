@@ -1,7 +1,11 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
-import { needsShell, resolveAgentExecutable } from '../../acp/adapter';
+import {
+  resolveAgentExecutable,
+  spawnAgentProcess,
+  terminateProcessTree,
+} from '../../acp/adapter';
 
 type JsonObject = Record<string, unknown>;
 
@@ -54,10 +58,10 @@ export class CodexAppServerClient {
         'Codex is not installed. Install Codex CLI and run `codex login` first.',
       );
     }
-    const child = spawn(executable, ['app-server', '--stdio'], {
+    const child = spawnAgentProcess(executable, ['app-server', '--stdio'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env,
-      shell: needsShell(executable),
+      detached: process.platform !== 'win32',
     });
     this.process = child;
 
@@ -154,8 +158,8 @@ export class CodexAppServerClient {
     this.process = null;
     this.rejectPending(new Error('Codex app-server was closed'));
     if (!child) return;
-    child.removeAllListeners();
-    child.kill('SIGTERM');
+    child.stdin.end();
+    terminateProcessTree(child);
   }
 
   private write(message: JsonObject): void {

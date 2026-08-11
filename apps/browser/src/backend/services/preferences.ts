@@ -2034,21 +2034,41 @@ export class PreferencesService extends DisposableService {
       enabledModelIds: [] as string[],
       disabledModelIds,
       discoveredModels: discovered,
-    };
+    } as ProviderInstance;
 
-    const patches: Patch[] = [
-      {
-        op: 'add',
-        path: ['providerInstances', this.preferences.providerInstances.length],
-        value: instance,
-      },
-    ];
-    await this.update(patches);
+    const added = await this.addProviderInstanceRecord(instance, !!localAgent);
+    if (!added) {
+      return {
+        success: false,
+        error: `${providerType.displayName} is already connected.`,
+      };
+    }
 
     this.logger.debug(
       `[PreferencesService] Added provider instance: ${instanceId} (${discovered.length} models discovered)`,
     );
     return { success: true, instanceId, discoveredModels: discovered };
+  }
+
+  private async addProviderInstanceRecord(
+    instance: ProviderInstance,
+    singleton: boolean,
+  ): Promise<boolean> {
+    return this.enqueuePreferenceWrite(async () => {
+      if (
+        singleton &&
+        this.preferences.providerInstances.some(
+          (candidate) => candidate.typeId === instance.typeId,
+        )
+      ) {
+        return false;
+      }
+      await this.replacePreferences({
+        ...this.preferences,
+        providerInstances: [...this.preferences.providerInstances, instance],
+      });
+      return true;
+    });
   }
 
   public async getLocalAgentAvailability(

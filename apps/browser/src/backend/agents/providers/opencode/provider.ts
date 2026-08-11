@@ -101,6 +101,7 @@ async function discoverOpenCodeModels(): Promise<DiscoveredModel[]> {
     encoding: 'utf8',
     env,
     maxBuffer: 16 * 1024 * 1024,
+    timeout: 30_000,
   });
   const models = parseOpenCodeModels(stdout);
   if (!models.length) throw new Error('OpenCode returned no models.');

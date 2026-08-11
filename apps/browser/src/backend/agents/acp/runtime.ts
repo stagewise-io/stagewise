@@ -26,7 +26,7 @@ import { ACP_ADAPTERS, adapterForProviderType } from './adapter-registry';
 import { AcpProcessClient } from './process-client';
 import type { ResolveAcpEnvironment } from './process-client';
 import { elicitationForm, requestScopeId } from './elicitation-mapper';
-import { buildAcpPrompt } from './prompt-builder';
+import { buildAcpPrompt, MAX_INLINE_IMAGE_BYTES } from './prompt-builder';
 import {
   commandFromTool,
   isHiddenTool,
@@ -280,6 +280,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     if (this.adapter?.id !== adapter.id || this.processKey !== processKey) {
       this.closeClient();
     }
+    if (this.client && !this.client.isRunning()) this.closeClient();
     if (!this.client) {
       this.adapter = adapter;
       this.processKey = processKey;
@@ -448,6 +449,10 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
 
   private appendImage(content: Extract<ContentBlock, { type: 'image' }>): void {
     const { data, mimeType } = content;
+    if (Buffer.byteLength(data, 'base64') > MAX_INLINE_IMAGE_BYTES) {
+      this.logger.warn('[ACP runtime] Ignoring oversized generated image');
+      return;
+    }
     const digest = createHash('sha256').update(data).digest('hex').slice(0, 16);
     const id = `image:${digest}`;
     if (this.imageIds.has(id)) return;
@@ -628,9 +633,21 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
   private async handleElicitation(
     request: CreateElicitationRequest,
   ): Promise<CreateElicitationResponse> {
+    if (
+      this.stopped ||
+      ('sessionId' in request && request.sessionId !== this.sessionId)
+    ) {
+      return { action: 'cancel' };
+    }
     const form = elicitationForm(request);
     if (!form) return { action: 'cancel' };
     const result = await this.forms.request(form, requestScopeId(request));
+    if (
+      this.stopped ||
+      ('sessionId' in request && request.sessionId !== this.sessionId)
+    ) {
+      return { action: 'cancel' };
+    }
     if (!result.completed || result.cancelled) return { action: 'cancel' };
     return { action: 'accept', content: result.answers };
   }
@@ -657,6 +674,16 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     for (const [id, part] of this.parts) {
       if (part.type === 'text' || part.type === 'reasoning') {
         this.parts.set(id, { ...part, state: 'done' });
+      } else if (
+        'state' in part &&
+        part.state === 'approval-responded' &&
+        part.approval?.approved === false
+      ) {
+        this.parts.set(id, {
+          ...part,
+          state: 'output-denied',
+          approval: { ...part.approval, approved: false },
+        });
       } else if (
         'state' in part &&
         (part.state === 'input-available' ||
@@ -802,6 +829,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
   }
 
   private closeClient(): void {
+    this.forms.cancelAll();
     this.client?.close();
     this.client = null;
     this.adapter = null;

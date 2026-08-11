@@ -26,6 +26,8 @@ export function ExternalAgentToolPart({
     (procedures) => procedures.agents.sendToolApprovalResponse,
   );
   const isApproval = part.state === 'approval-requested';
+  const isError = part.state === 'output-error';
+  const isDenied = part.state === 'output-denied';
   const isFinished = part.state.startsWith('output-');
   const toolName = part.toolName.slice(part.toolName.indexOf('.') + 1);
   const input = (part.input as ExternalToolInput | undefined) ?? {};
@@ -42,13 +44,17 @@ export function ExternalAgentToolPart({
     plan.length > 0 && plan.every((step) => step.status === 'completed');
   const label = isApproval
     ? `${toolName} needs approval`
-    : plan.length
-      ? `${planCompleted ? 'Completed' : 'Running'} plan`
-      : input.kind === 'edit' && locations.length > 0
-        ? `${isFinished ? 'Changed' : 'Changing'} ${locations.length} ${
-            locations.length === 1 ? 'file' : 'files'
-          }`
-        : `${isFinished ? 'Finished' : 'Running'} ${toolName}`;
+    : isError
+      ? `Failed ${toolName}`
+      : isDenied
+        ? `Denied ${toolName}`
+        : plan.length
+          ? `${planCompleted ? 'Completed' : 'Running'} plan`
+          : input.kind === 'edit' && locations.length > 0
+            ? `${isFinished ? 'Changed' : 'Changing'} ${locations.length} ${
+                locations.length === 1 ? 'file' : 'files'
+              }`
+            : `${isFinished ? 'Finished' : 'Running'} ${toolName}`;
   const respond = (approved: boolean) => {
     if (!openAgentId || !isApproval || !part.approval?.id) return;
     sendApproval(
@@ -70,7 +76,7 @@ export function ExternalAgentToolPart({
         </div>
       }
       content={
-        plan.length ? (
+        plan.length && !isError && !isDenied ? (
           <div className="space-y-1 px-2.5 py-2 text-xs">
             {plan.map((step) => (
               <div key={step.step} className="flex items-start gap-1.5">
@@ -98,7 +104,7 @@ export function ExternalAgentToolPart({
               </div>
             ))}
           </div>
-        ) : locations.length > 0 ? (
+        ) : locations.length > 0 && !isError && !isDenied ? (
           <div className="space-y-1 px-2.5 py-2 text-xs">
             {locations.map((location) => (
               <div
@@ -115,7 +121,12 @@ export function ExternalAgentToolPart({
               <div className="text-foreground">{input.title}</div>
             ) : null}
             {resultText ? (
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-2xs text-muted-foreground">
+              <pre
+                className={cn(
+                  'max-h-48 overflow-auto whitespace-pre-wrap font-mono text-2xs',
+                  isError ? 'text-error-foreground' : 'text-muted-foreground',
+                )}
+              >
                 {resultText}
               </pre>
             ) : null}

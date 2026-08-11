@@ -70,11 +70,18 @@ function resolveUtilityEntries(
   prefs: UtilityModelsSnapshot,
 ): CoreUtilityModelEntry[] | undefined {
   const { utilityModels, activePresetId, modelPresets } = prefs;
+  const globalEntries = (
+    task === 'title-generation'
+      ? utilityModels.titleGeneration
+      : utilityModels.contextCompression
+  )
+    ?.filter((entry) => supportsUtilityCalls(entry, prefs))
+    .map(toCoreEntry);
   // If an active preset exists, its utility model lists take
   // precedence over the global defaults. An undefined or empty list
   // means "use the main model" — we return [] so agent-core falls
-  // back to fallbackModelId (the preset's main model) instead of
-  // falling through to global defaults.
+  // back to the preset models. External-only presets cannot serve
+  // utility calls, so those use the global chain instead.
   if (activePresetId) {
     const preset = modelPresets.find((p) => p.id === activePresetId);
     if (preset) {
@@ -82,24 +89,19 @@ function resolveUtilityEntries(
         task === 'title-generation'
           ? preset.titleGeneration
           : preset.contextCompression;
-      if (presetList && presetList.length > 0) {
-        return presetList
-          .filter((entry) => supportsUtilityCalls(entry, prefs))
-          .map(toCoreEntry);
-      }
-      return [];
+      const configured = presetList
+        ?.filter((entry) => supportsUtilityCalls(entry, prefs))
+        .map(toCoreEntry);
+      if (configured?.length) return configured;
+      return preset.models?.some((entry) => supportsUtilityCalls(entry, prefs))
+        ? []
+        : globalEntries;
     }
     // Preset ID is set but the preset was deleted — treat as
     // inactive and fall through to global lists, matching
     // resolveActivePresetModels' behavior of returning undefined.
   }
-  const globalList =
-    task === 'title-generation'
-      ? utilityModels.titleGeneration
-      : utilityModels.contextCompression;
-  return globalList
-    ?.filter((entry) => supportsUtilityCalls(entry, prefs))
-    .map(toCoreEntry);
+  return globalEntries;
 }
 
 /**
@@ -207,6 +209,11 @@ export function createBrowserHostModels(
       if (!getUtilityModels) return undefined;
       return resolveUtilityEntries(task, getUtilityModels());
     },
+    supportsUtilityCalls(entry) {
+      return getUtilityModels
+        ? supportsUtilityCalls(entry, getUtilityModels())
+        : true;
+    },
     getActivePresetId() {
       if (!getUtilityModels) return undefined;
       return resolveActivePresetId(getUtilityModels());
@@ -278,6 +285,14 @@ export function createLazyBrowserHostModels(
         return inner.getUtilityModelEntries(task);
       if (!getUtilityModels) return undefined;
       return resolveUtilityEntries(task, getUtilityModels());
+    },
+    supportsUtilityCalls(entry) {
+      return (
+        inner?.supportsUtilityCalls?.(entry) ??
+        (getUtilityModels
+          ? supportsUtilityCalls(entry, getUtilityModels())
+          : true)
+      );
     },
     getActivePresetId() {
       if (inner?.getActivePresetId) return inner.getActivePresetId();
