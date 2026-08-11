@@ -56,21 +56,27 @@ function metadata(mainWorktreePath: string, workspacePath: string) {
 }
 
 async function writeSetupScript(worktreePath: string, content = 'exit 0') {
-  const scriptPath = path.join(worktreePath, '.stagewise', 'worktree-setup.sh');
+  const scriptPath = path.join(worktreePath, '.stagewise/worktree-setup.sh');
   await fs.mkdir(path.dirname(scriptPath), { recursive: true });
   await fs.writeFile(scriptPath, content);
   return scriptPath;
 }
 
 async function writePowerShellScript(worktreePath: string, content = 'exit 0') {
-  const scriptPath = path.join(
-    worktreePath,
-    '.stagewise',
-    'worktree-setup.ps1',
-  );
+  const scriptPath = path.join(worktreePath, '.stagewise/worktree-setup.ps1');
   await fs.mkdir(path.dirname(scriptPath), { recursive: true });
   await fs.writeFile(scriptPath, content);
   return scriptPath;
+}
+
+async function writeCodexFixture(worktreePath: string, content: string) {
+  const configPath = path.join(
+    worktreePath,
+    '.codex/environments/environment.toml',
+  );
+  await fs.mkdir(path.dirname(configPath), { recursive: true });
+  await fs.writeFile(configPath, content);
+  return configPath;
 }
 
 function createProcess() {
@@ -113,6 +119,25 @@ function createRunner(deps: TestRunnerDeps) {
   });
 }
 
+function createRunnerHarness(overrides: Partial<TestRunnerDeps> = {}) {
+  const { state, uiKarton } = createKarton();
+  const child = createProcess();
+  const spawnProcess = vi.fn<NonNullable<TestRunnerDeps['spawnProcess']>>(
+    () => child,
+  );
+  const runner = createRunner({
+    logger: { warn: vi.fn() } as unknown as Logger,
+    telemetryService: {
+      captureException: vi.fn(),
+    } as unknown as TelemetryService,
+    uiKarton,
+    resolvedEnvPromise: Promise.resolve(null),
+    spawnProcess,
+    ...overrides,
+  });
+  return { child, runner, spawnProcess, state };
+}
+
 describe('mergeEnv', () => {
   it('lets overrides replace base entries that differ only in case', () => {
     // Simulates Windows: process.env exposes a stale `Path`, the resolved
@@ -138,17 +163,7 @@ describe('WorktreeSetupRunner', () => {
     const mainWorktreePath = path.join(tempDir, 'main');
     const workspacePath = path.join(tempDir, 'worktree');
     await fs.mkdir(workspacePath, { recursive: true });
-    const { state, uiKarton } = createKarton();
-    const spawnProcess = vi.fn();
-    const runner = createRunner({
-      logger: { warn: vi.fn() } as unknown as Logger,
-      telemetryService: {
-        captureException: vi.fn(),
-      } as unknown as TelemetryService,
-      uiKarton,
-      resolvedEnvPromise: Promise.resolve(null),
-      spawnProcess,
-    });
+    const { runner, spawnProcess, state } = createRunnerHarness();
 
     await runner.start(metadata(mainWorktreePath, workspacePath));
 
@@ -161,18 +176,7 @@ describe('WorktreeSetupRunner', () => {
     const workspacePath = path.join(tempDir, 'worktree');
     await fs.mkdir(workspacePath, { recursive: true });
     const scriptPath = await writeSetupScript(mainWorktreePath);
-    const child = createProcess();
-    const { state, uiKarton } = createKarton();
-    const spawnProcess = vi.fn(() => child);
-    const runner = createRunner({
-      logger: { warn: vi.fn() } as unknown as Logger,
-      telemetryService: {
-        captureException: vi.fn(),
-      } as unknown as TelemetryService,
-      uiKarton,
-      resolvedEnvPromise: Promise.resolve(null),
-      spawnProcess,
-    });
+    const { child, runner, spawnProcess, state } = createRunnerHarness();
 
     await runner.start(metadata(mainWorktreePath, workspacePath));
 
@@ -190,6 +194,91 @@ describe('WorktreeSetupRunner', () => {
 
     child.emit('close', 0);
     runner.teardown();
+  });
+
+  it('falls back to the Codex setup config in the main worktree', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    const configPath = await writeCodexFixture(
+      mainWorktreePath,
+      "[setup]\nscript = 'pnpm install'\n[setup.darwin]\nscript = '   '\n",
+    );
+    const { child, runner, spawnProcess, state } = createRunnerHarness();
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'bash',
+      ['-xeo', 'pipefail', '-c', 'pnpm install'],
+      {
+        cwd: workspacePath,
+        env: expect.objectContaining({
+          CODEX_SOURCE_TREE_PATH: mainWorktreePath,
+          CODEX_WORKTREE_PATH: workspacePath,
+          STAGEWISE_TARGET_WORKTREE_PATH: workspacePath,
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    expect(state.workspaceGitSetup.runsByPath[workspacePath]).toMatchObject({
+      scriptPath: configPath,
+      status: 'running',
+    });
+
+    child.emit('close', 0);
+  });
+
+  it('prefers the stagewise setup script over the Codex config', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    const scriptPath = await writeSetupScript(mainWorktreePath);
+    await writeCodexFixture(workspacePath, "[setup]\nscript = 'codex setup'\n");
+    const { child, runner, spawnProcess } = createRunnerHarness();
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      '/bin/sh',
+      [scriptPath],
+      expect.objectContaining({
+        env: expect.not.objectContaining({
+          CODEX_WORKTREE_PATH: expect.any(String),
+        }),
+      }),
+    );
+
+    child.emit('close', 0);
+  });
+
+  it('uses the platform-specific Codex setup command on Windows', async () => {
+    const mainWorktreePath = path.join(tempDir, 'main');
+    const workspacePath = path.join(tempDir, 'worktree');
+    await fs.mkdir(workspacePath, { recursive: true });
+    await writeCodexFixture(
+      workspacePath,
+      "[setup]\nscript = 'default setup'\n[setup.win32]\nscript = 'windows setup'\n",
+    );
+    const { child, runner, spawnProcess } = createRunnerHarness({
+      resolvePowerShellCommand: () => 'powershell.exe',
+      platform: 'win32',
+    });
+
+    await runner.start(metadata(mainWorktreePath, workspacePath));
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'windows setup\nexit $LASTEXITCODE',
+      ],
+      expect.objectContaining({ cwd: workspacePath }),
+    );
+
+    child.emit('close', 0);
   });
 
   it('spawns the setup script with expected cwd and environment', async () => {

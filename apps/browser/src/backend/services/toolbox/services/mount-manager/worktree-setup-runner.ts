@@ -9,6 +9,7 @@ import {
   variantForPlatform,
 } from '@shared/worktree-setup';
 import { sanitizeEnv } from '@stagewise/agent-shell';
+import { parse } from 'smol-toml';
 import type { KartonService } from '@/services/karton';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
@@ -16,6 +17,8 @@ import type { TelemetryService } from '@/services/telemetry';
 const WORKTREE_SETUP_TIMEOUT_MS = 20 * 60 * 1000;
 const OUTPUT_TAIL_MAX_LENGTH = 12_000;
 const OUTPUT_UPDATE_INTERVAL_MS = 150;
+const CODEX_WORKTREE_SETUP_CONFIG_RELATIVE_PATH =
+  '.codex/environments/environment.toml';
 
 const WORKTREE_SETUP_TIMEOUT_MESSAGE = 'Worktree setup timed out.';
 
@@ -134,6 +137,10 @@ type ActiveRun = {
   settled: boolean;
 };
 
+type CodexSetupConfig = { script?: string } & Partial<
+  Record<'darwin' | 'linux' | 'win32', { script?: string }>
+>;
+
 function appendTail(current: string, chunk: Buffer): string {
   const next = current + chunk.toString('utf8');
   if (next.length <= OUTPUT_TAIL_MAX_LENGTH) return next;
@@ -177,20 +184,32 @@ export class WorktreeSetupRunner {
 
     const variant = variantForPlatform(this.platform);
     const relativeScriptPath = WORKTREE_SETUP_SCRIPT_RELATIVE_PATHS[variant];
-    const workspaceScriptPath = path.join(
-      metadata.workspacePath,
-      relativeScriptPath,
-    );
-    const mainWorktreeScriptPath = path.join(
-      metadata.mainWorktreePath,
-      relativeScriptPath,
-    );
-    const scriptPath = (await this.pathExists(workspaceScriptPath))
-      ? workspaceScriptPath
-      : (await this.pathExists(mainWorktreeScriptPath))
-        ? mainWorktreeScriptPath
-        : null;
-    if (!scriptPath) return;
+    let sourcePath = await this.findSetupFile(metadata, relativeScriptPath);
+    let inlineScript: string | null = null;
+
+    if (!sourcePath) {
+      sourcePath = await this.findSetupFile(
+        metadata,
+        CODEX_WORKTREE_SETUP_CONFIG_RELATIVE_PATH,
+      );
+      if (!sourcePath) return;
+      try {
+        const config = parse(await fs.readFile(sourcePath, 'utf8'));
+        const setup = config.setup as CodexSetupConfig | undefined;
+        const platformKey =
+          this.platform === 'darwin' || this.platform === 'win32'
+            ? this.platform
+            : 'linux';
+        inlineScript =
+          setup?.[platformKey]?.script?.trim() || setup?.script?.trim() || null;
+      } catch (error) {
+        this.logger.warn(
+          '[WorktreeSetupRunner] Failed to read Codex setup config',
+          { sourcePath, error },
+        );
+      }
+      if (!inlineScript) return;
+    }
 
     const runId = randomUUID();
     const startedAt = Date.now();
@@ -200,7 +219,7 @@ export class WorktreeSetupRunner {
         workspacePath: metadata.workspacePath,
         sourceWorktreePath: metadata.sourceWorktreePath,
         mainWorktreePath: metadata.mainWorktreePath,
-        scriptPath,
+        scriptPath: sourcePath,
         status: 'running',
         startedAt,
         finishedAt: null,
@@ -304,25 +323,29 @@ export class WorktreeSetupRunner {
       STAGEWISE_SOURCE_WORKTREE_PATH: metadata.sourceWorktreePath,
       STAGEWISE_TARGET_WORKTREE_PATH: metadata.workspacePath,
       STAGEWISE_MAIN_WORKTREE_PATH: metadata.mainWorktreePath,
+      ...(inlineScript !== null
+        ? {
+            CODEX_SOURCE_TREE_PATH: metadata.sourceWorktreePath,
+            CODEX_WORKTREE_PATH: metadata.workspacePath,
+          }
+        : {}),
     });
 
-    const [command, commandArgs] =
-      variant === 'powershell'
-        ? ([
-            this.resolvePowerShellCommand(env),
-            [
-              '-NoProfile',
-              '-NonInteractive',
-              '-ExecutionPolicy',
-              'Bypass',
-              '-File',
-              scriptPath,
-            ],
-          ] as const)
-        : (['/bin/sh', [scriptPath]] as const);
+    let command = inlineScript ? 'bash' : '/bin/sh';
+    let commandArgs = inlineScript
+      ? ['-xeo', 'pipefail', '-c', inlineScript]
+      : [sourcePath];
+
+    if (variant === 'powershell') {
+      command = this.resolvePowerShellCommand(env);
+      const actionArgs = inlineScript
+        ? ['-Command', `${inlineScript}\nexit $LASTEXITCODE`]
+        : ['-ExecutionPolicy', 'Bypass', '-File', sourcePath];
+      commandArgs = ['-NoProfile', '-NonInteractive', ...actionArgs];
+    }
 
     try {
-      activeRun.child = this.spawnProcess(command, [...commandArgs], {
+      activeRun.child = this.spawnProcess(command, commandArgs, {
         cwd: metadata.workspacePath,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -395,6 +418,20 @@ export class WorktreeSetupRunner {
     } catch {
       return false;
     }
+  }
+
+  private async findSetupFile(
+    metadata: WorktreeSetupMetadata,
+    relativePath: string,
+  ): Promise<string | null> {
+    for (const rootPath of [
+      metadata.workspacePath,
+      metadata.mainWorktreePath,
+    ]) {
+      const targetPath = path.join(rootPath, relativePath);
+      if (await this.pathExists(targetPath)) return targetPath;
+    }
+    return null;
   }
 
   private updateOutput(

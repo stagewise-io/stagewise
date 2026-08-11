@@ -58,6 +58,7 @@
     "react-virtuoso": "^4.18.7",
     "react-zoom-pan-pinch": "^4.0.4",
     "sharp": "^0.34.5",
+    "smol-toml": "^1.7.1",
     "tiptap-markdown": "^0.9.0",
     "web-tree-sitter": "^0.26.6",
     "yauzl": "^3.3.0"
