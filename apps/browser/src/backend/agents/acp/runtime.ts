@@ -235,10 +235,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     this.generation++;
     this.forms.cancelAll();
     this.activeToolWaiter?.();
-    for (const pending of this.pendingPermissions.values()) {
-      pending.resolve({ outcome: { outcome: 'cancelled' } });
-    }
-    this.pendingPermissions.clear();
+    this.cancelPendingPermissions();
     const client = this.client;
     const activePrompt = this.activePrompt;
     const restartAfterCancel = this.adapter?.restartAfterCancel === true;
@@ -362,7 +359,9 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     current = await this.setSelectOption(
       current,
       ['thought_level', 'reasoning_effort', 'effort'],
-      override?.enabled === false ? undefined : override?.value,
+      override?.enabled === false
+        ? findThinkingOffValue(current)
+        : override?.value,
     );
     this.sessionOptions = current;
   }
@@ -660,13 +659,14 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
 
   private markApprovalResponded(
     id: string,
-    response: ToolApprovalResponse,
+    response: Pick<ToolApprovalResponse, 'approved' | 'reason'>,
+    state: 'approval-responded' | 'output-denied' = 'approval-responded',
   ): void {
     for (const [partId, part] of this.parts) {
       if (!('approval' in part) || part.approval?.id !== id) continue;
       this.upsertPart(partId, {
         ...part,
-        state: 'approval-responded',
+        state,
         approval: {
           id,
           approved: response.approved,
@@ -837,6 +837,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
 
   private closeClient(): void {
     this.forms.cancelAll();
+    this.cancelPendingPermissions();
     this.client?.close();
     this.client = null;
     this.adapter = null;
@@ -845,6 +846,21 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     this.promptCapabilities = {};
     this.sessionId = null;
     this.sessionOptions = [];
+  }
+
+  private cancelPendingPermissions(): void {
+    for (const [id, pending] of this.pendingPermissions) {
+      pending.resolve({ outcome: { outcome: 'cancelled' } });
+      this.markApprovalResponded(
+        id,
+        {
+          approved: false,
+          reason: 'Agent session ended before approval was answered.',
+        },
+        'output-denied',
+      );
+    }
+    this.pendingPermissions.clear();
   }
 
   private async readPersistedSession(): Promise<PersistedSession | null> {
@@ -913,6 +929,23 @@ function flattenConfigOptions(
   return option.options.flatMap((entry) =>
     'group' in entry ? entry.options : [entry],
   );
+}
+
+function findThinkingOffValue(
+  options: SessionConfigOption[],
+): string | undefined {
+  return options
+    .flatMap((option) =>
+      option.type === 'select' &&
+      ['thought_level', 'reasoning_effort', 'effort'].some(
+        (id) => id === option.id || id === option.category,
+      )
+        ? flattenConfigOptions(option)
+        : [],
+    )
+    .find((option) =>
+      ['none', 'off', 'disabled'].includes(option.value.toLowerCase()),
+    )?.value;
 }
 
 function isJsonObject(value: unknown): value is JsonObject {

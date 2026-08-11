@@ -5,7 +5,6 @@ import type {
   RequestPermissionResponse,
   SessionConfigOption,
   SessionNotification,
-  ToolCall,
 } from '@agentclientprotocol/sdk';
 import type {
   ExternalAgentRuntimeContext,
@@ -21,6 +20,7 @@ import type { Logger } from '@/services/logger';
 import type { AcpAdapter } from './adapter';
 import { ACP_ADAPTERS } from './adapter-registry';
 import { AcpAgentRuntime } from './runtime';
+import type { ToolState } from './tool-mapper';
 
 type RuntimeInternals = {
   stopped: boolean;
@@ -66,11 +66,12 @@ type RuntimeInternals = {
     options: SessionConfigOption[],
   ): Promise<void>;
   handleSessionUpdate(notification: SessionNotification): void;
-  upsertTool(tool: ToolCall): void;
+  upsertTool(tool: ToolState): void;
   promptUntilSettled(
     prompt: Array<{ type: 'text'; text: string }>,
     generation: number,
   ): Promise<void>;
+  closeClient(): void;
 };
 
 const permissionOptions: RequestPermissionRequest['options'] = [
@@ -452,8 +453,9 @@ describe('AcpAgentRuntime translation', () => {
     expect(messages.at(-1)?.parts[0]).not.toHaveProperty('input.patchText');
   });
 
-  it('normalizes OpenCode apply_patch metadata into native diffs', () => {
-    const tool = ACP_ADAPTERS.opencode.normalizeTool?.({
+  it('normalizes OpenCode apply_patch metadata and renders deletes', () => {
+    const { runtime, messages } = createRuntime();
+    const tool = ACP_ADAPTERS.opencode.normalizeTool!({
       toolCallId: 'patch-1',
       title: 'Success. Updated the following files',
       kind: 'edit',
@@ -466,6 +468,12 @@ describe('AcpAgentRuntime translation', () => {
               type: 'update',
               patch:
                 '--- /repo/src/b.ts\n+++ /repo/src/b.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n context\n@@ -10 +10 @@\n-old two\n+new two\n',
+            },
+            {
+              filePath: '/repo/src/old.ts',
+              type: 'delete',
+              patch:
+                '--- /repo/src/old.ts\n+++ /dev/null\n@@ -1 +0,0 @@\n-old\n',
             },
           ],
         },
@@ -485,7 +493,20 @@ describe('AcpAgentRuntime translation', () => {
         oldText: 'old two\n',
         newText: 'new two\n',
       },
+      {
+        type: 'diff',
+        path: '/repo/src/old.ts',
+        oldText: 'old\n',
+        newText: '',
+        _meta: { stagewiseOperation: 'delete' },
+      },
     ]);
+    runtime.upsertTool(tool);
+    expect(messages.at(-1)?.parts[2]).toMatchObject({
+      type: 'tool-delete',
+      input: { path: 'workspace/src/old.ts' },
+      output: { _diff: { before: 'old\n', after: null } },
+    });
   });
 
   it('shows MCP questions natively and hides their technical tool call', async () => {
@@ -763,6 +784,32 @@ describe('AcpAgentRuntime translation', () => {
     });
     await expect(permission).resolves.toEqual({
       outcome: { outcome: 'selected', optionId: 'reject' },
+    });
+  });
+
+  it('cancels pending approvals when the ACP client closes', async () => {
+    const { runtime, messages } = createRuntime();
+    runtime.sessionId = 'session-1';
+    runtime.approvalMode = 'alwaysAsk';
+    const permission = runtime.handlePermission({
+      sessionId: 'session-1',
+      toolCall: {
+        toolCallId: 'command-1',
+        title: 'Create directory',
+        kind: 'execute',
+        status: 'pending',
+      },
+      options: permissionOptions,
+    });
+
+    runtime.closeClient();
+
+    await expect(permission).resolves.toEqual({
+      outcome: { outcome: 'cancelled' },
+    });
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      state: 'output-denied',
+      approval: { approved: false },
     });
   });
 
@@ -1096,6 +1143,16 @@ describe('AcpAgentRuntime translation', () => {
           { value: 'agent', name: 'Agent' },
         ],
       },
+      {
+        id: 'reasoning_effort',
+        name: 'Reasoning effort',
+        type: 'select',
+        currentValue: 'high',
+        options: [
+          { value: 'none', name: 'None' },
+          { value: 'high', name: 'High' },
+        ],
+      },
     ];
     const setConfigOption = vi.fn().mockResolvedValue({
       configOptions: nextOptions,
@@ -1109,7 +1166,10 @@ describe('AcpAgentRuntime translation', () => {
     };
 
     await runtime.applySessionOptions(
-      { modelId: 'model-1' } as UtilityModelEntry,
+      {
+        modelId: 'model-1',
+        thinkingOverride: { enabled: false, value: 'high' },
+      },
       [
         {
           ...nextOptions[0],
@@ -1118,10 +1178,15 @@ describe('AcpAgentRuntime translation', () => {
       ],
     );
 
-    expect(setConfigOption).toHaveBeenCalledWith({
+    expect(setConfigOption).toHaveBeenNthCalledWith(1, {
       sessionId: 'session-1',
       configId: 'mode',
       value: 'read-only',
+    });
+    expect(setConfigOption).toHaveBeenNthCalledWith(2, {
+      sessionId: 'session-1',
+      configId: 'reasoning_effort',
+      value: 'none',
     });
   });
 

@@ -34,6 +34,7 @@ function fileDiff(value: unknown) {
         path: filePath,
         oldText: type === 'add' ? null : hunkSide(hunk.lines, '+'),
         newText: hunkSide(hunk.lines, '-'),
+        _meta: type === 'delete' ? { stagewiseOperation: 'delete' } : undefined,
       })),
     );
   } catch {

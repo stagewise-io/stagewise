@@ -256,7 +256,7 @@ function createDiffToolPart(
 ): JsonObject {
   const state = toolPartState(tool);
   const path = toMountedPath(diff.path, mountedPaths);
-  if (tool.kind === 'delete') {
+  if (tool.kind === 'delete' || diff._meta?.stagewiseOperation === 'delete') {
     return {
       type: 'tool-delete',
       toolCallId,
