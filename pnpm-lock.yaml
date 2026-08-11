@@ -257,6 +257,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      smol-toml:
+        specifier: ^1.7.1
+        version: 1.7.1
       tiptap-markdown:
         specifier: ^0.9.0
         version: 0.9.0(@tiptap/core@3.23.1(@tiptap/pm@3.23.1))
@@ -10378,6 +10381,10 @@ packages:
   smart-buffer@4.2.0:
     resolution: {integrity: sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==}
     engines: {node: '>= 6.0.0', npm: '>= 3.0.0'}
+
+  smol-toml@1.7.1:
+    resolution: {integrity: sha512-PPlsspAZ4jbMBu5DMFhfUGDQLu/vrL4SyBROVS37x8ynnVmFIs1VPBz1Co8Xks3TvpIaZXmU85y4DrQ+UyVFoQ==}
+    engines: {node: '>= 18'}
 
   socks-proxy-agent@7.0.0:
     resolution: {integrity: sha512-Fgl0YPZ902wEsAyiQ+idGd1A7rSFx/ayC1CQVMw5P+EQx2V0SgpGtf6OKFhVjPflPUl9YMmEOnmfjCdMUsygww==}
@@ -22211,6 +22218,8 @@ snapshots:
       is-fullwidth-code-point: 4.0.0
 
   smart-buffer@4.2.0: {}
+
+  smol-toml@1.7.1: {}
 
   socks-proxy-agent@7.0.0:
     dependencies:

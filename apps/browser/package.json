@@ -57,6 +57,7 @@
     "prosemirror-highlight": "^0.15.1",
     "react-virtuoso": "^4.18.7",
     "sharp": "^0.34.5",
+    "smol-toml": "^1.7.1",
     "tiptap-markdown": "^0.9.0",
     "web-tree-sitter": "^0.26.6",
     "yauzl": "^3.3.0"
