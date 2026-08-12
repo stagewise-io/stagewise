@@ -3,6 +3,10 @@ import path from 'node:path';
 import type { GitService } from '@/services/git';
 import type { Logger } from '@/services/logger';
 import type { UserExperienceService } from '@/services/experience';
+import {
+  CODEX_WORKTREE_SETUP_CONFIG_RELATIVE_PATH,
+  readCodexSetupScript,
+} from '@/services/codex-worktree-setup';
 import { getWorktreesDir } from '@/utils/paths';
 import type {
   DeleteWorktreeSetupWorktreeResult,
@@ -339,12 +343,28 @@ export class WorktreeSetupSettingsService {
       mainWorktreePath,
       repositoryId,
       scripts,
+      hasCodexSetupScript: await this.hasCodexSetupScript(
+        path.join(mainWorktreePath, CODEX_WORKTREE_SETUP_CONFIG_RELATIVE_PATH),
+      ),
       managedWorktrees: this.filterManagedWorktreesForRepository(
         mainWorktreePath,
         repositoryId,
         managedWorktrees,
       ),
     };
+  }
+
+  private async hasCodexSetupScript(configPath: string): Promise<boolean> {
+    try {
+      return Boolean(await readCodexSetupScript(configPath, process.platform));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        this.logger.debug(
+          `[WorktreeSetupSettings] Failed to read Codex setup config ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      return false;
+    }
   }
 
   private async readScriptContent(scriptPath: string): Promise<string | null> {

@@ -9,7 +9,10 @@ import {
   variantForPlatform,
 } from '@shared/worktree-setup';
 import { sanitizeEnv } from '@stagewise/agent-shell';
-import { parse } from 'smol-toml';
+import {
+  CODEX_WORKTREE_SETUP_CONFIG_RELATIVE_PATH,
+  readCodexSetupScript,
+} from '@/services/codex-worktree-setup';
 import type { KartonService } from '@/services/karton';
 import type { Logger } from '@/services/logger';
 import type { TelemetryService } from '@/services/telemetry';
@@ -17,9 +20,6 @@ import type { TelemetryService } from '@/services/telemetry';
 const WORKTREE_SETUP_TIMEOUT_MS = 20 * 60 * 1000;
 const OUTPUT_TAIL_MAX_LENGTH = 12_000;
 const OUTPUT_UPDATE_INTERVAL_MS = 150;
-const CODEX_WORKTREE_SETUP_CONFIG_RELATIVE_PATH =
-  '.codex/environments/environment.toml';
-
 const WORKTREE_SETUP_TIMEOUT_MESSAGE = 'Worktree setup timed out.';
 
 const EXPECTED_FAILURE_MESSAGES = new Set([
@@ -137,10 +137,6 @@ type ActiveRun = {
   settled: boolean;
 };
 
-type CodexSetupConfig = { script?: string } & Partial<
-  Record<'darwin' | 'linux' | 'win32', { script?: string }>
->;
-
 function appendTail(current: string, chunk: Buffer): string {
   const next = current + chunk.toString('utf8');
   if (next.length <= OUTPUT_TAIL_MAX_LENGTH) return next;
@@ -194,14 +190,7 @@ export class WorktreeSetupRunner {
       );
       if (!sourcePath) return;
       try {
-        const config = parse(await fs.readFile(sourcePath, 'utf8'));
-        const setup = config.setup as CodexSetupConfig | undefined;
-        const platformKey =
-          this.platform === 'darwin' || this.platform === 'win32'
-            ? this.platform
-            : 'linux';
-        inlineScript =
-          setup?.[platformKey]?.script?.trim() || setup?.script?.trim() || null;
+        inlineScript = await readCodexSetupScript(sourcePath, this.platform);
       } catch (error) {
         this.logger.warn(
           '[WorktreeSetupRunner] Failed to read Codex setup config',

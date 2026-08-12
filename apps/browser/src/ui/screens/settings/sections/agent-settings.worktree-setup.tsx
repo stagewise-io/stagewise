@@ -37,6 +37,7 @@ import {
 } from '@shared/worktree-setup';
 import {
   IconBranchOutOutline18,
+  IconCircleInfoOutline18,
   IconCircleQuestionOutline18,
   IconTrashOutline18,
 } from '@stagewise/icons';
@@ -452,6 +453,16 @@ function RepositoryDetails({
             </FileContextMenu>
           </div>
         </div>
+        {repository.hasCodexSetupScript && (
+          <div className="flex items-start gap-2 rounded-md bg-info-background/45 p-2 text-info-foreground text-xs leading-snug ring-1 ring-info-solid/20">
+            <IconCircleInfoOutline18 className="mt-0.5 size-3.5 shrink-0" />
+            <p>
+              <span className="font-medium">Codex setup detected.</span> It is
+              configured in the main worktree for this platform and may be used
+              as a fallback when creating worktrees.
+            </p>
+          </div>
+        )}
         <Tabs
           value={activeVariant}
           onValueChange={(value) =>

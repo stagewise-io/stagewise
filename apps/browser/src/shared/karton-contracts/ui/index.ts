@@ -221,6 +221,7 @@ export type WorktreeSetupRepositorySettings = {
   mainWorktreePath: string;
   repositoryId: string | null;
   scripts: Record<WorktreeSetupScriptVariant, WorktreeSetupScriptFile>;
+  hasCodexSetupScript: boolean;
   managedWorktrees: WorktreeSetupManagedWorktree[];
 };
 
