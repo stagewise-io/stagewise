@@ -99,7 +99,7 @@
     "@stagewise/karton": "workspace:*",
     "@stagewise/stage-ui": "workspace:*",
     "@stagewise/tailwindcss-color-modifiers": "workspace:*",
-    "@storybook/addon-docs": "^10.3.6",
+    "@storybook/addon-docs": "^10.5.7",
     "@storybook/addon-onboarding": "10.3.6",
     "@storybook/react": "^10.3.6",
     "@storybook/react-dom-shim": "^10.3.6",
