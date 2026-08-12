@@ -235,12 +235,12 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     return true;
   }
 
-  public async stop(): Promise<void> {
+  public async stop(approvalDenyReason?: string): Promise<void> {
     this.stopped = true;
     this.generation++;
     this.forms.cancelAll();
     this.activeToolWaiter?.();
-    this.cancelPendingPermissions();
+    this.cancelPendingPermissions(approvalDenyReason);
     const client = this.client;
     const activePrompt = this.activePrompt;
     const restartAfterCancel = this.adapter?.restartAfterCancel === true;
@@ -858,14 +858,16 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     this.sessionOptions = [];
   }
 
-  private cancelPendingPermissions(): void {
+  private cancelPendingPermissions(
+    reason = 'Agent session ended before approval was answered.',
+  ): void {
     for (const [id, pending] of this.pendingPermissions) {
       pending.resolve({ outcome: { outcome: 'cancelled' } });
       this.markApprovalResponded(
         id,
         {
           approved: false,
-          reason: 'Agent session ended before approval was answered.',
+          reason,
         },
         'output-denied',
       );

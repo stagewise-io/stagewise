@@ -3349,7 +3349,7 @@ export abstract class BaseAgent<
             'User sent new message before tool call approval was granted.');
 
     try {
-      await this.externalRuntime?.stop();
+      await this.externalRuntime?.stop(toolCallRequestApprovalAbortReason);
     } catch (error) {
       this.host.logger.error(
         `[BaseAgent:${this.instanceId}] External runtime stop failed`,
