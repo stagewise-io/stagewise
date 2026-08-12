@@ -31,5 +31,8 @@ describe('BaseAgent stop ordering', () => {
     await agent.stop();
 
     expect(calls).toEqual(['external', 'terminalize']);
+    expect(agent.externalRuntime.stop).toHaveBeenCalledWith(
+      'User stopped agent before tool call approval was granted.',
+    );
   });
 });

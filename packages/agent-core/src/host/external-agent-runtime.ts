@@ -22,7 +22,7 @@ export interface ExternalAgentRuntime {
     approvalMode: string;
   }): Promise<void>;
   respondToApproval(response: ToolApprovalResponse): Promise<boolean>;
-  stop(): Promise<void>;
+  stop(approvalDenyReason?: string): Promise<void>;
   resetThread?(): Promise<void>;
   teardown(): Promise<void>;
 }

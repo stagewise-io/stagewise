@@ -72,6 +72,7 @@ type RuntimeInternals = {
     generation: number,
   ): Promise<void>;
   closeClient(): void;
+  stop(approvalDenyReason?: string): Promise<void>;
 };
 
 const permissionOptions: RequestPermissionRequest['options'] = [
@@ -830,6 +831,25 @@ describe('AcpAgentRuntime translation', () => {
     expect(messages.at(-1)?.parts[0]).toMatchObject({
       state: 'output-denied',
       approval: { approved: false },
+    });
+  });
+
+  it('keeps the host reason when stopping a pending approval', async () => {
+    const { runtime, messages } = createRuntime();
+    runtime.sessionId = 'session-1';
+    runtime.approvalMode = 'alwaysAsk';
+    const permission = runtime.handlePermission(
+      commandPermissionRequest('Create directory', 'mkdir test'),
+    );
+
+    await runtime.stop('Stopped by the user.');
+
+    await expect(permission).resolves.toEqual({
+      outcome: { outcome: 'cancelled' },
+    });
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      state: 'output-denied',
+      approval: { approved: false, reason: 'Stopped by the user.' },
     });
   });
 
