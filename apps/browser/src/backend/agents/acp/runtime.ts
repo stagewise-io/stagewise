@@ -54,6 +54,10 @@ type ClassifyCommand = (input: {
   cwdPrefix: string;
   agentExplanation: string;
 }) => Promise<{ needsApproval: boolean; explanation: string }>;
+type RecordApprovalExplanation = (
+  toolCallId: string,
+  explanation: string,
+) => void;
 
 interface PersistedSession {
   version: 2;
@@ -117,6 +121,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     private readonly resolveEnvironment: ResolveAcpEnvironment,
     stagewiseMcpScriptPath: string,
     private readonly classifyCommand?: ClassifyCommand,
+    private readonly recordApprovalExplanation?: RecordApprovalExplanation,
   ) {
     this.sessionFilePath = nodePath.join(agentDirectory, 'acp-session.json');
     this.forms = new StagewiseFormLifecycle(
@@ -593,20 +598,25 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
       tool.kind === 'execute' &&
       this.classifyCommand
     ) {
-      try {
-        const decision = await this.classifyCommand({
-          toolCallId: tool.toolCallId,
-          command: commandFromTool(tool),
-          cwdPrefix: primaryMountPrefix(this.context.getMountedPaths()),
-          agentExplanation: tool.title ?? '',
-        });
-        if (!decision.needsApproval) {
-          return permissionResponse(request.options, true);
-        }
-      } catch (error) {
+      const generation = this.generation;
+      const decision = await this.classifyCommand({
+        toolCallId: tool.toolCallId,
+        command: commandFromTool(tool),
+        cwdPrefix: primaryMountPrefix(this.context.getMountedPaths()),
+        agentExplanation: tool.title ?? '',
+      }).catch((error) => {
         this.logger.warn('[ACP runtime] Smart approval failed closed', {
           error,
         });
+      });
+      if (!this.isCurrent(generation) || request.sessionId !== this.sessionId) {
+        return { outcome: { outcome: 'cancelled' } };
+      }
+      if (decision?.needsApproval === false) {
+        return permissionResponse(request.options, true);
+      }
+      if (decision) {
+        this.recordApprovalExplanation?.(tool.toolCallId, decision.explanation);
       }
     }
 

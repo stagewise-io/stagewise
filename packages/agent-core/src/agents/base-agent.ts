@@ -3348,11 +3348,6 @@ export abstract class BaseAgent<
           : (this.config.flushQueueToolCallRequestApprovalReason ??
             'User sent new message before tool call approval was granted.');
 
-    this.state.commands.terminateNonTerminalToolPartsInLastAssistant({
-      approvalDenyReason: toolCallRequestApprovalAbortReason,
-      outputErrorText: toolCallAbortReason,
-    });
-
     try {
       await this.externalRuntime?.stop();
     } catch (error) {
@@ -3361,6 +3356,11 @@ export abstract class BaseAgent<
         error,
       );
     }
+
+    this.state.commands.terminateNonTerminalToolPartsInLastAssistant({
+      approvalDenyReason: toolCallRequestApprovalAbortReason,
+      outputErrorText: toolCallAbortReason,
+    });
   }
 
   /**

@@ -620,22 +620,19 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       agentCoreHost.paths.agentDir(context.instanceId),
       resolveAcpEnvironment,
       stagewiseMcpScriptPath,
-      async (input) => {
-        const result = await classifyShellCommand(
+      (input) =>
+        classifyShellCommand(
           { ...input, shellTail: '' },
           modelProviderService,
           context.instanceId,
           telemetryService,
-        );
-        if (result.needsApproval) {
-          agentCoreSeam.hostAgentStateMutations.recordPendingApproval(
-            context.instanceId,
-            input.toolCallId,
-            result.explanation,
-          );
-        }
-        return result;
-      },
+        ),
+      (toolCallId, explanation) =>
+        agentCoreSeam.hostAgentStateMutations.recordPendingApproval(
+          context.instanceId,
+          toolCallId,
+          explanation,
+        ),
     );
 
   // Wire the model-provider into the toolbox so the shell tool can run the
