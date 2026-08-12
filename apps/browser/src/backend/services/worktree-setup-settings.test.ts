@@ -129,7 +129,32 @@ async function createManagedWorktree(relativePath = 'repo-hash/feature-a') {
   return await fs.realpath(worktreePath);
 }
 
+async function writeCodexSetupConfig(content: string) {
+  const configPath = path.join(
+    repoPath,
+    '.codex/environments/environment.toml',
+  );
+  await fs.mkdir(path.dirname(configPath), { recursive: true });
+  await fs.writeFile(configPath, content);
+}
+
 describe('WorktreeSetupSettingsService', () => {
+  it('reports a usable Codex setup config', async () => {
+    await writeCodexSetupConfig('[setup]\nscript = "pnpm install"\n');
+
+    const result = await createService().service.listRepositories();
+
+    expect(result.repositories[0]?.hasCodexSetupScript).toBe(true);
+  });
+
+  it('does not report a Codex config without a setup script', async () => {
+    await writeCodexSetupConfig('[setup]\n');
+
+    const result = await createService().service.listRepositories();
+
+    expect(result.repositories[0]?.hasCodexSetupScript).toBe(false);
+  });
+
   it('rejects setup script saves for unknown repositories', async () => {
     const { service } = createService({ recentPaths: [] });
 
