@@ -79,6 +79,23 @@ const permissionOptions: RequestPermissionRequest['options'] = [
   { optionId: 'reject', name: 'Reject', kind: 'reject_once' },
 ];
 
+function commandPermissionRequest(
+  title: string,
+  command: string,
+): RequestPermissionRequest {
+  return {
+    sessionId: 'session-1',
+    toolCall: {
+      toolCallId: 'command-1',
+      title,
+      kind: 'execute',
+      status: 'pending',
+      rawInput: { command },
+    },
+    options: permissionOptions,
+  };
+}
+
 function createRuntime(
   requestUserInput = vi.fn(),
   writeAttachment = vi.fn().mockResolvedValue(undefined),
@@ -87,6 +104,7 @@ function createRuntime(
     providerInstanceId?: string,
   ) => 'codex' | 'stagewise' = () => 'codex',
   agentDirectory = '/agent',
+  recordApprovalExplanation = vi.fn(),
 ) {
   const messages: Array<AgentMessage & { role: 'assistant' }> = [];
   const context = {
@@ -109,6 +127,7 @@ function createRuntime(
     () => Promise.resolve({}),
     '/stagewise-mcp-server.mjs',
     classifyCommand,
+    recordApprovalExplanation,
   );
   Object.assign(runtime, {
     stopped: false,
@@ -120,6 +139,7 @@ function createRuntime(
     messages,
     context,
     writeAttachment,
+    recordApprovalExplanation,
   };
 }
 
@@ -1002,17 +1022,9 @@ describe('AcpAgentRuntime translation', () => {
     runtime.approvalMode = 'smart';
 
     await expect(
-      runtime.handlePermission({
-        sessionId: 'session-1',
-        toolCall: {
-          toolCallId: 'command-1',
-          title: 'Inspect status',
-          kind: 'execute',
-          status: 'pending',
-          rawInput: { command: 'git status --short' },
-        },
-        options: permissionOptions,
-      }),
+      runtime.handlePermission(
+        commandPermissionRequest('Inspect status', 'git status --short'),
+      ),
     ).resolves.toEqual({
       outcome: { outcome: 'selected', optionId: 'allow' },
     });
@@ -1023,6 +1035,73 @@ describe('AcpAgentRuntime translation', () => {
       agentExplanation: 'Inspect status',
     });
     expect(messages).toEqual([]);
+  });
+
+  it('records why a smart-approved command needs confirmation', async () => {
+    const classifyCommand = vi.fn().mockResolvedValue({
+      needsApproval: true,
+      explanation: 'Publishes a package.',
+    });
+    const { runtime, recordApprovalExplanation } = createRuntime(
+      vi.fn(),
+      vi.fn().mockResolvedValue(undefined),
+      classifyCommand,
+    );
+    runtime.sessionId = 'session-1';
+    runtime.approvalMode = 'smart';
+
+    const permission = runtime.handlePermission(
+      commandPermissionRequest('Publish package', 'npm publish'),
+    );
+    await vi.waitFor(() => {
+      expect(recordApprovalExplanation).toHaveBeenCalledWith(
+        'command-1',
+        'Publishes a package.',
+      );
+    });
+
+    await runtime.stop();
+    await expect(permission).resolves.toEqual({
+      outcome: { outcome: 'cancelled' },
+    });
+  });
+
+  it('discards smart approval results after the turn stops', async () => {
+    let resolveClassification!: (value: {
+      needsApproval: boolean;
+      explanation: string;
+    }) => void;
+    const classifyCommand = vi.fn(
+      () =>
+        new Promise<{
+          needsApproval: boolean;
+          explanation: string;
+        }>((resolve) => {
+          resolveClassification = resolve;
+        }),
+    );
+    const { runtime, context, recordApprovalExplanation } = createRuntime(
+      vi.fn(),
+      vi.fn().mockResolvedValue(undefined),
+      classifyCommand,
+    );
+    runtime.sessionId = 'session-1';
+    runtime.approvalMode = 'smart';
+
+    const pending = runtime.handlePermission(
+      commandPermissionRequest('Publish package', 'npm publish'),
+    );
+    await runtime.stop();
+    resolveClassification({
+      needsApproval: true,
+      explanation: 'Publishes a package.',
+    });
+
+    await expect(pending).resolves.toEqual({
+      outcome: { outcome: 'cancelled' },
+    });
+    expect(context.notifyApprovalRequested).not.toHaveBeenCalled();
+    expect(recordApprovalExplanation).not.toHaveBeenCalled();
   });
 
   it('continues OpenCode after a rejected permission ends its prompt', async () => {

@@ -106,11 +106,7 @@ export class AcpProcessClient {
         ),
       );
     });
-    connection.closed.catch((error) => {
-      this.logger.warn(`[${this.adapter.displayName} ACP] connection closed`, {
-        error,
-      });
-    });
+    void connection.closed.then(() => this.handleConnectionClosed(connection));
 
     try {
       return await withTimeout(
@@ -200,6 +196,12 @@ export class AcpProcessClient {
     this.connection = null;
     this.nodeExecutable = null;
     connection.close(error);
+  }
+
+  private handleConnectionClosed(connection: ClientConnection): void {
+    if (this.connection !== connection) return;
+    this.logger.warn(`[${this.adapter.displayName} ACP] connection closed`);
+    this.close();
   }
 }
 
