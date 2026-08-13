@@ -9,6 +9,7 @@ import type { LanguageModelMiddleware } from 'ai';
 import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import { getCodexChatGptAuth, type CodexChatGptAuth } from './chatgpt-auth';
 import { discoverCodexModels } from './models';
+import { getCodexUsageLimits } from './usage';
 import type { ProviderType } from '../types';
 
 const CODEX_RESPONSES_BASE_URL = 'https://chatgpt.com/backend-api/codex';
@@ -156,6 +157,7 @@ export const codexStagewiseProviderType: ProviderType = {
   sensitiveFields: [],
 
   getInitialModels: discoverCodexModels,
+  getUsageLimits: getCodexUsageLimits,
 
   createLanguageModel({ modelId }) {
     const openai = createOpenAI({

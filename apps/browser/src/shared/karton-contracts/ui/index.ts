@@ -43,6 +43,7 @@ import type {
   SocialAuthProvider,
   DiscoveredModel,
   ProviderInstanceTypeId,
+  ProviderUsageLimits,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -2205,6 +2206,9 @@ export type KartonContract = {
       getLocalAgentAvailability: (
         typeId: ProviderInstanceTypeId,
       ) => Promise<{ installed: boolean; error?: string }>;
+      getProviderUsageLimits: (
+        instanceId: string,
+      ) => Promise<ProviderUsageLimits>;
       /** Remove a provider instance by id */
       removeProviderInstance: (instanceId: string) => Promise<void>;
       /**

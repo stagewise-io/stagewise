@@ -466,6 +466,11 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
 ]);
 export type ProviderInstance = z.infer<typeof providerInstanceSchema>;
 
+export type ProviderUsageLimits = Array<{
+  label: string;
+  usedPercent: number;
+}>;
+
 /**
  * The kind of credential input the settings detail page should render
  * for a provider instance type. This drives the declarative UI — the

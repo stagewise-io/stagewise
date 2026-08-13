@@ -9,6 +9,7 @@ import {
   createAcpProviderType,
   DEFAULT_ACP_MODEL_CAPABILITIES,
 } from '../external-agent';
+import { getOpenCodeUsageLimits } from './usage';
 
 const execFileAsync = promisify(execFile);
 
@@ -113,4 +114,5 @@ const providerType = createAcpProviderType('opencode', discoverOpenCodeModels);
 export const opencodeProviderType = {
   ...providerType,
   refreshModels: discoverOpenCodeModels,
+  getUsageLimits: getOpenCodeUsageLimits,
 };

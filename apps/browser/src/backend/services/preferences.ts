@@ -749,6 +749,12 @@ export class PreferencesService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'preferences.getProviderUsageLimits',
+      async (_callingClientId: string, instanceId: string) =>
+        this.getProviderUsageLimits(instanceId),
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'preferences.removeProviderInstance',
       async (_callingClientId: string, instanceId: string) => {
         await this.removeProviderInstance(instanceId);
@@ -2094,6 +2100,14 @@ export class PreferencesService extends DisposableService {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  public async getProviderUsageLimits(instanceId: string) {
+    const instance = this.preferences.providerInstances.find(
+      (candidate) => candidate.id === instanceId,
+    );
+    if (!instance) throw new Error(`Provider instance ${instanceId} not found`);
+    return (await getProviderType(instance.typeId).getUsageLimits?.()) ?? [];
   }
 
   /**

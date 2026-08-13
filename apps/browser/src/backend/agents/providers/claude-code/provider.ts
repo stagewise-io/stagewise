@@ -3,6 +3,7 @@ import {
   createAcpProviderType,
   DEFAULT_ACP_MODEL_CAPABILITIES,
 } from '../external-agent';
+import { getClaudeCodeUsageLimits } from './usage';
 
 const thinking: Pick<
   DiscoveredModel,
@@ -44,7 +45,7 @@ const models: DiscoveredModel[] = [
   model('haiku', 'Haiku', 'Claude Code Haiku alias.'),
 ];
 
-export const claudeCodeProviderType = createAcpProviderType(
-  'claude-code',
-  async () => models,
-);
+export const claudeCodeProviderType = {
+  ...createAcpProviderType('claude-code', async () => models),
+  getUsageLimits: getClaudeCodeUsageLimits,
+};
