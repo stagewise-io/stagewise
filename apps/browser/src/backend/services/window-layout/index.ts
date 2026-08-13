@@ -22,6 +22,12 @@ import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
 import { UIController } from './ui-controller';
 import {
+  authorizeCeremony,
+  shouldUseLocalAuthenticator,
+  SystemPasskeyRelay,
+} from './system-passkey-relay';
+import { PersistedPasskeyCredentialStore } from './tab-passkey-authenticator/credential-store';
+import {
   BrowsingTabController,
   type ConsoleLogEntry,
   type GetConsoleLogsOptions,
@@ -456,6 +462,9 @@ export class WindowLayoutService extends DisposableService {
   private uiZoomPreferenceListener:
     | ((newPrefs: UserPreferences, oldPrefs: UserPreferences) => void)
     | null = null;
+
+  /** Runs WebAuthn ceremonies in a real browser on behalf of browsing tabs. */
+  private passkeyRelay: SystemPasskeyRelay | null = null;
   private readonly attachments: AttachmentsService;
 
   private constructor(
@@ -746,6 +755,9 @@ export class WindowLayoutService extends DisposableService {
     }
 
     ipcMain.removeHandler('request-turnstile-token');
+    ipcMain.removeHandler('passkey-relay-ceremony');
+    void this.passkeyRelay?.teardown();
+    this.passkeyRelay = null;
 
     app.applicationMenu = null;
 
@@ -1207,6 +1219,98 @@ export class WindowLayoutService extends DisposableService {
     );
     this.logger.debug(
       '[WindowLayoutService] Listening for turnstile proxy requests',
+    );
+
+    // Passkey relay: run WebAuthn ceremonies in a real browser, so pages in the
+    // preview browser can use the passkeys already on this machine.
+    this.passkeyRelay = new SystemPasskeyRelay(this.logger);
+    ipcMain.handle(
+      'passkey-relay-ceremony',
+      // Everything in `request` comes from a web page, so nothing about its
+      // shape is promised; `authorizeCeremony` is what decides it is usable.
+      async (event, request: { kind?: unknown; options?: unknown }) => {
+        const relay = this.passkeyRelay;
+        if (!relay?.available) return { ok: false, error: 'NoSystemBrowser' };
+        // Asking before finding out the browser is taken would spend a prompt
+        // on a ceremony that cannot run.
+        if (relay.running) return { ok: false, error: 'RelayBusy' };
+
+        const frame = event.senderFrame;
+        const allowed = authorizeCeremony({
+          kind: request?.kind,
+          inBrowsingSession:
+            event.sender.session ===
+            session.fromPartition('persist:browser-content'),
+          isMainFrame: Boolean(frame) && frame === event.sender.mainFrame,
+          frameOrigin: frame?.origin ?? null,
+        });
+        if (!allowed.ok) {
+          this.logger.debug(
+            `[SystemPasskeyRelay] Refused a ceremony: ${allowed.error}`,
+          );
+          return allowed;
+        }
+
+        // A passkey registered inside the preview browser lives in this tab's
+        // virtual authenticator, and the tab can answer for it without opening
+        // anything or asking the user anything.
+        if (
+          shouldUseLocalAuthenticator(
+            request.options,
+            allowed.origin,
+            PersistedPasskeyCredentialStore.getInstance(this.logger).list(),
+          )
+        ) {
+          this.logger.debug(
+            `[SystemPasskeyRelay] ${allowed.origin} has a passkey in this tab; not relaying`,
+          );
+          return { ok: false, error: 'UseLocalAuthenticator' };
+        }
+
+        // Relaying opens a browser outside the app and can return an assertion
+        // for a real account, so the site asks first, on the same terms as any
+        // other capability a page can reach for.
+        const permitted =
+          await SessionPermissionRegistry.getInstance()?.requestPasskeyRelay(
+            event.sender.id,
+            allowed.origin,
+          );
+        if (!permitted) {
+          this.logger.debug(
+            `[SystemPasskeyRelay] ${allowed.origin} was not permitted to use system passkeys`,
+          );
+          return { ok: false, error: 'PermissionDenied' };
+        }
+
+        this.logger.debug(
+          `[SystemPasskeyRelay] Running get for ${allowed.origin}`,
+        );
+        // If the tab is gone there is no one left to hand the assertion to, and
+        // the helper window would sit there until the ceremony timed out.
+        const abandon = () => relay.cancel();
+        event.sender.once('destroyed', abandon);
+        let result: Awaited<ReturnType<typeof relay.run>>;
+        try {
+          result = await relay.run(allowed.origin, request.options);
+        } finally {
+          try {
+            event.sender.removeListener('destroyed', abandon);
+          } catch {
+            // The tab took its emitter with it.
+          }
+        }
+        this.logger.debug(
+          `[SystemPasskeyRelay] get for ${allowed.origin}: ${
+            result.ok ? 'credential returned' : result.error
+          }`,
+        );
+        return result;
+      },
+    );
+    this.logger.debug(
+      `[WindowLayoutService] Passkey relay browser: ${
+        this.passkeyRelay.browserName ?? 'none found'
+      }`,
     );
   }
 

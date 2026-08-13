@@ -1,4 +1,5 @@
 import type { WebContents } from 'electron';
+import { PASSKEY_RELAY_MAIN_WORLD_SCRIPT } from '@shared/passkey-relay-script';
 import type { Logger } from '../../logger';
 import {
   type PasskeyCredentialStore,
@@ -56,6 +57,8 @@ export class TabPasskeyAuthenticator {
   private installing: Promise<void> | null = null;
   /** A trigger arrived mid-install, so the one being built is already stale. */
   private reinstallQueued = false;
+  /** Registration id of the main-world relay override, per CDP session. */
+  private relayScriptId: string | null = null;
 
   private readonly boundHandleDetach: () => void;
   private readonly boundHandleMessage: (
@@ -170,12 +173,61 @@ export class TabPasskeyAuthenticator {
         }
       }
 
+      await this.installRelayOverride(dbg);
+
       this.logger.debug(
         `[TabPasskeyAuthenticator] Installed ${authenticatorId} with ${this.store.list().length} credential(s)`,
       );
     } catch (err) {
       this.authenticatorId = null;
       this.logger.error(`[TabPasskeyAuthenticator] Install failed: ${err}`);
+    }
+  }
+
+  /**
+   * Hands the page's own JavaScript context an override of
+   * `navigator.credentials` that routes ceremonies to the system passkey relay.
+   *
+   * This goes through CDP rather than the preload script because a preload
+   * cannot reach the main world, and the `<script>` element trick the stealth
+   * overrides use is blocked outright by a strict `script-src` — which is
+   * exactly the kind of site people sign in to.
+   *
+   * The registration is per CDP session, so it is renewed on every reinstall
+   * alongside the authenticator itself.
+   */
+  private async installRelayOverride(
+    dbg: WebContents['debugger'],
+  ): Promise<void> {
+    try {
+      await dbg.sendCommand('Page.enable');
+      if (this.relayScriptId) {
+        await dbg
+          .sendCommand('Page.removeScriptToEvaluateOnNewDocument', {
+            identifier: this.relayScriptId,
+          })
+          .catch(() => {
+            // Gone with the previous session.
+          });
+        this.relayScriptId = null;
+      }
+
+      const { identifier } = (await dbg.sendCommand(
+        'Page.addScriptToEvaluateOnNewDocument',
+        { source: PASSKEY_RELAY_MAIN_WORLD_SCRIPT },
+      )) as { identifier: string };
+      this.relayScriptId = identifier;
+
+      // That only covers documents loaded from here on, and a reinstall often
+      // happens with a page already sitting there. The script guards itself
+      // against running twice.
+      await dbg.sendCommand('Runtime.evaluate', {
+        expression: PASSKEY_RELAY_MAIN_WORLD_SCRIPT,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `[TabPasskeyAuthenticator] Could not install relay override: ${err}`,
+      );
     }
   }
 

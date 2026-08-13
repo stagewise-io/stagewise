@@ -1,4 +1,5 @@
 import { injectStealthOverrides } from './stealth';
+import { installPasskeyRelayBridge } from './passkey-relay';
 import { contextBridge, ipcRenderer } from 'electron';
 import { createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -10,6 +11,9 @@ import { shouldChromeConsumeEvent } from './utils';
 
 // Inject stealth overrides into the main world before any page scripts run
 injectStealthOverrides();
+
+// Carry WebAuthn ceremonies out to the passkeys already on this machine
+installPasskeyRelayBridge();
 
 declare global {
   interface Window {

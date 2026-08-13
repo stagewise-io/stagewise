@@ -36,6 +36,7 @@ function createWebContents(url = 'https://app.example.com/login') {
   // reinstall which forgets to clean up is a test failure, not a silent one.
   let live: string | null = null;
   let nextId = 1;
+  let nextScriptId = 1;
   let gate: Promise<void> | null = null;
   const dbg = Object.assign(new EventEmitter(), {
     isAttached: vi.fn(() => true),
@@ -50,6 +51,8 @@ function createWebContents(url = 'https://app.example.com/login') {
         live = `auth-${nextId++}`;
         return { authenticatorId: live };
       }
+      if (method === 'Page.addScriptToEvaluateOnNewDocument')
+        return { identifier: `script-${nextScriptId++}` };
       if (method === 'WebAuthn.removeVirtualAuthenticator') {
         const { authenticatorId } = params as { authenticatorId: string };
         if (live !== authenticatorId)
@@ -211,6 +214,43 @@ describe('TabPasskeyAuthenticator', () => {
     await vi.waitFor(() =>
       expect(callsFor(wc, 'WebAuthn.addVirtualAuthenticator')).toHaveLength(2),
     );
+
+    authenticator.destroy();
+  });
+
+  it('installs the main-world override that reaches the system passkeys', async () => {
+    const wc = createWebContents();
+    const { store } = createStore();
+
+    const authenticator = new TabPasskeyAuthenticator(
+      wc,
+      store,
+      logger as never,
+    );
+    await authenticator.install();
+
+    // A preload cannot reach the main world and a <script> element is blocked
+    // by a strict script-src, so this has to arrive over CDP.
+    const added = callsFor(wc, 'Page.addScriptToEvaluateOnNewDocument');
+    expect(added).toHaveLength(1);
+    expect((added[0]?.[1] as { source: string }).source).toContain(
+      '__stagewisePasskeyRequest',
+    );
+    // …and again for the document already on screen.
+    expect(callsFor(wc, 'Runtime.evaluate')).toHaveLength(1);
+
+    // The registration dies with the CDP session, so a reinstall has to drop
+    // the stale one rather than stack a second override.
+    wc.debugger.emit('detach');
+    await vi.waitFor(() =>
+      expect(
+        callsFor(wc, 'Page.addScriptToEvaluateOnNewDocument'),
+      ).toHaveLength(2),
+    );
+    expect(
+      callsFor(wc, 'Page.removeScriptToEvaluateOnNewDocument'),
+    ).toHaveLength(1);
+    expect(logger.error).not.toHaveBeenCalled();
 
     authenticator.destroy();
   });
