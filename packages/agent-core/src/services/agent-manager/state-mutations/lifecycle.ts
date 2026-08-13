@@ -34,6 +34,8 @@ export function hydrateInitialState(
         args.initialState?.activeModelId ?? args.defaultModelId;
       state.activeProviderInstanceId =
         args.initialState?.activeProviderInstanceId;
+      state.imageGenerationOverrides =
+        args.initialState?.imageGenerationOverrides;
       state.toolApprovalMode =
         args.initialState?.toolApprovalMode ?? state.toolApprovalMode;
       state.pendingApprovals = args.initialState?.pendingApprovals ?? {};

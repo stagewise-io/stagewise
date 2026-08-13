@@ -51,6 +51,7 @@ const AGENT_RPC_COMMANDS = [
   'agents.markAsRead',
   'agents.markAsUnread',
   'agents.setActiveModelId',
+  'agents.setImageGenerationOverrides',
   'agents.setTitle',
   'agents.getAgentsHistoryList',
   'agents.getAgentHistoryEntriesByIds',

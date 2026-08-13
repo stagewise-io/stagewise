@@ -1,5 +1,8 @@
 import type { AgentStore } from '../../../store/agent-store';
-import type { AgentState } from '../../../types/agent';
+import type {
+  AgentState,
+  ImageGenerationOverrides,
+} from '../../../types/agent';
 import { updateAgentInstanceState } from './internal';
 
 /**
@@ -51,6 +54,16 @@ export function setActiveModel(
   updateAgentInstanceState(store, agentInstanceId, (state) => {
     state.activeModelId = args.modelId;
     state.activeProviderInstanceId = args.providerInstanceId;
+  });
+}
+
+export function setImageGenerationOverrides(
+  store: AgentStore,
+  agentInstanceId: string,
+  args: { overrides: ImageGenerationOverrides | undefined },
+): void {
+  updateAgentInstanceState(store, agentInstanceId, (state) => {
+    state.imageGenerationOverrides = args.overrides;
   });
 }
 

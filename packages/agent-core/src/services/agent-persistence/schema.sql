@@ -1,4 +1,4 @@
--- VERSION: 13
+-- VERSION: 14
 
 CREATE TABLE IF NOT EXISTS meta(
   key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY,
@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS agentInstances(
   last_message_at INTEGER NOT NULL,
   active_model_id TEXT NOT NULL,
   active_provider_instance_id TEXT,
+  image_generation_overrides TEXT,
   title TEXT NOT NULL,
   title_locked_by_user INTEGER,
   unread INTEGER NOT NULL DEFAULT 0,

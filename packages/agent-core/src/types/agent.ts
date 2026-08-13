@@ -56,6 +56,21 @@ export type AgentRuntimeError =
       stack?: string;
     };
 
+export type ImageGenerationSettings = {
+  aspectRatio?: string;
+  resolution?: string;
+  quality?: string;
+  outputFormat?: string;
+  background?: string;
+};
+
+export type ImageGenerationOverrides =
+  | (ImageGenerationSettings & {
+      providerInstanceId: string;
+      modelId: string;
+    })
+  | { mode: 'automatic' };
+
 /**
  * Per-agent reasoning and chat runtime state.
  *
@@ -96,6 +111,8 @@ export type AgentState<TMessage = AgentMessage> = {
    * default to `'stagewise-default'`.
    */
   activeProviderInstanceId?: string;
+  /** @persistence persisted-core — column `image_generation_overrides` (JSON, nullable). Only chat-local overrides are stored; global image defaults remain preferences-owned. */
+  imageGenerationOverrides?: ImageGenerationOverrides;
   /**
    * Per-agent tool-approval preference.
    *

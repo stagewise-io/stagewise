@@ -9,7 +9,7 @@ import {
 import { relations } from 'drizzle-orm';
 import superjson from 'superjson';
 import { metaTable } from '../../migrate-database';
-import type { AgentTypes } from '../../types/agent';
+import type { AgentTypes, ImageGenerationOverrides } from '../../types/agent';
 import type { MountPermission } from '../../types/metadata';
 import {
   DEFAULT_TOOL_APPROVAL_MODE,
@@ -107,6 +107,9 @@ export const agentInstances = sqliteTable(
     lastMessageAt: integer('last_message_at', { mode: 'timestamp' }).notNull(),
     activeModelId: modelId('active_model_id').notNull(),
     activeProviderInstanceId: text('active_provider_instance_id'),
+    imageGenerationOverrides: _sqliteJson(
+      'image_generation_overrides',
+    ).$type<ImageGenerationOverrides>(),
     title: text('title').notNull(),
     titleLockedByUser: _sqliteBoolean('title_locked_by_user'),
     unread: _sqliteBoolean('unread').notNull().default(false),

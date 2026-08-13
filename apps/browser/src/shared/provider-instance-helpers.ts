@@ -19,10 +19,7 @@ import type {
   ProviderInstanceTypeId,
   UserPreferences,
 } from './karton-contracts/ui/shared-types';
-import {
-  PROVIDER_TYPE_DISPLAY_INFO,
-  type CredentialType,
-} from './karton-contracts/ui/shared-types';
+import { PROVIDER_TYPE_DISPLAY_INFO } from './karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from './coding-plans';
 import { getSemanticProviderForApiSpec } from './api-spec-provider';
 import {
@@ -38,14 +35,7 @@ import type { ThinkingRoute } from './model-thinking-capabilities';
  * This is the UI-facing replacement for the removed PROVIDER_DISPLAY_INFO
  * vendor-keyed constant.
  */
-export function getVendorDisplayInfo(vendor: ModelProvider): {
-  displayName: string;
-  description: string;
-  helpText?: string;
-  getApiKeyUrl?: string;
-  defaultBaseUrl?: string;
-  credentialType: CredentialType;
-} {
+export function getVendorDisplayInfo(vendor: ModelProvider) {
   const typeId = `${vendor}-api` as ProviderInstanceTypeId;
   return PROVIDER_TYPE_DISPLAY_INFO[typeId];
 }
@@ -61,14 +51,7 @@ export function getVendorOfficialUrl(vendor: ModelProvider): string {
 /**
  * Get display info for a provider instance type by its typeId.
  */
-export function getTypeDisplayInfo(typeId: ProviderInstanceTypeId): {
-  displayName: string;
-  description: string;
-  helpText?: string;
-  getApiKeyUrl?: string;
-  defaultBaseUrl?: string;
-  credentialType: CredentialType;
-} {
+export function getTypeDisplayInfo(typeId: ProviderInstanceTypeId) {
   return PROVIDER_TYPE_DISPLAY_INFO[typeId];
 }
 

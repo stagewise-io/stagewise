@@ -1,5 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { defaultUserPreferences } from '@shared/karton-contracts/ui/shared-types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  defaultUserPreferences,
+  type ProviderInstance,
+} from '@shared/karton-contracts/ui/shared-types';
 import { PreferencesService } from './preferences';
 import { CODING_PLANS } from '@shared/coding-plans';
 
@@ -59,6 +62,92 @@ async function createServiceWithPreferences(
   const service = await PreferencesService.create(logger as any);
   return service;
 }
+
+function addImageProvider(
+  preferences: ReturnType<typeof cloneDefaultPreferences>,
+  typeId: 'openai-api' | 'openrouter',
+  overrides: Partial<ProviderInstance> = {},
+) {
+  const id = `${typeId}-test`;
+  preferences.providerInstances.push({
+    id,
+    name: typeId,
+    typeId,
+    config: { encryptedApiKey: 'encrypted:test-key' },
+    enabledModelIds: [],
+    disabledModelIds: [],
+    discoveredModels: [],
+    ...overrides,
+  } as ProviderInstance);
+  return id;
+}
+
+function getProviderInstance(service: PreferencesService, id: string) {
+  return service
+    .get()
+    .providerInstances.find((candidate) => candidate.id === id);
+}
+
+describe('PreferencesService image models', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('preserves enabled image models without auto-enabling newly discovered ones', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), { status: 200 }),
+    );
+    const preferences = cloneDefaultPreferences();
+    const instanceId = addImageProvider(preferences, 'openai-api', {
+      enabledImageModelIds: ['gpt-image-2'],
+      imageModels: [
+        {
+          modelId: 'gpt-image-2',
+          displayName: 'GPT Image 2',
+          supportedParameters: {},
+        },
+      ],
+    });
+    const service = await createServiceWithPreferences(preferences);
+
+    await service.refreshInstanceModels(instanceId);
+
+    const instance = getProviderInstance(service, instanceId);
+    expect(instance?.imageModels?.map((model) => model.modelId)).toEqual([
+      'gpt-image-2',
+      'gpt-image-1.5',
+      'gpt-image-1',
+      'gpt-image-1-mini',
+    ]);
+    expect(instance?.enabledImageModelIds).toEqual(['gpt-image-2']);
+  });
+
+  it('finishes language discovery when optional image discovery fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/images/models')) {
+        return new Response('Unavailable', { status: 503 });
+      }
+      return new Response(
+        JSON.stringify({ data: [{ id: 'vendor/chat-model' }] }),
+        { status: 200 },
+      );
+    });
+    const preferences = cloneDefaultPreferences();
+    const instanceId = addImageProvider(preferences, 'openrouter');
+    const service = await createServiceWithPreferences(preferences);
+
+    await service.refreshInstanceModels(instanceId);
+
+    const instance = getProviderInstance(service, instanceId);
+    expect(instance?.discoveredModels.map((model) => model.modelId)).toEqual([
+      'vendor/chat-model',
+    ]);
+    expect(instance?.imageModels).toEqual([]);
+  });
+});
 
 describe('PreferencesService provider instance names', () => {
   beforeEach(() => {

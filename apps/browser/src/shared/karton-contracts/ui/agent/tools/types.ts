@@ -4,6 +4,8 @@ import type {
   ToolOutputDiff,
   WithDiff,
 } from '@stagewise/agent-core/types/tools';
+import { attachmentSchema } from '../metadata';
+import { imageGenerationSettingsSchema } from '../../shared-types';
 import { z } from 'zod';
 
 export {
@@ -138,6 +140,47 @@ export type ExecuteSandboxJsToolOutput = z.infer<
 export const executeSandboxJsToolSchema = {
   inputSchema: executeSandboxJsToolInputSchema,
   outputSchema: executeSandboxJsToolOutputSchema,
+} as const;
+
+export const generateImageToolInputSchema =
+  imageGenerationSettingsSchema.extend({
+    prompt: z.string().min(1).describe('Detailed prompt for the image model'),
+    providerInstanceId: z
+      .string()
+      .optional()
+      .describe('Chosen image provider instance; a host pin may override it'),
+    modelId: z
+      .string()
+      .optional()
+      .describe('Chosen image model; a host pin may override it'),
+    outputFormat: z.enum(['png', 'jpeg', 'webp']).optional(),
+    background: z.enum(['auto', 'transparent', 'opaque']).optional(),
+    seed: z.number().int().optional(),
+  });
+
+export const generateImageToolOutputSchema = z.object({
+  message: z.string(),
+  providerInstanceId: z.string(),
+  modelId: z.string(),
+  attachments: z.array(
+    attachmentSchema.extend({
+      originalFileName: z.string(),
+      mediaType: z.string(),
+    }),
+  ),
+  effectiveSettings: imageGenerationSettingsSchema,
+});
+
+export type GenerateImageToolInput = z.infer<
+  typeof generateImageToolInputSchema
+>;
+export type GenerateImageToolOutput = z.infer<
+  typeof generateImageToolOutputSchema
+>;
+
+export const generateImageToolSchema = {
+  inputSchema: generateImageToolInputSchema,
+  outputSchema: generateImageToolOutputSchema,
 } as const;
 
 export const consoleLogLevelSchema = z.enum([
@@ -447,6 +490,7 @@ export const allToolSchemas = {
   ...universalToolSchemas,
   getLintingDiagnostics: getLintingDiagnosticsToolSchema,
   executeSandboxJs: executeSandboxJsToolSchema,
+  generateImage: generateImageToolSchema,
   readConsoleLogs: readConsoleLogsToolSchema,
   listLibraryDocs: listLibraryDocsToolSchema,
   searchInLibraryDocs: searchInLibraryDocsToolSchema,

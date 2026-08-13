@@ -75,6 +75,7 @@ import {
 import type { BaseAgentToolboxView } from '@stagewise/agent-core/agents';
 import { executeSandboxJs as executeSandboxJsTool } from './tools/browser/execute-sandbox-js';
 import { readConsoleLogs as readConsoleLogsTool } from './tools/browser/read-console-logs';
+import { generateImage as generateImageTool } from './tools/browser/generate-image';
 import {
   askUserQuestions as askUserQuestionsTool,
   advanceOrCompleteQuestion,
@@ -144,6 +145,7 @@ export class ToolboxService
    * smart-approval classification, which degrades gracefully if unset.
    */
   private modelProviderService: ModelProviderService | null = null;
+  private readonly pendingToolAttachments = new Map<string, Attachment[]>();
   private pluginsRuntime: ClientRuntimeNode | null = null;
   private globalSkillsRuntimes = new Map<string, ClientRuntimeNode>();
   private appsRuntimes = new Map<string, ClientRuntimeNode>();
@@ -639,6 +641,23 @@ export class ToolboxService
       case 'executeSandboxJs':
         if (!this.windowLayoutService) return null;
         return executeSandboxJsTool(this.sandboxService!, agentInstanceId);
+      case 'generateImage':
+        if (!this.modelProviderService) return null;
+        return generateImageTool(
+          {
+            modelProvider: this.modelProviderService,
+            preferences: this.preferencesService,
+            attachments: this.attachments,
+            agentStore: this.agentStore,
+            queueAttachments: (agentId, attachments) => {
+              this.pendingToolAttachments.set(agentId, [
+                ...(this.pendingToolAttachments.get(agentId) ?? []),
+                ...attachments,
+              ]);
+            },
+          },
+          agentInstanceId,
+        );
       case 'readConsoleLogs':
         if (!this.windowLayoutService) return null;
         return readConsoleLogsTool(this.windowLayoutService, agentInstanceId);
@@ -1283,8 +1302,12 @@ export class ToolboxService
    * consumed by `BaseAgent.handlePostStep`.
    */
   public drainPendingAttachments(agentInstanceId: string): Attachment[] {
-    if (!this.sandboxService) return [];
-    return this.sandboxService.drainPendingAttachments(agentInstanceId);
+    const toolAttachments =
+      this.pendingToolAttachments.get(agentInstanceId) ?? [];
+    this.pendingToolAttachments.delete(agentInstanceId);
+    const sandboxAttachments =
+      this.sandboxService?.drainPendingAttachments(agentInstanceId) ?? [];
+    return [...sandboxAttachments, ...toolAttachments];
   }
 
   public getMountedPathsForAgent(
@@ -1392,6 +1415,7 @@ export class ToolboxService
     agentInstanceId: string,
     { deleteBlobs = false }: { deleteBlobs?: boolean } = {},
   ): void {
+    this.pendingToolAttachments.delete(agentInstanceId);
     this.mountManagerService?.clearAgentMounts(agentInstanceId);
     this.sandboxService?.destroyAgent(agentInstanceId);
     this.shellService?.destroyAgent(agentInstanceId);

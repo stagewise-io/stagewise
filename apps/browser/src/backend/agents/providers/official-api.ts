@@ -19,6 +19,16 @@ import {
   discoverGoogleModels,
   discoverAnthropicModels,
 } from './shared';
+import { generateOpenAIImage, OPENAI_IMAGE_MODELS } from './openai-image';
+import { generateGoogleImage, GOOGLE_IMAGE_MODELS } from './google-image';
+import {
+  generateAlibabaImage,
+  getAlibabaImageModels,
+  generateMiniMaxImage,
+  generateZAiImage,
+  MINIMAX_IMAGE_MODELS,
+  Z_AI_IMAGE_MODELS,
+} from './native-image';
 
 // ============================================================================
 // Official API config — encrypted key + optional base URL override
@@ -72,7 +82,7 @@ const VENDOR_VALIDATION_MODEL: Partial<Record<ModelProvider, string>> = {
   'xiaomi-mimo': 'mimo-v2.5',
   mistral: 'mistral-small-latest',
   openai: 'gpt-4o-mini',
-  google: 'gemini-2.0-flash',
+  google: 'gemini-3.1-flash-lite',
 };
 
 // ============================================================================
@@ -189,6 +199,10 @@ export const openaiApiType: ProviderType<OfficialApiConfig> = {
     return discoverOpenAICompatibleModels(baseUrl, apiKey, 'openai');
   },
 
+  async getInitialImageModels() {
+    return [...OPENAI_IMAGE_MODELS];
+  },
+
   // ── Validation ─────────────────────────────────────────────────────────
 
   async validateCredentials(
@@ -232,6 +246,10 @@ export const openaiApiType: ProviderType<OfficialApiConfig> = {
       model: createOpenAIResponsesModel(apiKey, baseURL, modelId),
     };
   },
+
+  generateImage({ modelId, apiKey, baseURL, request }) {
+    return generateOpenAIImage(apiKey, baseURL, modelId, request);
+  },
 };
 
 // ============================================================================
@@ -267,6 +285,10 @@ export const googleApiType: ProviderType<OfficialApiConfig> = {
     if (!baseUrl) return [];
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
     return discoverGoogleModels(baseUrl, apiKey);
+  },
+
+  async getInitialImageModels() {
+    return [...GOOGLE_IMAGE_MODELS];
   },
 
   // ── Validation ─────────────────────────────────────────────────────────
@@ -312,6 +334,10 @@ export const googleApiType: ProviderType<OfficialApiConfig> = {
       model: createGoogleModel(apiKey, baseURL, modelId),
     };
   },
+
+  generateImage({ modelId, apiKey, baseURL, request }) {
+    return generateGoogleImage(apiKey, baseURL, modelId, request);
+  },
 };
 
 // ============================================================================
@@ -326,6 +352,10 @@ export const minimaxApiType: ProviderType<OfficialApiConfig> = {
   providerMode: 'official',
   apiSpec: VENDOR_TO_API_SPEC.minimax,
   sensitiveFields: ['encryptedApiKey'],
+
+  async getInitialImageModels() {
+    return [...MINIMAX_IMAGE_MODELS];
+  },
 
   // ── Discovery ──────────────────────────────────────────────────────────
 
@@ -402,6 +432,11 @@ export const minimaxApiType: ProviderType<OfficialApiConfig> = {
     return {
       model: createOpenAIChatModel(apiKey, baseURL, modelId),
     };
+  },
+
+  generateImage({ modelId, apiKey, baseURL, request }) {
+    if (!baseURL) throw new Error('MiniMax image endpoint is unavailable');
+    return generateMiniMaxImage(apiKey, baseURL, modelId, request);
   },
 };
 
@@ -505,14 +540,30 @@ function createOpenAICompatibleApiType(
 export const moonshotaiApiType: ProviderType<OfficialApiConfig> =
   createOpenAICompatibleApiType('moonshotai');
 
-export const alibabaApiType: ProviderType<OfficialApiConfig> =
-  createOpenAICompatibleApiType('alibaba');
+export const alibabaApiType: ProviderType<OfficialApiConfig> = {
+  ...createOpenAICompatibleApiType('alibaba'),
+  async getInitialImageModels(config) {
+    return getAlibabaImageModels(config.baseUrl);
+  },
+  generateImage({ modelId, apiKey, baseURL, request }) {
+    if (!baseURL) throw new Error('Alibaba image endpoint is unavailable');
+    return generateAlibabaImage(apiKey, baseURL, modelId, request);
+  },
+};
 
 export const deepseekApiType: ProviderType<OfficialApiConfig> =
   createOpenAICompatibleApiType('deepseek');
 
-export const zAiApiType: ProviderType<OfficialApiConfig> =
-  createOpenAICompatibleApiType('z-ai');
+export const zAiApiType: ProviderType<OfficialApiConfig> = {
+  ...createOpenAICompatibleApiType('z-ai'),
+  async getInitialImageModels() {
+    return [...Z_AI_IMAGE_MODELS];
+  },
+  generateImage({ modelId, apiKey, baseURL, request }) {
+    if (!baseURL) throw new Error('Z.ai image endpoint is unavailable');
+    return generateZAiImage(apiKey, baseURL, modelId, request);
+  },
+};
 
 export const xiaomiMimoApiType: ProviderType<OfficialApiConfig> =
   createOpenAICompatibleApiType('xiaomi-mimo');

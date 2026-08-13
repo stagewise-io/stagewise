@@ -13,6 +13,7 @@ import type {
   MountEntry,
   WorkspaceGitSummary,
 } from '@stagewise/agent-core/types/metadata';
+import type { ImageGenerationOverrides } from '@stagewise/agent-core/types/agent';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
@@ -1414,6 +1415,10 @@ export type KartonContract = {
         agentId: string,
         modelId: ModelId,
         providerInstanceId?: string,
+      ) => Promise<void>;
+      setImageGenerationOverrides: (
+        agentId: string,
+        overrides: ImageGenerationOverrides | undefined,
       ) => Promise<void>;
       setTitle: (agentId: string, title: string) => Promise<void>;
       storeAttachment: (

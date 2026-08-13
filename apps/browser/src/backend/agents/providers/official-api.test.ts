@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { generateText } = vi.hoisted(() => ({
-  generateText: vi.fn(),
-}));
+const { generateText } = vi.hoisted(() => ({ generateText: vi.fn() }));
 
-vi.mock('ai', () => ({ generateText }));
+vi.mock('ai', () => ({ generateImage: vi.fn(), generateText }));
 
 import { deepseekApiType, minimaxApiType } from './official-api';
 

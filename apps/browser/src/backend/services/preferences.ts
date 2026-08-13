@@ -1854,6 +1854,17 @@ export class PreferencesService extends DisposableService {
     );
   }
 
+  private invalidateCachedImageModels(patches: Patch[], index: number): void {
+    if (this.preferences.providerInstances[index].imageModels === undefined) {
+      return;
+    }
+    patches.push({
+      op: 'replace',
+      path: ['providerInstances', index, 'imageModels'],
+      value: undefined,
+    });
+  }
+
   /** Return a unique display name for an automatically named instance. */
   private getAvailableProviderInstanceName(baseName: string): string {
     const existingNames = new Set(
@@ -1952,19 +1963,26 @@ export class PreferencesService extends DisposableService {
       args.name ?? this.getAvailableProviderInstanceName(defaultName);
 
     // ── Model discovery ───────────────────────────────────────────────────────
-    let discovered: DiscoveredModel[] = [];
-    if (providerType.getInitialModels) {
-      try {
-        discovered = await providerType.getInitialModels(
-          finalConfig as never,
-          sensitiveValues,
-        );
-      } catch (err) {
+    const modelDiscovery = providerType
+      .getInitialModels?.(finalConfig as never, sensitiveValues)
+      .catch((err) => {
         this.logger.warn(
           `[PreferencesService] Model discovery failed for ${typeId}: ${String(err)}`,
         );
-      }
-    }
+        return [];
+      });
+    const imageModelDiscovery = providerType
+      .getInitialImageModels?.(finalConfig as never, sensitiveValues)
+      .catch((err) => {
+        this.logger.warn(
+          `[PreferencesService] Image model discovery failed for ${typeId}: ${String(err)}`,
+        );
+        return undefined;
+      });
+    const [discovered = [], discoveredImages] = await Promise.all([
+      modelDiscovery,
+      imageModelDiscovery,
+    ]);
 
     // Auto-disable non-flagship discovered models so the chat model
     // selector stays clean. Flagship models + catalog models stay enabled.
@@ -1976,7 +1994,6 @@ export class PreferencesService extends DisposableService {
       existingDisabledModelIds: [],
       existingDiscoveredModelIds: new Set(),
     });
-
     const instance = {
       id: instanceId,
       typeId: typeId as ProviderInstance['typeId'],
@@ -1985,6 +2002,8 @@ export class PreferencesService extends DisposableService {
       enabledModelIds: [] as string[],
       disabledModelIds,
       discoveredModels: discovered,
+      imageModels: discoveredImages,
+      enabledImageModelIds: [] as string[],
     };
 
     const patches: Patch[] = [
@@ -2057,6 +2076,16 @@ export class PreferencesService extends DisposableService {
       patches.push({
         op: 'remove',
         path: ['agent', 'modelThinkingOverrides', instanceId],
+      });
+    }
+    if (
+      this.preferences.agent.utilityModels.imageGeneration
+        ?.providerInstanceId === instanceId
+    ) {
+      patches.push({
+        op: 'replace',
+        path: ['agent', 'utilityModels', 'imageGeneration'],
+        value: undefined,
       });
     }
 
@@ -2133,6 +2162,9 @@ export class PreferencesService extends DisposableService {
         value: name,
       });
     }
+    if (isTypeReplacement || Object.keys(partialConfig).length > 0) {
+      this.invalidateCachedImageModels(patches, idx);
+    }
     await this.update(patches);
     this.logger.debug(
       `[PreferencesService] Updated provider instance: ${instanceId}`,
@@ -2161,6 +2193,7 @@ export class PreferencesService extends DisposableService {
         value: encrypted,
       },
     ];
+    this.invalidateCachedImageModels(patches, idx);
     await this.update(patches);
     this.logger.debug(
       `[PreferencesService] Set API key for instance: ${instanceId}`,
@@ -2336,27 +2369,26 @@ export class PreferencesService extends DisposableService {
     }
 
     const refreshFn = type.refreshModels ?? type.getInitialModels;
-    if (!refreshFn) {
-      return [];
-    }
-    const models = await refreshFn(instance.config as never, decryptedConfig);
-
-    // Capture the previous discovered model IDs and disabled list so we
-    // can preserve user choices for previously-known models while
-    // auto-disabling newly-discovered non-flagship models.
+    const imageRefreshFn = type.getInitialImageModels;
+    if (!refreshFn && !imageRefreshFn) return [];
+    const [models, imageModels] = await Promise.all([
+      refreshFn
+        ? refreshFn(instance.config as never, decryptedConfig)
+        : (instance.discoveredModels ?? []),
+      imageRefreshFn
+        ? imageRefreshFn(instance.config as never, decryptedConfig).catch(
+            (error) => {
+              this.logger.warn(
+                `[PreferencesService] Image model discovery failed for ${instance.typeId}: ${String(error)}`,
+              );
+              return instance.imageModels ?? [];
+            },
+          )
+        : undefined,
+    ]);
     const oldDiscoveredIds = new Set(
-      (instance.discoveredModels ?? []).map((dm) => dm.modelId),
+      (instance.discoveredModels ?? []).map((model) => model.modelId),
     );
-    const oldDisabledModelIds = instance.disabledModelIds ?? [];
-
-    const newDisabledModelIds = computeDisabledModelIdsAfterDiscovery({
-      typeId: instance.typeId,
-      config,
-      discoveredModels: models,
-      existingDisabledModelIds: oldDisabledModelIds,
-      existingDiscoveredModelIds: oldDiscoveredIds,
-    });
-
     const patches: Patch[] = [
       {
         op: 'replace',
@@ -2366,10 +2398,38 @@ export class PreferencesService extends DisposableService {
       {
         op: 'replace',
         path: ['providerInstances', idx, 'disabledModelIds'],
-        value: newDisabledModelIds,
+        value: computeDisabledModelIdsAfterDiscovery({
+          typeId: instance.typeId,
+          config,
+          discoveredModels: models,
+          existingDisabledModelIds: instance.disabledModelIds ?? [],
+          existingDiscoveredModelIds: oldDiscoveredIds,
+        }),
       },
     ];
+
+    if (imageModels !== undefined) {
+      const availableImageModelIds = new Set(
+        imageModels.map((model) => model.modelId),
+      );
+      patches.push(
+        {
+          op: instance.imageModels === undefined ? 'add' : 'replace',
+          path: ['providerInstances', idx, 'imageModels'],
+          value: imageModels,
+        },
+        {
+          op: instance.enabledImageModelIds === undefined ? 'add' : 'replace',
+          path: ['providerInstances', idx, 'enabledImageModelIds'],
+          value: (instance.enabledImageModelIds ?? []).filter((modelId) =>
+            availableImageModelIds.has(modelId),
+          ),
+        },
+      );
+    }
+
     await this.update(patches);
+
     this.logger.debug(
       `[PreferencesService] Refreshed models for instance: ${instanceId} (${models.length} models)`,
     );

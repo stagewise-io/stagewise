@@ -21,8 +21,9 @@ import type {
   AgentRuntimeError,
   AgentState,
   AgentToolUIPart,
+  AgentTypes,
+  ImageGenerationOverrides,
 } from '../types/agent';
-import type { AgentTypes } from '../types/agent';
 import type { ModelCapabilities } from '../types/models';
 import type { AgentStateMutations } from '../services/agent-manager/state-mutations';
 import type { AgentHost } from '../host/host';
@@ -1140,6 +1141,13 @@ export abstract class BaseAgent<
     // We accept model updates at all times, and the UI has to make enforce that model changes aren't allowed
     this.state.commands.setActiveModel({ modelId, providerInstanceId });
     return;
+  }
+
+  public async updateImageGenerationOverrides(
+    overrides: ImageGenerationOverrides | undefined,
+  ): Promise<void> {
+    this.state.commands.setImageGenerationOverrides({ overrides });
+    await this.saveState();
   }
 
   public async setTitle(newTitle: string): Promise<void> {
@@ -3128,6 +3136,7 @@ export abstract class BaseAgent<
     // Dismiss any pending host-side user-facing dialogs so their UI
     // is torn down alongside the cancelled step.
     this.toolbox.cancelPendingAgentDialogs(this.instanceId);
+    this.toolbox.drainPendingAttachments(this.instanceId);
 
     const toolCallAbortReason =
       stopReason === 'system-interrupted'
