@@ -5,6 +5,7 @@ import type {
   DiscoveredModel,
   ModelProvider,
   ProviderEndpointMode,
+  ProviderUsageLimits,
 } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderInstanceTypeId } from '@shared/karton-contracts/ui/shared-types';
 
@@ -103,6 +104,9 @@ export interface ProviderType<C = Record<string, unknown>> {
     config: C,
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]>;
+
+  /** Fetch current subscription usage when the provider exposes it. */
+  getUsageLimits?(): Promise<ProviderUsageLimits>;
 
   // ── Model ID transforms ───────────────────────────────────────────────
 

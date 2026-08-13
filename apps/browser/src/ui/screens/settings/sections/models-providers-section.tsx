@@ -4,13 +4,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
-import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
+import {
+  useKartonConnected,
+  useKartonProcedure,
+  useKartonState,
+} from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 import type {
   CustomModel,
   ModelCapabilities,
   ProviderInstance,
   ProviderInstanceTypeId,
+  ProviderUsageLimits,
   UserPreferences,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
@@ -67,6 +72,7 @@ import {
   useCallback,
   useRef,
   useLayoutEffect,
+  useEffectEvent,
 } from 'react';
 
 import { cn } from '@ui/utils';
@@ -318,6 +324,27 @@ function ProviderInstanceCard({
 }) {
   const subscription = useKartonState((s) => s.userAccount.subscription);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
+  const getUsageLimits = useKartonProcedure(
+    (p) => p.preferences.getProviderUsageLimits,
+  );
+  const connected = useKartonConnected();
+  const loadUsageLimits = useEffectEvent((instanceId: string) =>
+    getUsageLimits(instanceId),
+  );
+  const [usageLimits, setUsageLimits] = useState<ProviderUsageLimits>([]);
+
+  useEffect(() => {
+    if (!connected) return;
+    let active = true;
+    void loadUsageLimits(instance.id)
+      .then((usage) => {
+        if (active) setUsageLimits(usage);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [connected, instance.id]);
 
   const displayInfo = getTypeDisplayInfo(instance.typeId);
   const isStagewise = instance.typeId === 'stagewise';
@@ -352,6 +379,17 @@ function ProviderInstanceCard({
             {displayInfo?.description && (
               <p className="mt-0.5 truncate text-muted-foreground text-xs">
                 {displayInfo.description}
+              </p>
+            )}
+            {!!usageLimits.length && (
+              <p className="mt-1 truncate text-subtle-foreground text-xs">
+                Usage ·{' '}
+                {usageLimits
+                  .map(
+                    ({ label, usedPercent }) =>
+                      `${label} ${Math.round(100 - usedPercent)}% left`,
+                  )
+                  .join(' · ')}
               </p>
             )}
           </div>

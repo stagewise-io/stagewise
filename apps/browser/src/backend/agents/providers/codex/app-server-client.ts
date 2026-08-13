@@ -20,6 +20,16 @@ interface CodexModel {
   defaultReasoningEffort?: string;
 }
 
+export interface CodexRateLimitWindow {
+  usedPercent: number;
+  windowDurationMins?: number | null;
+}
+
+export interface CodexRateLimits {
+  primary?: CodexRateLimitWindow | null;
+  secondary?: CodexRateLimitWindow | null;
+}
+
 export class CodexAppServerClient {
   private process: ChildProcessWithoutNullStreams | null = null;
   private nextRequestId = 1;
@@ -151,6 +161,15 @@ export class CodexAppServerClient {
         'Codex is not signed in with ChatGPT. Run `codex login` first.',
       );
     }
+  }
+
+  public async readRateLimits(): Promise<CodexRateLimits> {
+    await this.start();
+    const response = await this.request<{ rateLimits: CodexRateLimits }>(
+      'account/rateLimits/read',
+      {},
+    );
+    return response.rateLimits;
   }
 
   public close(): void {
