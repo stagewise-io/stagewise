@@ -387,7 +387,7 @@ function ProviderInstanceCard({
                 {usageLimits
                   .map(
                     ({ label, usedPercent }) =>
-                      `${label} ${Math.round(100 - usedPercent)}% left`,
+                      `${label} ${Math.max(0, Math.round(100 - usedPercent))}% left`,
                   )
                   .join(' · ')}
               </p>

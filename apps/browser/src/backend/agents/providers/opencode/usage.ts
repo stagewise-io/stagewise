@@ -20,7 +20,7 @@ let pendingUsage: Promise<ProviderUsageLimits> | undefined;
 let environmentPromise: Promise<NodeJS.ProcessEnv | null> | undefined;
 
 function authFilePath(env: NodeJS.ProcessEnv): string {
-  const dataHome = env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share');
+  const dataHome = env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
   return join(dataHome, 'opencode', 'auth.json');
 }
 
