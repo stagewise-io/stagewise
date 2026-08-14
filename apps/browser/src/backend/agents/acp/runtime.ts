@@ -157,7 +157,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
       try {
         await this.runTurnNow(args, generation);
       } catch (error) {
-        if (generation === this.generation) this.closeClient();
+        if (!this.discardStaleSetup(generation)) this.closeClient();
         throw error;
       }
     });
@@ -188,9 +188,9 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     const roots = workspaceRoots(this.context.getMountedPaths());
     const cwd = roots[0] ?? this.agentDirectory;
     const sessionCreated = await this.ensureSession(adapter, cwd, roots);
-    if (!this.isCurrent(generation)) return;
+    if (this.discardStaleSetup(generation)) return;
     await this.applySessionOptions(args.selection, this.sessionOptions);
-    if (!this.isCurrent(generation)) return;
+    if (this.discardStaleSetup(generation)) return;
 
     this.assistantMessage = {
       id: randomUUID(),
@@ -208,7 +208,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
       sessionCreated ? this.context.getState().history : [],
       this.promptCapabilities,
     );
-    if (!this.isCurrent(generation)) return;
+    if (this.discardStaleSetup(generation)) return;
     const turn = this.promptUntilSettled(promptBlocks, generation);
     this.activePrompt = turn;
     try {
@@ -856,6 +856,16 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     this.promptCapabilities = {};
     this.sessionId = null;
     this.sessionOptions = [];
+  }
+
+  private discardStaleSetup(generation: number): boolean {
+    if (this.isCurrent(generation)) return false;
+    this.historyDiverged = true;
+    this.closeClient();
+    try {
+      unlinkSync(this.sessionFilePath);
+    } catch {}
+    return true;
   }
 
   private cancelPendingPermissions(
