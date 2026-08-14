@@ -29,6 +29,7 @@ type RuntimeInternals = {
   sessionId: string;
   activePrompt: Promise<unknown> | null;
   permissionRejected: boolean;
+  historyDiverged: boolean;
   client: {
     cancel(sessionId: string): Promise<void>;
     close(): void;
@@ -224,6 +225,43 @@ describe('AcpAgentRuntime translation', () => {
     expect(prompt.map((part) => part.text ?? '').join('\n')).toContain(
       'Native provider result',
     );
+  });
+
+  it.each([
+    'resolves',
+    'rejects',
+  ])('discards a session setup that %s after its turn was stopped', async (outcome) => {
+    let finishSession!: () => void;
+    const { runtime } = createRuntime();
+    const close = vi.fn();
+    Object.assign(runtime, {
+      client: { close },
+      ensureSession: vi.fn(
+        () =>
+          new Promise<boolean>((resolve, reject) => {
+            finishSession = () => {
+              runtime.sessionId = 'late-session';
+              if (outcome === 'resolves') resolve(true);
+              else reject(new Error('Session setup cancelled'));
+            };
+          }),
+      ),
+    });
+    const turn = runtime.runTurn({
+      selection: { modelId: 'codex', providerInstanceId: 'external' },
+      userMessages: [],
+      approvalMode: 'smart',
+    });
+    await vi.waitFor(() => expect(finishSession).toBeTypeOf('function'));
+
+    await runtime.stop();
+    finishSession();
+    if (outcome === 'resolves') await turn;
+    else await expect(turn).rejects.toThrow('Session setup cancelled');
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(runtime.sessionId).toBeNull();
+    expect(runtime.historyDiverged).toBe(true);
   });
 
   it('invalidates a persisted ACP session after a native-agent turn', () => {
