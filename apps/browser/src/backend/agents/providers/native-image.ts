@@ -1,6 +1,6 @@
 import type { DiscoveredImageModel } from '@shared/karton-contracts/ui/shared-types';
 import {
-  downloadGeneratedImages,
+  downloadGeneratedImage,
   imageApiEndpoint,
   postImageJson,
 } from './image-api';
@@ -75,7 +75,7 @@ export async function generateZAiImage(
     },
     request.abortSignal,
   );
-  return downloadGeneratedImages(
+  return downloadGeneratedImage(
     (body.data ?? []).flatMap(({ url }) => (url ? [url] : [])),
     request.abortSignal,
   );
@@ -123,7 +123,7 @@ export async function generateMiniMaxImage(
       body.base_resp.status_msg ?? 'MiniMax image generation failed',
     );
   }
-  return downloadGeneratedImages(
+  return downloadGeneratedImage(
     body.data?.image_urls ?? [],
     request.abortSignal,
   );
@@ -200,7 +200,14 @@ const ALIBABA_FIXED_SIZES: Record<string, Record<string, string>> = {
     '4:3': '1472*1104',
     '3:4': '1104*1472',
   },
-  'wan2.6': {
+  'wan2.6-t2i': {
+    '1:1': '1280*1280',
+    '16:9': '1696*960',
+    '9:16': '960*1696',
+    '4:3': '1472*1104',
+    '3:4': '1104*1472',
+  },
+  'wan2.6-image': {
     '1:1': '1280*1280',
     '16:9': '1440*810',
     '9:16': '810*1440',
@@ -222,7 +229,8 @@ export function supportsAlibabaImageGeneration(baseURL?: string): boolean {
     const { hostname, protocol } = new URL(baseURL);
     return (
       protocol === 'https:' &&
-      (hostname === 'dashscope-us.aliyuncs.com' ||
+      (hostname === 'dashscope-intl.aliyuncs.com' ||
+        hostname === 'dashscope-us.aliyuncs.com' ||
         hostname.endsWith('.maas.aliyuncs.com'))
     );
   } catch {
@@ -244,9 +252,7 @@ export function getAlibabaImageModels(
 
 function alibabaApiBase(baseURL: string): string {
   if (!supportsAlibabaImageGeneration(baseURL)) {
-    throw new Error(
-      'Alibaba image generation requires a workspace or US API base URL',
-    );
+    throw new Error('Alibaba image generation requires a supported API URL');
   }
   const trimmed = baseURL.replace(/\/$/, '');
   if (trimmed.endsWith('/compatible-mode/v1')) {
@@ -268,9 +274,7 @@ export async function generateAlibabaImage(
     ? modelId
     : modelId.startsWith('qwen-image')
       ? 'qwen-image'
-      : modelId.startsWith('wan2.6')
-        ? 'wan2.6'
-        : modelId;
+      : modelId;
   const size = request.aspectRatio
     ? (ALIBABA_FIXED_SIZES[fixedSizeGroup]?.[request.aspectRatio] ??
       ALIBABA_SIZES[resolution]?.[request.aspectRatio])
@@ -303,5 +307,5 @@ export async function generateAlibabaImage(
     ({ message }) =>
       message?.content?.flatMap(({ image }) => (image ? [image] : [])) ?? [],
   );
-  return downloadGeneratedImages(urls, request.abortSignal);
+  return downloadGeneratedImage(urls, request.abortSignal);
 }

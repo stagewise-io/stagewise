@@ -58,8 +58,7 @@ export const ImageGenerationSelect = memo(function ImageGenerationSelect() {
     overrides && 'modelId' in overrides ? overrides : undefined;
   const storedOverrideEntry = findImageModelEntry(entries, modelOverride);
   const defaultEntry = findImageModelEntry(entries, configuredDefault);
-  const automaticOverride =
-    !!defaultEntry && !!overrides && 'mode' in overrides;
+  const automaticOverride = !!overrides && 'mode' in overrides;
   const overrideEntry = selectsUtilityDefault(modelOverride, configuredDefault)
     ? undefined
     : storedOverrideEntry;
@@ -87,9 +86,7 @@ export const ImageGenerationSelect = memo(function ImageGenerationSelect() {
             next.modelId === configuredDefault.modelId)
           ? undefined
           : next
-        : defaultEntry
-          ? { mode: 'automatic' }
-          : undefined,
+        : { mode: 'automatic' },
     );
   };
   const summary = automaticOverride

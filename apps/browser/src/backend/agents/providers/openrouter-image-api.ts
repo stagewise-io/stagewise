@@ -4,14 +4,29 @@ import {
   type ProviderImageGenerationRequest,
   type ProviderImageGenerationResult,
 } from './types';
-import { imageApiEndpoint, readImageJson } from './image-api';
+import { imageApiEndpoint, readImageJson, readImageText } from './image-api';
+import { z } from 'zod';
 
-type OpenRouterImageModel = {
-  id: string;
-  name?: string;
-  description?: string;
-  supported_parameters?: Record<string, { type?: string; values?: string[] }>;
-};
+const openRouterImageModelsSchema = z.object({
+  data: z
+    .array(
+      z.object({
+        id: z.string().max(256),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        supported_parameters: z
+          .record(
+            z.string(),
+            z.object({
+              type: z.string().optional(),
+              values: z.array(z.string()).optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .default([]),
+});
 
 const RASTER_FORMATS = new Set(['png', 'jpeg', 'jpg', 'webp']);
 
@@ -28,19 +43,19 @@ export async function discoverOpenRouterImageModels(
 ): Promise<DiscoveredImageModel[]> {
   const response = await fetch(imageApiEndpoint(baseURL, 'images/models'), {
     headers: headers(apiKey),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
     throw new Error(`Image model discovery failed (${response.status})`);
   }
 
-  const body = await readImageJson<{ data?: OpenRouterImageModel[] }>(response);
-  return (body.data ?? [])
+  const { data } = openRouterImageModelsSchema.parse(
+    await readImageJson<unknown>(response),
+  );
+  return data
     .filter((model) => {
       const formats = model.supported_parameters?.output_format?.values;
-      return (
-        model.id.length <= 256 &&
-        (!formats || formats.some((format) => RASTER_FORMATS.has(format)))
-      );
+      return !formats || formats.some((format) => RASTER_FORMATS.has(format));
     })
     .map((model) => ({
       modelId: model.id,
@@ -89,7 +104,7 @@ export async function generateOpenRouterImage(
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const message = await readImageText(response);
     throw new Error(
       `Image generation failed (${response.status}): ${message.slice(0, 500)}`,
     );
@@ -108,5 +123,11 @@ export async function generateOpenRouterImage(
         ]
       : [],
   );
-  return { images };
+  if (images.length === 0) {
+    throw new Error('Image provider returned no images');
+  }
+  if (images.length > 1) {
+    throw new Error('Image provider returned multiple images');
+  }
+  return { image: images[0]! };
 }

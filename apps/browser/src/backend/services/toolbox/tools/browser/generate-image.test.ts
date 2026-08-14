@@ -54,15 +54,16 @@ function createImageTool(
   overrides?: ImageGenerationOverrides,
 ) {
   const generate = vi.fn().mockResolvedValue({
-    images: [{ base64: 'aGVsbG8=', mediaType: 'image/png' }],
+    image: { base64: 'aGVsbG8=', mediaType: 'image/png' },
   });
   const write = vi.fn().mockResolvedValue(undefined);
+  const deleteAttachment = vi.fn().mockResolvedValue(undefined);
   const queueAttachments = vi.fn();
   const imageTool = generateImage(
     {
       modelProvider: { generateImage: generate },
       preferences: { get: () => preferences },
-      attachments: { write },
+      attachments: { write, delete: deleteAttachment },
       agentStore: {
         get: () => ({
           agents: {
@@ -76,11 +77,25 @@ function createImageTool(
     } as never,
     'agent',
   );
-  const execute = (input: GenerateImageToolInput) => {
+  const execute = (
+    input: GenerateImageToolInput,
+    abortSignal?: AbortSignal,
+  ) => {
     if (!imageTool?.execute) throw new Error('Tool has no execute handler');
-    return imageTool.execute(input, { toolCallId: 'call-1', messages: [] });
+    return imageTool.execute(input, {
+      toolCallId: 'call-1',
+      messages: [],
+      abortSignal,
+    });
   };
-  return { execute, generate, imageTool, queueAttachments, write };
+  return {
+    execute,
+    generate,
+    imageTool,
+    queueAttachments,
+    write,
+    deleteAttachment,
+  };
 }
 
 describe('generateImage tool', () => {
@@ -176,7 +191,7 @@ describe('generateImage tool', () => {
     );
   });
 
-  it('does not leak settings from an unavailable chat override', async () => {
+  it('fails closed for an unavailable chat override', async () => {
     const preferences = createPreferences();
     const { execute, generate } = createImageTool(preferences, {
       providerInstanceId: 'removed-provider',
@@ -185,16 +200,10 @@ describe('generateImage tool', () => {
       quality: 'low',
     });
 
-    await execute({ prompt: 'A small red house' });
-
-    expect(generate).toHaveBeenCalledWith(
-      'openrouter-default',
-      'vendor/default-image',
-      expect.objectContaining({
-        aspectRatio: '3:2',
-        quality: 'high',
-      }),
+    await expect(execute({ prompt: 'A small red house' })).rejects.toThrow(
+      'pinned to this chat is unavailable',
     );
+    expect(generate).not.toHaveBeenCalled();
   });
 
   it('is unavailable when no image model is enabled', () => {
@@ -225,15 +234,17 @@ describe('generateImage tool', () => {
     );
   });
 
-  it('fails instead of reporting a successful empty generation', async () => {
-    const { execute, generate, queueAttachments } = createImageTool(
-      createPreferences(),
-    );
-    generate.mockResolvedValueOnce({ images: [] });
+  it('deletes an image written during cancellation', async () => {
+    const controller = new AbortController();
+    const { execute, write, deleteAttachment, queueAttachments } =
+      createImageTool(createPreferences());
+    write.mockImplementationOnce(async () => controller.abort());
 
-    await expect(execute({ prompt: 'A small red house' })).rejects.toThrow(
-      'Image provider returned no images',
-    );
+    await expect(
+      execute({ prompt: 'A small red house' }, controller.signal),
+    ).rejects.toThrow();
+
+    expect(deleteAttachment).toHaveBeenCalledOnce();
     expect(queueAttachments).not.toHaveBeenCalled();
   });
 });

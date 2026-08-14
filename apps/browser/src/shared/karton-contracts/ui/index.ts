@@ -43,6 +43,7 @@ import type {
   ToolApprovalMode,
   SocialAuthProvider,
   DiscoveredModel,
+  DiscoveredImageModel,
   ProviderInstanceTypeId,
 } from './shared-types';
 import {
@@ -2246,8 +2247,18 @@ export type KartonContract = {
         instanceId: string,
         enabledModelIds: string[],
       ) => Promise<void>;
+      /** Enable or disable one discovered image model atomically. */
+      setInstanceImageModelEnabled: (
+        instanceId: string,
+        modelId: string,
+        enabled: boolean,
+      ) => Promise<void>;
       /** Re-discover models for a provider instance. Returns the updated list. */
       refreshInstanceModels: (instanceId: string) => Promise<DiscoveredModel[]>;
+      /** Re-discover only image models for a provider instance. */
+      refreshInstanceImageModels: (
+        instanceId: string,
+      ) => Promise<DiscoveredImageModel[]>;
     };
     devToolbar: {
       /** Update the global widget order */

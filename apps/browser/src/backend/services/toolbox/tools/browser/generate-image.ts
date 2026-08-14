@@ -1,8 +1,5 @@
 import type { ModelProviderService } from '@/agents/model-provider';
-import {
-  MAX_GENERATED_IMAGE_BYTES,
-  MAX_GENERATED_IMAGES,
-} from '@/agents/providers/types';
+import { MAX_GENERATED_IMAGE_BYTES } from '@/agents/providers/types';
 import type { PreferencesService } from '@/services/preferences';
 import {
   findImageModelEntry,
@@ -148,6 +145,11 @@ async function executeGenerateImage(
   const overrides =
     deps.agentStore.get().agents.instances[agentInstanceId]?.state
       .imageGenerationOverrides;
+  const modelOverride =
+    overrides && 'modelId' in overrides ? overrides : undefined;
+  if (modelOverride && !findImageModelEntry(entries, modelOverride)) {
+    throw new Error('The image model pinned to this chat is unavailable.');
+  }
   const useAutomatic = overrides && 'mode' in overrides;
   const resolved = resolveImageRoute(entries, [
     useAutomatic ? undefined : overrides,
@@ -175,47 +177,40 @@ async function executeGenerateImage(
       abortSignal,
     },
   );
-  if (result.images.length === 0) {
-    throw new Error('Image provider returned no images');
-  }
-  if (result.images.length > MAX_GENERATED_IMAGES) {
-    throw new Error('Image provider returned too many images');
-  }
-  if (
-    result.images.some(
-      (image) => !SUPPORTED_IMAGE_MEDIA_TYPES.has(image.mediaType),
-    )
-  ) {
+  const { image } = result;
+  if (!SUPPORTED_IMAGE_MEDIA_TYPES.has(image.mediaType)) {
     throw new Error('Image provider returned an unsupported file type');
   }
-
-  const storedAttachments = [];
-  let totalBytes = 0;
-  for (const image of result.images) {
-    if (image.base64.length > 4 * Math.ceil(MAX_GENERATED_IMAGE_BYTES / 3)) {
-      throw new Error('Generated image exceeds the size limit');
-    }
-    const data = Buffer.from(image.base64, 'base64');
-    totalBytes += data.byteLength;
-    if (totalBytes > MAX_GENERATED_IMAGE_BYTES) {
-      throw new Error('Generated image exceeds the size limit');
-    }
-    const originalFileName = `generated-${mimeToDefaultName(image.mediaType)}`;
-    const fileName = generateAttachmentFilename(originalFileName);
-    await deps.attachments.write(agentInstanceId, fileName, data);
-    storedAttachments.push({
-      path: `att/${fileName}`,
-      originalFileName,
-      mediaType: image.mediaType,
-    });
+  if (image.base64.length > 4 * Math.ceil(MAX_GENERATED_IMAGE_BYTES / 3)) {
+    throw new Error('Generated image exceeds the size limit');
   }
-  deps.queueAttachments(agentInstanceId, storedAttachments);
+  const data = Buffer.from(image.base64, 'base64');
+  if (data.byteLength > MAX_GENERATED_IMAGE_BYTES) {
+    throw new Error('Generated image exceeds the size limit');
+  }
+  const originalFileName = `generated-${mimeToDefaultName(image.mediaType)}`;
+  const fileName = generateAttachmentFilename(originalFileName);
+  const attachment = {
+    path: `att/${fileName}`,
+    originalFileName,
+    mediaType: image.mediaType,
+  };
+  try {
+    abortSignal?.throwIfAborted();
+    await deps.attachments.write(agentInstanceId, fileName, data);
+    abortSignal?.throwIfAborted();
+    deps.queueAttachments(agentInstanceId, [attachment]);
+  } catch (error) {
+    await deps.attachments.delete(agentInstanceId, fileName).catch(() => {});
+    throw error;
+  }
 
   return {
-    message: `Generated and displayed ${storedAttachments.length} image${storedAttachments.length === 1 ? '' : 's'}. Continue normally and refer to the result without embedding or linking its attachments.`,
+    message:
+      'Generated and displayed the image. Continue normally and refer to the result without embedding or linking its attachment.',
     providerInstanceId: resolved.entry.instanceId,
     modelId: resolved.entry.modelId,
-    attachments: storedAttachments,
+    attachment,
     effectiveSettings,
   };
 }

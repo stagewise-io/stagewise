@@ -123,6 +123,8 @@ export interface BaseAgentToolboxView {
    * producer is wired.
    */
   drainPendingAttachments(agentInstanceId: string): AttachmentMetadata[];
+  /** Discard and delete attachments produced by a cancelled step. */
+  discardPendingAttachments(agentInstanceId: string): Promise<void>;
   /**
    * Cancel any pending host-side user-facing dialogs (currently:
    * `askUserQuestions`-style question UI) for the given agent.
@@ -3195,7 +3197,7 @@ export abstract class BaseAgent<
     // Dismiss any pending host-side user-facing dialogs so their UI
     // is torn down alongside the cancelled step.
     this.toolbox.cancelPendingAgentDialogs(this.instanceId);
-    this.toolbox.drainPendingAttachments(this.instanceId);
+    await this.toolbox.discardPendingAttachments(this.instanceId);
 
     const toolCallAbortReason =
       stopReason === 'system-interrupted'

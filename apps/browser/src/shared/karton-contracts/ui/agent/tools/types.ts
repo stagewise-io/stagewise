@@ -162,12 +162,10 @@ export const generateImageToolOutputSchema = z.object({
   message: z.string(),
   providerInstanceId: z.string(),
   modelId: z.string(),
-  attachments: z.array(
-    attachmentSchema.extend({
-      originalFileName: z.string(),
-      mediaType: z.string(),
-    }),
-  ),
+  attachment: attachmentSchema.extend({
+    originalFileName: z.string(),
+    mediaType: z.string(),
+  }),
   effectiveSettings: imageGenerationSettingsSchema,
 });
 

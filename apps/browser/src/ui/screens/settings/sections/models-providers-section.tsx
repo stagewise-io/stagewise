@@ -7,6 +7,7 @@ import {
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 import { useEnsureImageModels } from '@ui/hooks/use-image-models';
+import { canUseImageModels } from '@shared/available-image-models';
 import type {
   CustomModel,
   ModelCapabilities,
@@ -3077,10 +3078,15 @@ function ModelsSection({
 // Image Models Section (per-instance)
 // =============================================================================
 
-function ImageModelsSection({ instance }: { instance: ProviderInstance }) {
-  const preferences = useKartonState((state) => state.preferences);
-  const updatePreferences = useKartonProcedure(
-    (procedures) => procedures.preferences.update,
+function ImageModelsSection({
+  instance,
+  refreshFailed,
+}: {
+  instance: ProviderInstance;
+  refreshFailed: boolean;
+}) {
+  const setImageModelEnabled = useKartonProcedure(
+    (procedures) => procedures.preferences.setInstanceImageModelEnabled,
   );
   const models = instance.imageModels ?? [];
   const enabledModelIds = useMemo(
@@ -3090,20 +3096,6 @@ function ImageModelsSection({ instance }: { instance: ProviderInstance }) {
   const enabledCount = models.filter((model) =>
     enabledModelIds.has(model.modelId),
   ).length;
-
-  const handleToggle = (modelId: string) => {
-    const [, patches] = produceWithPatches(preferences, (draft) => {
-      const provider = draft.providerInstances.find(
-        (candidate) => candidate.id === instance.id,
-      );
-      if (!provider) return;
-      const enabledIds = provider.enabledImageModelIds ?? [];
-      provider.enabledImageModelIds = enabledIds.includes(modelId)
-        ? enabledIds.filter((id) => id !== modelId)
-        : [...enabledIds, modelId];
-    });
-    void updatePreferences(patches);
-  };
 
   return (
     <section className="flex flex-col space-y-4">
@@ -3148,7 +3140,13 @@ function ImageModelsSection({ instance }: { instance: ProviderInstance }) {
                 </div>
                 <Switch
                   checked={isEnabled}
-                  onCheckedChange={() => handleToggle(model.modelId)}
+                  onCheckedChange={(enabled) =>
+                    void setImageModelEnabled(
+                      instance.id,
+                      model.modelId,
+                      enabled,
+                    )
+                  }
                   size="xs"
                   aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${model.displayName}`}
                 />
@@ -3159,14 +3157,23 @@ function ImageModelsSection({ instance }: { instance: ProviderInstance }) {
 
         {models.length === 0 && (
           <div className="rounded-lg border border-derived-subtle bg-background p-4">
-            {instance.imageModels === undefined ? (
-              <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
-                <IconLoader6Outline18 className="size-4 animate-spin" />
-                <span>Loading image models…</span>
-              </div>
+            {instance.imageModels === undefined &&
+            canUseImageModels(instance) ? (
+              refreshFailed ? (
+                <p className="text-center text-muted-foreground text-sm">
+                  Could not load image models. Check the provider configuration.
+                </p>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                  <IconLoader6Outline18 className="size-4 animate-spin" />
+                  <span>Loading image models…</span>
+                </div>
+              )
             ) : (
               <p className="text-center text-muted-foreground text-sm">
-                No image models are available for this provider.
+                {canUseImageModels(instance)
+                  ? 'No image models are available for this provider.'
+                  : 'Configure provider credentials to load image models.'}
               </p>
             )}
           </div>
@@ -3554,7 +3561,7 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
       </div>
       <p className="text-muted-foreground text-xs">
         {instance.typeId === 'alibaba-api'
-          ? 'Use a workspace or US API base URL ending in /api/v1 to enable image models.'
+          ? 'Use the default endpoint or a supported workspace/US API URL to enable image models.'
           : 'Edit the base URL and click Save to re-discover available models.'}
       </p>
       {error && <TruncatedErrorText text={error} />}
@@ -3568,7 +3575,9 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
 
 export function ModelsProvidersSection() {
   const preferences = useKartonState((s) => s.preferences);
-  useEnsureImageModels(preferences.providerInstances);
+  const failedImageModelRefreshes = useEnsureImageModels(
+    preferences.providerInstances,
+  );
   const [detailInstanceId, setDetailInstanceId] = useState<string | null>(null);
   const [detailRenameRequested, setDetailRenameRequested] = useState(false);
   const [isDetailNameEditing, setIsDetailNameEditing] = useState(false);
@@ -3765,7 +3774,10 @@ export function ModelsProvidersSection() {
             </section>
 
             {displayInfo?.supportsImageGeneration && (
-              <ImageModelsSection instance={detailInstance} />
+              <ImageModelsSection
+                instance={detailInstance}
+                refreshFailed={failedImageModelRefreshes.has(detailInstance.id)}
+              />
             )}
           </div>
         </OverlayScrollbar>

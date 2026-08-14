@@ -545,7 +545,9 @@ export const moonshotaiApiType: ProviderType<OfficialApiConfig> =
 export const alibabaApiType: ProviderType<OfficialApiConfig> = {
   ...createOpenAICompatibleApiType('alibaba'),
   async getInitialImageModels(config) {
-    return getAlibabaImageModels(config.baseUrl);
+    return getAlibabaImageModels(
+      config.baseUrl ?? vendorMeta('alibaba').defaultBaseUrl,
+    );
   },
   generateImage({ modelId, apiKey, baseURL, request }) {
     if (!baseURL) throw new Error('Alibaba image endpoint is unavailable');

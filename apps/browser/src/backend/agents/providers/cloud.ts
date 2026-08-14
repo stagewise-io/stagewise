@@ -81,7 +81,7 @@ async function generateCloudImage(
             }
           : undefined,
   });
-  return { images: result.images };
+  return { image: result.image };
 }
 
 // ============================================================================
@@ -273,11 +273,12 @@ export type VertexConfig = {
 function buildVertexProvider(
   config: VertexConfig,
   decryptedConfig: Record<string, string>,
+  defaultLocation = 'us-central1',
 ) {
   const decryptedCredentials = decryptedConfig.encryptedGoogleCredentials;
   return createVertex({
     project: config.projectId?.trim() || undefined,
-    location: config.location?.trim() || 'global',
+    location: config.location?.trim() || defaultLocation,
     googleAuthOptions: decryptedCredentials
       ? { credentials: JSON.parse(decryptedCredentials) }
       : undefined,
@@ -304,7 +305,7 @@ export const vertexProviderType: ProviderType<VertexConfig> = {
   },
 
   generateImage({ modelId, decryptedConfig, config, request }) {
-    const provider = buildVertexProvider(config, decryptedConfig);
+    const provider = buildVertexProvider(config, decryptedConfig, 'global');
     return generateCloudImage(provider.image(modelId), request, 'vertex');
   },
 };

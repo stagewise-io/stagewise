@@ -9,7 +9,7 @@ import { generateGoogleImage } from './google-image';
 describe('Google image generation', () => {
   it('passes Gemini aspect ratio and resolution through the AI SDK', async () => {
     generateImage.mockResolvedValue({
-      images: [{ base64: 'image-data', mediaType: 'image/png' }],
+      image: { base64: 'image-data', mediaType: 'image/png' },
     });
 
     const result = await generateGoogleImage(
@@ -34,7 +34,7 @@ describe('Google image generation', () => {
       }),
     );
     expect(result).toEqual({
-      images: [{ base64: 'image-data', mediaType: 'image/png' }],
+      image: { base64: 'image-data', mediaType: 'image/png' },
     });
   });
 });

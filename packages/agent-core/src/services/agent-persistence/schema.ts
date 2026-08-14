@@ -109,7 +109,7 @@ export const agentInstances = sqliteTable(
     activeProviderInstanceId: text('active_provider_instance_id'),
     imageGenerationOverrides: _sqliteJson(
       'image_generation_overrides',
-    ).$type<ImageGenerationOverrides>(),
+    ).$type<ImageGenerationOverrides | null>(),
     title: text('title').notNull(),
     titleLockedByUser: _sqliteBoolean('title_locked_by_user'),
     unread: _sqliteBoolean('unread').notNull().default(false),

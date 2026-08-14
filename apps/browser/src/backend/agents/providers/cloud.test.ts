@@ -15,7 +15,7 @@ const createVertex = vi.hoisted(() =>
   vi.fn(() => Object.assign(vi.fn(), { image: vi.fn(() => vertexImageModel) })),
 );
 const generateImage = vi.hoisted(() =>
-  vi.fn().mockResolvedValue({ images: [] }),
+  vi.fn().mockResolvedValue({ image: { base64: '', mediaType: 'image/png' } }),
 );
 
 vi.mock('node:fs', () => ({ readFileSync }));
@@ -132,6 +132,19 @@ describe('cloud providers', () => {
     );
     expect(createVertex).toHaveBeenCalledWith(
       expect.objectContaining({ location: 'global' }),
+    );
+  });
+
+  it('keeps the existing Vertex language default location', () => {
+    vertexProviderType.createLanguageModel({
+      modelId: 'gemini-2.5-pro',
+      apiKey: '',
+      config: {},
+      decryptedConfig: {},
+    });
+
+    expect(createVertex).toHaveBeenCalledWith(
+      expect.objectContaining({ location: 'us-central1' }),
     );
   });
 

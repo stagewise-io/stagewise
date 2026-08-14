@@ -27,11 +27,10 @@ export type ProviderImageGenerationRequest = ImageGenerationSettings & {
 };
 
 export type ProviderImageGenerationResult = {
-  images: ReadonlyArray<{ base64: string; mediaType: string }>;
+  image: { base64: string; mediaType: string };
 };
 
 export const MAX_GENERATED_IMAGE_BYTES = 50 * 1024 * 1024;
-export const MAX_GENERATED_IMAGES = 4;
 
 /**
  * Stateless definition of a provider type. One folder = one provider.

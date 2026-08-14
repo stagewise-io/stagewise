@@ -550,7 +550,7 @@ function ProviderSpecificFields({
           <div className="space-y-1.5">
             <p className="font-medium text-foreground text-xs">Location</p>
             <Input
-              placeholder="global"
+              placeholder="Provider default"
               value={location}
               onValueChange={setLocation}
               size="sm"
@@ -1247,7 +1247,7 @@ export function CustomEndpointCard({
     endpoint.apiSpec === 'amazon-bedrock'
       ? `${specLabel} \u00b7 ${bedrockModeLabel} \u00b7 ${bedrockRegionLabel}`
       : endpoint.apiSpec === 'google-vertex'
-        ? `${specLabel} \u00b7 ${endpoint.projectId || 'no project'} \u00b7 ${endpoint.location || 'global'}`
+        ? `${specLabel} \u00b7 ${endpoint.projectId || 'no project'} \u00b7 ${endpoint.location || 'default location'}`
         : endpoint.apiSpec === 'azure'
           ? `${specLabel} \u00b7 ${endpoint.resourceName || endpoint.baseUrl || 'not configured'}`
           : `${specLabel} \u00b7 ${endpoint.baseUrl || 'No URL set'}`;

@@ -4,7 +4,11 @@ const { generateText } = vi.hoisted(() => ({ generateText: vi.fn() }));
 
 vi.mock('ai', () => ({ generateImage: vi.fn(), generateText }));
 
-import { deepseekApiType, minimaxApiType } from './official-api';
+import {
+  alibabaApiType,
+  deepseekApiType,
+  minimaxApiType,
+} from './official-api';
 
 describe('official API providers', () => {
   afterEach(() => {
@@ -43,5 +47,11 @@ describe('official API providers', () => {
     expect(generateText).toHaveBeenCalledTimes(2);
     expect(generateText.mock.calls[0]?.[0].model.modelId).toBe('minimax-m2.7');
     expect(generateText.mock.calls[1]?.[0].model.modelId).toBe('MiniMax-M3');
+  });
+
+  it('exposes Alibaba images on the default endpoint', async () => {
+    const models = await alibabaApiType.getInitialImageModels?.({}, {});
+
+    expect(models).not.toHaveLength(0);
   });
 });

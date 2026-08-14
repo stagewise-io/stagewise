@@ -532,9 +532,12 @@ export class ModelProviderService {
         request,
       });
     } catch (error) {
+      const providerError = error instanceof Error ? error : undefined;
       this.report(new Error('Image generation failed'), 'generateImage', {
         providerInstanceId,
         modelId,
+        providerErrorName: providerError?.name,
+        providerStatus: providerError?.message.match(/\((\d{3})\)/)?.[1],
       });
       throw error;
     }

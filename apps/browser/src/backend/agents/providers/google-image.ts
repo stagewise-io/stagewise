@@ -75,5 +75,5 @@ export async function generateGoogleImage(
       : undefined,
   });
 
-  return { images: result.images };
+  return { image: result.image };
 }

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const dnsLookup = vi.hoisted(() =>
   vi.fn().mockResolvedValue([{ address: '8.8.8.8', family: 4 }]),
@@ -6,6 +7,8 @@ const dnsLookup = vi.hoisted(() =>
 vi.mock('node:dns/promises', () => ({
   lookup: dnsLookup,
 }));
+const httpsGet = vi.hoisted(() => vi.fn());
+vi.mock('node:https', () => ({ get: httpsGet }));
 import {
   generateAlibabaImage,
   generateMiniMaxImage,
@@ -18,10 +21,32 @@ afterEach(() => {
   dnsLookup.mockReset().mockResolvedValue([{ address: '8.8.8.8', family: 4 }]);
 });
 
-function imageResponse() {
-  return new Response('image-bytes', {
-    headers: { 'Content-Type': 'image/png' },
+beforeEach(() => {
+  httpsGet.mockReset().mockImplementation((_url, _options, onResponse) => {
+    const request = new EventEmitter();
+    const response = Object.assign(new EventEmitter(), {
+      statusCode: 200,
+      headers: { 'content-type': 'image/png' },
+      resume: vi.fn(),
+      destroy: vi.fn(),
+    });
+    queueMicrotask(() => {
+      onResponse(response);
+      response.emit('data', Buffer.from('image-bytes'));
+      response.emit('end');
+    });
+    return request;
   });
+});
+
+function alibabaImageResponse() {
+  return new Response(
+    JSON.stringify({
+      output: {
+        choices: [{ message: { content: [{ image: 'https://image.test' }] } }],
+      },
+    }),
+  );
 }
 
 describe('native image APIs', () => {
@@ -30,8 +55,7 @@ describe('native image APIs', () => {
       .fn()
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: [{ url: 'https://image.test' }] })),
-      )
-      .mockResolvedValueOnce(imageResponse());
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await generateZAiImage(
@@ -46,7 +70,11 @@ describe('native image APIs', () => {
       size: '1728x960',
       quality: 'hd',
     });
-    expect(result.images[0]?.mediaType).toBe('image/png');
+    expect(result.image.mediaType).toBe('image/png');
+    const pinnedLookup = httpsGet.mock.calls[0]?.[1]?.lookup;
+    const callback = vi.fn();
+    pinnedLookup('image.test', {}, callback);
+    expect(callback).toHaveBeenCalledWith(null, '8.8.8.8', 4);
   });
 
   it('rejects provider image URLs that resolve to private addresses', async () => {
@@ -76,8 +104,7 @@ describe('native image APIs', () => {
         new Response(
           JSON.stringify({ data: { image_urls: ['https://image.test'] } }),
         ),
-      )
-      .mockResolvedValueOnce(imageResponse());
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     await generateMiniMaxImage(
@@ -96,20 +123,7 @@ describe('native image APIs', () => {
   });
 
   it('uses Alibaba native image endpoints instead of its chat endpoint', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            output: {
-              choices: [
-                { message: { content: [{ image: 'https://image.test' }] } },
-              ],
-            },
-          }),
-        ),
-      )
-      .mockResolvedValueOnce(imageResponse());
+    const fetchMock = vi.fn().mockResolvedValueOnce(alibabaImageResponse());
     vi.stubGlobal('fetch', fetchMock);
 
     await generateAlibabaImage(
@@ -136,23 +150,15 @@ describe('native image APIs', () => {
         ({ modelId }) => modelId,
       ),
     ).not.toContain('qwen-image-3.0-pro');
+    expect(
+      getAlibabaImageModels(
+        'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      ),
+    ).not.toHaveLength(0);
   });
 
   it('keeps Wan 2.7 Pro 4K dimensions within its API limit', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            output: {
-              choices: [
-                { message: { content: [{ image: 'https://image.test' }] } },
-              ],
-            },
-          }),
-        ),
-      )
-      .mockResolvedValueOnce(imageResponse());
+    const fetchMock = vi.fn().mockResolvedValueOnce(alibabaImageResponse());
     vi.stubGlobal('fetch', fetchMock);
 
     await generateAlibabaImage(
@@ -164,6 +170,22 @@ describe('native image APIs', () => {
 
     expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body)).toMatchObject({
       parameters: { size: '4096*2304' },
+    });
+  });
+
+  it('uses Wan 2.6 T2I recommended dimensions', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(alibabaImageResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await generateAlibabaImage(
+      'secret',
+      'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      'wan2.6-t2i',
+      { prompt: 'A lighthouse', aspectRatio: '16:9' },
+    );
+
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body)).toMatchObject({
+      parameters: { size: '1696*960' },
     });
   });
 });

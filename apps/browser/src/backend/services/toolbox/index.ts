@@ -1322,6 +1322,17 @@ export class ToolboxService
     return [...sandboxAttachments, ...toolAttachments];
   }
 
+  public async discardPendingAttachments(agentInstanceId: string) {
+    const attachments = this.drainPendingAttachments(agentInstanceId);
+    await Promise.allSettled(
+      attachments
+        .filter(({ path }) => path.startsWith('att/'))
+        .map(({ path }) =>
+          this.attachments.delete(agentInstanceId, path.slice(4)),
+        ),
+    );
+  }
+
   public getMountedPathsForAgent(
     agentInstanceId: string,
   ): Map<MountedPrefix, MountedPath> {

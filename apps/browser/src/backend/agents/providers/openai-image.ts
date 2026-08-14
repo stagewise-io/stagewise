@@ -87,5 +87,5 @@ export async function generateOpenAIImageWithModel(
     },
   });
 
-  return { images: result.images };
+  return { image: result.image };
 }

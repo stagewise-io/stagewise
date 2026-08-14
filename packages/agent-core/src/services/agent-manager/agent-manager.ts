@@ -1355,7 +1355,7 @@ export class AgentManager extends DisposableService {
         titleLockedByUser: agentState.titleLockedByUser,
         activeModelId: agentState.activeModelId,
         activeProviderInstanceId: agentState.activeProviderInstanceId,
-        imageGenerationOverrides: agentState.imageGenerationOverrides,
+        imageGenerationOverrides: agentState.imageGenerationOverrides ?? null,
         toolApprovalMode: agentState.toolApprovalMode as ToolApprovalMode,
         createdAt:
           (firstHistoryEntry?.metadata as UserMessageMetadata | undefined)

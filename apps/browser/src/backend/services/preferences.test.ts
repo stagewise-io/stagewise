@@ -124,7 +124,7 @@ describe('PreferencesService image models', () => {
     expect(instance?.enabledImageModelIds).toEqual(['gpt-image-2']);
   });
 
-  it('finishes language discovery when optional image discovery fails', async () => {
+  it('preserves image state when optional image discovery fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
       if (url.endsWith('/images/models')) {
@@ -136,7 +136,9 @@ describe('PreferencesService image models', () => {
       );
     });
     const preferences = cloneDefaultPreferences();
-    const instanceId = addImageProvider(preferences, 'openrouter');
+    const instanceId = addImageProvider(preferences, 'openrouter', {
+      enabledImageModelIds: ['vendor/image-model'],
+    });
     const service = await createServiceWithPreferences(preferences);
 
     await service.refreshInstanceModels(instanceId);
@@ -145,7 +147,67 @@ describe('PreferencesService image models', () => {
     expect(instance?.discoveredModels.map((model) => model.modelId)).toEqual([
       'vendor/chat-model',
     ]);
-    expect(instance?.imageModels).toEqual([]);
+    expect(instance?.imageModels).toBeUndefined();
+    expect(instance?.enabledImageModelIds).toEqual(['vendor/image-model']);
+  });
+
+  it('refreshes image models without rediscovering language models', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ id: 'vendor/image-model' }] }), {
+        status: 200,
+      }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
+    const preferences = cloneDefaultPreferences();
+    const instanceId = addImageProvider(preferences, 'openrouter');
+    const service = await createServiceWithPreferences(preferences);
+
+    await service.refreshInstanceImageModels(instanceId);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/images/models');
+  });
+
+  it('applies image model toggles against the latest state', async () => {
+    const preferences = cloneDefaultPreferences();
+    const instanceId = addImageProvider(preferences, 'openai-api');
+    const service = await createServiceWithPreferences(preferences);
+
+    await Promise.all([
+      service.setInstanceImageModelEnabled(instanceId, 'image-a', true),
+      service.setInstanceImageModelEnabled(instanceId, 'image-b', true),
+    ]);
+
+    expect(
+      getProviderInstance(service, instanceId)?.enabledImageModelIds,
+    ).toEqual(['image-a', 'image-b']);
+  });
+
+  it('preserves toggles made during image discovery', async () => {
+    let resolveDiscovery: (response: Response) => void = () => {};
+    vi.spyOn(globalThis, 'fetch').mockReturnValue(
+      new Promise((resolve) => {
+        resolveDiscovery = resolve;
+      }),
+    );
+    const preferences = cloneDefaultPreferences();
+    const instanceId = addImageProvider(preferences, 'openrouter');
+    const service = await createServiceWithPreferences(preferences);
+
+    const refresh = service.refreshInstanceImageModels(instanceId);
+    await service.setInstanceImageModelEnabled(
+      instanceId,
+      'vendor/image-model',
+      true,
+    );
+    resolveDiscovery(
+      new Response(JSON.stringify({ data: [{ id: 'vendor/image-model' }] })),
+    );
+    await refresh;
+
+    expect(
+      getProviderInstance(service, instanceId)?.enabledImageModelIds,
+    ).toEqual(['vendor/image-model']);
   });
 });
 

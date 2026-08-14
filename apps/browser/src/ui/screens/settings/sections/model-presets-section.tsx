@@ -80,7 +80,7 @@ import {
 } from '@ui/utils/model-thinking';
 import { cn } from '@ui/utils';
 import { ImageModelSelect } from '@ui/components/image-model-select';
-import { useImageModelEntries } from '@ui/hooks/use-image-models';
+import { getSelectableImageModelEntries } from '@shared/available-image-models';
 import { getModelAlias } from '@shared/available-models';
 
 enablePatches();
@@ -809,7 +809,10 @@ function UtilityModelList({
 function ImageUtilityModelSelect() {
   const preferences = useKartonState((s) => s.preferences);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-  const entries = useImageModelEntries();
+  const entries = useMemo(
+    () => getSelectableImageModelEntries(preferences.providerInstances),
+    [preferences.providerInstances],
+  );
   const configured = preferences.agent.utilityModels.imageGeneration;
 
   const handleChange = (next: ImageModelEntry | undefined) => {

@@ -1,9 +1,9 @@
 import {
   MAX_GENERATED_IMAGE_BYTES,
-  MAX_GENERATED_IMAGES,
   type ProviderImageGenerationResult,
 } from './types';
 import { lookup } from 'node:dns/promises';
+import { get } from 'node:https';
 import { BlockList } from 'node:net';
 
 const blockedAddresses = new BlockList();
@@ -30,7 +30,7 @@ blockedAddresses.addSubnet('::1', 128, 'ipv6');
 blockedAddresses.addSubnet('fc00::', 7, 'ipv6');
 blockedAddresses.addSubnet('fe80::', 10, 'ipv6');
 
-async function assertPublicImageUrl(url: URL): Promise<void> {
+async function resolvePublicImageAddress(url: URL) {
   if (url.protocol !== 'https:') {
     throw new Error('Generated image URL must use HTTPS');
   }
@@ -38,11 +38,14 @@ async function assertPublicImageUrl(url: URL): Promise<void> {
   if (
     addresses.length === 0 ||
     addresses.some(({ address, family }) =>
-      blockedAddresses.check(address, family === 6 ? 'ipv6' : 'ipv4'),
+      family === 6 && address.toLowerCase().startsWith('::ffff:')
+        ? true
+        : blockedAddresses.check(address, family === 6 ? 'ipv6' : 'ipv4'),
     )
   ) {
     throw new Error('Generated image URL must use a public host');
   }
+  return addresses[0]!;
 }
 
 async function readResponseBytes(
@@ -87,6 +90,13 @@ export async function readImageJson<T>(
   ) as T;
 }
 
+export async function readImageText(
+  response: Response,
+  maxBytes = 64 * 1024,
+): Promise<string> {
+  return new TextDecoder().decode(await readResponseBytes(response, maxBytes));
+}
+
 export function imageApiEndpoint(baseURL: string, path: string): string {
   return `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 }
@@ -108,48 +118,88 @@ export async function postImageJson<T>(
   });
   if (!response.ok) {
     throw new Error(
-      `Image generation failed (${response.status}): ${(await response.text()).slice(0, 500)}`,
+      `Image generation failed (${response.status}): ${(await readImageText(response)).slice(0, 500)}`,
     );
   }
   return readImageJson<T>(response);
 }
 
-export async function downloadGeneratedImages(
+async function downloadGeneratedImageBytes(
+  url: URL,
+  maxBytes: number,
+  abortSignal?: AbortSignal,
+) {
+  const address = await resolvePublicImageAddress(url);
+  return new Promise<{ data: Buffer; mediaType: string }>((resolve, reject) => {
+    const request = get(
+      url,
+      {
+        signal: abortSignal,
+        lookup: (_hostname, _options, callback) =>
+          callback(null, address.address, address.family),
+      },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        if (status < 200 || status >= 300) {
+          response.resume();
+          reject(new Error(`Generated image download failed (${status})`));
+          return;
+        }
+        const declaredSize = Number(response.headers['content-length']);
+        if (Number.isFinite(declaredSize) && declaredSize > maxBytes) {
+          response.destroy();
+          reject(new Error('Generated image exceeds the size limit'));
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        let totalBytes = 0;
+        response.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.byteLength;
+          if (totalBytes > maxBytes) {
+            response.destroy(
+              new Error('Generated image exceeds the size limit'),
+            );
+            return;
+          }
+          chunks.push(chunk);
+        });
+        response.on('end', () =>
+          resolve({
+            data: Buffer.concat(chunks, totalBytes),
+            mediaType:
+              response.headers['content-type']
+                ?.split(';')[0]
+                ?.trim()
+                .toLowerCase() ?? 'image/png',
+          }),
+        );
+        response.on('error', reject);
+      },
+    );
+    request.on('error', reject);
+  });
+}
+
+export async function downloadGeneratedImage(
   urls: string[],
   abortSignal?: AbortSignal,
 ): Promise<ProviderImageGenerationResult> {
   if (urls.length === 0) {
     throw new Error('Image provider returned no images');
   }
-  if (urls.length > MAX_GENERATED_IMAGES) {
-    throw new Error('Image provider returned too many images');
+  if (urls.length > 1) {
+    throw new Error('Image provider returned multiple images');
   }
-  const images: ProviderImageGenerationResult['images'][number][] = [];
-  let totalBytes = 0;
-  for (const url of urls) {
-    const parsedUrl = new URL(url);
-    await assertPublicImageUrl(parsedUrl);
-    const response = await fetch(parsedUrl, {
-      signal: abortSignal,
-      redirect: 'error',
-    });
-    if (!response.ok) {
-      throw new Error(`Generated image download failed (${response.status})`);
-    }
-    const data = await readResponseBytes(
-      response,
-      MAX_GENERATED_IMAGE_BYTES - totalBytes,
-    );
-    totalBytes += data.byteLength;
-    images.push({
-      base64: Buffer.from(data).toString('base64'),
-      mediaType:
-        response.headers
-          .get('content-type')
-          ?.split(';')[0]
-          ?.trim()
-          .toLowerCase() ?? 'image/png',
-    });
-  }
-  return { images };
+  const { data, mediaType } = await downloadGeneratedImageBytes(
+    new URL(urls[0]!),
+    MAX_GENERATED_IMAGE_BYTES,
+    abortSignal,
+  );
+  return {
+    image: {
+      base64: data.toString('base64'),
+      mediaType,
+    },
+  };
 }
