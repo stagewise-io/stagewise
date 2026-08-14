@@ -135,9 +135,14 @@ app.on('ready', async () => {
 
   if (isSmokeTest) {
     // Validate the full import tree is intact, then exit.
-    await import('./main');
-    console.log('[smoke-test] App ready — all modules loaded successfully.');
-    app.exit(0);
+    try {
+      await import('./main');
+      console.log('[smoke-test] App ready — all modules loaded successfully.');
+      app.exit(0);
+    } catch (error) {
+      console.error('[smoke-test] Failed to load application:', error);
+      app.exit(1);
+    }
     return;
   }
 
