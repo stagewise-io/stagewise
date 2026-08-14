@@ -2662,18 +2662,17 @@ export abstract class BaseAgent<
 
     this.updateUsageWarning(result);
 
-    // Save the agent state for recovery
-    await this.saveState();
-
-    // Drain any host-produced attachments (e.g. files written by a
-    // sandbox/runtime side-channel during this step) into
-    // metadata.attachments on the current assistant message.
+    // Claim host-produced attachments before yielding so stop() cannot discard
+    // completed outputs that are already visible in the chat.
     const pendingAtts = this.toolbox.drainPendingAttachments(this.instanceId);
     if (pendingAtts.length > 0) {
       this.state.commands.attachAttachmentsToLastAssistant({
         attachments: pendingAtts,
       });
     }
+
+    // Save the agent state for recovery
+    await this.saveState();
 
     // NOTE: populatePathReferencesOnAssistantMessage() is intentionally
     // NOT called here. It used to live in this spot, but handlePostStep

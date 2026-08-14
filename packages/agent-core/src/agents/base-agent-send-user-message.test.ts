@@ -224,3 +224,22 @@ describe('BaseAgent.sendUserMessage', () => {
     expect(agent.runStep).toHaveBeenCalledOnce();
   });
 });
+
+describe('BaseAgent attachment lifecycle', () => {
+  it('claims completed attachments before persisting the step', async () => {
+    const attachment = { path: 'att/generated-image.png' };
+    const agent = createTestAgent();
+    agent.updateUsageWarning = vi.fn();
+    agent.toolbox = { drainPendingAttachments: () => [attachment] };
+    agent.saveState = vi.fn().mockRejectedValue(new Error('stop'));
+    agent.state.commands.recordUsage = vi.fn();
+    agent.state.commands.attachAttachmentsToLastAssistant = vi.fn();
+
+    await expect(
+      agent.handlePostStep({ usage: { totalTokens: 0 } }),
+    ).rejects.toThrow('stop');
+    expect(
+      agent.state.commands.attachAttachmentsToLastAssistant,
+    ).toHaveBeenCalledWith({ attachments: [attachment] });
+  });
+});
