@@ -407,10 +407,12 @@ export class SystemPasskeyRelay extends DisposableService {
       this.pending.delete(message.id);
     };
     socket.onclose = () => {
-      this.failPending('socket closed');
       // Same reason as the child process: a close arriving after the next
-      // ceremony has connected must not drop that ceremony's socket.
-      if (this.socket === socket) this.socket = null;
+      // ceremony has connected belongs to the old socket, and must touch
+      // neither the handle nor the commands the new one has in flight.
+      if (this.socket !== socket) return;
+      this.failPending('socket closed');
+      this.socket = null;
     };
     this.socket = socket;
   }

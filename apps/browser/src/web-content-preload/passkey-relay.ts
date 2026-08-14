@@ -29,9 +29,11 @@ export function installPasskeyRelayBridge(): void {
       options?: unknown;
     } | null;
     // The page aborted its own request, so the helper window has nothing left
-    // to hand its answer to.
+    // to hand its answer to. The id goes with it: only the ceremony that
+    // request started may be the one this ends.
     if (data?.__stagewisePasskeyCancel) {
-      ipcRenderer.send('passkey-relay-cancel');
+      if (typeof data.id === 'number')
+        ipcRenderer.send('passkey-relay-cancel', data.id);
       return;
     }
     if (!data?.__stagewisePasskeyRequest || typeof data.id !== 'number') return;
@@ -48,6 +50,7 @@ export function installPasskeyRelayBridge(): void {
 
     ipcRenderer
       .invoke('passkey-relay-ceremony', {
+        id,
         kind: data.kind,
         options: data.options,
       })
