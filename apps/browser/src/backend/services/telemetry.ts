@@ -73,6 +73,7 @@ const providerInstanceTypeIdSchema = z.enum(providerInstanceTypeIds);
 const onboardingStepSchema = z.enum([
   'login',
   'configure-providers',
+  'configure-skills',
   'personalization',
 ]);
 const nonNegativeNumberSchema = z.number().nonnegative();

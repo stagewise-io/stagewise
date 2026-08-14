@@ -440,6 +440,11 @@ export type BaseAgentConfig<TFinishToolOutputSchema extends z.ZodType | null> =
 
 export type MessageId = string;
 
+export type SendUserMessageOptions = {
+  queueIfBlocked?: boolean;
+  flushQueueOnNextStep?: boolean;
+};
+
 /**
  * Interface for the static (class) side of any agent.
  * This enables type-safe access to static properties like `config` and `agentType`
@@ -620,6 +625,14 @@ export abstract class BaseAgent<
     null;
 
   /**
+   * ID of a queued user message that must be consumed by the immediately
+   * following step. Used when free-form input resolves a blocking user
+   * question: the tool result and the user's message must reach the model
+   * together instead of letting the autonomous tool chain continue first.
+   */
+  private _queuedMessageToFlushOnNextStepId: string | null = null;
+
+  /**
    * Set only for runtime recovery after a suspend/resume or event-loop stall.
    * It appends a transient model-only `continue` user message for the next
    * step without writing anything to visible/persisted chat history.
@@ -768,8 +781,8 @@ export abstract class BaseAgent<
    * Send a message to the agent. If the agent is busy, the message will be queued.
    * @param message - The message to send to the agent
    * @param options.queueIfBlocked - Queue instead of interrupting unfinished tool interactions.
-   *
-   * @note If the agent is waiting for one or more tool approvals or not every tool call has been finished, the message will be queued and sent once the current step is finished.
+   * @param options.flushQueueOnNextStep - Prioritize a blocked message and
+   * consume it in the immediately following step.
    *
    * @note On send, the chat history is converted into model context with the following pipeline:
    *        `transformMessagesBeforeStep` -> `getSystemPrompt` -> `transformMessagesToModelMessages` -> `transformModelMessagesBeforeStep`.
@@ -778,22 +791,30 @@ export abstract class BaseAgent<
    */
   public async sendUserMessage(
     message: AgentMessage & { role: 'user' },
-    options: { queueIfBlocked?: boolean } = {},
+    options: SendUserMessageOptions = {},
   ): Promise<MessageId> {
     // We override the message id with a random UUID to ensure it's unique.
     const id = crypto.randomUUID();
 
     const msg = { ...message, id: id };
 
-    // Background messages must not interrupt pending approvals or other
-    // unfinished tool interactions. Explicit user messages keep their
-    // existing interrupt behavior unless the caller opts into queueing.
+    // Preserve queue order, and only let manual input interrupt a blocked
+    // interaction when no older message is waiting.
+    const state = this.state.get();
     if (
-      this.state.get().isWorking ||
+      state.isWorking ||
+      state.queuedMessages.length > 0 ||
       (options.queueIfBlocked && !this.canRunStep())
     ) {
       const { queuedModelId, queueLengthAfter } =
-        this.state.commands.enqueueUserMessage({ message: msg });
+        this.state.commands.enqueueUserMessage({
+          message: msg,
+          position: options.flushQueueOnNextStep ? 'front' : 'back',
+        });
+
+      if (options.flushQueueOnNextStep) {
+        this._queuedMessageToFlushOnNextStepId = msg.id;
+      }
 
       this.host.logger.debug(`[BaseAgent:${this.instanceId}] Queued message`);
 
@@ -804,7 +825,9 @@ export abstract class BaseAgent<
         queue_length_after: queueLengthAfter,
       });
 
-      return message.id;
+      if (!state.isWorking && this.canRunStep()) void this.runStep();
+
+      return id;
     }
 
     this.host.logger.debug(
@@ -899,7 +922,17 @@ export abstract class BaseAgent<
    */
   public async deleteQueuedMessage(messageId: string): Promise<void> {
     this.state.commands.removeQueuedMessage({ messageId });
+    if (this._queuedMessageToFlushOnNextStepId === messageId) {
+      this._queuedMessageToFlushOnNextStepId = null;
+    }
     return;
+  }
+
+  public async moveQueuedMessage(
+    messageId: string,
+    toIndex: number,
+  ): Promise<void> {
+    this.state.commands.moveQueuedMessage({ messageId, toIndex });
   }
 
   /**
@@ -907,6 +940,7 @@ export abstract class BaseAgent<
    */
   public async clearQueue(): Promise<void> {
     this.state.commands.clearQueuedMessages();
+    this._queuedMessageToFlushOnNextStepId = null;
     return;
   }
 
@@ -919,18 +953,22 @@ export abstract class BaseAgent<
    *
    * @note DO NOT OVERRIDE
    */
-  public async flushQueue(): Promise<void> {
-    const flushedCount = this.state.get().queuedMessages.length;
+  public async flushQueue(messageId?: string): Promise<void> {
+    if (
+      messageId &&
+      !this.state.commands.moveQueuedMessage({ messageId, toIndex: 0 })
+    ) {
+      return;
+    }
+
+    const hasQueuedMessages = this.state.get().queuedMessages.length > 0;
 
     await this.internalStop('user-flushed-queue');
 
     // Let the runStep() at the end of this method handle popping the first queued message
 
-    if (flushedCount > 0) {
+    if (hasQueuedMessages) {
       this.scheduleMemorySnapshotWrite('queued-messages');
-    }
-
-    if (flushedCount > 0) {
       this.host.telemetry?.capture('agent-queue-flushed', {
         agent_type: this.agentType,
         agent_instance_id: this.instanceId,
@@ -939,8 +977,6 @@ export abstract class BaseAgent<
     }
 
     this.runStep();
-
-    return;
   }
 
   /**
@@ -966,6 +1002,10 @@ export abstract class BaseAgent<
     reason: 'system-resumed' | 'event-loop-stalled',
   ): Promise<void> {
     const historyLengthBefore = this.state.get().history.length;
+    const prioritizedMessageId = this._queuedMessageToFlushOnNextStepId;
+    const shouldFlushPrioritizedMessage =
+      prioritizedMessageId !== null &&
+      this.state.get().queuedMessages[0]?.id === prioritizedMessageId;
 
     this.host.logger.info(
       `[BaseAgent:${this.instanceId}] Recovering interrupted run with synthetic continuation. reason=${reason}, historyLength=${historyLengthBefore}`,
@@ -975,7 +1015,7 @@ export abstract class BaseAgent<
     this.state.commands.setIsWorkingFalse();
 
     this._pendingSyntheticContinuation = { reason };
-    void this.runStep(false, false);
+    void this.runStep(false, shouldFlushPrioritizedMessage);
   }
 
   /**
@@ -1654,6 +1694,10 @@ export abstract class BaseAgent<
       flushQueue,
     });
     if (flushedIndex !== undefined) {
+      const flushedMessage = this.state.get().history[flushedIndex];
+      if (flushedMessage?.id === this._queuedMessageToFlushOnNextStepId) {
+        this._queuedMessageToFlushOnNextStepId = null;
+      }
       this.scheduleMemorySnapshotWrite('queued-messages');
     }
     const queueFlushIndex = flushedIndex ?? -1;
@@ -1753,10 +1797,8 @@ export abstract class BaseAgent<
       return;
     }
 
-    let modelMessages: Awaited<
-      ReturnType<typeof this.generateContextForNewStep>
-    >;
-    let tools: Awaited<ReturnType<typeof this.getToolsForStep>>;
+    let modelMessages: ModelMessage[];
+    let tools: Partial<ToolSet>;
     let resolvedConfig: BaseAgentConfig<TFinishToolOutputSchema>;
     try {
       modelMessages = await this.generateContextForNewStep(
@@ -2514,7 +2556,16 @@ export abstract class BaseAgent<
       }
     }
 
-    const hasQueuedMessages = this.state.get().queuedMessages.length > 0;
+    const queuedMessages = this.state.get().queuedMessages;
+    const hasQueuedMessages = queuedMessages.length > 0;
+    if (
+      this._queuedMessageToFlushOnNextStepId !== null &&
+      !queuedMessages.some(
+        (message) => message.id === this._queuedMessageToFlushOnNextStepId,
+      )
+    ) {
+      this._queuedMessageToFlushOnNextStepId = null;
+    }
 
     // Check if the maximum number of steps has been reached
     if (this.config.maxSteps && stepsSinceLastMessage >= this.config.maxSteps) {
@@ -2552,6 +2603,13 @@ export abstract class BaseAgent<
         `[BaseAgent:${this.instanceId}] There are open tool approval requests`,
       );
       return { shouldRun: false, flushQueue: false };
+    }
+
+    if (
+      typeof this._queuedMessageToFlushOnNextStepId === 'string' &&
+      queuedMessages[0]?.id === this._queuedMessageToFlushOnNextStepId
+    ) {
+      return { shouldRun: true, flushQueue: true };
     }
 
     // We assume that approved tool calls are executed and results are attached,
@@ -3128,6 +3186,7 @@ export abstract class BaseAgent<
     this._pendingContinue = null;
     this._pendingSyntheticContinuation = null;
     this._pendingFallbackRetry = false;
+    this._queuedMessageToFlushOnNextStepId = null;
     try {
       this.stepAbortController?.abort();
     } catch {}
@@ -3553,15 +3612,19 @@ export abstract class BaseAgent<
     operation: string,
     extra?: Record<string, unknown>,
   ) {
-    this.host.telemetry?.captureException(error, {
-      service: 'base-agent',
-      operation,
-      modelId: this.state.get().activeModelId,
-      agentType: this.agentType,
-      instanceId: this.instanceId,
-      ...BaseAgent.extractApiErrorContext(error),
-      ...extra,
-    });
+    try {
+      this.host.telemetry?.captureException(error, {
+        service: 'base-agent',
+        operation,
+        modelId: this.state.get().activeModelId,
+        agentType: this.agentType,
+        instanceId: this.instanceId,
+        ...BaseAgent.extractApiErrorContext(error),
+        ...extra,
+      });
+    } catch {
+      // Reporting must not surface teardown-state or telemetry failures.
+    }
   }
 
   /**

@@ -16,6 +16,7 @@ import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { cn } from '@ui/utils';
 import { useTabUIState } from '@ui/hooks/use-tab-ui-state';
 import type {
+  FileDiffContent,
   FilePreviewResult,
   FileStatResult,
   TabState,
@@ -29,7 +30,6 @@ import {
   type ReactElement,
 } from 'react';
 import { IconDatabaseFillDuo18 } from '@stagewise/icons';
-import type { FileDiffContent } from '@shared/karton-contracts/ui';
 import {
   Loader2Icon,
   MinusIcon,
@@ -58,8 +58,13 @@ import { useHotKeyListener } from '@ui/hooks/use-hotkey-listener';
 import { HotkeyCombo } from '@ui/components/hotkey-combo';
 import { FileIcon } from '@ui/components/file-icon';
 import { nativeFileManagerLabel } from '@shared/ide-url';
+import { inferMimeType } from '@shared/mime-utils';
 import { OpenInIdeMenu } from '@ui/components/open-in-ide-menu-items';
 import { Streamdown } from '@ui/components/streamdown';
+import {
+  useZoomableViewport,
+  ZoomableViewport,
+} from '@ui/components/ui/zoomable-viewport';
 import {
   type EditorActions,
   useFileEditorController,
@@ -962,6 +967,16 @@ function useFileCodeZoom(tabId: string, enabled = true) {
 
 type DiffMode = 'inline' | 'split';
 
+function getWorkspacePath(workspaceKey: string) {
+  const colonIndex = workspaceKey.indexOf(':');
+  return colonIndex < 0 ? workspaceKey : workspaceKey.slice(colonIndex + 1);
+}
+
+function isImagePath(filePath: string | undefined) {
+  if (!filePath) return false;
+  return inferMimeType(filePath).startsWith('image/');
+}
+
 function DiffEditorPreview({
   tab,
   tabId,
@@ -1030,12 +1045,7 @@ function DiffEditorPreview({
 
   // Extract the workspace path from the workspace key for the git diff
   // procedure (it expects a filesystem path, not a composite key).
-  const workspacePath = useMemo(() => {
-    const colonIdx = tab.workspaceKey.indexOf(':');
-    return colonIdx < 0
-      ? tab.workspaceKey
-      : tab.workspaceKey.slice(colonIdx + 1);
-  }, [tab.workspaceKey]);
+  const workspacePath = getWorkspacePath(tab.workspaceKey);
 
   // All save / dirty / undo-redo / conflict / unsaved-prompt / hotkey behavior
   // is shared with the plain source editor via this controller. The diff
@@ -1561,183 +1571,106 @@ function getCheckerboardStyle(background: SvgPreviewBackground) {
     : undefined;
 }
 
-function useImagePanAndZoom(tabId: string, enabled = true) {
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const { tabUiState, setTabUiState } = useTabUIState();
-  const isTabContentFocused = tabUiState[tabId]?.focusedPanel === 'tab-content';
-  const panStateRef = useRef<{
-    pointerId: number | null;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  }>({ pointerId: null, startX: 0, startY: 0, originX: 0, originY: 0 });
+function getCanvasStyle(
+  background: SvgPreviewBackground,
+  customBackground: string,
+) {
+  return background === 'custom'
+    ? { backgroundColor: normalizeHexColor(customBackground, '#ffffff') }
+    : getCheckerboardStyle(background);
+}
 
-  const markFocused = useCallback(() => {
-    setTabUiState(tabId, { focusedPanel: 'tab-content' });
-  }, [setTabUiState, tabId]);
-
-  const zoomBy = useCallback((delta: number) => {
-    setZoom((value) => Math.max(0.01, value + delta));
-  }, []);
-
-  const handleZoomIn = useCallback(() => {
-    if (!isTabContentFocused) return false;
-    zoomBy(0.25);
-  }, [isTabContentFocused, zoomBy]);
-
-  const handleZoomOut = useCallback(() => {
-    if (!isTabContentFocused) return false;
-    zoomBy(-0.25);
-  }, [isTabContentFocused, zoomBy]);
-
-  const handleZoomReset = useCallback(() => {
-    if (!isTabContentFocused) return false;
-    setZoom(1);
-  }, [isTabContentFocused]);
-
-  useHotKeyListener(handleZoomIn, HotkeyActions.ZOOM_IN, enabled);
-  useHotKeyListener(handleZoomOut, HotkeyActions.ZOOM_OUT, enabled);
-  useHotKeyListener(handleZoomReset, HotkeyActions.ZOOM_RESET, enabled);
-
-  const handleWheel = useCallback((event: React.WheelEvent) => {
-    if (!event.ctrlKey && !event.metaKey) return;
-    event.preventDefault();
-    const factor = Math.exp(-event.deltaY * 0.0035);
-    setZoom((value) => Math.max(0.01, value * factor));
-  }, []);
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      markFocused();
-      (event.currentTarget as HTMLElement).focus({ preventScroll: true });
-      panStateRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        originX: pan.x,
-        originY: pan.y,
-      };
-      event.currentTarget.setPointerCapture(event.pointerId);
-    },
-    [markFocused, pan.x, pan.y],
+function ZoomControls({
+  controller,
+}: {
+  controller: ReturnType<typeof useZoomableViewport>;
+}) {
+  return (
+    <>
+      <div className="flex items-center px-1">
+        <ToolbarTooltip
+          label="Fit image to view"
+          shortcut={HotkeyActions.CENTER_IMAGE}
+        >
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Fit image to view"
+            onClick={controller.fitToView}
+          >
+            <IconArrowsToCenterOutline18 className="size-4" />
+          </Button>
+        </ToolbarTooltip>
+      </div>
+      <div className="flex items-center gap-0.5 px-1">
+        <ToolbarTooltip label="Zoom out" shortcut={HotkeyActions.ZOOM_OUT}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Zoom out"
+            onClick={controller.zoomOut}
+          >
+            <MinusIcon className="size-4" />
+          </Button>
+        </ToolbarTooltip>
+        <ToolbarTooltip label="Reset zoom" shortcut={HotkeyActions.ZOOM_RESET}>
+          <button
+            type="button"
+            className="min-w-10 cursor-pointer text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
+            aria-label="Reset zoom"
+            onClick={controller.resetZoom}
+          >
+            {Math.round(controller.scale * 100)}%
+          </button>
+        </ToolbarTooltip>
+        <ToolbarTooltip label="Zoom in" shortcut={HotkeyActions.ZOOM_IN}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Zoom in"
+            onClick={controller.zoomIn}
+          >
+            <PlusIcon className="size-4" />
+          </Button>
+        </ToolbarTooltip>
+      </div>
+    </>
   );
-
-  const clearPanCapture = useCallback((event: React.PointerEvent) => {
-    if (panStateRef.current.pointerId !== event.pointerId) return;
-    panStateRef.current.pointerId = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
-
-  const handlePointerMove = useCallback((event: React.PointerEvent) => {
-    const state = panStateRef.current;
-    if (state.pointerId !== event.pointerId) return;
-    if ((event.buttons & 1) === 0) {
-      panStateRef.current.pointerId = null;
-      return;
-    }
-    setPan({
-      x: state.originX + event.clientX - state.startX,
-      y: state.originY + event.clientY - state.startY,
-    });
-  }, []);
-
-  return {
-    zoom,
-    pan,
-    isPanned: pan.x !== 0 || pan.y !== 0,
-    setZoom,
-    setPan,
-    zoomBy,
-    handleWheel,
-    handlePointerDown,
-    handlePointerMove,
-    clearPanCapture,
-    markFocused,
-  };
 }
 
 function ImagePreview({
-  preview,
-  blobUrl,
+  src,
+  alt,
+  openExternalPath,
   tabId,
 }: {
-  preview: FilePreviewResult;
-  blobUrl: string;
+  src: string;
+  alt: string;
+  openExternalPath?: string;
   tabId: string;
 }) {
   const [background, setBackground] =
     useState<ImagePreviewBackground>('default');
   const [customBackground, setCustomBackground] = useState('ffffff');
-  const {
-    zoom,
-    pan,
-    isPanned,
-    setZoom,
-    setPan,
-    zoomBy,
-    handleWheel,
-    handlePointerDown,
-    handlePointerMove,
-    clearPanCapture,
-    markFocused,
-  } = useImagePanAndZoom(tabId);
-  const normalizedCustomBackground = normalizeHexColor(
-    customBackground,
-    '#ffffff',
-  );
+  const { tabUiState, setTabUiState } = useTabUIState();
+  const isTabContentFocused = tabUiState[tabId]?.focusedPanel === 'tab-content';
+  const markFocused = useCallback(() => {
+    setTabUiState(tabId, { focusedPanel: 'tab-content' });
+  }, [setTabUiState, tabId]);
+  const zoomController = useZoomableViewport({
+    hotkeysEnabled: isTabContentFocused,
+    onInteract: markFocused,
+  });
+  const backgroundStyle = getCanvasStyle(background, customBackground);
   const [imageError, setImageError] = useState(false);
   return (
     <div className="flex size-full flex-col bg-background">
       <FileTabToolbar
         actions={null}
-        openExternalPath={getPreviewAbsolutePath(preview)}
+        openExternalPath={openExternalPath}
         right={
           <>
-            {isPanned ? (
-              <div className="flex items-center px-1">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label="Center image"
-                  onClick={() => setPan({ x: 0, y: 0 })}
-                >
-                  <IconArrowsToCenterOutline18 className="size-4" />
-                </Button>
-              </div>
-            ) : null}
-            <div className="flex items-center gap-0.5 px-1">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Zoom out"
-                disabled={zoom <= 0.01}
-                onClick={() => zoomBy(-0.25)}
-              >
-                <MinusIcon className="size-4" />
-              </Button>
-              <button
-                type="button"
-                className="min-w-10 text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
-                onClick={() => setZoom(1)}
-                aria-label="Reset zoom"
-              >
-                {Math.round(zoom * 100)}%
-              </button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Zoom in"
-                onClick={() => zoomBy(0.25)}
-              >
-                <PlusIcon className="size-4" />
-              </Button>
-            </div>
+            <ZoomControls controller={zoomController} />
             <div className="h-5 w-px bg-border-subtle" />
             <div className="flex items-center px-1">
               <Popover>
@@ -1801,46 +1734,38 @@ function ImagePreview({
         }
       />
       <div
-        className={`flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden p-4 focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${getPreviewBackgroundClassName(background)}`}
-        role="button"
-        tabIndex={0}
-        aria-label="Image preview canvas"
-        data-image-preview-canvas="true"
-        onFocus={markFocused}
-        onClick={markFocused}
-        onWheel={handleWheel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={clearPanCapture}
-        onPointerCancel={clearPanCapture}
-        onLostPointerCapture={clearPanCapture}
-        style={
-          background === 'custom'
-            ? { backgroundColor: normalizedCustomBackground }
-            : getCheckerboardStyle(background)
-        }
+        className={`min-h-0 flex-1 ${getPreviewBackgroundClassName(background)}`}
+        style={backgroundStyle}
       >
-        {imageError ? (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <TriangleAlertIcon className="size-8" />
-            <span className="text-sm">Unable to render this image.</span>
-            <span className="text-xs">
-              The file may be corrupt or in an unsupported format.
-            </span>
-          </div>
-        ) : (
-          <img
-            src={blobUrl}
-            alt={preview.relativePath}
-            className="pointer-events-none max-h-none max-w-none object-contain"
-            draggable={false}
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: 'center',
-            }}
-            onError={() => setImageError(true)}
-          />
-        )}
+        <ZoomableViewport
+          controller={zoomController}
+          className="overflow-hidden focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+          wrapperProps={{
+            role: 'region',
+            tabIndex: 0,
+            'aria-label': 'Image preview canvas',
+            'data-image-preview-canvas': 'true',
+            onFocus: markFocused,
+          }}
+        >
+          {imageError ? (
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <TriangleAlertIcon className="size-8" />
+              <span className="text-sm">Unable to render this image.</span>
+              <span className="text-xs">
+                The file may be missing, corrupt, or unsupported.
+              </span>
+            </div>
+          ) : (
+            <img
+              src={src}
+              alt={alt}
+              className="pointer-events-none max-h-none max-w-none object-contain"
+              draggable={false}
+              onError={() => setImageError(true)}
+            />
+          )}
+        </ZoomableViewport>
       </div>
     </div>
   );
@@ -1913,10 +1838,7 @@ function SvgPreview({
   const cursorPosition = useSourceCursorPosition(editor);
   const actions = useEditorActions(tabId, editor, preview, text, setText);
   const previewBackgroundClassName = getPreviewBackgroundClassName(background);
-  const normalizedCustomBackground = normalizeHexColor(
-    customBackground,
-    '#ffffff',
-  );
+  const backgroundStyle = getCanvasStyle(background, customBackground);
   const normalizedCustomCurrentColor = normalizeHexColor(
     customCurrentColor,
     '#8b5cf6',
@@ -1951,7 +1873,10 @@ function SvgPreview({
   }, [dataUrl]);
 
   // Cmd/Ctrl+Shift+V toggles code/preview mode when the tab is focused.
-  const { tabUiState } = useTabUIState();
+  const { tabUiState, setTabUiState } = useTabUIState();
+  const markPreviewFocused = useCallback(() => {
+    setTabUiState(tabId, { focusedPanel: 'tab-content' });
+  }, [setTabUiState, tabId]);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const tabUiStateRef = useRef(tabUiState);
@@ -2003,33 +1928,17 @@ function SvgPreview({
     });
   }, [editor, sourceFontSize]);
 
-  const {
-    zoom,
-    pan,
-    isPanned,
-    setZoom,
-    setPan,
-    zoomBy,
-    handleWheel: handlePreviewWheel,
-    handlePointerDown,
-    handlePointerMove,
-    clearPanCapture,
-    markFocused,
-  } = useImagePanAndZoom(tabId, mode === 'preview');
+  const zoomController = useZoomableViewport({
+    hotkeysEnabled:
+      mode === 'preview' && tabUiState[tabId]?.focusedPanel === 'tab-content',
+    onInteract: markPreviewFocused,
+  });
 
   // Hotkeys scoped to this SVG tab when it has focus.
   const bgRef = useRef(background);
   bgRef.current = background;
   const fgRef = useRef(currentColorMode);
   fgRef.current = currentColorMode;
-
-  const handleCenterImage = useCallback(() => {
-    if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
-      return false;
-    if (modeRef.current !== 'preview') return false;
-    setPan({ x: 0, y: 0 });
-  }, [tabId, setPan]);
-  useHotKeyListener(handleCenterImage, HotkeyActions.CENTER_IMAGE);
 
   const handleCycleBg = useCallback(() => {
     if (tabUiStateRef.current[tabId]?.focusedPanel !== 'tab-content')
@@ -2063,66 +1972,8 @@ function SvgPreview({
         onInteract={markSourceFocused}
         right={
           <>
-            {mode === 'preview' && isPanned ? (
-              <div className="flex items-center pr-2 pl-1">
-                <ToolbarTooltip
-                  label="Center image"
-                  shortcut={HotkeyActions.CENTER_IMAGE}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Center image"
-                    onClick={() => setPan({ x: 0, y: 0 })}
-                  >
-                    <IconArrowsToCenterOutline18 className="size-4" />
-                  </Button>
-                </ToolbarTooltip>
-              </div>
-            ) : null}
             {mode === 'preview' ? (
-              <div className="flex items-center gap-0.5 px-1">
-                <ToolbarTooltip
-                  label="Zoom out"
-                  shortcut={HotkeyActions.ZOOM_OUT}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Zoom out"
-                    disabled={zoom <= 0.01}
-                    onClick={() => zoomBy(-0.25)}
-                  >
-                    <MinusIcon className="size-4" />
-                  </Button>
-                </ToolbarTooltip>
-                <ToolbarTooltip
-                  label="Reset zoom"
-                  shortcut={HotkeyActions.ZOOM_RESET}
-                >
-                  <button
-                    type="button"
-                    className="min-w-10 cursor-pointer text-center text-muted-foreground text-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid focus-visible:ring-inset"
-                    onClick={() => setZoom(1)}
-                    aria-label="Reset zoom"
-                  >
-                    {Math.round(zoom * 100)}%
-                  </button>
-                </ToolbarTooltip>
-                <ToolbarTooltip
-                  label="Zoom in"
-                  shortcut={HotkeyActions.ZOOM_IN}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Zoom in"
-                    onClick={() => zoomBy(0.25)}
-                  >
-                    <PlusIcon className="size-4" />
-                  </Button>
-                </ToolbarTooltip>
-              </div>
+              <ZoomControls controller={zoomController} />
             ) : null}
             {mode === 'preview' ? (
               <>
@@ -2291,26 +2142,24 @@ function SvgPreview({
       {actions.externalChange ? (
         <ExternalChangeBanner actions={actions} />
       ) : null}
-      <div className="min-h-0 flex-1">
+      <div
+        className={cn(
+          'min-h-0 flex-1',
+          mode === 'preview' && previewBackgroundClassName,
+        )}
+        style={mode === 'preview' ? backgroundStyle : undefined}
+      >
         {mode === 'preview' ? (
-          <button
-            type="button"
-            className={`flex size-full touch-none select-none items-center justify-center overflow-hidden p-4 text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${previewBackgroundClassName}`}
-            aria-label="SVG preview canvas"
-            data-image-preview-canvas="true"
-            onFocus={markFocused}
-            onClick={markFocused}
-            onWheel={handlePreviewWheel}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={clearPanCapture}
-            onPointerCancel={clearPanCapture}
-            onLostPointerCapture={clearPanCapture}
-            style={
-              background === 'custom'
-                ? { backgroundColor: normalizedCustomBackground }
-                : getCheckerboardStyle(background)
-            }
+          <ZoomableViewport
+            controller={zoomController}
+            className="overflow-hidden text-left focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+            wrapperProps={{
+              role: 'region',
+              tabIndex: 0,
+              'aria-label': 'SVG preview canvas',
+              'data-image-preview-canvas': 'true',
+              onFocus: markPreviewFocused,
+            }}
           >
             {imageError ? (
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -2326,14 +2175,10 @@ function SvgPreview({
                 alt={preview.relativePath}
                 className="pointer-events-none max-h-none max-w-none object-contain"
                 draggable={false}
-                style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                  transformOrigin: 'center',
-                }}
                 onError={() => setImageError(true)}
               />
             )}
-          </button>
+          </ZoomableViewport>
         ) : (
           <div
             className="size-full"
@@ -2635,6 +2480,22 @@ function MissingFileNotice() {
 }
 
 export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
+  const file = tab.file;
+  if (file?.sourceUrl) {
+    return (
+      <ImagePreview
+        key={file.sourceUrl}
+        src={file.sourceUrl}
+        alt={file.displayName ?? tab.title}
+        tabId={tab.id}
+      />
+    );
+  }
+
+  return <FileBackedPreviewTabContent tab={tab} />;
+}
+
+function FileBackedPreviewTabContent({ tab }: FilePreviewTabContentProps) {
   const getFilePreview = useKartonProcedure((p) => p.fileTree.getFilePreview);
   const getFileStat = useKartonProcedure((p) => p.fileTree.getFileStat);
   const clearFileNotice = useKartonProcedure((p) => p.browser.clearFileNotice);
@@ -2854,6 +2715,9 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
   }, [workspaceKey, relativePath, preview, recreateDeletedFile, revalidate]);
 
   const fileNotice = tab.fileNotice;
+  const isImageDiff = tab.file.kind === 'image' || tab.file.kind === 'svg';
+  const isBinaryDiff =
+    tab.file.kind === 'binary' || isImagePath(tab.file.diffOldPath);
 
   // File was deleted — keep showing cached content with the delete banner.
   // Don't show the MissingFileNotice; the user can still see/edit and
@@ -2873,8 +2737,9 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
           {cachedPreview ? (
             cachedPreview.kind === 'image' ? (
               <ImagePreview
-                preview={cachedPreview}
-                blobUrl={blobUrl}
+                src={blobUrl}
+                alt={cachedPreview.relativePath}
+                openExternalPath={getPreviewAbsolutePath(cachedPreview)}
                 tabId={tab.id}
               />
             ) : cachedPreview.kind === 'svg' ? (
@@ -2897,12 +2762,27 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
     );
   }
 
-  // Git diff view: bypass the regular file preview pipeline entirely.
-  // The DiffEditorPreview loads its own content and is read-only.
+  // Git diff views bypass the regular preview pipeline. Images show the
+  // current workspace file; other binary files avoid feeding bytes to Monaco.
   if (tab.file?.showDiff) {
     return (
       <div className="absolute inset-0 z-10 flex flex-col bg-background">
-        <DiffEditorPreview tab={tab.file} tabId={tab.id} />
+        {isImageDiff ? (
+          <ImagePreview
+            src={blobUrl}
+            alt={tab.file.relativePath}
+            openExternalPath={tab.file.absolutePath}
+            tabId={tab.id}
+          />
+        ) : isBinaryDiff ? (
+          <BinaryPreview
+            workspaceKey={tab.file.workspaceKey}
+            relativePath={tab.file.relativePath}
+            revealInFolder={revealInFolder}
+          />
+        ) : (
+          <DiffEditorPreview tab={tab.file} tabId={tab.id} />
+        )}
       </div>
     );
   }
@@ -2956,7 +2836,12 @@ export function FilePreviewTabContent({ tab }: FilePreviewTabContentProps) {
             )}
           </div>
         ) : preview.kind === 'image' ? (
-          <ImagePreview preview={preview} blobUrl={blobUrl} tabId={tab.id} />
+          <ImagePreview
+            src={blobUrl}
+            alt={preview.relativePath}
+            openExternalPath={getPreviewAbsolutePath(preview)}
+            tabId={tab.id}
+          />
         ) : preview.kind === 'svg' ? (
           <SvgPreview preview={preview} tabId={tab.id} />
         ) : preview.kind === 'text' && isMarkdownPath(preview.relativePath) ? (

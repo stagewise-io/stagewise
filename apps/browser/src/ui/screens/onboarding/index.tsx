@@ -18,20 +18,28 @@ import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@ui/utils';
 import { StepLogin } from './steps/01-login';
 import type { OnboardingAuthCompletion } from './steps/01-login';
+import type {
+  OnboardingNavigationAction,
+  OnboardingStep,
+} from '@shared/karton-contracts/ui/telemetry';
 import {
   StepConfigureProviders,
   type ProviderStepSummary,
 } from './steps/06-configure-providers';
+import {
+  StepConfigureSkills,
+  hasDetectedExternalSkills,
+  type ExternalSkillSourceSelection,
+} from './steps/07-configure-skills';
 import { StepTheme } from './steps/07-theme';
 
-type ScreenId = 'login' | 'configure-providers' | 'personalization';
-type NavigationAction = 'next' | 'back' | 'skip' | 'finish';
-
 export function OnboardingWizard() {
-  const [screen, setScreen] = useState<ScreenId>('login');
+  const [screen, setScreen] = useState<OnboardingStep>('login');
   const [onboardingRunId] = useState(() => crypto.randomUUID());
   const [authCompletion, setAuthCompletion] =
     useState<OnboardingAuthCompletion | null>(null);
+  const [skillSourceSelection, setSkillSourceSelection] =
+    useState<ExternalSkillSourceSelection>({});
   const providerSummaryRef = useRef<ProviderStepSummary | null>(null);
   const personalizationChangedRef = useRef(false);
   const track = useTrack();
@@ -39,17 +47,21 @@ export function OnboardingWizard() {
   const connectedProviderCount = useKartonState(
     (s) => s.preferences.providerInstances?.length ?? 0,
   );
+  const hasExternalSkills = useKartonState((s) =>
+    hasDetectedExternalSkills(s.globalSkills),
+  );
   const runStartedAtRef = useRef(performance.now());
   const stepEnteredAtRef = useRef(runStartedAtRef.current);
-  const currentStepRef = useRef<ScreenId>('login');
-  const previousStepRef = useRef<ScreenId | undefined>(undefined);
-  const visitCountsRef = useRef<Record<ScreenId, number>>({
+  const currentStepRef = useRef<OnboardingStep>('login');
+  const previousStepRef = useRef<OnboardingStep | undefined>(undefined);
+  const visitCountsRef = useRef<Record<OnboardingStep, number>>({
     login: 0,
     'configure-providers': 0,
+    'configure-skills': 0,
     personalization: 0,
   });
   const startedTrackedRef = useRef(false);
-  const lastViewedStepRef = useRef<ScreenId | null>(null);
+  const lastViewedStepRef = useRef<OnboardingStep | null>(null);
   const setHasSeenOnboardingFlow = useKartonProcedure(
     (p) => p.userExperience.setHasSeenOnboardingFlow,
   );
@@ -82,7 +94,7 @@ export function OnboardingWizard() {
   }, [authStatus, connectedProviderCount, onboardingRunId, screen, track]);
 
   const navigate = useCallback(
-    (next: ScreenId, action: NavigationAction) => {
+    (next: OnboardingStep, action: OnboardingNavigationAction) => {
       const current = currentStepRef.current;
       void track('onboarding-step-exited', {
         onboarding_run_id: onboardingRunId,
@@ -156,14 +168,39 @@ export function OnboardingWizard() {
                   summary.provider_step_skipped,
               };
             }}
-            onNext={() => navigate('personalization', 'next')}
+            onNext={() =>
+              navigate(
+                hasExternalSkills ? 'configure-skills' : 'personalization',
+                'next',
+              )
+            }
             onBack={() => navigate('login', 'back')}
+          />
+        )}
+        {screen === 'configure-skills' && (
+          <StepConfigureSkills
+            selection={skillSourceSelection}
+            onSelectionChange={(prefix, enabled) =>
+              setSkillSourceSelection((current) => ({
+                ...current,
+                [prefix]: enabled,
+              }))
+            }
+            onNext={() => navigate('personalization', 'next')}
+            onBack={() => navigate('configure-providers', 'back')}
           />
         )}
         {screen === 'personalization' && (
           <StepTheme
             onNext={complete}
-            onBack={() => navigate('configure-providers', 'back')}
+            onBack={() =>
+              navigate(
+                previousStepRef.current === 'configure-skills'
+                  ? 'configure-skills'
+                  : 'configure-providers',
+                'back',
+              )
+            }
             onPersonalizationChanged={() => {
               personalizationChangedRef.current = true;
             }}
@@ -195,9 +232,15 @@ export function OnboardingBottomNav({
 }
 
 /** Back button styled consistently across screens. */
-export function BackButton({ onClick }: { onClick: () => void }) {
+export function BackButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <Button variant="ghost" size="sm" onClick={onClick}>
+    <Button variant="ghost" size="sm" onClick={onClick} disabled={disabled}>
       <IconArrowLeftFill18 className="size-4" />
       Back
     </Button>

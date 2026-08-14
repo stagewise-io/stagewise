@@ -104,7 +104,6 @@ import { useOpenSideChat } from '@ui/hooks/use-open-side-chat';
 
 // Stable empty arrays to avoid new-reference re-renders
 const EMPTY_HISTORY: AgentMessage[] = [];
-const EMPTY_QUEUE: (AgentMessage & { role: 'user' })[] = [];
 const EMPTY_WORKSPACE_ACTION_CONFIGS: ReadonlyMap<
   string,
   WorkspaceActionConfig
@@ -232,6 +231,12 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
   );
   const isWorkingRef = useRef(isWorking);
   isWorkingRef.current = isWorking;
+
+  const hasQueuedMessages = useKartonState((s) =>
+    openAgent
+      ? (s.agents.instances[openAgent]?.state.queuedMessages.length ?? 0) > 0
+      : false,
+  );
 
   // History & inputState are NEVER used during rendering — only inside
   // callbacks via refs.  We use a silent-subscription pattern: the
@@ -1061,10 +1066,10 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     setCanSendMessage(false);
     if (openAgent) void setChatInputState(openAgent, JSON.stringify(emptyDoc));
 
-    // Dispatch event with message data for optimistic rendering
-    // Only dispatch when agent is NOT working - if working, the backend
-    // will queue the message instead of adding to history immediately
-    const didDispatchOptimisticMessage = !isWorkingRef.current;
+    // Only render optimistically when the backend will add the message to
+    // history immediately. Active work or an older queue entry will queue it.
+    const didDispatchOptimisticMessage =
+      !isWorkingRef.current && !hasQueuedMessages;
     if (didDispatchOptimisticMessage)
       window.dispatchEvent(
         new CustomEvent('chat-message-sent', {
@@ -1123,8 +1128,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
 
       if (openAgent) {
         if (currentPendingQuestionId) {
-          // Atomic: queue message + resolve question in a single backend call.
-          // Include the current form draft so partial answers are preserved.
+          // Atomic: stage the message for the next model step and resolve the
+          // question. Include the current draft so partial answers survive.
           await interruptQuestionWithMessage(
             openAgent,
             currentPendingQuestionId,
@@ -1167,6 +1172,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     interruptQuestionWithMessage,
     executePendingWorkspaceActions,
     setFileAttachments,
+    hasQueuedMessages,
   ]);
 
   const handleNextAttentionAgentClick = () => {
@@ -1238,12 +1244,6 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     const max = maxTokens ?? 1;
     return Math.min(100, Math.round((used / max) * 100));
   }, [usedTokens, maxTokens]);
-
-  const queuedMessages = useKartonState((s) =>
-    openAgent
-      ? (s.agents.instances[openAgent]?.state.queuedMessages ?? EMPTY_QUEUE)
-      : EMPTY_QUEUE,
-  );
 
   const handlePromptHistoryNavigationRequest = useCallback(
     (direction: PromptHistoryDirection) => {
@@ -1952,7 +1952,7 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
             contextUsedPercentage={contextUsed}
             contextUsedKb={usedTokens ? usedTokens / 1000 : 0}
             contextMaxKb={maxTokens ? maxTokens / 1000 : 0}
-            hasQueuedMessages={(queuedMessages?.length ?? 0) > 0}
+            hasQueuedMessages={hasQueuedMessages}
             onFlushQueue={handleFlushQueue}
             onFocus={onInputFocus}
             onBlur={onInputBlur}

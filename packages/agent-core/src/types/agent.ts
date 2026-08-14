@@ -160,6 +160,7 @@ export type AgentHistoryEntry = {
   messageCount: number;
   parentAgentInstanceId: string | null;
   unread: boolean;
+  archivedAt: Date | null;
   mountedWorkspaces?: AgentHistoryWorkspaceEntry[] | null;
 };
 

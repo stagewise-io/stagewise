@@ -41,6 +41,7 @@ describe('agent list workspace model', () => {
           messageCount: 1,
           parentAgentInstanceId: null,
           unread: true,
+          archivedAt: null,
         },
       ],
       pendingRemovals: new Set(),

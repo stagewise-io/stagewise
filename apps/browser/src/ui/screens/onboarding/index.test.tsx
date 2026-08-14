@@ -1,13 +1,19 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { AppState } from '@shared/karton-contracts/ui';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   track: vi.fn(),
   setHasSeenOnboardingFlow: vi.fn(),
+  updatePreferences: vi.fn(),
   markCurrentReleaseNotesSeen: vi.fn(),
   state: {
     userAccount: { status: 'unauthenticated' },
-    preferences: { providerInstances: [] as unknown[] },
+    preferences: {
+      providerInstances: [] as unknown[],
+      agent: { enabledGlobalSkillDirs: [] as string[] },
+    },
+    globalSkills: [] as AppState['globalSkills'],
   },
 }));
 
@@ -22,6 +28,7 @@ vi.mock('@ui/hooks/use-karton', () => ({
       userExperience: {
         setHasSeenOnboardingFlow: mocks.setHasSeenOnboardingFlow,
       },
+      preferences: { update: mocks.updatePreferences },
     }),
   ),
 }));
@@ -90,21 +97,23 @@ vi.mock('./steps/07-theme', () => ({
     </div>
   ),
 }));
-
 import { OnboardingWizard } from './index';
 
 function callsFor(eventName: string) {
   return mocks.track.mock.calls.filter(([name]) => name === eventName);
 }
 
-describe('OnboardingWizard telemetry', () => {
+describe('OnboardingWizard', () => {
   beforeEach(() => {
     mocks.track.mockReset();
     mocks.track.mockResolvedValue(undefined);
     mocks.setHasSeenOnboardingFlow.mockReset();
+    mocks.updatePreferences.mockReset();
+    mocks.updatePreferences.mockResolvedValue(undefined);
     mocks.markCurrentReleaseNotesSeen.mockReset();
     mocks.state.userAccount.status = 'unauthenticated';
     mocks.state.preferences.providerInstances = [];
+    mocks.state.globalSkills = [];
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
       '00000000-0000-4000-8000-000000000001',
     );
@@ -254,5 +263,26 @@ describe('OnboardingWizard telemetry', () => {
         }),
       }),
     );
+  });
+
+  it('routes through skill configuration when external skills are detected', async () => {
+    mocks.state.globalSkills = [
+      {
+        name: 'review',
+        description: 'Review code',
+        mountPrefix: 'globalskills-codex',
+      },
+    ];
+    render(<OnboardingWizard />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip login' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Provider next skipped' }),
+    );
+    expect(await screen.findByText('Use your existing skills')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Theme back' }));
+
+    expect(await screen.findByText('Use your existing skills')).toBeTruthy();
   });
 });

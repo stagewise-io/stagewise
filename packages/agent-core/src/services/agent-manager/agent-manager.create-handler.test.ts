@@ -23,12 +23,20 @@ function createDeps() {
   const persistenceDb = {
     getLastChatWorkspacePaths: vi.fn(async () => null),
     getLastChatModelSelection: vi.fn(async () => null),
+    getAgentHistoryEntries: vi.fn(async () => []),
+    getChildAgentInstanceIds: vi.fn(async () => []),
+    deleteAgentInstance: vi.fn(async () => {}),
     updateAgentUnread: vi.fn(async () => {}),
+    setAgentArchived: vi.fn(async () => {}),
+  };
+  const attachments = {
+    deleteAgentBlobs: vi.fn(async () => {}),
   };
   return {
     registry: new CommandRegistry(),
     toolbox,
     persistenceDb,
+    attachments,
     agentStore: {
       get: vi.fn(() => ({ agents: { instances: {} }, toolbox: {} })),
       update: vi.fn(),
@@ -48,7 +56,7 @@ function buildManager(deps: ReturnType<typeof createDeps>) {
     state: { store: deps.agentStore as any },
     storage: {
       persistenceDb: deps.persistenceDb as any,
-      attachments: {} as any,
+      attachments: deps.attachments as any,
       fileReadCache: {} as any,
     },
     tools: {
@@ -119,6 +127,24 @@ describe('AgentManager unread handlers', () => {
       'active',
       true,
     );
+  });
+});
+
+describe('AgentManager agents.delete handler', () => {
+  it('completes after attachment cleanup fails', async () => {
+    const deps = createDeps();
+    deps.attachments.deleteAgentBlobs.mockRejectedValueOnce(
+      new Error('filesystem unavailable'),
+    );
+    const manager = buildManager(deps);
+
+    await deps.registry.dispatch<unknown[], void>(
+      'agents.delete',
+      { callerId: 'test' },
+      ['agent-1'],
+    );
+    expect(deps.attachments.deleteAgentBlobs).toHaveBeenCalledWith('agent-1');
+    await manager.teardown();
   });
 });
 
@@ -232,6 +258,19 @@ describe('AgentManager agents.create handler', () => {
     await expect(manager.resumeAgent('restored')).rejects.toThrow();
 
     expect(has).toHaveBeenCalledWith('local-chat', 'ollama-local');
+    await manager.teardown();
+  });
+
+  it('does not resume archived agents', async () => {
+    const deps = createDeps();
+    (deps.persistenceDb as any).getStoredAgentInstanceById = vi.fn(
+      async () => ({ archivedAt: new Date() }),
+    );
+    const manager = buildManager(deps);
+
+    await expect(manager.resumeAgent('archived')).rejects.toThrow(
+      'must be unarchived before it can be resumed',
+    );
     await manager.teardown();
   });
 
@@ -386,6 +425,75 @@ describe('AgentManager agents.create handler', () => {
   });
 });
 
+describe('AgentManager question interruption handler', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('prioritizes the message before resolving the pending question', async () => {
+    const sendUserMessageSpy = vi
+      .spyOn(AgentManager.prototype, 'sendUserMessage')
+      .mockResolvedValue(undefined);
+    const deps = createDeps();
+    const manager = buildManager(deps);
+    const message = {
+      id: 'message-1',
+      role: 'user',
+      parts: [{ type: 'text', text: 'Use my free-form answer' }],
+    } as any;
+    const draftAnswers = { framework: 'react' };
+
+    await deps.registry.dispatch<unknown[], void>(
+      'agents.interruptQuestionWithMessage',
+      { callerId: 'test' },
+      ['agent-1', 'question-1', message, draftAnswers],
+    );
+
+    expect(sendUserMessageSpy).toHaveBeenCalledWith('agent-1', message, {
+      flushQueueOnNextStep: true,
+    });
+    expect(deps.toolbox.cancelQuestion).toHaveBeenCalledWith(
+      'agent-1',
+      'question-1',
+      'user_sent_message',
+      draftAnswers,
+    );
+    expect(sendUserMessageSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.toolbox.cancelQuestion.mock.invocationCallOrder[0]!,
+    );
+
+    await manager.teardown();
+  });
+
+  it('keeps the question pending when message staging fails', async () => {
+    vi.spyOn(AgentManager.prototype, 'sendUserMessage').mockRejectedValue(
+      new Error('staging failed'),
+    );
+    const deps = createDeps();
+    const manager = buildManager(deps);
+
+    await expect(
+      deps.registry.dispatch<unknown[], void>(
+        'agents.interruptQuestionWithMessage',
+        { callerId: 'test' },
+        [
+          'agent-1',
+          'question-1',
+          {
+            id: 'message-1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Use my free-form answer' }],
+          },
+          { framework: 'react' },
+        ],
+      ),
+    ).rejects.toThrow('staging failed');
+    expect(deps.toolbox.cancelQuestion).not.toHaveBeenCalled();
+
+    await manager.teardown();
+  });
+});
+
 describe('AgentManager agents.fork handler', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -436,16 +544,38 @@ describe('AgentManager agents.archive handler', () => {
     vi.restoreAllMocks();
   });
 
-  it('finalizes pending edits before tearing down the agent', async () => {
+  it('persists finalized state before tearing down the agent', async () => {
     const deps = createDeps();
+    deps.agentStore.get.mockReturnValue({
+      agents: {
+        instances: {
+          'agent-1': { parentAgentInstanceId: null, sideChatParentId: null },
+          'side-chat': {
+            parentAgentInstanceId: null,
+            sideChatParentId: 'agent-1',
+          },
+        },
+      },
+      toolbox: {},
+    });
     const manager = buildManager(deps);
+    const persistAgentState = vi
+      .spyOn(manager as any, 'persistAgentState')
+      .mockResolvedValue(undefined);
     const agent = {
       stop: vi.fn(async () => {}),
       reportErrorToParent: vi.fn(async () => {}),
       onTeardown: vi.fn(async () => {}),
       agentType: AgentTypes.CHAT,
     };
+    const sideChat = {
+      ...agent,
+      stop: vi.fn(async () => {}),
+      reportErrorToParent: vi.fn(async () => {}),
+      onTeardown: vi.fn(async () => {}),
+    };
     (manager as any).activeAgents.set('agent-1', agent);
+    (manager as any).activeAgents.set('side-chat', sideChat);
     await flush();
 
     await deps.registry.dispatch<unknown[], void>(
@@ -459,7 +589,64 @@ describe('AgentManager agents.archive handler', () => {
     );
     expect(
       deps.toolbox.finalizePendingEditsForAgent.mock.invocationCallOrder[0],
+    ).toBeLessThan(persistAgentState.mock.invocationCallOrder[0]!);
+    expect(persistAgentState).toHaveBeenCalledWith('agent-1');
+    expect(persistAgentState.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.persistenceDb.setAgentArchived.mock.invocationCallOrder[0]!,
+    );
+    expect(deps.persistenceDb.setAgentArchived).toHaveBeenCalledTimes(1);
+    expect(deps.persistenceDb.setAgentArchived).toHaveBeenCalledWith(
+      'agent-1',
+      true,
+    );
+    expect(deps.persistenceDb.setAgentArchived).not.toHaveBeenCalledWith(
+      'side-chat',
+      true,
+    );
+    expect(sideChat.onTeardown).toHaveBeenCalledTimes(1);
+    expect(
+      deps.persistenceDb.setAgentArchived.mock.invocationCallOrder[0],
     ).toBeLessThan(agent.onTeardown.mock.invocationCallOrder[0]!);
+    await manager.teardown();
+  });
+
+  it.each([
+    ['agents.archive', true],
+    ['agents.unarchive', false],
+  ] as const)('updates persisted archive state for %s', async (command, value) => {
+    const deps = createDeps();
+    const manager = buildManager(deps);
+
+    await deps.registry.dispatch<unknown[], void>(
+      command,
+      { callerId: 'test' },
+      ['agent-1'],
+    );
+
+    expect(deps.persistenceDb.setAgentArchived).toHaveBeenCalledWith(
+      'agent-1',
+      value,
+    );
+    await manager.teardown();
+  });
+
+  it('queries archived history separately', async () => {
+    const deps = createDeps();
+    const manager = buildManager(deps);
+
+    await deps.registry.dispatch<unknown[], unknown>(
+      'agents.getAgentsHistoryList',
+      { callerId: 'test' },
+      [0, 101, ' chat ', true],
+    );
+
+    expect(deps.persistenceDb.getAgentHistoryEntries).toHaveBeenCalledWith(
+      101,
+      0,
+      [],
+      '%chat%',
+      true,
+    );
     await manager.teardown();
   });
 });

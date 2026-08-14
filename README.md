@@ -1,17 +1,40 @@
+<div align="center">
+
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo-dark.svg">
-  <img src="https://raw.githubusercontent.com/stagewise-io/stagewise/refs/heads/main/logo-combo.svg" alt="stagewise" height="60" />
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-combo-dark.svg">
+  <img src=".github/assets/logo-combo.svg" alt="stagewise" height="60" />
 </picture>
 
-### The Agentic IDE for Open-Source Models
+<h3>The Agentic IDE for Open-Source Models</h3>
 
-English | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.ko.md) | [Português](./README.pt.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [हिन्दी](./README.hi.md) | [Русский](./README.ru.md) | [Українська](./README.uk.md)
+<p>
+  <a href="./locales/README.zh-CN.md">简体中文</a> ·
+  <a href="./locales/README.de.md">Deutsch</a> ·
+  <a href="./locales/README.ja.md">日本語</a> ·
+  <a href="./locales/README.es.md">Español</a> ·
+  <a href="./locales/README.ko.md">한국어</a> ·
+  <a href="./locales/README.pt.md">Português</a> ·
+  <a href="./locales/README.fr.md">Français</a> ·
+  <a href="./locales/README.it.md">Italiano</a> ·
+  <a href="./locales/README.hi.md">हिन्दी</a> ·
+  <a href="./locales/README.ru.md">Русский</a> ·
+  <a href="./locales/README.uk.md">Українська</a>
+</p>
 
- ![NPM License](https://img.shields.io/npm/l/stagewise) [![GitHub Repo stars](https://img.shields.io/github/stars/stagewise-io/stagewise)](https://github.com/stagewise-io/stagewise)
+<p>
+  <a href="https://github.com/stagewise-io/stagewise/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/stagewise" /></a>
+  <a href="https://github.com/stagewise-io/stagewise/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/stagewise-io/stagewise" /></a>
+  <a href="https://discord.gg/gkdGsDYaKA"><img alt="Discord" src="https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white" /></a>
+  <a href="https://x.com/stagewise_io"><img alt="X Follow" src="https://img.shields.io/twitter/follow/stagewise_io" /></a>
+</p>
 
-[![Join us on Discord](https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white)](https://discord.gg/gkdGsDYaKA) [![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/stagewise_io)](https://x.com/stagewise_io)
+</div>
 
-![stagewise demo](https://raw.githubusercontent.com/stagewise-io/stagewise/main/apps/website/src/app/(home)/_components/feature-images/full-demo-dark.png)
+![stagewise demo](apps/website/src/app/%28home%29/_components/feature-images/full-demo-dark.webp)
+
+<br />
+
+---
 
 ## About the project
 
@@ -36,7 +59,7 @@ Bring Your Own Key for all popular model providers — you can also register com
 
 Connect any of the following subscriptions with a single API key to unlock all models the provider offers directly inside stagewise.
 
-| **Subscription** | **Provider** | **Featured Models** | **Dashboard** |
+| Subscription | Provider | Featured Models | Dashboard |
 | ---------------- | ------------ | ------------------- | ------------- |
 | Kimi             | [Moonshot AI](https://platform.moonshot.ai) | Kimi K3, Kimi K2.7 Code, Kimi K2.6, Kimi K2.5 | [Get API key](https://platform.moonshot.ai/console/api-keys) |
 | Qwen Coding Plan | [Alibaba DashScope](https://dashscope.console.aliyun.com) | Qwen 3-Coder 30B-A3B, Qwen 3-32B | [Get API key](https://dashscope.console.aliyun.com/apiKey) |
@@ -48,7 +71,7 @@ Connect any of the following subscriptions with a single API key to unlock all m
 
 Connect directly to any of the following API providers with your own key. For maximum flexibility, [OpenRouter](https://openrouter.ai) gives you access to 345+ models from all major vendors through a single API key.
 
-| **Provider** | **Featured Models** | **Dashboard** |
+| Provider | Featured Models | Dashboard |
 | ------------- | ------------------- | ------------- |
 | OpenRouter    | Claude Opus 4.8, GPT-5.6 Sol, Gemini 3.1 Pro, DeepSeek V4 Pro | [Get API key](https://openrouter.ai/keys) |
 
@@ -56,7 +79,7 @@ Connect directly to any of the following API providers with your own key. For ma
 
 For ease of use and immediate access to a large library of models, you can simply create a stagewise Account.
 
-| **Plan** | **Price**     | **Limits**                      |
+| Plan | Price | Limits |
 | -------- | ------------- | ------------------------------- |
 | Free     | $0 / month    | Limited access to 3 standard models (Default, Quick, Smart) |
 | Pro      | $20 / month   | Access to all models, including Frontier and Open-Weights |
@@ -79,6 +102,7 @@ Included models:
 - **Anthropic**: Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 5, Sonnet 4.6, Haiku 4.5
 - **OpenAI**: GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
 - **Google**: Gemini 3.5 Flash, Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
+- **xAI**: Grok 4.5
 
 ## License
 

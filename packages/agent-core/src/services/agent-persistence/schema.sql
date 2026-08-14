@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS agentInstances(
   input_state TEXT NOT NULL,
   used_tokens INTEGER NOT NULL,
   mounted_workspaces TEXT,
-  tool_approval_mode TEXT NOT NULL DEFAULT 'alwaysAsk'
+  tool_approval_mode TEXT NOT NULL DEFAULT 'alwaysAsk',
+  archived_at INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS agentInstances_created_at_index ON agentInstances(created_at);

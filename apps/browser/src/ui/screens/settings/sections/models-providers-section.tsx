@@ -517,6 +517,7 @@ const ADDABLE_VENDOR_TYPES: ProviderInstanceTypeId[] = [
   'minimax-api',
   'xiaomi-mimo-api',
   'mistral-api',
+  'x-ai-api',
 ];
 
 const ADDABLE_GATEWAY_TYPES: ProviderInstanceTypeId[] = ['openrouter'];

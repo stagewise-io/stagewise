@@ -22,7 +22,7 @@ import {
  * Each attachment is identified by `(agentId, attachmentId)` and stored at
  * `host.agentAttachmentPath(agentId, attachmentId)`. Writes go through a
  * temp-then-rename dance for atomicity. Per-agent cleanup is exposed via
- * `deleteAgentBlobs()`; the agent-manager fires it when an agent is hard
+ * `deleteAgentBlobs()`; the agent-manager calls it when an agent is hard
  * deleted (archive intentionally preserves blobs so a resumed agent can
  * still read its attachments).
  *

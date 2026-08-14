@@ -222,6 +222,7 @@ export type WorktreeSetupRepositorySettings = {
   mainWorktreePath: string;
   repositoryId: string | null;
   scripts: Record<WorktreeSetupScriptVariant, WorktreeSetupScriptFile>;
+  hasCodexSetupScript: boolean;
   managedWorktrees: WorktreeSetupManagedWorktree[];
 };
 
@@ -700,6 +701,8 @@ export type FileTabMetadata = {
    * file name should be shown to the user.
    */
   displayName?: string;
+  /** Direct image URL for read-only media tabs that do not have a file path. */
+  sourceUrl?: string;
   /** When true, the tab content is read-only (e.g. attachment blobs). */
   readOnly?: boolean;
   /**
@@ -1352,11 +1355,13 @@ export type KartonContract = {
       discardSideChat: (agentId: string) => Promise<void>;
       resume: (agentId: string) => Promise<void>;
       archive: (agentId: string) => Promise<void>;
+      unarchive: (agentId: string) => Promise<void>;
       delete: (agentId: string) => Promise<void>;
       getAgentsHistoryList: (
         offset: number,
         limit: number,
         searchString?: string,
+        archived?: boolean,
       ) => Promise<AgentHistoryEntry[]>;
       getAgentHistoryEntriesByIds: (
         ids: string[],
@@ -1366,7 +1371,7 @@ export type KartonContract = {
         agentId: string,
         message: AgentMessage & { role: 'user' },
       ) => Promise<void>;
-      /** Queue a user message AND resolve a pending question in one atomic call. */
+      /** Stage a user message for the next step and resolve a question atomically. */
       interruptQuestionWithMessage: (
         agentId: string,
         questionId: string,
@@ -1391,11 +1396,16 @@ export type KartonContract = {
         source?: 'panel-combobox' | 'inline-approval-button',
       ) => Promise<void>;
       stop: (agentId: string) => Promise<void>;
-      flushQueue: (agentId: string) => Promise<void>;
+      flushQueue: (agentId: string, messageId?: string) => Promise<void>;
       clearQueue: (agentId: string) => Promise<void>;
       deleteQueuedMessage: (
         agentId: string,
         messageId: string,
+      ) => Promise<void>;
+      moveQueuedMessage: (
+        agentId: string,
+        messageId: string,
+        toIndex: number,
       ) => Promise<void>;
       revertToUserMessage: (
         agentId: string,
@@ -2030,6 +2040,12 @@ export type KartonContract = {
         displayName?: string,
         agentInstanceId?: string | null,
         options?: OpenFileTabOptions,
+      ) => Promise<string | null>;
+      openImageTab: (
+        title: string,
+        sourceUrl: string,
+        mimeType: string,
+        agentInstanceId?: string | null,
       ) => Promise<string | null>;
       promoteFileTab: (tabId: string) => Promise<void>;
       renameEntry: (

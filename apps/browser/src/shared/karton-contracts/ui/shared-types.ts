@@ -41,6 +41,7 @@ export const modelProviderSchema = z.enum([
   'minimax',
   'xiaomi-mimo',
   'mistral',
+  'x-ai',
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
@@ -88,6 +89,7 @@ export const providerConfigsSchema = z.object({
   minimax: providerConfigSchema.default({ mode: 'stagewise' }),
   'xiaomi-mimo': providerConfigSchema.default({ mode: 'stagewise' }),
   mistral: providerConfigSchema.default({ mode: 'stagewise' }),
+  'x-ai': providerConfigSchema.default({ mode: 'stagewise' }),
 });
 export type ProviderConfigs = z.infer<typeof providerConfigsSchema>;
 
@@ -216,6 +218,7 @@ export const providerInstanceTypeIds = [
   'minimax-api',
   'xiaomi-mimo-api',
   'mistral-api',
+  'x-ai-api',
   'coding-plan',
   'custom-anthropic',
   'custom-openai-chat',
@@ -386,6 +389,10 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
   }),
   providerInstanceBaseSchema.extend({
     typeId: z.literal('mistral-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('x-ai-api'),
     config: officialApiConfigSchema,
   }),
   providerInstanceBaseSchema.extend({
@@ -618,6 +625,14 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     credentialType: 'api-key',
     supportsImageGeneration: true,
+  },
+  'x-ai-api': {
+    displayName: 'xAI API',
+    description: 'Grok models',
+    helpText: 'Create one at console.x.ai → API Keys',
+    getApiKeyUrl: 'https://console.x.ai',
+    defaultBaseUrl: 'https://api.x.ai/v1',
+    credentialType: 'api-key',
   },
 };
 
@@ -1214,6 +1229,7 @@ export const userPreferencesSchema = z.object({
     minimax: { mode: 'stagewise' },
     'xiaomi-mimo': { mode: 'stagewise' },
     mistral: { mode: 'stagewise' },
+    'x-ai': { mode: 'stagewise' },
   }),
   /** User-defined API endpoints */
   customEndpoints: z.array(customEndpointSchema).default([]),
@@ -1332,6 +1348,7 @@ export const defaultUserPreferences: UserPreferences = {
     minimax: { mode: 'stagewise' },
     'xiaomi-mimo': { mode: 'stagewise' },
     mistral: { mode: 'stagewise' },
+    'x-ai': { mode: 'stagewise' },
   },
   customEndpoints: [],
   customModels: [],

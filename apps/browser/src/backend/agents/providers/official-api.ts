@@ -64,6 +64,7 @@ const VENDOR_TO_API_SPEC: Record<ModelProvider, ApiSpec> = {
   minimax: 'openai-chat-completions',
   'xiaomi-mimo': 'openai-chat-completions',
   mistral: 'openai-chat-completions',
+  'x-ai': 'openai-chat-completions',
 };
 
 /**
@@ -81,6 +82,7 @@ const VENDOR_VALIDATION_MODEL: Partial<Record<ModelProvider, string>> = {
   minimax: 'minimax-m2.7',
   'xiaomi-mimo': 'mimo-v2.5',
   mistral: 'mistral-small-latest',
+  'x-ai': 'grok-3-mini',
   openai: 'gpt-4o-mini',
   google: 'gemini-3.1-flash-lite',
 };
@@ -571,6 +573,9 @@ export const xiaomiMimoApiType: ProviderType<OfficialApiConfig> =
 export const mistralApiType: ProviderType<OfficialApiConfig> =
   createOpenAICompatibleApiType('mistral');
 
+export const xAiApiType: ProviderType<OfficialApiConfig> =
+  createOpenAICompatibleApiType('x-ai');
+
 // ============================================================================
 // Registry of all official-api types, keyed by vendor
 // ============================================================================
@@ -589,6 +594,7 @@ export const OFFICIAL_API_TYPES: Record<
   minimax: minimaxApiType,
   'xiaomi-mimo': xiaomiMimoApiType,
   mistral: mistralApiType,
+  'x-ai': xAiApiType,
 };
 
 export const VENDOR_API_SPECS = VENDOR_TO_API_SPEC;

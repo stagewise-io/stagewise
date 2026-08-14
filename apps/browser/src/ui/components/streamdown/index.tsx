@@ -6,6 +6,7 @@ import { useOpenAgent } from '@ui/hooks/use-open-chat';
 import { CodeBlock } from '../ui/code-block';
 import { StreamingCodeBlock } from '../ui/streaming-code-block';
 import { Mermaid } from '../ui/mermaid';
+import { useOpenImageTab } from '@ui/hooks/use-open-image-tab';
 import {
   memo,
   type DetailedHTMLProps,
@@ -358,6 +359,7 @@ const CodeComponent = ({
         >
           <Mermaid
             chart={code}
+            openInTab
             config={{
               theme: 'default',
             }}
@@ -641,6 +643,7 @@ const ImgComponent = ({
   ...props
 }: DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement> &
   ExtraProps) => {
+  const openImageTab = useOpenImageTab();
   const downloadImage = useCallback(async () => {
     if (!src) return;
 
@@ -672,9 +675,9 @@ const ImgComponent = ({
   }, [src]);
 
   return (
-    <div className="my-2 flex flex-col gap-1" data-streamdown="image-wrapper">
+    <span className="my-2 flex flex-col gap-1" data-streamdown="image-wrapper">
       {/* Download control */}
-      <div className="flex items-center justify-end">
+      <span className="flex items-center justify-end">
         <Button
           variant="ghost"
           size="icon-xs"
@@ -683,17 +686,30 @@ const ImgComponent = ({
         >
           <DownloadIcon className="size-3" />
         </Button>
-      </div>
+      </span>
 
-      {/* Image */}
-      <img
-        className={cn('max-w-full rounded-lg', className)}
-        alt={alt ?? ''}
-        src={src}
-        data-streamdown="image"
-        {...props}
-      />
-    </div>
+      {src ? (
+        <button
+          type="button"
+          className="max-w-full cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-solid"
+          aria-label={`Open ${alt || 'image'} in tab`}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openImageTab(alt || 'Image', src);
+          }}
+        >
+          <img
+            className={cn('max-w-full rounded-lg', className)}
+            alt={alt ?? ''}
+            src={src}
+            data-streamdown="image"
+            {...props}
+          />
+        </button>
+      ) : null}
+    </span>
   );
 };
 

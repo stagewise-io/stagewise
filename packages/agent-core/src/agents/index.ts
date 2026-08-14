@@ -21,6 +21,7 @@ export {
   type BaseAgentStatic,
   type AgentConfig,
   type MessageId,
+  type SendUserMessageOptions,
 } from './base-agent';
 export { ChatAgent } from './chat/chat';
 

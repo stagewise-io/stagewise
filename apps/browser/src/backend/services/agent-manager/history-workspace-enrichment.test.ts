@@ -20,6 +20,7 @@ function makeEntry(
     messageCount: 0,
     parentAgentInstanceId: null,
     unread: false,
+    archivedAt: null,
     mountedWorkspaces,
   };
 }

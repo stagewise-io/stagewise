@@ -3,6 +3,7 @@ import type {
   BaseAgent,
   BaseAgentDependencies,
   BaseAgentToolboxView,
+  SendUserMessageOptions,
 } from '../../agents/base-agent';
 import type { AgentTypeRegistry } from '../../agents/agents-registry';
 import { toAgentsMap, type AgentsMap } from '../../agents/agents-map';
@@ -568,18 +569,18 @@ export class AgentManager extends DisposableService {
         message: AgentMessage & { role: 'user' },
         draftAnswers: Record<string, unknown>,
       ) => {
-        // Queue the message FIRST, then resolve the question — both in
-        // one backend call so there's no race between separate RPCs.
-        try {
-          await this.sendUserMessage(instanceId, message);
-        } finally {
-          this.managerToolbox.cancelQuestion(
-            instanceId,
-            questionId,
-            'user_sent_message',
-            draftAnswers,
-          );
-        }
+        // Stage the message for the immediate next model step, then resolve
+        // the question. Keeping both actions in one command avoids a race
+        // between separate RPCs while preserving partial form answers.
+        await this.sendUserMessage(instanceId, message, {
+          flushQueueOnNextStep: true,
+        });
+        this.managerToolbox.cancelQuestion(
+          instanceId,
+          questionId,
+          'user_sent_message',
+          draftAnswers,
+        );
       },
     );
     this.wrapAgentRpc(
@@ -612,9 +613,12 @@ export class AgentManager extends DisposableService {
     this.wrapAgentRpc('agents.stop', async (instanceId: string) => {
       await this.stopAgent(instanceId);
     });
-    this.wrapAgentRpc('agents.flushQueue', async (instanceId: string) => {
-      await this.flushQueue(instanceId);
-    });
+    this.wrapAgentRpc(
+      'agents.flushQueue',
+      async (instanceId: string, messageId?: string) => {
+        await this.flushQueue(instanceId, messageId);
+      },
+    );
     this.wrapAgentRpc('agents.clearQueue', async (instanceId: string) => {
       await this.clearQueue(instanceId);
     });
@@ -622,6 +626,12 @@ export class AgentManager extends DisposableService {
       'agents.deleteQueuedMessage',
       async (instanceId: string, messageId: string) => {
         await this.deleteQueuedMessage(instanceId, messageId);
+      },
+    );
+    this.wrapAgentRpc(
+      'agents.moveQueuedMessage',
+      async (instanceId: string, messageId: string, toIndex: number) => {
+        await this.moveQueuedMessage(instanceId, messageId, toIndex);
       },
     );
     this.wrapAgentRpc(
@@ -657,9 +667,12 @@ export class AgentManager extends DisposableService {
     this.wrapAgentRpc('agents.delete', async (instanceId: string) => {
       await this.deleteAgent(instanceId);
     });
-    this.wrapAgentRpc('agents.archive', async (instanceId: string) => {
-      await this.archiveAgent(instanceId);
-    });
+    this.wrapAgentRpc('agents.archive', (instanceId: string) =>
+      this.archiveAgent(instanceId, true),
+    );
+    this.wrapAgentRpc('agents.unarchive', (instanceId: string) =>
+      this.persistenceDb.setAgentArchived(instanceId, false),
+    );
     this.wrapAgentRpc('agents.markAsRead', async (instanceId: string) => {
       await this.updateUnread(instanceId, false);
     });
@@ -747,9 +760,12 @@ export class AgentManager extends DisposableService {
     );
     this.wrapAgentRpc(
       'agents.getAgentsHistoryList',
-      async (offset: number, limit: number, searchString?: string) => {
-        return await this.getAgentsHistoryList(offset, limit, searchString);
-      },
+      (
+        offset: number,
+        limit: number,
+        searchString?: string,
+        archived?: boolean,
+      ) => this.getAgentsHistoryList(offset, limit, searchString, archived),
     );
     this.wrapAgentRpc(
       'agents.getAgentHistoryEntriesByIds',
@@ -1238,6 +1254,11 @@ export class AgentManager extends DisposableService {
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
+    if (agent.archivedAt) {
+      throw new Error(
+        `Agent with instance id ${instanceId} is archived and must be unarchived before it can be resumed`,
+      );
+    }
 
     // Right now, we don't allow resuming sub-agents (because persisted agents stop all their tools calls anyway when they arew stopped and resumed - including any child agents).
     if (agent.parentAgentInstanceId) {
@@ -1318,10 +1339,6 @@ export class AgentManager extends DisposableService {
 
     if (!agent || !agentState) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
-    }
-
-    if (agentState.history.length === 0) {
-      // We don't persist empty agents.
     }
 
     const mountedWorkspaces =
@@ -1501,7 +1518,14 @@ export class AgentManager extends DisposableService {
 
     // Permanently remove on-disk attachment blobs (archive intentionally
     // preserves them so a resumed agent can still access its attachments).
-    void this.attachments.deleteAgentBlobs(instanceId);
+    try {
+      await this.attachments.deleteAgentBlobs(instanceId);
+    } catch (error) {
+      this.logger.error(
+        `[AgentManager] Failed to delete attachment blobs for agent ${instanceId}`,
+        error,
+      );
+    }
 
     this.host.telemetry?.capture('agent-deleted', {
       agent_type: agentType,
@@ -1513,12 +1537,18 @@ export class AgentManager extends DisposableService {
    * Stops an agent and deletes it's active instance while keeping the persisted state intact - must be resumed when it should be opened again.
    * @param instanceId The agent instance that should be archived (stopped and only persistence kept)
    */
-  private async archiveAgent(instanceId: string) {
+  private async archiveAgent(
+    instanceId: string,
+    persistState = false,
+    markArchived = persistState,
+  ) {
     this.logger.debug(`[AgentManager] Archiving agent. ID: ${instanceId}`);
     // Stop this agent and all child agents
     const agent = this.activeAgents.get(instanceId);
 
     if (!agent) {
+      if (markArchived)
+        await this.persistenceDb.setAgentArchived(instanceId, true);
       return;
     }
 
@@ -1543,11 +1573,13 @@ export class AgentManager extends DisposableService {
     const childAgentInstanceIds =
       this.getActiveChildAgentInstanceIds(instanceId);
     for (const childAgentInstanceId of childAgentInstanceIds) {
-      const childAgent = this.activeAgents.get(childAgentInstanceId);
-      await childAgent?.onTeardown();
-      await this.archiveAgent(childAgentInstanceId);
+      await this.archiveAgent(childAgentInstanceId, persistState, false);
     }
 
+    if (persistState) await this.persistAgentState(instanceId);
+    if (markArchived) {
+      await this.persistenceDb.setAgentArchived(instanceId, true);
+    }
     await agent.onTeardown();
 
     // Clear the active agents map.
@@ -1575,7 +1607,7 @@ export class AgentManager extends DisposableService {
   public async sendUserMessage(
     instanceId: string,
     message: AgentMessage & { role: 'user' },
-    options: { queueIfBlocked?: boolean } = {},
+    options: SendUserMessageOptions = {},
   ) {
     const agent = this.activeAgents.get(instanceId);
 
@@ -1754,14 +1786,14 @@ export class AgentManager extends DisposableService {
   /**
    * Flush the queue of a specific agent
    */
-  public async flushQueue(instanceId: string) {
+  public async flushQueue(instanceId: string, messageId?: string) {
     const agent = this.activeAgents.get(instanceId);
 
     if (!agent) {
       throw new Error(`Agent with instance id ${instanceId} not found`);
     }
 
-    await agent.flushQueue();
+    await agent.flushQueue(messageId);
   }
 
   /**
@@ -1788,6 +1820,20 @@ export class AgentManager extends DisposableService {
     }
 
     await agent.deleteQueuedMessage(messageId);
+  }
+
+  public async moveQueuedMessage(
+    instanceId: string,
+    messageId: string,
+    toIndex: number,
+  ) {
+    const agent = this.activeAgents.get(instanceId);
+
+    if (!agent) {
+      throw new Error(`Agent with instance id ${instanceId} not found`);
+    }
+
+    await agent.moveQueuedMessage(messageId, toIndex);
   }
 
   /**
@@ -1893,6 +1939,7 @@ export class AgentManager extends DisposableService {
     offset: number,
     limit: number,
     searchString?: string,
+    archived = false,
   ): Promise<AgentHistoryEntry[]> {
     const entries = await this.persistenceDb.getAgentHistoryEntries(
       limit,
@@ -1901,6 +1948,7 @@ export class AgentManager extends DisposableService {
       searchString && searchString.trim().length > 0
         ? `%${searchString.trim()}%`
         : undefined,
+      archived,
     );
     return this.enrichHistoryEntries
       ? await this.enrichHistoryEntries(entries)

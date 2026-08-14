@@ -9,6 +9,7 @@ import type {
 export type OnboardingStep =
   | 'login'
   | 'configure-providers'
+  | 'configure-skills'
   | 'personalization';
 export type OnboardingNavigationAction = 'next' | 'back' | 'skip' | 'finish';
 export type OnboardingProviderKind =

@@ -120,6 +120,9 @@ export function StatusCard() {
   const deleteQueuedMessage = useKartonProcedure(
     (p) => p.agents.deleteQueuedMessage,
   );
+  const moveQueuedMessage = useKartonProcedure(
+    (p) => p.agents.moveQueuedMessage,
+  );
 
   // Procedure to send a queued message immediately (aborts current work)
   const flushQueue = useKartonProcedure((p) => p.agents.flushQueue);
@@ -246,17 +249,16 @@ export function StatusCard() {
     });
 
     if (userQuestionSection) result.push(userQuestionSection);
-    const messageQueueSection = MessageQueueSection({
-      queuedMessages: messageQueue ?? [],
-      onRemoveMessage: async (messageId) => {
-        if (!openAgentId) return;
-        await deleteQueuedMessage(openAgentId, messageId);
-      },
-      onFlush: async () => {
-        if (!openAgentId) return;
-        await flushQueue(openAgentId);
-      },
-    });
+    const messageQueueSection = openAgentId
+      ? MessageQueueSection({
+          queuedMessages: messageQueue,
+          onRemoveMessage: (messageId) =>
+            void deleteQueuedMessage(openAgentId, messageId),
+          onSendMessage: (messageId) => void flushQueue(openAgentId, messageId),
+          onMoveMessage: (messageId, toIndex) =>
+            void moveQueuedMessage(openAgentId, messageId, toIndex),
+        })
+      : null;
     if (messageQueueSection) result.push(messageQueueSection);
 
     const planSections = buildPlanSections({
@@ -284,6 +286,7 @@ export function StatusCard() {
     handleImplement,
     messageQueue,
     deleteQueuedMessage,
+    moveQueuedMessage,
     flushQueue,
     pendingUserQuestion,
     submitUserQuestionStep,

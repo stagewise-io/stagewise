@@ -1065,9 +1065,6 @@ export class ToolboxService
         draft.skills = cmds.map(toSkillDefinitionUI);
       });
     }
-    // Always populate the global skills index for the Settings UI,
-    // even before any agent is created.
-    void this.rebuildGlobalSkillsIndex();
   }
 
   /**
@@ -1106,10 +1103,25 @@ export class ToolboxService
     const gen = ++this.globalSkillsRebuildGeneration;
     const mounts = getGlobalSkillsMounts();
     const perMount = await Promise.all(
-      mounts.map(async (m) => ({
-        mount: m,
-        skills: await discoverSkills(m.skillsPath ?? m.absolutePath),
-      })),
+      mounts.map(async (mount) => {
+        try {
+          return {
+            mount,
+            skills: await discoverSkills(
+              mount.skillsPath ?? mount.absolutePath,
+            ),
+          };
+        } catch (error) {
+          this.logger.warn(
+            `[ToolboxService] Failed to discover global skills from ${mount.prefix}`,
+            { error },
+          );
+          this.report(error as Error, 'rebuildGlobalSkillsIndex', {
+            mountPrefix: mount.prefix,
+          });
+          return { mount, skills: [] };
+        }
+      }),
     );
     if (gen !== this.globalSkillsRebuildGeneration) return;
 
@@ -1499,7 +1511,8 @@ export class ToolboxService
       );
     }
 
-    // Start watching global skills directories (~/.stagewise/skills, ~/.agents/skills)
+    // Populate the index before onboarding can inspect it, then keep it current.
+    await this.rebuildGlobalSkillsIndex();
     this.startGlobalSkillsWatchers();
 
     const fileDiffHandler = createFileDiffHandler({

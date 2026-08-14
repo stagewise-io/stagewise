@@ -14,12 +14,19 @@ import { updateAgentInstanceState } from './internal';
 export function enqueueUserMessage(
   store: AgentStore,
   agentInstanceId: string,
-  args: { message: AgentMessage & { role: 'user' } },
+  args: {
+    message: AgentMessage & { role: 'user' };
+    position?: 'front' | 'back';
+  },
 ): { queuedModelId: string; queueLengthAfter: number } {
   let queuedModelId = 'unknown';
   let queueLengthAfter = 0;
   updateAgentInstanceState(store, agentInstanceId, (state) => {
-    state.queuedMessages.push(args.message);
+    if (args.position === 'front') {
+      state.queuedMessages.unshift(args.message);
+    } else {
+      state.queuedMessages.push(args.message);
+    }
     queuedModelId = state.activeModelId ?? 'unknown';
     queueLengthAfter = state.queuedMessages.length;
   });
@@ -36,6 +43,28 @@ export function removeQueuedMessage(
       (m) => m.id !== args.messageId,
     );
   });
+}
+
+export function moveQueuedMessage(
+  store: AgentStore,
+  agentInstanceId: string,
+  args: { messageId: string; toIndex: number },
+): boolean {
+  let found = false;
+  updateAgentInstanceState(store, agentInstanceId, (state) => {
+    const index = state.queuedMessages.findIndex(
+      (message) => message.id === args.messageId,
+    );
+    if (index < 0) return;
+
+    state.queuedMessages.splice(
+      args.toIndex,
+      0,
+      ...state.queuedMessages.splice(index, 1),
+    );
+    found = true;
+  });
+  return found;
 }
 
 export function clearQueuedMessages(
