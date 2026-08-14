@@ -23,10 +23,17 @@ export function installPasskeyRelayBridge(): void {
     if (event.source !== window) return;
     const data = event.data as {
       __stagewisePasskeyRequest?: boolean;
+      __stagewisePasskeyCancel?: boolean;
       id?: number;
       kind?: 'create' | 'get';
       options?: unknown;
     } | null;
+    // The page aborted its own request, so the helper window has nothing left
+    // to hand its answer to.
+    if (data?.__stagewisePasskeyCancel) {
+      ipcRenderer.send('passkey-relay-cancel');
+      return;
+    }
     if (!data?.__stagewisePasskeyRequest || typeof data.id !== 'number') return;
 
     const id = data.id;

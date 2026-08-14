@@ -465,6 +465,8 @@ export class WindowLayoutService extends DisposableService {
 
   /** Runs WebAuthn ceremonies in a real browser on behalf of browsing tabs. */
   private passkeyRelay: SystemPasskeyRelay | null = null;
+  /** The tab whose ceremony is running, and the only one that may cancel it. */
+  private passkeyRelayOwner: number | null = null;
   private readonly attachments: AttachmentsService;
 
   private constructor(
@@ -756,8 +758,10 @@ export class WindowLayoutService extends DisposableService {
 
     ipcMain.removeHandler('request-turnstile-token');
     ipcMain.removeHandler('passkey-relay-ceremony');
+    ipcMain.removeAllListeners('passkey-relay-cancel');
     void this.passkeyRelay?.teardown();
     this.passkeyRelay = null;
+    this.passkeyRelayOwner = null;
 
     app.applicationMenu = null;
 
@@ -1285,16 +1289,21 @@ export class WindowLayoutService extends DisposableService {
         this.logger.debug(
           `[SystemPasskeyRelay] Running get for ${allowed.origin}`,
         );
-        // If the tab is gone there is no one left to hand the assertion to, and
-        // the helper window would sit there until the ceremony timed out.
+        // If the tab is gone — closed, or simply moved on to another page —
+        // there is no one left to hand the assertion to, and the helper window
+        // would sit there until the ceremony timed out.
         const abandon = () => relay.cancel();
         event.sender.once('destroyed', abandon);
+        event.sender.once('did-navigate', abandon);
+        this.passkeyRelayOwner = event.sender.id;
         let result: Awaited<ReturnType<typeof relay.run>>;
         try {
           result = await relay.run(allowed.origin, request.options);
         } finally {
+          this.passkeyRelayOwner = null;
           try {
             event.sender.removeListener('destroyed', abandon);
+            event.sender.removeListener('did-navigate', abandon);
           } catch {
             // The tab took its emitter with it.
           }
@@ -1307,6 +1316,15 @@ export class WindowLayoutService extends DisposableService {
         return result;
       },
     );
+    // A page that gives up on its own request — an AbortController firing, a
+    // sign-in button the user clicked away from — should not leave the helper
+    // window open, holding the relay against every other tab. Only the tab the
+    // ceremony belongs to may end it.
+    ipcMain.on('passkey-relay-cancel', (event) => {
+      if (this.passkeyRelayOwner !== event.sender.id) return;
+      this.logger.debug('[SystemPasskeyRelay] The page abandoned its ceremony');
+      this.passkeyRelay?.cancel();
+    });
     this.logger.debug(
       `[WindowLayoutService] Passkey relay browser: ${
         this.passkeyRelay.browserName ?? 'none found'

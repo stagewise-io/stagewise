@@ -44,6 +44,14 @@ export const PASSKEY_RELAY_MAIN_WORLD_SCRIPT = `(() => {
   const isBinary = (value) =>
     value instanceof ArrayBuffer || ArrayBuffer.isView(value);
 
+  // Extensions nest — \`prf.eval.first\` is a BufferSource two levels down, and
+  // JSON.stringify would flatten it to {} on the way to the helper browser.
+  const hasBinary = (value, depth) => {
+    if (isBinary(value)) return true;
+    if (!value || typeof value !== 'object' || depth > 4) return false;
+    return Object.values(value).some((inner) => hasBinary(inner, depth + 1));
+  };
+
   // The JSON shape parseRequestOptionsFromJSON expects on the other side.
   const serialize = (options) => {
     const out = { ...options, challenge: toB64(options.challenge) };
@@ -81,12 +89,20 @@ export const PASSKEY_RELAY_MAIN_WORLD_SCRIPT = `(() => {
   };
 
   let nextId = 0;
-  const relay = (options) => new Promise((resolve) => {
+  const relay = (options, signal) => new Promise((resolve) => {
     const id = ++nextId;
     let acknowledged = false;
     const settle = (value) => {
       window.removeEventListener('message', onMessage);
+      if (signal) signal.removeEventListener('abort', onAbort);
       resolve(value);
+    };
+    // A ceremony the page has given up on has to stop waiting on the user, and
+    // the helper window has to go with it — otherwise it sits there holding the
+    // relay for every other tab until the ceremony times out.
+    const onAbort = () => {
+      window.postMessage({ __stagewisePasskeyCancel: true, id }, '*');
+      settle(null);
     };
     const onMessage = (event) => {
       if (event.source !== window) return;
@@ -97,6 +113,7 @@ export const PASSKEY_RELAY_MAIN_WORLD_SCRIPT = `(() => {
       settle(data.result);
     };
     window.addEventListener('message', onMessage);
+    if (signal) signal.addEventListener('abort', onAbort);
     // Overriding navigator.credentials with nothing behind it would hang every
     // WebAuthn call forever — the exact bug this is here to fix. A ceremony can
     // legitimately take minutes, so the deadline is on the bridge acknowledging
@@ -112,12 +129,15 @@ export const PASSKEY_RELAY_MAIN_WORLD_SCRIPT = `(() => {
     if (!arg || !arg.publicKey) return 'not-a-webauthn-request';
     // Autofill runs on page load with no user intent behind it — opening a
     // browser window for that would be an ambush.
-    if (arg.mediation === 'conditional') return 'conditional-mediation';
-    // An abort the page can still trigger has to stay with the native call,
-    // which is the only thing that knows how to honour the signal.
+    // 'silent' is the same bargain: no UI was asked for, so opening one is
+    // never the right answer.
+    if (arg.mediation === 'conditional' || arg.mediation === 'silent')
+      return arg.mediation + '-mediation';
+    // Already over before it began; the native call is what rejects with the
+    // AbortError the page is waiting for.
     if (arg.signal && arg.signal.aborted) return 'already-aborted';
     const options = arg.publicKey;
-    if (options.extensions && Object.values(options.extensions).some(isBinary))
+    if (options.extensions && hasBinary(options.extensions, 0))
       return 'binary-extensions';
     if (!options.challenge) return 'incomplete-options';
     return null;
@@ -137,7 +157,7 @@ export const PASSKEY_RELAY_MAIN_WORLD_SCRIPT = `(() => {
     log('get relayed to the system browser');
     let result;
     try {
-      result = await relay(serialize(arg.publicKey));
+      result = await relay(serialize(arg.publicKey), arg.signal);
     } catch (err) {
       log('get could not be serialized: ' + err);
       return nativeGet(arg);
