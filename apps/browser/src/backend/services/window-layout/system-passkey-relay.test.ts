@@ -164,8 +164,45 @@ describe('shouldUseLocalAuthenticator', () => {
     ).toBe(true);
   });
 
-  it('survives junk from the page without claiming a local passkey', () => {
-    expect(shouldUseLocalAuthenticator(null, 'not a url', stored)).toBe(false);
+  it('keeps an rpId the origin is not under away from the helper browser', () => {
+    // The native call rejects this with a SecurityError. Relaying it would open
+    // a window instead, and the difference between the two answers would tell
+    // evil.example whether this machine holds a passkey for the other site.
+    expect(
+      shouldUseLocalAuthenticator(
+        { rpId: 'webauthn.io' },
+        'https://evil.example',
+        stored,
+      ),
+    ).toBe(true);
+    expect(
+      shouldUseLocalAuthenticator(
+        { rpId: 'github.com' },
+        'https://evil.example',
+        stored,
+      ),
+    ).toBe(true);
+    // A subdomain claiming its parent is what WebAuthn allows, and it still
+    // relays when the tab holds nothing for that relying party.
+    expect(
+      shouldUseLocalAuthenticator(
+        { rpId: 'github.com' },
+        'https://login.github.com',
+        stored,
+      ),
+    ).toBe(false);
+    expect(
+      shouldUseLocalAuthenticator(
+        { rpId: 'example.com' },
+        'https://notexample.com',
+        stored,
+      ),
+    ).toBe(true);
+  });
+
+  it('survives junk from the page without opening a helper browser', () => {
+    // An origin that is not a URL is nothing to point a window at either.
+    expect(shouldUseLocalAuthenticator(null, 'not a url', stored)).toBe(true);
     expect(
       shouldUseLocalAuthenticator(
         { rpId: 'webauthn.io', allowCredentials: [null, 7, {}] },

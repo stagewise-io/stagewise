@@ -131,14 +131,21 @@ export function shouldUseLocalAuthenticator(
     allowCredentials?: unknown;
   };
 
-  let rpId = typeof request.rpId === 'string' ? request.rpId : null;
-  if (!rpId) {
-    try {
-      rpId = new URL(origin).hostname;
-    } catch {
-      return false;
-    }
+  let host: string;
+  try {
+    host = new URL(origin).hostname;
+  } catch {
+    // Nothing to open a window onto; leave it with the native call.
+    return true;
   }
+
+  const rpId = typeof request.rpId === 'string' ? request.rpId : host;
+  // WebAuthn only lets a page claim an rpId its own origin sits under, and the
+  // native call rejects anything else with a SecurityError. Relaying one of
+  // those instead would open a window and turn the choice of path into an
+  // oracle: a page could ask with someone else's rpId and learn from the
+  // answer whether this machine holds a passkey for that site.
+  if (host !== rpId && !host.endsWith(`.${rpId}`)) return true;
 
   const local = stored.filter((credential) => credential.rpId === rpId);
   if (local.length === 0) return false;
@@ -316,7 +323,7 @@ export class SystemPasskeyRelay extends DisposableService {
     this.profile = path.join(this.profileRoot, String(++this.ceremonyCount));
     const bounds = screen.getPrimaryDisplay().workArea;
 
-    this.child = spawn(
+    const child = spawn(
       this.browserPath,
       [
         `--app=${origin}`,
@@ -332,9 +339,19 @@ export class SystemPasskeyRelay extends DisposableService {
       ],
       { stdio: 'ignore', detached: false },
     );
-    this.child.on('exit', () => {
-      this.child = null;
+    this.child = child;
+    // A ChildProcess with no 'error' listener rethrows, and a browser that
+    // cannot be executed at all would take the main process down with it.
+    child.on('error', (err) => {
+      this.logger.warn(
+        `[SystemPasskeyRelay] Helper browser could not be started: ${err}`,
+      );
+      this.forgetChild(child);
     });
+    // Only if this is still the current child: a late exit from the previous
+    // ceremony's browser would otherwise drop the handle to this one, and its
+    // window would outlive every ceremony after it.
+    child.on('exit', () => this.forgetChild(child));
 
     const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
     let pageSocketUrl: string | null = null;
@@ -390,12 +407,32 @@ export class SystemPasskeyRelay extends DisposableService {
       this.pending.delete(message.id);
     };
     socket.onclose = () => {
-      for (const resolve of this.pending.values())
-        resolve({ error: { message: 'socket closed' } });
-      this.pending.clear();
-      this.socket = null;
+      this.failPending('socket closed');
+      // Same reason as the child process: a close arriving after the next
+      // ceremony has connected must not drop that ceremony's socket.
+      if (this.socket === socket) this.socket = null;
     };
     this.socket = socket;
+  }
+
+  /**
+   * Fails every command still in flight.
+   *
+   * The stored callbacks reject on an `error` member, so this is what unwinds a
+   * ceremony whose browser has gone away. Waiting for `onclose` to do it would
+   * not work: the socket closes a turn later, by which point `stopBrowser` has
+   * already emptied the map, and the ceremony would sit on the `send` timeout —
+   * holding the relay busy, and every other tab with it, for three minutes.
+   */
+  private failPending(reason: string): void {
+    for (const settle of this.pending.values())
+      settle({ error: { message: reason } });
+    this.pending.clear();
+  }
+
+  /** Drops the handle to `child`, unless a later ceremony has replaced it. */
+  private forgetChild(child: ChildProcess): void {
+    if (this.child === child) this.child = null;
   }
 
   private send(
@@ -430,7 +467,7 @@ export class SystemPasskeyRelay extends DisposableService {
       // Already gone.
     }
     this.socket = null;
-    this.pending.clear();
+    this.failPending('helper browser stopped');
     if (this.child && !this.child.killed) this.child.kill();
     this.child = null;
     this.discardProfile();
