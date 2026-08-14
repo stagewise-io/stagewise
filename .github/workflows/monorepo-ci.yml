@@ -251,13 +251,33 @@ jobs:
           set -euo pipefail
 
           if [ "$RUNNER_OS" == "macOS" ]; then
-            BINARY="apps/browser/out/dev/stagewise-dev-${PLATFORM}/stagewise-dev.app/Contents/MacOS/stagewise-dev"
+            APP_PATH="apps/browser/out/dev/stagewise-dev-${PLATFORM}/stagewise-dev.app"
           elif [ "$RUNNER_OS" == "Linux" ]; then
-            BINARY="apps/browser/out/dev/stagewise-dev-linux-x64/stagewise-dev"
+            APP_PATH="apps/browser/out/dev/stagewise-dev-linux-x64"
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            BINARY="apps/browser/out/dev/stagewise-dev-win32-x64/stagewise-dev.exe"
+            APP_PATH="apps/browser/out/dev/stagewise-dev-win32-x64"
           fi
 
+          TEMP_ROOT="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            TEMP_ROOT="$(cygpath -u "$RUNNER_TEMP")"
+          fi
+          SMOKE_ROOT="$(mktemp -d "$TEMP_ROOT/stagewise-smoke-${PLATFORM}.XXXXXX")"
+          ISOLATED_APP="$SMOKE_ROOT/app"
+          SMOKE_CWD="$SMOKE_ROOT/cwd"
+          mv "$APP_PATH" "$ISOLATED_APP"
+          mkdir -p "$SMOKE_CWD"
+
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            BINARY="$ISOLATED_APP/Contents/MacOS/stagewise-dev"
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            BINARY="$ISOLATED_APP/stagewise-dev"
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            BINARY="$ISOLATED_APP/stagewise-dev.exe"
+          fi
+
+          unset NODE_PATH
+          cd "$SMOKE_CWD"
           echo "Launching smoke test: $BINARY --smoke-test"
 
           if [ "$RUNNER_OS" == "Linux" ]; then

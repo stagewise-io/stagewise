@@ -12,6 +12,7 @@ import { promisify } from 'node:util';
 import type { ToolCall, ToolCallUpdate } from '@agentclientprotocol/sdk';
 import { detectShell, resolveShellEnv } from '@stagewise/agent-shell';
 import type { ExternalAgentProviderTypeId } from '@shared/karton-contracts/ui/shared-types';
+import crossSpawn from 'cross-spawn';
 
 export interface AcpLaunchCommand {
   command: string;
@@ -51,7 +52,6 @@ export interface AcpAdapter {
 
 const require = createRequire(import.meta.url);
 const execFileAsync = promisify(execFile);
-const crossSpawn = require('cross-spawn') as typeof spawn;
 export const spawnAgentProcess = crossSpawn;
 
 export async function resolveBundledAdapterLaunch(
