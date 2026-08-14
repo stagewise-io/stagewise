@@ -212,6 +212,8 @@ export class SystemPasskeyRelay extends DisposableService {
   >();
   /** Each ceremony owns the helper browser, so only one may run at a time. */
   private busy = false;
+  /** Set by `cancel`, cleared by the next `run`. See `cancel`. */
+  private cancelled = false;
   private readonly profileRoot: string;
   private profile: string | null = null;
   private ceremonyCount = 0;
@@ -257,6 +259,7 @@ export class SystemPasskeyRelay extends DisposableService {
     if (this.busy) return { ok: false, error: 'RelayBusy' };
 
     this.busy = true;
+    this.cancelled = false;
     try {
       return await this.runCeremony(origin, optionsJson);
     } finally {
@@ -270,9 +273,16 @@ export class SystemPasskeyRelay extends DisposableService {
    * Closing the helper browser drops the CDP socket, which fails the pending
    * evaluation and lets the ceremony unwind normally. Used when the tab that
    * asked for the sign-in goes away and nobody is left to finish it.
+   *
+   * Stopping the browser is not enough on its own: for most of a ceremony's
+   * life there is no browser to stop yet, or none that answers. The flag is
+   * what the waiting loops check, so a cancel during the launch is not simply
+   * lost — and does not leave them polling something already killed.
    */
   public cancel(): void {
-    if (this.busy) this.stopBrowser();
+    if (!this.busy) return;
+    this.cancelled = true;
+    this.stopBrowser();
   }
 
   private async runCeremony(
@@ -311,6 +321,9 @@ export class SystemPasskeyRelay extends DisposableService {
     this.stopBrowser();
 
     const port = await freePort();
+    // Picking a port is a trip through the event loop, and a cancel landing in
+    // it would have found no browser to stop.
+    if (this.cancelled) throw new Error('cancelled');
     // A profile of its own, thrown away after the ceremony: whatever the
     // relying party's page leaves behind — cookies, storage, cache — goes with
     // it, and nothing touches the user's real browser session. Passkeys live in
@@ -355,7 +368,9 @@ export class SystemPasskeyRelay extends DisposableService {
 
     const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
     let pageSocketUrl: string | null = null;
-    while (Date.now() < deadline && !pageSocketUrl) {
+    // A cancel kills the browser, so without the flag this would go on polling
+    // a dead port for the whole launch timeout, holding the relay all the while.
+    while (Date.now() < deadline && !pageSocketUrl && !this.cancelled) {
       await sleep(200);
       try {
         const res = await fetch(`http://127.0.0.1:${port}/json/list`);
@@ -370,6 +385,7 @@ export class SystemPasskeyRelay extends DisposableService {
         // Not listening yet.
       }
     }
+    if (this.cancelled) throw new Error('cancelled');
     if (!pageSocketUrl) throw new Error('helper browser never opened a page');
 
     await this.connect(pageSocketUrl);
@@ -381,7 +397,7 @@ export class SystemPasskeyRelay extends DisposableService {
    * is actually on, so the ceremony must not start until it has arrived there.
    */
   private async waitForOrigin(origin: string): Promise<void> {
-    for (let attempt = 0; attempt < 60; attempt++) {
+    for (let attempt = 0; attempt < 60 && !this.cancelled; attempt++) {
       const evaluated = (await this.send('Runtime.evaluate', {
         expression: 'location.origin',
         returnByValue: true,
@@ -494,6 +510,9 @@ export class SystemPasskeyRelay extends DisposableService {
   }
 
   protected onTeardown(): void {
+    // Same reason the loops check it during a cancel: a ceremony in flight
+    // while the app shuts down should stop, not keep polling a dead browser.
+    this.cancelled = true;
     this.stopBrowser();
     try {
       rmSync(this.profileRoot, { recursive: true, force: true });

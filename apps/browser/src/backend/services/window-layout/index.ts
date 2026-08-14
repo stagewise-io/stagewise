@@ -150,6 +150,14 @@ type PasskeyCeremony = {
   senderId: number;
   requestId: number | null;
   cancelled: boolean;
+  /**
+   * Resolves when the page gives up. A permission prompt has no way to be
+   * withdrawn, so without this the handler would sit on one nobody is waiting
+   * for — holding the relay against every other tab until someone happened to
+   * answer it.
+   */
+  abandoned: Promise<void>;
+  abandon: () => void;
 };
 
 const LEGACY_DIFF_REVIEW_URL_PREFIX = 'stagewise://internal/diff-review/';
@@ -1294,34 +1302,43 @@ export class WindowLayoutService extends DisposableService {
         // tab asking meanwhile is told the relay is taken rather than being
         // prompted for a ceremony that cannot run, and a page that gives up
         // while the prompt is open has something to cancel.
+        let abandon = () => {};
+        const abandoned = new Promise<void>((resolve) => {
+          abandon = resolve;
+        });
         const ceremony: PasskeyCeremony = {
           senderId: event.sender.id,
           requestId: typeof request.id === 'number' ? request.id : null,
           cancelled: false,
+          abandoned,
+          abandon,
         };
         this.passkeyCeremony = ceremony;
         try {
           // Relaying opens a browser outside the app and can return an
           // assertion for a real account, so the site asks first, on the same
           // terms as any other capability a page can reach for.
-          const permitted =
-            await SessionPermissionRegistry.getInstance()?.requestPasskeyRelay(
+          const permitted = await Promise.race([
+            SessionPermissionRegistry.getInstance()?.requestPasskeyRelay(
               event.sender.id,
               allowed.origin,
-            );
-          if (!permitted) {
-            this.logger.debug(
-              `[SystemPasskeyRelay] ${allowed.origin} was not permitted to use system passkeys`,
-            );
-            return { ok: false, error: 'PermissionDenied' };
-          }
-          // Answering a prompt the page stopped waiting on would open a helper
-          // window for a ceremony nobody is left to receive.
+            ),
+            ceremony.abandoned.then(() => false),
+          ]);
+          // Asked before the refusal, because the race answers false for both
+          // and only one of the two is the user's own answer. Going ahead would
+          // open a helper window for a ceremony nobody is left to receive.
           if (ceremony.cancelled) {
             this.logger.debug(
               `[SystemPasskeyRelay] ${allowed.origin} gave up while the prompt was open`,
             );
             return { ok: false, error: 'Cancelled' };
+          }
+          if (!permitted) {
+            this.logger.debug(
+              `[SystemPasskeyRelay] ${allowed.origin} was not permitted to use system passkeys`,
+            );
+            return { ok: false, error: 'PermissionDenied' };
           }
 
           this.logger.debug(
@@ -1330,16 +1347,16 @@ export class WindowLayoutService extends DisposableService {
           // If the tab is gone — closed, or simply moved on to another page —
           // there is no one left to hand the assertion to, and the helper
           // window would sit there until the ceremony timed out.
-          const abandon = () => relay.cancel();
-          event.sender.once('destroyed', abandon);
-          event.sender.once('did-navigate', abandon);
+          const stopOnTabGone = () => relay.cancel();
+          event.sender.once('destroyed', stopOnTabGone);
+          event.sender.once('did-navigate', stopOnTabGone);
           let result: Awaited<ReturnType<typeof relay.run>>;
           try {
             result = await relay.run(allowed.origin, request.options);
           } finally {
             try {
-              event.sender.removeListener('destroyed', abandon);
-              event.sender.removeListener('did-navigate', abandon);
+              event.sender.removeListener('destroyed', stopOnTabGone);
+              event.sender.removeListener('did-navigate', stopOnTabGone);
             } catch {
               // The tab took its emitter with it.
             }
@@ -1370,6 +1387,7 @@ export class WindowLayoutService extends DisposableService {
       if (ceremony.requestId !== requestId) return;
       this.logger.debug('[SystemPasskeyRelay] The page abandoned its ceremony');
       ceremony.cancelled = true;
+      ceremony.abandon();
       this.passkeyRelay?.cancel();
     });
     this.logger.debug(
