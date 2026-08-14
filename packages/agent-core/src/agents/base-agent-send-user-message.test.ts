@@ -71,7 +71,9 @@ function createWorkingAgent() {
     get: () => stateValue,
     commands: {
       enqueueUserMessage,
-      setIsWorkingFalse: vi.fn(),
+      setIsWorkingFalse: vi.fn(() => {
+        stateValue.isWorking = false;
+      }),
     },
   };
   agent.host = {
@@ -202,5 +204,23 @@ describe('BaseAgent.sendUserMessage', () => {
 
     expect(agent.internalStop).toHaveBeenCalledWith('system-interrupted');
     expect(agent.runStep).toHaveBeenCalledWith(false, true);
+  });
+
+  it('starts a message queued while stopping', async () => {
+    const { agent, enqueueUserMessage } = createWorkingAgent();
+    let finishStop = () => {};
+    const pendingStop = new Promise<void>((resolve) => {
+      finishStop = resolve;
+    });
+    agent.internalStop = vi.fn(() => pendingStop);
+    agent.runStep = vi.fn();
+
+    const stopping = agent.stop();
+    await agent.sendUserMessage(userMessage('message-during-stop'));
+    finishStop();
+    await stopping;
+
+    expect(enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(agent.runStep).toHaveBeenCalledOnce();
   });
 });

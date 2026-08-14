@@ -989,8 +989,15 @@ export abstract class BaseAgent<
    * @note DO NOT OVERRIDE
    */
   public async stop(): Promise<void> {
+    const queuedMessageIds = new Set(
+      this.state.get().queuedMessages.map((message) => message.id),
+    );
     await this.internalStop('user-stopped');
     this.state.commands.setIsWorkingFalse();
+    const hasNewQueuedMessages = this.state
+      .get()
+      .queuedMessages.some((message) => !queuedMessageIds.has(message.id));
+    if (hasNewQueuedMessages) void this.runStep();
   }
 
   /**

@@ -6,6 +6,7 @@ import { lookup } from 'node:dns/promises';
 import { get } from 'node:https';
 import { BlockList } from 'node:net';
 
+const IMAGE_DOWNLOAD_TIMEOUT_MS = 30_000;
 const blockedAddresses = new BlockList();
 for (const [address, prefix] of [
   ['0.0.0.0', 8],
@@ -135,6 +136,7 @@ async function downloadGeneratedImageBytes(
       url,
       {
         signal: abortSignal,
+        timeout: IMAGE_DOWNLOAD_TIMEOUT_MS,
         lookup: (_hostname, _options, callback) =>
           callback(null, address.address, address.family),
       },
@@ -176,6 +178,9 @@ async function downloadGeneratedImageBytes(
         );
         response.on('error', reject);
       },
+    );
+    request.on('timeout', () =>
+      request.destroy(new Error('Generated image download timed out')),
     );
     request.on('error', reject);
   });

@@ -125,10 +125,12 @@ export function ImageModelSelect({
           return;
         }
         onSelectionChange(
-          {
-            providerInstanceId: item.entry.instanceId,
-            modelId: item.entry.modelId,
-          },
+          item.value === selectionKey
+            ? selection
+            : {
+                providerInstanceId: item.entry.instanceId,
+                modelId: item.entry.modelId,
+              },
           'model',
         );
       }}
