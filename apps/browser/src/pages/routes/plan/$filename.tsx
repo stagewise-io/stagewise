@@ -41,8 +41,13 @@ function PlanPage() {
         const text = await response.text();
         if (cancelled) return;
 
-        setContent(text);
-        setRevision((r) => r + 1);
+        setContent((prev) => {
+          if (prev !== text) {
+            setRevision((r) => r + 1);
+            return text;
+          }
+          return prev;
+        });
       } catch (e) {
         if (!cancelled) setError(String(e));
       }
@@ -84,6 +89,7 @@ function PlanPage() {
 
   return (
     <OverlayScrollbar
+      defer={false}
       className="h-screen w-full bg-background p-8 text-foreground text-sm"
       contentClassName="flex justify-center"
     >

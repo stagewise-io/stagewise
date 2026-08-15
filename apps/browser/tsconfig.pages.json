@@ -20,7 +20,7 @@
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/pages", "forge.env.d.ts", "src/shared", "src/ui"],
+  "include": ["src/pages", "forge.env.d.ts", "src/shared", "src/ui", "src/types"],
   "exclude": [
     "**/*.stories.tsx",
     "**/*.stories.ts",

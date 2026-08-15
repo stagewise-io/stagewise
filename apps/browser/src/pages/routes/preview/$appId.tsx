@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sendThemeToIframe } from '@shared/iframe-theme';
 import { useIframeAppBridge } from '@pages/lib/iframe-app-bridge';
 
-interface PreviewSearch {
+export interface PreviewSearch {
   agentId?: string;
   pluginId?: string;
   t?: string;
