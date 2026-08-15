@@ -1324,6 +1324,7 @@ const defaultPermissionsForUserPrefs = {
     'idle-detection': 0 as const,
     'speaker-selection': 0 as const,
     'storage-access': 0 as const,
+    passkey: 0 as const,
   },
   exceptions: {
     media: {},
@@ -1340,6 +1341,7 @@ const defaultPermissionsForUserPrefs = {
     'idle-detection': {},
     'speaker-selection': {},
     'storage-access': {},
+    passkey: {},
   },
 };
 
@@ -1500,6 +1502,7 @@ export const configurablePermissionTypes = [
   'idle-detection',
   'speaker-selection',
   'storage-access',
+  'passkey',
 ] as const;
 
 export type ConfigurablePermissionType =
@@ -1539,6 +1542,7 @@ export const defaultPermissionSettingsSchema = z.object({
   'idle-detection': z.enum(PermissionSetting).default(PermissionSetting.Ask),
   'speaker-selection': z.enum(PermissionSetting).default(PermissionSetting.Ask),
   'storage-access': z.enum(PermissionSetting).default(PermissionSetting.Ask),
+  passkey: z.enum(PermissionSetting).default(PermissionSetting.Ask),
 });
 
 export type DefaultPermissionSettings = z.infer<
@@ -1577,6 +1581,7 @@ export const hostPermissionOverridesSchema = z.object({
   'storage-access': z
     .record(z.string(), hostPermissionExceptionSchema)
     .default({}),
+  passkey: z.record(z.string(), hostPermissionExceptionSchema).default({}),
 });
 
 export type HostPermissionOverrides = z.infer<
@@ -1599,6 +1604,7 @@ export const defaultPermissionSettings: DefaultPermissionSettings = {
   'idle-detection': PermissionSetting.Ask,
   'speaker-selection': PermissionSetting.Ask,
   'storage-access': PermissionSetting.Ask,
+  passkey: PermissionSetting.Ask,
 };
 
 /** Default empty host overrides */
@@ -1617,6 +1623,7 @@ export const defaultHostPermissionOverrides: HostPermissionOverrides = {
   'idle-detection': {},
   'speaker-selection': {},
   'storage-access': {},
+  passkey: {},
 };
 
 /**

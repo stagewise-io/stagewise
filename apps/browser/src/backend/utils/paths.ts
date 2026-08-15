@@ -36,6 +36,7 @@ export type JsonName =
   | 'identity'
   | 'auth-session'
   | 'credentials'
+  | 'passkeys'
   | 'preferences'
   | 'recently-opened-workspaces'
   | 'onboarding-state'
