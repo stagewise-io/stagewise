@@ -34,6 +34,7 @@ import {
   type BuiltInModel,
 } from './available-models';
 import type { ThinkingRoute } from './model-thinking-capabilities';
+import { isFastModeSupportedForModel } from './model-fast-mode-capabilities';
 
 /**
  * Get display info for a vendor by looking up its `-api` provider type.
@@ -132,6 +133,7 @@ export function providerInstanceToCustomEndpoint(
         projectId: undefined,
         location: undefined,
         encryptedGoogleCredentials: undefined,
+        fastMode: (instance.config as { fastMode?: boolean })?.fastMode,
       };
     case 'azure':
       return {
@@ -150,6 +152,7 @@ export function providerInstanceToCustomEndpoint(
         projectId: undefined,
         location: undefined,
         encryptedGoogleCredentials: undefined,
+        fastMode: (instance.config as { fastMode?: boolean })?.fastMode,
       };
     case 'bedrock':
       return {
@@ -494,6 +497,20 @@ export function resolveModelThinkingOverride(
     : undefined;
 }
 
+/**
+ * Resolve the fast mode override for a specific provider instance + model.
+ * Returns `undefined` if no override is set.
+ */
+export function getInstanceModelFastModeOverride(
+  preferences: UserPreferences,
+  instanceId: string,
+  modelId: string,
+): boolean | undefined {
+  const overrides =
+    preferences.agent.modelFastModeOverrides?.[instanceId] ?? {};
+  return overrides[modelId];
+}
+
 // ===========================================================================
 // Model Selector Aggregation
 // ===========================================================================
@@ -516,6 +533,8 @@ export interface ModelSelectorEntry {
   thinkingEnabled: boolean;
   thinkingEfforts?: string[];
   defaultThinkingEffort?: string;
+  fastModeSupported?: boolean;
+  fastModeEnabled?: boolean;
   pricingMultiplier?: number;
   isAlias: boolean;
   /** The catalog model, if this entry is a built-in model or alias. */
@@ -596,6 +615,11 @@ function makeBuiltInEntry(
     contextLabel: catalogModel.modelContext,
     contextWindowRaw: catalogModel.modelContextRaw,
     thinkingEnabled: catalogModel.thinkingEnabled,
+    fastModeSupported: isFastModeSupportedForModel({
+      modelId: targetModelId,
+      vendor: getVendorForInstance(instance),
+      providerTypeId: instance.typeId,
+    }),
     pricingMultiplier: catalogModel.pricing?.relativeMultiplier,
     isAlias,
     catalogModel,
@@ -626,6 +650,15 @@ function makeCustomEntry(
     contextLabel: `${Math.round(model.contextWindowSize / 1000)}k context`,
     contextWindowRaw: model.contextWindowSize,
     thinkingEnabled: !!model.thinkingEnabled,
+    fastModeSupported: isFastModeSupportedForModel({
+      modelId: model.modelId,
+      providerTypeId: instance.typeId,
+      apiSpec: instanceTypeIdToApiSpec(instance.typeId),
+    }),
+    fastModeEnabled:
+      'fastMode' in model
+        ? Boolean((model as { fastMode?: boolean }).fastMode)
+        : undefined,
     isAlias: false,
     targetModelId: model.modelId,
   };
@@ -653,6 +686,11 @@ function makeDiscoveredEntry(
     thinkingEnabled: !!model.thinkingEnabled,
     thinkingEfforts: model.thinkingEfforts,
     defaultThinkingEffort: model.defaultThinkingEffort,
+    fastModeSupported: isFastModeSupportedForModel({
+      modelId: model.modelId,
+      vendor: getVendorForInstance(instance),
+      providerTypeId: instance.typeId,
+    }),
     isAlias: false,
     targetModelId: model.modelId,
   };

@@ -145,6 +145,7 @@ export const customEndpointSchema = z.object({
   projectId: z.string().optional(),
   location: z.string().optional(),
   encryptedGoogleCredentials: z.string().optional(),
+  fastMode: z.boolean().optional(),
 });
 export type CustomEndpoint = z.infer<typeof customEndpointSchema>;
 
@@ -164,6 +165,7 @@ export const customModelSchema = z
      */
     providerInstanceId: z.string().optional(),
     thinkingEnabled: z.boolean().default(false),
+    fastMode: z.boolean().default(false).optional(),
     capabilities: modelCapabilitiesSchema.default({
       inputModalities: {
         text: true,
@@ -262,6 +264,7 @@ const emptyProviderConfigSchema = z.object({}).strict();
 const officialApiConfigSchema = z.object({
   encryptedApiKey: z.string().optional(),
   baseUrl: z.string().optional(),
+  fastMode: z.boolean().optional(),
 });
 
 /** Coding plan — encrypted key + plan ID + optional base URL */
@@ -276,6 +279,7 @@ const customCompatibleConfigSchema = z.object({
   encryptedApiKey: z.string().optional(),
   baseUrl: z.string(),
   modelIdMapping: z.record(z.string(), z.string()).optional(),
+  fastMode: z.boolean().optional(),
 });
 
 /** Azure OpenAI */
@@ -285,6 +289,7 @@ const azureConfigSchema = z.object({
   resourceName: z.string().optional(),
   apiVersion: z.string().optional(),
   modelIdMapping: z.record(z.string(), z.string()).optional(),
+  fastMode: z.boolean().optional(),
 });
 
 /** Amazon Bedrock */
@@ -316,6 +321,7 @@ const ollamaConfigSchema = z.object({
 const openrouterConfigSchema = z.object({
   encryptedApiKey: z.string().optional(),
   baseUrl: z.string().optional(),
+  fastMode: z.boolean().optional(),
 });
 
 // ============================================================================
@@ -749,6 +755,7 @@ export const presetModelEntrySchema = z.object({
   modelId: z.string(),
   providerInstanceId: z.string().optional(),
   thinkingOverride: modelThinkingOverrideSchema.optional(),
+  fastMode: z.boolean().optional(),
 });
 export type PresetModelEntry = z.infer<typeof presetModelEntrySchema>;
 
@@ -1148,6 +1155,14 @@ export const userPreferencesSchema = z.object({
         .default({})
         .catch({}),
       /**
+       * Per-model fast mode overrides keyed by instance ID, then model ID.
+       * Outer key = providerInstanceId, inner key = modelId.
+       */
+      modelFastModeOverrides: z
+        .record(z.string(), z.record(z.string(), z.boolean()))
+        .default({})
+        .catch({}),
+      /**
        * External global skill directories the user has opted in to.
        * Contains mount prefixes (e.g. `globalskills-codex`,
        * `globalskills-claude`). The built-in `globalskills-sw` and
@@ -1268,6 +1283,7 @@ export const userPreferencesSchema = z.object({
       workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
       workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
       modelThinkingOverrides: {},
+      modelFastModeOverrides: {},
       enabledGlobalSkillDirs: [],
       disabledGlobalSkills: [],
       utilityModels: {
@@ -1388,6 +1404,7 @@ export const defaultUserPreferences: UserPreferences = {
     workspaceGitActionPreferences: defaultWorkspaceGitActionPreferences,
     workspaceGitCleanup: defaultWorkspaceGitCleanupPreferences,
     modelThinkingOverrides: {},
+    modelFastModeOverrides: {},
     enabledGlobalSkillDirs: [],
     disabledGlobalSkills: [],
     utilityModels: {

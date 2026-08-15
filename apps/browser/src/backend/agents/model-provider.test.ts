@@ -3,9 +3,11 @@ import {
   defaultUserPreferences,
   type ProviderInstance,
   type CustomEndpoint,
+  type CustomModel,
 } from '@shared/karton-contracts/ui/shared-types';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
+  PRESET_FAST_MODE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
 } from '@stagewise/agent-core/host';
 import { ModelProviderService } from './model-provider';
@@ -102,7 +104,10 @@ function createTestModelProviderService({
   providerModes = {},
   connectedCodingPlanIds = {},
   modelThinkingOverrides = {},
+  modelFastModeOverrides = {},
+  providerFastModes = {},
   customEndpoints = [],
+  customModels = [],
 }: {
   providerModes?: Record<string, 'stagewise' | 'official' | 'custom'>;
   connectedCodingPlanIds?: Record<string, string | undefined>;
@@ -113,7 +118,10 @@ function createTestModelProviderService({
       value?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
     }
   >; // Flat format — wrapped under 'stagewise-default' below.
+  modelFastModeOverrides?: Record<string, boolean>;
+  providerFastModes?: Record<string, boolean>;
   customEndpoints?: typeof defaultUserPreferences.customEndpoints;
+  customModels?: CustomModel[];
 } = {}) {
   const preferences = structuredClone(defaultUserPreferences);
   // Wrap flat overrides under the stagewise-default instance key.
@@ -121,6 +129,11 @@ function createTestModelProviderService({
     Object.keys(modelThinkingOverrides).length > 0
       ? { 'stagewise-default': modelThinkingOverrides as any }
       : {};
+  preferences.agent.modelFastModeOverrides =
+    Object.keys(modelFastModeOverrides).length > 0
+      ? { 'stagewise-default': modelFastModeOverrides }
+      : {};
+  preferences.customModels = customModels;
 
   const instances: ProviderInstance[] = [];
 
@@ -132,6 +145,8 @@ function createTestModelProviderService({
         provider as keyof typeof preferences.providerConfigs
       ];
     config.mode = mode;
+
+    const fastMode = providerFastModes[provider];
 
     if (mode === 'official') {
       const planId = connectedCodingPlanIds[provider];
@@ -155,7 +170,7 @@ function createTestModelProviderService({
           id: `${provider}-api-default`,
           typeId: `${provider}-api`,
           name: provider,
-          config: { encryptedApiKey: 'encrypted' },
+          config: { encryptedApiKey: 'encrypted', fastMode },
           enabledModelIds: [],
           disabledModelIds: [],
           discoveredModels: [],
@@ -2112,5 +2127,148 @@ describe('reasoning signature source helpers', () => {
         endpointId: 'vertex-prod',
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('Fast Mode support', () => {
+  it('injects serviceTier: auto for Anthropic models when fastMode override is set', () => {
+    const service = createTestModelProviderService({
+      modelFastModeOverrides: {
+        'claude-opus-4.8': true,
+      },
+    });
+
+    const result = service.getModelWithOptions(
+      'claude-opus-4.8',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      anthropic: {
+        serviceTier: 'auto',
+      },
+    });
+  });
+
+  it('injects serviceTier: priority for OpenAI models when preset fastMode is enabled', () => {
+    const service = createTestModelProviderService();
+
+    const result = service.getModelWithOptions('gpt-5.4', 'trace-1', {
+      ...agentStepMetadata,
+      [PRESET_FAST_MODE_METADATA_KEY]: true,
+    });
+
+    expect(result.providerOptions).toMatchObject({
+      openai: {
+        serviceTier: 'priority',
+      },
+    });
+  });
+
+  it('injects serviceTier: auto when provider instance has fastMode enabled', () => {
+    const service = createTestModelProviderService({
+      providerModes: { anthropic: 'official' },
+      providerFastModes: { anthropic: true },
+    });
+
+    const result = service.getModelWithOptions(
+      'claude-opus-4.8',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      anthropic: {
+        serviceTier: 'auto',
+      },
+    });
+  });
+
+  it('applies :nitro suffix for OpenRouter models when fastMode is enabled', () => {
+    const service = createTestModelProviderService();
+    const preferences = (service as any).preferencesService.get();
+    preferences.providerInstances = [
+      {
+        id: 'openrouter-instance',
+        typeId: 'openrouter',
+        name: 'OpenRouter',
+        config: { encryptedApiKey: 'router-key', fastMode: true },
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [
+          {
+            modelId: 'anthropic/claude-opus-4.8',
+            displayName: 'Claude Opus 4.8',
+          },
+        ],
+      },
+    ];
+
+    const result = service.getModelWithOptions(
+      'anthropic/claude-opus-4.8',
+      'trace-1',
+      agentStepMetadata,
+      'openrouter-instance',
+    );
+
+    expect(result.model.modelId).toContain(':nitro');
+  });
+
+  it('applies fastMode to custom models when fastMode: true', () => {
+    const service = createTestModelProviderService({
+      customEndpoints: [
+        {
+          id: 'custom-openai-ep',
+          name: 'Custom OpenAI',
+          apiSpec: 'openai-chat-completions',
+          baseUrl: 'https://example.com/v1',
+          encryptedApiKey: 'test-key',
+          awsAuthMode: 'access-keys',
+        },
+      ],
+      customModels: [
+        {
+          modelId: 'custom-gpt-5',
+          displayName: 'Custom GPT-5',
+          description: '',
+          contextWindowSize: 128000,
+          providerInstanceId: 'custom-openai-ep',
+          thinkingEnabled: false,
+          fastMode: true,
+          capabilities: {
+            inputModalities: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              file: false,
+            },
+            outputModalities: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              file: false,
+            },
+            toolCalling: true,
+          },
+          providerOptions: {},
+          headers: {},
+        },
+      ],
+    });
+
+    const result = service.getModelWithOptions(
+      'custom-gpt-5',
+      'trace-1',
+      agentStepMetadata,
+    );
+
+    expect(result.providerOptions).toMatchObject({
+      openai: {
+        serviceTier: 'priority',
+      },
+    });
   });
 });

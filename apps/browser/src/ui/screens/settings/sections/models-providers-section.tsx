@@ -1333,6 +1333,7 @@ function CustomModelDialog({
   const [thinkingEnabled, setThinkingEnabled] = useState(
     model?.thinkingEnabled ?? false,
   );
+  const [fastMode, setFastMode] = useState(model?.fastMode ?? false);
   const defaultCaps: ModelCapabilities = {
     inputModalities: {
       text: true,
@@ -1376,6 +1377,7 @@ function CustomModelDialog({
     setContextWindowSize(model?.contextWindowSize ?? 128000);
     setProviderInstanceId(initialProviderInstanceId);
     setThinkingEnabled(model?.thinkingEnabled ?? false);
+    setFastMode(model?.fastMode ?? false);
     setCapabilities(model?.capabilities ?? defaultCaps);
     setProviderOptionsJson(
       model?.providerOptions && Object.keys(model.providerOptions).length > 0
@@ -1495,6 +1497,7 @@ function CustomModelDialog({
         contextWindowSize,
         providerInstanceId,
         thinkingEnabled,
+        fastMode,
         capabilities,
         providerOptions,
         headers,
@@ -1615,6 +1618,16 @@ function CustomModelDialog({
                     size="xs"
                   />
                   Thinking
+                </label>
+
+                {/* biome-ignore lint/a11y/noLabelWithoutControl: base-ui Switch renders a button, label click delegates correctly */}
+                <label className="flex cursor-pointer items-center gap-1.5 text-muted-foreground text-xs">
+                  <Switch
+                    checked={fastMode}
+                    onCheckedChange={setFastMode}
+                    size="xs"
+                  />
+                  Fast Mode
                 </label>
 
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: base-ui Switch renders a button, label click delegates correctly */}
@@ -3537,6 +3550,7 @@ export function ModelsProvidersSection() {
   const removeProviderInstance = useKartonProcedure(
     (p) => p.preferences.removeProviderInstance,
   );
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const detailInstance = detailInstanceId
     ? (preferences?.providerInstances ?? []).find(
@@ -3702,6 +3716,52 @@ export function ModelsProvidersSection() {
                     Uses your stagewise account. All built-in models are
                     available through Stagewise Inference by default.
                   </p>
+                </div>
+              )}
+
+              {[
+                'anthropic-api',
+                'openai-api',
+                'openrouter',
+                'custom-anthropic',
+                'custom-openai-chat',
+                'custom-openai-responses',
+                'azure',
+              ].includes(detailInstance.typeId) && (
+                <div className="flex items-center justify-between rounded-lg border border-derived p-3">
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-foreground text-xs">
+                      Fast Mode
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Enable low-latency priority routing for supported models
+                      on this provider.
+                    </p>
+                  </div>
+                  <Switch
+                    size="sm"
+                    checked={Boolean(
+                      (detailInstance.config as { fastMode?: boolean })
+                        ?.fastMode,
+                    )}
+                    onCheckedChange={async (checked) => {
+                      const [, patches] = produceWithPatches(
+                        preferences,
+                        (draft) => {
+                          const inst = draft.providerInstances.find(
+                            (i) => i.id === detailInstance.id,
+                          );
+                          if (inst) {
+                            inst.config = {
+                              ...inst.config,
+                              fastMode: checked,
+                            };
+                          }
+                        },
+                      );
+                      await updatePreferences(patches);
+                    }}
+                  />
                 </div>
               )}
             </section>

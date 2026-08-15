@@ -57,6 +57,17 @@ export const PRESET_THINKING_OVERRIDE_METADATA_KEY =
   '$preset_thinking_override';
 
 /**
+ * Reserved metadata key for passing a preset's fast mode flag for
+ * the main agent step.
+ */
+export const PRESET_FAST_MODE_METADATA_KEY = '$preset_fast_mode';
+
+/**
+ * Reserved metadata key for passing utility model fast mode flag.
+ */
+export const UTILITY_FAST_MODE_METADATA_KEY = '$utility_fast_mode';
+
+/**
  * Thinking override shape for utility model calls. Mirrors the host's
  * `ModelThinkingOverride` but kept as a structural type so agent-core
  * does not depend on host-side schema definitions.
@@ -69,12 +80,13 @@ export interface UtilityModelThinkingOverride {
 
 /**
  * A model entry in a utility model list, carrying optional thinking
- * override so the host can apply per-model thinking configuration.
+ * override and fast mode so the host can apply per-model configuration.
  */
 export interface UtilityModelEntry {
   modelId: string;
   providerInstanceId?: string;
   thinkingOverride?: UtilityModelThinkingOverride;
+  fastMode?: boolean;
 }
 
 /**

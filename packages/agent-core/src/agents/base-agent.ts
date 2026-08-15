@@ -30,6 +30,7 @@ import type { ExternalAgentRuntime } from '../host/external-agent-runtime';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
   PRESET_THINKING_OVERRIDE_METADATA_KEY,
+  PRESET_FAST_MODE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   type ModelWithOptions,
   type UtilityModelEntry,
@@ -1743,6 +1744,7 @@ export abstract class BaseAgent<
     // on every call. If a fallback is active (index > 0), the corresponding
     // model from the preset's list is used instead of the main model.
     let presetThinkingOverride: UtilityModelEntry['thinkingOverride'];
+    let presetFastMode: boolean | undefined;
     const presetId = this.host.models.getActivePresetId?.();
     const presetModels = this.host.models.getActivePresetModels?.();
     const fallbackIndex = this._fallbackManager.resolveModelIndex(
@@ -1755,6 +1757,7 @@ export abstract class BaseAgent<
       stepModelId = resolvedModel.modelId;
       stepProviderInstanceId = resolvedModel.providerInstanceId;
       presetThinkingOverride = resolvedModel.thinkingOverride;
+      presetFastMode = resolvedModel.fastMode;
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Chat model resolved — ` +
           `preset="${presetId}", ` +
@@ -1804,6 +1807,9 @@ export abstract class BaseAgent<
       if (presetThinkingOverride) {
         resolutionMetadata[PRESET_THINKING_OVERRIDE_METADATA_KEY] =
           presetThinkingOverride;
+      }
+      if (presetFastMode !== undefined) {
+        resolutionMetadata[PRESET_FAST_MODE_METADATA_KEY] = presetFastMode;
       }
       modelWithOptions = await this.host.models.getWithOptions(
         stepModelId,

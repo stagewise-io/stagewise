@@ -28,8 +28,10 @@ import { wrapLanguageModel } from 'ai';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
   PRESET_THINKING_OVERRIDE_METADATA_KEY,
+  PRESET_FAST_MODE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   UTILITY_THINKING_OVERRIDE_METADATA_KEY,
+  UTILITY_FAST_MODE_METADATA_KEY,
   type UtilityModelThinkingOverride,
 } from '@stagewise/agent-core/host';
 import {
@@ -43,6 +45,7 @@ import {
   type ThinkingCapableModel,
   type ThinkingProvider,
 } from '@shared/model-thinking-capabilities';
+import { createFastModeProviderOptionsPatch } from '@shared/model-fast-mode-capabilities';
 
 // ── Provider type registry ──────────────────────────────────────────────────
 import type { ProviderType } from './providers/types';
@@ -742,7 +745,7 @@ export class ModelProviderService {
     // native model-ID convention (for example MiniMax via custom OpenAI).
     // Apply an explicit mapping first, then use the transport transform when
     // available or the official vendor transform as the compatibility fallback.
-    const wireModelId =
+    let wireModelId =
       explicitMappedModelId ??
       type.toWireModelId?.(mappedModelId, officialProvider) ??
       (officialProvider
@@ -752,6 +755,36 @@ export class ModelProviderService {
           )
         : undefined) ??
       mappedModelId;
+
+    // ── Fast mode resolution ────────────────────────────────────────────────
+    const fastModeOverrides =
+      this.preferencesService.get().agent.modelFastModeOverrides ?? {};
+    const presetFastMode = otherPostHogProperties?.[
+      PRESET_FAST_MODE_METADATA_KEY
+    ] as boolean | undefined;
+    const utilityFastMode = otherPostHogProperties?.[
+      UTILITY_FAST_MODE_METADATA_KEY
+    ] as boolean | undefined;
+    const instanceFastMode = (instanceConfig as { fastMode?: boolean })
+      ?.fastMode;
+    const modelFastMode =
+      fastModeOverrides[instanceKey]?.[modelSettings.modelId] ??
+      fastModeOverrides['stagewise-default']?.[modelSettings.modelId];
+
+    const isFastModeActive =
+      utilityFastMode ??
+      presetFastMode ??
+      modelFastMode ??
+      instanceFastMode ??
+      false;
+
+    if (
+      isFastModeActive &&
+      (instance?.typeId === 'openrouter' || type.id === 'openrouter') &&
+      !wireModelId.endsWith(':nitro')
+    ) {
+      wireModelId = `${wireModelId}:nitro`;
+    }
 
     // ── Create the language model via the provider type ─────────────────────
     const { model: rawModel, middleware } = type.createLanguageModel({
@@ -807,18 +840,34 @@ export class ModelProviderService {
             reasoningModelId,
           );
 
+    const thinkingProviderOptions = resolveThinkingProviderOptions({
+      baseProviderOptions,
+      modelSettings,
+      override: thinkingOverride,
+      providerMode: type.providerMode,
+      semanticProvider,
+      customEndpointApiSpec: effectiveApiSpec,
+      requestMetadata: otherPostHogProperties,
+    });
+
+    const fastModePatch = isFastModeActive
+      ? createFastModeProviderOptionsPatch({
+          vendor: officialProvider,
+          apiSpec: effectiveApiSpec,
+          providerTypeId: instance?.typeId ?? type.id,
+          enabled: true,
+        })
+      : {};
+
+    const finalProviderOptions =
+      isFastModeActive && Object.keys(fastModePatch).length > 0
+        ? deepMergeProviderOptions(thinkingProviderOptions, fastModePatch)
+        : thinkingProviderOptions;
+
     return {
       model: this.telemetryService.withTracing(model, posthogConfig),
       headers,
-      providerOptions: resolveThinkingProviderOptions({
-        baseProviderOptions,
-        modelSettings,
-        override: thinkingOverride,
-        providerMode: type.providerMode,
-        semanticProvider,
-        customEndpointApiSpec: effectiveApiSpec,
-        requestMetadata: otherPostHogProperties,
-      }),
+      providerOptions: finalProviderOptions,
       contextWindowSize: modelSettings.modelContextRaw,
       providerMode: type.providerMode,
       providerType: instance?.typeId ?? type.id,
@@ -901,8 +950,34 @@ export class ModelProviderService {
       : instance?.typeId === 'coding-plan'
         ? getCodingPlanVendor(instance.config as CodingPlanConfig)
         : undefined;
-    const wireModelId =
+
+    const fastModeOverrides =
+      this.preferencesService.get().agent.modelFastModeOverrides ?? {};
+    const presetFastMode = otherPostHogProperties?.[
+      PRESET_FAST_MODE_METADATA_KEY
+    ] as boolean | undefined;
+    const instanceFastMode = (instance?.config as { fastMode?: boolean })
+      ?.fastMode;
+    const modelFastMode =
+      fastModeOverrides[instance?.id ?? providerInstanceId]?.[
+        customModel.modelId
+      ];
+    const isFastModeActive =
+      presetFastMode ??
+      modelFastMode ??
+      instanceFastMode ??
+      (customModel as { fastMode?: boolean }).fastMode ??
+      false;
+
+    let wireModelId =
       type.toWireModelId?.(customModel.modelId, vendor) ?? customModel.modelId;
+    if (
+      isFastModeActive &&
+      (instance?.typeId === 'openrouter' || type.id === 'openrouter') &&
+      !wireModelId.endsWith(':nitro')
+    ) {
+      wireModelId = `${wireModelId}:nitro`;
+    }
 
     // ── Create the language model via the provider type ─────────────────────
     const { model: rawModel, middleware } = type.createLanguageModel({
@@ -923,13 +998,26 @@ export class ModelProviderService {
 
     // ── Provider options wrapping ───────────────────────────────────────────
     const providerKey = apiSpec?.startsWith('openai-') ? 'openai' : apiSpec;
-    const providerOptions =
+    const baseOptions =
       Object.keys(customModel.providerOptions).length > 0
         ? ({ [providerKey as string]: customModel.providerOptions } as Record<
             string,
             unknown
           >)
         : {};
+
+    const fastModePatch = isFastModeActive
+      ? createFastModeProviderOptionsPatch({
+          apiSpec: apiSpec as ApiSpec,
+          providerTypeId: instance?.typeId ?? type.id,
+          enabled: true,
+        })
+      : {};
+
+    const finalProviderOptions =
+      isFastModeActive && Object.keys(fastModePatch).length > 0
+        ? deepMergeProviderOptions(baseOptions, fastModePatch)
+        : baseOptions;
 
     // ── Reasoning signature source ──────────────────────────────────────────
     const semanticProvider = apiSpec
@@ -949,7 +1037,7 @@ export class ModelProviderService {
     return {
       model: this.telemetryService.withTracing(model, posthogConfig),
       headers,
-      providerOptions: providerOptions as Parameters<
+      providerOptions: finalProviderOptions as Parameters<
         typeof streamText
       >[0]['providerOptions'],
       contextWindowSize: customModel.contextWindowSize,
@@ -983,8 +1071,26 @@ export class ModelProviderService {
       (instance.typeId === 'coding-plan'
         ? getCodingPlanVendor(instance.config as CodingPlanConfig)
         : undefined);
-    const wireModelId =
+    const fastModeOverrides =
+      this.preferencesService.get().agent.modelFastModeOverrides ?? {};
+    const presetFastMode = otherPostHogProperties?.[
+      PRESET_FAST_MODE_METADATA_KEY
+    ] as boolean | undefined;
+    const instanceFastMode = (instance.config as { fastMode?: boolean })
+      ?.fastMode;
+    const modelFastMode = fastModeOverrides[instance.id]?.[discovered.modelId];
+    const isFastModeActive =
+      presetFastMode ?? modelFastMode ?? instanceFastMode ?? false;
+
+    let wireModelId =
       type.toWireModelId?.(discovered.modelId, vendor) ?? discovered.modelId;
+    if (
+      isFastModeActive &&
+      instance.typeId === 'openrouter' &&
+      !wireModelId.endsWith(':nitro')
+    ) {
+      wireModelId = `${wireModelId}:nitro`;
+    }
     const decryptedConfig = this.decryptSensitiveFields(instance, type);
 
     const { model: rawModel, middleware } = type.createLanguageModel({
@@ -1076,10 +1182,24 @@ export class ModelProviderService {
       requestMetadata: otherPostHogProperties,
     });
 
+    const fastModePatch = isFastModeActive
+      ? createFastModeProviderOptionsPatch({
+          vendor,
+          apiSpec: apiSpec as ApiSpec,
+          providerTypeId: instance.typeId,
+          enabled: true,
+        })
+      : {};
+
+    const finalProviderOptions =
+      isFastModeActive && Object.keys(fastModePatch).length > 0
+        ? deepMergeProviderOptions(resolvedProviderOptions, fastModePatch)
+        : resolvedProviderOptions;
+
     return {
       model: this.telemetryService.withTracing(model, posthogConfig),
       headers: {},
-      providerOptions: resolvedProviderOptions,
+      providerOptions: finalProviderOptions,
       contextWindowSize: contextWindow,
       providerMode: type.providerMode,
       providerType: instance.typeId,
@@ -1220,6 +1340,8 @@ function omitModelRequestMetadata(
     [PROVIDER_INSTANCE_ID_METADATA_KEY]: _providerInstanceId,
     [UTILITY_THINKING_OVERRIDE_METADATA_KEY]: _utilityThinkingOverride,
     [PRESET_THINKING_OVERRIDE_METADATA_KEY]: _presetThinkingOverride,
+    [PRESET_FAST_MODE_METADATA_KEY]: _presetFastMode,
+    [UTILITY_FAST_MODE_METADATA_KEY]: _utilityFastMode,
     ...telemetry
   } = metadata;
   return telemetry;

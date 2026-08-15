@@ -289,6 +289,7 @@ interface PresetEntry {
   modelId: string;
   providerInstanceId?: string;
   thinkingLabel?: string;
+  fastMode?: boolean;
 }
 
 export const ModelSelect = memo(function ModelSelect({
@@ -446,6 +447,7 @@ export const ModelSelect = memo(function ModelSelect({
         providerInstanceId:
           display?.instanceId ?? mainModel?.providerInstanceId,
         thinkingLabel,
+        fastMode: mainModel?.fastMode,
       };
     });
   }, [modelPresets, selectableEntries]);
@@ -1073,6 +1075,7 @@ const PresetItem = memo(function PresetItem({
         <span className="truncate text-[10px] text-subtle-foreground">
           {preset.modelDisplayName}
           {preset.thinkingLabel && ` · ${preset.thinkingLabel}`}
+          {preset.fastMode && ' · Fast'}
         </span>
       </span>
     </ComboboxItem>

@@ -85,6 +85,7 @@ export type EndpointSaveData = {
   projectId?: string;
   location?: string;
   googleCredentials?: string;
+  fastMode?: boolean;
 };
 
 const AWS_AUTH_MODE_OPTIONS: {
@@ -709,6 +710,7 @@ export const CustomEndpointForm = forwardRef<
   const [projectId, setProjectId] = useState(endpoint?.projectId ?? '');
   const [location, setLocation] = useState(endpoint?.location ?? '');
   const [googleCredentials, setGoogleCredentials] = useState('');
+  const [fastMode, setFastMode] = useState(endpoint?.fastMode ?? false);
 
   // Profile-list loading is lifted to the dialog so both `BedrockFields`
   // (for the dropdown + detected-region hint) and the "Suggest mapping"
@@ -874,7 +876,8 @@ export const CustomEndpointForm = forwardRef<
     awsProfileName !== (endpoint?.awsProfileName ?? '') ||
     projectId !== (endpoint?.projectId ?? '') ||
     location !== (endpoint?.location ?? '') ||
-    googleCredentials !== '';
+    googleCredentials !== '' ||
+    fastMode !== (endpoint?.fastMode ?? false);
 
   // A pristine, unmodified form is NOT an error — an empty required
   // `name` field at initial state means "not filled in yet", not
@@ -951,6 +954,7 @@ export const CustomEndpointForm = forwardRef<
         projectId: projectId || undefined,
         location: location || undefined,
         googleCredentials: googleCredentials || undefined,
+        fastMode,
       });
       if (isAddMode) {
         track('custom-provider-add-finished', buildUrlProps());
@@ -1114,6 +1118,24 @@ export const CustomEndpointForm = forwardRef<
           <p className="text-error-foreground text-xs">{mappingError}</p>
         )}
       </div>
+
+      {[
+        'anthropic',
+        'openai-chat-completions',
+        'openai-responses',
+        'azure',
+      ].includes(apiSpec) && (
+        <div className="flex items-center justify-between rounded-lg border border-derived p-3">
+          <div className="space-y-0.5">
+            <p className="font-medium text-foreground text-xs">Fast Mode</p>
+            <p className="text-muted-foreground text-xs">
+              Enable priority processing / low-latency routing for supported
+              models.
+            </p>
+          </div>
+          <Switch size="sm" checked={fastMode} onCheckedChange={setFastMode} />
+        </div>
+      )}
 
       {saveError && (
         <p className="text-error-foreground text-xs" role="alert">
@@ -1293,6 +1315,7 @@ export function endpointSaveDataToInstanceArgs(data: EndpointSaveData): {
         config: {
           baseUrl: data.baseUrl,
           modelIdMapping: data.modelIdMapping,
+          fastMode: data.fastMode,
         },
       };
     case 'azure':
@@ -1304,6 +1327,7 @@ export function endpointSaveDataToInstanceArgs(data: EndpointSaveData): {
           resourceName: data.resourceName,
           apiVersion: data.apiVersion,
           modelIdMapping: data.modelIdMapping,
+          fastMode: data.fastMode,
         },
       };
     case 'bedrock':

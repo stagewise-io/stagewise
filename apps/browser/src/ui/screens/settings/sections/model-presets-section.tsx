@@ -158,6 +158,9 @@ function SortableModelItem({
   thinkingModel,
   thinkingDefaultOptions,
   effectiveThinkingOverride,
+  fastMode,
+  fastModeSupported,
+  onFastModeToggle,
 }: {
   itemKey: string;
   label?: string;
@@ -173,6 +176,9 @@ function SortableModelItem({
   thinkingModel: ThinkingPanelModel | undefined;
   thinkingDefaultOptions: ModelThinkingDefaultOptions | undefined;
   effectiveThinkingOverride?: ModelThinkingOverride;
+  fastMode?: boolean;
+  fastModeSupported?: boolean;
+  onFastModeToggle?: (enabled: boolean) => void;
 }) {
   const {
     attributes,
@@ -259,6 +265,21 @@ function SortableModelItem({
           >
             <IconBrainOutline18 className="size-3" />
             {thinkingDisplay.label}
+          </button>
+        )}
+        {fastModeSupported && (
+          <button
+            type="button"
+            className={cn(
+              'flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs transition-colors',
+              fastMode
+                ? 'bg-surface-hover font-medium text-foreground'
+                : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
+            )}
+            onClick={() => onFastModeToggle?.(!fastMode)}
+            title={fastMode ? 'Fast mode enabled' : 'Click to enable fast mode'}
+          >
+            ⚡ Fast
           </button>
         )}
         <button
@@ -529,6 +550,7 @@ function useModelListItems(
     modelId: string;
     providerInstanceId?: string;
     thinkingOverride?: ModelThinkingOverride;
+    fastMode?: boolean;
   }>,
   entries: ModelSelectorEntry[],
   preferences: UserPreferences,
@@ -591,6 +613,8 @@ function useModelListItems(
           thinkingModel,
           thinkingDefaultOptions,
           effectiveThinkingOverride,
+          fastMode: entry.fastMode ?? false,
+          fastModeSupported: selectorEntry?.fastModeSupported ?? false,
         };
       }),
     [modelEntries, entries, preferences, instanceMap],
@@ -698,6 +722,19 @@ function ModelList({
     [modelEntries, onChange],
   );
 
+  const handleFastModeToggle = useCallback(
+    (key: string, enabled: boolean) => {
+      onChange(
+        modelEntries.map((e) =>
+          modelKey(e) === key
+            ? { ...e, fastMode: enabled ? true : undefined }
+            : e,
+        ),
+      );
+    },
+    [modelEntries, onChange],
+  );
+
   return (
     <div className="space-y-2">
       <div>
@@ -738,6 +775,11 @@ function ModelList({
                   thinkingModel={item.thinkingModel}
                   thinkingDefaultOptions={item.thinkingDefaultOptions}
                   effectiveThinkingOverride={item.effectiveThinkingOverride}
+                  fastMode={item.fastMode}
+                  fastModeSupported={item.fastModeSupported}
+                  onFastModeToggle={(enabled) =>
+                    handleFastModeToggle(item.key, enabled)
+                  }
                 />
               ))}
             </div>
