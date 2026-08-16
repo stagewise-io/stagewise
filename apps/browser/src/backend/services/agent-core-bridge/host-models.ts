@@ -141,6 +141,7 @@ function toCoreEntry(entry: {
   modelId: string;
   providerInstanceId?: string;
   thinkingOverride?: CoreUtilityModelEntry['thinkingOverride'];
+  fastMode?: boolean;
 }): CoreUtilityModelEntry {
   return {
     modelId: entry.modelId,
@@ -150,6 +151,7 @@ function toCoreEntry(entry: {
     ...(entry.thinkingOverride
       ? { thinkingOverride: entry.thinkingOverride }
       : {}),
+    ...(entry.fastMode !== undefined ? { fastMode: entry.fastMode } : {}),
   };
 }
 

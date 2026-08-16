@@ -37,6 +37,7 @@ import {
 import {
   findInstanceForVendor,
   findModelSelectorEntry,
+  getInstanceModelFastModeOverride,
 } from '@shared/provider-instance-helpers';
 import {
   createThinkingProviderOptionsPatch,
@@ -45,7 +46,10 @@ import {
   type ThinkingCapableModel,
   type ThinkingProvider,
 } from '@shared/model-thinking-capabilities';
-import { createFastModeProviderOptionsPatch } from '@shared/model-fast-mode-capabilities';
+import {
+  createFastModeProviderOptionsPatch,
+  isFastModeSupportedForModel,
+} from '@shared/model-fast-mode-capabilities';
 
 // ── Provider type registry ──────────────────────────────────────────────────
 import type { ProviderType } from './providers/types';
@@ -757,8 +761,6 @@ export class ModelProviderService {
       mappedModelId;
 
     // ── Fast mode resolution ────────────────────────────────────────────────
-    const fastModeOverrides =
-      this.preferencesService.get().agent.modelFastModeOverrides ?? {};
     const presetFastMode = otherPostHogProperties?.[
       PRESET_FAST_MODE_METADATA_KEY
     ] as boolean | undefined;
@@ -768,8 +770,16 @@ export class ModelProviderService {
     const instanceFastMode = (instanceConfig as { fastMode?: boolean })
       ?.fastMode;
     const modelFastMode =
-      fastModeOverrides[instanceKey]?.[modelSettings.modelId] ??
-      fastModeOverrides['stagewise-default']?.[modelSettings.modelId];
+      getInstanceModelFastModeOverride(
+        this.preferencesService.get(),
+        instanceKey,
+        modelSettings.modelId,
+      ) ??
+      getInstanceModelFastModeOverride(
+        this.preferencesService.get(),
+        'stagewise-default',
+        modelSettings.modelId,
+      );
 
     const isFastModeActive =
       utilityFastMode ??
@@ -850,14 +860,21 @@ export class ModelProviderService {
       requestMetadata: otherPostHogProperties,
     });
 
-    const fastModePatch = isFastModeActive
-      ? createFastModeProviderOptionsPatch({
-          vendor: officialProvider,
-          apiSpec: effectiveApiSpec,
-          providerTypeId: instance?.typeId ?? type.id,
-          enabled: true,
-        })
-      : {};
+    const fastModePatch =
+      isFastModeActive &&
+      isFastModeSupportedForModel({
+        modelId: mappedModelId,
+        vendor: officialProvider,
+        apiSpec: effectiveApiSpec,
+        providerTypeId: instance?.typeId ?? type.id,
+      })
+        ? createFastModeProviderOptionsPatch({
+            vendor: officialProvider,
+            apiSpec: effectiveApiSpec,
+            providerTypeId: instance?.typeId ?? type.id,
+            enabled: true,
+          })
+        : {};
 
     const finalProviderOptions =
       isFastModeActive && Object.keys(fastModePatch).length > 0
@@ -951,18 +968,21 @@ export class ModelProviderService {
         ? getCodingPlanVendor(instance.config as CodingPlanConfig)
         : undefined;
 
-    const fastModeOverrides =
-      this.preferencesService.get().agent.modelFastModeOverrides ?? {};
     const presetFastMode = otherPostHogProperties?.[
       PRESET_FAST_MODE_METADATA_KEY
     ] as boolean | undefined;
+    const utilityFastMode = otherPostHogProperties?.[
+      UTILITY_FAST_MODE_METADATA_KEY
+    ] as boolean | undefined;
     const instanceFastMode = (instance?.config as { fastMode?: boolean })
       ?.fastMode;
-    const modelFastMode =
-      fastModeOverrides[instance?.id ?? providerInstanceId]?.[
-        customModel.modelId
-      ];
+    const modelFastMode = getInstanceModelFastModeOverride(
+      this.preferencesService.get(),
+      instance?.id ?? providerInstanceId,
+      customModel.modelId,
+    );
     const isFastModeActive =
+      utilityFastMode ??
       presetFastMode ??
       modelFastMode ??
       instanceFastMode ??
@@ -1006,13 +1026,21 @@ export class ModelProviderService {
           >)
         : {};
 
-    const fastModePatch = isFastModeActive
-      ? createFastModeProviderOptionsPatch({
-          apiSpec: apiSpec as ApiSpec,
-          providerTypeId: instance?.typeId ?? type.id,
-          enabled: true,
-        })
-      : {};
+    const fastModePatch =
+      isFastModeActive &&
+      isFastModeSupportedForModel({
+        modelId: customModel.modelId,
+        vendor,
+        apiSpec,
+        providerTypeId: instance?.typeId ?? type.id,
+      })
+        ? createFastModeProviderOptionsPatch({
+            vendor,
+            apiSpec,
+            providerTypeId: instance?.typeId ?? type.id,
+            enabled: true,
+          })
+        : {};
 
     const finalProviderOptions =
       isFastModeActive && Object.keys(fastModePatch).length > 0
@@ -1071,16 +1099,25 @@ export class ModelProviderService {
       (instance.typeId === 'coding-plan'
         ? getCodingPlanVendor(instance.config as CodingPlanConfig)
         : undefined);
-    const fastModeOverrides =
-      this.preferencesService.get().agent.modelFastModeOverrides ?? {};
     const presetFastMode = otherPostHogProperties?.[
       PRESET_FAST_MODE_METADATA_KEY
     ] as boolean | undefined;
+    const utilityFastMode = otherPostHogProperties?.[
+      UTILITY_FAST_MODE_METADATA_KEY
+    ] as boolean | undefined;
     const instanceFastMode = (instance.config as { fastMode?: boolean })
       ?.fastMode;
-    const modelFastMode = fastModeOverrides[instance.id]?.[discovered.modelId];
+    const modelFastMode = getInstanceModelFastModeOverride(
+      this.preferencesService.get(),
+      instance.id,
+      discovered.modelId,
+    );
     const isFastModeActive =
-      presetFastMode ?? modelFastMode ?? instanceFastMode ?? false;
+      utilityFastMode ??
+      presetFastMode ??
+      modelFastMode ??
+      instanceFastMode ??
+      false;
 
     let wireModelId =
       type.toWireModelId?.(discovered.modelId, vendor) ?? discovered.modelId;
@@ -1182,14 +1219,21 @@ export class ModelProviderService {
       requestMetadata: otherPostHogProperties,
     });
 
-    const fastModePatch = isFastModeActive
-      ? createFastModeProviderOptionsPatch({
-          vendor,
-          apiSpec: apiSpec as ApiSpec,
-          providerTypeId: instance.typeId,
-          enabled: true,
-        })
-      : {};
+    const fastModePatch =
+      isFastModeActive &&
+      isFastModeSupportedForModel({
+        modelId: discovered.modelId,
+        vendor,
+        apiSpec: apiSpec as ApiSpec,
+        providerTypeId: instance.typeId,
+      })
+        ? createFastModeProviderOptionsPatch({
+            vendor,
+            apiSpec: apiSpec as ApiSpec,
+            providerTypeId: instance.typeId,
+            enabled: true,
+          })
+        : {};
 
     const finalProviderOptions =
       isFastModeActive && Object.keys(fastModePatch).length > 0

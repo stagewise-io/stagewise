@@ -829,6 +829,7 @@ export const CustomEndpointForm = forwardRef<
     setProjectId(endpoint?.projectId ?? '');
     setLocation(endpoint?.location ?? '');
     setGoogleCredentials('');
+    setFastMode(endpoint?.fastMode ?? false);
     savedRef.current = false;
     if (isAddMode) {
       // No payload on `started` — `api_spec` at this point is always the

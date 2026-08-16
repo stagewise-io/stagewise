@@ -649,12 +649,14 @@ function ModelList({
     modelId: string;
     providerInstanceId?: string;
     thinkingOverride?: ModelThinkingOverride;
+    fastMode?: boolean;
   }>;
   onChange: (
     entries: Array<{
       modelId: string;
       providerInstanceId?: string;
       thinkingOverride?: ModelThinkingOverride;
+      fastMode?: boolean;
     }>,
   ) => void;
   entries: ModelSelectorEntry[];

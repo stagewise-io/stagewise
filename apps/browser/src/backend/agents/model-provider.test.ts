@@ -8,6 +8,7 @@ import {
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
   PRESET_FAST_MODE_METADATA_KEY,
+  UTILITY_FAST_MODE_METADATA_KEY,
   PROVIDER_INSTANCE_ID_METADATA_KEY,
 } from '@stagewise/agent-core/host';
 import { ModelProviderService } from './model-provider';
@@ -2185,7 +2186,7 @@ describe('Fast Mode support', () => {
     });
   });
 
-  it('applies :nitro suffix for OpenRouter models when fastMode is enabled', () => {
+  it('applies :nitro suffix and sort: throughput for OpenRouter models when fastMode is enabled', () => {
     const service = createTestModelProviderService();
     const preferences = (service as any).preferencesService.get();
     preferences.providerInstances = [
@@ -2213,6 +2214,63 @@ describe('Fast Mode support', () => {
     );
 
     expect(result.model.modelId).toContain(':nitro');
+    expect(result.providerOptions).toMatchObject({
+      openrouter: {
+        sort: 'throughput',
+      },
+    });
+  });
+
+  it('respects utility fastMode precedence over preset fastMode and instance config', () => {
+    const service = createTestModelProviderService({
+      modelFastModeOverrides: {
+        'claude-opus-4.8': true,
+      },
+    });
+
+    // When utility fast mode is explicitly false, it overrides model/preset fastMode true
+    const disabledResult = service.getModelWithOptions(
+      'claude-opus-4.8',
+      'trace-1',
+      {
+        ...agentStepMetadata,
+        [PRESET_FAST_MODE_METADATA_KEY]: true,
+        [UTILITY_FAST_MODE_METADATA_KEY]: false,
+      },
+    );
+
+    expect(disabledResult.providerOptions).not.toHaveProperty(
+      'anthropic.serviceTier',
+    );
+
+    // When utility fast mode is explicitly true, it activates fast mode
+    const enabledResult = service.getModelWithOptions(
+      'claude-opus-4.8',
+      'trace-1',
+      {
+        ...agentStepMetadata,
+        [PRESET_FAST_MODE_METADATA_KEY]: false,
+        [UTILITY_FAST_MODE_METADATA_KEY]: true,
+      },
+    );
+
+    expect(enabledResult.providerOptions).toMatchObject({
+      anthropic: {
+        serviceTier: 'auto',
+      },
+    });
+  });
+
+  it('does not inject fast mode provider options for unsupported models', () => {
+    const service = createTestModelProviderService();
+
+    const result = service.getModelWithOptions('gemini-3.5-flash', 'trace-1', {
+      ...agentStepMetadata,
+      [PRESET_FAST_MODE_METADATA_KEY]: true,
+    });
+
+    expect(result.providerOptions).not.toHaveProperty('openai.serviceTier');
+    expect(result.providerOptions).not.toHaveProperty('anthropic.serviceTier');
   });
 
   it('applies fastMode to custom models when fastMode: true', () => {

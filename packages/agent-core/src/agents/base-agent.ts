@@ -1785,6 +1785,7 @@ export abstract class BaseAgent<
       modelId: stepModelId,
       providerInstanceId: stepProviderInstanceId,
       thinkingOverride: presetThinkingOverride,
+      fastMode: presetFastMode,
     };
     if (
       !isApprovalContinuation &&

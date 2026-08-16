@@ -22,11 +22,14 @@ export function isFastModeSupportedForModel(args: {
 
   // Anthropic API or Anthropic-compatible custom endpoint
   if (
-    vendor === 'anthropic' ||
+    providerTypeId === 'custom-anthropic' ||
     apiSpec === 'anthropic' ||
-    providerTypeId === 'anthropic-api' ||
-    providerTypeId === 'custom-anthropic'
+    vendor === 'anthropic' ||
+    providerTypeId === 'anthropic-api'
   ) {
+    if (providerTypeId === 'custom-anthropic' || apiSpec === 'anthropic') {
+      return true;
+    }
     return (
       modelId.startsWith('claude-opus') ||
       modelId.startsWith('claude-sonnet') ||
@@ -37,15 +40,25 @@ export function isFastModeSupportedForModel(args: {
 
   // OpenAI API or OpenAI-compatible custom endpoint or Azure
   if (
-    vendor === 'openai' ||
+    providerTypeId === 'custom-openai-chat' ||
+    providerTypeId === 'custom-openai-responses' ||
+    providerTypeId === 'azure' ||
     apiSpec === 'openai-chat-completions' ||
     apiSpec === 'openai-responses' ||
     apiSpec === 'azure' ||
-    providerTypeId === 'openai-api' ||
-    providerTypeId === 'custom-openai-chat' ||
-    providerTypeId === 'custom-openai-responses' ||
-    providerTypeId === 'azure'
+    vendor === 'openai' ||
+    providerTypeId === 'openai-api'
   ) {
+    if (
+      providerTypeId === 'custom-openai-chat' ||
+      providerTypeId === 'custom-openai-responses' ||
+      providerTypeId === 'azure' ||
+      apiSpec === 'openai-chat-completions' ||
+      apiSpec === 'openai-responses' ||
+      apiSpec === 'azure'
+    ) {
+      return true;
+    }
     return (
       modelId.startsWith('gpt-5') ||
       modelId.startsWith('gpt-4o') ||
@@ -71,6 +84,14 @@ export function createFastModeProviderOptionsPatch(args: {
 
   if (!enabled) {
     return {};
+  }
+
+  if (providerTypeId === 'openrouter') {
+    return {
+      openrouter: {
+        sort: 'throughput',
+      },
+    };
   }
 
   if (
@@ -99,14 +120,6 @@ export function createFastModeProviderOptionsPatch(args: {
     return {
       openai: {
         serviceTier: 'priority',
-      },
-    };
-  }
-
-  if (providerTypeId === 'openrouter') {
-    return {
-      openrouter: {
-        sort: 'throughput',
       },
     };
   }

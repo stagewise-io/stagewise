@@ -1424,6 +1424,7 @@ function CustomModelDialog({
     contextWindowSize !== (model?.contextWindowSize ?? 128000) ||
     providerInstanceId !== initialProviderInstanceId ||
     thinkingEnabled !== (model?.thinkingEnabled ?? false) ||
+    fastMode !== (model?.fastMode ?? false) ||
     providerOptionsJson !==
       (model?.providerOptions && Object.keys(model.providerOptions).length > 0
         ? JSON.stringify(model.providerOptions, null, 2)

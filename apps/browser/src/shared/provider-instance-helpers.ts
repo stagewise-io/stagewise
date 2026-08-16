@@ -617,7 +617,10 @@ function makeBuiltInEntry(
     thinkingEnabled: catalogModel.thinkingEnabled,
     fastModeSupported: isFastModeSupportedForModel({
       modelId: targetModelId,
-      vendor: getVendorForInstance(instance),
+      vendor:
+        instance.typeId === 'stagewise'
+          ? catalogModel.officialProvider
+          : getVendorForInstance(instance),
       providerTypeId: instance.typeId,
     }),
     pricingMultiplier: catalogModel.pricing?.relativeMultiplier,
