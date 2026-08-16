@@ -7,6 +7,7 @@ import {
   findInstanceForVendor,
   findModelSelectorEntry,
   getInstanceModelCount,
+  getInstanceModelFastModeOverride,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
   getSelectableUtilityModelEntries,
@@ -524,5 +525,35 @@ describe('vendor instance routing', () => {
     expect(getVendorInstanceId(preferences, 'z-ai')).toBeUndefined();
     expect(vendorHasApiKey(preferences, 'z-ai')).toBe(false);
     expect(getVendorMode(preferences, 'z-ai')).toBe('stagewise');
+  });
+});
+
+describe('getInstanceModelFastModeOverride', () => {
+  it('returns override for specific instance and model', () => {
+    const preferences = {
+      ...defaultUserPreferences,
+      agent: {
+        ...defaultUserPreferences.agent,
+        modelFastModeOverrides: {
+          'instance-1': {
+            'model-a': true,
+            'model-b': false,
+          },
+        },
+      },
+    };
+
+    expect(
+      getInstanceModelFastModeOverride(preferences, 'instance-1', 'model-a'),
+    ).toBe(true);
+    expect(
+      getInstanceModelFastModeOverride(preferences, 'instance-1', 'model-b'),
+    ).toBe(false);
+    expect(
+      getInstanceModelFastModeOverride(preferences, 'instance-1', 'model-c'),
+    ).toBeUndefined();
+    expect(
+      getInstanceModelFastModeOverride(preferences, 'instance-2', 'model-a'),
+    ).toBeUndefined();
   });
 });
