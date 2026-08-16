@@ -30,6 +30,13 @@ describe('isFastModeSupportedForModel', () => {
     expect(
       isFastModeSupportedForModel({
         modelId: 'claude-sonnet-4.6',
+        providerTypeId: 'anthropic-api',
+        apiSpec: 'anthropic',
+      }),
+    ).toBe(true);
+    expect(
+      isFastModeSupportedForModel({
+        modelId: 'claude-sonnet-4.6',
         providerTypeId: 'custom-anthropic',
       }),
     ).toBe(true);
@@ -37,6 +44,13 @@ describe('isFastModeSupportedForModel', () => {
       isFastModeSupportedForModel({
         modelId: 'claude-haiku-3.5',
         vendor: 'anthropic',
+      }),
+    ).toBe(false);
+    expect(
+      isFastModeSupportedForModel({
+        modelId: 'claude-haiku-3.5',
+        providerTypeId: 'anthropic-api',
+        apiSpec: 'anthropic',
       }),
     ).toBe(false);
   });
@@ -66,6 +80,13 @@ describe('isFastModeSupportedForModel', () => {
         vendor: 'openai',
       }),
     ).toBe(false);
+    expect(
+      isFastModeSupportedForModel({
+        modelId: 'llama-3.3-70b',
+        providerTypeId: 'ollama',
+        apiSpec: 'openai-chat-completions',
+      }),
+    ).toBe(false);
   });
 });
 
@@ -79,7 +100,7 @@ describe('createFastModeProviderOptionsPatch', () => {
     ).toEqual({});
   });
 
-  it('returns openrouter sort: throughput for OpenRouter even with openai apiSpec', () => {
+  it('uses OpenRouter throughput with an OpenAI API spec', () => {
     expect(
       createFastModeProviderOptionsPatch({
         providerTypeId: 'openrouter',

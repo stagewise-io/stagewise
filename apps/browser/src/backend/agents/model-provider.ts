@@ -791,7 +791,7 @@ export class ModelProviderService {
     if (
       isFastModeActive &&
       (instance?.typeId === 'openrouter' || type.id === 'openrouter') &&
-      !wireModelId.endsWith(':nitro')
+      !wireModelId.includes(':')
     ) {
       wireModelId = `${wireModelId}:nitro`;
     }
@@ -994,7 +994,7 @@ export class ModelProviderService {
     if (
       isFastModeActive &&
       (instance?.typeId === 'openrouter' || type.id === 'openrouter') &&
-      !wireModelId.endsWith(':nitro')
+      !wireModelId.includes(':')
     ) {
       wireModelId = `${wireModelId}:nitro`;
     }
@@ -1124,7 +1124,7 @@ export class ModelProviderService {
     if (
       isFastModeActive &&
       instance.typeId === 'openrouter' &&
-      !wireModelId.endsWith(':nitro')
+      !wireModelId.includes(':')
     ) {
       wireModelId = `${wireModelId}:nitro`;
     }

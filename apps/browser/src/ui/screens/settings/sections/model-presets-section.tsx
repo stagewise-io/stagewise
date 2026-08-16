@@ -728,9 +728,7 @@ function ModelList({
     (key: string, enabled: boolean) => {
       onChange(
         modelEntries.map((e) =>
-          modelKey(e) === key
-            ? { ...e, fastMode: enabled ? true : undefined }
-            : e,
+          modelKey(e) === key ? { ...e, fastMode: enabled } : e,
         ),
       );
     },

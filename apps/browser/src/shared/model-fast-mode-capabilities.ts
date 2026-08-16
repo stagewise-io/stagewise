@@ -20,16 +20,17 @@ export function isFastModeSupportedForModel(args: {
     return true;
   }
 
-  // Anthropic API or Anthropic-compatible custom endpoint
+  // Custom Anthropic endpoints support fast mode for all user-defined models
+  if (providerTypeId === 'custom-anthropic') {
+    return true;
+  }
+
+  // Anthropic API / official vendor
   if (
-    providerTypeId === 'custom-anthropic' ||
-    apiSpec === 'anthropic' ||
     vendor === 'anthropic' ||
+    apiSpec === 'anthropic' ||
     providerTypeId === 'anthropic-api'
   ) {
-    if (providerTypeId === 'custom-anthropic' || apiSpec === 'anthropic') {
-      return true;
-    }
     return (
       modelId.startsWith('claude-opus') ||
       modelId.startsWith('claude-sonnet') ||
@@ -38,27 +39,23 @@ export function isFastModeSupportedForModel(args: {
     );
   }
 
-  // OpenAI API or OpenAI-compatible custom endpoint or Azure
+  // Custom OpenAI or Azure endpoints support fast mode for all user-configured models
   if (
     providerTypeId === 'custom-openai-chat' ||
     providerTypeId === 'custom-openai-responses' ||
-    providerTypeId === 'azure' ||
+    providerTypeId === 'azure'
+  ) {
+    return true;
+  }
+
+  // OpenAI API / official vendor
+  if (
+    vendor === 'openai' ||
     apiSpec === 'openai-chat-completions' ||
     apiSpec === 'openai-responses' ||
     apiSpec === 'azure' ||
-    vendor === 'openai' ||
     providerTypeId === 'openai-api'
   ) {
-    if (
-      providerTypeId === 'custom-openai-chat' ||
-      providerTypeId === 'custom-openai-responses' ||
-      providerTypeId === 'azure' ||
-      apiSpec === 'openai-chat-completions' ||
-      apiSpec === 'openai-responses' ||
-      apiSpec === 'azure'
-    ) {
-      return true;
-    }
     return (
       modelId.startsWith('gpt-5') ||
       modelId.startsWith('gpt-4o') ||

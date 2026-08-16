@@ -2202,6 +2202,10 @@ describe('Fast Mode support', () => {
             modelId: 'anthropic/claude-opus-4.8',
             displayName: 'Claude Opus 4.8',
           },
+          {
+            modelId: 'meta-llama/llama-3.3-70b:free',
+            displayName: 'Llama 3.3 70B Free',
+          },
         ],
       },
     ];
@@ -2215,6 +2219,21 @@ describe('Fast Mode support', () => {
 
     expect(result.model.modelId).toContain(':nitro');
     expect(result.providerOptions).toMatchObject({
+      openrouter: {
+        sort: 'throughput',
+      },
+    });
+
+    // When modelId already contains a variant suffix like :free, do not append :nitro
+    const freeResult = service.getModelWithOptions(
+      'meta-llama/llama-3.3-70b:free',
+      'trace-1',
+      agentStepMetadata,
+      'openrouter-instance',
+    );
+
+    expect(freeResult.model.modelId).toBe('meta-llama/llama-3.3-70b:free');
+    expect(freeResult.providerOptions).toMatchObject({
       openrouter: {
         sort: 'throughput',
       },
