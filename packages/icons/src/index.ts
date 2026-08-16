@@ -49,4 +49,8 @@ export {
 } from './nucleo/micro-bold';
 export { IconGithub } from './nucleo/social-media';
 
-export { IconNewTerminal, IconBrowserTab } from './custom/ui-outline-18';
+export {
+  IconNewTerminal,
+  IconBrowserTab,
+  IconBolt,
+} from './custom/ui-outline-18';

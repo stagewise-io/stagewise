@@ -71,6 +71,7 @@ import {
   IconTriangleWarningOutline18,
   IconPenOutline18,
   IconBrainOutline18,
+  IconBolt,
 } from '@stagewise/icons';
 import {
   getModelThinkingDisplayState,
@@ -271,15 +272,16 @@ function SortableModelItem({
           <button
             type="button"
             className={cn(
-              'flex shrink-0 items-center gap-0.5 rounded px-1.5 py-0.5 text-2xs transition-colors',
+              'flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-2xs transition-colors',
               fastMode
-                ? 'bg-surface-hover font-medium text-foreground'
+                ? 'border border-border bg-surface-hover font-medium text-foreground'
                 : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
             )}
             onClick={() => onFastModeToggle?.(!fastMode)}
             title={fastMode ? 'Fast mode enabled' : 'Click to enable fast mode'}
           >
-            ⚡ Fast
+            <IconBolt className="size-3" />
+            <span>Fast</span>
           </button>
         )}
         <button
