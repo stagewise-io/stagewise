@@ -53,7 +53,10 @@ export interface OverlayScrollbarProps {
   onUpdated?: (instance: OverlayScrollbars) => void;
   /** Called when the instance is initialized */
   onInitialized?: (instance: OverlayScrollbars) => void;
-  /** Defer initialization until idle (defaults to false for immediate scrollability) */
+  /**
+   * Defer initialization until idle (defaults to false for immediate
+   * scrollability).
+   */
   defer?: boolean;
   /** The HTML element to use for the root */
   element?: 'div' | 'section' | 'article' | 'main' | 'aside' | 'nav';

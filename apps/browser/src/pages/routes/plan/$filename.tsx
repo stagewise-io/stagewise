@@ -12,7 +12,10 @@ export const Route = createFileRoute('/plan/$filename')({
 
 function PlanPage() {
   const { filename } = Route.useParams();
-  const [content, setContent] = useState<string | null>(null);
+  const [{ content, revision }, setPlanState] = useState<{
+    content: string | null;
+    revision: number;
+  }>({ content: null, revision: 0 });
   const [error, setError] = useState<string | null>(null);
 
   const fetchUrl = `plans://plans/${filename}`;
@@ -24,10 +27,6 @@ function PlanPage() {
   const planMeta = useKartonState((s) => {
     return s.plans.find((p) => p.filename === filename);
   });
-
-  // Revision counter bumped on external changes to force editor remount
-  // so the read-only editor picks up the latest content.
-  const [revision, setRevision] = useState(0);
 
   // Fetch file content. Runs on initial load and whenever planMeta changes
   // (i.e. the backend detected a file change on disk).
@@ -41,10 +40,12 @@ function PlanPage() {
         const text = await response.text();
         if (cancelled) return;
 
-        setContent((prev) => {
-          if (prev !== text) {
-            setRevision((r) => r + 1);
-            return text;
+        setPlanState((prev) => {
+          if (prev.content !== text) {
+            return {
+              content: text,
+              revision: prev.content === null ? 0 : prev.revision + 1,
+            };
           }
           return prev;
         });
