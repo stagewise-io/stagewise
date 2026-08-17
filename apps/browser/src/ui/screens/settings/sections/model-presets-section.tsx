@@ -33,6 +33,7 @@ import type {
 import {
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
+  getSelectableUtilityModelEntries,
   getVendorForInstance,
   isModelEntryValid,
   type ModelSelectorEntry,
@@ -779,7 +780,7 @@ function UtilityModelList({
   const modelEntries = preferences.agent.utilityModels[task] ?? [];
 
   const entries = useMemo(
-    () => getSelectableModelEntries(preferences),
+    () => getSelectableUtilityModelEntries(preferences),
     [preferences],
   );
 
@@ -958,6 +959,7 @@ function PresetEditorDialog({
   onOpenChange,
   onSave,
   entries,
+  utilityEntries,
   preferences,
 }: {
   preset?: UserPreferences['agent']['modelPresets'][number];
@@ -971,6 +973,7 @@ function PresetEditorDialog({
     contextCompression?: UtilityModelEntry[];
   }) => void;
   entries: ModelSelectorEntry[];
+  utilityEntries: ModelSelectorEntry[];
   preferences: UserPreferences;
 }) {
   const isEdit = !!preset;
@@ -1051,7 +1054,7 @@ function PresetEditorDialog({
               onChange={(next) =>
                 setTitleGeneration(next.length > 0 ? next : undefined)
               }
-              entries={entries}
+              entries={utilityEntries}
               preferences={preferences}
               emptyMessage="Uses main model."
             />
@@ -1062,7 +1065,7 @@ function PresetEditorDialog({
               onChange={(next) =>
                 setContextCompression(next.length > 0 ? next : undefined)
               }
-              entries={entries}
+              entries={utilityEntries}
               preferences={preferences}
               emptyMessage="Uses main model."
             />
@@ -1101,6 +1104,10 @@ export function ModelPresetsSection() {
   const presets = preferences.agent.modelPresets ?? [];
   const entries = useMemo(
     () => getSelectableModelEntries(preferences),
+    [preferences],
+  );
+  const utilityEntries = useMemo(
+    () => getSelectableUtilityModelEntries(preferences),
     [preferences],
   );
 
@@ -1246,6 +1253,7 @@ export function ModelPresetsSection() {
         onOpenChange={setEditorOpen}
         onSave={handleSavePreset}
         entries={entries}
+        utilityEntries={utilityEntries}
         preferences={preferences}
       />
     </div>

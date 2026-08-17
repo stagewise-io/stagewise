@@ -27,6 +27,7 @@ import type {
 import type { ModelCapabilities } from '../types/models';
 import type { AgentStateMutations } from '../services/agent-manager/state-mutations';
 import type { AgentHost } from '../host/host';
+import type { ExternalAgentRuntime } from '../host/external-agent-runtime';
 import {
   MODEL_REQUEST_PURPOSE_METADATA_KEY,
   PRESET_THINKING_OVERRIDE_METADATA_KEY,
@@ -132,6 +133,11 @@ export interface BaseAgentToolboxView {
    * expose dialog UIs may implement as a no-op.
    */
   cancelPendingAgentDialogs(agentInstanceId: string): void;
+  /** Open the host's structured question UI without invoking an AI tool. */
+  requestUserQuestions(
+    agentInstanceId: string,
+    input: unknown,
+  ): Promise<unknown>;
   clearAgentTracking(agentInstanceId: string): void | Promise<void>;
   getSkillsList(agentInstanceId: string): Promise<SkillDefinition[]>;
   getMountedPathsForAgent(agentInstanceId: string): Map<string, string>;
@@ -246,6 +252,7 @@ export interface BaseAgentDependencies<
     event: AgentNotificationEvent,
     agentId: string,
   ) => void | Promise<void>;
+  externalRuntime?: ExternalAgentRuntime;
 }
 
 /**
@@ -716,6 +723,7 @@ export abstract class BaseAgent<
     event: AgentNotificationEvent,
     agentId: string,
   ) => void | Promise<void>;
+  private readonly externalRuntime?: ExternalAgentRuntime;
 
   private messages: AgentMessage[] = [];
 
@@ -737,6 +745,7 @@ export abstract class BaseAgent<
     this.finishToolErrorHandler = deps.finishToolErrorHandler;
     this.agentTypeRegistry = deps.agentTypeRegistry;
     this.notificationEventHandler = deps.notificationEventHandler;
+    this.externalRuntime = deps.externalRuntime;
     this.processedImageCacheService = deps.caches?.processedImageCache;
     this.renderExtraMention = deps.renderExtraMention;
     if (!deps.caches?.fileReadCache) {
@@ -875,6 +884,19 @@ export abstract class BaseAgent<
     const approved = toolCallResponse.approved;
     const reason = toolCallResponse.reason;
 
+    let handledExternally = false;
+    let externalError: unknown;
+    try {
+      handledExternally =
+        (await this.externalRuntime?.respondToApproval(toolCallResponse)) ??
+        false;
+    } catch (error) {
+      externalError = error;
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External approval response failed`,
+        error,
+      );
+    }
     this.state.commands.resolveApproval({ approvalId, approved, reason });
 
     // Find the tool name from the approval for telemetry
@@ -910,6 +932,9 @@ export abstract class BaseAgent<
         tool_call_id: approvalId,
       });
     }
+
+    if (externalError) throw externalError;
+    if (handledExternally) return;
 
     this.runStep(true);
 
@@ -1059,11 +1084,13 @@ export abstract class BaseAgent<
     newUserMessage: AgentMessage & { role: 'user' },
     undoToolCalls: boolean,
   ): Promise<string> {
-    const undoneMessages = this.state
+    const messageIndex = this.state
       .get()
-      .history.slice(
-        this.state.get().history.findIndex((msg) => msg.id === userMessageId),
-      );
+      .history.findIndex((msg) => msg.id === userMessageId);
+    if (messageIndex === -1) {
+      throw new Error('User message not found in history');
+    }
+    const undoneMessages = this.state.get().history.slice(messageIndex);
 
     const undoneToolCallIds = undoneMessages
       .filter((msg) => msg.role === 'assistant')
@@ -1080,6 +1107,7 @@ export abstract class BaseAgent<
       await this.toolbox.undoToolCalls(undoneToolCallIds, this.instanceId);
     }
 
+    await this.externalRuntime?.resetThread?.();
     this.state.commands.replaceUserMessage({ userMessageId });
 
     return await this.sendUserMessage(newUserMessage);
@@ -1172,6 +1200,7 @@ export abstract class BaseAgent<
       await this.toolbox.undoToolCalls(undoneToolCallIds, this.instanceId);
     }
 
+    await this.externalRuntime?.resetThread?.();
     this.state.commands.truncateHistoryAt({ messageIndex: msgIndex });
     this.scheduleMemorySnapshotWrite('user-message');
 
@@ -1766,6 +1795,19 @@ export abstract class BaseAgent<
       );
     }
 
+    const externalSelection: UtilityModelEntry = {
+      modelId: stepModelId,
+      providerInstanceId: stepProviderInstanceId,
+      thinkingOverride: presetThinkingOverride,
+    };
+    if (
+      !isApprovalContinuation &&
+      this.externalRuntime?.handles(externalSelection)
+    ) {
+      await this.runExternalStep(externalSelection, stepGen, flushedIndex);
+      return;
+    }
+
     // Get the current model — wrapped in try-catch so a deleted custom model
     // or endpoint doesn't wedge the agent with isWorking=true and no error.
     let modelWithOptions: ModelWithOptions;
@@ -2287,6 +2329,106 @@ export abstract class BaseAgent<
         markUnread: 'mark-unread',
       });
       this.emitNotificationEvent('error');
+    }
+  }
+
+  private async runExternalStep(
+    selection: UtilityModelEntry,
+    stepGeneration: number,
+    queueFlushIndex: number | undefined,
+  ): Promise<void> {
+    const state = this.state.get();
+    const userHistory = state.history.filter(
+      (message): message is AgentMessage & { role: 'user' } =>
+        message.role === 'user',
+    );
+    const visibleUserMessage = userHistory.at(-1);
+
+    if (!visibleUserMessage) {
+      this.state.commands.setIsWorkingFalse();
+      return;
+    }
+
+    const syntheticContinuation = this._pendingSyntheticContinuation;
+    this._pendingSyntheticContinuation = null;
+    const flushedUserMessages =
+      queueFlushIndex === undefined
+        ? []
+        : (state.history
+            .slice(queueFlushIndex)
+            .filter((message) => message.role === 'user') as Array<
+            AgentMessage & { role: 'user' }
+          >);
+    const continuationMessage: AgentMessage & { role: 'user' } = {
+      id: randomUUID(),
+      role: 'user',
+      parts: [
+        {
+          type: 'text',
+          text: 'Continue from where the interrupted turn stopped.',
+        },
+      ],
+    };
+    const userMessages = syntheticContinuation
+      ? [continuationMessage, ...flushedUserMessages]
+      : flushedUserMessages.length > 0
+        ? flushedUserMessages
+        : [visibleUserMessage];
+
+    const firstText = visibleUserMessage.parts.find(
+      (part) => part.type === 'text',
+    )?.text;
+    if (
+      firstText?.trim() &&
+      !state.titleLockedByUser &&
+      userHistory.length === 1
+    ) {
+      this.state.commands.setTitle({
+        title: firstText.trim().replace(/\s+/g, ' ').slice(0, 64),
+      });
+    }
+
+    try {
+      await this.externalRuntime!.runTurn({
+        selection,
+        userMessages,
+        approvalMode: state.toolApprovalMode,
+      });
+      if (this._stepGeneration !== stepGeneration) return;
+      this.state.commands.recordStepError({
+        error: undefined,
+        markUnread: 'if-assistant-history',
+      });
+      await this.saveState(
+        queueFlushIndex === undefined ? undefined : [queueFlushIndex],
+      );
+      if (this._stepGeneration !== stepGeneration) return;
+      this.scheduleMemorySnapshotWrite('post-step');
+    } catch (rawError) {
+      if (this._stepGeneration !== stepGeneration) return;
+      const error =
+        rawError instanceof Error ? rawError : new Error(String(rawError));
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External harness turn failed: ${error.message}`,
+      );
+      this.state.commands.recordStepError({
+        error: { message: error.message, stack: error.stack },
+        markUnread: 'mark-unread',
+      });
+      this.emitNotificationEvent('error');
+      await this.saveState();
+      if (this._stepGeneration !== stepGeneration) return;
+      if (this.state.get().queuedMessages.length > 0) {
+        setTimeout(() => void this.runStep(), 0);
+      }
+      return;
+    }
+
+    if (this.state.get().queuedMessages.length > 0) {
+      setTimeout(() => void this.runStep(), 0);
+    } else {
+      void this.onIdle();
+      this.emitNotificationEvent('done');
     }
   }
 
@@ -3223,6 +3365,15 @@ export abstract class BaseAgent<
           : (this.config.flushQueueToolCallRequestApprovalReason ??
             'User sent new message before tool call approval was granted.');
 
+    try {
+      await this.externalRuntime?.stop(toolCallRequestApprovalAbortReason);
+    } catch (error) {
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External runtime stop failed`,
+        error,
+      );
+    }
+
     this.state.commands.terminateNonTerminalToolPartsInLastAssistant({
       approvalDenyReason: toolCallRequestApprovalAbortReason,
       outputErrorText: toolCallAbortReason,
@@ -3818,6 +3969,14 @@ export abstract class BaseAgent<
       }
     }
     void this.toolbox.clearAgentTracking(this.instanceId);
+    try {
+      await this.externalRuntime?.teardown();
+    } catch (error) {
+      this.host.logger.error(
+        `[BaseAgent:${this.instanceId}] External runtime teardown failed`,
+        error,
+      );
+    }
     // NOTE: `fileReadCacheService` is app-wide and owned by bootstrap;
     // do not tear it down from an individual agent instance.
   }

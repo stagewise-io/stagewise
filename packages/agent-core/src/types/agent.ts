@@ -128,8 +128,10 @@ export type AgentState<TMessage = AgentMessage> = {
   pendingApprovals: Record<string, { explanation: string }>;
   /** @persistence persisted-core — column `input_state` (JSON). Preserves draft input across restart. */
   inputState: string;
-  /** @persistence persisted-core — column `used_tokens`. Cumulative token counter. */
+  /** @persistence persisted-core — column `used_tokens`. Tokens in the active model context. */
   usedTokens: number;
+  /** @persistence ephemeral — active model context window reported by an external runtime. */
+  contextWindowSize?: number;
   /** @persistence ephemeral — reset on resume; set by the runloop on failure. */
   error?: AgentRuntimeError;
   /** @persistence persisted-core — stored in `agentInstances.unread`. */

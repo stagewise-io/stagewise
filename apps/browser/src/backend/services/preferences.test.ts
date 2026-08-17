@@ -279,6 +279,62 @@ describe('PreferencesService provider instance names', () => {
   });
 });
 
+describe('PreferencesService local agent providers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it.each([
+    ['codex', 'Codex'],
+    ['codex-stagewise', 'Codex (Stagewise)'],
+    ['claude-code', 'Claude Code'],
+    ['opencode', 'OpenCode'],
+  ] as const)('rejects a second %s instance', async (typeId, displayName) => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances.push({
+      id: `${typeId}-existing`,
+      typeId,
+      name: displayName,
+      config: {},
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [],
+    });
+    const service = await createServiceWithPreferences(preferences);
+
+    await expect(
+      service.addProviderInstance({ typeId, config: {} }),
+    ).resolves.toEqual({
+      success: false,
+      error: `${displayName} is already connected.`,
+    });
+    expect(
+      service
+        .get()
+        .providerInstances.filter((instance) => instance.typeId === typeId),
+    ).toHaveLength(1);
+  });
+
+  it('serializes concurrent local-agent additions', async () => {
+    const service = await createServiceWithPreferences();
+    vi.spyOn(service, 'getLocalAgentAvailability').mockResolvedValue({
+      installed: true,
+    });
+
+    const results = await Promise.all([
+      service.addProviderInstance({ typeId: 'claude-code', config: {} }),
+      service.addProviderInstance({ typeId: 'claude-code', config: {} }),
+    ]);
+    expect(results.map(({ success }) => success).sort()).toEqual([false, true]);
+    expect(
+      service
+        .get()
+        .providerInstances.filter(({ typeId }) => typeId === 'claude-code'),
+    ).toHaveLength(1);
+  });
+});
+
 describe('PreferencesService provider instance deletion', () => {
   beforeEach(() => {
     vi.clearAllMocks();

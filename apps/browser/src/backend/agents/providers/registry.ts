@@ -30,6 +30,10 @@ import {
 } from './cloud';
 import { ollamaProviderType } from './ollama';
 import { openrouterProviderType } from './openrouter';
+import { codexProviderType } from './codex/codex-harness';
+import { codexStagewiseProviderType } from './codex/stagewise-harness';
+import { claudeCodeProviderType } from './claude-code/provider';
+import { opencodeProviderType } from './opencode/provider';
 
 // ============================================================================
 // Registry — maps every ProviderInstanceTypeId to its ProviderType impl
@@ -61,6 +65,10 @@ export const PROVIDER_TYPE_REGISTRY: Record<
   vertex: vertexProviderType,
   ollama: ollamaProviderType,
   openrouter: openrouterProviderType,
+  'codex-stagewise': codexStagewiseProviderType,
+  codex: codexProviderType,
+  'claude-code': claudeCodeProviderType,
+  opencode: opencodeProviderType,
 };
 
 /**

@@ -82,6 +82,7 @@ import {
   cancelQuestion,
   goBackQuestion,
   cleanupQuestionsForAgent,
+  requestUserQuestions,
 } from './tools/user-interaction/ask-user-questions';
 import type { Tool } from 'ai';
 import type { MountedClientRuntimes } from './utils';
@@ -162,6 +163,15 @@ export class ToolboxService
         agentId: string,
       ) => void | Promise<void>)
     | null = null;
+  private readonly notifyQuestion = (agentId: string): void => {
+    void Promise.resolve(
+      this.notificationEventHandler?.('question', agentId),
+    ).catch((error) => {
+      this.logger.debug(
+        `[ToolboxService] Notification event failed: ${(error as Error).message}`,
+      );
+    });
+  };
   /** Cached API client - recreated when auth changes */
   private apiClient: ApiClient | null = null;
 
@@ -666,15 +676,7 @@ export class ToolboxService
           this.uiKarton,
           this.hostAgentStateMutations,
           agentInstanceId,
-          (id) => {
-            void Promise.resolve(
-              this.notificationEventHandler?.('question', id),
-            ).catch((error) => {
-              this.logger.debug(
-                `[ToolboxService] Notification event failed: ${(error as Error).message}`,
-              );
-            });
-          },
+          this.notifyQuestion,
         );
       case 'createShellSession': {
         if (!this.shellService?.isAvailable()) return null;
@@ -1409,6 +1411,19 @@ export class ToolboxService
    */
   public cancelPendingAgentDialogs(agentInstanceId: string): void {
     cleanupQuestionsForAgent(agentInstanceId, this.uiKarton);
+  }
+
+  public requestUserQuestions(
+    agentInstanceId: string,
+    input: unknown,
+  ): Promise<unknown> {
+    return requestUserQuestions(
+      this.uiKarton,
+      this.hostAgentStateMutations,
+      agentInstanceId,
+      input,
+      this.notifyQuestion,
+    );
   }
 
   /** Resolve a specific pending question with a given reason. */

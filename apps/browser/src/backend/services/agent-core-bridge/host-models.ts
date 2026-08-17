@@ -6,7 +6,10 @@ import {
   PROVIDER_INSTANCE_ID_METADATA_KEY,
   type UtilityModelEntry as CoreUtilityModelEntry,
 } from '@stagewise/agent-core/host';
-import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
+import {
+  isExternalAgentProviderType,
+  type UserPreferences,
+} from '@shared/karton-contracts/ui/shared-types';
 
 /**
  * Thin `HostModels` adapter over the browser's `ModelProviderService`.
@@ -37,10 +40,23 @@ import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
  * Includes `activePresetId` and `modelPresets` so per-preset utility
  * model overrides and the active preset's main model can be resolved.
  */
-export type UtilityModelsGetter = () => Pick<
+type UtilityModelsSnapshot = Pick<
   UserPreferences['agent'],
   'utilityModels' | 'activePresetId' | 'modelPresets'
->;
+> &
+  Pick<UserPreferences, 'providerInstances'>;
+
+export type UtilityModelsGetter = () => UtilityModelsSnapshot;
+
+function supportsUtilityCalls(
+  entry: { providerInstanceId?: string },
+  prefs: UtilityModelsSnapshot,
+): boolean {
+  const instance = prefs.providerInstances.find(
+    (candidate) => candidate.id === entry.providerInstanceId,
+  );
+  return !instance || !isExternalAgentProviderType(instance.typeId);
+}
 
 /**
  * Resolves the ordered utility model entries for a given task,
@@ -51,17 +67,21 @@ export type UtilityModelsGetter = () => Pick<
  */
 function resolveUtilityEntries(
   task: 'title-generation' | 'context-compression',
-  prefs: Pick<
-    UserPreferences['agent'],
-    'utilityModels' | 'activePresetId' | 'modelPresets'
-  >,
+  prefs: UtilityModelsSnapshot,
 ): CoreUtilityModelEntry[] | undefined {
   const { utilityModels, activePresetId, modelPresets } = prefs;
+  const globalEntries = (
+    task === 'title-generation'
+      ? utilityModels.titleGeneration
+      : utilityModels.contextCompression
+  )
+    ?.filter((entry) => supportsUtilityCalls(entry, prefs))
+    .map(toCoreEntry);
   // If an active preset exists, its utility model lists take
   // precedence over the global defaults. An undefined or empty list
   // means "use the main model" — we return [] so agent-core falls
-  // back to fallbackModelId (the preset's main model) instead of
-  // falling through to global defaults.
+  // back to the preset models. External-only presets cannot serve
+  // utility calls, so those use the global chain instead.
   if (activePresetId) {
     const preset = modelPresets.find((p) => p.id === activePresetId);
     if (preset) {
@@ -69,20 +89,19 @@ function resolveUtilityEntries(
         task === 'title-generation'
           ? preset.titleGeneration
           : preset.contextCompression;
-      if (presetList && presetList.length > 0) {
-        return presetList.map(toCoreEntry);
-      }
-      return [];
+      const configured = presetList
+        ?.filter((entry) => supportsUtilityCalls(entry, prefs))
+        .map(toCoreEntry);
+      if (configured?.length) return configured;
+      return preset.models?.some((entry) => supportsUtilityCalls(entry, prefs))
+        ? []
+        : globalEntries;
     }
     // Preset ID is set but the preset was deleted — treat as
     // inactive and fall through to global lists, matching
     // resolveActivePresetModels' behavior of returning undefined.
   }
-  const globalList =
-    task === 'title-generation'
-      ? utilityModels.titleGeneration
-      : utilityModels.contextCompression;
-  return globalList?.map(toCoreEntry);
+  return globalEntries;
 }
 
 /**
@@ -103,7 +122,7 @@ function resolveActivePresetId(
  * `thinkingOverride` so the agent can cycle through them on failure.
  */
 function resolveActivePresetModels(
-  prefs: Pick<UserPreferences['agent'], 'activePresetId' | 'modelPresets'>,
+  prefs: UtilityModelsSnapshot,
 ): CoreUtilityModelEntry[] | undefined {
   const { activePresetId, modelPresets } = prefs;
   if (!activePresetId) return undefined;
@@ -190,6 +209,11 @@ export function createBrowserHostModels(
       if (!getUtilityModels) return undefined;
       return resolveUtilityEntries(task, getUtilityModels());
     },
+    supportsUtilityCalls(entry) {
+      return getUtilityModels
+        ? supportsUtilityCalls(entry, getUtilityModels())
+        : true;
+    },
     getActivePresetId() {
       if (!getUtilityModels) return undefined;
       return resolveActivePresetId(getUtilityModels());
@@ -261,6 +285,14 @@ export function createLazyBrowserHostModels(
         return inner.getUtilityModelEntries(task);
       if (!getUtilityModels) return undefined;
       return resolveUtilityEntries(task, getUtilityModels());
+    },
+    supportsUtilityCalls(entry) {
+      return (
+        inner?.supportsUtilityCalls?.(entry) ??
+        (getUtilityModels
+          ? supportsUtilityCalls(entry, getUtilityModels())
+          : true)
+      );
     },
     getActivePresetId() {
       if (inner?.getActivePresetId) return inner.getActivePresetId();

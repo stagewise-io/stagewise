@@ -40,6 +40,12 @@ import {
 import { getProviderType } from '../agents/providers/registry';
 import { computeDisabledModelIdsAfterDiscovery } from '@shared/flagship-models';
 import { apiSpecToTypeId } from '@shared/provider-instance-helpers';
+import {
+  prepareAcpProcess,
+  resolveAcpEnvironment,
+  resolveAgentExecutable,
+} from '../agents/acp/adapter';
+import { adapterForProviderType } from '../agents/acp/adapter-registry';
 
 // Enable Immer patches support
 enablePatches();
@@ -738,6 +744,18 @@ export class PreferencesService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'preferences.getLocalAgentAvailability',
+      async (_callingClientId: string, typeId: ProviderInstanceTypeId) =>
+        this.getLocalAgentAvailability(typeId),
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.getProviderUsageLimits',
+      async (_callingClientId: string, instanceId: string) =>
+        this.getProviderUsageLimits(instanceId),
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'preferences.removeProviderInstance',
       async (_callingClientId: string, instanceId: string) => {
         await this.removeProviderInstance(instanceId);
@@ -962,14 +980,15 @@ export class PreferencesService extends DisposableService {
   /**
    * Get a shallow snapshot of the `agent` sub-object without cloning the
    * entire preferences tree. Used by hot paths (e.g. the lazy host-models
-   * closure) that only need `utilityModels`, `activePresetId`, and
-   * `modelPresets` and would otherwise pay the cost of a full
+   * closure) that only need the utility-model configuration and provider
+   * instances and would otherwise pay the cost of a full
    * `structuredClone` on every agent turn.
    */
   public getAgentSnapshot(): Pick<
     UserPreferences['agent'],
     'utilityModels' | 'activePresetId' | 'modelPresets'
-  > {
+  > &
+    Pick<UserPreferences, 'providerInstances'> {
     this.assertNotDisposed();
     const agent = this.preferences.agent;
     const modelPresets = agent.modelPresets ?? [];
@@ -987,6 +1006,7 @@ export class PreferencesService extends DisposableService {
       utilityModels: agent.utilityModels,
       activePresetId,
       modelPresets,
+      providerInstances: this.preferences.providerInstances,
     };
   }
 
@@ -1918,6 +1938,30 @@ export class PreferencesService extends DisposableService {
     const { typeId, validateApiKey } = args;
     let config = args.config;
     const providerType = getProviderType(typeId);
+    const localAgent =
+      PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]?.localAgent;
+    if (
+      localAgent &&
+      this.preferences.providerInstances.some(
+        (instance) => instance.typeId === typeId,
+      )
+    ) {
+      return {
+        success: false,
+        error: `${providerType.displayName} is already connected.`,
+      };
+    }
+    const localAvailability = localAgent
+      ? await this.getLocalAgentAvailability(typeId as ProviderInstanceTypeId)
+      : undefined;
+    if (localAvailability && !localAvailability.installed) {
+      return {
+        success: false,
+        error:
+          localAvailability.error ??
+          `${providerType.displayName} is not installed.`,
+      };
+    }
 
     if (typeId === 'coding-plan') {
       const plan = CODING_PLANS[config.planId as CodingPlanId];
@@ -1972,26 +2016,42 @@ export class PreferencesService extends DisposableService {
     }
 
     const instanceId = `${typeId}-${crypto.randomUUID()}`;
-    const defaultName = typeId.endsWith('-api')
-      ? (PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]
-          ?.displayName ?? typeId)
-      : typeId === 'coding-plan'
+    const defaultName =
+      typeId === 'coding-plan'
         ? (CODING_PLANS[finalConfig.planId as CodingPlanId]?.displayName ??
           'Coding Plan')
-        : typeId;
+        : (PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]
+            ?.displayName ?? typeId);
     const name =
       args.name ?? this.getAvailableProviderInstanceName(defaultName);
 
     // ── Model discovery ───────────────────────────────────────────────────────
-    const modelDiscovery = providerType
-      .getInitialModels?.(finalConfig as never, sensitiveValues)
-      .catch((err) => {
+    let discovered: DiscoveredModel[] = [];
+    if (providerType.getInitialModels) {
+      try {
+        discovered = await providerType.getInitialModels(
+          finalConfig as never,
+          sensitiveValues,
+        );
+      } catch (err) {
         this.logger.warn(
           `[PreferencesService] Model discovery failed for ${typeId}: ${String(err)}`,
         );
-        return [];
-      });
-    const imageModelDiscovery = providerType
+        if (localAgent) {
+          const displayName =
+            PROVIDER_TYPE_DISPLAY_INFO[typeId as ProviderInstanceTypeId]
+              ?.displayName ?? typeId;
+          return {
+            success: false,
+            error:
+              err instanceof Error
+                ? err.message
+                : `Could not connect to ${displayName}.`,
+          };
+        }
+      }
+    }
+    const discoveredImages = await providerType
       .getInitialImageModels?.(finalConfig as never, sensitiveValues)
       .catch((err) => {
         this.logger.warn(
@@ -1999,10 +2059,6 @@ export class PreferencesService extends DisposableService {
         );
         return undefined;
       });
-    const [discovered = [], discoveredImages] = await Promise.all([
-      modelDiscovery,
-      imageModelDiscovery,
-    ]);
 
     // Auto-disable non-flagship discovered models so the chat model
     // selector stays clean. Flagship models + catalog models stay enabled.
@@ -2024,21 +2080,74 @@ export class PreferencesService extends DisposableService {
       discoveredModels: discovered,
       imageModels: discoveredImages,
       enabledImageModelIds: [] as string[],
-    };
+    } as ProviderInstance;
 
-    const patches: Patch[] = [
-      {
-        op: 'add',
-        path: ['providerInstances', this.preferences.providerInstances.length],
-        value: instance,
-      },
-    ];
-    await this.update(patches);
+    const added = await this.addProviderInstanceRecord(instance, !!localAgent);
+    if (!added) {
+      return {
+        success: false,
+        error: `${providerType.displayName} is already connected.`,
+      };
+    }
 
     this.logger.debug(
       `[PreferencesService] Added provider instance: ${instanceId} (${discovered.length} models discovered)`,
     );
     return { success: true, instanceId, discoveredModels: discovered };
+  }
+
+  private async addProviderInstanceRecord(
+    instance: ProviderInstance,
+    singleton: boolean,
+  ): Promise<boolean> {
+    return this.enqueuePreferenceWrite(async () => {
+      if (
+        singleton &&
+        this.preferences.providerInstances.some(
+          (candidate) => candidate.typeId === instance.typeId,
+        )
+      ) {
+        return false;
+      }
+      await this.replacePreferences({
+        ...this.preferences,
+        providerInstances: [...this.preferences.providerInstances, instance],
+      });
+      return true;
+    });
+  }
+
+  public async getLocalAgentAvailability(
+    typeId: ProviderInstanceTypeId,
+  ): Promise<{ installed: boolean; error?: string }> {
+    const executable =
+      PROVIDER_TYPE_DISPLAY_INFO[typeId].localAgent?.executable;
+    if (!executable) return { installed: true };
+    const shellEnv = (await resolveAcpEnvironment()) ?? {};
+    const env = { ...process.env, ...shellEnv };
+    try {
+      const adapter = adapterForProviderType(typeId);
+      if (adapter) await prepareAcpProcess(adapter, env, 'smart');
+      else if (!(await resolveAgentExecutable(executable, env))) {
+        throw new Error(
+          `${PROVIDER_TYPE_DISPLAY_INFO[typeId].displayName} is not installed.`,
+        );
+      }
+      return { installed: true };
+    } catch (error) {
+      return {
+        installed: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  public async getProviderUsageLimits(instanceId: string) {
+    const instance = this.preferences.providerInstances.find(
+      (candidate) => candidate.id === instanceId,
+    );
+    if (!instance) throw new Error(`Provider instance ${instanceId} not found`);
+    return (await getProviderType(instance.typeId).getUsageLimits?.()) ?? [];
   }
 
   /**
@@ -2549,6 +2658,9 @@ export class PreferencesService extends DisposableService {
       );
       this.uiKarton.removeServerProcedureHandler(
         'preferences.addProviderInstance',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.getLocalAgentAvailability',
       );
       this.uiKarton.removeServerProcedureHandler(
         'preferences.removeProviderInstance',

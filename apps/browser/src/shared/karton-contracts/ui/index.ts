@@ -45,6 +45,7 @@ import type {
   DiscoveredModel,
   DiscoveredImageModel,
   ProviderInstanceTypeId,
+  ProviderUsageLimits,
 } from './shared-types';
 import {
   defaultUserPreferences,
@@ -2208,6 +2209,12 @@ export type KartonContract = {
           }
         | { success: false; error: string }
       >;
+      getLocalAgentAvailability: (
+        typeId: ProviderInstanceTypeId,
+      ) => Promise<{ installed: boolean; error?: string }>;
+      getProviderUsageLimits: (
+        instanceId: string,
+      ) => Promise<ProviderUsageLimits>;
       /** Remove a provider instance by id */
       removeProviderInstance: (instanceId: string) => Promise<void>;
       /**

@@ -52,6 +52,10 @@ import { createBrowserAgentTypeRegistry } from './agents/agents-registry';
 import { CredentialsService } from './services/credentials';
 import type { CredentialTypeId } from '@shared/credential-types';
 import { ModelProviderService } from './agents/model-provider';
+import { AcpAgentRuntime } from './agents/acp/runtime';
+import { resolveAcpEnvironment } from './agents/acp/adapter';
+import { resolveModelThinkingOverride } from '@shared/provider-instance-helpers';
+import { classifyShellCommand } from './services/toolbox/tools/shell/smart-approval';
 import { wirePagesStateSync } from './wiring/pages-state-sync';
 import {
   ensureDataDirectories,
@@ -281,6 +285,7 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
       utilityModels: agent.utilityModels,
       activePresetId: agent.activePresetId,
       modelPresets: agent.modelPresets ?? [],
+      providerInstances: agent.providerInstances,
     };
   });
   const agentCoreHost = createBrowserAgentHost({
@@ -588,6 +593,47 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     authService,
     preferencesService,
   );
+
+  // External agent harnesses use ACP. The native Stagewise agent stays on its
+  // existing direct path; this runtime only handles ACP provider instances.
+  const stagewiseMcpScriptPath = path.join(
+    app.isPackaged ? process.resourcesPath! : app.getAppPath(),
+    'bundled/acp',
+    'stagewise-mcp-server.mjs',
+  );
+  agentCoreHost.externalAgentRuntimeFactory = (context) =>
+    new AcpAgentRuntime(
+      context,
+      logger,
+      (providerInstanceId) =>
+        preferencesService
+          .get()
+          .providerInstances.find(
+            (instance) => instance.id === providerInstanceId,
+          )?.typeId,
+      (selection) =>
+        resolveModelThinkingOverride(
+          preferencesService.get(),
+          selection.providerInstanceId,
+          selection.modelId,
+        ),
+      agentCoreHost.paths.agentDir(context.instanceId),
+      resolveAcpEnvironment,
+      stagewiseMcpScriptPath,
+      (input) =>
+        classifyShellCommand(
+          { ...input, shellTail: '' },
+          modelProviderService,
+          context.instanceId,
+          telemetryService,
+        ),
+      (toolCallId, explanation) =>
+        agentCoreSeam.hostAgentStateMutations.recordPendingApproval(
+          context.instanceId,
+          toolCallId,
+          explanation,
+        ),
+    );
 
   // Wire the model-provider into the toolbox so the shell tool can run the
   // smart-approval classifier on demand. Done here because

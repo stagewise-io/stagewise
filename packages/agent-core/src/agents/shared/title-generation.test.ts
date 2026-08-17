@@ -229,6 +229,34 @@ describe('generateSimpleTitle', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(3);
   });
 
+  it('skips preset entries that cannot serve utility calls', async () => {
+    generateTextMock.mockResolvedValueOnce({ text: 'Internal Title' } as any);
+    const hm = makeMockHostModelsWithPreset([
+      { modelId: 'external', providerInstanceId: 'external-agent' },
+      { modelId: 'internal', providerInstanceId: 'stagewise-agent' },
+    ]);
+    hm.getUtilityModelEntries = vi.fn(() => []);
+    hm.supportsUtilityCalls = vi.fn(
+      (entry) => entry.providerInstanceId !== 'external-agent',
+    );
+
+    await expect(
+      generateSimpleTitle(
+        makeMessages(2),
+        hm,
+        'agent-1',
+        'external',
+        'external-agent',
+      ),
+    ).resolves.toBe('Internal Title');
+    expect(hm.getWithOptions).toHaveBeenCalledOnce();
+    expect(hm.getWithOptions).toHaveBeenCalledWith(
+      'internal',
+      'agent-1',
+      expect.objectContaining({ $provider_instance_id: 'stagewise-agent' }),
+    );
+  });
+
   it('falls back when getWithOptions throws for a model', async () => {
     const hm = makeMockHostModels();
     const getMock = vi.mocked(hm.getWithOptions);

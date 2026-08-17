@@ -9,8 +9,10 @@ import {
   getInstanceModelCount,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
+  getSelectableUtilityModelEntries,
   getVendorInstanceId,
   getVendorMode,
+  resolveModelThinkingOverride,
   vendorHasApiKey,
 } from './provider-instance-helpers';
 import { getSupportedThinkingOptions } from './model-thinking-capabilities';
@@ -50,6 +52,16 @@ const ollamaInstance: ProviderInstance = {
   discoveredModels: [],
 };
 
+const codexStagewiseInstance: ProviderInstance = {
+  id: 'codex-stagewise-default',
+  typeId: 'codex-stagewise',
+  name: 'Codex (Stagewise)',
+  config: {},
+  enabledModelIds: [],
+  disabledModelIds: [],
+  discoveredModels: [],
+};
+
 describe('getInstanceThinkingDefaultOptions', () => {
   it('uses the OpenAI-compatible official route for OpenRouter', () => {
     expect(getInstanceThinkingDefaultOptions(openrouterInstance)).toEqual({
@@ -82,6 +94,41 @@ describe('getInstanceThinkingDefaultOptions', () => {
       ),
     ).toEqual(['low', 'medium', 'high']);
   });
+
+  it('uses native OpenAI thinking options for Codex models', () => {
+    expect(getInstanceThinkingDefaultOptions(codexStagewiseInstance)).toEqual({
+      providerMode: 'official',
+      modelProvider: 'openai',
+    });
+  });
+});
+
+describe('resolveModelThinkingOverride', () => {
+  it('keeps overrides isolated to their provider instance', () => {
+    const preferences = createPreferences();
+    preferences.agent.modelThinkingOverrides = {
+      'stagewise-default': {
+        shared: { enabled: true, value: 'high' },
+      },
+    };
+    preferences.providerInstances = [
+      {
+        ...codexStagewiseInstance,
+        id: 'external-instance',
+        discoveredModels: [
+          {
+            modelId: 'shared',
+            displayName: 'Shared',
+            defaultThinkingEffort: 'medium',
+          },
+        ],
+      },
+    ];
+
+    expect(
+      resolveModelThinkingOverride(preferences, 'external-instance', 'shared'),
+    ).toEqual({ enabled: true, value: 'medium' });
+  });
 });
 
 function createPreferences() {
@@ -101,6 +148,36 @@ function createVendorApiInstance(): ProviderInstance {
 }
 
 describe('discovered model catalog matching', () => {
+  it('excludes external agent models from utility selectors', () => {
+    const external: ProviderInstance = {
+      id: 'codex-default',
+      typeId: 'codex',
+      name: 'Codex',
+      config: {},
+      enabledModelIds: [],
+      disabledModelIds: [],
+      discoveredModels: [{ modelId: 'gpt', displayName: 'GPT' }],
+    };
+
+    const entries = getSelectableUtilityModelEntries({
+      providerInstances: [
+        external,
+        {
+          ...codexStagewiseInstance,
+          discoveredModels: [{ modelId: 'gpt', displayName: 'GPT' }],
+        },
+      ],
+      customModels: [],
+    });
+
+    expect(entries.some((entry) => entry.instanceId === external.id)).toBe(
+      false,
+    );
+    expect(
+      entries.some((entry) => entry.instanceId === codexStagewiseInstance.id),
+    ).toBe(true);
+  });
+
   it('deduplicates native Anthropic discovery IDs against dotted catalog IDs', () => {
     const prefs = { providerInstances: [anthropicInstance], customModels: [] };
 

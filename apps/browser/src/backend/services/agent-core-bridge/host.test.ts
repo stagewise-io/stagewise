@@ -247,6 +247,68 @@ describe('createBrowserHostModels', () => {
       message: 'string-failure',
     });
   });
+
+  it('excludes external agent models from utility model chains', () => {
+    const mp = { modelExists: vi.fn(), getModelWithOptions: vi.fn() };
+    const models = createBrowserHostModels(
+      mp as unknown as ModelProviderService,
+      () =>
+        ({
+          utilityModels: {
+            titleGeneration: [
+              { modelId: 'agent', providerInstanceId: 'codex-1' },
+              { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+            ],
+            contextCompression: [],
+          },
+          activePresetId: undefined,
+          modelPresets: [],
+          providerInstances: [
+            { id: 'codex-1', typeId: 'codex' },
+            { id: 'stagewise-1', typeId: 'stagewise' },
+          ],
+        }) as never,
+    );
+
+    expect(models.getUtilityModelEntries?.('title-generation')).toEqual([
+      { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+    ]);
+  });
+
+  it('uses global utilities for an external-only active preset', () => {
+    const mp = { modelExists: vi.fn(), getModelWithOptions: vi.fn() };
+    const models = createBrowserHostModels(
+      mp as unknown as ModelProviderService,
+      () =>
+        ({
+          utilityModels: {
+            titleGeneration: [
+              { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+            ],
+            contextCompression: [],
+          },
+          activePresetId: 'external-preset',
+          modelPresets: [
+            {
+              id: 'external-preset',
+              name: 'External',
+              models: [{ modelId: 'agent', providerInstanceId: 'codex-1' }],
+            },
+          ],
+          providerInstances: [
+            { id: 'codex-1', typeId: 'codex' },
+            { id: 'stagewise-1', typeId: 'stagewise' },
+          ],
+        }) as never,
+    );
+
+    expect(models.getActivePresetModels?.()).toEqual([
+      { modelId: 'agent', providerInstanceId: 'codex-1' },
+    ]);
+    expect(models.getUtilityModelEntries?.('title-generation')).toEqual([
+      { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+    ]);
+  });
 });
 
 describe('createLazyBrowserHostModels', () => {
