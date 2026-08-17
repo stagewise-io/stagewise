@@ -21,7 +21,7 @@
     "@radix-ui/react-navigation-menu": "^1.2.12",
     "@stagewise/stage-ui": "workspace:*",
     "@stagewise/tailwindcss-color-modifiers": "workspace:*",
-    "@tailwindcss/typography": "^0.5.19",
+    "@tailwindcss/typography": "^0.5.20",
     "better-auth": "^1.6.10",
     "framer-motion": "^12.38.0",
     "geist": "1.7.2",
