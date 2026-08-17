@@ -315,11 +315,13 @@ const WorkspaceFileClickWrapper = ({
   filePath,
   lineNumber,
   incomplete,
+  expanded = false,
   children,
 }: {
   filePath: string;
   lineNumber?: string;
   incomplete?: boolean;
+  expanded?: boolean;
   children: ReactNode;
 }) => {
   const [openAgent] = useOpenAgent();
@@ -371,7 +373,11 @@ const WorkspaceFileClickWrapper = ({
       <TooltipTrigger
         render={
           <span
-            className={cn('inline cursor-pointer', incomplete && 'opacity-70')}
+            className={cn(
+              expanded ? 'my-2 block w-fit max-w-full' : 'inline',
+              'cursor-pointer',
+              incomplete && 'opacity-70',
+            )}
             onClick={handleClick}
             role="link"
             aria-label={`Open ${displayPathWithLine}`}
@@ -404,13 +410,17 @@ const WorkspaceFileClickWrapper = ({
  * Attachment blobs open as read-only tabs; the backend resolves the per-agent
  * blob directory, so only the agent id and blob id are required here.
  */
-const AttachmentFileClickWrapper = ({
+export const AttachmentFileClickWrapper = ({
   attachmentId,
   displayName,
+  expanded = false,
+  className,
   children,
 }: {
   attachmentId: string;
   displayName?: string;
+  expanded?: boolean;
+  className?: string;
   children: ReactNode;
 }) => {
   const [openAgent] = useOpenAgent();
@@ -428,7 +438,11 @@ const AttachmentFileClickWrapper = ({
       <TooltipTrigger
         render={
           <span
-            className="inline cursor-pointer"
+            className={cn(
+              expanded ? 'my-2 block w-fit max-w-full' : 'inline',
+              'cursor-pointer',
+              className,
+            )}
             onClick={handleClick}
             role="link"
             aria-label={`Open ${displayName ?? attachmentId}`}
@@ -560,14 +574,18 @@ const PathFileRendererLink = ({
   // Workspace files get IDE-opening click + context menu + tooltip.
   if (!isAtt) {
     return (
-      <WorkspaceFileClickWrapper filePath={path}>
+      <WorkspaceFileClickWrapper filePath={path} expanded={isExpanded}>
         {content}
       </WorkspaceFileClickWrapper>
     );
   }
 
   return (
-    <AttachmentFileClickWrapper attachmentId={id} displayName={displayFileName}>
+    <AttachmentFileClickWrapper
+      attachmentId={id}
+      displayName={displayFileName}
+      expanded={isExpanded}
+    >
       {content}
     </AttachmentFileClickWrapper>
   );

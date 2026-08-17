@@ -13,6 +13,7 @@ import type {
   MountEntry,
   WorkspaceGitSummary,
 } from '@stagewise/agent-core/types/metadata';
+import type { ImageGenerationOverrides } from '@stagewise/agent-core/types/agent';
 import type { ReactSelectedElementInfo } from '../../selected-elements/react';
 import type { ApiClient } from '@stagewise/api-client';
 import type { SelectedElement } from '../../selected-elements';
@@ -42,6 +43,7 @@ import type {
   ToolApprovalMode,
   SocialAuthProvider,
   DiscoveredModel,
+  DiscoveredImageModel,
   ProviderInstanceTypeId,
   ProviderUsageLimits,
 } from './shared-types';
@@ -1426,6 +1428,10 @@ export type KartonContract = {
         modelId: ModelId,
         providerInstanceId?: string,
       ) => Promise<void>;
+      setImageGenerationOverrides: (
+        agentId: string,
+        overrides: ImageGenerationOverrides | undefined,
+      ) => Promise<void>;
       setTitle: (agentId: string, title: string) => Promise<void>;
       storeAttachment: (
         agentId: string,
@@ -2248,8 +2254,18 @@ export type KartonContract = {
         instanceId: string,
         enabledModelIds: string[],
       ) => Promise<void>;
+      /** Enable or disable one discovered image model atomically. */
+      setInstanceImageModelEnabled: (
+        instanceId: string,
+        modelId: string,
+        enabled: boolean,
+      ) => Promise<void>;
       /** Re-discover models for a provider instance. Returns the updated list. */
       refreshInstanceModels: (instanceId: string) => Promise<DiscoveredModel[]>;
+      /** Re-discover only image models for a provider instance. */
+      refreshInstanceImageModels: (
+        instanceId: string,
+      ) => Promise<DiscoveredImageModel[]>;
     };
     devToolbar: {
       /** Update the global widget order */

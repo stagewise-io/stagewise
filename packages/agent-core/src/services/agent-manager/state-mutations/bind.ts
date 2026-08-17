@@ -26,6 +26,7 @@ import {
   recordUsage,
   setActiveModel,
   setInputState,
+  setImageGenerationOverrides,
   setIsWorkingFalse,
   setTitle,
   setUsageWarning,
@@ -72,6 +73,9 @@ export function bindStateMutations(store: AgentStore, agentInstanceId: string) {
       setInputState(store, agentInstanceId, args),
     setActiveModel: (args: Parameters<typeof setActiveModel>[2]) =>
       setActiveModel(store, agentInstanceId, args),
+    setImageGenerationOverrides: (
+      args: Parameters<typeof setImageGenerationOverrides>[2],
+    ) => setImageGenerationOverrides(store, agentInstanceId, args),
     setIsWorkingFalse: () => setIsWorkingFalse(store, agentInstanceId),
     setUsageWarning: (args: Parameters<typeof setUsageWarning>[2]) =>
       setUsageWarning(store, agentInstanceId, args),

@@ -71,7 +71,9 @@ function createWorkingAgent() {
     get: () => stateValue,
     commands: {
       enqueueUserMessage,
-      setIsWorkingFalse: vi.fn(),
+      setIsWorkingFalse: vi.fn(() => {
+        stateValue.isWorking = false;
+      }),
     },
   };
   agent.host = {
@@ -202,5 +204,42 @@ describe('BaseAgent.sendUserMessage', () => {
 
     expect(agent.internalStop).toHaveBeenCalledWith('system-interrupted');
     expect(agent.runStep).toHaveBeenCalledWith(false, true);
+  });
+
+  it('starts a message queued while stopping', async () => {
+    const { agent, enqueueUserMessage } = createWorkingAgent();
+    let finishStop = () => {};
+    const pendingStop = new Promise<void>((resolve) => {
+      finishStop = resolve;
+    });
+    agent.internalStop = vi.fn(() => pendingStop);
+    agent.runStep = vi.fn();
+
+    const stopping = agent.stop();
+    await agent.sendUserMessage(userMessage('message-during-stop'));
+    finishStop();
+    await stopping;
+
+    expect(enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(agent.runStep).toHaveBeenCalledOnce();
+  });
+});
+
+describe('BaseAgent attachment lifecycle', () => {
+  it('claims completed attachments before persisting the step', async () => {
+    const attachment = { path: 'att/generated-image.png' };
+    const agent = createTestAgent();
+    agent.updateUsageWarning = vi.fn();
+    agent.toolbox = { drainPendingAttachments: () => [attachment] };
+    agent.saveState = vi.fn().mockRejectedValue(new Error('stop'));
+    agent.state.commands.recordUsage = vi.fn();
+    agent.state.commands.attachAttachmentsToLastAssistant = vi.fn();
+
+    await expect(
+      agent.handlePostStep({ usage: { totalTokens: 0 } }),
+    ).rejects.toThrow('stop');
+    expect(
+      agent.state.commands.attachAttachmentsToLastAssistant,
+    ).toHaveBeenCalledWith({ attachments: [attachment] });
   });
 });

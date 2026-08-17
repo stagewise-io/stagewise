@@ -84,6 +84,8 @@ export function createUniversalToolbox(
       return [];
     },
 
+    async discardPendingAttachments(_agentInstanceId: string): Promise<void> {},
+
     cancelPendingAgentDialogs(_agentInstanceId: string): void {},
 
     async requestUserQuestions(

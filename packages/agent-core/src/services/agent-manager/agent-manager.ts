@@ -25,6 +25,7 @@ import {
   type AgentHistoryEntry,
   type AgentMessage,
   type AgentState,
+  type ImageGenerationOverrides,
   AgentTypes,
 } from '../../types/agent';
 import {
@@ -689,6 +690,19 @@ export class AgentManager extends DisposableService {
       },
     );
     this.wrapAgentRpc(
+      'agents.setImageGenerationOverrides',
+      async (
+        instanceId: string,
+        overrides: ImageGenerationOverrides | undefined,
+      ) => {
+        const agent = this.activeAgents.get(instanceId);
+        if (!agent) {
+          throw new Error(`Agent with instance id ${instanceId} not found`);
+        }
+        await agent.updateImageGenerationOverrides(overrides);
+      },
+    );
+    this.wrapAgentRpc(
       'agents.setTitle',
       async (instanceId: string, title: string) => {
         const trimmed = title.trim();
@@ -1312,6 +1326,7 @@ export class AgentManager extends DisposableService {
         activeProviderInstanceId: resumedModelValid
           ? (agent.activeProviderInstanceId ?? undefined)
           : undefined,
+        imageGenerationOverrides: agent.imageGenerationOverrides ?? undefined,
         toolApprovalMode: agent.toolApprovalMode ?? DEFAULT_TOOL_APPROVAL_MODE,
         inputState: agent.inputState,
         usedTokens: agent.usedTokens,
@@ -1376,6 +1391,7 @@ export class AgentManager extends DisposableService {
         titleLockedByUser: agentState.titleLockedByUser,
         activeModelId: agentState.activeModelId,
         activeProviderInstanceId: agentState.activeProviderInstanceId,
+        imageGenerationOverrides: agentState.imageGenerationOverrides ?? null,
         toolApprovalMode: agentState.toolApprovalMode as ToolApprovalMode,
         createdAt:
           (firstHistoryEntry?.metadata as UserMessageMetadata | undefined)
@@ -1451,6 +1467,7 @@ export class AgentManager extends DisposableService {
         history: sourceEnvelope.state.history.slice(),
         activeModelId: sourceEnvelope.state.activeModelId,
         activeProviderInstanceId: sourceEnvelope.state.activeProviderInstanceId,
+        imageGenerationOverrides: sourceEnvelope.state.imageGenerationOverrides,
         toolApprovalMode: sourceEnvelope.state.toolApprovalMode,
         usedTokens: sourceEnvelope.state.usedTokens,
       },

@@ -45,7 +45,11 @@ import {
 } from '@shared/model-thinking-capabilities';
 
 // ── Provider type registry ──────────────────────────────────────────────────
-import type { ProviderType } from './providers/types';
+import type {
+  ProviderImageGenerationRequest,
+  ProviderImageGenerationResult,
+  ProviderType,
+} from './providers/types';
 import { getProviderType, getProviderTypeByVendor } from './providers/registry';
 import { stagewiseProviderType } from './providers/stagewise';
 import {
@@ -499,6 +503,41 @@ export class ModelProviderService {
       this.report(error as Error, 'getModelWithOptions', {
         modelId,
         providerInstanceId,
+      });
+      throw error;
+    }
+  }
+
+  public async generateImage(
+    providerInstanceId: string,
+    modelId: string,
+    request: ProviderImageGenerationRequest,
+  ): Promise<ProviderImageGenerationResult> {
+    try {
+      const resolved = this.resolveInstanceById(providerInstanceId, undefined);
+      if (!resolved.type.generateImage) {
+        throw new Error(
+          `Provider ${resolved.type.displayName} does not support image generation`,
+        );
+      }
+      const config = resolved.instance?.config ?? {};
+      const modelIdMapping = (config as Record<string, unknown>)
+        .modelIdMapping as Record<string, string> | undefined;
+      return await resolved.type.generateImage({
+        modelId: modelIdMapping?.[modelId] ?? modelId,
+        apiKey: resolved.apiKey,
+        baseURL: resolved.baseURL,
+        config,
+        decryptedConfig: resolved.decryptedConfig,
+        request,
+      });
+    } catch (error) {
+      const providerError = error instanceof Error ? error : undefined;
+      this.report(new Error('Image generation failed'), 'generateImage', {
+        providerInstanceId,
+        modelId,
+        providerErrorName: providerError?.name,
+        providerStatus: providerError?.message.match(/\((\d{3})\)/)?.[1],
       });
       throw error;
     }

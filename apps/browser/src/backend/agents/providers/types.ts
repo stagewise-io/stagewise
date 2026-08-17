@@ -1,7 +1,9 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider';
+import type { ImageGenerationSettings } from '@stagewise/agent-core/types/agent';
 import type { LanguageModelMiddleware } from 'ai';
 import type {
   ApiSpec,
+  DiscoveredImageModel,
   DiscoveredModel,
   ModelProvider,
   ProviderEndpointMode,
@@ -18,6 +20,18 @@ export type ProviderCategory =
   | 'cloud'
   | 'custom-compatible'
   | 'self-hosted';
+
+export type ProviderImageGenerationRequest = ImageGenerationSettings & {
+  prompt: string;
+  seed?: number;
+  abortSignal?: AbortSignal;
+};
+
+export type ProviderImageGenerationResult = {
+  image: { base64: string; mediaType: string };
+};
+
+export const MAX_GENERATED_IMAGE_BYTES = 50 * 1024 * 1024;
 
 /**
  * Stateless definition of a provider type. One folder = one provider.
@@ -105,6 +119,11 @@ export interface ProviderType<C = Record<string, unknown>> {
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]>;
 
+  getInitialImageModels?(
+    config: C,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredImageModel[]>;
+
   /** Fetch current subscription usage when the provider exposes it. */
   getUsageLimits?(): Promise<ProviderUsageLimits>;
 
@@ -145,4 +164,13 @@ export interface ProviderType<C = Record<string, unknown>> {
     model: LanguageModelV3;
     middleware?: LanguageModelMiddleware[];
   };
+
+  generateImage?(args: {
+    modelId: string;
+    apiKey: string;
+    baseURL?: string;
+    config: C;
+    decryptedConfig: Record<string, string>;
+    request: ProviderImageGenerationRequest;
+  }): Promise<ProviderImageGenerationResult>;
 }

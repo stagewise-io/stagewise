@@ -82,6 +82,44 @@ describe('userPreferencesSchema sidebar defaults', () => {
   });
 });
 
+describe('userPreferencesSchema image generation defaults', () => {
+  it('preserves model-specific generation settings', () => {
+    const parsed = userPreferencesSchema.parse({
+      agent: {
+        utilityModels: {
+          imageGeneration: {
+            modelId: 'openai/gpt-5-image',
+            providerInstanceId: 'stagewise-default',
+            aspectRatio: '16:9',
+            quality: 'high',
+            outputFormat: 'png',
+          },
+        },
+      },
+    });
+
+    expect(parsed.agent.utilityModels.imageGeneration).toEqual({
+      modelId: 'openai/gpt-5-image',
+      providerInstanceId: 'stagewise-default',
+      aspectRatio: '16:9',
+      quality: 'high',
+      outputFormat: 'png',
+    });
+  });
+
+  it('rejects partial image model routes', () => {
+    const parsed = userPreferencesSchema.safeParse({
+      agent: {
+        utilityModels: {
+          imageGeneration: { modelId: 'openai/gpt-5-image' },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
 describe('providerConfigSchema connected coding plan defaults', () => {
   it('preserves legacy provider configs without connected coding plan ids', () => {
     const parsed = providerConfigSchema.parse({ mode: 'official' });

@@ -5,8 +5,8 @@ import { BrowserChatAgent } from './chat';
  * Smoke test for the browser-specific {@link BrowserChatAgent} subclass.
  *
  * Confirms that `getAdditionalTools` asks the toolbox for every browser
- * host tool (sandbox JS, shell, library docs, linting, console logs,
- * user questions) — i.e. the host-tool surface that was previously
+ * host tool (sandbox JS, shell, image generation, library docs, linting,
+ * console logs, user questions) — i.e. the host-tool surface that was previously
  * hardcoded into agent-core's `ChatAgent.getTools`.
  *
  * Like the core-side test, we bypass `BaseAgent`'s heavy constructor by
@@ -16,6 +16,7 @@ import { BrowserChatAgent } from './chat';
 
 const HOST_TOOL_IDS = [
   'executeSandboxJs',
+  'generateImage',
   'listLibraryDocs',
   'searchInLibraryDocs',
   'getLintingDiagnostics',

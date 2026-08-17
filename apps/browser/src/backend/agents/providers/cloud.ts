@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from '@ai-sdk/provider';
+import type { ImageModelV3, LanguageModelV3 } from '@ai-sdk/provider';
 import { createAzure } from '@ai-sdk/azure';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { fromIni, fromNodeProviderChain } from '@aws-sdk/credential-providers';
@@ -6,9 +6,83 @@ import { createVertex } from '@ai-sdk/google-vertex';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ApiSpec } from '@shared/karton-contracts/ui/shared-types';
+import type {
+  ApiSpec,
+  DiscoveredImageModel,
+} from '@shared/karton-contracts/ui/shared-types';
 import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
-import type { ProviderType } from './types';
+import { generateImage } from 'ai';
+import { GOOGLE_IMAGE_MODELS } from './google-image';
+import {
+  generateOpenAIImageWithModel,
+  OPENAI_IMAGE_MODELS,
+} from './openai-image';
+import type {
+  ProviderImageGenerationRequest,
+  ProviderImageGenerationResult,
+  ProviderType,
+} from './types';
+
+const BEDROCK_IMAGE_MODELS: readonly DiscoveredImageModel[] = [
+  {
+    modelId: 'amazon.nova-canvas-v1:0',
+    displayName: 'Amazon Nova Canvas',
+    description: "Amazon's image generation model for studio-quality assets.",
+    supportedParameters: {
+      aspect_ratio: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+      quality: ['standard', 'premium'],
+    },
+  },
+];
+
+const BEDROCK_SIZES: Record<string, `${number}x${number}`> = {
+  '1:1': '1024x1024',
+  '16:9': '1280x720',
+  '9:16': '720x1280',
+  '4:3': '1152x864',
+  '3:4': '864x1152',
+};
+
+const AZURE_IMAGE_MODELS: readonly DiscoveredImageModel[] =
+  OPENAI_IMAGE_MODELS.map((model) => ({
+    ...model,
+    supportedParameters: {
+      ...model.supportedParameters,
+      output_format: ['png', 'jpeg'],
+    },
+  }));
+
+async function generateCloudImage(
+  model: ImageModelV3,
+  request: ProviderImageGenerationRequest,
+  provider?: 'bedrock' | 'vertex',
+): Promise<ProviderImageGenerationResult> {
+  const useSize = provider === 'bedrock';
+  const result = await generateImage({
+    model,
+    prompt: request.prompt,
+    aspectRatio: useSize
+      ? undefined
+      : (request.aspectRatio as `${number}:${number}` | undefined),
+    size: useSize ? BEDROCK_SIZES[request.aspectRatio ?? ''] : undefined,
+    seed: request.seed,
+    abortSignal: request.abortSignal,
+    providerOptions:
+      provider === 'bedrock' && request.quality
+        ? { bedrock: { quality: request.quality } }
+        : provider === 'vertex' && request.resolution
+          ? {
+              vertex: {
+                imageConfig: {
+                  aspectRatio: request.aspectRatio,
+                  imageSize: request.resolution,
+                },
+              },
+            }
+          : undefined,
+  });
+  return { image: result.image };
+}
 
 // ============================================================================
 // Azure OpenAI
@@ -22,6 +96,20 @@ export type AzureConfig = {
   modelIdMapping?: Record<string, string>;
 };
 
+function buildAzureProvider(
+  config: AzureConfig,
+  apiKey: string,
+  baseURL?: string,
+  apiVersion = config.apiVersion,
+) {
+  return createAzure({
+    apiKey,
+    baseURL,
+    resourceName: config.resourceName,
+    apiVersion,
+  });
+}
+
 export const azureProviderType: ProviderType<AzureConfig> = {
   id: 'azure',
   ...PROVIDER_TYPE_DISPLAY_INFO.azure,
@@ -30,16 +118,25 @@ export const azureProviderType: ProviderType<AzureConfig> = {
   apiSpec: 'azure' satisfies ApiSpec,
   sensitiveFields: ['encryptedApiKey'],
 
+  async getInitialImageModels() {
+    return [...AZURE_IMAGE_MODELS];
+  },
+
   createLanguageModel({ modelId, apiKey, baseURL, config }): {
     model: LanguageModelV3;
   } {
-    const provider = createAzure({
+    const provider = buildAzureProvider(config, apiKey, baseURL);
+    return { model: provider(modelId as never) };
+  },
+
+  generateImage({ modelId, apiKey, baseURL, config, request }) {
+    const provider = buildAzureProvider(
+      config,
       apiKey,
       baseURL,
-      resourceName: config.resourceName,
-      apiVersion: config.apiVersion,
-    });
-    return { model: provider(modelId as never) };
+      config.apiVersion ?? 'preview',
+    );
+    return generateOpenAIImageWithModel(provider.image(modelId), request);
   },
 };
 
@@ -140,12 +237,25 @@ export const bedrockProviderType: ProviderType<BedrockConfig> = {
   sensitiveFields: ['encryptedApiKey', 'encryptedSecretKey'],
   stripStrictFromTools: true,
 
+  async getInitialImageModels() {
+    return [...BEDROCK_IMAGE_MODELS];
+  },
+
   createLanguageModel({ modelId, apiKey, decryptedConfig, config }): {
     model: LanguageModelV3;
   } {
     const decryptedSecretKey = decryptedConfig.encryptedSecretKey ?? '';
     const provider = buildBedrockProvider(config, apiKey, decryptedSecretKey);
     return { model: provider(modelId as never) };
+  },
+
+  generateImage({ modelId, apiKey, decryptedConfig, config, request }) {
+    const provider = buildBedrockProvider(
+      config,
+      apiKey,
+      decryptedConfig.encryptedSecretKey ?? '',
+    );
+    return generateCloudImage(provider.image(modelId), request, 'bedrock');
   },
 };
 
@@ -160,6 +270,37 @@ export type VertexConfig = {
   modelIdMapping?: Record<string, string>;
 };
 
+const GEMINI_25_FLASH_IMAGE_REGIONS = new Set([
+  'us-central1',
+  'us-east1',
+  'us-east4',
+  'us-east5',
+  'us-south1',
+  'us-west1',
+  'us-west4',
+  'europe-central2',
+  'europe-north1',
+  'europe-southwest1',
+  'europe-west1',
+  'europe-west4',
+  'europe-west8',
+]);
+
+function buildVertexProvider(
+  config: VertexConfig,
+  decryptedConfig: Record<string, string>,
+  defaultLocation = 'us-central1',
+) {
+  const decryptedCredentials = decryptedConfig.encryptedGoogleCredentials;
+  return createVertex({
+    project: config.projectId?.trim() || undefined,
+    location: config.location?.trim() || defaultLocation,
+    googleAuthOptions: decryptedCredentials
+      ? { credentials: JSON.parse(decryptedCredentials) }
+      : undefined,
+  });
+}
+
 export const vertexProviderType: ProviderType<VertexConfig> = {
   id: 'vertex',
   ...PROVIDER_TYPE_DISPLAY_INFO.vertex,
@@ -168,17 +309,25 @@ export const vertexProviderType: ProviderType<VertexConfig> = {
   apiSpec: 'google-vertex' satisfies ApiSpec,
   sensitiveFields: ['encryptedGoogleCredentials'],
 
+  async getInitialImageModels(config) {
+    const location = config.location?.trim();
+    if (!location || location === 'global') return [...GOOGLE_IMAGE_MODELS];
+    return GEMINI_25_FLASH_IMAGE_REGIONS.has(location)
+      ? GOOGLE_IMAGE_MODELS.filter(
+          ({ modelId }) => modelId === 'gemini-2.5-flash-image',
+        )
+      : [];
+  },
+
   createLanguageModel({ modelId, decryptedConfig, config }): {
     model: LanguageModelV3;
   } {
-    const decryptedCredentials = decryptedConfig.encryptedGoogleCredentials;
-    const provider = createVertex({
-      project: config.projectId?.trim() || undefined,
-      location: config.location ?? 'us-central1',
-      googleAuthOptions: decryptedCredentials
-        ? { credentials: JSON.parse(decryptedCredentials) }
-        : undefined,
-    });
+    const provider = buildVertexProvider(config, decryptedConfig);
     return { model: provider(modelId as never) };
+  },
+
+  generateImage({ modelId, decryptedConfig, config, request }) {
+    const provider = buildVertexProvider(config, decryptedConfig, 'global');
+    return generateCloudImage(provider.image(modelId), request, 'vertex');
   },
 };
