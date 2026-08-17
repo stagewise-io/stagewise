@@ -270,6 +270,22 @@ export type VertexConfig = {
   modelIdMapping?: Record<string, string>;
 };
 
+const GEMINI_25_FLASH_IMAGE_REGIONS = new Set([
+  'us-central1',
+  'us-east1',
+  'us-east4',
+  'us-east5',
+  'us-south1',
+  'us-west1',
+  'us-west4',
+  'europe-central2',
+  'europe-north1',
+  'europe-southwest1',
+  'europe-west1',
+  'europe-west4',
+  'europe-west8',
+]);
+
 function buildVertexProvider(
   config: VertexConfig,
   decryptedConfig: Record<string, string>,
@@ -293,8 +309,14 @@ export const vertexProviderType: ProviderType<VertexConfig> = {
   apiSpec: 'google-vertex' satisfies ApiSpec,
   sensitiveFields: ['encryptedGoogleCredentials'],
 
-  async getInitialImageModels() {
-    return [...GOOGLE_IMAGE_MODELS];
+  async getInitialImageModels(config) {
+    const location = config.location?.trim();
+    if (!location || location === 'global') return [...GOOGLE_IMAGE_MODELS];
+    return GEMINI_25_FLASH_IMAGE_REGIONS.has(location)
+      ? GOOGLE_IMAGE_MODELS.filter(
+          ({ modelId }) => modelId === 'gemini-2.5-flash-image',
+        )
+      : [];
   },
 
   createLanguageModel({ modelId, decryptedConfig, config }): {

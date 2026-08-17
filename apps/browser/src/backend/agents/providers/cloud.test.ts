@@ -148,6 +148,22 @@ describe('cloud providers', () => {
     );
   });
 
+  it('only exposes region-compatible Vertex image models', async () => {
+    const models = await vertexProviderType.getInitialImageModels?.(
+      { location: 'us-central1' },
+      {},
+    );
+    const unsupportedModels = await vertexProviderType.getInitialImageModels?.(
+      { location: 'asia-northeast1' },
+      {},
+    );
+
+    expect(models?.map(({ modelId }) => modelId)).toEqual([
+      'gemini-2.5-flash-image',
+    ]);
+    expect(unsupportedModels).toEqual([]);
+  });
+
   it('uses Azure image API defaults and supported output formats', async () => {
     const models = await azureProviderType.getInitialImageModels?.(
       { baseUrl: '' },
