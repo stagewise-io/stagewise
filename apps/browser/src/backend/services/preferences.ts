@@ -2118,10 +2118,21 @@ export class PreferencesService extends DisposableService {
     return (await getProviderType(instance.typeId).getUsageLimits?.()) ?? [];
   }
 
+  private findCodingPlanInstance(
+    planId: CodingPlanId,
+  ): ProviderInstance | undefined {
+    return this.preferences.providerInstances.find(
+      (instance) =>
+        instance.typeId === 'coding-plan' &&
+        (instance.config as { planId?: string }).planId === planId,
+    );
+  }
+
   /**
    * Report whether a coding plan's credential can be imported from a local
    * CLI auth file on this machine. Only plans declaring `localImport` are
-   * detectable; the credential itself never leaves the backend.
+   * detectable; the credential itself never leaves the backend, and a plan
+   * that is already connected is not offered again.
    */
   public async detectLocalSubscriptionImport(
     planId: CodingPlanId,
@@ -2129,6 +2140,7 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
     const localImport = CODING_PLANS[planId]?.localImport;
     if (!localImport) return { available: false };
+    if (this.findCodingPlanInstance(planId)) return { available: false };
     const apiKey = await getLocalOpenCodeApiKey(localImport.opencodeProviderId);
     return { available: !!apiKey };
   }
@@ -2150,6 +2162,12 @@ export class PreferencesService extends DisposableService {
       return {
         success: false,
         error: `Plan ${planId} does not support local import.`,
+      };
+    }
+    if (this.findCodingPlanInstance(planId)) {
+      return {
+        success: false,
+        error: `${plan.displayName} is already connected.`,
       };
     }
     const apiKey = await getLocalOpenCodeApiKey(
@@ -2623,6 +2641,12 @@ export class PreferencesService extends DisposableService {
       );
       this.uiKarton.removeServerProcedureHandler(
         'preferences.refreshInstanceModels',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.detectLocalSubscriptionImport',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.importDetectedCodingPlan',
       );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',

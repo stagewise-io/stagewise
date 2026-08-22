@@ -74,4 +74,14 @@ describe('getLocalOpenCodeApiKey', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('rejects an api credential whose key is not a string', async () => {
+    await expect(
+      getLocalOpenCodeApiKey('opencode-go', {
+        OPENCODE_AUTH_CONTENT: JSON.stringify({
+          'opencode-go': { type: 'api', key: { nested: true } },
+        }),
+      }),
+    ).resolves.toBeUndefined();
+  });
 });

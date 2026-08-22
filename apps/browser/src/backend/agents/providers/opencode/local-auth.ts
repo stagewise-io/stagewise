@@ -67,5 +67,8 @@ export async function getLocalOpenCodeApiKey(
     env ?? (await resolveEnvironment()),
   );
   const credential = credentials[providerId];
-  return credential?.type === 'api' ? credential.key : undefined;
+  // auth.json is user-controlled: a valid JSON file can hold a non-string key.
+  return credential?.type === 'api' && typeof credential.key === 'string'
+    ? credential.key
+    : undefined;
 }
