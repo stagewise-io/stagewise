@@ -18,7 +18,8 @@ export type ApiKeyProvider =
   | 'minimax'
   | 'xiaomi-mimo'
   | 'mistral'
-  | 'x-ai';
+  | 'x-ai'
+  | 'opencode';
 
 export type ApiKeyValidationResult =
   | null
@@ -134,6 +135,11 @@ const providerConfigs: Record<
       apiKey,
       baseURL: baseURL ?? 'https://api.x.ai/v1',
     }).chat('grok-3-mini'),
+  opencode: (apiKey, baseURL) =>
+    createOpenAI({
+      apiKey,
+      baseURL: baseURL ?? 'https://opencode.ai/zen/go/v1',
+    }).chat('mimo-v2.5'),
 };
 
 async function validateModel(model: ValidationModel): Promise<void> {
@@ -238,6 +244,7 @@ export async function validateApiKeys(
     'xiaomi-mimo': null,
     mistral: null,
     'x-ai': null,
+    opencode: null,
   };
 
   const promises: Promise<void>[] = [];
