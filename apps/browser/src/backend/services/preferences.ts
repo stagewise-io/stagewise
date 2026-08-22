@@ -38,7 +38,10 @@ import {
 } from '../utils/validate-api-keys';
 import { getProviderType } from '../agents/providers/registry';
 import { computeDisabledModelIdsAfterDiscovery } from '@shared/flagship-models';
-import { apiSpecToTypeId } from '@shared/provider-instance-helpers';
+import {
+  apiSpecToTypeId,
+  findCodingPlanInstance,
+} from '@shared/provider-instance-helpers';
 import {
   prepareAcpProcess,
   resolveAcpEnvironment,
@@ -997,6 +1000,18 @@ export class PreferencesService extends DisposableService {
       providerInstances: this.preferences.providerInstances,
     };
   }
+
+  private readonly pendingCodingPlanImports = new Map<
+    CodingPlanId,
+    Promise<
+      | {
+          success: true;
+          instanceId: string;
+          discoveredModels: DiscoveredModel[];
+        }
+      | { success: false; error: string }
+    >
+  >();
 
   private async enqueuePreferenceWrite<T>(
     operation: () => Promise<T>,
@@ -2118,16 +2133,6 @@ export class PreferencesService extends DisposableService {
     return (await getProviderType(instance.typeId).getUsageLimits?.()) ?? [];
   }
 
-  private findCodingPlanInstance(
-    planId: CodingPlanId,
-  ): ProviderInstance | undefined {
-    return this.preferences.providerInstances.find(
-      (instance) =>
-        instance.typeId === 'coding-plan' &&
-        (instance.config as { planId?: string }).planId === planId,
-    );
-  }
-
   /**
    * Report whether a coding plan's credential can be imported from a local
    * CLI auth file on this machine. Only plans declaring `localImport` are
@@ -2140,7 +2145,9 @@ export class PreferencesService extends DisposableService {
     this.assertNotDisposed();
     const localImport = CODING_PLANS[planId]?.localImport;
     if (!localImport) return { available: false };
-    if (this.findCodingPlanInstance(planId)) return { available: false };
+    if (findCodingPlanInstance(this.preferences, planId)) {
+      return { available: false };
+    }
     const apiKey = await getLocalOpenCodeApiKey(localImport.opencodeProviderId);
     return { available: !!apiKey };
   }
@@ -2157,6 +2164,24 @@ export class PreferencesService extends DisposableService {
     | { success: false; error: string }
   > {
     this.assertNotDisposed();
+    // The existence check below cannot share the preference write queue —
+    // addProviderInstance enqueues onto it — so concurrent imports of the
+    // same plan share one run instead of both passing the check.
+    const inFlight = this.pendingCodingPlanImports.get(planId);
+    if (inFlight) return inFlight;
+    const run = this.runDetectedCodingPlanImport(planId).finally(() => {
+      this.pendingCodingPlanImports.delete(planId);
+    });
+    this.pendingCodingPlanImports.set(planId, run);
+    return run;
+  }
+
+  private async runDetectedCodingPlanImport(
+    planId: CodingPlanId,
+  ): Promise<
+    | { success: true; instanceId: string; discoveredModels: DiscoveredModel[] }
+    | { success: false; error: string }
+  > {
     const plan = CODING_PLANS[planId];
     if (!plan?.localImport) {
       return {
@@ -2164,7 +2189,7 @@ export class PreferencesService extends DisposableService {
         error: `Plan ${planId} does not support local import.`,
       };
     }
-    if (this.findCodingPlanInstance(planId)) {
+    if (findCodingPlanInstance(this.preferences, planId)) {
       return {
         success: false,
         error: `${plan.displayName} is already connected.`,
