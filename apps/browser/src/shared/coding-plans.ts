@@ -48,6 +48,13 @@ export type CodingPlan = {
   fallbackModelIds?: string[];
   /** Featured provider-native model IDs for card copy. */
   featuredModelIds: string[];
+  /**
+   * Credential importable from the OpenCode CLI's local `auth.json`, keyed
+   * by the provider ID that file stores it under.
+   */
+  localImport?: {
+    opencodeProviderId: string;
+  };
 };
 
 export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
@@ -194,6 +201,7 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     validationModelId: 'mimo-v2.5',
     endpointHelpText:
       'Routed through the Go subscription endpoint at opencode.ai/zen/go/v1.',
+    localImport: { opencodeProviderId: 'opencode-go' },
     featuredModelIds: [
       'glm-5.2',
       'kimi-k3',

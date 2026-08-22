@@ -45,6 +45,7 @@ import {
   resolveAgentExecutable,
 } from '../agents/acp/adapter';
 import { adapterForProviderType } from '../agents/acp/adapter-registry';
+import { getLocalOpenCodeApiKey } from '../agents/providers/opencode/local-auth';
 
 // Enable Immer patches support
 enablePatches();
@@ -658,6 +659,20 @@ export class PreferencesService extends DisposableService {
         apiKey: string,
       ) => {
         return this.connectProvider(provider, apiKey);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.detectLocalSubscriptionImport',
+      async (_callingClientId: string, planId: CodingPlanId) => {
+        return this.detectLocalSubscriptionImport(planId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.importDetectedCodingPlan',
+      async (_callingClientId: string, planId: CodingPlanId) => {
+        return this.importDetectedCodingPlan(planId);
       },
     );
 
@@ -2101,6 +2116,56 @@ export class PreferencesService extends DisposableService {
     );
     if (!instance) throw new Error(`Provider instance ${instanceId} not found`);
     return (await getProviderType(instance.typeId).getUsageLimits?.()) ?? [];
+  }
+
+  /**
+   * Report whether a coding plan's credential can be imported from a local
+   * CLI auth file on this machine. Only plans declaring `localImport` are
+   * detectable; the credential itself never leaves the backend.
+   */
+  public async detectLocalSubscriptionImport(
+    planId: CodingPlanId,
+  ): Promise<{ available: boolean }> {
+    this.assertNotDisposed();
+    const localImport = CODING_PLANS[planId]?.localImport;
+    if (!localImport) return { available: false };
+    const apiKey = await getLocalOpenCodeApiKey(localImport.opencodeProviderId);
+    return { available: !!apiKey };
+  }
+
+  /**
+   * Import a locally detected subscription as a coding-plan provider
+   * instance. The key is read server-side and passed straight into
+   * `addProviderInstance`, so it never crosses the IPC boundary.
+   */
+  public async importDetectedCodingPlan(
+    planId: CodingPlanId,
+  ): Promise<
+    | { success: true; instanceId: string; discoveredModels: DiscoveredModel[] }
+    | { success: false; error: string }
+  > {
+    this.assertNotDisposed();
+    const plan = CODING_PLANS[planId];
+    if (!plan?.localImport) {
+      return {
+        success: false,
+        error: `Plan ${planId} does not support local import.`,
+      };
+    }
+    const apiKey = await getLocalOpenCodeApiKey(
+      plan.localImport.opencodeProviderId,
+    );
+    if (!apiKey) {
+      return {
+        success: false,
+        error: `No ${plan.displayName} subscription was found in the OpenCode CLI auth file.`,
+      };
+    }
+    return this.addProviderInstance({
+      typeId: 'coding-plan',
+      config: { planId },
+      validateApiKey: apiKey,
+    });
   }
 
   /**

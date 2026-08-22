@@ -2200,6 +2200,25 @@ export type KartonContract = {
       getLocalAgentAvailability: (
         typeId: ProviderInstanceTypeId,
       ) => Promise<{ installed: boolean; error?: string }>;
+      /**
+       * Report whether a coding plan's credential can be imported from a
+       * local CLI auth file on this machine.
+       */
+      detectLocalSubscriptionImport: (
+        planId: CodingPlanId,
+      ) => Promise<{ available: boolean }>;
+      /**
+       * Import a locally detected subscription as a coding-plan instance.
+       * The credential is resolved server-side and never sent to the UI.
+       */
+      importDetectedCodingPlan: (planId: CodingPlanId) => Promise<
+        | {
+            success: true;
+            instanceId: string;
+            discoveredModels: DiscoveredModel[];
+          }
+        | { success: false; error: string }
+      >;
       getProviderUsageLimits: (
         instanceId: string,
       ) => Promise<ProviderUsageLimits>;

@@ -43,9 +43,9 @@ describe('coding plan endpoint helpers', () => {
 describe('opencode-go plan', () => {
   const plan = CODING_PLANS['opencode-go'];
 
-  it('is registered', () => {
+  it('is registered and wired for local import', () => {
     expect(plan.id).toBe('opencode-go');
-    expect(plan.provider).toBe('opencode');
+    expect(plan.localImport?.opencodeProviderId).toBe('opencode-go');
   });
 
   it('routes through the Go subscription endpoint with a validation model', () => {
