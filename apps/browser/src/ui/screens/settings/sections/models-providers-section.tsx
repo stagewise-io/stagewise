@@ -593,6 +593,12 @@ function AddProviderGrid({
   const setProviderInstanceGoogleCredentials = useKartonProcedure(
     (p) => p.preferences.setProviderInstanceGoogleCredentials,
   );
+  const detectLocalSubscriptionImport = useKartonProcedure(
+    (p) => p.preferences.detectLocalSubscriptionImport,
+  );
+  const importDetectedCodingPlan = useKartonProcedure(
+    (p) => p.preferences.importDetectedCodingPlan,
+  );
   const preferences = useKartonState((s) => s.preferences);
   const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
   const [selected, setSelected] = useState<SelectionKey | null>(null);
@@ -605,6 +611,7 @@ function AddProviderGrid({
     useState<LocalAgentStatus | null>(null);
   const [localAgentError, setLocalAgentError] = useState<string | null>(null);
   const [availabilityCheck, setAvailabilityCheck] = useState(0);
+  const [localImportAvailable, setLocalImportAvailable] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus the search input when the dialog opens.
@@ -754,6 +761,49 @@ function AddProviderGrid({
     getLocalAgentAvailability,
     localAgent,
     selectedVendorType,
+  ]);
+
+  const supportsLocalImport = !!selectedPlan?.localImport;
+
+  useEffect(() => {
+    if (!selectedPlanId || !supportsLocalImport) {
+      setLocalImportAvailable(false);
+      return;
+    }
+    let cancelled = false;
+    void detectLocalSubscriptionImport(selectedPlanId)
+      .then(({ available }) => {
+        if (!cancelled) setLocalImportAvailable(available);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalImportAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detectLocalSubscriptionImport, selectedPlanId, supportsLocalImport]);
+
+  const handleImportDetectedPlan = useCallback(async () => {
+    if (!selectedPlanId || !supportsLocalImport) return;
+    setIsConnecting(true);
+    setError(null);
+    try {
+      const result = await importDetectedCodingPlan(selectedPlanId);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      onConnected(result.instanceId);
+    } catch {
+      setError('Import failed. Please try again.');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [
+    importDetectedCodingPlan,
+    onConnected,
+    selectedPlanId,
+    supportsLocalImport,
   ]);
 
   const handleBack = useCallback(() => {
@@ -961,6 +1011,26 @@ function AddProviderGrid({
               )}
 
               {error && <TruncatedErrorText text={error} />}
+
+              {supportsLocalImport && localImportAvailable && (
+                <div className="rounded-md border border-derived bg-surface-1 p-2 text-xs">
+                  <p className="text-foreground">
+                    {selectedPlan?.displayName} subscription detected in your
+                    OpenCode CLI on this machine.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isConnecting}
+                    onClick={() => void handleImportDetectedPlan()}
+                    className={cn(
+                      buttonVariants({ variant: 'link', size: 'xs' }),
+                      'mt-0.5 -ml-1',
+                    )}
+                  >
+                    Import subscription
+                  </button>
+                </div>
+              )}
 
               {localAgent && localAgentStatus === 'missing' && (
                 <div
