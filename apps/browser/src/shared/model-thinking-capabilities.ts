@@ -182,6 +182,7 @@ export function getThinkingProviderForRoute({
     case 'xiaomi-mimo':
     case 'mistral':
     case 'x-ai':
+    case 'opencode':
       return 'openai-compatible';
     default:
       // Unknown routes have no proven provider-native reasoning contract.
