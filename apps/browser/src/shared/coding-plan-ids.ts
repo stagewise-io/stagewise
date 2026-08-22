@@ -5,6 +5,7 @@ export const codingPlanIds = [
   'qwen-token-plan',
   'minimax-plan',
   'mimo-plan',
+  'opencode-go',
 ] as const;
 
 export type CodingPlanId = (typeof codingPlanIds)[number];

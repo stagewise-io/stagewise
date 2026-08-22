@@ -1646,13 +1646,7 @@ export type KartonContract = {
                   | 'coding-plan'
                   | 'unknown';
                 provider?: ModelProvider;
-                plan_id?:
-                  | 'glm-coding-plan'
-                  | 'kimi-plan'
-                  | 'qwen-plan'
-                  | 'qwen-token-plan'
-                  | 'minimax-plan'
-                  | 'mimo-plan';
+                plan_id?: CodingPlanId;
               };
               summary?: OnboardingCompletionSummary;
             },
