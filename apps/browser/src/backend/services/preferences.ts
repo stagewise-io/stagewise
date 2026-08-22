@@ -255,18 +255,11 @@ export class PreferencesService extends DisposableService {
   ): Promise<void> {
     if (this.preferences.providerInstances.length > 0) return;
 
-    const VENDORS: ModelProvider[] = [
-      'anthropic',
-      'openai',
-      'google',
-      'moonshotai',
-      'alibaba',
-      'deepseek',
-      'z-ai',
-      'minimax',
-      'xiaomi-mimo',
-      'mistral',
-    ];
+    // Every vendor with a providerConfig must be listed, or its legacy
+    // config is skipped here and `migrateLegacyCodingPlansToProviderInstances`
+    // has to repair it with a second write. Derive from the schema so adding
+    // a vendor cannot reintroduce that gap.
+    const VENDORS: ModelProvider[] = [...modelProviderSchema.options];
     const BUILT_IN_VENDOR_NAMES = new Set<string>(VENDORS);
 
     const instances: ProviderInstance[] = [];
