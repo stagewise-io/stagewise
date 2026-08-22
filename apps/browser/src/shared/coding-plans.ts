@@ -48,6 +48,13 @@ export type CodingPlan = {
   fallbackModelIds?: string[];
   /** Featured provider-native model IDs for card copy. */
   featuredModelIds: string[];
+  /**
+   * Credential importable from the OpenCode CLI's local `auth.json`, keyed
+   * by the provider ID that file stores it under.
+   */
+  localImport?: {
+    opencodeProviderId: string;
+  };
 };
 
 export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
@@ -178,6 +185,30 @@ export const CODING_PLANS: Record<CodingPlanId, CodingPlan> = {
     endpointHelpText:
       'MiMo Token Plan keys (tp-xxxxx) are routed through https://token-plan-cn.xiaomimimo.com/v1. Singapore and Europe clusters are also available (token-plan-sgp / token-plan-ams).',
     featuredModelIds: ['mimo-v2.5-pro', 'mimo-v2.5'],
+  },
+  'opencode-go': {
+    id: 'opencode-go',
+    provider: 'opencode',
+    displayName: 'OpenCode Go',
+    tagline:
+      'GLM, Kimi K3, DeepSeek V4 and more via the OpenCode Go subscription',
+    subscribeUrl: 'https://opencode.ai/go',
+    apiKeyUrl: 'https://opencode.ai/auth',
+    helpText:
+      'Subscribe to OpenCode Go and copy your key at opencode.ai → Auth',
+    baseUrl: 'https://opencode.ai/zen/go/v1',
+    validationBaseUrl: 'https://opencode.ai/zen/go/v1',
+    validationModelId: 'mimo-v2.5',
+    endpointHelpText:
+      'Routed through the Go subscription endpoint at opencode.ai/zen/go/v1.',
+    localImport: { opencodeProviderId: 'opencode-go' },
+    featuredModelIds: [
+      'glm-5.2',
+      'kimi-k3',
+      'deepseek-v4-pro',
+      'qwen3.7-plus',
+      'minimax-m3',
+    ],
   },
 };
 

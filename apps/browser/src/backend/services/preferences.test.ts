@@ -41,6 +41,12 @@ const validationMock = vi.hoisted(() => ({
 
 vi.mock('../utils/validate-api-keys', () => validationMock);
 
+const localAuthMock = vi.hoisted(() => ({
+  getLocalOpenCodeApiKey: vi.fn(),
+}));
+
+vi.mock('../agents/providers/opencode/local-auth', () => localAuthMock);
+
 const logger = {
   debug: vi.fn(),
   error: vi.fn(),
@@ -181,6 +187,46 @@ describe('PreferencesService local agent providers', () => {
         .get()
         .providerInstances.filter(({ typeId }) => typeId === 'claude-code'),
     ).toHaveLength(1);
+  });
+
+  it('imports a detected coding plan once under concurrent calls', async () => {
+    localAuthMock.getLocalOpenCodeApiKey.mockResolvedValue('go-key');
+    validationMock.validateCodingPlanApiKey.mockResolvedValue({
+      success: true,
+    });
+    const service = await createServiceWithPreferences();
+
+    const results = await Promise.all([
+      service.importDetectedCodingPlan('opencode-go'),
+      service.importDetectedCodingPlan('opencode-go'),
+    ]);
+
+    expect(results.every(({ success }) => success)).toBe(true);
+    expect(
+      service
+        .get()
+        .providerInstances.filter(
+          (instance) =>
+            instance.typeId === 'coding-plan' &&
+            (instance.config as { planId?: string }).planId === 'opencode-go',
+        ),
+    ).toHaveLength(1);
+  });
+
+  it('does not offer an import for an already connected plan', async () => {
+    localAuthMock.getLocalOpenCodeApiKey.mockResolvedValue('go-key');
+    validationMock.validateCodingPlanApiKey.mockResolvedValue({
+      success: true,
+    });
+    const service = await createServiceWithPreferences();
+
+    expect(await service.detectLocalSubscriptionImport('opencode-go')).toEqual({
+      available: true,
+    });
+    await service.importDetectedCodingPlan('opencode-go');
+    expect(await service.detectLocalSubscriptionImport('opencode-go')).toEqual({
+      available: false,
+    });
   });
 });
 

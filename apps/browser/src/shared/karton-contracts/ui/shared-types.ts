@@ -41,6 +41,7 @@ export const modelProviderSchema = z.enum([
   'xiaomi-mimo',
   'mistral',
   'x-ai',
+  'opencode',
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;
 
@@ -89,6 +90,7 @@ export const providerConfigsSchema = z.object({
   'xiaomi-mimo': providerConfigSchema.default({ mode: 'stagewise' }),
   mistral: providerConfigSchema.default({ mode: 'stagewise' }),
   'x-ai': providerConfigSchema.default({ mode: 'stagewise' }),
+  opencode: providerConfigSchema.default({ mode: 'stagewise' }),
 });
 export type ProviderConfigs = z.infer<typeof providerConfigsSchema>;
 
@@ -240,6 +242,7 @@ export const providerInstanceTypeIds = [
   'xiaomi-mimo-api',
   'mistral-api',
   'x-ai-api',
+  'opencode-api',
   'coding-plan',
   'custom-anthropic',
   'custom-openai-chat',
@@ -405,6 +408,10 @@ export const providerInstanceSchema = z.discriminatedUnion('typeId', [
   }),
   providerInstanceBaseSchema.extend({
     typeId: z.literal('x-ai-api'),
+    config: officialApiConfigSchema,
+  }),
+  providerInstanceBaseSchema.extend({
+    typeId: z.literal('opencode-api'),
     config: officialApiConfigSchema,
   }),
   providerInstanceBaseSchema.extend({
@@ -643,6 +650,14 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     helpText: 'Create one at console.mistral.ai → API Keys',
     getApiKeyUrl: 'https://console.mistral.ai/api-keys',
     defaultBaseUrl: 'https://api.mistral.ai/v1',
+    credentialType: 'api-key',
+  },
+  'opencode-api': {
+    displayName: 'OpenCode API',
+    description: 'Models served by the OpenCode Go subscription',
+    helpText: 'Get your key at opencode.ai → Auth',
+    getApiKeyUrl: 'https://opencode.ai/auth',
+    defaultBaseUrl: 'https://opencode.ai/zen/go/v1',
     credentialType: 'api-key',
   },
   'coding-plan': {
@@ -1290,6 +1305,7 @@ export const userPreferencesSchema = z.object({
     'xiaomi-mimo': { mode: 'stagewise' },
     mistral: { mode: 'stagewise' },
     'x-ai': { mode: 'stagewise' },
+    opencode: { mode: 'stagewise' },
   }),
   /** User-defined API endpoints */
   customEndpoints: z.array(customEndpointSchema).default([]),
@@ -1409,6 +1425,7 @@ export const defaultUserPreferences: UserPreferences = {
     'xiaomi-mimo': { mode: 'stagewise' },
     mistral: { mode: 'stagewise' },
     'x-ai': { mode: 'stagewise' },
+    opencode: { mode: 'stagewise' },
   },
   customEndpoints: [],
   customModels: [],
