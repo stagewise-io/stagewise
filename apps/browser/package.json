@@ -118,7 +118,7 @@
     "@tanstack/react-router-devtools": "^1.166.13",
     "@tanstack/router-plugin": "^1.167.35",
     "@testing-library/react": "^16.3.2",
-    "@tiptap/core": "^3.23.1",
+    "@tiptap/core": "^3.30.4",
     "@tiptap/pm": "^3.23.1",
     "@tiptap/react": "^3.23.1",
     "@tiptap/starter-kit": "^3.23.1",
