@@ -9,7 +9,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
-    "express": "^4.21.0",
+    "express": "^5.2.1",
     "semver": "^7.7.3"
   },
   "devDependencies": {
