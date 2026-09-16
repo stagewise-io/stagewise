@@ -10,8 +10,8 @@ const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'stagewise',
-  url: 'https://stagewise.io',
-  logo: 'https://stagewise.io/icon.png',
+  url: 'https://ade.stagewise.io',
+  logo: 'https://ade.stagewise.io/icon.png',
   description:
     'The Open Source Agentic IDE — a purpose-built browser for developers with a coding agent built right in.',
   foundingDate: '2024',
@@ -30,7 +30,7 @@ const websiteJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'stagewise',
-  url: 'https://stagewise.io',
+  url: 'https://ade.stagewise.io',
   publisher: { '@type': 'Organization', name: 'stagewise' },
 };
 
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     shortcut: [{ url: '/icon.png', type: 'image/png' }],
     apple: [{ url: '/apple-touch-icon.png', type: 'image/png' }],
   },
-  metadataBase: new URL('https://stagewise.io'),
+  metadataBase: new URL('https://ade.stagewise.io'),
   title: 'stagewise · The Open Source Agentic IDE',
   description:
     'The Open Source Agentic IDE. stagewise is a purpose-built browser for developers with a coding agent built right in.',

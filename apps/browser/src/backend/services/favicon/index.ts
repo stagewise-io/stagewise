@@ -496,7 +496,7 @@ export class FaviconService {
       const response = await net.fetch(url, {
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (compatible; Stagewise/1.0; +https://stagewise.io)',
+            'Mozilla/5.0 (compatible; Stagewise/1.0; +https://ade.stagewise.io)',
         },
       });
 

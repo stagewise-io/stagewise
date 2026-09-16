@@ -46,7 +46,7 @@
 
 ## Erste Schritte
 
-Lade stagewise von [stagewise.io](https://stagewise.io) herunter und folge der kurzen Einführung zur Einrichtung deines Kontos.
+Lade stagewise von [stagewise.io](https://ade.stagewise.io) herunter und folge der kurzen Einführung zur Einrichtung deines Kontos.
 
 ## Nutze dein Coding-Abo
 

@@ -46,7 +46,7 @@
 
 ## Primeros pasos
 
-Descarga stagewise desde [stagewise.io](https://stagewise.io) y sigue la breve guía de incorporación para configurar tu cuenta.
+Descarga stagewise desde [stagewise.io](https://ade.stagewise.io) y sigue la breve guía de incorporación para configurar tu cuenta.
 
 ## Usa tu suscripción de programación
 

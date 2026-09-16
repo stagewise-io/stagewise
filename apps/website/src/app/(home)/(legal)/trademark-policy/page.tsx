@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   category: 'legal',
   alternates: {
-    canonical: 'https://stagewise.io/trademark-policy',
+    canonical: 'https://ade.stagewise.io/trademark-policy',
   },
   robots: { index: true, follow: true },
 };

@@ -17,7 +17,7 @@
   "scripts": {
     "build": "node scripts/build.mjs"
   },
-  "deprecated": "stagewise CLI has been deprecated. Download the desktop app at https://stagewise.io/download",
+  "deprecated": "stagewise CLI has been deprecated. Download the desktop app at https://ade.stagewise.io/download",
   "devDependencies": {
     "esbuild": "^0.25.0"
   }

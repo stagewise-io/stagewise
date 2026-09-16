@@ -12,9 +12,9 @@ const LINK_ALIAS_MAP: Record<string, (v: AliasVariables) => string> = {
     `https://github.com/stagewise-io/stagewise/issues/new?template=5.agent_issue.yml&agent-instance-id=${encodeURIComponent(v.agentInstanceId)}`,
   'request-new-feature': (v) =>
     `https://github.com/stagewise-io/stagewise/issues/new?template=2.feature_request.yml&app-version=${encodeURIComponent(v.appVersion)}`,
-  'socials-discord': () => 'https://stagewise.io/socials/discord',
-  'socials-x': () => 'https://stagewise.io/socials/x',
-  'socials-linkedin': () => 'https://stagewise.io/socials/linkedin',
+  'socials-discord': () => 'https://ade.stagewise.io/socials/discord',
+  'socials-x': () => 'https://ade.stagewise.io/socials/x',
+  'socials-linkedin': () => 'https://ade.stagewise.io/socials/linkedin',
 };
 
 /**

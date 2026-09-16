@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   },
   category: 'technology',
   alternates: {
-    canonical: 'https://stagewise.io/download',
+    canonical: 'https://ade.stagewise.io/download',
   },
   robots: { index: true, follow: true },
 };

@@ -81,7 +81,7 @@ const config: StorybookConfig = {
         __APP_PLATFORM__: JSON.stringify('darwin'),
         __APP_ARCH__: JSON.stringify('x64'),
         __APP_COPYRIGHT__: JSON.stringify('Copyright © 2025 stagewise Inc.'),
-        __APP_HOMEPAGE__: JSON.stringify('https://stagewise.io'),
+        __APP_HOMEPAGE__: JSON.stringify('https://ade.stagewise.io'),
       },
     });
   },

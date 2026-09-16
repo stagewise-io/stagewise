@@ -46,7 +46,7 @@
 
 ## はじめに
 
-[stagewise.io](https://stagewise.io) から stagewise をダウンロードし、短いオンボーディングガイドに従ってアカウントを設定してください。
+[stagewise.io](https://ade.stagewise.io) から stagewise をダウンロードし、短いオンボーディングガイドに従ってアカウントを設定してください。
 
 ## コーディングサブスクリプションを活用する
 

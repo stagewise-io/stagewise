@@ -79,7 +79,7 @@ export class AppMenuService extends DisposableService {
             label: 'Open our Discord server',
             click: () => {
               void this.windowLayoutService.openUrl(
-                'https://stagewise.io/socials/discord',
+                'https://ade.stagewise.io/socials/discord',
               );
             },
           },

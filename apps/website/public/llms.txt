@@ -14,18 +14,18 @@ stagewise is a next-gen agent orchestrator for software engineers. It leverages 
 
 ## Key Pages
 
-- [Homepage](https://stagewise.io/)
-- [Pricing](https://stagewise.io/pricing)
-- [Enterprise](https://stagewise.io/enterprise)
-- [Company](https://stagewise.io/company)
-- [Careers](https://stagewise.io/careers)
-- [Newsroom](https://stagewise.io/news)
-- [Download](https://stagewise.io/download)
+- [Homepage](https://ade.stagewise.io/)
+- [Pricing](https://ade.stagewise.io/pricing)
+- [Enterprise](https://ade.stagewise.io/enterprise)
+- [Company](https://ade.stagewise.io/company)
+- [Careers](https://ade.stagewise.io/careers)
+- [Newsroom](https://ade.stagewise.io/news)
+- [Download](https://ade.stagewise.io/download)
 
 ## Use Cases
 
-- [DeepSeek in stagewise](https://stagewise.io/use-cases/deepseek)
-- [GLM in stagewise](https://stagewise.io/use-cases/glm)
+- [DeepSeek in stagewise](https://ade.stagewise.io/use-cases/deepseek)
+- [GLM in stagewise](https://ade.stagewise.io/use-cases/glm)
 
 ## Supported Models
 
@@ -61,5 +61,5 @@ Self-hosted on your own infrastructure with your own models, compliance controls
 ## Links
 
 - [GitHub Repository](https://github.com/stagewise-io/stagewise)
-- [Documentation](https://stagewise.io)
+- [Documentation](https://ade.stagewise.io)
 - [Twitter / X](https://x.com/stagewise_io)

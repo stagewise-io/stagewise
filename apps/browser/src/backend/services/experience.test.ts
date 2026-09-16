@@ -9,7 +9,7 @@ vi.hoisted(() => {
   vi.stubGlobal('__APP_PLATFORM__', 'darwin');
   vi.stubGlobal('__APP_AUTHOR__', 'stagewise');
   vi.stubGlobal('__APP_COPYRIGHT__', 'stagewise');
-  vi.stubGlobal('__APP_HOMEPAGE__', 'https://stagewise.io');
+  vi.stubGlobal('__APP_HOMEPAGE__', 'https://ade.stagewise.io');
   vi.stubGlobal('__APP_ARCH__', 'arm64');
 });
 import type { GitService } from './git';

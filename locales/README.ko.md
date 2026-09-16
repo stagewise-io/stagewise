@@ -46,7 +46,7 @@
 
 ## 시작하기
 
-[stagewise.io](https://stagewise.io)에서 stagewise를 다운로드하고 짧은 온보딩 가이드를 따라 계정을 설정하세요.
+[stagewise.io](https://ade.stagewise.io)에서 stagewise를 다운로드하고 짧은 온보딩 가이드를 따라 계정을 설정하세요.
 
 ## 코딩 구독 활용하기
 

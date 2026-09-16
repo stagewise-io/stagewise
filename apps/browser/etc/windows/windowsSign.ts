@@ -45,7 +45,7 @@ export function getWindowsSignConfig():
     timestampServer: 'http://timestamp.acs.microsoft.com',
     // @ts-expect-error - the types don't properly overlap for some reason...
     hashes: ['sha256'],
-    website: 'https://stagewise.io',
+    website: 'https://ade.stagewise.io',
     // CRITICAL: Disable automatic certificate selection (/a flag)
     // The /a flag causes signtool to look in the Windows certificate store,
     // which conflicts with the DLIB approach where the certificate comes from Azure

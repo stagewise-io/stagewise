@@ -11,7 +11,7 @@ export const authClient: BetterAuthClient = createAuthClient({
   baseURL:
     typeof window !== 'undefined'
       ? window.location.origin
-      : 'https://stagewise.io',
+      : 'https://ade.stagewise.io',
   basePath: '/api/auth',
 });
 
