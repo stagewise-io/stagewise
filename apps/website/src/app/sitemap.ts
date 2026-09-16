@@ -3,7 +3,7 @@ import path from 'node:path';
 import { getAllJobs, getAllNewsPosts } from '@/lib/source';
 import type { MetadataRoute } from 'next';
 
-const siteUrl = 'https://stagewise.io';
+const siteUrl = 'https://ade.stagewise.io';
 const appRoot = path.join(process.cwd(), 'src', 'app');
 const pageFilePattern = /^page\.(tsx|ts|jsx|js|mdx|md)$/;
 const ignoredRouteSegments = new Set(['vscode-extension']);

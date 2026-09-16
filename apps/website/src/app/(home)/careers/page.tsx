@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   category: 'technology',
   alternates: {
-    canonical: 'https://stagewise.io/careers',
+    canonical: 'https://ade.stagewise.io/careers',
   },
   robots: { index: true, follow: true },
 };

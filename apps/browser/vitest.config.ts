@@ -10,7 +10,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify('0.0.0-test'),
     __APP_AUTHOR__: JSON.stringify('stagewise'),
     __APP_COPYRIGHT__: JSON.stringify('stagewise'),
-    __APP_HOMEPAGE__: JSON.stringify('https://stagewise.io'),
+    __APP_HOMEPAGE__: JSON.stringify('https://ade.stagewise.io'),
     __APP_PLATFORM__: JSON.stringify('darwin'),
     __APP_ARCH__: JSON.stringify('arm64'),
   },

@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     creator: '@stagewise_io',
   },
   alternates: {
-    canonical: 'https://stagewise.io/use-cases/glm',
+    canonical: 'https://ade.stagewise.io/use-cases/glm',
   },
   robots: { index: true, follow: true },
   category: 'technology',
@@ -39,13 +39,13 @@ const breadcrumbJsonLd = {
       '@type': 'ListItem',
       position: 1,
       name: 'Home',
-      item: 'https://stagewise.io/',
+      item: 'https://ade.stagewise.io/',
     },
     {
       '@type': 'ListItem',
       position: 2,
       name: 'GLM',
-      item: 'https://stagewise.io/use-cases/glm',
+      item: 'https://ade.stagewise.io/use-cases/glm',
     },
   ],
 };

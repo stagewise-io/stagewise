@@ -11,7 +11,7 @@ ${DIM}${line}${RESET}
   The stagewise CLI has been replaced by the stagewise
   desktop app — a much more powerful way to use stagewise.
 
-  ${BOLD}Download:${RESET}  ${CYAN}https://stagewise.io/download${RESET}
+  ${BOLD}Download:${RESET}  ${CYAN}https://ade.stagewise.io/download${RESET}
   ${BOLD}Docs:${RESET}      ${CYAN}https://docs.stagewise.io${RESET}
 
 ${DIM}${line}${RESET}

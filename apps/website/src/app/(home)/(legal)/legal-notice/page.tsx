@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   category: 'legal',
   alternates: {
-    canonical: 'https://stagewise.io/legal-notice',
+    canonical: 'https://ade.stagewise.io/legal-notice',
   },
   robots: { index: true, follow: true },
 };

@@ -19,8 +19,8 @@ const softwareAppJsonLd = {
   operatingSystem: 'macOS, Windows, Linux',
   description:
     'An open-source agentic IDE — a purpose-built browser for developers with a coding agent built right in. Supports any LLM including frontier, open-weight, and locally deployed models.',
-  url: 'https://stagewise.io',
-  downloadUrl: 'https://stagewise.io/download',
+  url: 'https://ade.stagewise.io',
+  downloadUrl: 'https://ade.stagewise.io/download',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   publisher: { '@type': 'Organization', name: 'stagewise' },
 };
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   },
   category: 'technology',
   alternates: {
-    canonical: 'https://stagewise.io',
+    canonical: 'https://ade.stagewise.io',
   },
   robots: { index: true, follow: true },
 };

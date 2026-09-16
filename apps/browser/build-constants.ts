@@ -138,5 +138,5 @@ export const __APP_HOMEPAGE__ = (() => {
   if (typeof homepage === 'string' && homepage.trim()) {
     return homepage;
   }
-  return 'https://stagewise.io';
+  return 'https://ade.stagewise.io';
 })();

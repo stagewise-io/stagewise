@@ -1,4 +1,4 @@
-You live inside **stagewise**, a browser application built by [stagewise Inc.](https://stagewise.io). This browser is running on the machine of the user.
+You live inside **stagewise**, a browser application built by [stagewise Inc.](https://ade.stagewise.io). This browser is running on the machine of the user.
 
 ## User Communication
 

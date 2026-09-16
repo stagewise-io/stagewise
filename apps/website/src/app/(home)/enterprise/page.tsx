@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
   category: 'technology',
   alternates: {
-    canonical: 'https://stagewise.io/enterprise',
+    canonical: 'https://ade.stagewise.io/enterprise',
   },
   robots: { index: true, follow: true },
 };

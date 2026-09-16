@@ -49,7 +49,7 @@
 
 ## Getting Started
 
-Download stagewise from [stagewise.io](https://stagewise.io) and follow the short onboarding guide to set up your account.
+Download stagewise from [stagewise.io](https://ade.stagewise.io) and follow the short onboarding guide to set up your account.
 
 ## Use your coding subscription
 

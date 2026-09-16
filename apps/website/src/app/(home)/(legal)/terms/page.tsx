@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   category: 'legal',
   alternates: {
-    canonical: 'https://stagewise.io/terms',
+    canonical: 'https://ade.stagewise.io/terms',
   },
   robots: { index: true, follow: true },
 };

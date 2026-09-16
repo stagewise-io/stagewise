@@ -46,7 +46,7 @@
 
 ## Démarrage
 
-Téléchargez stagewise sur [stagewise.io](https://stagewise.io) et suivez le court guide d'intégration pour configurer votre compte.
+Téléchargez stagewise sur [stagewise.io](https://ade.stagewise.io) et suivez le court guide d'intégration pour configurer votre compte.
 
 ## Utilisez votre abonnement de programmation
 

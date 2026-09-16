@@ -96,7 +96,7 @@ export const MixedContent: Story = {
     children: [
       '## Help & Resources',
       '',
-      'If you need help, check out [the documentation](https://stagewise.io/docs).',
+      'If you need help, check out [the documentation](https://ade.stagewise.io/docs).',
       '',
       "Didn't find what you need?",
       '- [Request a feature](request-new-feature)',

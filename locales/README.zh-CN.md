@@ -46,7 +46,7 @@
 
 ## 快速开始
 
-从 [stagewise.io](https://stagewise.io) 下载 stagewise，并按照简短的新手引导完成账号设置。
+从 [stagewise.io](https://ade.stagewise.io) 下载 stagewise，并按照简短的新手引导完成账号设置。
 
 ## 使用你的编程订阅
 

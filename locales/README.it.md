@@ -46,7 +46,7 @@
 
 ## Introduzione
 
-Scarica stagewise da [stagewise.io](https://stagewise.io) e segui la breve guida di onboarding per configurare il tuo account.
+Scarica stagewise da [stagewise.io](https://ade.stagewise.io) e segui la breve guida di onboarding per configurare il tuo account.
 
 ## Usa il tuo abbonamento di programmazione
 

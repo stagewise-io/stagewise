@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/vscode-extension/'],
     },
-    sitemap: 'https://stagewise.io/sitemap.xml',
-    host: 'https://stagewise.io',
+    sitemap: 'https://ade.stagewise.io/sitemap.xml',
+    host: 'https://ade.stagewise.io',
   };
 }
