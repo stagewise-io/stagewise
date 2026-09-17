@@ -192,24 +192,6 @@ export function generateNewsPostOgImage({
   });
 }
 
-export function generateJobOgImage({
-  jobTitle,
-  jobLocation,
-  geistFont,
-}: {
-  jobTitle: string;
-  jobLocation?: string;
-  geistFont: Buffer;
-}): ImageResponse {
-  return generateContentOgImage({
-    label: 'Career',
-    title: jobTitle,
-    subtitle: jobLocation,
-    bottomUrl: 'stagewise.io/careers',
-    geistFont,
-  });
-}
-
 export function generateOgImage({
   pageName,
   pageSlug,
