@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { IconArrowRightFill18 } from '@stagewise/icons';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 
@@ -60,13 +59,13 @@ export function CompanySection() {
                 />
               </div>
             </div>
-            <Link
-              href="/company"
+            <a
+              href="https://company.stagewise.io"
               className="inline-flex w-fit items-center gap-2 text-primary-foreground hover:text-hover-derived active:text-active-derived"
             >
               Learn more about us
               <IconArrowRightFill18 className="inline size-4" />
-            </Link>
+            </a>
           </div>
           <div
             className="relative w-full shrink-0 overflow-hidden rounded-md ring-1 ring-surface-2 md:max-w-[45%]"
