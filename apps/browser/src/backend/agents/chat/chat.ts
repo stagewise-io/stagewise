@@ -26,6 +26,7 @@ export class BrowserChatAgent extends ChatAgent {
     const box = this.toolbox;
     return {
       executeSandboxJs: await box.getTool('executeSandboxJs', id),
+      generateImage: await box.getTool('generateImage', id),
       listLibraryDocs: await box.getTool('listLibraryDocs', id),
       searchInLibraryDocs: await box.getTool('searchInLibraryDocs', id),
       getLintingDiagnostics: await box.getTool('getLintingDiagnostics', id),

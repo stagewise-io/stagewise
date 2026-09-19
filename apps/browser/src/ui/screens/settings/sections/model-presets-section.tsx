@@ -25,6 +25,7 @@ import { enablePatches, produceWithPatches } from 'immer';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import type {
   ModelThinkingOverride,
+  ImageModelEntry,
   PresetModelEntry,
   UtilityModelEntry,
   UserPreferences,
@@ -79,6 +80,8 @@ import {
   type ThinkingPanelModel,
 } from '@ui/utils/model-thinking';
 import { cn } from '@ui/utils';
+import { ImageModelSelect } from '@ui/components/image-model-select';
+import { getSelectableImageModelEntries } from '@shared/available-image-models';
 import { getModelAlias } from '@shared/available-models';
 
 enablePatches();
@@ -804,6 +807,54 @@ function UtilityModelList({
   );
 }
 
+function ImageUtilityModelSelect() {
+  const preferences = useKartonState((s) => s.preferences);
+  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const entries = useMemo(
+    () => getSelectableImageModelEntries(preferences.providerInstances),
+    [preferences.providerInstances],
+  );
+  const configured = preferences.agent.utilityModels.imageGeneration;
+
+  const handleChange = (next: ImageModelEntry | undefined) => {
+    const [, patches] = produceWithPatches(preferences, (draft) => {
+      draft.agent.utilityModels.imageGeneration = next;
+    });
+    void updatePreferences(patches);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <h4 className="font-medium text-foreground text-sm">
+          Image generation
+        </h4>
+        <p className="text-muted-foreground text-xs">
+          Default image model and settings for chats without a local override.
+        </p>
+      </div>
+      <div className="max-w-sm">
+        {entries.length === 0 ? (
+          <Button variant="secondary" size="md" disabled>
+            No image models enabled
+          </Button>
+        ) : (
+          <ImageModelSelect
+            entries={entries}
+            selection={configured}
+            onSelectionChange={handleChange}
+            automaticDescription="The agent chooses from available image models."
+            triggerSize="md"
+            side="bottom"
+            triggerVariant="secondary"
+            triggerClassName="px-2"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Preset Card
 // ---------------------------------------------------------------------------
@@ -1151,6 +1202,7 @@ export function ModelPresetsSection() {
             label="Context compression"
             description="Models used to compress conversation history."
           />
+          <ImageUtilityModelSelect />
         </div>
       </section>
 

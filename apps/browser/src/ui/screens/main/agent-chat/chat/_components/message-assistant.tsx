@@ -29,6 +29,7 @@ import {
 import { UnknownToolPart } from './message-part-ui/tools/unknown';
 import { ExecuteSandboxJsToolPart } from './message-part-ui/tools/execute-sandbox-js';
 import { ReadConsoleLogsToolPart } from './message-part-ui/tools/read-console-logs';
+import { GenerateImageToolPart } from './message-part-ui/tools/generate-image';
 import { AskUserQuestionsToolPart } from './message-part-ui/tools/ask-user-questions';
 import { CreateWatcherSessionToolPart } from './message-part-ui/tools/create-watcher-session';
 import { ExecuteShellCommandToolPart } from './message-part-ui/tools/execute-shell-command';
@@ -185,6 +186,8 @@ const SinglePartRenderer = memo(
             messageAttachments={msg.metadata?.attachments}
           />
         );
+      case 'tool-generateImage':
+        return <GenerateImageToolPart key={stableKey} part={part} />;
       case 'tool-readConsoleLogs':
         return (
           <ReadConsoleLogsToolPart

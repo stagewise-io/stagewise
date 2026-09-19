@@ -15,7 +15,7 @@ export function ExpandedShell({
   return (
     <span
       className={cn(
-        'my-1 inline-flex shrink-0 flex-col overflow-hidden rounded-lg',
+        'flex w-fit max-w-full shrink-0 flex-col overflow-hidden rounded-lg',
         'border border-border-subtle bg-surface-1',
         className,
       )}

@@ -10,6 +10,8 @@ import {
   useKartonState,
 } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
+import { useEnsureImageModels } from '@ui/hooks/use-image-models';
+import { canUseImageModels } from '@shared/available-image-models';
 import type {
   CustomModel,
   ModelCapabilities,
@@ -2767,7 +2769,8 @@ function ModelsSection({
         const instance = draft.providerInstances.find(
           (item) => item.id === filterInstanceId,
         );
-        if (instance) instance.disabledModelIds = disabledModelIds;
+        if (!instance) return;
+        instance.disabledModelIds = disabledModelIds;
       });
       await updatePreferences(patches);
     },
@@ -3138,6 +3141,115 @@ function ModelsSection({
         defaultProviderInstanceId={filterInstanceId}
       />
     </div>
+  );
+}
+
+// =============================================================================
+// Image Models Section (per-instance)
+// =============================================================================
+
+function ImageModelsSection({
+  instance,
+  refreshFailed,
+}: {
+  instance: ProviderInstance;
+  refreshFailed: boolean;
+}) {
+  const setImageModelEnabled = useKartonProcedure(
+    (procedures) => procedures.preferences.setInstanceImageModelEnabled,
+  );
+  const models = instance.imageModels ?? [];
+  const enabledModelIds = useMemo(
+    () => new Set(instance.enabledImageModelIds ?? []),
+    [instance.enabledImageModelIds],
+  );
+  const enabledCount = models.filter((model) =>
+    enabledModelIds.has(model.modelId),
+  ).length;
+
+  return (
+    <section className="flex flex-col space-y-4">
+      <div>
+        <div className="flex items-baseline gap-2">
+          <h2 className="font-medium text-foreground text-lg">Image models</h2>
+          {models.length > 0 && (
+            <span className="text-muted-foreground text-xs">
+              {enabledCount} of {models.length} enabled
+            </span>
+          )}
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Enabled models are available in image defaults and chats.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {models.map((model) => {
+          const isEnabled = enabledModelIds.has(model.modelId);
+          return (
+            <div
+              key={model.modelId}
+              className={cn(
+                'rounded-lg border border-derived bg-surface-1 p-3',
+                !isEnabled && 'opacity-60',
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-foreground text-sm">
+                    {model.displayName}
+                  </h3>
+                  <p className="truncate text-muted-foreground text-xs">
+                    {model.modelId}
+                  </p>
+                  {model.description && (
+                    <p className="mt-0.5 text-muted-foreground/70 text-xs">
+                      {model.description}
+                    </p>
+                  )}
+                </div>
+                <Switch
+                  checked={isEnabled}
+                  onCheckedChange={(enabled) =>
+                    void setImageModelEnabled(
+                      instance.id,
+                      model.modelId,
+                      enabled,
+                    )
+                  }
+                  size="xs"
+                  aria-label={`${isEnabled ? 'Disable' : 'Enable'} ${model.displayName}`}
+                />
+              </div>
+            </div>
+          );
+        })}
+
+        {models.length === 0 && (
+          <div className="rounded-lg border border-derived-subtle bg-background p-4">
+            {instance.imageModels === undefined &&
+            canUseImageModels(instance) ? (
+              refreshFailed ? (
+                <p className="text-center text-muted-foreground text-sm">
+                  Could not load image models. Check the provider configuration.
+                </p>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                  <IconLoader6Outline18 className="size-4 animate-spin" />
+                  <span>Loading image models…</span>
+                </div>
+              )
+            ) : (
+              <p className="text-center text-muted-foreground text-sm">
+                {canUseImageModels(instance)
+                  ? 'No image models are available for this provider.'
+                  : 'Configure provider credentials to load image models.'}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -3518,7 +3630,9 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
         )}
       </div>
       <p className="text-muted-foreground text-xs">
-        Edit the base URL and click Save to re-discover available models.
+        {instance.typeId === 'alibaba-api'
+          ? 'Use the default endpoint or a supported workspace/US API URL to enable image models.'
+          : 'Edit the base URL and click Save to re-discover available models.'}
       </p>
       {error && <TruncatedErrorText text={error} />}
     </div>
@@ -3531,6 +3645,9 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
 
 export function ModelsProvidersSection() {
   const preferences = useKartonState((s) => s.preferences);
+  const failedImageModelRefreshes = useEnsureImageModels(
+    preferences.providerInstances,
+  );
   const [detailInstanceId, setDetailInstanceId] = useState<string | null>(null);
   const [detailRenameRequested, setDetailRenameRequested] = useState(false);
   const [isDetailNameEditing, setIsDetailNameEditing] = useState(false);
@@ -3692,6 +3809,10 @@ export function ModelsProvidersSection() {
                 <SelfHostedConnection instance={detailInstance} />
               )}
 
+              {detailInstance.typeId === 'alibaba-api' && (
+                <SelfHostedConnection instance={detailInstance} />
+              )}
+
               {credentialType === 'custom-endpoint' && (
                 <CustomEndpointConnection instance={detailInstance} />
               )}
@@ -3721,6 +3842,13 @@ export function ModelsProvidersSection() {
                 filterInstance={detailInstance}
               />
             </section>
+
+            {displayInfo?.supportsImageGeneration && (
+              <ImageModelsSection
+                instance={detailInstance}
+                refreshFailed={failedImageModelRefreshes.has(detailInstance.id)}
+              />
+            )}
           </div>
         </OverlayScrollbar>
       </div>

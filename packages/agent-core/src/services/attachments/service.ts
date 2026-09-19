@@ -84,6 +84,14 @@ export class AttachmentsService {
     return readFile(filePath);
   }
 
+  public async delete(agentId: string, attachmentId: string): Promise<void> {
+    await unlink(this.paths.agentAttachmentPath(agentId, attachmentId)).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      },
+    );
+  }
+
   public readStream(agentId: string, attachmentId: string): ReadStream {
     const filePath = this.paths.agentAttachmentPath(agentId, attachmentId);
     return createReadStream(filePath);

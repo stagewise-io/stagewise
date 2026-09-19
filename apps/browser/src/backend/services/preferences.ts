@@ -11,6 +11,7 @@ import {
   type ProviderInstance,
   type CustomEndpoint,
   type DiscoveredModel,
+  type DiscoveredImageModel,
   userPreferencesSchema,
   defaultUserPreferences,
   PermissionSetting,
@@ -837,9 +838,28 @@ export class PreferencesService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'preferences.setInstanceImageModelEnabled',
+      async (
+        _callingClientId: string,
+        instanceId: string,
+        modelId: string,
+        enabled: boolean,
+      ) => {
+        await this.setInstanceImageModelEnabled(instanceId, modelId, enabled);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'preferences.refreshInstanceModels',
       async (_callingClientId: string, instanceId: string) => {
         return this.refreshInstanceModels(instanceId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.refreshInstanceImageModels',
+      async (_callingClientId: string, instanceId: string) => {
+        return this.refreshInstanceImageModels(instanceId);
       },
     );
 
@@ -1874,6 +1894,17 @@ export class PreferencesService extends DisposableService {
     );
   }
 
+  private invalidateCachedImageModels(patches: Patch[], index: number): void {
+    if (this.preferences.providerInstances[index].imageModels === undefined) {
+      return;
+    }
+    patches.push({
+      op: 'replace',
+      path: ['providerInstances', index, 'imageModels'],
+      value: undefined,
+    });
+  }
+
   /** Return a unique display name for an automatically named instance. */
   private getAvailableProviderInstanceName(baseName: string): string {
     const existingNames = new Set(
@@ -2020,6 +2051,14 @@ export class PreferencesService extends DisposableService {
         }
       }
     }
+    const discoveredImages = await providerType
+      .getInitialImageModels?.(finalConfig as never, sensitiveValues)
+      .catch((err) => {
+        this.logger.warn(
+          `[PreferencesService] Image model discovery failed for ${typeId}: ${String(err)}`,
+        );
+        return undefined;
+      });
 
     // Auto-disable non-flagship discovered models so the chat model
     // selector stays clean. Flagship models + catalog models stay enabled.
@@ -2031,7 +2070,6 @@ export class PreferencesService extends DisposableService {
       existingDisabledModelIds: [],
       existingDiscoveredModelIds: new Set(),
     });
-
     const instance = {
       id: instanceId,
       typeId: typeId as ProviderInstance['typeId'],
@@ -2040,6 +2078,8 @@ export class PreferencesService extends DisposableService {
       enabledModelIds: [] as string[],
       disabledModelIds,
       discoveredModels: discovered,
+      imageModels: discoveredImages,
+      enabledImageModelIds: [] as string[],
     } as ProviderInstance;
 
     const added = await this.addProviderInstanceRecord(instance, !!localAgent);
@@ -2167,6 +2207,16 @@ export class PreferencesService extends DisposableService {
         path: ['agent', 'modelThinkingOverrides', instanceId],
       });
     }
+    if (
+      this.preferences.agent.utilityModels.imageGeneration
+        ?.providerInstanceId === instanceId
+    ) {
+      patches.push({
+        op: 'replace',
+        path: ['agent', 'utilityModels', 'imageGeneration'],
+        value: undefined,
+      });
+    }
 
     await this.update(patches);
     this.logger.debug(
@@ -2241,6 +2291,9 @@ export class PreferencesService extends DisposableService {
         value: name,
       });
     }
+    if (isTypeReplacement || Object.keys(partialConfig).length > 0) {
+      this.invalidateCachedImageModels(patches, idx);
+    }
     await this.update(patches);
     this.logger.debug(
       `[PreferencesService] Updated provider instance: ${instanceId}`,
@@ -2269,6 +2322,7 @@ export class PreferencesService extends DisposableService {
         value: encrypted,
       },
     ];
+    this.invalidateCachedImageModels(patches, idx);
     await this.update(patches);
     this.logger.debug(
       `[PreferencesService] Set API key for instance: ${instanceId}`,
@@ -2417,6 +2471,73 @@ export class PreferencesService extends DisposableService {
     );
   }
 
+  public async setInstanceImageModelEnabled(
+    instanceId: string,
+    modelId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    this.assertNotDisposed();
+    await this.enqueuePreferenceWrite(async () => {
+      const idx = this.findProviderInstanceIndex(instanceId);
+      if (idx === -1) {
+        throw new Error(`Provider instance ${instanceId} not found`);
+      }
+      const next = structuredClone(this.preferences);
+      const instance = next.providerInstances[idx]!;
+      const current = instance.enabledImageModelIds ?? [];
+      instance.enabledImageModelIds = enabled
+        ? [...new Set([...current, modelId])]
+        : current.filter((id) => id !== modelId);
+      await this.replacePreferences(next);
+    });
+  }
+
+  public async refreshInstanceImageModels(
+    instanceId: string,
+  ): Promise<DiscoveredImageModel[]> {
+    this.assertNotDisposed();
+    const idx = this.findProviderInstanceIndex(instanceId);
+    if (idx === -1) {
+      throw new Error(`Provider instance ${instanceId} not found`);
+    }
+    const instance = this.preferences.providerInstances[idx]!;
+    const type = getProviderType(instance.typeId);
+    if (!type.getInitialImageModels) return [];
+
+    const config = instance.config as Record<string, unknown>;
+    const decryptedConfig: Record<string, string> = {};
+    for (const field of type.sensitiveFields) {
+      const encrypted = config[field] as string | undefined;
+      if (encrypted) {
+        decryptedConfig[field] = this.decryptProviderApiKey(encrypted);
+      }
+    }
+    const imageModels = await type.getInitialImageModels(
+      instance.config as never,
+      decryptedConfig,
+    );
+    const availableIds = new Set(imageModels.map((model) => model.modelId));
+    await this.enqueuePreferenceWrite(async () => {
+      const currentIdx = this.findProviderInstanceIndex(instanceId);
+      if (currentIdx === -1) return;
+      const current = this.preferences.providerInstances[currentIdx]!;
+      if (
+        current.typeId !== instance.typeId ||
+        JSON.stringify(current.config) !== JSON.stringify(instance.config)
+      ) {
+        return;
+      }
+      const next = structuredClone(this.preferences);
+      const nextInstance = next.providerInstances[currentIdx]!;
+      nextInstance.imageModels = imageModels;
+      nextInstance.enabledImageModelIds = (
+        nextInstance.enabledImageModelIds ?? []
+      ).filter((modelId) => availableIds.has(modelId));
+      await this.replacePreferences(next);
+    });
+    return imageModels;
+  }
+
   /**
    * Re-discover models for a provider instance. Calls the provider type's
    * `getInitialModels` (or `refreshModels` if defined), caches the result
@@ -2433,7 +2554,6 @@ export class PreferencesService extends DisposableService {
     const instance = this.preferences.providerInstances[idx];
     const type = getProviderType(instance.typeId);
 
-    // Decrypt sensitive fields from the instance config
     const config = instance.config as Record<string, unknown>;
     const decryptedConfig: Record<string, string> = {};
     for (const field of type.sensitiveFields) {
@@ -2445,26 +2565,13 @@ export class PreferencesService extends DisposableService {
 
     const refreshFn = type.refreshModels ?? type.getInitialModels;
     if (!refreshFn) {
-      return [];
+      await this.refreshInstanceImageModels(instanceId);
+      return instance.discoveredModels ?? [];
     }
     const models = await refreshFn(instance.config as never, decryptedConfig);
-
-    // Capture the previous discovered model IDs and disabled list so we
-    // can preserve user choices for previously-known models while
-    // auto-disabling newly-discovered non-flagship models.
     const oldDiscoveredIds = new Set(
-      (instance.discoveredModels ?? []).map((dm) => dm.modelId),
+      (instance.discoveredModels ?? []).map((model) => model.modelId),
     );
-    const oldDisabledModelIds = instance.disabledModelIds ?? [];
-
-    const newDisabledModelIds = computeDisabledModelIdsAfterDiscovery({
-      typeId: instance.typeId,
-      config,
-      discoveredModels: models,
-      existingDisabledModelIds: oldDisabledModelIds,
-      existingDiscoveredModelIds: oldDiscoveredIds,
-    });
-
     const patches: Patch[] = [
       {
         op: 'replace',
@@ -2474,10 +2581,26 @@ export class PreferencesService extends DisposableService {
       {
         op: 'replace',
         path: ['providerInstances', idx, 'disabledModelIds'],
-        value: newDisabledModelIds,
+        value: computeDisabledModelIdsAfterDiscovery({
+          typeId: instance.typeId,
+          config,
+          discoveredModels: models,
+          existingDisabledModelIds: instance.disabledModelIds ?? [],
+          existingDiscoveredModelIds: oldDiscoveredIds,
+        }),
       },
     ];
+
     await this.update(patches);
+
+    if (type.getInitialImageModels) {
+      await this.refreshInstanceImageModels(instanceId).catch((error) =>
+        this.logger.warn(
+          `[PreferencesService] Image model discovery failed for ${instance.typeId}: ${String(error)}`,
+        ),
+      );
+    }
+
     this.logger.debug(
       `[PreferencesService] Refreshed models for instance: ${instanceId} (${models.length} models)`,
     );
@@ -2564,7 +2687,13 @@ export class PreferencesService extends DisposableService {
         'preferences.setInstanceEnabledModels',
       );
       this.uiKarton.removeServerProcedureHandler(
+        'preferences.setInstanceImageModelEnabled',
+      );
+      this.uiKarton.removeServerProcedureHandler(
         'preferences.refreshInstanceModels',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.refreshInstanceImageModels',
       );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',

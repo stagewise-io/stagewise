@@ -1,4 +1,5 @@
 import { modelCapabilitiesSchema } from '@stagewise/agent-core/types';
+import type { ImageGenerationSettings } from '@stagewise/agent-core/types/agent';
 import { z } from 'zod';
 import { codingPlanIds } from '../../coding-plan-ids';
 
@@ -342,6 +343,15 @@ export const discoveredModelSchema = z.object({
 });
 export type DiscoveredModel = z.infer<typeof discoveredModelSchema>;
 
+/** An image-generation model offered by one provider instance. */
+export const discoveredImageModelSchema = z.object({
+  modelId: z.string(),
+  displayName: z.string(),
+  description: z.string().optional(),
+  supportedParameters: z.record(z.string(), z.array(z.string())).default({}),
+});
+export type DiscoveredImageModel = z.infer<typeof discoveredImageModelSchema>;
+
 /** Common fields shared by every provider instance variant. */
 const providerInstanceBaseSchema = z.object({
   id: z.string(),
@@ -351,6 +361,10 @@ const providerInstanceBaseSchema = z.object({
   disabledModelIds: z.array(z.string()).default([]),
   /** Cached model list from discovery providers. Empty for catalog-only types. */
   discoveredModels: z.array(discoveredModelSchema).default([]),
+  /** Cached image-generation offerings. Kept separate from chat models. */
+  imageModels: z.array(discoveredImageModelSchema).optional(),
+  /** Image models explicitly enabled for defaults and chats. */
+  enabledImageModelIds: z.array(z.string()).optional(),
 });
 
 /**
@@ -504,6 +518,8 @@ export type ProviderTypeDisplayInfo = {
     executable: 'codex' | 'claude' | 'opencode';
     installationDocsUrl: string;
   };
+  /** Whether this provider exposes dedicated image-generation models. */
+  supportsImageGeneration?: boolean;
   /** Which credential input UI to render on the detail page. */
   credentialType: CredentialType;
 };
@@ -578,6 +594,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     defaultBaseUrl: 'https://api.openai.com/v1',
     credentialType: 'api-key',
+    supportsImageGeneration: true,
   },
   'google-api': {
     displayName: 'Google API',
@@ -586,6 +603,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     getApiKeyUrl: 'https://aistudio.google.com/app/apikey',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     credentialType: 'api-key',
+    supportsImageGeneration: true,
   },
   'moonshotai-api': {
     displayName: 'Moonshot AI API',
@@ -602,6 +620,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     getApiKeyUrl: 'https://dashscope.console.aliyuncs.com/apiKey',
     defaultBaseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     credentialType: 'api-key',
+    supportsImageGeneration: true,
   },
   'deepseek-api': {
     displayName: 'DeepSeek API',
@@ -618,6 +637,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     getApiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
     defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
     credentialType: 'api-key',
+    supportsImageGeneration: true,
   },
   'minimax-api': {
     displayName: 'MiniMax API',
@@ -628,6 +648,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
       'https://platform.minimax.io/user-center/basic-information/interface-key',
     defaultBaseUrl: 'https://api.minimax.io/v1',
     credentialType: 'api-key',
+    supportsImageGeneration: true,
   },
   'xiaomi-mimo-api': {
     displayName: 'Xiaomi MiMo API',
@@ -674,16 +695,19 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     displayName: 'Azure OpenAI',
     description: 'Azure-hosted OpenAI models',
     credentialType: 'custom-endpoint',
+    supportsImageGeneration: true,
   },
   bedrock: {
     displayName: 'Amazon Bedrock',
     description: 'AWS-hosted models via Bedrock',
     credentialType: 'custom-endpoint',
+    supportsImageGeneration: true,
   },
   vertex: {
     displayName: 'Google Vertex AI',
     description: 'Google Cloud-hosted models via Vertex AI',
     credentialType: 'custom-endpoint',
+    supportsImageGeneration: true,
   },
   ollama: {
     displayName: 'Ollama',
@@ -698,6 +722,7 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
     getApiKeyUrl: 'https://openrouter.ai/keys',
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     credentialType: 'api-key',
+    supportsImageGeneration: true,
   },
   'x-ai-api': {
     displayName: 'xAI API',
@@ -762,6 +787,20 @@ export const utilityModelEntrySchema = z
   .union([z.string(), presetModelEntrySchema])
   .transform((val) => (typeof val === 'string' ? { modelId: val } : val));
 export type UtilityModelEntry = z.infer<typeof utilityModelEntrySchema>;
+
+export const imageGenerationSettingsSchema = z.object({
+  aspectRatio: z.string().optional(),
+  resolution: z.string().optional(),
+  quality: z.string().optional(),
+  outputFormat: z.string().optional(),
+  background: z.string().optional(),
+}) satisfies z.ZodType<ImageGenerationSettings>;
+
+export const imageModelEntrySchema = imageGenerationSettingsSchema.extend({
+  modelId: z.string(),
+  providerInstanceId: z.string(),
+});
+export type ImageModelEntry = z.infer<typeof imageModelEntrySchema>;
 
 /**
  * GLOBAL CONFIG CAPABILITIES
@@ -1162,19 +1201,17 @@ export const userPreferencesSchema = z.object({
        */
       disabledGlobalSkills: z.array(z.string()).default([]),
       /**
-       * User-configured fallback chains for background utility tasks.
-       * Each array is an ordered list of model entries; the agent tries
-       * each in order until one succeeds. An empty array falls back
-       * to the main chat model.
+       * User-configured models for background utility tasks. Text utilities
+       * use ordered fallback chains; image generation has one optional default
+       * and otherwise lets the chat agent choose.
        *
        * Defaults are populated from {@link DEFAULT_TITLE_GENERATION_MODELS}
        * and {@link DEFAULT_HISTORY_COMPRESSION_MODELS} so new users
        * start with sensible built-in fallbacks without the UI needing
        * a separate constant file.
        *
-       * Models that belong to deleted providers or have been disabled
-       * are retained in the array (marked invalid by the UI) rather
-       * than silently removed.
+       * Text models that belong to deleted providers or have been disabled are
+       * retained in their arrays rather than silently removed.
        */
       utilityModels: z
         .object({
@@ -1184,6 +1221,7 @@ export const userPreferencesSchema = z.object({
           contextCompression: z
             .array(utilityModelEntrySchema)
             .default(DEFAULT_HISTORY_COMPRESSION_ENTRIES),
+          imageGeneration: imageModelEntrySchema.optional(),
         })
         .default({
           titleGeneration: DEFAULT_TITLE_GENERATION_ENTRIES,

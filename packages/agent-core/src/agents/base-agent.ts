@@ -21,8 +21,9 @@ import type {
   AgentRuntimeError,
   AgentState,
   AgentToolUIPart,
+  AgentTypes,
+  ImageGenerationOverrides,
 } from '../types/agent';
-import type { AgentTypes } from '../types/agent';
 import type { ModelCapabilities } from '../types/models';
 import type { AgentStateMutations } from '../services/agent-manager/state-mutations';
 import type { AgentHost } from '../host/host';
@@ -123,6 +124,8 @@ export interface BaseAgentToolboxView {
    * producer is wired.
    */
   drainPendingAttachments(agentInstanceId: string): AttachmentMetadata[];
+  /** Discard and delete attachments produced by a cancelled step. */
+  discardPendingAttachments(agentInstanceId: string): Promise<void>;
   /**
    * Cancel any pending host-side user-facing dialogs (currently:
    * `askUserQuestions`-style question UI) for the given agent.
@@ -1011,8 +1014,15 @@ export abstract class BaseAgent<
    * @note DO NOT OVERRIDE
    */
   public async stop(): Promise<void> {
+    const queuedMessageIds = new Set(
+      this.state.get().queuedMessages.map((message) => message.id),
+    );
     await this.internalStop('user-stopped');
     this.state.commands.setIsWorkingFalse();
+    const hasNewQueuedMessages = this.state
+      .get()
+      .queuedMessages.some((message) => !queuedMessageIds.has(message.id));
+    if (hasNewQueuedMessages) void this.runStep();
   }
 
   /**
@@ -1209,6 +1219,13 @@ export abstract class BaseAgent<
     // We accept model updates at all times, and the UI has to make enforce that model changes aren't allowed
     this.state.commands.setActiveModel({ modelId, providerInstanceId });
     return;
+  }
+
+  public async updateImageGenerationOverrides(
+    overrides: ImageGenerationOverrides | undefined,
+  ): Promise<void> {
+    this.state.commands.setImageGenerationOverrides({ overrides });
+    await this.saveState();
   }
 
   public async setTitle(newTitle: string): Promise<void> {
@@ -2787,18 +2804,17 @@ export abstract class BaseAgent<
 
     this.updateUsageWarning(result);
 
-    // Save the agent state for recovery
-    await this.saveState();
-
-    // Drain any host-produced attachments (e.g. files written by a
-    // sandbox/runtime side-channel during this step) into
-    // metadata.attachments on the current assistant message.
+    // Claim host-produced attachments before yielding so stop() cannot discard
+    // completed outputs that are already visible in the chat.
     const pendingAtts = this.toolbox.drainPendingAttachments(this.instanceId);
     if (pendingAtts.length > 0) {
       this.state.commands.attachAttachmentsToLastAssistant({
         attachments: pendingAtts,
       });
     }
+
+    // Save the agent state for recovery
+    await this.saveState();
 
     // NOTE: populatePathReferencesOnAssistantMessage() is intentionally
     // NOT called here. It used to live in this spot, but handlePostStep
@@ -3329,6 +3345,7 @@ export abstract class BaseAgent<
     // Dismiss any pending host-side user-facing dialogs so their UI
     // is torn down alongside the cancelled step.
     this.toolbox.cancelPendingAgentDialogs(this.instanceId);
+    await this.toolbox.discardPendingAttachments(this.instanceId);
 
     const toolCallAbortReason =
       stopReason === 'system-interrupted'

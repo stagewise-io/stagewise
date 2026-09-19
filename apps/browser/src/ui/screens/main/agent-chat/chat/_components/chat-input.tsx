@@ -4,6 +4,7 @@ import type { EditorView } from '@tiptap/pm/view';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { ModelSelect } from './model-select';
+import { ImageGenerationSelect } from './image-generation-select';
 import { ToolApprovalSelect } from './tool-approval-select';
 import { ContextUsageRing } from './context-usage-ring';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -882,6 +883,7 @@ export const ChatInput = memo(function ChatInput({
             {showModelSelect && (
               <ModelSelect onModelChange={handleModelSelectChange} />
             )}
+            <ImageGenerationSelect />
             {showContextUsageRing && contextUsedPercentage > 0 && (
               <ContextUsageRing
                 percentage={contextUsedPercentage}

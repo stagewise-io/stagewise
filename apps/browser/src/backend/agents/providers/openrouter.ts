@@ -4,6 +4,10 @@ import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-t
 import type { ProviderType } from './types';
 import { generateText } from 'ai';
 import { createOpenAIChatModel, discoverOpenRouterModels } from './shared';
+import {
+  discoverOpenRouterImageModels,
+  generateOpenRouterImage,
+} from './openrouter-image-api';
 
 const VALIDATION_TIMEOUT_MS = 10_000;
 
@@ -16,6 +20,13 @@ export type OpenRouterConfig = {
   encryptedApiKey?: string;
   baseUrl?: string;
 };
+
+function getBaseUrl(config: OpenRouterConfig): string {
+  return (
+    config.baseUrl?.trim() ||
+    PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl!
+  );
+}
 
 // ============================================================================
 // OpenRouter provider type
@@ -47,9 +58,7 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
     config: OpenRouterConfig,
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]> {
-    const baseUrl =
-      config.baseUrl?.trim() ||
-      PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
+    const baseUrl = getBaseUrl(config);
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
     return discoverOpenRouterModels(apiKey, baseUrl);
   },
@@ -58,11 +67,20 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
     config: OpenRouterConfig,
     decryptedConfig: Record<string, string>,
   ): Promise<DiscoveredModel[]> {
-    const baseUrl =
-      config.baseUrl?.trim() ||
-      PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
+    const baseUrl = getBaseUrl(config);
     const apiKey = decryptedConfig.encryptedApiKey ?? '';
     return discoverOpenRouterModels(apiKey, baseUrl);
+  },
+
+  async getInitialImageModels(
+    config: OpenRouterConfig,
+    decryptedConfig: Record<string, string>,
+  ) {
+    const baseUrl = getBaseUrl(config);
+    return discoverOpenRouterImageModels(
+      decryptedConfig.encryptedApiKey ?? '',
+      baseUrl,
+    );
   },
 
   // ── Validation ─────────────────────────────────────────────────────────
@@ -75,9 +93,7 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
     if (!apiKey) {
       return { success: false, error: 'OpenRouter API key is required' };
     }
-    const baseUrl =
-      config.baseUrl?.trim() ||
-      PROVIDER_TYPE_DISPLAY_INFO.openrouter.defaultBaseUrl;
+    const baseUrl = getBaseUrl(config);
     // Use a cheap, widely-available model for the validation probe.
     const validationModelId = 'openai/gpt-4o-mini';
     try {
@@ -110,5 +126,10 @@ export const openrouterProviderType: ProviderType<OpenRouterConfig> = {
     return {
       model: createOpenAIChatModel(apiKey, baseURL, modelId),
     };
+  },
+
+  async generateImage({ modelId, apiKey, baseURL, request }) {
+    if (!baseURL) throw new Error('OpenRouter image endpoint is unavailable');
+    return generateOpenRouterImage(apiKey, baseURL, modelId, request);
   },
 };
