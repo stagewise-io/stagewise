@@ -443,3 +443,31 @@ it('enables the native DeepSeek Flash alias on first discovery', () => {
     }),
   ).toEqual([]);
 });
+
+describe('native DeepSeek catalog alias discovery', () => {
+  it.each([
+    'deepseek-flash',
+    'deepseek-v4.1-flash',
+  ])('retains disabled catalog choice %s even when discovery omits it', (id) => {
+    expect(
+      computeDisabledModelIdsAfterDiscovery({
+        typeId: 'deepseek-api',
+        config: {},
+        discoveredModels: [],
+        existingDisabledModelIds: [id],
+        existingDiscoveredModelIds: new Set([id]),
+      }),
+    ).toEqual([id]);
+  });
+  it('enables the newly discovered native alias as a catalog model', () => {
+    expect(
+      computeDisabledModelIdsAfterDiscovery({
+        typeId: 'deepseek-api',
+        config: {},
+        discoveredModels: [makeDiscoveredModel('deepseek-flash')],
+        existingDisabledModelIds: [],
+        existingDiscoveredModelIds: new Set(),
+      }),
+    ).toEqual([]);
+  });
+});

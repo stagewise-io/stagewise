@@ -5,6 +5,8 @@ import {
 } from './karton-contracts/ui/shared-types';
 import {
   findInstanceForVendor,
+  getInstanceDisabledModelIds,
+  toggleInstanceDisabledModelId,
   findModelSelectorEntry,
   getInstanceModelCount,
   getInstanceThinkingDefaultOptions,
@@ -524,5 +526,93 @@ describe('vendor instance routing', () => {
     expect(getVendorInstanceId(preferences, 'z-ai')).toBeUndefined();
     expect(vendorHasApiKey(preferences, 'z-ai')).toBe(false);
     expect(getVendorMode(preferences, 'z-ai')).toBe('stagewise');
+  });
+});
+
+describe('native DeepSeek Flash matching', () => {
+  const instance: ProviderInstance = {
+    ...anthropicInstance,
+    id: 'deepseek-native',
+    typeId: 'deepseek-api',
+    name: 'DeepSeek',
+    discoveredModels: [
+      { modelId: 'deepseek-flash', displayName: 'Native Flash' },
+      { modelId: 'deepseek-v4.1-flash', displayName: 'Canonical Flash' },
+    ],
+  };
+
+  it('deduplicates discovery and resolves saved native IDs with catalog metadata', () => {
+    const prefs = { providerInstances: [instance], customModels: [] };
+    const entries = getSelectableModelEntries(prefs);
+    expect(
+      entries.filter((entry) => entry.modelId === 'deepseek-flash'),
+    ).toHaveLength(0);
+    expect(
+      entries.filter((entry) => entry.modelId === 'deepseek-v4.1-flash'),
+    ).toHaveLength(1);
+    const entry = findModelSelectorEntry(prefs, instance.id, 'deepseek-flash');
+    expect(entry?.catalogModel?.modelId).toBe('deepseek-v4.1-flash');
+    expect(entry?.catalogModel?.pricing).toBeDefined();
+    expect(entry?.thinkingEnabled).toBe(true);
+    expect(getInstanceModelCount(instance)).toBe(entries.length);
+    expect(instance.discoveredModels?.[0]?.modelId).toBe('deepseek-flash');
+  });
+
+  it.each([
+    'deepseek-flash',
+    'deepseek-v4.1-flash',
+  ])('preserves disabled choice stored as %s', (id) => {
+    const disabledInstance = { ...instance, disabledModelIds: [id] };
+    const prefs = { providerInstances: [disabledInstance], customModels: [] };
+    const entries = getSelectableModelEntries(prefs);
+    expect(
+      entries.some((entry) =>
+        ['deepseek-flash', 'deepseek-v4.1-flash'].includes(entry.modelId),
+      ),
+    ).toBe(false);
+    expect(getInstanceModelCount(disabledInstance)).toBe(entries.length);
+    expect(
+      findModelSelectorEntry(prefs, instance.id, id)?.catalogModel,
+    ).toBeDefined();
+    expect(disabledInstance.disabledModelIds).toEqual([id]);
+  });
+
+  it('shows saved native disabled choices and can re-enable the catalog card', () => {
+    const prefs = {
+      ...defaultUserPreferences,
+      providerInstances: [
+        {
+          ...instance,
+          disabledModelIds: [
+            'deepseek-flash',
+            'deepseek-v4.1-flash',
+            'deepseek-reasoner',
+          ],
+        },
+      ],
+    };
+    expect(getInstanceDisabledModelIds(prefs, instance.id)).toContain(
+      'deepseek-v4.1-flash',
+    );
+    expect(
+      toggleInstanceDisabledModelId(prefs, instance.id, 'deepseek-v4.1-flash'),
+    ).toEqual(['deepseek-reasoner']);
+    expect(prefs.providerInstances[0]?.disabledModelIds).toContain(
+      'deepseek-flash',
+    );
+  });
+
+  it('does not alias IDs on unrelated custom routes', () => {
+    const customInstance: ProviderInstance = {
+      ...instance,
+      typeId: 'custom-openai-chat',
+      config: { baseUrl: 'https://example.com/v1' },
+    };
+    expect(
+      getSelectableModelEntries({
+        providerInstances: [customInstance],
+        customModels: [],
+      }).map((entry) => entry.modelId),
+    ).toEqual(['deepseek-flash', 'deepseek-v4.1-flash']);
   });
 });

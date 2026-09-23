@@ -868,10 +868,10 @@ export const availableModels = [
     modelContextRaw: 1048576,
     headers: {},
     providerOptions: {
-      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      stagewise: { reasoning: { enabled: true, effort: 'high' } },
       moonshotai: {
         thinking: { type: 'adaptive' },
-        effort: 'medium',
+        effort: 'high',
       },
     },
     thinkingEnabled: true,

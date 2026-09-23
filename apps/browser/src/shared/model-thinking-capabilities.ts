@@ -426,15 +426,18 @@ function requiresThinking(modelId: string): boolean {
 }
 
 function getOpenAiCompatibleOptions(modelId: string): ThinkingOption[] {
-  // These native APIs accept low, high, and max, but not medium.
-  if (['glm-5.3', 'deepseek-v4.1-flash', 'kimi-k3'].includes(modelId)) {
+  const id = modelId.split('/').at(-1) ?? modelId;
+  // Use the compatible xhigh wire value for Max, as with GLM 5.2.
+  if (
+    ['glm-5.3', 'deepseek-v4.1-flash', 'deepseek-flash', 'kimi-k3'].includes(id)
+  ) {
     return createOptions('openai-compatible', [
       ['low', 'Low', true],
       ['high', 'High', true],
-      ['max', 'Max', true],
+      ['xhigh', 'Max', true],
     ]);
   }
-  if (modelId === 'glm-5.2') return OPENAI_COMPATIBLE_MAX_OPTIONS;
+  if (id === 'glm-5.2') return OPENAI_COMPATIBLE_MAX_OPTIONS;
   return OPENAI_COMPATIBLE_OPTIONS;
 }
 

@@ -352,6 +352,44 @@ describe('current model reasoning contracts', () => {
   ])('omits unsupported medium reasoning for %s', (id) => {
     expect(
       getSupportedThinkingOptions(getAvailableModel(id)!).map((o) => o.value),
-    ).toEqual(['low', 'high', 'max']);
+    ).toEqual(['low', 'high', 'xhigh']);
+  });
+});
+
+describe('compatible reasoning wire values', () => {
+  it.each([
+    'deepseek/deepseek-v4.1-flash',
+    'deepseek-flash',
+    'z-ai/glm-5.3',
+    'moonshotai/kimi-k3',
+  ])('constrains prefixed and native IDs for %s', (modelId) => {
+    const route = { thinkingProvider: 'openai-compatible' as const };
+    const options = getSupportedThinkingOptions(modelId, route);
+    expect(options.map((option) => option.value)).toEqual([
+      'low',
+      'high',
+      'xhigh',
+    ]);
+    expect(options.at(-1)?.label).toBe('Max');
+    expect(
+      createThinkingProviderOptionsPatch({
+        model: { modelId, thinkingEnabled: true, providerOptions: {} },
+        route,
+        override: {
+          provider: 'openai-compatible',
+          enabled: true,
+          value: 'xhigh',
+        },
+      }),
+    ).toEqual({ openai: { reasoningEffort: 'xhigh' } });
+  });
+
+  it('uses supported Kimi K3 defaults without an override', () => {
+    const model = getAvailableModel('kimi-k3')!;
+    expect(model.providerOptions).toMatchObject({
+      stagewise: { reasoning: { effort: 'high' } },
+      moonshotai: { effort: 'high' },
+    });
+    expect(getEffectiveThinkingSelection(model)?.value).toBe('high');
   });
 });
