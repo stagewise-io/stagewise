@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.29.1 (2026-09-23)
+
+### Bug Fixes
+
+* correct remaining model reasoning behavior (02d333d)
+* address model catalog review findings (f038f62)
+* refresh curated inference model catalog (849ec6f)
+
 ## 1.29.0 (2026-08-15)
 
 ### Features
