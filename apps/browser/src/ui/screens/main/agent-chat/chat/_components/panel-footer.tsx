@@ -1312,6 +1312,45 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
     if (openAgent) void flushQueue(openAgent);
   }, [flushQueue, openAgent]);
 
+  const compressHistory = useKartonProcedure((p) => p.agents.compressHistory);
+  const [isCompactingHistory, setIsCompactingHistory] = useState(false);
+  const handleCompactContext = useCallback(() => {
+    if (!openAgent || isCompactingHistory) return;
+    setIsCompactingHistory(true);
+    void compressHistory(openAgent)
+      .then((result) => {
+        if (result.status === 'failed') {
+          toast({
+            id: `compact-context-error-${openAgent}`,
+            title: 'Could not compact history',
+            message:
+              result.error ??
+              'All compression models failed. Check your provider settings.',
+            type: 'error',
+            actions: [],
+          });
+        } else if (result.status === 'noop') {
+          toast({
+            id: `compact-context-noop-${openAgent}`,
+            title: 'Nothing to compact',
+            message: 'The conversation is already short enough.',
+            type: 'info',
+            actions: [],
+          });
+        }
+      })
+      .catch((error) => {
+        toast({
+          id: `compact-context-error-${openAgent}`,
+          title: 'Could not compact history',
+          message: error instanceof Error ? error.message : String(error),
+          type: 'error',
+          actions: [],
+        });
+      })
+      .finally(() => setIsCompactingHistory(false));
+  }, [compressHistory, openAgent, isCompactingHistory]);
+
   const [chatInputActive, setChatInputActive] = useState<boolean>(false);
   // Mirror `chatInputActive` into a ref so synchronous handlers
   // (`omnibox-focus-requested`, `search-bar-focus-requested`, `onInputBlur`)
@@ -1972,6 +2011,8 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
             contextUsedPercentage={contextUsed}
             contextUsedKb={displayedUsedTokens ? displayedUsedTokens / 1000 : 0}
             contextMaxKb={maxTokens ? maxTokens / 1000 : 0}
+            onCompactContext={openAgent ? handleCompactContext : undefined}
+            compactingContext={isCompactingHistory}
             hasQueuedMessages={hasQueuedMessages}
             onFlushQueue={handleFlushQueue}
             onFocus={onInputFocus}

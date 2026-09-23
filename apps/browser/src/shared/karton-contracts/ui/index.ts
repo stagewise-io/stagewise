@@ -1419,6 +1419,16 @@ export type KartonContract = {
         undoToolCalls: boolean,
       ) => Promise<string>;
       retryLastUserMessage: (agentId: string) => Promise<void>;
+      /**
+       * Manually trigger history compression for an agent, bypassing the
+       * automatic token-threshold check. Mirrors `HistoryCompressionOutcome`
+       * from `@stagewise/agent-core` (inlined to avoid pulling Node-only
+       * modules into the renderer).
+       */
+      compressHistory: (agentId: string) => Promise<{
+        status: 'compressed' | 'noop' | 'busy' | 'failed';
+        error?: string;
+      }>;
       markAsRead: (agentId: string) => Promise<void>;
       markAsUnread: (agentId: string) => Promise<void>;
       setActiveModelId: (

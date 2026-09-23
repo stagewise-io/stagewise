@@ -452,6 +452,19 @@ export type SendUserMessageOptions = {
 };
 
 /**
+ * Result of a history-compression attempt.
+ *
+ * - `compressed`: a briefing was written to the boundary message.
+ * - `noop`: there was nothing worth compressing (too little history).
+ * - `busy`: another compression run is already in flight.
+ * - `failed`: every candidate model failed; `error` carries the reason.
+ */
+export type HistoryCompressionOutcome = {
+  status: 'compressed' | 'noop' | 'busy' | 'failed';
+  error?: string;
+};
+
+/**
  * Interface for the static (class) side of any agent.
  * This enables type-safe access to static properties like `config` and `agentType`
  * on agent classes (not instances).
@@ -2439,7 +2452,7 @@ export abstract class BaseAgent<
    */
   private static readonly KEPT_BUDGET_HARD_CAP_TOKENS = 40_000;
 
-  private async compressHistoryInternal(): Promise<void> {
+  private async compressHistoryInternal(): Promise<HistoryCompressionOutcome> {
     // Prevent concurrent compression runs — a second trigger while
     // compression is in-flight would see stale history and produce
     // a redundant (or conflicting) summary.
@@ -2447,7 +2460,7 @@ export abstract class BaseAgent<
       this.host.logger.debug(
         `[BaseAgent:${this.instanceId}] Skipping history compression — already in progress.`,
       );
-      return;
+      return { status: 'busy' };
     }
     this._isCompressingHistory = true;
     try {
@@ -2500,7 +2513,7 @@ export abstract class BaseAgent<
         }
 
         // Scanned everything, it all fits — nothing to compress
-        if (i === 0) return;
+        if (i === 0) return { status: 'noop' };
       }
 
       // Edge case: even the last message alone exceeds the budget
@@ -2511,7 +2524,7 @@ export abstract class BaseAgent<
         );
       }
 
-      if (boundaryIndex < 1) return; // nothing meaningful to compress
+      if (boundaryIndex < 1) return { status: 'noop' }; // nothing meaningful to compress
 
       const actualKept = history.length - boundaryIndex;
       if (actualKept < preferredFloor) {
@@ -2521,7 +2534,7 @@ export abstract class BaseAgent<
       }
 
       const boundaryMessageId = history[boundaryIndex]?.id;
-      if (!boundaryMessageId) return;
+      if (!boundaryMessageId) return { status: 'noop' };
 
       // If the boundary message already has compressed history, the
       // previous summary is included in messagesToCompact and will be
@@ -2555,6 +2568,7 @@ export abstract class BaseAgent<
         .history.findIndex((m) => m.id === boundaryMessageId);
       await this.saveState(boundarySeq >= 0 ? [boundarySeq] : undefined);
       this.scheduleMemorySnapshotWrite('compression');
+      return { status: 'compressed' };
     } catch (e) {
       // Fail silently — compression is best-effort. The agent continues
       // without compression until the context window is exhausted, at which
@@ -2564,9 +2578,22 @@ export abstract class BaseAgent<
         `[BaseAgent:${this.instanceId}] History compression failed silently: ${error.message}`,
       );
       this.report(error, 'compressHistory');
+      return { status: 'failed', error: error.message };
     } finally {
       this._isCompressingHistory = false;
     }
+  }
+
+  /**
+   * Manually trigger history compression, bypassing the automatic
+   * token-threshold check. Used by the UI "compact context" action so a
+   * user can reclaim context on demand (and see why it failed).
+   *
+   * Returns the outcome instead of throwing so callers can surface a
+   * helpful message; automatic triggers keep ignoring the result.
+   */
+  public async requestHistoryCompression(): Promise<HistoryCompressionOutcome> {
+    return await this.compressHistoryInternal();
   }
 
   private getMemoryWriter(): AgentMemoryWriter {
