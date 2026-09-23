@@ -262,6 +262,9 @@ export function getDefaultThinkingSelection(
   const option =
     findSupportedOption(options, preferredValue) ??
     findSupportedOption(options, 'medium') ??
+    (provider === 'openai-compatible'
+      ? findSupportedOption(options, 'high')
+      : undefined) ??
     firstEnabledOption(options) ??
     options[0];
 
@@ -421,20 +424,23 @@ function requiresThinking(modelId: string): boolean {
     id === 'claude-opus-5-5' ||
     id === 'claude-fable-5-1' ||
     id === 'gpt-6-astra' ||
-    id === 'glm-5-3'
+    id === 'glm-5-3' ||
+    id === 'kimi-k3'
   );
 }
 
 function getOpenAiCompatibleOptions(modelId: string): ThinkingOption[] {
   const id = modelId.split('/').at(-1) ?? modelId;
-  // Use the compatible xhigh wire value for Max, as with GLM 5.2.
+  // DeepSeek maps xhigh to high; only literal max selects maximum effort.
+  const maxEffort =
+    id === 'deepseek-v4.1-flash' || id === 'deepseek-flash' ? 'max' : 'xhigh';
   if (
     ['glm-5.3', 'deepseek-v4.1-flash', 'deepseek-flash', 'kimi-k3'].includes(id)
   ) {
     return createOptions('openai-compatible', [
       ['low', 'Low', true],
       ['high', 'High', true],
-      ['xhigh', 'Max', true],
+      [maxEffort, 'Max', true],
     ]);
   }
   if (id === 'glm-5.2') return OPENAI_COMPATIBLE_MAX_OPTIONS;

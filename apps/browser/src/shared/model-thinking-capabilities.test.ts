@@ -319,6 +319,7 @@ describe('current model reasoning contracts', () => {
     'claude-fable-5.1',
     'gpt-6-astra',
     'glm-5.3',
+    'kimi-k3',
   ])('keeps required thinking enabled for %s even with a saved off override', (id) => {
     const model = getAvailableModel(id)!;
     expect(
@@ -352,23 +353,23 @@ describe('current model reasoning contracts', () => {
   ])('omits unsupported medium reasoning for %s', (id) => {
     expect(
       getSupportedThinkingOptions(getAvailableModel(id)!).map((o) => o.value),
-    ).toEqual(['low', 'high', 'xhigh']);
+    ).toEqual(['low', 'high', id === 'deepseek-v4.1-flash' ? 'max' : 'xhigh']);
   });
 });
 
 describe('compatible reasoning wire values', () => {
   it.each([
-    'deepseek/deepseek-v4.1-flash',
-    'deepseek-flash',
-    'z-ai/glm-5.3',
-    'moonshotai/kimi-k3',
-  ])('constrains prefixed and native IDs for %s', (modelId) => {
+    ['deepseek/deepseek-v4.1-flash', 'max'],
+    ['deepseek-flash', 'max'],
+    ['z-ai/glm-5.3', 'xhigh'],
+    ['moonshotai/kimi-k3', 'xhigh'],
+  ])('constrains prefixed and native IDs for %s', (modelId, maxEffort) => {
     const route = { thinkingProvider: 'openai-compatible' as const };
     const options = getSupportedThinkingOptions(modelId, route);
     expect(options.map((option) => option.value)).toEqual([
       'low',
       'high',
-      'xhigh',
+      maxEffort,
     ]);
     expect(options.at(-1)?.label).toBe('Max');
     expect(
@@ -378,10 +379,10 @@ describe('compatible reasoning wire values', () => {
         override: {
           provider: 'openai-compatible',
           enabled: true,
-          value: 'xhigh',
+          value: maxEffort,
         },
       }),
-    ).toEqual({ openai: { reasoningEffort: 'xhigh' } });
+    ).toEqual({ openai: { reasoningEffort: maxEffort } });
   });
 
   it('uses supported Kimi K3 defaults without an override', () => {
@@ -391,5 +392,43 @@ describe('compatible reasoning wire values', () => {
       moonshotai: { effort: 'high' },
     });
     expect(getEffectiveThinkingSelection(model)?.value).toBe('high');
+  });
+});
+
+describe('discovered model reasoning defaults', () => {
+  it.each([
+    'deepseek/deepseek-v4.1-flash',
+    'deepseek-flash',
+    'z-ai/glm-5.3',
+    'moonshotai/kimi-k3',
+  ])('uses high by default for %s', (modelId) => {
+    const model = { modelId, thinkingEnabled: true, providerOptions: {} };
+    const route = { thinkingProvider: 'openai-compatible' as const };
+    expect(getEffectiveThinkingSelection(model, undefined, route)?.value).toBe(
+      'high',
+    );
+    expect(
+      createThinkingProviderOptionsPatch({
+        model,
+        route,
+        override: { enabled: true },
+      }),
+    ).toEqual({ openai: { reasoningEffort: 'high' } });
+    expect(
+      getEffectiveThinkingSelection(model, { value: 'low' }, route)?.value,
+    ).toBe('low');
+  });
+
+  it.each([
+    'kimi-k3',
+    'moonshotai/kimi-k3',
+  ])('keeps Kimi reasoning enabled on compatible routes for %s', (modelId) => {
+    expect(
+      createThinkingProviderOptionsPatch({
+        model: { modelId, thinkingEnabled: true, providerOptions: {} },
+        route: { thinkingProvider: 'openai-compatible' },
+        override: { enabled: false },
+      }),
+    ).toEqual({ openai: { reasoningEffort: 'high' } });
   });
 });
