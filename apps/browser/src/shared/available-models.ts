@@ -153,10 +153,51 @@ export const availableModels = [
   // Anthropic Models
   {
     officialProvider: 'anthropic',
+    modelId: 'claude-opus-5.5',
+    modelDisplayName: 'Opus 5.5',
+    modelDescription:
+      'Long-running agentic coding and knowledge work with always-on adaptive thinking.',
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
+    headers: anthropicHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      anthropic: {
+        thinking: { type: 'adaptive' },
+        effort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 4,
+      outputPerMillion: 20,
+      relativeMultiplier: 4,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: ANTHROPIC_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'anthropic',
     modelId: 'claude-opus-5',
     modelDisplayName: 'Opus 5',
     modelDescription:
-      "Anthropic's flagship model for demanding reasoning, coding, and long-horizon agentic work.",
+      "Anthropic's previous-generation model for demanding reasoning, coding, and long-horizon agentic work.",
     modelContext: '1M context',
     modelContextRaw: 1000000,
     headers: anthropicHeaders,
@@ -172,6 +213,47 @@ export const availableModels = [
       inputPerMillion: 5.0,
       outputPerMillion: 25.0,
       relativeMultiplier: 5.3,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: ANTHROPIC_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'anthropic',
+    modelId: 'claude-fable-5.1',
+    modelDisplayName: 'Fable 5.1',
+    modelDescription:
+      'Advanced reasoning and long-horizon agentic work with always-on adaptive thinking.',
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
+    headers: anthropicHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'high' } },
+      anthropic: {
+        thinking: { type: 'adaptive' },
+        effort: 'high',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 10.0,
+      outputPerMillion: 50.0,
+      relativeMultiplier: 10.0,
     },
     capabilities: {
       inputModalities: {
@@ -238,7 +320,7 @@ export const availableModels = [
     modelId: 'claude-opus-4.8',
     modelDisplayName: 'Opus 4.8',
     modelDescription:
-      "Anthropic's most capable model, excels at complex reasoning and architectural decisions.",
+      "Anthropic's highly capable model, excels at complex reasoning and architectural decisions.",
     modelContext: '1M context',
     modelContextRaw: 1000000,
     headers: anthropicHeaders,
@@ -321,8 +403,8 @@ export const availableModels = [
     modelDisplayName: 'Opus 4.6',
     modelDescription:
       'Previous-generation Opus model. Still highly capable for complex reasoning tasks.',
-    modelContext: '200k context',
-    modelContextRaw: 200000,
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
     headers: anthropicHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
@@ -358,10 +440,55 @@ export const availableModels = [
   },
   {
     officialProvider: 'openai',
+    modelId: 'gpt-6-astra',
+    modelDisplayName: 'GPT-6 Astra',
+    modelDescription:
+      'Advanced reasoning, software engineering, and demanding end-to-end agentic work.',
+    modelContext: '1.05M context',
+    modelContextRaw: 1050000,
+    headers: openaiHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: {
+        // The installed SDK predates GPT-6 reasoning-model detection.
+        forceReasoning: true,
+        reasoningEffort: 'medium',
+        reasoningSummary: 'auto',
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 10,
+      outputPerMillion: 50,
+      relativeMultiplier: 10,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'openai',
     modelId: 'gpt-5.6-sol',
     modelDisplayName: 'GPT-5.6 Sol',
     modelDescription:
-      "OpenAI's flagship GPT-5.6 model, excelling at complex reasoning, coding, and agentic workflows. Particularly strong at command-line and multi-step coding tasks.",
+      "OpenAI's previous-generation GPT-5.6 model, excelling at complex reasoning, coding, and agentic workflows. Particularly strong at command-line and multi-step coding tasks.",
     modelContext: '1.05M context',
     modelContextRaw: 1050000,
     headers: openaiHeaders,
@@ -491,8 +618,8 @@ export const availableModels = [
     modelDisplayName: 'GPT-5.5',
     modelDescription:
       "OpenAI's previous-generation frontier model, excelling at agentic coding, computer use, and long-horizon knowledge work.",
-    modelContext: '1M context',
-    modelContextRaw: 1000000,
+    modelContext: '1.05M context',
+    modelContextRaw: 1050000,
     headers: openaiHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
@@ -534,8 +661,8 @@ export const availableModels = [
     modelDisplayName: 'GPT-5.4',
     modelDescription:
       "OpenAI's previous-generation frontier model. Strong reasoning and multimodal capabilities.",
-    modelContext: '1.1m context',
-    modelContextRaw: 1100000,
+    modelContext: '1.05M context',
+    modelContextRaw: 1050000,
     headers: openaiHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
@@ -576,7 +703,7 @@ export const availableModels = [
     modelId: 'gemini-3.1-pro-preview',
     modelDisplayName: 'Gemini 3.1 Pro (Preview)',
     modelDescription:
-      "Google's latest model with strong reasoning and multimodal capabilities. Preview version (may be unstable).",
+      "Google's reasoning model with strong reasoning and multimodal capabilities. Preview version (may be unstable).",
     modelContext: '1M context',
     modelContextRaw: 1000000,
     headers: googleHeaders,
@@ -616,9 +743,9 @@ export const availableModels = [
     modelId: 'gpt-5.3-codex',
     modelDisplayName: 'GPT-5.3 Codex',
     modelDescription:
-      "OpenAI's most powerful coding model, designed for large-scale projects and complex refactoring.",
-    modelContext: '128k context',
-    modelContextRaw: 128000,
+      "OpenAI's coding model, designed for large-scale projects and complex refactoring.",
+    modelContext: '400k context',
+    modelContextRaw: 400000,
     headers: openaiHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'high' } },
@@ -660,8 +787,8 @@ export const availableModels = [
     modelDisplayName: 'Sonnet 5',
     modelDescription:
       "Anthropic's next-generation mid-size model, combining strong reasoning with efficient performance for daily coding tasks.",
-    modelContext: '200k context',
-    modelContextRaw: 200000,
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
     headers: anthropicHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
@@ -669,9 +796,9 @@ export const availableModels = [
     },
     thinkingEnabled: true,
     pricing: {
-      inputPerMillion: 3.0,
-      outputPerMillion: 15.0,
-      relativeMultiplier: 3.2,
+      inputPerMillion: 2.0,
+      outputPerMillion: 10.0,
+      relativeMultiplier: 2.0,
     },
     capabilities: {
       inputModalities: {
@@ -699,8 +826,8 @@ export const availableModels = [
     modelDisplayName: 'Sonnet 4.6',
     modelDescription:
       'Previous-generation balanced model, still great for daily coding tasks.',
-    modelContext: '200k context',
-    modelContextRaw: 200000,
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
     headers: anthropicHeaders,
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
@@ -860,8 +987,8 @@ export const availableModels = [
     modelDisplayName: 'Kimi K2.5',
     modelDescription:
       "Kimi's most versatile model to date, featuring a native multimodal architecture for dialogue and agent tasks.",
-    modelContext: '250k context',
-    modelContextRaw: 250000,
+    modelContext: '256k context',
+    modelContextRaw: 262144,
     headers: {},
     providerOptions: {
       stagewise: { reasoning: { enabled: true, effort: 'medium' } },
@@ -873,7 +1000,7 @@ export const availableModels = [
     thinkingEnabled: true,
     pricing: {
       inputPerMillion: 0.45,
-      outputPerMillion: 2.2,
+      outputPerMillion: 2.25,
       relativeMultiplier: 0.5,
     },
     capabilities: {
@@ -977,6 +1104,86 @@ export const availableModels = [
         file: false,
       },
       inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'google',
+    modelId: 'gemini-3.8-flash',
+    modelDisplayName: 'Gemini 3.8 Flash',
+    modelDescription:
+      'Multimodal model for long-horizon software engineering and agentic workflows.',
+    modelContext: '1m context',
+    modelContextRaw: 1_048_576,
+    headers: googleHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.75,
+      outputPerMillion: 3.75,
+      relativeMultiplier: 0.75,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: true,
+        image: true,
+        video: true,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GEMINI35_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'google',
+    modelId: 'gemini-3.5-flash-lite',
+    modelDisplayName: 'Gemini 3.5 Flash-Lite',
+    modelDescription:
+      'Efficient multimodal model for focused tasks and high-volume agentic workflows.',
+    modelContext: '1m context',
+    modelContextRaw: 1_048_576,
+    headers: googleHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      google: {
+        thinkingConfig: { includeThoughts: true, thinkingLevel: 'medium' },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.3,
+      outputPerMillion: 2.5,
+      relativeMultiplier: 0.47,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: true,
+        image: true,
+        video: true,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GEMINI35_INPUT_CONSTRAINTS,
       toolCalling: true,
     },
   },
@@ -1301,6 +1508,47 @@ export const availableModels = [
   },
   {
     officialProvider: 'deepseek',
+    modelId: 'deepseek-v4.1-flash',
+    modelDisplayName: 'DeepSeek V4.1 Flash',
+    modelDescription:
+      'Efficient reasoning model with vision input and tool calling.',
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'high' },
+        // Defensive: all current V4 Flash upstreams support tools, but this
+        // guards against future upstream additions that don't.
+        provider: { require_parameters: true },
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.06,
+      outputPerMillion: 0.32,
+      relativeMultiplier: 0.06,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'deepseek',
     modelId: 'deepseek-v4-flash',
     modelDisplayName: 'DeepSeek V4 Flash',
     modelDescription:
@@ -1342,10 +1590,52 @@ export const availableModels = [
   },
   {
     officialProvider: 'z-ai',
+    modelId: 'glm-5.3',
+    modelDisplayName: 'GLM 5.3',
+    modelDescription:
+      'Text-only reasoning model for complex software engineering and long-horizon agent tasks.',
+    modelContext: '1M context',
+    modelContextRaw: 1_048_576,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'high' },
+        provider: { require_parameters: true },
+      },
+      openai: {
+        reasoningEffort: 'high',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.84,
+      outputPerMillion: 2.64,
+      relativeMultiplier: 0.58,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'z-ai',
     modelId: 'glm-5.2',
     modelDisplayName: 'GLM 5.2',
     modelDescription:
-      "Z.ai's latest flagship with a 1M-token context window for large codebases, long-horizon coding, and agentic workflows.",
+      "Z.ai's previous-generation model with a 1M-token context window for large codebases, long-horizon coding, and agentic workflows.",
     modelContext: '1M context',
     modelContextRaw: 1_048_576,
     headers: {},
@@ -1391,7 +1681,7 @@ export const availableModels = [
     modelId: 'glm-5.1',
     modelDisplayName: 'GLM 5.1',
     modelDescription:
-      "Z.ai's newest flagship. Major leap in long-horizon coding and agentic workflows.",
+      "Z.ai's previous-generation model for long-horizon coding and agentic workflows.",
     modelContext: '200k context',
     modelContextRaw: 202_752,
     headers: {},
@@ -1558,7 +1848,7 @@ export const availableModels = [
     modelId: 'MiniMax-M2',
     modelDisplayName: 'MiniMax M2',
     modelDescription:
-      "MiniMax's flagship model tuned for coding and agentic reasoning.",
+      "MiniMax's previous-generation model tuned for coding and agentic reasoning.",
     modelContext: '200k context',
     modelContextRaw: 204_800,
     headers: {},
@@ -1826,10 +2116,54 @@ export const availableModels = [
   },
   {
     officialProvider: 'x-ai',
+    modelId: 'grok-4.7',
+    modelDisplayName: 'Grok 4.7',
+    modelDescription:
+      'Reasoning and multimodal model for coding, knowledge work, and agentic tool use.',
+    modelContext: '500K context',
+    modelContextRaw: 500_000,
+    headers: {},
+    providerOptions: {
+      stagewise: {
+        reasoning: { enabled: true, effort: 'medium' },
+        // Only route to OpenRouter upstreams that support the `reasoning`
+        // parameter, preventing silent drops on non-reasoning upstreams.
+        provider: { require_parameters: true },
+      },
+      openai: {
+        reasoningEffort: 'medium',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 1.6,
+      outputPerMillion: 4.8,
+      relativeMultiplier: 1.07,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'x-ai',
     modelId: 'grok-4.5',
     modelDisplayName: 'Grok 4.5',
     modelDescription:
-      "xAI's smartest model with frontier performance on coding, knowledge work, and STEM. 500K token context window with strong reasoning and low cost.",
+      "xAI's reasoning model with frontier performance on coding, knowledge work, and STEM. 500K token context window with strong reasoning and low cost.",
     modelContext: '500K context',
     modelContextRaw: 500_000,
     headers: {},

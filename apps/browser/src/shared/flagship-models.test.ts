@@ -234,9 +234,9 @@ describe('computeDisabledModelIdsAfterDiscovery', () => {
       expect(result).toContain('gpt-4.1');
     });
 
-    it('enables Pro variants as flagship', () => {
+    it('enables native Pro models but not GPT-5.6 Pro mode slugs', () => {
       const discovered: DiscoveredModel[] = [
-        makeDiscoveredModel('gpt-5.6-sol-pro'), // flagship
+        makeDiscoveredModel('gpt-5.6-sol-pro'), // Pro mode is not a model ID
         makeDiscoveredModel('gpt-5.5-pro'), // flagship
         makeDiscoveredModel('gpt-5.4-pro'), // flagship
         makeDiscoveredModel('gpt-5.2'), // non-flagship
@@ -250,7 +250,7 @@ describe('computeDisabledModelIdsAfterDiscovery', () => {
         existingDiscoveredModelIds: new Set(),
       });
 
-      expect(result).not.toContain('gpt-5.6-sol-pro');
+      expect(result).toContain('gpt-5.6-sol-pro');
       expect(result).not.toContain('gpt-5.5-pro');
       expect(result).not.toContain('gpt-5.4-pro');
       expect(result).toContain('gpt-5.2');
@@ -403,4 +403,43 @@ describe('computeDisabledModelIdsAfterDiscovery', () => {
       expect(result).toEqual(existingDisabled);
     });
   });
+});
+
+describe('September catalog discovery', () => {
+  it('enables new curated models while preserving an existing opt-out', () => {
+    const ids = [
+      'openai/gpt-6-astra',
+      'anthropic/claude-opus-5.5',
+      'anthropic/claude-fable-5.1',
+      'google/gemini-3.8-flash',
+      'google/gemini-3.5-flash-lite',
+      'deepseek/deepseek-v4.1-flash',
+      'z-ai/glm-5.3',
+      'x-ai/grok-4.7',
+      'meta-llama/llama-4-maverick',
+      'qwen/qwen3.8-max-0902',
+      'xiaomi/mimo-v2.6-pro',
+    ];
+    expect(
+      computeDisabledModelIdsAfterDiscovery({
+        typeId: 'openrouter',
+        config: {},
+        discoveredModels: ids.map((id) => makeDiscoveredModel(id)),
+        existingDisabledModelIds: ['openai/gpt-6-astra'],
+        existingDiscoveredModelIds: new Set(['openai/gpt-6-astra']),
+      }),
+    ).toEqual(['openai/gpt-6-astra']);
+  });
+});
+
+it('enables the native DeepSeek Flash alias on first discovery', () => {
+  expect(
+    computeDisabledModelIdsAfterDiscovery({
+      typeId: 'deepseek-api',
+      config: {},
+      discoveredModels: [makeDiscoveredModel('deepseek-flash')],
+      existingDisabledModelIds: [],
+      existingDiscoveredModelIds: new Set(),
+    }),
+  ).toEqual([]);
 });

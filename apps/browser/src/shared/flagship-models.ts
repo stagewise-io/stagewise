@@ -28,11 +28,14 @@ import { availableModels } from './available-models';
 
 const OPENROUTER_FLAGSHIP_MODELS = new Set<string>([
   // Anthropic
+  'anthropic/claude-opus-5.5',
+  'anthropic/claude-fable-5.1',
   'anthropic/claude-opus-5',
   'anthropic/claude-sonnet-5',
   'anthropic/claude-fable-5',
   'anthropic/claude-opus-4.7',
   // OpenAI
+  'openai/gpt-6-astra',
   'openai/gpt-5.6-sol',
   'openai/gpt-5.6-terra',
   'openai/gpt-5.6-luna',
@@ -40,20 +43,26 @@ const OPENROUTER_FLAGSHIP_MODELS = new Set<string>([
   'openai/o3',
   'openai/o4-mini',
   // Google
+  'google/gemini-3.8-flash',
+  'google/gemini-3.5-flash-lite',
   'google/gemini-3.5-flash',
   'google/gemini-3.1-pro-preview',
   'google/gemini-3.1-flash-lite',
   // DeepSeek
+  'deepseek/deepseek-v4.1-flash',
   'deepseek/deepseek-v4-pro',
   'deepseek/deepseek-v4-flash',
   'deepseek/deepseek-r1',
   // Z.AI
+  'z-ai/glm-5.3',
   'z-ai/glm-5.2',
   'z-ai/glm-5.1',
   // MoonshotAI
+  'moonshotai/kimi-k3',
   'moonshotai/kimi-k2.7-code',
   'moonshotai/kimi-k2.6',
   // xAI
+  'x-ai/grok-4.7',
   'x-ai/grok-4.5',
   'x-ai/grok-4.20',
   // Mistral
@@ -62,8 +71,17 @@ const OPENROUTER_FLAGSHIP_MODELS = new Set<string>([
   // NVIDIA
   'nvidia/nemotron-3-ultra-550b-a55b',
   // Qwen
+  'qwen/qwen3.8-max-0902',
+  'qwen/qwen3.8-flash',
   'qwen/qwen3-coder-plus',
   'qwen/qwen3.7-plus',
+  // Meta (OpenRouter discovery only)
+  'meta-llama/llama-4-maverick',
+  // MiniMax
+  'minimax/minimax-m3',
+  // Xiaomi
+  'xiaomi/mimo-v2.6-pro',
+  'xiaomi/mimo-v2.6-flash',
   // Poolside
   'poolside/laguna-xs-2.1',
 ]);
@@ -78,17 +96,8 @@ const OPENROUTER_FLAGSHIP_MODELS = new Set<string>([
 const VENDOR_FLAGSHIP_DISCOVERED_MODELS: Partial<
   Record<ModelProvider, Set<string>>
 > = {
-  openai: new Set([
-    'gpt-5.6-sol-pro',
-    'gpt-5.6-terra-pro',
-    'gpt-5.6-luna-pro',
-    'gpt-5.5-pro',
-    'gpt-5.4-pro',
-    'o3',
-    'o4-mini',
-    'o3-mini',
-  ]),
-  deepseek: new Set(['deepseek-reasoner']),
+  openai: new Set(['gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-mini']),
+  deepseek: new Set(['deepseek-flash', 'deepseek-reasoner']),
 };
 
 // ── Catalog model IDs by vendor (pre-computed) ──────────────────────────────
