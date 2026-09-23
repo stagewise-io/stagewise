@@ -26,6 +26,7 @@ import {
   DEFAULT_INSTANCE_ID,
   INSTANCE_TYPE_ID_TO_API_SPEC,
   getInstanceDisabledModelIds,
+  toggleInstanceDisabledModelId,
   getInstanceModelThinkingOverride,
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
@@ -2745,12 +2746,11 @@ function ModelsSection({
       const [, patches] = produceWithPatches(preferences, (draft) => {
         const inst = draft.providerInstances.find((i) => i.id === instanceId);
         if (!inst) return;
-        const idx = inst.disabledModelIds.indexOf(modelId);
-        if (idx === -1) {
-          inst.disabledModelIds.push(modelId);
-        } else {
-          inst.disabledModelIds.splice(idx, 1);
-        }
+        inst.disabledModelIds = toggleInstanceDisabledModelId(
+          preferences,
+          instanceId,
+          modelId,
+        );
       });
       await updatePreferences(patches);
     },

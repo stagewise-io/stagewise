@@ -2,6 +2,7 @@ import type {
   DiscoveredModel,
   ModelProvider,
 } from './karton-contracts/ui/shared-types';
+import { normalizeNativeModelAlias } from './model-id-matching';
 import { availableModels } from './available-models';
 
 // ============================================================================
@@ -97,7 +98,7 @@ const VENDOR_FLAGSHIP_DISCOVERED_MODELS: Partial<
   Record<ModelProvider, Set<string>>
 > = {
   openai: new Set(['gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-mini']),
-  deepseek: new Set(['deepseek-flash', 'deepseek-reasoner']),
+  deepseek: new Set(['deepseek-reasoner']),
 };
 
 // ── Catalog model IDs by vendor (pre-computed) ──────────────────────────────
@@ -165,13 +166,19 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
   // Resolve the flagship set and catalog IDs for this instance type.
   const { flagshipIds, catalogIds } = resolveFlagshipSet(typeId);
 
+  const matchId = (id: string) =>
+    normalizeNativeModelAlias(
+      id,
+      typeId === 'deepseek-api' ? 'deepseek' : undefined,
+    ).toLowerCase();
+
   // Build the set of currently-discovered model IDs (lowercase).
   const currentDiscoveredIds = new Set(
-    discoveredModels.map((m) => m.modelId.toLowerCase()),
+    discoveredModels.map((m) => matchId(m.modelId)),
   );
 
   const normalizedExistingDiscoveredIds = new Set(
-    Array.from(existingDiscoveredModelIds, (id) => id.toLowerCase()),
+    Array.from(existingDiscoveredModelIds, (id) => matchId(id)),
   );
 
   // Start with a copy of existing disabled IDs.
@@ -179,7 +186,7 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
 
   // Auto-disable newly-discovered non-flagship models.
   for (const dm of discoveredModels) {
-    const idLower = dm.modelId.toLowerCase();
+    const idLower = matchId(dm.modelId);
 
     // Catalog models are always flagship — skip.
     if (catalogIds.has(idLower)) continue;
@@ -201,7 +208,7 @@ export function computeDisabledModelIdsAfterDiscovery(params: {
   // discovery (which shouldn't happen for vendor APIs, but be safe).
   const finalDisabled: string[] = [];
   for (const id of Array.from(disabledSet)) {
-    const idLower = id.toLowerCase();
+    const idLower = matchId(id);
     if (catalogIds.has(idLower)) {
       // User-disabled catalog model — keep.
       finalDisabled.push(id);

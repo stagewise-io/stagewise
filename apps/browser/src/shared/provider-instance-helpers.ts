@@ -33,6 +33,7 @@ import {
   getAvailableModel,
   type BuiltInModel,
 } from './available-models';
+import { normalizeNativeModelAlias } from './model-id-matching';
 import type { ThinkingRoute } from './model-thinking-capabilities';
 
 /**
@@ -421,7 +422,8 @@ export function getInstanceThinkingDefaultOptions(
 }
 
 /**
- * Get the `disabledModelIds` for a specific provider instance.
+ * Get disabled IDs and their catalog equivalents for a provider instance.
+ * Stored preferences are left untouched.
  * Returns an empty array if the instance is not found.
  */
 export function getInstanceDisabledModelIds(
@@ -430,7 +432,16 @@ export function getInstanceDisabledModelIds(
 ): string[] {
   const instances = preferences.providerInstances ?? [];
   const instance = instances.find((i) => i.id === instanceId);
-  return instance?.disabledModelIds ?? [];
+  if (!instance) return [];
+  const vendor = getVendorForInstance(instance);
+  return Array.from(
+    new Set(
+      (instance.disabledModelIds ?? []).flatMap((id) => [
+        id,
+        normalizeNativeModelAlias(id, vendor),
+      ]),
+    ),
+  );
 }
 
 /**
@@ -453,12 +464,18 @@ export function toggleInstanceDisabledModelId(
   instanceId: string,
   modelId: string,
 ): string[] {
-  const current = getInstanceDisabledModelIds(preferences, instanceId);
-  const idx = current.indexOf(modelId);
-  if (idx === -1) {
-    return [...current, modelId];
-  }
-  return current.filter((id) => id !== modelId);
+  const instance = preferences.providerInstances?.find(
+    (i) => i.id === instanceId,
+  );
+  const current = instance?.disabledModelIds ?? [];
+  const vendor = instance ? getVendorForInstance(instance) : undefined;
+  const matchId = normalizeNativeModelAlias(modelId, vendor);
+  const remaining = current.filter(
+    (id) => normalizeNativeModelAlias(id, vendor) !== matchId,
+  );
+  return remaining.length === current.length
+    ? [...current, modelId]
+    : remaining;
 }
 
 /**
@@ -542,6 +559,7 @@ function getVendorForTypeId(
  * Normalize model IDs for catalog/discovery matching without changing the ID
  * displayed or sent to the provider. Anthropic's catalog uses dotted version
  * numbers, while its native discovery API returns the equivalent hyphenated ID.
+ * DeepSeek's native deepseek-flash alias matches the curated versioned ID.
  */
 function getCatalogMatchId(
   instance: ProviderInstance,
@@ -550,7 +568,7 @@ function getCatalogMatchId(
   const vendor = getVendorForInstance(instance);
   return vendor === 'anthropic'
     ? modelId.replace(/\./g, '-').toLowerCase()
-    : modelId.toLowerCase();
+    : normalizeNativeModelAlias(modelId, vendor).toLowerCase();
 }
 
 /**
@@ -686,8 +704,16 @@ export function getSelectableModelEntries(
   const entries: ModelSelectorEntry[] = [];
 
   for (const instance of instances) {
-    const disabled = new Set(instance.disabledModelIds ?? []);
-    const isDisabled = (id: string) => !includeDisabled && disabled.has(id);
+    const disabled = new Set(
+      (instance.disabledModelIds ?? []).map((id) =>
+        normalizeNativeModelAlias(id, getVendorForInstance(instance)),
+      ),
+    );
+    const isDisabled = (id: string) =>
+      !includeDisabled &&
+      disabled.has(
+        normalizeNativeModelAlias(id, getVendorForInstance(instance)),
+      );
     // Track catalog model IDs pushed for this instance so discovered
     // models that duplicate a catalog entry are skipped (catalog wins).
     // Stored lowercase for case-insensitive matching — some APIs return
@@ -903,7 +929,13 @@ export function getInstanceModelCount(
   instance: ProviderInstance,
   preferences?: Pick<UserPreferences, 'customModels'>,
 ): number {
-  const disabled = new Set(instance.disabledModelIds ?? []);
+  const disabled = new Set(
+    (instance.disabledModelIds ?? []).map((id) =>
+      normalizeNativeModelAlias(id, getVendorForInstance(instance)),
+    ),
+  );
+  const isDisabled = (id: string) =>
+    disabled.has(normalizeNativeModelAlias(id, getVendorForInstance(instance)));
   let count = 0;
   // Track catalog model IDs counted for this instance so discovered
   // models that duplicate a catalog entry are not double-counted.
@@ -911,16 +943,14 @@ export function getInstanceModelCount(
   const catalogModelIds = new Set<string>();
 
   if (instance.typeId === 'stagewise') {
-    count += availableModelAliases.filter(
-      (a) => !disabled.has(a.modelId),
-    ).length;
+    count += availableModelAliases.filter((a) => !isDisabled(a.modelId)).length;
     for (const a of availableModelAliases) {
-      if (!disabled.has(a.modelId))
+      if (!isDisabled(a.modelId))
         catalogModelIds.add(getCatalogMatchId(instance, a.modelId));
     }
-    count += availableModels.filter((m) => !disabled.has(m.modelId)).length;
+    count += availableModels.filter((m) => !isDisabled(m.modelId)).length;
     for (const m of availableModels) {
-      if (!disabled.has(m.modelId))
+      if (!isDisabled(m.modelId))
         catalogModelIds.add(getCatalogMatchId(instance, m.modelId));
     }
   } else if (instance.typeId === 'coding-plan') {
@@ -937,7 +967,7 @@ export function getInstanceModelCount(
         (m) =>
           m.officialProvider === plan.provider &&
           discoveredIds.has(getCatalogMatchId(instance, m.modelId)) &&
-          !disabled.has(m.modelId),
+          !isDisabled(m.modelId),
       );
       count += vendorModels.length;
       for (const m of vendorModels)
@@ -947,7 +977,7 @@ export function getInstanceModelCount(
     const vendor = getVendorForTypeId(instance.typeId);
     if (vendor) {
       const vendorModels = availableModels.filter(
-        (m) => m.officialProvider === vendor && !disabled.has(m.modelId),
+        (m) => m.officialProvider === vendor && !isDisabled(m.modelId),
       );
       count += vendorModels.length;
       for (const m of vendorModels)
@@ -981,7 +1011,7 @@ export function getInstanceModelCount(
       ) {
         continue;
       }
-      if (disabled.has(dm.modelId)) continue;
+      if (isDisabled(dm.modelId)) continue;
       if (hasEnabledList && !enabled.has(dm.modelId)) continue;
       discoveredModelIds.add(normalizedModelId);
       count++;
@@ -991,7 +1021,7 @@ export function getInstanceModelCount(
   if (preferences) {
     count += (preferences.customModels ?? []).filter((model) => {
       const instanceId = model.providerInstanceId ?? model.endpointId;
-      return instanceId === instance.id && !disabled.has(model.modelId);
+      return instanceId === instance.id && !isDisabled(model.modelId);
     }).length;
   }
 
