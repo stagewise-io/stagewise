@@ -510,8 +510,12 @@ export const moonshotaiApiType: ProviderType<OfficialApiConfig> =
 export const alibabaApiType: ProviderType<OfficialApiConfig> =
   createOpenAICompatibleApiType('alibaba');
 
-export const deepseekApiType: ProviderType<OfficialApiConfig> =
-  createOpenAICompatibleApiType('deepseek');
+export const deepseekApiType: ProviderType<OfficialApiConfig> = {
+  ...createOpenAICompatibleApiType('deepseek'),
+  toWireModelId(modelId: string): string {
+    return modelId === 'deepseek-v4.1-flash' ? 'deepseek-flash' : modelId;
+  },
+};
 
 export const zAiApiType: ProviderType<OfficialApiConfig> =
   createOpenAICompatibleApiType('z-ai');

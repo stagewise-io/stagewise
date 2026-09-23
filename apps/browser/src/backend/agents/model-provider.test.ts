@@ -2114,3 +2114,48 @@ describe('reasoning signature source helpers', () => {
     ).toBe(true);
   });
 });
+
+describe('current catalog wire IDs', () => {
+  it.each([
+    [
+      'anthropic',
+      'claude-opus-5.5',
+      'claude-opus-5-5',
+      'anthropic/claude-opus-5.5',
+    ],
+    [
+      'anthropic',
+      'claude-fable-5.1',
+      'claude-fable-5-1',
+      'anthropic/claude-fable-5.1',
+    ],
+    [
+      'deepseek',
+      'deepseek-v4.1-flash',
+      'deepseek-flash',
+      'deepseek/deepseek-v4.1-flash',
+    ],
+  ] as const)('keeps native and Stagewise IDs distinct for %s %s', (vendor, id, nativeId, stagewiseId) => {
+    expect(getProviderType(`${vendor}-api`).toWireModelId?.(id, vendor)).toBe(
+      nativeId,
+    );
+    expect(getProviderType('stagewise').toWireModelId?.(id, vendor)).toBe(
+      stagewiseId,
+    );
+  });
+});
+
+describe('GPT-6 Astra SDK compatibility', () => {
+  it('preserves reasoning options on the native Responses route', () => {
+    const service = createTestModelProviderService({
+      providerModes: { openai: 'official' },
+    });
+    const result = service.getModelWithOptions('gpt-6-astra', 'trace-1');
+    expect(result.contextWindowSize).toBe(1050000);
+    expect(result.providerOptions?.openai).toMatchObject({
+      forceReasoning: true,
+      reasoningEffort: 'medium',
+      reasoningSummary: 'auto',
+    });
+  });
+});

@@ -1,3 +1,4 @@
+import { getAvailableModel } from './available-models';
 import { describe, expect, it } from 'vitest';
 import {
   createThinkingProviderOptionsPatch,
@@ -309,5 +310,48 @@ describe('model thinking capabilities', () => {
       getSupportedThinkingOptions(model).map((option) => option.value),
     ).toEqual(['low', 'medium', 'high', 'max', 'ultra']);
     expect(getEffectiveThinkingSelection(model)?.value).toBe('high');
+  });
+});
+
+describe('current model reasoning contracts', () => {
+  it.each([
+    'claude-opus-5.5',
+    'claude-fable-5.1',
+    'gpt-6-astra',
+    'glm-5.3',
+  ])('keeps required thinking enabled for %s even with a saved off override', (id) => {
+    const model = getAvailableModel(id)!;
+    expect(
+      getEffectiveThinkingSelection(model, { enabled: false })?.enabled,
+    ).toBe(true);
+    const patch = createThinkingProviderOptionsPatch({
+      model,
+      override: { enabled: false },
+    });
+    expect(JSON.stringify(patch)).not.toContain('disabled');
+    expect(JSON.stringify(patch)).not.toContain('none');
+  });
+  it('does not offer unsupported minimal thinking for Gemini 3.8', () => {
+    expect(
+      getSupportedThinkingOptions(getAvailableModel('gemini-3.8-flash')!).map(
+        (o) => o.value,
+      ),
+    ).toEqual(['low', 'medium', 'high']);
+  });
+  it('offers the native Astra effort range without off', () => {
+    expect(
+      getSupportedThinkingOptions(getAvailableModel('gpt-6-astra')!).map(
+        (o) => o.value,
+      ),
+    ).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+  });
+  it.each([
+    'glm-5.3',
+    'deepseek-v4.1-flash',
+    'kimi-k3',
+  ])('omits unsupported medium reasoning for %s', (id) => {
+    expect(
+      getSupportedThinkingOptions(getAvailableModel(id)!).map((o) => o.value),
+    ).toEqual(['low', 'high', 'max']);
   });
 });

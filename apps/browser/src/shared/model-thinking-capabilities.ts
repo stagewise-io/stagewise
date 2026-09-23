@@ -63,6 +63,14 @@ const OPENAI_GPT_5_OPTIONS = createOptions('openai', [
   ['xhigh', 'Extra high', true],
 ]);
 
+const OPENAI_ASTRA_OPTIONS = createOptions('openai', [
+  ['low', 'Low', true],
+  ['medium', 'Medium', true],
+  ['high', 'High', true],
+  ['xhigh', 'Extra high', true],
+  ['max', 'Max', true],
+]);
+
 const OPENAI_CONSERVATIVE_OPTIONS = createOptions('openai', [
   ['low', 'Low', true],
   ['medium', 'Medium', true],
@@ -218,6 +226,7 @@ export function getSupportedThinkingOptions(
     case 'stagewise':
       return STAGEWISE_OPTIONS;
     case 'openai':
+      if (modelId === 'gpt-6-astra') return OPENAI_ASTRA_OPTIONS;
       return isKnownOpenAiGpt5Model(modelId)
         ? OPENAI_GPT_5_OPTIONS
         : OPENAI_CONSERVATIVE_OPTIONS;
@@ -281,7 +290,7 @@ export function getEffectiveThinkingSelection(
 
   if (!hasOverride) return defaultSelection;
 
-  if (override?.enabled === false) {
+  if (override?.enabled === false && !requiresThinking(model.modelId)) {
     return toDisabledSelection(
       options,
       provider,
@@ -406,12 +415,31 @@ function isMatchingOverrideProvider(
   );
 }
 
+function requiresThinking(modelId: string): boolean {
+  const id = modelId.split('/').at(-1)?.replace(/\./g, '-');
+  return (
+    id === 'claude-opus-5-5' ||
+    id === 'claude-fable-5-1' ||
+    id === 'gpt-6-astra' ||
+    id === 'glm-5-3'
+  );
+}
+
 function getOpenAiCompatibleOptions(modelId: string): ThinkingOption[] {
+  // These native APIs accept low, high, and max, but not medium.
+  if (['glm-5.3', 'deepseek-v4.1-flash', 'kimi-k3'].includes(modelId)) {
+    return createOptions('openai-compatible', [
+      ['low', 'Low', true],
+      ['high', 'High', true],
+      ['max', 'Max', true],
+    ]);
+  }
   if (modelId === 'glm-5.2') return OPENAI_COMPATIBLE_MAX_OPTIONS;
   return OPENAI_COMPATIBLE_OPTIONS;
 }
 
 function getGoogleOptions(modelId: string): ThinkingOption[] {
+  if (/^gemini-3\.[78]-flash/.test(modelId)) return GOOGLE_PRO_OPTIONS;
   if (modelId.startsWith('gemini-3.1-pro')) return GOOGLE_PRO_OPTIONS;
   if (modelId.startsWith('gemini-3-pro')) return GOOGLE_PRO_STRICT_OPTIONS;
   if (modelId.startsWith('gemini-3') && modelId.includes('flash')) {
@@ -422,6 +450,7 @@ function getGoogleOptions(modelId: string): ThinkingOption[] {
 
 function getAnthropicOptions(modelId: string): ThinkingOption[] {
   if (
+    modelId.startsWith('claude-sonnet-5') ||
     modelId.startsWith('claude-opus-5') ||
     modelId.startsWith('claude-fable-5') ||
     modelId.startsWith('claude-mythos-5') ||
@@ -434,8 +463,7 @@ function getAnthropicOptions(modelId: string): ThinkingOption[] {
 
   if (
     modelId.startsWith('claude-opus-4.6') ||
-    modelId.startsWith('claude-sonnet-4.6') ||
-    modelId.startsWith('claude-sonnet-5')
+    modelId.startsWith('claude-sonnet-4.6')
   ) {
     return ANTHROPIC_ADAPTIVE_MAX_OPTIONS;
   }
