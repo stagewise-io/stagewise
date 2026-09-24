@@ -1,8 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import type { ProviderUsageLimits } from '@shared/karton-contracts/ui/shared-types';
-import { resolveAcpEnvironment } from '../../acp/adapter';
+import { getLocalOpenCodeApiKey } from './local-auth';
 
 interface OpenCodeUsageResponse {
   usage?: {
@@ -17,28 +14,6 @@ interface OpenCodeUsageWindow {
 }
 
 let pendingUsage: Promise<ProviderUsageLimits> | undefined;
-let environmentPromise: Promise<NodeJS.ProcessEnv | null> | undefined;
-
-function authFilePath(env: NodeJS.ProcessEnv): string {
-  const dataHome = env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
-  return join(dataHome, 'opencode', 'auth.json');
-}
-
-async function readApiKey(env: NodeJS.ProcessEnv): Promise<string | undefined> {
-  try {
-    const contents = env.OPENCODE_AUTH_CONTENT
-      ? env.OPENCODE_AUTH_CONTENT
-      : await readFile(authFilePath(env), 'utf8');
-    const auth = JSON.parse(contents) as Record<
-      string,
-      { type?: string; key?: string }
-    >;
-    const credential = auth['opencode-go'];
-    return credential?.type === 'api' ? credential.key : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export function formatOpenCodeUsage(
   response: OpenCodeUsageResponse,
@@ -54,9 +29,7 @@ export function formatOpenCodeUsage(
 }
 
 async function readOpenCodeUsageLimits(): Promise<ProviderUsageLimits> {
-  environmentPromise ??= resolveAcpEnvironment();
-  const shellEnv = (await environmentPromise) ?? {};
-  const apiKey = await readApiKey({ ...process.env, ...shellEnv });
+  const apiKey = await getLocalOpenCodeApiKey('opencode-go');
   if (!apiKey) return [];
   const response = await fetch('https://opencode.ai/zen/go/v1/usage', {
     headers: { authorization: `Bearer ${apiKey}` },
