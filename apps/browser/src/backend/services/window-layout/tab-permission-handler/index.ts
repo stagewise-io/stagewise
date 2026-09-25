@@ -784,6 +784,9 @@ export class TabPermissionHandler {
       'speaker-selection': 'speaker-selection',
       'storage-access': 'storage-access',
       'top-level-storage-access': 'storage-access',
+      // Not an Electron permission: raised by the passkey relay before it runs
+      // a WebAuthn ceremony in a browser outside the app.
+      passkey: 'passkey',
     };
     return mapping[permission] || null;
   }

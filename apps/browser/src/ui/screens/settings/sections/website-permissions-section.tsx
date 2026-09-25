@@ -29,6 +29,7 @@ const permissionTypeLabels: Record<ConfigurablePermissionType, string> = {
   'idle-detection': 'Idle Detection',
   'speaker-selection': 'Speaker Selection',
   'storage-access': 'Storage Access',
+  passkey: 'Passkeys',
 };
 
 /** Human-readable labels for permission settings */

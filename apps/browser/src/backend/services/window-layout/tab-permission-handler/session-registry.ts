@@ -61,6 +61,7 @@ function mapToConfigurablePermission(
     'speaker-selection': 'speaker-selection',
     'storage-access': 'storage-access',
     'top-level-storage-access': 'storage-access', // variant maps to storage-access
+    passkey: 'passkey',
   };
   return mapping[permission] ?? null;
 }
@@ -355,6 +356,45 @@ export class SessionPermissionRegistry {
     this.logger.debug(
       '[SessionPermissionRegistry] Session handlers registered',
     );
+  }
+
+  /**
+   * Asks the user whether `origin` may use the passkeys stored on this machine.
+   *
+   * WebAuthn is not an Electron permission, so this request never passes through
+   * `setPermissionRequestHandler` — but relaying a ceremony opens a browser
+   * outside the app and can produce an assertion for a real account, so it gets
+   * the same stored Allow/Block/Ask treatment and the same prompt as any other
+   * capability a page can reach for.
+   */
+  public async requestPasskeyRelay(
+    webContentsId: number,
+    origin: string,
+  ): Promise<boolean> {
+    const setting = this.preferencesService?.getPermissionSetting(
+      origin,
+      'passkey',
+    );
+    if (setting === PermissionSetting.Allow) return true;
+    if (setting === PermissionSetting.Block) {
+      this.logger.debug(
+        `[SessionPermissionRegistry] Auto-blocking passkey relay for ${origin} (stored preference)`,
+      );
+      return false;
+    }
+
+    const handler = this.handlers.get(webContentsId);
+    if (!handler) {
+      // No handler registered - reject for security, as the request handler does.
+      this.logger.debug(
+        `[SessionPermissionRegistry] No handler for passkey relay request (webContents: ${webContentsId})`,
+      );
+      return false;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      handler.handlePermissionRequest('passkey', {}, resolve);
+    });
   }
 
   /**

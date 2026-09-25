@@ -21,6 +21,7 @@ import {
   IconConnection2Outline18,
   IconCheckOutline18,
   IconBanOutline18,
+  IconKey2Outline18,
 } from '@stagewise/icons';
 import { IconBluetoothOutline24 } from '@stagewise/icons';
 import { IconUsbOutline24 } from '@stagewise/icons';
@@ -67,6 +68,7 @@ const ICON_COLORS: Record<string, string> = {
   'idle-detection': 'text-violet-600 dark:text-violet-300',
   'speaker-selection': 'text-cyan-600 dark:text-cyan-300',
   'storage-access': 'text-amber-600 dark:text-amber-300',
+  passkey: 'text-emerald-600 dark:text-emerald-300',
 };
 
 function PermissionIcon({
@@ -110,6 +112,8 @@ function PermissionIcon({
       return <IconSpeakerOutline18 className={cn} />;
     case 'storage-access':
       return <IconHardDriveOutline18 className={cn} />;
+    case 'passkey':
+      return <IconKey2Outline18 className={cn} />;
     default:
       return <IconConnection2Outline18 className={cn} />;
   }
@@ -162,6 +166,8 @@ function getRequestDescription(request: PermissionRequest): string {
       return 'wants to select audio output';
     case 'storage-access':
       return 'wants storage access';
+    case 'passkey':
+      return 'wants to sign in with a passkey saved on this device';
     case 'bluetooth':
       return 'wants to connect to a Bluetooth device';
     case 'hid':
@@ -189,6 +195,7 @@ const SIMPLE_REQUEST_TYPES = [
   'idle-detection',
   'speaker-selection',
   'storage-access',
+  'passkey',
 ];
 
 function isSimpleRequest(request: PermissionRequest): boolean {

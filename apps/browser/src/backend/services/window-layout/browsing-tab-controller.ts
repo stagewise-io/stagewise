@@ -49,6 +49,8 @@ import { TabErrorHandler } from './tab-error-handler';
 import { TabPermissionHandler } from './tab-permission-handler';
 import { SessionPermissionRegistry } from './tab-permission-handler/session-registry';
 import { TabAuthenticationHandler } from './tab-authentication-handler';
+import { TabPasskeyAuthenticator } from './tab-passkey-authenticator';
+import { PersistedPasskeyCredentialStore } from './tab-passkey-authenticator/credential-store';
 import type {
   PermissionRequest,
   AuthenticationRequest,
@@ -265,6 +267,9 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
   // Authentication handling
   private authenticationHandler: TabAuthenticationHandler | null = null;
 
+  // WebAuthn / passkey support
+  private passkeyAuthenticator: TabPasskeyAuthenticator | null = null;
+
   constructor(
     id: string,
     parentWindow: BaseWindow,
@@ -412,6 +417,7 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     this.setupErrorHandler();
     this.setupPermissionHandler();
     this.setupAuthenticationHandler();
+    this.setupPasskeyAuthenticator();
 
     // Initialize zoom percentage from Electron's current zoom factor
     // This ensures we reflect any persisted zoom from previous sessions
@@ -1330,6 +1336,12 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
     if (this.authenticationHandler) {
       this.authenticationHandler.destroy();
       this.authenticationHandler = null;
+    }
+
+    // Clean up passkey authenticator
+    if (this.passkeyAuthenticator) {
+      this.passkeyAuthenticator.destroy();
+      this.passkeyAuthenticator = null;
     }
 
     // Only detach debugger if webContents is still alive
@@ -2579,6 +2591,23 @@ export class BrowsingTabController extends EventEmitter<TabControllerEventMap> {
    */
   public cancelAuth(requestId: string): void {
     this.authenticationHandler?.cancelAuth(requestId);
+  }
+
+  // =========================================================================
+  // Passkey / WebAuthn Handling
+  // =========================================================================
+
+  /**
+   * Gives the tab a virtual authenticator so WebAuthn requests resolve instead
+   * of hanging forever. See TabPasskeyAuthenticator for why this is needed.
+   */
+  private setupPasskeyAuthenticator() {
+    this.passkeyAuthenticator = new TabPasskeyAuthenticator(
+      this.webContentsView.webContents,
+      PersistedPasskeyCredentialStore.getInstance(this.logger),
+      this.logger,
+    );
+    void this.passkeyAuthenticator.install();
   }
 
   // =========================================================================
