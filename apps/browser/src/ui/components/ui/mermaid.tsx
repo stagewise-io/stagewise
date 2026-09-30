@@ -1,9 +1,8 @@
 import posthog from 'posthog-js';
 import type { MermaidConfig } from 'mermaid';
 import { useEffect, useRef, useState } from 'react';
-import { cn } from '@ui/utils';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 import { getMermaidCache } from '@ui/hooks/use-mermaid-cache';
-import { useOpenImageTab } from '@ui/hooks/use-open-image-tab';
 
 const initializeMermaid = async (customConfig?: MermaidConfig) => {
   const defaultConfig: MermaidConfig = {
@@ -30,16 +29,15 @@ type MermaidProps = {
   chart: string;
   className?: string;
   config?: MermaidConfig;
-  openInTab?: boolean;
+  onOpenInTab?: (title: string, sourceUrl: string, mimeType: string) => void;
 };
 
 export const Mermaid = ({
   chart,
   className,
   config,
-  openInTab = false,
+  onOpenInTab,
 }: MermaidProps) => {
-  const openImageTab = useOpenImageTab();
   const cachedEntry = mermaidCache.get(chart, config);
 
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +145,7 @@ export const Mermaid = ({
 
   const displaySvg = svgContent || lastValidSvg;
 
-  if (openInTab) {
+  if (onOpenInTab) {
     return (
       <button
         type="button"
@@ -168,7 +166,7 @@ export const Mermaid = ({
             exportedSvg.setAttribute('width', String(width));
             exportedSvg.setAttribute('height', String(height));
           }
-          openImageTab(
+          onOpenInTab(
             'Mermaid chart',
             `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
               new XMLSerializer().serializeToString(exportedSvg),

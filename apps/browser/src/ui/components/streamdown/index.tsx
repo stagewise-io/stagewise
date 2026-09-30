@@ -307,6 +307,7 @@ const CodeComponent = ({
 }: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> &
   ExtraProps) => {
   const { isStreaming } = useContext(StreamdownContext);
+  const openImageTab = useOpenImageTab();
 
   const inline = node?.position?.start.line === node?.position?.end.line;
 
@@ -359,7 +360,7 @@ const CodeComponent = ({
         >
           <Mermaid
             chart={code}
-            openInTab
+            onOpenInTab={openImageTab}
             config={{
               theme: 'default',
             }}
