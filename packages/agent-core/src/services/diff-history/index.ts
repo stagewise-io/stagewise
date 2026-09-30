@@ -1644,10 +1644,11 @@ export class DiffHistoryService extends DisposableService {
     return o;
   }
 
-  protected onTeardown(): Promise<void> | void {
+  protected async onTeardown(): Promise<void> {
     this.unsubscribeStore?.();
     this.unsubscribeStore = null;
-    this.watcher?.close();
+    await this.watcher?.close();
+    this.watcher = null;
     this.dbDriver.close();
     this.filesIgnoredByWatcher.clear();
     this.fileDiffCache.clear();

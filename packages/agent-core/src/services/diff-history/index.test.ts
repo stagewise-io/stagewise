@@ -16,7 +16,14 @@ describe('DiffHistoryService finalization', () => {
   afterEach(async () => {
     await service?.teardown();
     service = undefined;
-    if (root) await rm(root, { recursive: true, force: true });
+    if (root) {
+      await rm(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
+    }
     root = undefined;
   });
 

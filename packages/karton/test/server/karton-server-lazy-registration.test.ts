@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { createKartonServer } from '../../src/server/karton-server.js';
@@ -7,6 +7,32 @@ import { KartonProcedureError } from '../../src/shared/types.js';
 import { createKartonClient } from '../../src/client/karton-client.js';
 import type { KartonClient } from '../../src/shared/types.js';
 import type { Server } from 'http';
+
+async function listenOnAvailablePort(server: Server): Promise<number> {
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => reject(error);
+    server.once('error', onError);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', onError);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('HTTP test server did not bind to a TCP port');
+  }
+  return address.port;
+}
+
+async function waitForConnection(
+  client: KartonClient<TestAppType>,
+): Promise<void> {
+  await vi.waitFor(() => expect(client.isConnected).toBe(true), {
+    timeout: 5_000,
+    interval: 10,
+  });
+}
 
 type TestAppType = {
   state: {
@@ -30,10 +56,6 @@ describe('KartonServer Lazy Registration', () => {
   let client: KartonClient<TestAppType>;
   let httpServer: Server;
   let port: number;
-
-  beforeEach(async () => {
-    port = 8080 + Math.floor(Math.random() * 1000);
-  });
 
   afterEach(async () => {
     if (client) {
@@ -73,10 +95,10 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: {
           notify: async (message: string) => {
             console.log('Client notified:', message);
@@ -86,7 +108,7 @@ describe('KartonServer Lazy Registration', () => {
       });
 
       // Wait for connection
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       // Call the procedure
       const result = await client.serverProcedures.increment(5);
@@ -119,17 +141,17 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: {
           notify: async () => {},
         },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       const data = await client.serverProcedures.nested.getData();
       expect(data).toBe('test data');
@@ -156,22 +178,25 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       // Create multiple clients
       const client1 = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
       const client2 = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await Promise.all([
+        waitForConnection(client1),
+        waitForConnection(client2),
+      ]);
 
       // Register handler after clients are connected
       const handler = vi.fn(async (clientId: string, amount: number) => amount * 2);
@@ -243,15 +268,15 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       const result = await client.serverProcedures.increment(4);
       
@@ -276,15 +301,15 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       const handler = async (clientId: string, amount: number) => amount * 2;
       server.registerServerProcedureHandler('increment', handler);
@@ -318,15 +343,15 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       // Try to call procedure without handler
       await expect(client.serverProcedures.increment(5)).rejects.toThrow(
@@ -350,15 +375,15 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       try {
         await client.serverProcedures.nested.getData();
@@ -400,15 +425,15 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       // Both procedures should work
       const dataResult = await client.serverProcedures.nested.getData();
@@ -441,15 +466,15 @@ describe('KartonServer Lazy Registration', () => {
           wss.emit('connection', ws, request);
         });
       });
-      httpServer.listen(port);
+      port = await listenOnAvailablePort(httpServer);
 
       client = createKartonClient<TestAppType>({
-        webSocketPath: `ws://localhost:${port}`,
+        webSocketPath: `ws://127.0.0.1:${port}`,
         procedures: { notify: async () => {} },
         fallbackState: { counter: 0, message: '' },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForConnection(client);
 
       // Initial handler works
       const result1 = await client.serverProcedures.increment(5);
