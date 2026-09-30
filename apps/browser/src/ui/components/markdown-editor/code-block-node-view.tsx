@@ -4,7 +4,7 @@ import {
   type NodeViewProps,
 } from '@tiptap/react';
 import { useState, useEffect, useRef } from 'react';
-import { cn } from '@ui/utils';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 import { Mermaid } from '../ui/mermaid';
 
 type MermaidMode = 'view' | 'edit' | 'split';

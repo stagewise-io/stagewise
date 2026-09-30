@@ -5,7 +5,7 @@ import { CustomTaskItem } from './task-item-extension';
 import { ShikiCodeBlock } from './shiki-code-block';
 import { Markdown } from 'tiptap-markdown';
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { cn } from '@ui/utils';
+import { cn } from '@stagewise/stage-ui/lib/utils';
 import './markdown-editor.css';
 
 const DEBOUNCE_MS = 300;
