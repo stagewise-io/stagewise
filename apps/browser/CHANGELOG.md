@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.30.0 (2026-09-30)
+
+### Features
+
+* add latest GPT and Claude models (47a8162)
+
+### Bug Fixes
+
+* normalize rich LSP diagnostic messages (39f6a52)
+* decouple plan viewer from UI karton (db8a06d)
+
 ## 1.29.1 (2026-09-23)
 
 ### Bug Fixes
