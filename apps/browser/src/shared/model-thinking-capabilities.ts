@@ -63,13 +63,18 @@ const OPENAI_GPT_5_OPTIONS = createOptions('openai', [
   ['xhigh', 'Extra high', true],
 ]);
 
-const OPENAI_ASTRA_OPTIONS = createOptions('openai', [
+const OPENAI_GPT_6_OPTIONS = createOptions('openai', [
+  ['none', 'Off', false],
   ['low', 'Low', true],
   ['medium', 'Medium', true],
   ['high', 'High', true],
   ['xhigh', 'Extra high', true],
   ['max', 'Max', true],
 ]);
+
+const OPENAI_GPT_6_REQUIRED_OPTIONS = OPENAI_GPT_6_OPTIONS.filter(
+  (option) => option.enabled,
+);
 
 const OPENAI_CONSERVATIVE_OPTIONS = createOptions('openai', [
   ['low', 'Low', true],
@@ -226,7 +231,10 @@ export function getSupportedThinkingOptions(
     case 'stagewise':
       return STAGEWISE_OPTIONS;
     case 'openai':
-      if (modelId === 'gpt-6-astra') return OPENAI_ASTRA_OPTIONS;
+      if (requiresOpenAiGpt6Thinking(modelId)) {
+        return OPENAI_GPT_6_REQUIRED_OPTIONS;
+      }
+      if (isKnownOpenAiGpt6Model(modelId)) return OPENAI_GPT_6_OPTIONS;
       return isKnownOpenAiGpt5Model(modelId)
         ? OPENAI_GPT_5_OPTIONS
         : OPENAI_CONSERVATIVE_OPTIONS;
@@ -424,6 +432,7 @@ function requiresThinking(modelId: string): boolean {
     id === 'claude-opus-5-5' ||
     id === 'claude-fable-5-1' ||
     id === 'gpt-6-astra' ||
+    id === 'gpt-6-1-sol' ||
     id === 'glm-5-3' ||
     id === 'kimi-k3'
   );
@@ -478,6 +487,14 @@ function getAnthropicOptions(modelId: string): ThinkingOption[] {
   }
 
   return ANTHROPIC_CONSERVATIVE_OPTIONS;
+}
+
+function requiresOpenAiGpt6Thinking(modelId: string): boolean {
+  return modelId === 'gpt-6-astra' || modelId === 'gpt-6.1-sol';
+}
+
+function isKnownOpenAiGpt6Model(modelId: string): boolean {
+  return /^gpt-6(?:\.\d+)?(?:$|-)/.test(modelId);
 }
 
 function isKnownOpenAiGpt5Model(modelId: string): boolean {

@@ -408,8 +408,12 @@ describe('computeDisabledModelIdsAfterDiscovery', () => {
 describe('September catalog discovery', () => {
   it('enables new curated models while preserving an existing opt-out', () => {
     const ids = [
+      'openai/gpt-6.1-sol',
       'openai/gpt-6-astra',
+      'openai/gpt-6-sol',
+      'openai/gpt-6-luna',
       'anthropic/claude-opus-5.5',
+      'anthropic/claude-sonnet-5.5',
       'anthropic/claude-fable-5.1',
       'google/gemini-3.8-flash',
       'google/gemini-3.5-flash-lite',

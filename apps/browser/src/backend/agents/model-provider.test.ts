@@ -2125,6 +2125,12 @@ describe('current catalog wire IDs', () => {
     ],
     [
       'anthropic',
+      'claude-sonnet-5.5',
+      'claude-sonnet-5-5',
+      'anthropic/claude-sonnet-5.5',
+    ],
+    [
+      'anthropic',
       'claude-fable-5.1',
       'claude-fable-5-1',
       'anthropic/claude-fable-5.1',
@@ -2145,12 +2151,17 @@ describe('current catalog wire IDs', () => {
   });
 });
 
-describe('GPT-6 Astra SDK compatibility', () => {
-  it('preserves reasoning options on the native Responses route', () => {
+describe('GPT-6 SDK compatibility', () => {
+  it.each([
+    'gpt-6.1-sol',
+    'gpt-6-astra',
+    'gpt-6-sol',
+    'gpt-6-luna',
+  ])('preserves reasoning options on the native Responses route for %s', (modelId) => {
     const service = createTestModelProviderService({
       providerModes: { openai: 'official' },
     });
-    const result = service.getModelWithOptions('gpt-6-astra', 'trace-1');
+    const result = service.getModelWithOptions(modelId, 'trace-1');
     expect(result.contextWindowSize).toBe(1050000);
     expect(result.providerOptions?.openai).toMatchObject({
       forceReasoning: true,

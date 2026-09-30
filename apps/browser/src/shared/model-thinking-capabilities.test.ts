@@ -297,6 +297,26 @@ describe('model thinking capabilities', () => {
     }
   });
 
+  it('uses the supported GPT-6 reasoning effort ranges', () => {
+    for (const id of ['gpt-6-sol', 'gpt-6-luna']) {
+      expect(
+        getSupportedThinkingOptions(id, {
+          providerMode: 'official',
+          modelProvider: 'openai',
+        }).map((option) => option.value),
+      ).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+    }
+
+    for (const id of ['gpt-6-astra', 'gpt-6.1-sol']) {
+      expect(
+        getSupportedThinkingOptions(id, {
+          providerMode: 'official',
+          modelProvider: 'openai',
+        }).map((option) => option.value),
+      ).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+    }
+  });
+
   it('uses reasoning efforts reported by a discovered runtime', () => {
     const model: ThinkingCapableModel = {
       modelId: 'gpt-5.6-sol',
@@ -318,6 +338,7 @@ describe('current model reasoning contracts', () => {
     'claude-opus-5.5',
     'claude-fable-5.1',
     'gpt-6-astra',
+    'gpt-6.1-sol',
     'glm-5.3',
     'kimi-k3',
   ])('keeps required thinking enabled for %s even with a saved off override', (id) => {
@@ -339,11 +360,12 @@ describe('current model reasoning contracts', () => {
       ),
     ).toEqual(['low', 'medium', 'high']);
   });
-  it('offers the native Astra effort range without off', () => {
+  it.each([
+    'gpt-6-astra',
+    'gpt-6.1-sol',
+  ])('offers the required GPT-6 effort range without off for %s', (id) => {
     expect(
-      getSupportedThinkingOptions(getAvailableModel('gpt-6-astra')!).map(
-        (o) => o.value,
-      ),
+      getSupportedThinkingOptions(getAvailableModel(id)!).map((o) => o.value),
     ).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
   });
   it.each([
