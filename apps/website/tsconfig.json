@@ -1,10 +1,5 @@
 {
   "extends": "../../packages/typescript-config/base.json",
-  "references": [
-    {
-      "path": "../../packages/stage-ui"
-    }
-  ],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
