@@ -61,6 +61,56 @@ describe('model aliases', () => {
     });
   });
 
+  it('includes Claude Sonnet 5.5 with current API metadata', () => {
+    const sonnet = availableModels.find(
+      (model) => model.modelId === 'claude-sonnet-5.5',
+    );
+
+    expect(sonnet).toMatchObject({
+      modelDisplayName: 'Sonnet 5.5',
+      modelContextRaw: 1000000,
+      thinkingEnabled: true,
+      providerOptions: {
+        anthropic: { thinking: { type: 'adaptive' }, effort: 'high' },
+      },
+      pricing: {
+        inputPerMillion: 2,
+        outputPerMillion: 10,
+        relativeMultiplier: 2,
+      },
+      capabilities: {
+        inputModalities: { text: true, image: true, file: true },
+        toolCalling: true,
+      },
+    });
+  });
+
+  it('includes the latest GPT-6 family with expected pricing and context', () => {
+    expect(
+      Object.fromEntries(
+        availableModels
+          .filter((model) =>
+            ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna'].includes(
+              model.modelId,
+            ),
+          )
+          .map((model) => [
+            model.modelId,
+            {
+              context: model.modelContextRaw,
+              input: model.pricing.inputPerMillion,
+              output: model.pricing.outputPerMillion,
+            },
+          ]),
+      ),
+    ).toEqual({
+      'gpt-6.1-sol': { context: 1050000, input: 2, output: 10 },
+      'gpt-6-astra': { context: 1050000, input: 10, output: 50 },
+      'gpt-6-sol': { context: 1050000, input: 2, output: 10 },
+      'gpt-6-luna': { context: 1050000, input: 0.1, output: 0.5 },
+    });
+  });
+
   it('defines aliases for existing built-in target models', () => {
     const availableModelIds = new Set(
       availableModels.map((model) => model.modelId),

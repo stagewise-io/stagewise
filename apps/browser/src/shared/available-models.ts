@@ -194,6 +194,46 @@ export const availableModels = [
   },
   {
     officialProvider: 'anthropic',
+    modelId: 'claude-sonnet-5.5',
+    modelDisplayName: 'Sonnet 5.5',
+    modelDescription: 'The best combination of speed and intelligence.',
+    modelContext: '1M context',
+    modelContextRaw: 1000000,
+    headers: anthropicHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'high' } },
+      anthropic: {
+        thinking: { type: 'adaptive' },
+        effort: 'high',
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 2,
+      outputPerMillion: 10,
+      relativeMultiplier: 2,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: ANTHROPIC_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'anthropic',
     modelId: 'claude-opus-5',
     modelDisplayName: 'Opus 5',
     modelDescription:
@@ -440,6 +480,51 @@ export const availableModels = [
   },
   {
     officialProvider: 'openai',
+    modelId: 'gpt-6.1-sol',
+    modelDisplayName: 'GPT-6.1 Sol',
+    modelDescription:
+      "OpenAI's upgraded high-end model for agentic coding, computer use, and document-heavy professional work.",
+    modelContext: '1.05M context',
+    modelContextRaw: 1050000,
+    headers: openaiHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: {
+        // The installed SDK predates GPT-6 reasoning-model detection.
+        forceReasoning: true,
+        reasoningEffort: 'medium',
+        reasoningSummary: 'auto',
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 2.0,
+      outputPerMillion: 10.0,
+      relativeMultiplier: 2.0,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'openai',
     modelId: 'gpt-6-astra',
     modelDisplayName: 'GPT-6 Astra',
     modelDescription:
@@ -463,6 +548,96 @@ export const availableModels = [
       inputPerMillion: 10,
       outputPerMillion: 50,
       relativeMultiplier: 10,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'openai',
+    modelId: 'gpt-6-sol',
+    modelDisplayName: 'GPT-6 Sol',
+    modelDescription:
+      "OpenAI's cost-efficient high-end GPT-6 model for demanding professional, coding, and agentic workflows.",
+    modelContext: '1.05M context',
+    modelContextRaw: 1050000,
+    headers: openaiHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: {
+        // The installed SDK predates GPT-6 reasoning-model detection.
+        forceReasoning: true,
+        reasoningEffort: 'medium',
+        reasoningSummary: 'auto',
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 2.0,
+      outputPerMillion: 10.0,
+      relativeMultiplier: 2.0,
+    },
+    capabilities: {
+      inputModalities: {
+        text: true,
+        audio: false,
+        image: true,
+        video: false,
+        file: true,
+      },
+      outputModalities: {
+        text: true,
+        audio: false,
+        image: false,
+        video: false,
+        file: false,
+      },
+      inputConstraints: GPT54_INPUT_CONSTRAINTS,
+      toolCalling: true,
+    },
+  },
+  {
+    officialProvider: 'openai',
+    modelId: 'gpt-6-luna',
+    modelDisplayName: 'GPT-6 Luna',
+    modelDescription:
+      "OpenAI's fast, cost-efficient GPT-6 model for high-volume chat, classification, and lightweight agentic work.",
+    modelContext: '1.05M context',
+    modelContextRaw: 1050000,
+    headers: openaiHeaders,
+    providerOptions: {
+      stagewise: { reasoning: { enabled: true, effort: 'medium' } },
+      openai: {
+        // The installed SDK predates GPT-6 reasoning-model detection.
+        forceReasoning: true,
+        reasoningEffort: 'medium',
+        reasoningSummary: 'auto',
+        parallelToolCalls: true,
+        strictJsonSchema: true,
+      },
+    },
+    thinkingEnabled: true,
+    pricing: {
+      inputPerMillion: 0.1,
+      outputPerMillion: 0.5,
+      relativeMultiplier: 0.1,
     },
     capabilities: {
       inputModalities: {

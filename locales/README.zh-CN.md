@@ -88,8 +88,8 @@
 
 #### 专有模型
 
-- **Anthropic**：Fable 5、Opus 4.8、Opus 4.7、Opus 4.6、Sonnet 5、Sonnet 4.6、Haiku 4.5
-- **OpenAI**：GPT-5.6 Sol、GPT-5.6 Terra、GPT-5.6 Luna、GPT-5.5、GPT-5.4、GPT-5.3 Codex、GPT-5.3 Instant、GPT-5.4 mini、GPT-5.4 nano
+- **Anthropic**：Fable 5.1、Opus 5.5、Sonnet 5.5、Fable 5、Opus 4.8、Opus 4.7、Opus 4.6、Sonnet 5、Sonnet 4.6、Haiku 4.5
+- **OpenAI**：GPT-6.1 Sol、GPT-6 Astra、GPT-6 Sol、GPT-6 Luna、GPT-5.6 Sol、GPT-5.6 Terra、GPT-5.6 Luna、GPT-5.5、GPT-5.4、GPT-5.3 Codex、GPT-5.3 Instant、GPT-5.4 mini、GPT-5.4 nano
 - **Google**：Gemini 3.5 Flash、Gemini 3.1 Pro（预览）、Gemini 3 Flash、Gemini 3.1 Flash Lite
 
 ## 许可证
