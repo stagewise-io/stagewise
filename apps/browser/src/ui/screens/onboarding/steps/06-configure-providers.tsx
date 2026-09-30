@@ -417,6 +417,97 @@ export function ConnectionDetailView({
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const detectLocalSubscriptionImport = useKartonProcedure(
+    (p) => p.preferences.detectLocalSubscriptionImport,
+  );
+  const importDetectedCodingPlan = useKartonProcedure(
+    (p) => p.preferences.importDetectedCodingPlan,
+  );
+
+  const plan = entry.planId ? CODING_PLANS[entry.planId] : undefined;
+  const supportsLocalImport =
+    entry.kind === 'coding-plan' && !!plan?.localImport;
+  const [localImportAvailable, setLocalImportAvailable] = useState(false);
+
+  useEffect(() => {
+    if (!supportsLocalImport || !entry.planId) {
+      setLocalImportAvailable(false);
+      return;
+    }
+    let cancelled = false;
+    void detectLocalSubscriptionImport(entry.planId)
+      .then(({ available }) => {
+        if (!cancelled) setLocalImportAvailable(available);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalImportAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detectLocalSubscriptionImport, entry.planId, supportsLocalImport]);
+
+  const handleImport = useCallback(async () => {
+    if (!supportsLocalImport || !entry.planId) return;
+    setIsConnecting(true);
+    setError(null);
+    const attemptNumber = getNextAttemptNumber(entry);
+    const startedAt = performance.now();
+    const identity = getTelemetryIdentity(entry);
+    void track('onboarding-provider-connect-attempted', {
+      onboarding_run_id: onboardingRunId,
+      ...identity,
+      attempt_number: attemptNumber,
+    });
+    try {
+      const result = await importDetectedCodingPlan(entry.planId);
+      if (!result.success) {
+        setError(result.error);
+        void track('onboarding-provider-connect-failed', {
+          onboarding_run_id: onboardingRunId,
+          ...identity,
+          attempt_number: attemptNumber,
+          duration_ms: performance.now() - startedAt,
+          failure_stage: 'credential-validation',
+          error_kind: 'validation-error',
+        });
+        onConnectionResult({ entry, success: false });
+        return;
+      }
+      void track('onboarding-provider-connected', {
+        onboarding_run_id: onboardingRunId,
+        ...identity,
+        attempt_number: attemptNumber,
+        duration_ms: performance.now() - startedAt,
+        discovered_model_count: result.discoveredModels.length,
+      });
+      onConnectionResult({ entry, success: true });
+      onBack();
+    } catch {
+      setError('Import failed. Please try again.');
+      void track('onboarding-provider-connect-failed', {
+        onboarding_run_id: onboardingRunId,
+        ...identity,
+        attempt_number: attemptNumber,
+        duration_ms: performance.now() - startedAt,
+        failure_stage: 'rpc',
+        error_kind: 'unknown-error',
+      });
+      onConnectionResult({ entry, success: false });
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [
+    entry,
+    supportsLocalImport,
+    importDetectedCodingPlan,
+    getNextAttemptNumber,
+    onBack,
+    onConnectionResult,
+    onboardingRunId,
+    track,
+  ]);
+
   const handleConnect = useCallback(async () => {
     if (!apiKey.trim()) return;
     const endpointResult = entry.configurableEndpoint
@@ -558,6 +649,26 @@ export function ConnectionDetailView({
             )}
           </div>
         </div>
+
+        {supportsLocalImport && localImportAvailable && (
+          <div className="rounded-md border border-derived bg-surface-1 p-2 text-xs">
+            <p className="text-foreground">
+              {plan?.displayName} subscription detected in your OpenCode CLI on
+              this machine.
+            </p>
+            <button
+              type="button"
+              disabled={isConnecting}
+              onClick={() => void handleImport()}
+              className={cn(
+                buttonVariants({ variant: 'link', size: 'xs' }),
+                'mt-0.5 -ml-1',
+              )}
+            >
+              Import subscription
+            </button>
+          </div>
+        )}
 
         {entry.configurableEndpoint && (
           <div className="space-y-1">

@@ -38,13 +38,17 @@ import {
 } from '../utils/validate-api-keys';
 import { getProviderType } from '../agents/providers/registry';
 import { computeDisabledModelIdsAfterDiscovery } from '@shared/flagship-models';
-import { apiSpecToTypeId } from '@shared/provider-instance-helpers';
+import {
+  apiSpecToTypeId,
+  findCodingPlanInstance,
+} from '@shared/provider-instance-helpers';
 import {
   prepareAcpProcess,
   resolveAcpEnvironment,
   resolveAgentExecutable,
 } from '../agents/acp/adapter';
 import { adapterForProviderType } from '../agents/acp/adapter-registry';
+import { getLocalOpenCodeApiKey } from '../agents/providers/opencode/local-auth';
 
 // Enable Immer patches support
 enablePatches();
@@ -255,18 +259,11 @@ export class PreferencesService extends DisposableService {
   ): Promise<void> {
     if (this.preferences.providerInstances.length > 0) return;
 
-    const VENDORS: ModelProvider[] = [
-      'anthropic',
-      'openai',
-      'google',
-      'moonshotai',
-      'alibaba',
-      'deepseek',
-      'z-ai',
-      'minimax',
-      'xiaomi-mimo',
-      'mistral',
-    ];
+    // Every vendor with a providerConfig must be listed, or its legacy
+    // config is skipped here and `migrateLegacyCodingPlansToProviderInstances`
+    // has to repair it with a second write. Derive from the schema so adding
+    // a vendor cannot reintroduce that gap.
+    const VENDORS: ModelProvider[] = [...modelProviderSchema.options];
     const BUILT_IN_VENDOR_NAMES = new Set<string>(VENDORS);
 
     const instances: ProviderInstance[] = [];
@@ -669,6 +666,20 @@ export class PreferencesService extends DisposableService {
     );
 
     this.uiKarton.registerServerProcedureHandler(
+      'preferences.detectLocalSubscriptionImport',
+      async (_callingClientId: string, planId: CodingPlanId) => {
+        return this.detectLocalSubscriptionImport(planId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
+      'preferences.importDetectedCodingPlan',
+      async (_callingClientId: string, planId: CodingPlanId) => {
+        return this.importDetectedCodingPlan(planId);
+      },
+    );
+
+    this.uiKarton.registerServerProcedureHandler(
       'preferences.setCustomEndpointApiKey',
       async (_callingClientId: string, endpointId: string, apiKey: string) => {
         await this.setCustomEndpointApiKey(endpointId, apiKey);
@@ -989,6 +1000,18 @@ export class PreferencesService extends DisposableService {
       providerInstances: this.preferences.providerInstances,
     };
   }
+
+  private readonly pendingCodingPlanImports = new Map<
+    CodingPlanId,
+    Promise<
+      | {
+          success: true;
+          instanceId: string;
+          discoveredModels: DiscoveredModel[];
+        }
+      | { success: false; error: string }
+    >
+  >();
 
   private async enqueuePreferenceWrite<T>(
     operation: () => Promise<T>,
@@ -2111,6 +2134,84 @@ export class PreferencesService extends DisposableService {
   }
 
   /**
+   * Report whether a coding plan's credential can be imported from a local
+   * CLI auth file on this machine. Only plans declaring `localImport` are
+   * detectable; the credential itself never leaves the backend, and a plan
+   * that is already connected is not offered again.
+   */
+  public async detectLocalSubscriptionImport(
+    planId: CodingPlanId,
+  ): Promise<{ available: boolean }> {
+    this.assertNotDisposed();
+    const localImport = CODING_PLANS[planId]?.localImport;
+    if (!localImport) return { available: false };
+    if (findCodingPlanInstance(this.preferences, planId)) {
+      return { available: false };
+    }
+    const apiKey = await getLocalOpenCodeApiKey(localImport.opencodeProviderId);
+    return { available: !!apiKey };
+  }
+
+  /**
+   * Import a locally detected subscription as a coding-plan provider
+   * instance. The key is read server-side and passed straight into
+   * `addProviderInstance`, so it never crosses the IPC boundary.
+   */
+  public async importDetectedCodingPlan(
+    planId: CodingPlanId,
+  ): Promise<
+    | { success: true; instanceId: string; discoveredModels: DiscoveredModel[] }
+    | { success: false; error: string }
+  > {
+    this.assertNotDisposed();
+    // The existence check below cannot share the preference write queue —
+    // addProviderInstance enqueues onto it — so concurrent imports of the
+    // same plan share one run instead of both passing the check.
+    const inFlight = this.pendingCodingPlanImports.get(planId);
+    if (inFlight) return inFlight;
+    const run = this.runDetectedCodingPlanImport(planId).finally(() => {
+      this.pendingCodingPlanImports.delete(planId);
+    });
+    this.pendingCodingPlanImports.set(planId, run);
+    return run;
+  }
+
+  private async runDetectedCodingPlanImport(
+    planId: CodingPlanId,
+  ): Promise<
+    | { success: true; instanceId: string; discoveredModels: DiscoveredModel[] }
+    | { success: false; error: string }
+  > {
+    const plan = CODING_PLANS[planId];
+    if (!plan?.localImport) {
+      return {
+        success: false,
+        error: `Plan ${planId} does not support local import.`,
+      };
+    }
+    if (findCodingPlanInstance(this.preferences, planId)) {
+      return {
+        success: false,
+        error: `${plan.displayName} is already connected.`,
+      };
+    }
+    const apiKey = await getLocalOpenCodeApiKey(
+      plan.localImport.opencodeProviderId,
+    );
+    if (!apiKey) {
+      return {
+        success: false,
+        error: `No ${plan.displayName} subscription was found in the OpenCode CLI auth file.`,
+      };
+    }
+    return this.addProviderInstance({
+      typeId: 'coding-plan',
+      config: { planId },
+      validateApiKey: apiKey,
+    });
+  }
+
+  /**
    * Remove a provider instance by id. Vendors that had this instance as
    * their route fall back to the shared stagewise instance at routing time.
    */
@@ -2565,6 +2666,12 @@ export class PreferencesService extends DisposableService {
       );
       this.uiKarton.removeServerProcedureHandler(
         'preferences.refreshInstanceModels',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.detectLocalSubscriptionImport',
+      );
+      this.uiKarton.removeServerProcedureHandler(
+        'preferences.importDetectedCodingPlan',
       );
       this.uiKarton.removeServerProcedureHandler(
         'devToolbar.updateWidgetOrder',

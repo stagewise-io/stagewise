@@ -39,3 +39,28 @@ describe('coding plan endpoint helpers', () => {
     });
   });
 });
+
+describe('opencode-go plan', () => {
+  const plan = CODING_PLANS['opencode-go'];
+
+  it('is registered and wired for local import', () => {
+    expect(plan.id).toBe('opencode-go');
+    expect(plan.localImport?.opencodeProviderId).toBe('opencode-go');
+  });
+
+  it('routes through the Go subscription endpoint with a validation model', () => {
+    expect(resolveCodingPlanBaseUrl(plan)).toBe(
+      'https://opencode.ai/zen/go/v1',
+    );
+    expect(resolveCodingPlanValidationBaseUrl(plan)).toBe(
+      'https://opencode.ai/zen/go/v1',
+    );
+    expect(plan.validationModelId).toBe('mimo-v2.5');
+  });
+
+  it('curates featured models and relies on live model discovery', () => {
+    expect(plan.featuredModelIds).toContain('glm-5.2');
+    // The Go endpoint serves /models, so no documented fallback is needed.
+    expect(plan.fallbackModelIds).toBeUndefined();
+  });
+});

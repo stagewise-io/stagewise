@@ -190,6 +190,29 @@ const VENDOR_REASONING_MODEL_IDS: Partial<Record<ModelProvider, Set<string>>> =
       'minimax-m1',
     ]),
     'xiaomi-mimo': new Set(['mimo-v2.5-pro', 'mimo-v2.5', 'mimo-v2.5-think']),
+    // OpenCode Go re-serves other vendors' models under their native IDs.
+    // Listed here are the ones this repo already declares as reasoning
+    // models elsewhere — in a vendor set above, or in the model catalog
+    // (`available-models.ts`), which is where grok-4.5 and gpt-5.6-luna
+    // are declared. Nothing is asserted for OpenCode that is not already
+    // asserted somewhere else.
+    opencode: new Set([
+      'glm-5',
+      'glm-5.1',
+      'glm-5.2',
+      'kimi-k2.5',
+      'kimi-k2.6',
+      'kimi-k2.7-code',
+      'kimi-k3',
+      'deepseek-v4-flash',
+      'deepseek-v4-pro',
+      'minimax-m2.7',
+      'minimax-m3',
+      'mimo-v2.5',
+      'mimo-v2.5-pro',
+      'gpt-5.6-luna',
+      'grok-4.5',
+    ]),
     mistral: new Set([
       'mistral-medium-3-5',
       'mistral-small-2603',
