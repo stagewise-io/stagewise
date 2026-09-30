@@ -25,6 +25,19 @@ type LintingDiagnosticsResult = {
   summary: DiagnosticsSummary;
 };
 
+function formatDiagnosticMessage(message: unknown): string {
+  if (typeof message === 'string') return message;
+  if (
+    message !== null &&
+    typeof message === 'object' &&
+    'value' in message &&
+    typeof message.value === 'string'
+  ) {
+    return message.value;
+  }
+  return String(message);
+}
+
 // Outer safety-net cap for the whole request (touch + wait + collect across all
 // files). This MUST stay strictly greater than the largest per-server
 // `diagnosticsTimeoutMs` (currently rust-analyzer at 15_000ms) plus headroom for
@@ -130,7 +143,7 @@ async function doGetLintingDiagnostics(
           column: diagnostic.range.start.character + 1,
           severity,
           source: diagnostic.source ?? serverID,
-          message: diagnostic.message,
+          message: formatDiagnosticMessage(diagnostic.message),
           code:
             diagnostic.code !== undefined ? String(diagnostic.code) : undefined,
         });
