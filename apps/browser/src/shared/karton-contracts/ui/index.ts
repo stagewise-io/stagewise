@@ -465,7 +465,8 @@ export type PermissionRequestType =
   | 'midi'
   | 'idle-detection'
   | 'speaker-selection'
-  | 'storage-access';
+  | 'storage-access'
+  | 'passkey';
 
 /** Media types for camera/microphone distinction */
 export type MediaType = 'video' | 'audio'; // video = camera, audio = microphone
@@ -502,7 +503,8 @@ export interface SimplePermissionRequest extends BasePermissionRequest {
     | 'midi'
     | 'idle-detection'
     | 'speaker-selection'
-    | 'storage-access';
+    | 'storage-access'
+    | 'passkey';
 }
 
 /** Bluetooth device info for UI display */

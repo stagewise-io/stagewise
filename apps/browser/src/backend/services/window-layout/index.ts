@@ -22,6 +22,12 @@ import type { PageTransition } from '@shared/karton-contracts/pages-api/types';
 import type { UserPreferences } from '@shared/karton-contracts/ui/shared-types';
 import { UIController } from './ui-controller';
 import {
+  authorizeCeremony,
+  shouldUseLocalAuthenticator,
+  SystemPasskeyRelay,
+} from './system-passkey-relay';
+import { PersistedPasskeyCredentialStore } from './tab-passkey-authenticator/credential-store';
+import {
   BrowsingTabController,
   type ConsoleLogEntry,
   type GetConsoleLogsOptions,
@@ -131,6 +137,29 @@ const tabStateSchema = z.object({
 });
 
 type PersistedTabState = z.infer<typeof tabStateSchema>;
+
+/**
+ * The passkey ceremony currently holding the relay.
+ *
+ * The relay runs one ceremony at a time, so this doubles as the lock: it is
+ * claimed before the permission prompt goes up and released when the request
+ * that claimed it is done. `requestId` is the page's own id for the request,
+ * which is what tells a cancel meant for this ceremony from one left over from
+ * an earlier `get()` in the same tab.
+ */
+type PasskeyCeremony = {
+  senderId: number;
+  requestId: number | null;
+  cancelled: boolean;
+  /**
+   * Resolves when the page gives up. A permission prompt has no way to be
+   * withdrawn, so without this the handler would sit on one nobody is waiting
+   * for — holding the relay against every other tab until someone happened to
+   * answer it.
+   */
+  abandoned: Promise<void>;
+  abandon: () => void;
+};
 
 const LEGACY_DIFF_REVIEW_URL_PREFIX = 'stagewise://internal/diff-review/';
 
@@ -457,6 +486,11 @@ export class WindowLayoutService extends DisposableService {
   private uiZoomPreferenceListener:
     | ((newPrefs: UserPreferences, oldPrefs: UserPreferences) => void)
     | null = null;
+
+  /** Runs WebAuthn ceremonies in a real browser on behalf of browsing tabs. */
+  private passkeyRelay: SystemPasskeyRelay | null = null;
+  /** The one ceremony in flight, and the only request that may cancel it. */
+  private passkeyCeremony: PasskeyCeremony | null = null;
   private readonly attachments: AttachmentsService;
 
   private constructor(
@@ -747,6 +781,11 @@ export class WindowLayoutService extends DisposableService {
     }
 
     ipcMain.removeHandler('request-turnstile-token');
+    ipcMain.removeHandler('passkey-relay-ceremony');
+    ipcMain.removeAllListeners('passkey-relay-cancel');
+    void this.passkeyRelay?.teardown();
+    this.passkeyRelay = null;
+    this.passkeyCeremony = null;
 
     app.applicationMenu = null;
 
@@ -1208,6 +1247,154 @@ export class WindowLayoutService extends DisposableService {
     );
     this.logger.debug(
       '[WindowLayoutService] Listening for turnstile proxy requests',
+    );
+
+    // Passkey relay: run WebAuthn ceremonies in a real browser, so pages in the
+    // preview browser can use the passkeys already on this machine.
+    this.passkeyRelay = new SystemPasskeyRelay(this.logger);
+    ipcMain.handle(
+      'passkey-relay-ceremony',
+      // Everything in `request` comes from a web page, so nothing about its
+      // shape is promised; `authorizeCeremony` is what decides it is usable.
+      async (
+        event,
+        request: { kind?: unknown; options?: unknown; id?: unknown },
+      ) => {
+        const relay = this.passkeyRelay;
+        if (!relay?.available) return { ok: false, error: 'NoSystemBrowser' };
+        // Asking before finding out the browser is taken would spend a prompt
+        // on a ceremony that cannot run.
+        if (relay.running || this.passkeyCeremony)
+          return { ok: false, error: 'RelayBusy' };
+
+        const frame = event.senderFrame;
+        const allowed = authorizeCeremony({
+          kind: request?.kind,
+          inBrowsingSession:
+            event.sender.session ===
+            session.fromPartition('persist:browser-content'),
+          isMainFrame: Boolean(frame) && frame === event.sender.mainFrame,
+          frameOrigin: frame?.origin ?? null,
+        });
+        if (!allowed.ok) {
+          this.logger.debug(
+            `[SystemPasskeyRelay] Refused a ceremony: ${allowed.error}`,
+          );
+          return allowed;
+        }
+
+        // A passkey registered inside the preview browser lives in this tab's
+        // virtual authenticator, and the tab can answer for it without opening
+        // anything or asking the user anything.
+        if (
+          shouldUseLocalAuthenticator(
+            request.options,
+            allowed.origin,
+            PersistedPasskeyCredentialStore.getInstance(this.logger).list(),
+          )
+        ) {
+          this.logger.debug(
+            `[SystemPasskeyRelay] ${allowed.origin} has a passkey in this tab; not relaying`,
+          );
+          return { ok: false, error: 'UseLocalAuthenticator' };
+        }
+
+        // Claimed before the prompt goes up, not after it comes back: a second
+        // tab asking meanwhile is told the relay is taken rather than being
+        // prompted for a ceremony that cannot run, and a page that gives up
+        // while the prompt is open has something to cancel.
+        let abandon = () => {};
+        const abandoned = new Promise<void>((resolve) => {
+          abandon = resolve;
+        });
+        const ceremony: PasskeyCeremony = {
+          senderId: event.sender.id,
+          requestId: typeof request.id === 'number' ? request.id : null,
+          cancelled: false,
+          abandoned,
+          abandon,
+        };
+        this.passkeyCeremony = ceremony;
+        try {
+          // Relaying opens a browser outside the app and can return an
+          // assertion for a real account, so the site asks first, on the same
+          // terms as any other capability a page can reach for.
+          const permitted = await Promise.race([
+            SessionPermissionRegistry.getInstance()?.requestPasskeyRelay(
+              event.sender.id,
+              allowed.origin,
+            ),
+            ceremony.abandoned.then(() => false),
+          ]);
+          // Asked before the refusal, because the race answers false for both
+          // and only one of the two is the user's own answer. Going ahead would
+          // open a helper window for a ceremony nobody is left to receive.
+          if (ceremony.cancelled) {
+            this.logger.debug(
+              `[SystemPasskeyRelay] ${allowed.origin} gave up while the prompt was open`,
+            );
+            return { ok: false, error: 'Cancelled' };
+          }
+          if (!permitted) {
+            this.logger.debug(
+              `[SystemPasskeyRelay] ${allowed.origin} was not permitted to use system passkeys`,
+            );
+            return { ok: false, error: 'PermissionDenied' };
+          }
+
+          this.logger.debug(
+            `[SystemPasskeyRelay] Running get for ${allowed.origin}`,
+          );
+          // If the tab is gone — closed, or simply moved on to another page —
+          // there is no one left to hand the assertion to, and the helper
+          // window would sit there until the ceremony timed out.
+          const stopOnTabGone = () => relay.cancel();
+          event.sender.once('destroyed', stopOnTabGone);
+          event.sender.once('did-navigate', stopOnTabGone);
+          let result: Awaited<ReturnType<typeof relay.run>>;
+          try {
+            result = await relay.run(allowed.origin, request.options);
+          } finally {
+            try {
+              event.sender.removeListener('destroyed', stopOnTabGone);
+              event.sender.removeListener('did-navigate', stopOnTabGone);
+            } catch {
+              // The tab took its emitter with it.
+            }
+          }
+          this.logger.debug(
+            `[SystemPasskeyRelay] get for ${allowed.origin}: ${
+              result.ok ? 'credential returned' : result.error
+            }`,
+          );
+          return result;
+        } finally {
+          if (this.passkeyCeremony === ceremony) this.passkeyCeremony = null;
+        }
+      },
+    );
+    // A page that gives up on its own request — an AbortController firing, a
+    // sign-in button the user clicked away from — should not leave the helper
+    // window open, holding the relay against every other tab.
+    ipcMain.on('passkey-relay-cancel', (event, requestId: unknown) => {
+      const ceremony = this.passkeyCeremony;
+      if (!ceremony || ceremony.senderId !== event.sender.id) return;
+      // Only a main frame can start a ceremony, so only a main frame may end
+      // one: the preload runs in subframes too, and they share this sender.
+      if (event.senderFrame !== event.sender.mainFrame) return;
+      // The id the page gave the request it is abandoning. Without it, a
+      // cancel left over from an earlier `get()` in the same tab would stop
+      // whatever ceremony happens to be running now.
+      if (ceremony.requestId !== requestId) return;
+      this.logger.debug('[SystemPasskeyRelay] The page abandoned its ceremony');
+      ceremony.cancelled = true;
+      ceremony.abandon();
+      this.passkeyRelay?.cancel();
+    });
+    this.logger.debug(
+      `[WindowLayoutService] Passkey relay browser: ${
+        this.passkeyRelay.browserName ?? 'none found'
+      }`,
     );
   }
 
