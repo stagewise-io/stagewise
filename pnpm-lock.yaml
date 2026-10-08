@@ -11,6 +11,11 @@ overrides:
   '@types/glob': 8.1.0
   '@types/minimatch': 5.1.2
 
+patchedDependencies:
+  electron-installer-redhat@3.4.0:
+    hash: 8fe238a56db4de235c10dd7f02c6a523c6ac3010edcc1d547dbc5c6416b89a37
+    path: patches/electron-installer-redhat@3.4.0.patch
+
 importers:
 
   .:
@@ -13497,7 +13502,7 @@ snapshots:
       '@electron-forge/maker-base': 7.11.1
       '@electron-forge/shared-types': 7.11.1
     optionalDependencies:
-      electron-installer-redhat: 3.4.0
+      electron-installer-redhat: 3.4.0(patch_hash=8fe238a56db4de235c10dd7f02c6a523c6ac3010edcc1d547dbc5c6416b89a37)
     transitivePeerDependencies:
       - bluebird
       - supports-color
@@ -18895,7 +18900,7 @@ snapshots:
       - supports-color
     optional: true
 
-  electron-installer-redhat@3.4.0:
+  electron-installer-redhat@3.4.0(patch_hash=8fe238a56db4de235c10dd7f02c6a523c6ac3010edcc1d547dbc5c6416b89a37):
     dependencies:
       '@malept/cross-spawn-promise': 1.1.1
       debug: 4.4.3(supports-color@5.5.0)
