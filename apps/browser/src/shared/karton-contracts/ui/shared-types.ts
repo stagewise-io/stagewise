@@ -307,9 +307,10 @@ const vertexConfigSchema = z.object({
   modelIdMapping: z.record(z.string(), z.string()).optional(),
 });
 
-/** Ollama self-hosted — baseUrl only, no auth */
+/** Ollama — self-hosted baseUrl, or Ollama Cloud with an API key */
 const ollamaConfigSchema = z.object({
   baseUrl: z.string(),
+  encryptedApiKey: z.string().optional(),
 });
 
 /** OpenRouter — encrypted key + optional base URL override */
@@ -687,7 +688,9 @@ export const PROVIDER_TYPE_DISPLAY_INFO: Record<
   },
   ollama: {
     displayName: 'Ollama',
-    description: 'Self-hosted local models via Ollama',
+    description: 'Local models via Ollama, or Ollama Cloud with an API key',
+    helpText: 'Create a key at ollama.com → Settings → Keys',
+    getApiKeyUrl: 'https://ollama.com/settings/keys',
     defaultBaseUrl: 'http://localhost:11434',
     credentialType: 'base-url',
   },

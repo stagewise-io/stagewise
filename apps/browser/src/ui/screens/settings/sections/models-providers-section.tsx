@@ -3438,14 +3438,27 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
     (p) => p.preferences.refreshInstanceModels,
   );
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const setProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceApiKey,
+  );
+  const clearProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.clearProviderInstanceApiKey,
+  );
 
   const displayInfo = getTypeDisplayInfo(instance.typeId);
-  const config = instance.config as { baseUrl?: string };
+  const config = instance.config as {
+    baseUrl?: string;
+    encryptedApiKey?: string;
+  };
   const savedBaseUrl = config.baseUrl ?? displayInfo?.defaultBaseUrl ?? '';
+  const hasApiKey = !!config.encryptedApiKey;
   const [baseUrl, setBaseUrl] = useState(savedBaseUrl);
   const isDirty = baseUrl.trim() !== savedBaseUrl.trim();
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [isSavingKey, setIsSavingKey] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   const handleRefresh = useCallback(async () => {
     if (!baseUrl.trim()) return;
@@ -3486,6 +3499,32 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
     updatePreferences,
   ]);
 
+  const handleSaveKey = useCallback(async () => {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
+    setIsSavingKey(true);
+    setKeyError(null);
+    try {
+      await setProviderInstanceApiKey(instance.id, trimmed);
+      setApiKeyInput('');
+      await handleRefresh();
+    } catch (e) {
+      setKeyError(
+        e instanceof Error
+          ? e.message
+          : 'Failed to validate the API key.',
+      );
+    } finally {
+      setIsSavingKey(false);
+    }
+  }, [apiKeyInput, instance.id, setProviderInstanceApiKey, handleRefresh]);
+
+  const handleClearKey = useCallback(async () => {
+    setKeyError(null);
+    await clearProviderInstanceApiKey(instance.id);
+    await handleRefresh();
+  }, [instance.id, clearProviderInstanceApiKey, handleRefresh]);
+
   return (
     <div className="space-y-3 rounded-lg border border-derived p-3">
       <div className="flex gap-2">
@@ -3521,6 +3560,60 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
         Edit the base URL and click Save to re-discover available models.
       </p>
       {error && <TruncatedErrorText text={error} />}
+
+      <div className="space-y-2 border-derived border-t pt-3">
+        <p className="font-medium text-muted-foreground text-xs">
+          Ollama Cloud API key (optional)
+        </p>
+        <div className="flex gap-1.5">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            placeholder={
+              hasApiKey
+                ? '••••••••••••••••••••••••••••••••'
+                : 'Enter API key...'
+            }
+            onValueChange={(v) => {
+              setApiKeyInput(v);
+              setKeyError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && apiKeyInput.trim()) {
+                void handleSaveKey();
+              }
+            }}
+            disabled={isSavingKey}
+            size="sm"
+            style={{ maxWidth: 'none' }}
+            className="flex-1"
+          />
+          {apiKeyInput.trim() && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isSavingKey}
+              onClick={() => void handleSaveKey()}
+            >
+              Save
+            </Button>
+          )}
+          {hasApiKey && !apiKeyInput.trim() && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isSavingKey}
+              onClick={() => void handleClearKey()}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Only required for Ollama Cloud; leave empty for a local server.
+        </p>
+        {keyError && <TruncatedErrorText text={keyError} />}
+      </div>
     </div>
   );
 }
