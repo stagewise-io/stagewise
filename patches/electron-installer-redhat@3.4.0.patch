@@ -1,0 +1,13 @@
+diff --git a/resources/spec.ejs b/resources/spec.ejs
+index e07a8a3dac52b7ac5e165d203bc26d0ac336c6ec..388316f7f5a2103fcc4ebffea581a8759fc83a19 100644
+--- a/resources/spec.ejs
++++ b/resources/spec.ejs
+@@ -24,7 +24,7 @@ print('\n\n\n') }
+ 
+ %>%install
+ mkdir -p %{buildroot}/usr/
+-cp <%= process.platform === 'darwin' ? '-R' : '-r' %> usr/* %{buildroot}/usr/
++cp <%= process.platform === 'darwin' ? '-R' : '-r' %> %{_topdir}/BUILD/usr/* %{buildroot}/usr/
+ 
+ 
+ %files
