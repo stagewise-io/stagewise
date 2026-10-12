@@ -1329,6 +1329,14 @@ export const ChatPanelFooter = memo(function ChatPanelFooter({
             type: 'error',
             actions: [],
           });
+        } else if (result.status === 'busy') {
+          toast({
+            id: `compact-context-busy-${openAgent}`,
+            title: 'Compaction already running',
+            message: 'History compression is already in progress.',
+            type: 'info',
+            actions: [],
+          });
         } else if (result.status === 'noop') {
           toast({
             id: `compact-context-noop-${openAgent}`,

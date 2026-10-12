@@ -2554,14 +2554,21 @@ export abstract class BaseAgent<
         compressedHistory,
       });
       if (writeResult === 'missing') {
+        // The boundary message was undone/removed while we were compressing,
+        // so nothing was stored. Do not report success — return a failure so
+        // the manual trigger can tell the user instead of a false "compacted".
         this.host.logger.warn(
           `[BaseAgent:${this.instanceId}] Boundary message not found in history after compression. The user may have undone or manipulated messages.`,
         );
-      } else {
-        this.host.logger.debug(
-          `[BaseAgent:${this.instanceId}] Stored compressed history in message ${boundaryMessageId}`,
-        );
+        return {
+          status: 'failed',
+          error:
+            'The message being compacted was removed before the summary could be stored. Nothing was changed.',
+        };
       }
+      this.host.logger.debug(
+        `[BaseAgent:${this.instanceId}] Stored compressed history in message ${boundaryMessageId}`,
+      );
 
       const boundarySeq = this.state
         .get()
