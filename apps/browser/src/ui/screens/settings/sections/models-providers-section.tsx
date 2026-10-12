@@ -3460,70 +3460,100 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
   const [error, setError] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
 
+  // Re-discovers models for the currently-saved endpoint and prunes stale
+  // disabledModelIds. Throws on failure so each caller can surface the error
+  // in the right place (base-URL error vs API-key error).
+  const runDiscovery = useCallback(async () => {
+    const discovered = await refreshInstanceModels(instance.id);
+
+    // Prune stale disabledModelIds: keep only IDs still in discovered list
+    const newIds = new Set(discovered.map((m) => m.modelId));
+    const currentDisabled = instance.disabledModelIds ?? [];
+    const pruned = currentDisabled.filter((id) => newIds.has(id));
+
+    if (pruned.length < currentDisabled.length) {
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        const inst = draft.providerInstances.find((i) => i.id === instance.id);
+        if (inst) {
+          inst.disabledModelIds = pruned;
+        }
+      });
+      await updatePreferences(patches);
+    }
+  }, [
+    instance.id,
+    instance.disabledModelIds,
+    preferences,
+    refreshInstanceModels,
+    updatePreferences,
+  ]);
+
+  // Saves the base URL, then re-discovers models. Errors surface on the
+  // base-URL error line (`error`).
   const handleRefresh = useCallback(async () => {
     if (!baseUrl.trim()) return;
     setIsRefreshing(true);
     setError(null);
     try {
       await updateProviderInstance(instance.id, { baseUrl: baseUrl.trim() });
-      const discovered = await refreshInstanceModels(instance.id);
-
-      // Prune stale disabledModelIds: keep only IDs still in discovered list
-      const newIds = new Set(discovered.map((m) => m.modelId));
-      const currentDisabled = instance.disabledModelIds ?? [];
-      const pruned = currentDisabled.filter((id) => newIds.has(id));
-
-      if (pruned.length < currentDisabled.length) {
-        const [, patches] = produceWithPatches(preferences, (draft) => {
-          const inst = draft.providerInstances.find(
-            (i) => i.id === instance.id,
-          );
-          if (inst) {
-            inst.disabledModelIds = pruned;
-          }
-        });
-        await updatePreferences(patches);
-      }
+      await runDiscovery();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to refresh models.');
     } finally {
       setIsRefreshing(false);
     }
-  }, [
-    baseUrl,
-    instance.id,
-    instance.disabledModelIds,
-    preferences,
-    updateProviderInstance,
-    refreshInstanceModels,
-    updatePreferences,
-  ]);
+  }, [baseUrl, instance.id, updateProviderInstance, runDiscovery]);
 
   const handleSaveKey = useCallback(async () => {
     const trimmed = apiKeyInput.trim();
     if (!trimmed) return;
     setIsSavingKey(true);
     setKeyError(null);
+    let keyStored = false;
     try {
       await setProviderInstanceApiKey(instance.id, trimmed);
-      setApiKeyInput('');
-      await handleRefresh();
+      keyStored = true;
     } catch (e) {
       setKeyError(
-        e instanceof Error
-          ? e.message
-          : 'Failed to validate the API key.',
+        `Failed to save the API key: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
+    // If the key was stored, try to load the models it unlocks. A discovery
+    // failure must not look like a successful save, and must not commit an
+    // unsaved base-URL edit.
+    if (keyStored) {
+      try {
+        await runDiscovery();
+        setApiKeyInput('');
+      } catch (e) {
+        setKeyError(
+          `The API key was saved, but models could not be loaded: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
+    setIsSavingKey(false);
+  }, [apiKeyInput, instance.id, setProviderInstanceApiKey, runDiscovery]);
+
+  const handleClearKey = useCallback(async () => {
+    setKeyError(null);
+    setIsSavingKey(true);
+    try {
+      await clearProviderInstanceApiKey(instance.id);
+      await runDiscovery();
+    } catch (e) {
+      setKeyError(
+        `Failed to clear the API key: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
       );
     } finally {
       setIsSavingKey(false);
     }
-  }, [apiKeyInput, instance.id, setProviderInstanceApiKey, handleRefresh]);
-
-  const handleClearKey = useCallback(async () => {
-    setKeyError(null);
-    await clearProviderInstanceApiKey(instance.id);
-    await handleRefresh();
-  }, [instance.id, clearProviderInstanceApiKey, handleRefresh]);
+  }, [instance.id, clearProviderInstanceApiKey, runDiscovery]);
 
   return (
     <div className="space-y-3 rounded-lg border border-derived p-3">
@@ -3549,7 +3579,7 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
           <Button
             variant="primary"
             size="sm"
-            disabled={!baseUrl.trim() || isRefreshing}
+            disabled={!baseUrl.trim() || isRefreshing || isSavingKey}
             onClick={() => void handleRefresh()}
           >
             {isRefreshing ? 'Saving...' : 'Save'}
@@ -3592,7 +3622,7 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
             <Button
               variant="primary"
               size="sm"
-              disabled={isSavingKey}
+              disabled={isSavingKey || isRefreshing}
               onClick={() => void handleSaveKey()}
             >
               Save
@@ -3602,7 +3632,7 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
             <Button
               variant="secondary"
               size="sm"
-              disabled={isSavingKey}
+              disabled={isSavingKey || isRefreshing}
               onClick={() => void handleClearKey()}
             >
               Clear
