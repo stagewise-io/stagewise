@@ -3438,53 +3438,122 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
     (p) => p.preferences.refreshInstanceModels,
   );
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+  const setProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.setProviderInstanceApiKey,
+  );
+  const clearProviderInstanceApiKey = useKartonProcedure(
+    (p) => p.preferences.clearProviderInstanceApiKey,
+  );
 
   const displayInfo = getTypeDisplayInfo(instance.typeId);
-  const config = instance.config as { baseUrl?: string };
+  const config = instance.config as {
+    baseUrl?: string;
+    encryptedApiKey?: string;
+  };
   const savedBaseUrl = config.baseUrl ?? displayInfo?.defaultBaseUrl ?? '';
+  const hasApiKey = !!config.encryptedApiKey;
   const [baseUrl, setBaseUrl] = useState(savedBaseUrl);
   const isDirty = baseUrl.trim() !== savedBaseUrl.trim();
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [isSavingKey, setIsSavingKey] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
+  // Re-discovers models for the currently-saved endpoint and prunes stale
+  // disabledModelIds. Throws on failure so each caller can surface the error
+  // in the right place (base-URL error vs API-key error).
+  const runDiscovery = useCallback(async () => {
+    const discovered = await refreshInstanceModels(instance.id);
+
+    // Prune stale disabledModelIds: keep only IDs still in discovered list
+    const newIds = new Set(discovered.map((m) => m.modelId));
+    const currentDisabled = instance.disabledModelIds ?? [];
+    const pruned = currentDisabled.filter((id) => newIds.has(id));
+
+    if (pruned.length < currentDisabled.length) {
+      const [, patches] = produceWithPatches(preferences, (draft) => {
+        const inst = draft.providerInstances.find((i) => i.id === instance.id);
+        if (inst) {
+          inst.disabledModelIds = pruned;
+        }
+      });
+      await updatePreferences(patches);
+    }
+  }, [
+    instance.id,
+    instance.disabledModelIds,
+    preferences,
+    refreshInstanceModels,
+    updatePreferences,
+  ]);
+
+  // Saves the base URL, then re-discovers models. Errors surface on the
+  // base-URL error line (`error`).
   const handleRefresh = useCallback(async () => {
     if (!baseUrl.trim()) return;
     setIsRefreshing(true);
     setError(null);
     try {
       await updateProviderInstance(instance.id, { baseUrl: baseUrl.trim() });
-      const discovered = await refreshInstanceModels(instance.id);
-
-      // Prune stale disabledModelIds: keep only IDs still in discovered list
-      const newIds = new Set(discovered.map((m) => m.modelId));
-      const currentDisabled = instance.disabledModelIds ?? [];
-      const pruned = currentDisabled.filter((id) => newIds.has(id));
-
-      if (pruned.length < currentDisabled.length) {
-        const [, patches] = produceWithPatches(preferences, (draft) => {
-          const inst = draft.providerInstances.find(
-            (i) => i.id === instance.id,
-          );
-          if (inst) {
-            inst.disabledModelIds = pruned;
-          }
-        });
-        await updatePreferences(patches);
-      }
+      await runDiscovery();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to refresh models.');
     } finally {
       setIsRefreshing(false);
     }
-  }, [
-    baseUrl,
-    instance.id,
-    instance.disabledModelIds,
-    preferences,
-    updateProviderInstance,
-    refreshInstanceModels,
-    updatePreferences,
-  ]);
+  }, [baseUrl, instance.id, updateProviderInstance, runDiscovery]);
+
+  const handleSaveKey = useCallback(async () => {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
+    setIsSavingKey(true);
+    setKeyError(null);
+    let keyStored = false;
+    try {
+      await setProviderInstanceApiKey(instance.id, trimmed);
+      keyStored = true;
+    } catch (e) {
+      setKeyError(
+        `Failed to save the API key: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
+    // If the key was stored, try to load the models it unlocks. A discovery
+    // failure must not look like a successful save, and must not commit an
+    // unsaved base-URL edit.
+    if (keyStored) {
+      try {
+        await runDiscovery();
+        setApiKeyInput('');
+      } catch (e) {
+        setKeyError(
+          `The API key was saved, but models could not be loaded: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
+    setIsSavingKey(false);
+  }, [apiKeyInput, instance.id, setProviderInstanceApiKey, runDiscovery]);
+
+  const handleClearKey = useCallback(async () => {
+    setKeyError(null);
+    setIsSavingKey(true);
+    try {
+      await clearProviderInstanceApiKey(instance.id);
+      await runDiscovery();
+    } catch (e) {
+      setKeyError(
+        `Failed to clear the API key: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    } finally {
+      setIsSavingKey(false);
+    }
+  }, [instance.id, clearProviderInstanceApiKey, runDiscovery]);
 
   return (
     <div className="space-y-3 rounded-lg border border-derived p-3">
@@ -3510,7 +3579,7 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
           <Button
             variant="primary"
             size="sm"
-            disabled={!baseUrl.trim() || isRefreshing}
+            disabled={!baseUrl.trim() || isRefreshing || isSavingKey}
             onClick={() => void handleRefresh()}
           >
             {isRefreshing ? 'Saving...' : 'Save'}
@@ -3521,6 +3590,60 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
         Edit the base URL and click Save to re-discover available models.
       </p>
       {error && <TruncatedErrorText text={error} />}
+
+      <div className="space-y-2 border-derived border-t pt-3">
+        <p className="font-medium text-muted-foreground text-xs">
+          Ollama Cloud API key (optional)
+        </p>
+        <div className="flex gap-1.5">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            placeholder={
+              hasApiKey
+                ? '••••••••••••••••••••••••••••••••'
+                : 'Enter API key...'
+            }
+            onValueChange={(v) => {
+              setApiKeyInput(v);
+              setKeyError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && apiKeyInput.trim()) {
+                void handleSaveKey();
+              }
+            }}
+            disabled={isSavingKey}
+            size="sm"
+            style={{ maxWidth: 'none' }}
+            className="flex-1"
+          />
+          {apiKeyInput.trim() && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isSavingKey || isRefreshing}
+              onClick={() => void handleSaveKey()}
+            >
+              Save
+            </Button>
+          )}
+          {hasApiKey && !apiKeyInput.trim() && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isSavingKey || isRefreshing}
+              onClick={() => void handleClearKey()}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        <p className="text-muted-foreground text-xs">
+          Only required for Ollama Cloud; leave empty for a local server.
+        </p>
+        {keyError && <TruncatedErrorText text={keyError} />}
+      </div>
     </div>
   );
 }

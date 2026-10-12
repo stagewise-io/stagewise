@@ -201,4 +201,64 @@ describe('discoverOllamaModels', () => {
 
     await expect(discovery).resolves.toHaveLength(5);
   });
+
+  it('sends the bearer token to tags and show when an API key is provided', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.endsWith('/api/tags')) {
+          return new Response(JSON.stringify({ models: [{ name: 'chat' }] }), {
+            status: 200,
+          });
+        }
+        if (url.endsWith('/api/show')) {
+          return new Response(
+            JSON.stringify({ capabilities: ['completion'] }),
+            {
+              status: 200,
+            },
+          );
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      });
+
+    await discoverOllamaModels('https://ollama.com', 'secret-key');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://ollama.com/api/tags',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer secret-key' },
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://ollama.com/api/show',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer secret-key',
+        }),
+      }),
+    );
+  });
+
+  it('omits the authorization header without an API key', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.endsWith('/api/tags')) {
+          return new Response(JSON.stringify({ models: [] }), { status: 200 });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      });
+
+    await discoverOllamaModels('http://localhost:11434');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:11434/api/tags',
+      expect.objectContaining({ headers: undefined }),
+    );
+  });
 });

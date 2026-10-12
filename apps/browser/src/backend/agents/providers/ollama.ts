@@ -15,6 +15,8 @@ import { mapWithBoundedConcurrency } from './bounded-concurrency';
 
 export type OllamaConfig = {
   baseUrl: string;
+  /** Encrypted Ollama Cloud API key. Optional — local servers need none. */
+  encryptedApiKey?: string;
 };
 
 // ============================================================================
@@ -58,23 +60,35 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
   category: 'self-hosted',
   providerMode: 'custom',
   apiSpec: 'openai-chat-completions' satisfies ApiSpec,
-  sensitiveFields: [],
+  sensitiveFields: ['encryptedApiKey'],
 
   defaultBaseUrl: PROVIDER_TYPE_DISPLAY_INFO.ollama.defaultBaseUrl,
 
   // ── Discovery ──────────────────────────────────────────────────────────
 
-  async getInitialModels(config: OllamaConfig): Promise<DiscoveredModel[]> {
-    return discoverOllamaModels(config.baseUrl);
+  async getInitialModels(
+    config: OllamaConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    return discoverOllamaModels(
+      config.baseUrl,
+      decryptedConfig.encryptedApiKey,
+    );
   },
 
-  async refreshModels(config: OllamaConfig): Promise<DiscoveredModel[]> {
-    return discoverOllamaModels(config.baseUrl);
+  async refreshModels(
+    config: OllamaConfig,
+    decryptedConfig: Record<string, string>,
+  ): Promise<DiscoveredModel[]> {
+    return discoverOllamaModels(
+      config.baseUrl,
+      decryptedConfig.encryptedApiKey,
+    );
   },
 
   // ── Model creation ────────────────────────────────────────────────────
 
-  createLanguageModel({ modelId, baseURL }) {
+  createLanguageModel({ modelId, baseURL, apiKey }) {
     // Ollama's OpenAI-compatible endpoint is at /v1, but the AI-SDK OpenAI
     // provider appends /chat/completions directly to baseURL. Prepend /v1.
     const rootBaseUrl = normalizeOllamaRootUrl(
@@ -83,8 +97,9 @@ export const ollamaProviderType: ProviderType<OllamaConfig> = {
         'http://localhost:11434',
     );
     const v1BaseUrl = `${rootBaseUrl}/v1`;
+    // Local Ollama ignores auth; Ollama Cloud requires the bearer token.
     const model = createOpenAIChatModel(
-      'ollama',
+      apiKey || 'ollama',
       v1BaseUrl,
       modelId,
     ) as LanguageModelV3;
@@ -114,11 +129,15 @@ async function getOllamaModelMetadata(
   endpoint: string,
   name: string,
   signal: AbortSignal,
+  apiKey?: string,
 ): Promise<OllamaModelMetadata | undefined> {
   try {
     const response = await fetch(`${endpoint}/show`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       body: JSON.stringify({ name }),
       signal,
     });
@@ -141,15 +160,22 @@ function isEmbeddingOnly(metadata: OllamaModelMetadata | undefined): boolean {
 
 export async function discoverOllamaModels(
   baseUrl: string,
+  apiKey?: string,
 ): Promise<DiscoveredModel[]> {
   const rootBaseUrl = normalizeOllamaRootUrl(baseUrl);
   const url = `${rootBaseUrl}/api/tags`;
+  const authHeaders = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : undefined;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
   try {
     let response: Response;
     try {
-      response = await fetch(url, { signal: controller.signal });
+      response = await fetch(url, {
+        signal: controller.signal,
+        headers: authHeaders,
+      });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         throw new Error(
@@ -170,7 +196,7 @@ export async function discoverOllamaModels(
       models,
       METADATA_CONCURRENCY,
       (model) =>
-        getOllamaModelMetadata(endpoint, model.name, controller.signal),
+        getOllamaModelMetadata(endpoint, model.name, controller.signal, apiKey),
       { signal: controller.signal, fallback: (value) => value },
     );
 
