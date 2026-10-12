@@ -247,6 +247,9 @@ export interface ChatInputProps {
   contextUsedPercentage?: number;
   contextUsedKb?: number;
   contextMaxKb?: number;
+  /** Manually trigger history compression from the context-usage ring. */
+  onCompactContext?: () => void;
+  compactingContext?: boolean;
 
   // Queued messages (for early flushing)
   hasQueuedMessages?: boolean;
@@ -324,6 +327,8 @@ export const ChatInput = memo(function ChatInput({
   contextUsedPercentage = 0,
   contextUsedKb = 0,
   contextMaxKb = 0,
+  onCompactContext,
+  compactingContext = false,
 
   hasQueuedMessages = false,
   onFlushQueue,
@@ -887,6 +892,8 @@ export const ChatInput = memo(function ChatInput({
                 percentage={contextUsedPercentage}
                 usedKb={contextUsedKb}
                 maxKb={contextMaxKb}
+                onCompact={onCompactContext}
+                compacting={compactingContext}
               />
             )}
             {showToolApprovalSelect && (

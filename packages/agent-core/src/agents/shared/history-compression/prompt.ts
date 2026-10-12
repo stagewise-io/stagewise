@@ -66,6 +66,26 @@ Condensation rules (when shortening is needed):
 - Use your full output budget — do not cut short. The target size is a goal to aim for, not a ceiling. Longer is always better than losing detail.`;
 
 /**
+ * Builds the dynamic output-budget hint shared by the single-pass user
+ * message and the merge step of the chunked path.
+ */
+export function buildCompressionBudgetHint(previousBriefingChars = 0): string {
+  const targetChars = COMPRESSION_TARGET_CHARS;
+  const ratio = previousBriefingChars / targetChars;
+
+  if (previousBriefingChars === 0) {
+    return `Your target output size is approximately ${targetChars.toLocaleString()} characters.`;
+  }
+  if (ratio < 0.6) {
+    return `Your target output size is approximately ${targetChars.toLocaleString()} characters. The previous briefing is only ${previousBriefingChars.toLocaleString()} characters (${Math.round(ratio * 100)}% of target) — incorporate it fully and add the new content. Do NOT shorten the previous briefing.`;
+  }
+  if (ratio < 0.85) {
+    return `Your target output size is approximately ${targetChars.toLocaleString()} characters. The previous briefing is ${previousBriefingChars.toLocaleString()} characters (${Math.round(ratio * 100)}% of target). There is still room — apply only light condensation to the oldest sections if needed, but preserve all detail from recent sections. Do NOT aggressively shorten.`;
+  }
+  return `Your target output size is approximately ${targetChars.toLocaleString()} characters. The previous briefing is ${previousBriefingChars.toLocaleString()} characters (${Math.round(ratio * 100)}% of target) and approaching the limit. Condense the oldest, fully-resolved sections to make room, but keep all file paths, decisions, and outcomes.`;
+}
+
+/**
  * Builds the user message for the compression LLM.
  *
  * When a previous briefing exists, includes a dynamic budget hint that tells
@@ -76,24 +96,86 @@ export function buildCompressionUserMessage(
   compactHistory: string,
   previousBriefingChars = 0,
 ): string {
-  const targetChars = COMPRESSION_TARGET_CHARS;
-
-  const ratio = previousBriefingChars / targetChars;
-
-  let budgetHint: string;
-  if (previousBriefingChars === 0) {
-    budgetHint = `Your target output size is approximately ${targetChars.toLocaleString()} characters.`;
-  } else if (ratio < 0.6) {
-    budgetHint = `Your target output size is approximately ${targetChars.toLocaleString()} characters. The previous briefing is only ${previousBriefingChars.toLocaleString()} characters (${Math.round(ratio * 100)}% of target) — incorporate it fully and add the new content. Do NOT shorten the previous briefing.`;
-  } else if (ratio < 0.85) {
-    budgetHint = `Your target output size is approximately ${targetChars.toLocaleString()} characters. The previous briefing is ${previousBriefingChars.toLocaleString()} characters (${Math.round(ratio * 100)}% of target). There is still room — apply only light condensation to the oldest sections if needed, but preserve all detail from recent sections. Do NOT aggressively shorten.`;
-  } else {
-    budgetHint = `Your target output size is approximately ${targetChars.toLocaleString()} characters. The previous briefing is ${previousBriefingChars.toLocaleString()} characters (${Math.round(ratio * 100)}% of target) and approaching the limit. Condense the oldest, fully-resolved sections to make room, but keep all file paths, decisions, and outcomes.`;
-  }
-
   return `<chat-history>${compactHistory}</chat-history>
 
-${budgetHint}
+${buildCompressionBudgetHint(previousBriefingChars)}
 
 Write the briefing. The agent will read this as its own memory and must be able to continue working without losing context.`;
+}
+
+/**
+ * System prompt for the "map" step of chunked compression: summarises a
+ * single chronological segment of the history into a partial briefing.
+ * The partials are later merged into the final briefing.
+ */
+export const COMPRESSION_SEGMENT_SYSTEM_PROMPT = `You are writing a **partial** briefing for a coding AI agent about one chronological segment of its prior conversation with a user. Several segment briefings will later be merged into a single final briefing, and the original conversation is permanently discarded — any detail you omit is lost forever. Err on the side of including too much.
+
+Write in **second-person** for the agent ("you") and **third-person** for the user ("the user").
+
+## Input format
+The segment uses XML-like tags: \`<user>...</user>\` for user messages, \`<assistant>...</assistant>\` for agent messages (with compact tool annotations like \`[read: path]\`, \`[edited: path (N edits)]\`, \`[shell: label → exit 1]\`), and an optional \`<previous-chat-history>...</previous-chat-history>\` block containing an earlier briefing to treat as established ground truth.
+
+## What this partial briefing must cover
+- Tasks the user asked you to do and how you approached them
+- What you found, built, changed, or decided — and why
+- Questions asked by either side (and answers, if given)
+- Errors, dead ends, reverted approaches, or rejected alternatives
+- Tool outcomes that changed direction or confirmed results
+- The state at the end of this segment: done, in progress, open
+
+## What to preserve verbatim
+- File paths as [](path:{mount-prefixed-path}) links; preserve existing path: links and markdown links as-is.
+- User decisions, stated preferences, constraints, and explicit rules.
+- Color values, directory structures, configuration details.
+- If a \`<previous-chat-history>\` block is present, preserve its decisions and path links.
+
+## Output rules
+- Use \`##\` headings to separate distinct tasks or topics; write flowing chronological prose inside (no sub-headings, no bullets, no tables, no code blocks).
+- Output ONLY the partial briefing. **NEVER** emit XML tags of any kind (no \`<user>\`, \`<assistant>\`, \`<chat-history>\`, \`<previous-chat-history>\`).
+- You may be more detailed than the final target size; a later merge step condenses.`;
+
+/**
+ * System prompt for the "reduce" step of chunked compression: merges
+ * chronological partial briefings into one coherent briefing.
+ */
+export const COMPRESSION_MERGE_SYSTEM_PROMPT = `You are merging several partial briefings of ONE continuous conversation into a single coherent briefing for a coding AI agent. The briefings are given in chronological order — later sections are more recent. The agent will read the merged result as its **only** memory of what happened; the original conversation is permanently discarded, so any detail you drop is lost forever.
+
+Write in **second-person** for the agent ("you") and **third-person** for the user ("the user").
+
+## Merge rules
+- Merge overlapping topics into one section; keep section order chronological.
+- **Keep every \`##\` heading** that carries distinct information. Do not drop or merge unrelated sections.
+- **Preserve all [](path:...) links, markdown links, user decisions, stated preferences, constraints, and outcomes verbatim.**
+- **Recency bias:** apply progressive condensation to the oldest, fully-resolved sections (2–4 sentences each). Recent or still-active sections keep full detail, ending with the current status so the agent knows where to pick up.
+- Never invent content that is not in the partials.
+
+## Output rules
+- Output ONLY the merged briefing, in plain markdown with \`##\` headings and flowing prose inside (no sub-headings, no bullets, no tables, no code blocks).
+- **NEVER** emit XML tags of any kind.
+- Use your full output budget — longer is better than losing detail.`;
+
+/** User message for a single map-step segment. */
+export function buildCompressionSegmentUserMessage(segment: string): string {
+  return `<chat-history>${segment}</chat-history>
+
+Write the partial briefing for this segment. Remember: your output is merged with other segments later and must not lose detail.`;
+}
+
+/** User message for a reduce-step merge of partial briefings. */
+export function buildCompressionMergeUserMessage(
+  partials: string[],
+  previousBriefingChars = 0,
+): string {
+  const sections = partials
+    .map(
+      (partial, index) =>
+        `<briefing-section index="${index + 1}">${partial}</briefing-section>`,
+    )
+    .join('\n');
+
+  return `${sections}
+
+${buildCompressionBudgetHint(previousBriefingChars)}
+
+Merge the sections above into one briefing. Preserve every heading, path link, decision, and outcome; condense only the oldest, fully-resolved topics.`;
 }
