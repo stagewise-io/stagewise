@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.30.1 (2026-10-27)
+
+### Bug Fixes
+
+* ship agent-core memory flush performance fix (281d097)
+
 ## 1.30.0 (2026-09-30)
 
 ### Features
