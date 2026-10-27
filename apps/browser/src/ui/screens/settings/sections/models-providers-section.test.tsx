@@ -82,7 +82,10 @@ describe('CodingPlanEndpointConnection', () => {
         'Unavailable Failed to restore the previous endpoint: Rollback unavailable',
       ),
     ).toBeTruthy();
-    expect(screen.getByDisplayValue(instance.config.baseUrl)).toBeTruthy();
+    // The input is restored in a later render than the error message.
+    await waitFor(() =>
+      expect(screen.getByDisplayValue(instance.config.baseUrl)).toBeTruthy(),
+    );
   });
 
   it('restores the previous endpoint when discovery fails', async () => {
