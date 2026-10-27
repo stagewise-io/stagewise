@@ -27,9 +27,15 @@ export type MemoryWriteReason =
   | 'queued-messages'
   | 'title';
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const FORCE_REWRITE_AFTER_APPENDS = 20;
+const HASH_YIELD_INTERVAL = 50;
 const snapshotWriteQueues = new Map<string, Promise<void>>();
+
+// Per-message content digests keyed by message object. Agent history lives in
+// an Immer store, so frozen messages never change in place and their digest
+// can be reused across flushes. Unfrozen messages are rehashed every time.
+const messageContentDigests = new WeakMap<object, string>();
 
 export interface AgentMemoryWriterOptions {
   host: AgentHost;
@@ -99,36 +105,47 @@ function getMessageCreatedAt(message: AgentMessage): string | null {
   return null;
 }
 
-function hashArchivedMessages(
-  history: readonly AgentMessage[],
-  count: number,
-  mode: 'ids' | 'content',
-): string {
-  const hash = createHash('sha256');
-  for (let index = 0; index < count; index++) {
-    const message = history[index];
-    if (mode === 'ids') {
-      hash.update(message?.id ?? '');
-    } else {
-      hash.update(stringifyMemoryJson(message ?? null));
-    }
-    hash.update('\n');
-  }
-  return hash.digest('hex');
+async function yieldToEventLoop(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 function hashMessageIds(
   history: readonly AgentMessage[],
   count: number,
 ): string {
-  return hashArchivedMessages(history, count, 'ids');
+  const hash = createHash('sha256');
+  for (let index = 0; index < count; index++) {
+    hash.update(history[index]?.id ?? '');
+    hash.update('\n');
+  }
+  return hash.digest('hex');
 }
 
-function hashMessageContent(
+async function hashMessageContent(
   history: readonly AgentMessage[],
   count: number,
-): string {
-  return hashArchivedMessages(history, count, 'content');
+): Promise<string> {
+  const hash = createHash('sha256');
+  let computedSinceYield = 0;
+  for (let index = 0; index < count; index++) {
+    const message = history[index];
+    let digest = message ? messageContentDigests.get(message) : undefined;
+    if (digest === undefined) {
+      digest = createHash('sha256')
+        .update(stringifyMemoryJson(message ?? null))
+        .digest('hex');
+      if (message && Object.isFrozen(message)) {
+        messageContentDigests.set(message, digest);
+      }
+      if (++computedSinceYield >= HASH_YIELD_INTERVAL) {
+        computedSinceYield = 0;
+        await yieldToEventLoop();
+      }
+    }
+    hash.update(digest);
+    hash.update('\n');
+  }
+  return hash.digest('hex');
 }
 
 function computeMetadata(
@@ -285,7 +302,7 @@ export class AgentMemoryWriter {
         archive.archivedIdsHash ===
           hashMessageIds(history, archive.archivedCount) &&
         archive.archivedContentHash ===
-          hashMessageContent(history, archive.archivedCount) &&
+          (await hashMessageContent(history, archive.archivedCount)) &&
         (await this.hasExpectedByteState(archive))
       ) {
         this.archiveState = archive;
@@ -324,7 +341,7 @@ export class AgentMemoryWriter {
     }
     if (
       state.archivedContentHash !==
-      hashMessageContent(history, state.archivedCount)
+      (await hashMessageContent(history, state.archivedCount))
     ) {
       return false;
     }
@@ -335,9 +352,10 @@ export class AgentMemoryWriter {
     reason: MemoryWriteReason,
     state: AgentMemoryArchiveState,
   ): boolean {
+    // Edited or truncated messages are caught by the archive hash check in
+    // `isStateValid`, so new user messages can be appended like any other.
     return (
       reason === 'compression' ||
-      reason === 'user-message' ||
       state.appendsSinceRewrite >= FORCE_REWRITE_AFTER_APPENDS
     );
   }
@@ -420,7 +438,7 @@ export class AgentMemoryWriter {
     return {
       archivedCount: history.length,
       archivedIdsHash: hashMessageIds(history, history.length),
-      archivedContentHash: hashMessageContent(history, history.length),
+      archivedContentHash: await hashMessageContent(history, history.length),
       mdBytes: markdownStats.size,
       jsonlBytes: jsonlStats.size,
       appendsSinceRewrite,
