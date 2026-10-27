@@ -286,12 +286,14 @@ export class AgentMemoryWriter {
       await this.restoreArchiveState();
 
       let state = this.archiveState;
+      let truncatedTail = false;
       if (state && !(await this.isStateValid(state, options.history))) {
         state = await this.truncateChangedTail(state, options.history);
+        truncatedTail = state !== null;
       }
       if (!state) {
         state = await this.fullRewrite(options);
-      } else if (options.reason === 'title') {
+      } else if (options.reason === 'title' && !truncatedTail) {
         await this.writeMetadataAndIndex(options, state, new Date());
       } else if (this.shouldFullRewrite(options.reason, state)) {
         state = await this.fullRewrite(options);

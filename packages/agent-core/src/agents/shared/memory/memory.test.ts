@@ -665,6 +665,43 @@ describe('agent memory writer', () => {
     });
   });
 
+  it('re-appends a changed tail on a title-only flush', async () => {
+    await withMemoryRoot(async (root, host) => {
+      const writer = new AgentMemoryWriter({
+        host,
+        agentInstanceId: 'agent-1',
+      });
+      const history = [
+        makeMessage('u1', 'user', 'question'),
+        makeMessage('a1', 'assistant', 'streaming'),
+      ];
+      await writer.flush({
+        title: 'Old',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+
+      await writer.flush({
+        title: 'New',
+        activeModelId: 'm',
+        history: [history[0]!, makeMessage('a1', 'assistant', 'done')],
+        reason: 'title',
+      });
+
+      const metadata = await readMetadata(root);
+      expect(metadata.title).toBe('New');
+      expect(metadata.archive.archivedCount).toBe(2);
+      const markdown = await readFile(
+        agentFile(root, 'agent-1', 'history.md'),
+        'utf-8',
+      );
+      expect(markdown).toContain('done');
+      expect(markdown).not.toContain('streaming');
+      expect(metadata.archive.mdBytes).toBe(Buffer.byteLength(markdown));
+    });
+  });
+
   it('still rewrites fully when a message before the tail changes', async () => {
     await withMemoryRoot(async (root, host) => {
       const writer = new AgentMemoryWriter({
