@@ -144,7 +144,35 @@ describe('BaseAgent.retryLastUserMessage', () => {
     expect(
       agent.state.commands.denyAllNonTerminalToolPartsInHistory,
     ).not.toHaveBeenCalled();
-    expect(agent._pendingSyntheticContinuation ?? null).toBeNull();
+    // Lets an external runtime resume the turn; the internal path skips it
+    // because the model context ends with the approval response.
+    expect(agent._pendingSyntheticContinuation).toEqual({
+      reason: 'error-retry',
+    });
+  });
+
+  it('rejects a second retry while the first is stopping the failed step', async () => {
+    const { agent } = createErroredAgent([
+      userMessage('user-1'),
+      assistantMessage('assistant-1'),
+    ]);
+    let finishStop: () => void = () => {};
+    agent.internalStop.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStop = resolve;
+        }),
+    );
+
+    const first = agent.retryLastUserMessage();
+    await expect(agent.retryLastUserMessage()).rejects.toThrow(
+      'A retry is already in progress',
+    );
+    finishStop();
+    await first;
+
+    expect(agent.internalStop).toHaveBeenCalledOnce();
+    expect(agent.runStep).toHaveBeenCalledOnce();
   });
 
   it('refuses to retry without an error', async () => {

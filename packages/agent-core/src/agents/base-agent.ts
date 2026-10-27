@@ -638,6 +638,9 @@ export abstract class BaseAgent<
    */
   private _queuedMessageToFlushOnNextStepId: string | null = null;
 
+  /** Set while `retryLastUserMessage` is stopping the failed step. */
+  private _retryInProgress = false;
+
   /**
    * Set only for runtime recovery after a suspend/resume, an event-loop
    * stall, or a retry after a step error. It appends a transient model-only
@@ -1135,8 +1138,20 @@ export abstract class BaseAgent<
       throw new Error('No user message found to retry');
     }
 
+    if (this._retryInProgress) {
+      throw new Error('A retry is already in progress');
+    }
+    this._retryInProgress = true;
+    try {
+      await this.resumeAfterError(currentState.history.length);
+    } finally {
+      this._retryInProgress = false;
+    }
+  }
+
+  private async resumeAfterError(historyLength: number): Promise<void> {
     this.host.logger.info(
-      `[BaseAgent:${this.instanceId}] Retrying after error without truncating history. historyLength=${currentState.history.length}`,
+      `[BaseAgent:${this.instanceId}] Retrying after error without truncating history. historyLength=${historyLength}`,
     );
 
     // Invalidate the failed step so late stream chunks are ignored, and
@@ -1144,8 +1159,10 @@ export abstract class BaseAgent<
     await this.internalStop('error-retry');
 
     // Approved tool calls that never ran must go through the approval
-    // continuation so the SDK collects the approvals and runs them.
+    // continuation so the SDK collects the approvals and runs them. An
+    // external runtime resumes the turn itself with the continuation.
     if (this.hasApprovalResponseAwaitingExecution()) {
+      this._pendingSyntheticContinuation = { reason: 'error-retry' };
       void this.runStep(true);
       return;
     }
@@ -1821,8 +1838,13 @@ export abstract class BaseAgent<
       providerInstanceId: stepProviderInstanceId,
       thinkingOverride: presetThinkingOverride,
     };
+    // External runtimes answer approvals themselves, so approval
+    // continuations stay internal. A retry after an error is the exception:
+    // the external runtime resumes the turn with the synthetic continuation.
+    const isErrorRetry =
+      this._pendingSyntheticContinuation?.reason === 'error-retry';
     if (
-      !isApprovalContinuation &&
+      (!isApprovalContinuation || isErrorRetry) &&
       this.externalRuntime?.handles(externalSelection)
     ) {
       await this.runExternalStep(externalSelection, stepGen, flushedIndex);
