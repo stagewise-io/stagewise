@@ -801,7 +801,7 @@ export class AgentManager extends DisposableService {
       },
     );
     this.wrapAgentRpc('agents.getStoredInstance', async (agentId: string) => {
-      const row = await this.persistenceDb.getStoredAgentInstanceById(agentId);
+      const row = await this.persistenceDb.getAgentPreviewById(agentId);
       if (!row) return null;
 
       const mountedWorkspaces = row.mountedWorkspaces
@@ -820,7 +820,7 @@ export class AgentManager extends DisposableService {
         lastMessageAt: row.lastMessageAt,
         activeModelId: row.activeModelId,
         activeProviderInstanceId: row.activeProviderInstanceId ?? undefined,
-        messageCount: row.history.length,
+        messageCount: row.messageCount,
         mountedWorkspaces,
       };
     });

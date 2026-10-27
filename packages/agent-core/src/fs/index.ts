@@ -38,6 +38,7 @@ export {
   access,
   open,
   realpath,
+  truncate,
 } from 'node:fs/promises';
 export { constants, createReadStream, createWriteStream } from 'node:fs';
 export type { ReadStream, WriteStream } from 'node:fs';

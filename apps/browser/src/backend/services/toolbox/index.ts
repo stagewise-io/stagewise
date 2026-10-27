@@ -1474,6 +1474,7 @@ export class ToolboxService
         const activeIds = Object.keys(this.uiKarton.state.agents.instances);
         for (const id of activeIds) void this.rebuildSkillsList(id);
       },
+      { inputs: (state) => [state.preferences] },
     );
 
     // Start watching the global plans directory
