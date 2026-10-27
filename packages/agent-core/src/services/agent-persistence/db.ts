@@ -146,6 +146,17 @@ export class AgentPersistenceDB {
   ): Promise<AgentPersistenceDB | null> {
     const instance = new AgentPersistenceDB(deps);
 
+    // WAL lets long history reads run alongside writes instead of blocking
+    // them. The mode is stored in the database file, so it also applies to
+    // the extra connections libsql opens for transactions.
+    try {
+      await instance._dbDriver.execute('PRAGMA journal_mode = WAL');
+    } catch (e) {
+      deps.logger.warn(
+        `[AgentPersistenceDB] Failed to enable WAL mode: ${(e as Error).message}`,
+      );
+    }
+
     try {
       deps.logger.debug(`[AgentPersistenceDB] Migrating database...`);
       await migrateDatabase({

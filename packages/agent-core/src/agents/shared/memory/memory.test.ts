@@ -254,7 +254,7 @@ describe('agent memory writer', () => {
       }
 
       const metadata = await readMetadata(root);
-      expect(metadata.schemaVersion).toBe(2);
+      expect(metadata.schemaVersion).toBe(3);
       expect(metadata.archive.archivedCount).toBe(1);
 
       const index = await readFile(path.join(root, 'index.md'), 'utf-8');
@@ -465,7 +465,7 @@ describe('agent memory writer', () => {
         title: 'A',
         activeModelId: 'm',
         history,
-        reason: 'user-message',
+        reason: 'compression',
       });
       expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(0);
 
@@ -509,6 +509,71 @@ describe('agent memory writer', () => {
       );
       expect(markdown).toContain('content-only change');
       expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(0);
+    });
+  });
+
+  it('appends new user messages instead of rewriting', async () => {
+    await withMemoryRoot(async (root, host) => {
+      const writer = new AgentMemoryWriter({
+        host,
+        agentInstanceId: 'agent-1',
+      });
+      const history = [makeMessage('u1', 'user', 'one')];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+      history.push(makeMessage('u2', 'user', 'two'));
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+      expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(1);
+      const jsonl = await readFile(
+        agentFile(root, 'agent-1', 'history.jsonl'),
+        'utf-8',
+      );
+      expect(jsonl.trim().split('\n')).toHaveLength(2);
+    });
+  });
+
+  it('detects replaced frozen messages despite cached digests', async () => {
+    await withMemoryRoot(async (root, host) => {
+      const writer = new AgentMemoryWriter({
+        host,
+        agentInstanceId: 'agent-1',
+      });
+      let history = [
+        Object.freeze(makeMessage('u1', 'user', 'original')),
+        Object.freeze(makeMessage('a1', 'assistant', 'reply')),
+      ];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+      history = [
+        Object.freeze(makeMessage('u1', 'user', 'edited')),
+        ...history.slice(1),
+      ];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'post-step',
+      });
+      expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(0);
+      const markdown = await readFile(
+        agentFile(root, 'agent-1', 'history.md'),
+        'utf-8',
+      );
+      expect(markdown).toContain('edited');
+      expect(markdown).not.toContain('original');
     });
   });
 
