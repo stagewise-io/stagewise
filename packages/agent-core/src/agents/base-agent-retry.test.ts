@@ -40,6 +40,7 @@ function createErroredAgent(
   const agent = Object.create(ChatAgent.prototype) as any;
   agent.instanceId = 'agent-1';
   agent.runStep = vi.fn();
+  agent.internalStop = vi.fn().mockResolvedValue(undefined);
   agent.revertToUserMessage = vi.fn();
   agent.sendUserMessage = vi.fn();
   agent.state = {
@@ -53,7 +54,7 @@ function createErroredAgent(
     logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
     telemetry: { capture: vi.fn() },
   };
-  return agent;
+  return { agent, stateValue };
 }
 
 describe('BaseAgent.retryLastUserMessage', () => {
@@ -63,7 +64,7 @@ describe('BaseAgent.retryLastUserMessage', () => {
       assistantMessage('assistant-1'),
       assistantMessage('assistant-2'),
     ];
-    const agent = createErroredAgent(history);
+    const { agent } = createErroredAgent(history);
 
     await agent.retryLastUserMessage();
 
@@ -80,7 +81,7 @@ describe('BaseAgent.retryLastUserMessage', () => {
   });
 
   it('answers the user message directly when the failed step left no output', async () => {
-    const agent = createErroredAgent([
+    const { agent } = createErroredAgent([
       userMessage('user-1'),
       assistantMessage('assistant-1'),
       userMessage('user-2'),
@@ -89,12 +90,65 @@ describe('BaseAgent.retryLastUserMessage', () => {
     await agent.retryLastUserMessage();
 
     expect(agent.state.commands.truncateHistoryAt).not.toHaveBeenCalled();
+    expect(agent.revertToUserMessage).not.toHaveBeenCalled();
+    expect(agent.sendUserMessage).not.toHaveBeenCalled();
     expect(agent._pendingSyntheticContinuation ?? null).toBeNull();
     expect(agent.runStep).toHaveBeenCalledWith(false, false);
   });
 
+  it('stops the failed step before resuming', async () => {
+    const { agent, stateValue } = createErroredAgent([
+      userMessage('user-1'),
+      {
+        id: 'reasoning-only',
+        role: 'assistant',
+        parts: [{ type: 'reasoning', text: 'thinking' }],
+      } as unknown as AgentMessage,
+    ]);
+    // internalStop drops a reasoning-only leftover assistant message.
+    agent.internalStop.mockImplementation(async () => {
+      stateValue.history = stateValue.history.slice(0, -1);
+    });
+
+    await agent.retryLastUserMessage();
+
+    expect(agent.internalStop).toHaveBeenCalledWith('error-retry');
+    expect(agent.internalStop.mock.invocationCallOrder[0]).toBeLessThan(
+      agent.runStep.mock.invocationCallOrder[0],
+    );
+    expect(agent._pendingSyntheticContinuation ?? null).toBeNull();
+    expect(agent.runStep).toHaveBeenCalledWith(false, false);
+  });
+
+  it('runs approved tool calls through the approval continuation', async () => {
+    const { agent } = createErroredAgent([
+      userMessage('user-1'),
+      {
+        id: 'assistant-approval',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-executeShellCommand',
+            toolCallId: 'call-1',
+            state: 'approval-responded',
+            input: {},
+            approval: { id: 'approval-1', approved: true },
+          },
+        ],
+      } as unknown as AgentMessage,
+    ]);
+
+    await agent.retryLastUserMessage();
+
+    expect(agent.runStep).toHaveBeenCalledWith(true);
+    expect(
+      agent.state.commands.denyAllNonTerminalToolPartsInHistory,
+    ).not.toHaveBeenCalled();
+    expect(agent._pendingSyntheticContinuation ?? null).toBeNull();
+  });
+
   it('refuses to retry without an error', async () => {
-    const agent = createErroredAgent([userMessage('user-1')], {
+    const { agent } = createErroredAgent([userMessage('user-1')], {
       error: undefined,
     });
 
@@ -105,7 +159,7 @@ describe('BaseAgent.retryLastUserMessage', () => {
   });
 
   it('refuses to retry while the agent is working', async () => {
-    const agent = createErroredAgent([userMessage('user-1')], {
+    const { agent } = createErroredAgent([userMessage('user-1')], {
       isWorking: true,
     });
 
@@ -116,7 +170,7 @@ describe('BaseAgent.retryLastUserMessage', () => {
   });
 
   it('refuses to retry without any user message', async () => {
-    const agent = createErroredAgent([assistantMessage('assistant-1')]);
+    const { agent } = createErroredAgent([assistantMessage('assistant-1')]);
 
     await expect(agent.retryLastUserMessage()).rejects.toThrow(
       'No user message found to retry',
