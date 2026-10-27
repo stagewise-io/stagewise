@@ -25,6 +25,10 @@ export type DbName =
 export const getDbPath = (name: DbName): string =>
   path.join(getDataRoot(), `${name}.sqlite`);
 
+/**
+ * The agent DB runs in WAL mode, so copies or moves of this file must
+ * include its `-wal` and `-shm` companions.
+ */
 export const getAgentDbPath = (): string =>
   path.join(getDataRoot(), 'agents', 'instances.sqlite');
 
