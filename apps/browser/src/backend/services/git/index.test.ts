@@ -55,10 +55,11 @@ async function createGitService(
 ) {
   const mutationCalls: string[] = [];
   const readCalls: string[] = [];
-  const runGitCommand: GitCommandRunner = async (_cwd, args) => {
+  const runGitCommand: GitCommandRunner = async (cwd, args) => {
     const key = args.join(' ');
     readCalls.push(key);
-    return responses[key] ?? null;
+    // `<cwd>::<args>` entries override the cwd-independent ones.
+    return responses[`${cwd}::${key}`] ?? responses[key] ?? null;
   };
   const runGitMutationCommand: GitStrictCommandRunner = async (_cwd, args) => {
     const key = args.join(' ');
@@ -85,6 +86,16 @@ async function createGitService(
 const repoPath = path.resolve('/repo');
 const repoLinkedPath = path.resolve('/repo-linked');
 const repoGitDir = path.join(repoPath, '.git');
+
+const linkedWorktreeList = [
+  'worktree /repo',
+  'HEAD abc123',
+  'branch refs/heads/main',
+  '',
+  'worktree /repo-linked',
+  'HEAD fed789',
+  'branch refs/heads/feature-b',
+].join('\n');
 
 const baseReadResponses = {
   'rev-parse --show-toplevel --git-common-dir': `${repoPath}\n${repoGitDir}\n`,
@@ -351,10 +362,19 @@ describe('GitService', () => {
   });
 
   it('shares the worktree list across summaries of one repository', async () => {
-    const { service, readCalls } = await createGitService(baseReadResponses);
+    const { service, readCalls } = await createGitService({
+      ...baseReadResponses,
+      '/repo-linked::rev-parse --show-toplevel --git-common-dir': `${repoLinkedPath}\n${repoGitDir}\n`,
+      '/repo-linked::rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoLinkedPath}\nfeature-b\nfed789\n`,
+      'worktree list --porcelain': linkedWorktreeList,
+    });
 
-    await service.getMountedWorkspaceSummary('/repo');
-    await service.getMountedWorkspaceSummary('/repo');
+    await expect(
+      service.getMountedWorkspaceSummary('/repo'),
+    ).resolves.toMatchObject({ branch: 'main', isWorktree: false });
+    await expect(
+      service.getMountedWorkspaceSummary('/repo-linked'),
+    ).resolves.toMatchObject({ branch: 'feature-b', isWorktree: true });
 
     expect(
       readCalls.filter((call) => call === 'worktree list --porcelain'),
@@ -373,6 +393,82 @@ describe('GitService', () => {
     expect(
       readCalls.filter((call) => call === 'status --porcelain'),
     ).toHaveLength(1);
+  });
+
+  it('lists worktrees again when the shared list misses the workspace', async () => {
+    const readCalls: string[] = [];
+    let externalWorktreeAdded = false;
+    const responses: Record<string, string> = {
+      '/repo::rev-parse --show-toplevel --git-common-dir': `${repoPath}\n${repoGitDir}\n`,
+      '/repo::rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nmain\nabc123\n`,
+      '/repo-linked::rev-parse --show-toplevel --git-common-dir': `${repoLinkedPath}\n${repoGitDir}\n`,
+      '/repo-linked::rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoLinkedPath}\nfeature-b\nfed789\n`,
+    };
+    const service = await GitService.create({
+      logger,
+      telemetryService,
+      resolvedEnvPromise: Promise.resolve({ PATH: '/usr/bin' }),
+      runGitCommand: async (cwd, args) => {
+        const key = args.join(' ');
+        readCalls.push(key);
+        if (key === 'worktree list --porcelain') {
+          return externalWorktreeAdded
+            ? linkedWorktreeList
+            : 'worktree /repo\nHEAD abc123\nbranch refs/heads/main\n';
+        }
+        if (key === 'status --porcelain') return '';
+        return responses[`${cwd}::${key}`] ?? null;
+      },
+      runGitMutationCommand: async () => ({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+      }),
+    });
+
+    await service.getMountedWorkspaceSummary('/repo');
+    // A worktree is added in a terminal while the shared list is cached.
+    externalWorktreeAdded = true;
+    await expect(
+      service.getMountedWorkspaceSummary('/repo-linked'),
+    ).resolves.toMatchObject({ isWorktree: true, branch: 'feature-b' });
+    expect(
+      readCalls.filter((call) => call === 'worktree list --porcelain'),
+    ).toHaveLength(2);
+  });
+
+  it('does not share a read that started before a mutation', async () => {
+    let releaseFirstRead: () => void = () => {};
+    const readCalls: string[] = [];
+    const service = await GitService.create({
+      logger,
+      telemetryService,
+      resolvedEnvPromise: Promise.resolve({ PATH: '/usr/bin' }),
+      runGitCommand: async (_cwd, args) => {
+        readCalls.push(args.join(' '));
+        if (readCalls.length === 1) {
+          await new Promise<void>((resolve) => {
+            releaseFirstRead = resolve;
+          });
+          return 'before';
+        }
+        return 'after';
+      },
+      runGitMutationCommand: async () => ({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+      }),
+    });
+
+    const pending = service.getRepositoryRemoteUrl('/repo');
+    await vi.waitFor(() => expect(readCalls).toHaveLength(1));
+    await service.removeWorktree('/repo-linked');
+    const afterMutation = service.getRepositoryRemoteUrl('/repo');
+    releaseFirstRead();
+    await Promise.all([pending, afterMutation]);
+
+    expect(readCalls.filter((call) => call === 'remote -v')).toHaveLength(2);
   });
 
   it('lists worktrees again after a mutation', async () => {
@@ -977,6 +1073,9 @@ describe('GitService', () => {
       {
         ...baseReadResponses,
         'rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nfeature-a\ndef456\n`,
+        '/repo-linked::rev-parse --show-toplevel --git-common-dir': `${repoLinkedPath}\n${repoGitDir}\n`,
+        '/repo-linked::rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoLinkedPath}\nfeature-b\nfed789\n`,
+        'worktree list --porcelain': linkedWorktreeList,
         'for-each-ref --format=%(refname:short) refs/heads':
           'main\nfeature-a\nfeature-b',
         'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
@@ -991,7 +1090,7 @@ describe('GitService', () => {
       service.findMergedTarget('/repo', 'feature-a'),
     ).resolves.toEqual({ merged: true, target: 'main' });
     await expect(
-      service.findMergedTarget('/repo', 'feature-b'),
+      service.findMergedTarget('/repo-linked', 'feature-b'),
     ).resolves.toEqual({ merged: false, target: null });
 
     expect(

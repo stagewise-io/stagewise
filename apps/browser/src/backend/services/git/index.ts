@@ -260,10 +260,23 @@ export class GitService extends DisposableService {
     const repositoryInfo = await this.getWorkspaceRepositoryInfo(workspacePath);
     if (!repositoryInfo) return null;
 
-    const worktrees = await this.listRepositoryWorktrees(
+    let worktrees = await this.listRepositoryWorktrees(
       workspacePath,
       repositoryInfo.commonGitDir,
     );
+    const normalizedRepoRoot = normalizeGitPath(repositoryInfo.repoRoot);
+    if (
+      !worktrees.some(
+        (worktree) => normalizeGitPath(worktree.path) === normalizedRepoRoot,
+      )
+    ) {
+      // The shared list can predate a worktree created outside the app.
+      this.invalidateRepositoryReads(repositoryInfo.commonGitDir);
+      worktrees = await this.listRepositoryWorktrees(
+        workspacePath,
+        repositoryInfo.commonGitDir,
+      );
+    }
     const worktreeInfo = await this.getWorktreeInfo(workspacePath, worktrees);
     if (!worktreeInfo) return null;
 
@@ -662,6 +675,21 @@ export class GitService extends DisposableService {
     );
   }
 
+  /**
+   * Drops shared repository reads, for one repository or all of them. Call
+   * this when worktrees or branches change outside the app.
+   */
+  public invalidateRepositoryReads(commonGitDir?: string): void {
+    if (commonGitDir === undefined) {
+      this.repositoryReadCache.clear();
+      return;
+    }
+    const prefix = `${commonGitDir}\0`;
+    for (const key of this.repositoryReadCache.keys()) {
+      if (key.startsWith(prefix)) this.repositoryReadCache.delete(key);
+    }
+  }
+
   private memoizeForRepository<T>(
     commonGitDir: string,
     key: string,
@@ -676,11 +704,13 @@ export class GitService extends DisposableService {
       if (entry.expiresAt <= now) this.repositoryReadCache.delete(entryKey);
     }
     const value = read();
-    this.repositoryReadCache.set(cacheKey, {
-      expiresAt: now + REPOSITORY_READ_CACHE_TTL_MS,
-      value,
+    const entry = { expiresAt: now + REPOSITORY_READ_CACHE_TTL_MS, value };
+    this.repositoryReadCache.set(cacheKey, entry);
+    value.catch(() => {
+      if (this.repositoryReadCache.get(cacheKey) === entry) {
+        this.repositoryReadCache.delete(cacheKey);
+      }
     });
-    value.catch(() => this.repositoryReadCache.delete(cacheKey));
     return value;
   }
 
@@ -1439,9 +1469,12 @@ export class GitService extends DisposableService {
     const inFlight = this.inFlightReads.get(key);
     if (inFlight) return inFlight;
 
-    const read = this.executeGitRead(cwd, args).finally(() => {
-      this.inFlightReads.delete(key);
-    });
+    const read: Promise<string | null> = this.executeGitRead(cwd, args).finally(
+      () => {
+        if (this.inFlightReads.get(key) === read)
+          this.inFlightReads.delete(key);
+      },
+    );
     this.inFlightReads.set(key, read);
     return read;
   }
@@ -1546,8 +1579,12 @@ export class GitService extends DisposableService {
     const resolvedEnv = await this.getResolvedEnv();
     const env = sanitizeEnv(resolvedEnv, undefined, { forAgent: false });
     const result = await this.runGitMutationCommand(cwd, args, env);
-    // Mutations can add, remove or switch worktrees and branches.
-    if (operation !== 'query') this.repositoryReadCache.clear();
+    // Mutations can add, remove or switch worktrees and branches. Reads that
+    // started before the mutation must not be shared with later callers.
+    if (operation !== 'query') {
+      this.repositoryReadCache.clear();
+      this.inFlightReads.clear();
+    }
     this.logger.debug(`[GitService] Git ${operation} finished`, {
       cwd,
       args,
