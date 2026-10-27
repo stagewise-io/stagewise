@@ -7,7 +7,6 @@ import type {
 } from './shared-types';
 
 export type OnboardingStep =
-  | 'login'
   | 'configure-providers'
   | 'configure-skills'
   | 'personalization';

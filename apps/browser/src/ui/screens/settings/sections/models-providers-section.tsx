@@ -32,8 +32,10 @@ import {
   getSelectableModelEntries,
   getTypeDisplayInfo,
   getVendorForInstance,
+  isStagewiseInferenceAvailable,
   resolveCustomModelInstanceName,
   type ModelSelectorEntry,
+  withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
 import {
   availableModelAliases,
@@ -799,6 +801,8 @@ function AddProviderGrid({
     : codingPlans;
   const filteredSelfHostedTypes = filterTypes(ADDABLE_SELF_HOSTED_TYPES);
   const filteredExternalAgentTypes = filterTypes(externalAgentProviderTypeIds);
+  // `codex-stagewise` stays addable regardless of account state: it runs
+  // Codex for inference, the stagewise harness merely hosts it.
   const filteredStagewiseModelTypes = filterTypes(
     stagewiseModelProviderTypeIds,
   );
@@ -1220,8 +1224,19 @@ function ProviderInstancesSection({
   onDelete: (instanceId: string) => void;
 }) {
   const preferences = useKartonState((s) => s.preferences);
-  const instances = preferences.providerInstances ?? [];
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const [showAddProvider, setShowAddProvider] = useState(false);
+
+  // Stagewise Inference instances are hidden while the user is not
+  // signed in. They stay stored (nothing is deleted) and reappear once
+  // the user signs in.
+  const instances = useMemo(
+    () =>
+      withoutStagewiseInference(preferences, stagewiseAvailable)
+        .providerInstances ?? [],
+    [preferences, stagewiseAvailable],
+  );
 
   // Sort: stagewise first, then coding-plan, then vendor-api, then custom
   const sortedInstances = useMemo(() => {
@@ -2365,6 +2380,8 @@ function ModelsSection({
   const refreshInstanceModels = useKartonProcedure(
     (p) => p.preferences.refreshInstanceModels,
   );
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
 
   const isTrulyCustom =
     !!filterInstance && filterInstance.typeId in INSTANCE_TYPE_ID_TO_API_SPEC;
@@ -2387,7 +2404,15 @@ function ModelsSection({
   }, [filterInstance, refreshInstanceModels]);
 
   const customModels = preferences?.customModels ?? EMPTY_CUSTOM_MODELS;
-  const providerInstances = preferences?.providerInstances ?? [];
+
+  // Selection and management views exclude Stagewise Inference while the
+  // user is not signed in. Write handlers below keep using the
+  // unfiltered `preferences`.
+  const selectionPreferences = useMemo(
+    () => withoutStagewiseInference(preferences, stagewiseAvailable),
+    [preferences, stagewiseAvailable],
+  );
+  const providerInstances = selectionPreferences.providerInstances ?? [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<CustomModel | undefined>(
@@ -2405,8 +2430,11 @@ function ModelsSection({
 
   // Group selectable entries by instance
   const allEntries = useMemo(
-    () => getSelectableModelEntries(preferences, { includeDisabled: true }),
-    [preferences],
+    () =>
+      getSelectableModelEntries(selectionPreferences, {
+        includeDisabled: true,
+      }),
+    [selectionPreferences],
   );
   const instanceEntries = useMemo(
     () =>
@@ -3034,7 +3062,7 @@ function ModelsSection({
                           key={`${modelVisibility}-${group.prefix || 'other'}`}
                           instance={filteredGroup.instance}
                           group={group}
-                          preferences={preferences}
+                          preferences={selectionPreferences}
                           onToggleModel={handleToggleModel}
                           onEditThinking={handleEditThinking}
                           onEditCustomModel={handleEdit}
@@ -3055,7 +3083,7 @@ function ModelsSection({
                         ? filteredGroup.entries.filter(isModelEnabled)
                         : filteredGroup.entries
                     }
-                    preferences={preferences}
+                    preferences={selectionPreferences}
                     onToggleModel={handleToggleModel}
                     onEditThinking={handleEditThinking}
                     onEditCustomModel={handleEdit}
@@ -3068,7 +3096,7 @@ function ModelsSection({
                   key={instance.id}
                   instance={instance}
                   entries={entries}
-                  preferences={preferences}
+                  preferences={selectionPreferences}
                   onToggleModel={handleToggleModel}
                   onEditThinking={handleEditThinking}
                   onEditCustomModel={handleEdit}
@@ -3531,6 +3559,8 @@ function SelfHostedConnection({ instance }: { instance: ProviderInstance }) {
 
 export function ModelsProvidersSection() {
   const preferences = useKartonState((s) => s.preferences);
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const [detailInstanceId, setDetailInstanceId] = useState<string | null>(null);
   const [detailRenameRequested, setDetailRenameRequested] = useState(false);
   const [isDetailNameEditing, setIsDetailNameEditing] = useState(false);
@@ -3559,6 +3589,16 @@ export function ModelsProvidersSection() {
       total: entries.length,
     };
   }, [detailInstance, preferences]);
+
+  // If the user signs out while viewing a Stagewise Inference detail
+  // page, fall back to the list — the entry is hidden while signed out.
+  // (`codex-stagewise` is unaffected: it runs Codex for inference.)
+  useEffect(() => {
+    if (!stagewiseAvailable && detailInstance?.typeId === 'stagewise') {
+      setDetailInstanceId(null);
+      setDetailRenameRequested(false);
+    }
+  }, [detailInstance?.typeId, stagewiseAvailable]);
 
   // Intercept Escape on the capture phase when a detail page is open.
   // This fires before the global bubble-phase handler in

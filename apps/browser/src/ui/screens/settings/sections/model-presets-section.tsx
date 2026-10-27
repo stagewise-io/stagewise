@@ -35,7 +35,9 @@ import {
   getSelectableUtilityModelEntries,
   getVendorForInstance,
   isModelEntryValid,
+  isStagewiseInferenceAvailable,
   type ModelSelectorEntry,
+  withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
 import { resolveModelDisplay } from '@ui/screens/main/agent-chat/chat/_components/model-presets-shared';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -772,33 +774,63 @@ function UtilityModelList({
   description: string;
 }) {
   const preferences = useKartonState((s) => s.preferences);
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
 
   const modelEntries = preferences.agent.utilityModels[task] ?? [];
 
+  // Stagewise Inference is excluded from the selectable entries while
+  // the user is not signed in.
+  const selectionPreferences = useMemo(
+    () => withoutStagewiseInference(preferences, stagewiseAvailable),
+    [preferences, stagewiseAvailable],
+  );
   const entries = useMemo(
-    () => getSelectableUtilityModelEntries(preferences),
-    [preferences],
+    () => getSelectableUtilityModelEntries(selectionPreferences),
+    [selectionPreferences],
+  );
+
+  // While signed out, entries routed through Stagewise Inference cannot
+  // run and are hidden from the list. They stay stored (nothing is
+  // deleted) and reappear once the user signs in.
+  const visibleEntries = useMemo(
+    () =>
+      stagewiseAvailable
+        ? modelEntries
+        : modelEntries.filter((entry) =>
+            isModelEntryValid(
+              selectionPreferences,
+              entry.modelId,
+              entry.providerInstanceId,
+            ),
+          ),
+    [modelEntries, stagewiseAvailable, selectionPreferences],
   );
 
   const handleChange = useCallback(
     (next: UtilityModelEntry[]) => {
+      // Re-append the entries hidden above so that saving while signed
+      // out never removes the stored Stagewise Inference entries.
+      const hiddenEntries = modelEntries.filter(
+        (entry) => !visibleEntries.some((v) => modelKey(v) === modelKey(entry)),
+      );
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.utilityModels[task] = next;
+        draft.agent.utilityModels[task] = [...next, ...hiddenEntries];
       });
       void updatePreferences(patches);
     },
-    [preferences, task, updatePreferences],
+    [modelEntries, visibleEntries, preferences, task, updatePreferences],
   );
 
   return (
     <ModelList
       label={label}
       description={description}
-      modelEntries={modelEntries}
+      modelEntries={visibleEntries}
       onChange={handleChange}
       entries={entries}
-      preferences={preferences}
+      preferences={selectionPreferences}
       emptyMessage="No model configured, uses main chat model."
     />
   );
@@ -1048,16 +1080,25 @@ function PresetEditorDialog({
 
 export function ModelPresetsSection() {
   const preferences = useKartonState((s) => s.preferences);
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
+
+  // Selection UIs exclude Stagewise Inference while the user is not
+  // signed in; writes below still use the unfiltered preferences.
+  const selectionPreferences = useMemo(
+    () => withoutStagewiseInference(preferences, stagewiseAvailable),
+    [preferences, stagewiseAvailable],
+  );
 
   const presets = preferences.agent.modelPresets ?? [];
   const entries = useMemo(
-    () => getSelectableModelEntries(preferences),
-    [preferences],
+    () => getSelectableModelEntries(selectionPreferences),
+    [selectionPreferences],
   );
   const utilityEntries = useMemo(
-    () => getSelectableUtilityModelEntries(preferences),
-    [preferences],
+    () => getSelectableUtilityModelEntries(selectionPreferences),
+    [selectionPreferences],
   );
 
   const [editorOpen, setEditorOpen] = useState(false);
@@ -1177,7 +1218,7 @@ export function ModelPresetsSection() {
                 key={preset.id}
                 preset={preset}
                 entries={entries}
-                preferences={preferences}
+                preferences={selectionPreferences}
                 onEdit={() => handleEditPreset(preset)}
                 onDelete={() => handleDeletePreset(preset.id)}
               />
@@ -1202,7 +1243,7 @@ export function ModelPresetsSection() {
         onSave={handleSavePreset}
         entries={entries}
         utilityEntries={utilityEntries}
-        preferences={preferences}
+        preferences={selectionPreferences}
       />
     </div>
   );

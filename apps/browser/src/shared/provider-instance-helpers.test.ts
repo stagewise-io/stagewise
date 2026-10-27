@@ -14,8 +14,10 @@ import {
   getSelectableUtilityModelEntries,
   getVendorInstanceId,
   getVendorMode,
+  isStagewiseInferenceAvailable,
   resolveModelThinkingOverride,
   vendorHasApiKey,
+  withoutStagewiseInference,
 } from './provider-instance-helpers';
 import { getSupportedThinkingOptions } from './model-thinking-capabilities';
 
@@ -58,6 +60,16 @@ const codexStagewiseInstance: ProviderInstance = {
   id: 'codex-stagewise-default',
   typeId: 'codex-stagewise',
   name: 'Codex (Stagewise)',
+  config: {},
+  enabledModelIds: [],
+  disabledModelIds: [],
+  discoveredModels: [],
+};
+
+const stagewiseInstance: ProviderInstance = {
+  id: 'stagewise-default',
+  typeId: 'stagewise',
+  name: 'Stagewise Inference',
   config: {},
   enabledModelIds: [],
   disabledModelIds: [],
@@ -614,5 +626,51 @@ describe('native DeepSeek Flash matching', () => {
         customModels: [],
       }).map((entry) => entry.modelId),
     ).toEqual(['deepseek-flash', 'deepseek-v4.1-flash']);
+  });
+});
+
+describe('Stagewise Inference visibility', () => {
+  it('is only available with an authenticated account', () => {
+    expect(isStagewiseInferenceAvailable('authenticated')).toBe(true);
+    // Optimistic while the backend is unreachable so signed-in users do
+    // not lose their models during a hiccup.
+    expect(isStagewiseInferenceAvailable('server_unreachable')).toBe(true);
+    expect(isStagewiseInferenceAvailable('unauthenticated')).toBe(false);
+    expect(isStagewiseInferenceAvailable('authentication_invalid')).toBe(false);
+    expect(isStagewiseInferenceAvailable(undefined)).toBe(false);
+  });
+
+  it('returns preferences unchanged when stagewise is available', () => {
+    const preferences = createPreferences();
+    const result = withoutStagewiseInference(preferences, true);
+    expect(result).toBe(preferences);
+  });
+
+  it('hides Stagewise Inference instances but keeps codex-stagewise while signed out', () => {
+    const preferences = createPreferences();
+    preferences.providerInstances = [
+      ...(preferences.providerInstances ?? []),
+      stagewiseInstance,
+      anthropicInstance,
+      codexStagewiseInstance,
+    ];
+
+    const result = withoutStagewiseInference(preferences, false);
+
+    // Only `stagewise` is hidden — `codex-stagewise` runs Codex for
+    // inference (the stagewise harness merely hosts it) and stays.
+    expect(
+      result.providerInstances?.map((instance) => instance.typeId),
+    ).toEqual(['anthropic-api', 'codex-stagewise']);
+    // The input preferences are not mutated.
+    expect(preferences.providerInstances?.map((i) => i.typeId)).toContain(
+      'stagewise',
+    );
+    // Stagewise models are no longer selectable via the filtered view.
+    expect(
+      getSelectableModelEntries(result).filter(
+        (entry) => entry.typeId === 'stagewise',
+      ),
+    ).toEqual([]);
   });
 });

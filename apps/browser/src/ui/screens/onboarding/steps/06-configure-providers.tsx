@@ -6,16 +6,13 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@stagewise/stage-ui/components/tooltip';
-import { Logo } from '@stagewise/stage-ui/components/logo';
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { cn } from '@ui/utils';
 import {
   IconChevronRightOutline18,
-  IconChevronLeftOutline18,
   IconCheck2Outline18,
-  IconArrowUpRightOutline18,
 } from '@stagewise/icons';
 import type {
   OnboardingProviderIdentity,
@@ -36,9 +33,6 @@ import { ProviderLogo } from '@ui/components/provider-logos';
 import { OllamaLogo } from '@ui/components/provider-logos/ollama';
 import { OpenRouterLogo } from '@ui/components/provider-logos/openrouter';
 import { BackButton, NextButton, OnboardingBottomNav } from '../index';
-
-const consoleUrl =
-  import.meta.env.VITE_STAGEWISE_CONSOLE_URL || 'https://console.stagewise.io';
 
 // ─── Unified Provider Entries ──────────────────────────────────────────────
 
@@ -243,70 +237,6 @@ export function TruncatedErrorText({ text }: { text: string }) {
       </TooltipTrigger>
       <TooltipContent>{text}</TooltipContent>
     </Tooltip>
-  );
-}
-
-// ─── Stagewise Status Card ─────────────────────────────────────────────────
-
-function StagewiseStatusCard({
-  connected,
-  onBack,
-}: {
-  connected: boolean;
-  onBack: () => void;
-}) {
-  const subscription = useKartonState((s) => s.userAccount.subscription);
-  const openExternalUrl = useKartonProcedure((p) => p.openExternalUrl);
-  const refreshSubscription = useKartonProcedure(
-    (p) => p.userAccount.refreshSubscription,
-  );
-  const plan = subscription?.plan;
-  const isFreePlan = !plan || plan === 'free';
-
-  useEffect(() => {
-    if (!connected) return;
-    const id = setInterval(() => {
-      void refreshSubscription();
-    }, 10_000);
-    return () => clearInterval(id);
-  }, [connected, refreshSubscription]);
-
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-derived bg-surface-1 p-3">
-      <Logo className="size-5 shrink-0" pathClassName="text-foreground" />
-      <div className="min-w-0 flex-1">
-        <h3 className="truncate font-medium text-foreground text-sm">
-          Stagewise Inference
-        </h3>
-        <p className="truncate text-muted-foreground text-xs">
-          {!connected
-            ? 'Sign in to access models via stagewise'
-            : isFreePlan
-              ? 'Requires Pro or Ultra plan'
-              : 'Connected — all built-in models available'}
-        </p>
-      </div>
-      {!connected ? (
-        <Button variant="ghost" size="xs" onClick={onBack}>
-          <IconChevronLeftOutline18 className="size-3.5" />
-          Sign in
-        </Button>
-      ) : isFreePlan ? (
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={() => void openExternalUrl(consoleUrl)}
-        >
-          Upgrade to Pro
-          <IconArrowUpRightOutline18 className="size-3" />
-        </Button>
-      ) : (
-        <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground text-xs">
-          <IconCheck2Outline18 className="size-4" />
-          Connected
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -671,17 +601,13 @@ export function ConnectionDetailView({
 // ─── Scrollable Provider List ──────────────────────────────────────────────
 
 function ScrollableProviderList({
-  isStagewiseConnected,
   searchQuery,
   isEntryConnected,
   onSelectEntry,
-  onBack,
 }: {
-  isStagewiseConnected: boolean;
   searchQuery: string;
   isEntryConnected: (entry: ProviderEntry) => boolean;
   onSelectEntry: (entry: ProviderEntry) => void;
-  onBack: () => void;
 }) {
   const query = searchQuery.trim().toLowerCase();
 
@@ -726,7 +652,7 @@ function ScrollableProviderList({
   );
 
   // Split all entries into connected vs unconnected.
-  // Connected entries are shown in a single section right after Builtin.
+  // Connected entries are shown in a single section at the top.
   const allFilteredEntries = useMemo(
     () => [
       ...filteredCodingPlanEntries,
@@ -786,17 +712,6 @@ function ScrollableProviderList({
           <p className="py-4 text-center text-muted-foreground text-xs">
             No providers match &quot;{query}&quot;
           </p>
-        )}
-
-        {/* Builtin */}
-        {!query && (
-          <div className="space-y-2">
-            <p className="font-medium text-foreground text-xs">Builtin</p>
-            <StagewiseStatusCard
-              connected={isStagewiseConnected}
-              onBack={onBack}
-            />
-          </div>
         )}
 
         {/* Connected — all connected entries across categories */}
@@ -894,17 +809,14 @@ function ScrollableProviderList({
 
 export function StepConfigureProviders({
   onNext,
-  onBack,
   onboardingRunId,
   onSummary,
 }: {
   onNext: () => void;
-  onBack: () => void;
   onboardingRunId: string;
   onSummary: (summary: ProviderStepSummary) => void;
 }) {
   const preferences = useKartonState((s) => s.preferences);
-  const authStatus = useKartonState((s) => s.userAccount.status);
   const track = useTrack();
 
   const [selectedEntry, setSelectedEntry] = useState<ProviderEntry | null>(
@@ -918,9 +830,6 @@ export function StepConfigureProviders({
   const connectionAttemptCountRef = useRef(0);
   const connectionFailureCountRef = useRef(0);
   const searchUsedRef = useRef(false);
-
-  const isStagewiseConnected =
-    authStatus === 'authenticated' || authStatus === 'server_unreachable';
 
   // Check if a provider entry is already connected.
   const isEntryConnected = useCallback(
@@ -1059,11 +968,9 @@ export function StepConfigureProviders({
           ) : (
             /* Scrollable provider list with groups */
             <ScrollableProviderList
-              isStagewiseConnected={isStagewiseConnected}
               searchQuery={searchQuery}
               isEntryConnected={isEntryConnected}
               onSelectEntry={handleSelectEntry}
-              onBack={onBack}
             />
           )}
         </div>
@@ -1076,7 +983,7 @@ export function StepConfigureProviders({
         />
       ) : (
         <OnboardingBottomNav
-          left={<BackButton onClick={onBack} />}
+          left={null}
           right={<NextButton onClick={handleNext} label="Next" />}
         />
       )}

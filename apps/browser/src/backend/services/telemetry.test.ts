@@ -330,7 +330,7 @@ describe('onboarding funnel telemetry schemas', () => {
     expect(
       parseUIEventProperties('onboarding-step-exited', {
         onboarding_run_id: 'run-1',
-        step: 'login',
+        step: 'personalization',
         destination: 'configure-providers',
         action: 'abandon',
         duration_ms: -1,

@@ -26,6 +26,7 @@ import {
   PROVIDER_TYPE_DISPLAY_INFO,
 } from './karton-contracts/ui/shared-types';
 import { CODING_PLANS, type CodingPlanId } from './coding-plans';
+import type { AuthStatus } from './karton-contracts/ui';
 import { getSemanticProviderForApiSpec } from './api-spec-provider';
 import {
   availableModels,
@@ -377,6 +378,53 @@ export function findCodingPlanInstance(
  * specific instance fall back to this one at routing time.
  */
 export const DEFAULT_INSTANCE_ID = 'stagewise-default';
+
+// ===========================================================================
+// Stagewise Inference visibility
+// ===========================================================================
+
+/**
+ * Whether Stagewise Inference — and other account-backed stagewise
+ * provider types — should be surfaced in the UI. These route through the
+ * user's stagewise account and cannot be used without one.
+ * `server_unreachable` is treated optimistically (the same way the
+ * onboarding flow treats it) so a temporary backend hiccup does not
+ * strip models from signed-in users.
+ */
+export function isStagewiseInferenceAvailable(
+  authStatus: AuthStatus | undefined,
+): boolean {
+  return authStatus === 'authenticated' || authStatus === 'server_unreachable';
+}
+
+/**
+ * Preferences with Stagewise Inference provider instances removed,
+ * for use in selection UIs (model picker, utility model lists, model
+ * management). Pass the result to `getSelectableModelEntries`,
+ * `getSelectableUtilityModelEntries`, `isModelEntryValid`, etc. so that
+ * Stagewise Inference models never appear as selectable choices without
+ * a stagewise account. When `stagewiseAvailable` is true the input is
+ * returned unchanged.
+ *
+ * Only the `stagewise` type is hidden: `codex-stagewise` runs Codex for
+ * inference (the stagewise harness merely hosts it), so it stays
+ * selectable regardless of account state.
+ *
+ * Nothing is deleted: the caller's stored preferences — and any
+ * selections pointing at the hidden instances — are preserved untouched
+ * and reappear once the user signs in. Never use the result for writes.
+ */
+export function withoutStagewiseInference<
+  T extends Pick<UserPreferences, 'providerInstances'>,
+>(prefs: T, stagewiseAvailable: boolean): T {
+  if (stagewiseAvailable) return prefs;
+  return {
+    ...prefs,
+    providerInstances: (prefs.providerInstances ?? []).filter(
+      (instance) => instance.typeId !== 'stagewise',
+    ),
+  };
+}
 
 /**
  * Resolve thinking default options for a specific provider instance.

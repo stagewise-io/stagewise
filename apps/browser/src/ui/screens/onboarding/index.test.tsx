@@ -32,27 +32,9 @@ vi.mock('@ui/hooks/use-karton', () => ({
     }),
   ),
 }));
-vi.mock('./steps/01-login', () => ({
-  StepLogin: ({ onSkip, onAuthenticated }: any) => (
-    <div>
-      <button type="button" onClick={onSkip}>
-        Skip login
-      </button>
-      <button
-        type="button"
-        onClick={() => onAuthenticated({ auth_method: 'stagewise' })}
-      >
-        Authenticate
-      </button>
-    </div>
-  ),
-}));
 vi.mock('./steps/06-configure-providers', () => ({
-  StepConfigureProviders: ({ onNext, onBack, onSummary }: any) => (
+  StepConfigureProviders: ({ onNext, onSummary }: any) => (
     <div>
-      <button type="button" onClick={onBack}>
-        Provider back
-      </button>
       <button
         type="button"
         onClick={() => {
@@ -125,10 +107,10 @@ describe('OnboardingWizard', () => {
     await waitFor(() => expect(callsFor('onboarding-started')).toHaveLength(1));
     expect(callsFor('onboarding-step-viewed')).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Skip login' }));
-    await screen.findByRole('button', { name: 'Provider back' });
-    fireEvent.click(screen.getByRole('button', { name: 'Provider back' }));
-    await screen.findByRole('button', { name: 'Skip login' });
+    fireEvent.click(screen.getByRole('button', { name: 'Provider next' }));
+    await screen.findByRole('button', { name: 'Theme back' });
+    fireEvent.click(screen.getByRole('button', { name: 'Theme back' }));
+    await screen.findByRole('button', { name: 'Provider next' });
 
     await waitFor(() =>
       expect(callsFor('onboarding-step-viewed')).toHaveLength(3),
@@ -138,16 +120,16 @@ describe('OnboardingWizard', () => {
       [
         'onboarding-step-exited',
         expect.objectContaining({
-          step: 'login',
-          destination: 'configure-providers',
-          action: 'skip',
+          step: 'configure-providers',
+          destination: 'personalization',
+          action: 'next',
         }),
       ],
       [
         'onboarding-step-exited',
         expect.objectContaining({
-          step: 'configure-providers',
-          destination: 'login',
+          step: 'personalization',
+          destination: 'configure-providers',
           action: 'back',
         }),
       ],
@@ -178,11 +160,10 @@ describe('OnboardingWizard', () => {
 
   it('passes the final aggregate summary to durable completion', async () => {
     render(<OnboardingWizard />);
-    await screen.findByRole('button', { name: 'Authenticate' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }));
-    await screen.findByRole('button', { name: 'Provider next' });
-    fireEvent.click(screen.getByRole('button', { name: 'Provider next' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Provider next' }),
+    );
     await screen.findByRole('button', { name: 'Change theme' });
     fireEvent.click(screen.getByRole('button', { name: 'Change theme' }));
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
@@ -196,7 +177,7 @@ describe('OnboardingWizard', () => {
     );
     expect(mocks.setHasSeenOnboardingFlow).toHaveBeenCalledWith({
       value: true,
-      auth: { auth_method: 'stagewise' },
+      auth: { auth_method: 'unknown' },
       summary: expect.objectContaining({
         onboarding_run_id: '00000000-0000-4000-8000-000000000001',
         connected_provider_keys: ['openai-api'],
@@ -218,9 +199,6 @@ describe('OnboardingWizard', () => {
   it('preserves a provider connection across repeated step visits', async () => {
     render(<OnboardingWizard />);
 
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Authenticate' }),
-    );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Provider next' }),
     );
@@ -247,7 +225,6 @@ describe('OnboardingWizard', () => {
     ];
     render(<OnboardingWizard />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip login' }));
     await screen.findByRole('button', { name: 'Provider next skipped' });
     fireEvent.click(
       screen.getByRole('button', { name: 'Provider next skipped' }),
@@ -275,7 +252,6 @@ describe('OnboardingWizard', () => {
     ];
     render(<OnboardingWizard />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip login' }));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Provider next skipped' }),
     );
