@@ -1594,6 +1594,9 @@ export class MountManagerService extends DisposableService {
     }
 
     const scheduleBump = () => {
+      // Drop shared git reads right away so a mount in the debounce window
+      // does not see the old worktree list.
+      this.gitService.invalidateRepositoryReads(commonGitDir);
       const pending = this.gitWorktreeWatcherDebounceTimers.get(commonGitDir);
       if (pending) clearTimeout(pending);
       this.gitWorktreeWatcherDebounceTimers.set(

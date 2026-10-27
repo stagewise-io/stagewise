@@ -95,7 +95,9 @@ function createHarness() {
     removeServerProcedureHandler: vi.fn(),
   } as unknown as KartonService;
 
-  const gitService = {} as unknown as GitService;
+  const gitService = {
+    invalidateRepositoryReads: vi.fn(),
+  } as unknown as GitService;
   const userExperienceService = {
     saveRecentlyOpenedWorkspace: vi.fn(),
     getRecentlyOpenedWorkspaces: vi.fn(async () => []),
@@ -128,7 +130,7 @@ function createHarness() {
   );
 
   services.push(service);
-  return { service, state };
+  return { service, state, gitService };
 }
 
 function ensureWatcher(
@@ -322,12 +324,15 @@ describe('git worktree watcher lifecycle', () => {
   });
 
   it('bumps the per-repository revision (debounced) when a worktree dir is added', () => {
-    const { service, state } = createHarness();
+    const { service, state, gitService } = createHarness();
     ensureWatcher(service, '/repo/wt-a', '/repo/.git');
     const w = watchInstances[0] as unknown as FakeWatcherInstance;
 
     w.trigger('addDir', '/repo/.git/worktrees/feature-x');
-    // Debounced — nothing yet.
+    // Shared git reads are dropped right away; the bump is debounced.
+    expect(gitService.invalidateRepositoryReads).toHaveBeenCalledWith(
+      '/repo/.git',
+    );
     expect(state.gitWorktreeRevisions['/repo/.git']).toBeUndefined();
 
     vi.advanceTimersByTime(400);
