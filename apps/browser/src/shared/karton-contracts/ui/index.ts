@@ -361,7 +361,6 @@ export type {
 export { apiSpecSchema } from './shared-types';
 
 // Update channel types
-export type { UpdateChannel } from './shared-types';
 
 /**
  * Lightweight chat metadata for the chat history list.
@@ -1124,14 +1123,14 @@ export type AppState = {
   };
   // Current stagewise app runtime information
   appInfo: {
-    baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-prerelease', 'stagewise').
+    baseName: string; // Base name (e.g., 'stagewise-dev', 'stagewise-nightly', 'stagewise').
     name: string; // Display name (e.g., 'stagewise (Dev-Build)', 'stagewise').
     bundleId: string; // Bundle ID (e.g., 'io.stagewise.dev').
     version: string; // The version of the app.
     platform: 'darwin' | 'linux' | 'win32'; // The platform on which the app is running.
     isFullScreen: boolean; // Whether the app window is in fullscreen mode.
     // Build-time constants
-    releaseChannel: 'dev' | 'prerelease' | 'nightly' | 'release'; // The release channel of the app.
+    releaseChannel: 'dev' | 'nightly' | 'release'; // The release channel of the app.
     author: string; // Author name.
     copyright: string; // Copyright string.
     homepage: string; // Homepage URL.

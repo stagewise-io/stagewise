@@ -4,16 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import semver from 'semver';
 
-// Release channel: 'dev' | 'prerelease' | 'nightly' | 'release'
-type ReleaseChannel = 'dev' | 'prerelease' | 'nightly' | 'release';
+// Release channel: 'dev' | 'nightly' | 'release'
+type ReleaseChannel = 'dev' | 'nightly' | 'release';
 export const __APP_RELEASE_CHANNEL__: ReleaseChannel = (() => {
   switch (process.env.RELEASE_CHANNEL) {
     case 'release':
       return 'release';
     case 'nightly':
       return 'nightly';
-    case 'prerelease':
-      return 'prerelease';
     case 'dev':
     default:
       return 'dev';
@@ -40,8 +38,6 @@ export const __APP_BASE_NAME__ = (() => {
       return 'stagewise';
     case 'nightly':
       return 'stagewise-nightly';
-    case 'prerelease':
-      return 'stagewise-prerelease';
     case 'dev':
     default:
       return devInstance ? `stagewise-dev-${devInstance}` : 'stagewise-dev';
@@ -55,8 +51,6 @@ export const __APP_NAME__ = (() => {
       return 'stagewise';
     case 'nightly':
       return 'stagewise Nightly';
-    case 'prerelease':
-      return 'stagewise (Pre-Release)';
     case 'dev':
     default:
       return devInstance
@@ -71,8 +65,6 @@ export const __APP_BUNDLE_ID__ = (() => {
       return 'io.stagewise.app';
     case 'nightly':
       return 'io.stagewise.nightly';
-    case 'prerelease':
-      return 'io.stagewise.prerelease';
     case 'dev':
     default:
       return 'io.stagewise.dev';

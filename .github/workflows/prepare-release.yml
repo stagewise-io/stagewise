@@ -10,21 +10,8 @@ on:
         options:
           - stagewise
           - karton
-      channel:
-        description: "Release channel"
-        required: true
-        type: choice
-        options:
-          - alpha
-          - beta
-          - release
-      new-cycle:
-        description: "Start new version cycle (abandon current prerelease)"
-        required: false
-        type: boolean
-        default: false
 
-run-name: "Prepare Release: ${{ inputs.package }} (${{ inputs.channel }}${{ inputs.new-cycle && ', new cycle' || '' }})"
+run-name: "Prepare Release: ${{ inputs.package }}"
 
 permissions:
   contents: write
@@ -62,39 +49,10 @@ jobs:
         env:
           NUCLEO_LICENSE_KEY: ${{ secrets.NUCLEO_LICENSE_KEY }}
 
-      # For karton: validate prerelease is not requested
-      - name: Validate karton channel
-        if: inputs.package == 'karton' && inputs.channel != 'release'
-        run: |
-          echo "::error::Karton only supports the 'release' channel. Prerelease channels are not enabled."
-          exit 1
-
-      # For karton new-cycle: not supported
-      - name: Validate karton new-cycle
-        if: inputs.package == 'karton' && inputs.new-cycle
-        run: |
-          echo "::error::--new-cycle is not supported for karton."
-          exit 1
-
-      # For stagewise new-cycle: validate current version is a prerelease
-      - name: Validate new-cycle precondition
-        if: inputs.new-cycle && inputs.package == 'stagewise'
-        run: |
-          VERSION=$(node -p "require('./apps/browser/package.json').version")
-          # Accepts both the new format (`1.0.0-alpha063`) and the legacy
-          # format (`1.0.0-alpha.63`) so repos in either state can start
-          # a new cycle.
-          if [[ ! "$VERSION" =~ -alpha(\.[0-9]+|[0-9]+)$ ]] && [[ ! "$VERSION" =~ -beta(\.[0-9]+|[0-9]+)$ ]]; then
-            echo "::error::Current version $VERSION is not a prerelease. --new-cycle requires a prerelease version."
-            exit 1
-          fi
-
       - name: Bump Version
         id: bump
         run: |
-          ARGS="--package ${{ inputs.package }} --channel ${{ inputs.channel }}"
-          [ "${{ inputs.new-cycle }}" == "true" ] && ARGS="$ARGS --new-cycle"
-          pnpm tsx scripts/release/index.ts $ARGS
+          pnpm tsx scripts/release/index.ts --package ${{ inputs.package }}
           echo "version=$(cat .release-version)" >> $GITHUB_OUTPUT
           echo "tag=$(cat .release-tag)" >> $GITHUB_OUTPUT
           echo "notes<<EOF" >> $GITHUB_OUTPUT
@@ -125,7 +83,6 @@ jobs:
         run: |
           BODY="## Release: ${{ inputs.package }} ${{ steps.bump.outputs.version }}
 
-          **Channel:** ${{ inputs.channel }}
           **Tag:** \`${{ steps.bump.outputs.tag }}\`
 
           ### Release Notes
@@ -149,7 +106,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Package:** ${{ inputs.package }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ steps.bump.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Channel:** ${{ inputs.channel }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag:** \`${{ steps.bump.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch:** \`${{ steps.branch.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

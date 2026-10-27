@@ -3,31 +3,24 @@
  * Release CLI - Version bumping and changelog generation
  *
  * Usage:
- *   pnpm tsx scripts/release/index.ts --package stagewise --channel beta
- *   pnpm tsx scripts/release/index.ts --package karton --channel release --dry-run
+ *   pnpm tsx scripts/release/index.ts --package stagewise
+ *   pnpm tsx scripts/release/index.ts --package karton --dry-run
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import * as readline from 'node:readline';
+import semver from 'semver';
 
 import { getPackageConfig, getAvailablePackageNames } from './config.js';
 import {
-  getLastTag,
   getLastStableTag,
-  getFirstPrereleaseTagForCycle,
   getCommitsSince,
   getRecommendedBump,
   hasUncommittedChanges,
   getRepoRoot,
 } from './git-utils.js';
-import {
-  calculateNextVersion,
-  getPossibleNextVersions,
-  parseVersion,
-  isValidChannelTransition,
-} from './bump-version.js';
 import {
   updateChangelog,
   generateChangelogMarkdown,
@@ -35,9 +28,7 @@ import {
   deleteReleaseNotes,
   getReleaseNotesPath,
 } from './generate-changelog.js';
-import type { ReleaseChannel, CLIOptions, PackageConfig } from './types.js';
-
-const VALID_CHANNELS: ReleaseChannel[] = ['alpha', 'beta', 'release'];
+import type { CLIOptions, PackageConfig } from './types.js';
 
 /**
  * Parse command line arguments
@@ -46,9 +37,7 @@ function parseCliArgs(): CLIOptions {
   const { values } = parseArgs({
     options: {
       package: { type: 'string', short: 'p' },
-      channel: { type: 'string', short: 'c' },
       'dry-run': { type: 'boolean', default: false },
-      'new-cycle': { type: 'boolean', default: false },
       since: { type: 'string', short: 's' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -59,26 +48,20 @@ function parseCliArgs(): CLIOptions {
 Release CLI - Version bumping and changelog generation
 
 Usage:
-  pnpm tsx scripts/release/index.ts --package <name> [--channel <channel>] [--dry-run]
+  pnpm tsx scripts/release/index.ts --package <name> [--dry-run]
 
 Options:
   -p, --package <name>     Package to release (${getAvailablePackageNames().join(', ')})
-  -c, --channel <channel>  Release channel (alpha, beta, release)
   -s, --since <ref>        Git ref to start from (commit, tag, branch) for first releases
-  --new-cycle              Abandon current prerelease and start fresh version cycle
   --dry-run                Preview changes without applying them
   -h, --help               Show this help message
 
 Examples:
-  pnpm tsx scripts/release/index.ts --package stagewise --channel beta
-  pnpm tsx scripts/release/index.ts --package karton --channel release
-  pnpm tsx scripts/release/index.ts --package stagewise --dry-run
+  pnpm tsx scripts/release/index.ts --package stagewise
+  pnpm tsx scripts/release/index.ts --package karton --dry-run
 
   # First release - only include commits after a specific point
   pnpm tsx scripts/release/index.ts --package stagewise --since abc1234
-
-  # Abandon beta and start fresh alpha for next version
-  pnpm tsx scripts/release/index.ts --package stagewise --channel alpha --new-cycle
 `);
     process.exit(0);
   }
@@ -91,19 +74,10 @@ Examples:
     process.exit(1);
   }
 
-  const channel = values.channel as ReleaseChannel | undefined;
-  if (channel && !VALID_CHANNELS.includes(channel)) {
-    console.error(`Error: Invalid channel "${channel}"`);
-    console.error(`Valid channels: ${VALID_CHANNELS.join(', ')}`);
-    process.exit(1);
-  }
-
   return {
     package: values.package,
-    channel,
     dryRun: values['dry-run'] ?? false,
     since: values.since,
-    newCycle: values['new-cycle'] ?? false,
   };
 }
 
@@ -158,55 +132,6 @@ async function writeReleaseArtifacts(
 }
 
 /**
- * Prompt user to select a channel interactively
- */
-async function promptForChannel(
-  currentVersion: string,
-  bumpType: 'patch' | 'minor' | 'major',
-): Promise<ReleaseChannel> {
-  const possibleVersions = getPossibleNextVersions(currentVersion, bumpType);
-  const parsed = parseVersion(currentVersion);
-
-  console.log('\nSelect release channel:');
-
-  // Filter available channels based on current version
-  const availableChannels = VALID_CHANNELS.filter((channel) =>
-    isValidChannelTransition(parsed.prerelease, channel),
-  );
-
-  for (const [i, channel] of availableChannels.entries()) {
-    const version = possibleVersions[channel];
-    console.log(`  ${i + 1}. ${channel} -> ${version}`);
-  }
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(
-      `\nEnter choice (1-${availableChannels.length}): `,
-      (answer) => {
-        rl.close();
-        const choice = Number.parseInt(answer, 10) - 1;
-        const selectedChannel = availableChannels[choice];
-        if (
-          choice >= 0 &&
-          choice < availableChannels.length &&
-          selectedChannel
-        ) {
-          resolve(selectedChannel);
-        } else {
-          console.error('Invalid choice');
-          process.exit(1);
-        }
-      },
-    );
-  });
-}
-
-/**
  * Confirm release with user
  */
 async function confirmRelease(): Promise<boolean> {
@@ -253,36 +178,26 @@ async function main(): Promise<void> {
   const currentVersion = await getCurrentVersion(packageConfig);
   console.log(`   Current version: ${currentVersion}`);
 
-  // Get last tag for this package
-  const lastTag = await getLastTag(packageConfig.tagPrefix);
-  console.log(`   Last tag: ${lastTag || 'none'}`);
+  if (semver.prerelease(currentVersion)) {
+    console.error(
+      `\nError: Current version ${currentVersion} has a prerelease suffix.`,
+    );
+    console.error('Set package.json to the last stable version first.');
+    process.exit(1);
+  }
 
-  // Parse current version to detect prerelease state
-  const parsedCurrent = parseVersion(currentVersion);
-  const isCurrentPrerelease = parsedCurrent.prerelease !== null;
-
-  // Get the last stable tag for the package
+  // Compare against the last stable tag so nightly tags never shorten the
+  // range of commits included in a release.
   const lastStableTag = await getLastStableTag(packageConfig.tagPrefix);
   console.log(`   Last stable tag: ${lastStableTag || 'none'}`);
 
-  const requestedChannel = options.channel;
-
-  // Determine starting point for commits. Stable releases from an existing
-  // stable version must compare against the latest stable tag, not the latest
-  // tag across all channels. Otherwise old alpha/beta tags can win Git's
-  // version sort and cause stable changelogs to include an entire prerelease
-  // cycle again.
-  const useStableBaseline =
-    requestedChannel === 'release' && !isCurrentPrerelease && !options.since;
-  let sinceRef = options.since || (useStableBaseline ? lastStableTag : lastTag);
+  const sinceRef = options.since || lastStableTag;
   if (options.since) {
     console.log(`   Using --since: ${options.since}`);
-  } else if (useStableBaseline) {
-    console.log(`   Using stable baseline: ${sinceRef || 'none'}`);
   }
 
-  // Get commits since last tag or specified ref
-  let commits = await getCommitsSince(sinceRef, packageConfig.scope);
+  // Get commits since last stable tag or specified ref
+  const commits = await getCommitsSince(sinceRef, packageConfig.scope);
   console.log(`   Commits since last release: ${commits.length}`);
 
   // Check for custom release notes
@@ -292,58 +207,16 @@ async function main(): Promise<void> {
     console.log(`   Custom release notes: ${notesPath}`);
   }
 
-  // Determine if this is a channel promotion (alpha→beta or prerelease→release)
-  // Note: options.channel is always provided in CI, which is the primary use case for promotions
-  const isChannelPromotion =
-    isCurrentPrerelease &&
-    requestedChannel &&
-    ((parsedCurrent.prerelease === 'alpha' && requestedChannel === 'beta') ||
-      (parsedCurrent.prerelease !== null && requestedChannel === 'release'));
-
   if (commits.length === 0) {
-    if (isChannelPromotion) {
-      // This is a channel promotion without new commits
-      // Get commits from the start of the prerelease cycle instead
-      console.log(
-        `\n   ℹ️  No new commits since last tag, but this is a channel promotion`,
-      );
-      console.log(
-        `      Looking for commits since the start of the prerelease cycle...`,
-      );
-
-      // Find the reference point: either last stable tag or first prerelease of this cycle
-      const cycleStartRef =
-        lastStableTag ||
-        (await getFirstPrereleaseTagForCycle(
-          packageConfig.tagPrefix,
-          parsedCurrent.base,
-        ));
-
-      if (cycleStartRef && cycleStartRef !== lastTag) {
-        sinceRef = cycleStartRef;
-        commits = await getCommitsSince(sinceRef, packageConfig.scope);
-        console.log(
-          `      Found ${commits.length} commits since ${cycleStartRef}`,
-        );
-      }
-
-      // If still no commits, allow the promotion with a generated note
-      if (commits.length === 0) {
-        console.log(
-          `      No commits found in cycle, proceeding with promotion release note`,
-        );
-      }
-    } else {
-      console.error(
-        `\nError: No commits with scope "${packageConfig.scope}" found since last release.`,
-      );
-      console.error('Nothing to release.');
-      process.exit(1);
-    }
+    console.error(
+      `\nError: No commits with scope "${packageConfig.scope}" found since last release.`,
+    );
+    console.error('Nothing to release.');
+    process.exit(1);
   }
 
   // Warn if this is a first release (no previous tag and no --since)
-  if (!lastTag && !options.since) {
+  if (!lastStableTag && !options.since) {
     console.log(
       `\n   ⚠️  First release detected - all matching commits will be included`,
     );
@@ -353,96 +226,34 @@ async function main(): Promise<void> {
   }
 
   // Show commits
-  if (commits.length > 0) {
-    console.log('\n   Commits to include:');
-    for (const commit of commits.slice(0, 10)) {
-      const breaking = commit.breaking ? ' [BREAKING]' : '';
-      console.log(
-        `   - ${commit.type}(${commit.scope}): ${commit.subject}${breaking}`,
-      );
-    }
-    if (commits.length > 10) {
-      console.log(`   ... and ${commits.length - 10} more`);
-    }
-  } else if (isChannelPromotion) {
-    console.log('\n   Commits to include: (channel promotion, no new commits)');
+  console.log('\n   Commits to include:');
+  for (const commit of commits.slice(0, 10)) {
+    const breaking = commit.breaking ? ' [BREAKING]' : '';
+    console.log(
+      `   - ${commit.type}(${commit.scope}): ${commit.subject}${breaking}`,
+    );
+  }
+  if (commits.length > 10) {
+    console.log(`   ... and ${commits.length - 10} more`);
   }
 
   // Get recommended bump
-  // For channel promotions without commits, use 'patch' as fallback (won't affect version calculation for promotions)
-  const bumpType =
-    getRecommendedBump(commits) || (isChannelPromotion ? 'patch' : null);
+  const bumpType = getRecommendedBump(commits);
   if (!bumpType) {
     console.error('\nError: Could not determine version bump type.');
     process.exit(1);
   }
-  console.log(
-    `\n   Recommended bump: ${bumpType}${isChannelPromotion && commits.length === 0 ? ' (fallback for promotion)' : ''}`,
-  );
+  console.log(`\n   Recommended bump: ${bumpType}`);
 
-  // Check if prerelease channels are enabled for this package
-  const prereleaseEnabled = packageConfig.prereleaseEnabled !== false;
-
-  // Get target channel
-  let targetChannel = options.channel;
-
-  if (!prereleaseEnabled) {
-    // For packages without prerelease, always use 'release' channel
-    if (targetChannel && targetChannel !== 'release') {
-      console.error(
-        `\nError: Package "${packageConfig.name}" does not support prerelease channels.`,
-      );
-      console.error('Only regular semver releases are allowed.');
-      process.exit(1);
-    }
-    if (options.newCycle) {
-      console.error(
-        `\nError: --new-cycle is not supported for package "${packageConfig.name}".`,
-      );
-      process.exit(1);
-    }
-    targetChannel = 'release';
-    console.log('   Mode: standard semver (no prereleases)');
-  } else if (!targetChannel) {
-    // Interactive channel selection for packages with prerelease enabled
-    targetChannel = await promptForChannel(currentVersion, bumpType);
-  }
-
-  // Handle --new-cycle: abandon current prerelease and start fresh
-  let versionForCalculation = currentVersion;
-  const parsed = parseVersion(currentVersion);
-
-  if (options.newCycle) {
-    if (!parsed.prerelease) {
-      console.error(
-        '\nError: --new-cycle is only valid when current version is a prerelease.',
-      );
-      console.error(`Current version ${currentVersion} is already a release.`);
-      process.exit(1);
-    }
-    if (targetChannel === 'release') {
-      console.error(
-        '\nError: --new-cycle cannot be used with release channel.',
-      );
-      console.error('Use --new-cycle with alpha or beta to start a new cycle.');
-      process.exit(1);
-    }
-    // Use the base version so bump gets applied fresh
-    versionForCalculation = parsed.base;
-    console.log(
-      `\n   🔄 New cycle: abandoning ${currentVersion}, starting fresh from ${parsed.base}`,
+  const newVersion = semver.inc(currentVersion, bumpType);
+  if (!newVersion) {
+    console.error(
+      `\nError: Failed to bump version ${currentVersion} with ${bumpType}`,
     );
+    process.exit(1);
   }
-
-  // Calculate new version
-  const newVersion = calculateNextVersion(
-    versionForCalculation,
-    bumpType,
-    targetChannel,
-  );
   const newTag = `${packageConfig.tagPrefix}${newVersion}`;
 
-  console.log(`\n   Target channel: ${targetChannel}`);
   console.log(`   New version: ${newVersion}`);
   console.log(`   New tag: ${newTag}`);
 
@@ -487,7 +298,6 @@ async function main(): Promise<void> {
   const releaseNotes = await updateChangelog(
     packageConfig,
     newVersion,
-    targetChannel,
     commits,
     customNotes,
   );

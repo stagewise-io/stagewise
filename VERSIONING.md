@@ -67,14 +67,6 @@ BREAKING CHANGE: Navigation API has changed. Update your code accordingly.
 
 Standard semver: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
 
-### Prerelease Versions
-
-Format: `MAJOR.MINOR.PATCH-<channel><NNN>` where `NNN` is a 3-digit zero-padded counter (e.g. `1.0.1-alpha001`).
-
-The channel name and counter are intentionally concatenated (no dot separator) so the version string stays compatible with **SemVer 1.0 / the NuGet `SemanticVersion` parser** used inside Squirrel.Windows. A dot-separated SemVer 2.0 prerelease like `1.0.1-alpha.1` causes Squirrel.Windows to crash on Windows clients with `System.ArgumentException: '1' is not a valid version string` when it tries to parse the installed package's RELEASES manifest locally.
-
-The counter is **capped at `999`**. Going beyond would break lexical ordering — for example `alpha1000` sorts lower than `alpha999` because SemVer 2.0 compares non-purely-numeric prerelease identifiers as ASCII strings. The bump script hard-fails if the limit is reached. If you're about to hit it, promote to the next channel (`alpha` → `beta` → `release`) or bump the base version so the counter resets.
-
 ### Nightly Versions
 
 Nightly versions are generated dynamically by CI and are **not committed** to `apps/browser/package.json`.
@@ -83,72 +75,41 @@ Format: `MAJOR.MINOR.PATCH-nightlyYYYYMMDDcNNN` (e.g. `1.0.1-nightly20260525c001
 
 The nightly suffix is a single SemVer prerelease identifier so the version remains compatible with Squirrel.Windows. `YYYYMMDD` is the UTC date and `NNN` is a 3-digit per-day counter. The `c` separator prevents Squirrel.Windows' embedded NuGet parser from reading `YYYYMMDDNNN` as one integer, which overflows Int32.
 
-Examples:
-
-- `1.0.1-alpha001` - First alpha for upcoming 1.0.1
-- `1.0.1-alpha002` - Second alpha
-- `1.0.1-beta001` - First beta (after alpha phase)
-- `1.0.1-nightly20260525c001` - Nightly build for the 1.0.1 release line
-- `1.0.1` - Final release
-
-### Version Transitions
-
-| Current | Target Channel | New Version |
-|---------|----------------|-------------|
-| `1.0.0` | alpha | `1.0.1-alpha001` (bump applied) |
-| `1.0.1-alpha001` | alpha | `1.0.1-alpha002` |
-| `1.0.1-alpha005` | beta | `1.0.1-beta001` |
-| `1.0.1-beta003` | release | `1.0.1` |
-| `1.0.1` | beta | `1.0.2-beta001` (bump applied) |
+Example: `1.0.1-nightly20260525c001` is a nightly build for the upcoming 1.0.1 release.
 
 ## Release Channels
 
-| Channel | npm Tag | Purpose |
-|---------|---------|---------|
-| alpha | `alpha` | Early testing, unstable |
-| beta | `beta` | Legacy prerelease testing during transition |
-| nightly | n/a | Scheduled/manual nightly builds from main |
-| release | `latest` | Production ready |
+| Channel | Purpose |
+|---------|---------|
+| nightly | Scheduled/manual nightly builds from `main` |
+| release | Production releases |
+
+There are no other channels. Releases always bump the stable version directly.
 
 ## Versioning Commands
 
 ### Local Development
 
 ```bash
-# Interactive mode - prompts for channel selection
+# Bump version and update the changelog
 pnpm version:stagewise
 pnpm version:karton
 
-# Direct channel specification
-pnpm version:stagewise:alpha
-pnpm version:stagewise:beta
-pnpm version:stagewise:release
-
-pnpm version:karton:alpha
-pnpm version:karton:beta
-pnpm version:karton:release
-
 # Dry run - preview without making changes
 pnpm tsx scripts/release/index.ts --package stagewise --dry-run
-
-# Abandon current prerelease and start new version cycle
-pnpm tsx scripts/release/index.ts --package stagewise --channel alpha --new-cycle
 ```
 
 ### CI (GitHub Actions)
 
 Releases are driven by a two-step workflow:
 
-1. **Prepare Release** (manual, `.github/workflows/prepare-release.yml`) — run from the Actions tab with inputs:
-   - `package`: `stagewise` or `karton`
-   - `channel`: `alpha`, `beta`, or `release`
-   - `new-cycle` (optional): abandon the current prerelease and start a fresh cycle
+1. **Prepare Release** (manual, `.github/workflows/prepare-release.yml`) — run from the Actions tab and pick the `package` (`stagewise` or `karton`).
 
    This opens a release PR that bumps the version and updates the changelog.
 
 2. **Auto Release** (automatic, `.github/workflows/auto-release.yml`) — fires when the release PR merges to `main`. It detects which packages need a release (based on tag absence), then invokes the reusable `_Release Browser` or `_Release Karton` workflow to build artifacts and publish.
 
-Nightly releases are separate from the release PR flow. `.github/workflows/nightly-release.yml` can be triggered manually and computes a dynamic nightly version without modifying package.json. Alpha and beta are legacy prerelease channels and should no longer be used for new releases; use the nightly workflow for nightly builds instead of creating new alpha/beta releases.
+Nightly releases are separate from the release PR flow. `.github/workflows/nightly-release.yml` runs daily and can be triggered manually. It computes a dynamic nightly version without modifying package.json.
 
 **Prerequisites for release:**
 
@@ -174,7 +135,7 @@ If a release fails after the version bump (e.g., build fails on one platform):
 
 1. Fix the issue in a new commit
 2. Go to **Actions** > **Retry Failed Release**
-3. Enter the tag name (e.g., `stagewise@1.0.0-alpha001`)
+3. Enter the tag name (e.g., `stagewise@1.0.1`)
 4. Click **Run workflow**
 
 This will rebuild and publish without bumping the version again.
@@ -183,8 +144,8 @@ This will rebuild and publish without bumping the version again.
 
 ```bash
 # Delete the tag locally and remotely
-git tag -d stagewise@1.0.0-alpha001
-git push origin :refs/tags/stagewise@1.0.0-alpha001
+git tag -d stagewise@1.0.1
+git push origin :refs/tags/stagewise@1.0.1
 
 # Revert the version bump commit
 git revert HEAD
@@ -196,7 +157,7 @@ git push
 ```
 
 **Option 3: Skip the failed version**
-Just run another release - it will create the next version (e.g., `alpha002` instead of retrying `alpha001`).
+Just run another release - it will create the next version (e.g., `1.0.2` instead of retrying `1.0.1`).
 
 ## Package-Specific Behavior
 
@@ -211,7 +172,7 @@ Just run another release - it will create the next version (e.g., `alpha002` ins
 ### karton (npm Package)
 
 - **Distribution:** npm registry
-- **npm tags:** `alpha`, `beta`, or `latest`
+- **npm tag:** `latest`
 - **Git tags:** `@stagewise/karton@<version>`
 
 ## Adding New Packages
@@ -324,8 +285,6 @@ Changelogs are automatically generated from conventional commits and follow this
 * improve performance of data processing (mno7890)
 ```
 
-When promoting from beta to release, prerelease changelog entries are consolidated into a single release entry.
-
 ## Troubleshooting
 
 ### "No commits with scope found"
@@ -335,22 +294,7 @@ This error occurs when there are no commits with the specified package scope sin
 1. Your commits use the correct scope: `feat(stagewise): ...`
 2. There are actual changes to release
 3. Sub-scopes like `stagewise-ui` need to be changed to `stagewise`
-
-### "Cannot downgrade channel"
-
-You cannot go from `beta` back to `alpha` for the same base version. The progression must be:
-`alpha` → `beta` → `release`
-
-If you need to add new features during beta, use `--new-cycle` to abandon the current prerelease and start fresh:
-
-```bash
-# Current: 1.0.1-beta001, want to start fresh alpha
-pnpm version:stagewise --channel alpha --new-cycle
-
-# Result: 1.1.0-alpha001 (or 1.0.2-alpha001 depending on commit types)
-```
-
-This abandons the `1.0.1` release cycle entirely and starts a new version.
+4. The commit actually reached `main`. GitHub's rebase merge drops empty commits, so a `git commit --allow-empty` PR merges without adding anything
 
 ### Commitlint rejecting commits
 

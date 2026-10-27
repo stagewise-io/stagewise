@@ -15,15 +15,9 @@ import { DisposableService } from './disposable';
 import type { Logger } from './logger';
 import type { NotificationService } from './notification';
 import type { TelemetryService } from './telemetry';
-import type { PreferencesService } from './preferences';
 import type { KartonService } from './karton';
-import type { UpdateChannel } from '@shared/karton-contracts/ui/shared-types';
 
-declare const __APP_RELEASE_CHANNEL__:
-  | 'dev'
-  | 'prerelease'
-  | 'nightly'
-  | 'release';
+declare const __APP_RELEASE_CHANNEL__: 'dev' | 'nightly' | 'release';
 declare const __APP_VERSION__: string;
 declare const __APP_PLATFORM__: string;
 declare const __APP_ARCH__: string;
@@ -37,7 +31,6 @@ export class AutoUpdateService extends DisposableService {
   private readonly logger: Logger;
   private readonly notificationService: NotificationService;
   private readonly telemetryService: TelemetryService;
-  private readonly preferencesService: PreferencesService;
   private readonly uiKarton: KartonService;
   private pendingUpdate: UpdateInfo | null = null;
   private downloadingUpdate: UpdateInfo | null = null;
@@ -53,14 +46,12 @@ export class AutoUpdateService extends DisposableService {
     logger: Logger,
     notificationService: NotificationService,
     telemetryService: TelemetryService,
-    preferencesService: PreferencesService,
     uiKarton: KartonService,
   ) {
     super();
     this.logger = logger;
     this.notificationService = notificationService;
     this.telemetryService = telemetryService;
-    this.preferencesService = preferencesService;
     this.uiKarton = uiKarton;
   }
 
@@ -80,14 +71,12 @@ export class AutoUpdateService extends DisposableService {
     logger: Logger,
     notificationService: NotificationService,
     telemetryService: TelemetryService,
-    preferencesService: PreferencesService,
     uiKarton: KartonService,
   ): Promise<AutoUpdateService> {
     const instance = new AutoUpdateService(
       logger,
       notificationService,
       telemetryService,
-      preferencesService,
       uiKarton,
     );
     await instance.initialize();
@@ -150,13 +139,6 @@ export class AutoUpdateService extends DisposableService {
         }
       }, this.UPDATE_CHECK_INTERVAL_MS);
 
-      // Listen for preference changes to update the feed URL when channel changes
-      this.preferencesService.addListener((newPrefs, oldPrefs) => {
-        if (newPrefs.updateChannel !== oldPrefs.updateChannel) {
-          this.onUpdateChannelChanged();
-        }
-      });
-
       this.registerProcedureHandlers();
     } catch (error) {
       this.logger.error(
@@ -179,42 +161,6 @@ export class AutoUpdateService extends DisposableService {
     );
   }
 
-  /**
-   * Called when the user changes the update channel preference.
-   * Re-configures the feed URL and triggers an immediate update check.
-   */
-  private onUpdateChannelChanged(): void {
-    const feedURL = this.buildUpdateURL('update');
-    if (!feedURL) {
-      this.logger.warn(
-        '[AutoUpdateService] Could not build feed URL after channel change',
-      );
-      return;
-    }
-
-    this.logger.debug(
-      `[AutoUpdateService] Update channel changed, new feed URL: ${feedURL}`,
-    );
-
-    try {
-      autoUpdater.setFeedURL({ url: feedURL });
-
-      // Let an active Electron download finish; otherwise restart the preflight
-      // against the new channel while preserving any installable update.
-      if (!this.downloadingUpdate) {
-        this.updateCheckRequestId += 1;
-        this.updateCheckInProgress = false;
-        this.checkForUpdates();
-      }
-    } catch (error) {
-      this.logger.error(
-        '[AutoUpdateService] Failed to reconfigure feed URL after channel change',
-        error,
-      );
-      this.report(error as Error, 'onUpdateChannelChanged');
-    }
-  }
-
   private getPlatform(): 'macos' | 'win' | 'linux' {
     const platform = __APP_PLATFORM__;
     if (platform === 'darwin') return 'macos';
@@ -228,36 +174,11 @@ export class AutoUpdateService extends DisposableService {
   }
 
   /**
-   * Infer the default update channel from the installed version string.
-   * e.g. "1.0.0-alpha003" → 'alpha', "1.0.0-beta001" → 'beta'
+   * Get the update server channel. Dev builds never reach this because
+   * auto-update is disabled for them.
    */
-  private inferChannelFromVersion(): UpdateChannel {
-    const version = __APP_VERSION__;
-    if (version.includes('-alpha')) {
-      return 'alpha';
-    }
-    // Default to beta for any other prerelease version
-    return 'beta';
-  }
-
-  /**
-   * Get the effective update channel for the update server.
-   * For release builds, always use 'release'.
-   * For prerelease builds, use the user's configured channel or infer from version.
-   */
-  private getReleaseChannel(): string {
-    switch (__APP_RELEASE_CHANNEL__) {
-      case 'release':
-        return 'release';
-      case 'nightly':
-        return 'nightly';
-      case 'prerelease': {
-        const prefs = this.preferencesService.get();
-        return prefs.updateChannel ?? this.inferChannelFromVersion();
-      }
-      default:
-        return 'alpha';
-    }
+  private getReleaseChannel(): 'nightly' | 'release' {
+    return __APP_RELEASE_CHANNEL__ === 'nightly' ? 'nightly' : 'release';
   }
 
   private buildUpdateURL(

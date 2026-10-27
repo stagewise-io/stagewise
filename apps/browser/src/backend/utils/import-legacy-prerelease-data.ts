@@ -4,11 +4,7 @@ import path from 'node:path';
 import type { Logger } from '../services/logger';
 import { getDataRoot } from './paths';
 
-declare const __APP_RELEASE_CHANNEL__:
-  | 'dev'
-  | 'prerelease'
-  | 'nightly'
-  | 'release';
+declare const __APP_RELEASE_CHANNEL__: 'dev' | 'nightly' | 'release';
 
 const LEGACY_PRERELEASE_BASE_NAME = 'stagewise-prerelease';
 const DATA_ROOT_DIR_NAME = 'stagewise';

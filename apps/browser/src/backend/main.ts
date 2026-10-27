@@ -349,7 +349,6 @@ export async function main({ launchOptions: { verbose } }: MainParameters) {
     logger,
     notificationService,
     telemetryService,
-    preferencesService,
     uiKarton,
   );
 
@@ -1409,7 +1408,6 @@ function isOpenableUrl(url: string): boolean {
       parsed.protocol === 'http:' ||
       parsed.protocol === 'https:' ||
       parsed.protocol === 'stagewise:' ||
-      parsed.protocol === 'stagewise-prerelease:' ||
       parsed.protocol === 'stagewise-nightly:' ||
       parsed.protocol === 'stagewise-dev:'
     );
@@ -1443,7 +1441,6 @@ function isAuthCallbackUrl(url: string): boolean {
     const parsed = new URL(url);
     if (
       parsed.protocol !== 'stagewise:' &&
-      parsed.protocol !== 'stagewise-prerelease:' &&
       parsed.protocol !== 'stagewise-nightly:' &&
       parsed.protocol !== 'stagewise-dev:'
     ) {

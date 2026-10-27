@@ -2,8 +2,6 @@
  * Type definitions for the release scripts
  */
 
-export type ReleaseChannel = 'alpha' | 'beta' | 'release';
-
 export type VersionBump = 'patch' | 'minor' | 'major';
 
 export interface PackageConfig {
@@ -19,25 +17,6 @@ export interface PackageConfig {
   createGithubRelease: boolean;
   /** Git tag prefix (e.g., "stagewise@", "@stagewise/karton@") */
   tagPrefix: string;
-  /** Whether prerelease channels (alpha/beta) are enabled. Default: true */
-  prereleaseEnabled?: boolean;
-}
-
-export interface ParsedVersion {
-  /** Full version string (e.g., "1.0.0-alpha001") */
-  full: string;
-  /** Major version number */
-  major: number;
-  /** Minor version number */
-  minor: number;
-  /** Patch version number */
-  patch: number;
-  /** Prerelease channel (alpha, beta) or null for release */
-  prerelease: ReleaseChannel | null;
-  /** Prerelease number (e.g., 1 in "alpha001") or null */
-  prereleaseNum: number | null;
-  /** Base version without prerelease (e.g., "1.0.0") */
-  base: string;
 }
 
 export interface ConventionalCommit {
@@ -88,12 +67,8 @@ export interface ReleaseResult {
 export interface CLIOptions {
   /** Package name to release */
   package: string;
-  /** Target release channel */
-  channel?: ReleaseChannel;
   /** Dry run mode */
   dryRun: boolean;
   /** Git ref to start from (for first releases without a tag) */
   since?: string;
-  /** Start a new version cycle, abandoning any current prerelease */
-  newCycle: boolean;
 }

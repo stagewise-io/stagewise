@@ -113,11 +113,11 @@ Input to LLM is XML-ish:
 Replays every real compression from local stagewise SQLite into playground-ready bundles.
 
 ```bash
-npx tsx scripts/experiments/extract-compression-test-data.ts --channel prerelease
+npx tsx scripts/experiments/extract-compression-test-data.ts --channel nightly
 npx tsx scripts/experiments/extract-compression-test-data.ts --channel dev --min-messages 10
 ```
 
-Channels map to `<appData>/{stagewise | stagewise-prerelease | stagewise-dev}/stagewise/agents/instances.sqlite`.
+Channels map to `<appData>/{stagewise | stagewise-nightly | stagewise-dev}/stagewise/agents/instances.sqlite`.
 
 Per chat, for each boundary message (every real compression event):
 

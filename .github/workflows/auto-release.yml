@@ -31,7 +31,6 @@ jobs:
       stagewise-needs-release: ${{ steps.check.outputs.stagewise_needs_release }}
       stagewise-version: ${{ steps.check.outputs.stagewise_version }}
       stagewise-tag: ${{ steps.check.outputs.stagewise_tag }}
-      stagewise-channel: ${{ steps.check.outputs.stagewise_channel }}
       karton-needs-release: ${{ steps.check.outputs.karton_needs_release }}
       karton-version: ${{ steps.check.outputs.karton_version }}
       karton-tag: ${{ steps.check.outputs.karton_tag }}
@@ -67,16 +66,11 @@ jobs:
             echo "${name}_version=${version}" >> $GITHUB_OUTPUT
             echo "${name}_tag=${tag}" >> $GITHUB_OUTPUT
 
-            # Determine channel from version.
-            # Accepts both the new format (`1.0.0-alpha063`) and the legacy
-            # format (`1.0.0-alpha.63`) so re-runs of historical release PRs
-            # continue to classify correctly.
-            if [[ "$version" =~ -alpha(\.[0-9]+|[0-9]+)$ ]]; then
-              echo "${name}_channel=alpha" >> $GITHUB_OUTPUT
-            elif [[ "$version" =~ -beta(\.[0-9]+|[0-9]+)$ ]]; then
-              echo "${name}_channel=beta" >> $GITHUB_OUTPUT
-            else
-              echo "${name}_channel=release" >> $GITHUB_OUTPUT
+            # Only stable versions are released here. Nightlies are tagged by
+            # the Nightly Release workflow and never bump package.json.
+            if [[ "$version" == *-* ]]; then
+              echo "::error::${name} version ${version} has a prerelease suffix. Only stable versions can be released."
+              exit 1
             fi
           }
 
@@ -95,7 +89,7 @@ jobs:
     with:
       version: ${{ needs.detect.outputs.stagewise-version }}
       tag: ${{ needs.detect.outputs.stagewise-tag }}
-      channel: ${{ needs.detect.outputs.stagewise-channel }}
+      channel: release
       ref: ${{ github.sha }}
     secrets: inherit
 

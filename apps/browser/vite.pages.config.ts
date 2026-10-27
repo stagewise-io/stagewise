@@ -16,7 +16,7 @@ const packageJson = JSON.parse(
 );
 const _appVersion = packageJson.version;
 
-// Release channel: 'dev' | 'prerelease' | 'release'
+// Release channel: 'dev' | 'nightly' | 'release'
 const _releaseChannel = process.env.RELEASE_CHANNEL || 'dev';
 
 const pagesPort = buildConstants.__APP_BASE_NAME__.startsWith('stagewise-dev-')
