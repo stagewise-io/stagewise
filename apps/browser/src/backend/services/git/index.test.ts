@@ -471,6 +471,39 @@ describe('GitService', () => {
     expect(readCalls.filter((call) => call === 'remote -v')).toHaveLength(2);
   });
 
+  it('does not share a pending read after invalidation', async () => {
+    let releaseFirstRead: () => void = () => {};
+    const readCalls: string[] = [];
+    const service = await GitService.create({
+      logger,
+      telemetryService,
+      resolvedEnvPromise: Promise.resolve({ PATH: '/usr/bin' }),
+      runGitCommand: async (_cwd, args) => {
+        readCalls.push(args.join(' '));
+        if (readCalls.length === 1) {
+          await new Promise<void>((resolve) => {
+            releaseFirstRead = resolve;
+          });
+        }
+        return '';
+      },
+      runGitMutationCommand: async () => ({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+      }),
+    });
+
+    const pending = service.getRepositoryRemoteUrl('/repo');
+    await vi.waitFor(() => expect(readCalls).toHaveLength(1));
+    service.invalidateRepositoryReads();
+    const afterInvalidation = service.getRepositoryRemoteUrl('/repo');
+    releaseFirstRead();
+    await Promise.all([pending, afterInvalidation]);
+
+    expect(readCalls).toEqual(['remote -v', 'remote -v']);
+  });
+
   it('lists worktrees again after a mutation', async () => {
     const { service, readCalls } = await createGitService(baseReadResponses);
 

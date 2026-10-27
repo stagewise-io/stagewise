@@ -1071,6 +1071,8 @@ export class MountManagerService extends DisposableService {
     workspacePath: string,
     options: WorkspaceGitWorktreeDeleteOptions = {},
   ): Promise<WorkspaceGitWorktreeDeleteResult> {
+    // Decide on fresh git state before removing anything.
+    this.gitService.invalidateRepositoryReads();
     const info = await this.getGitWorktreeDeletionInfo(workspacePath);
     if (!info) {
       return { ok: false, message: 'Worktree is no longer available.' };
@@ -1212,6 +1214,8 @@ export class MountManagerService extends DisposableService {
 
     for (const workspacePath of uniquePaths) {
       try {
+        // Re-check against fresh git state before removing anything.
+        this.gitService.invalidateRepositoryReads();
         const candidate = await this.getCleanupCandidateForPath(
           workspacePath,
           lastUsedByPath,
