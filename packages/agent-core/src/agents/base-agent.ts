@@ -638,13 +638,17 @@ export abstract class BaseAgent<
    */
   private _queuedMessageToFlushOnNextStepId: string | null = null;
 
+  /** Set while `retryLastUserMessage` is stopping the failed step. */
+  private _retryInProgress = false;
+
   /**
-   * Set only for runtime recovery after a suspend/resume or event-loop stall.
-   * It appends a transient model-only `continue` user message for the next
-   * step without writing anything to visible/persisted chat history.
+   * Set only for runtime recovery after a suspend/resume, an event-loop
+   * stall, or a retry after a step error. It appends a transient model-only
+   * `continue` user message for the next step without writing anything to
+   * visible/persisted chat history.
    */
   private _pendingSyntheticContinuation: {
-    reason: 'system-resumed' | 'event-loop-stalled';
+    reason: 'system-resumed' | 'event-loop-stalled' | 'error-retry';
   } | null = null;
 
   /**
@@ -807,10 +811,13 @@ export abstract class BaseAgent<
     const msg = { ...message, id: id };
 
     // Preserve queue order, and only let manual input interrupt a blocked
-    // interaction when no older message is waiting.
+    // interaction when no older message is waiting. A retry that is still
+    // stopping the failed step counts as working, so the message runs after
+    // the resumed step instead of racing it.
     const state = this.state.get();
     if (
       state.isWorking ||
+      this._retryInProgress ||
       state.queuedMessages.length > 0 ||
       (options.queueIfBlocked && !this.canRunStep())
     ) {
@@ -833,7 +840,8 @@ export abstract class BaseAgent<
         queue_length_after: queueLengthAfter,
       });
 
-      if (!state.isWorking && this.canRunStep()) void this.runStep();
+      if (!state.isWorking && !this._retryInProgress && this.canRunStep())
+        void this.runStep();
 
       return id;
     }
@@ -1104,39 +1112,90 @@ export abstract class BaseAgent<
   }
 
   /**
-   * Retries the last user message that resulted in an error.
+   * Resumes the agent after a step error without touching the history.
    *
-   * @note Only works if there is an error in the state and the last message is a user message.
+   * Everything the agent did since the last user message stays in the chat.
+   * The next step continues from the current history: if it ends with the
+   * user message, that message is answered; otherwise a transient
+   * model-only `continue` message is added. The failed step is stopped
+   * first, so its unfinished tool calls are marked as interrupted and a
+   * reasoning-only leftover is dropped. Approved tool calls that never ran
+   * go through the approval continuation. To start over from an earlier
+   * message, use `revertToUserMessage`.
+   *
+   * @note Only works if there is an error in the state.
    *
    * @note DO NOT OVERRIDE
    */
   public async retryLastUserMessage(): Promise<void> {
     const currentState = this.state.get();
 
-    // Check if there's an error
     if (!currentState.error) {
       throw new Error('No error to retry');
     }
 
-    // Find the last user message
-    const history = currentState.history;
-    let lastUserMessage: (AgentMessage & { role: 'user' }) | null = null;
-
-    for (let i = history.length - 1; i >= 0; i--) {
-      const entry = history[i];
-      if (entry?.role === 'user') {
-        lastUserMessage = entry as AgentMessage & { role: 'user' };
-        break;
-      }
+    if (currentState.isWorking) {
+      throw new Error('Cannot retry while agent is still running');
     }
 
-    if (!lastUserMessage) {
+    if (!currentState.history.some((entry) => entry.role === 'user')) {
       throw new Error('No user message found to retry');
     }
 
-    // Revert to the last user message and resend it
-    await this.revertToUserMessage(lastUserMessage.id, false);
-    await this.sendUserMessage(lastUserMessage);
+    if (this._retryInProgress) {
+      throw new Error('A retry is already in progress');
+    }
+    this._retryInProgress = true;
+    try {
+      await this.resumeAfterError(currentState.history.length);
+    } finally {
+      this._retryInProgress = false;
+    }
+  }
+
+  private async resumeAfterError(historyLength: number): Promise<void> {
+    this.host.logger.info(
+      `[BaseAgent:${this.instanceId}] Retrying after error without truncating history. historyLength=${historyLength}`,
+    );
+
+    // Invalidate the failed step so late stream chunks are ignored, and
+    // drop a reasoning-only or empty leftover assistant message.
+    await this.internalStop('error-retry');
+
+    // Approved tool calls that never ran must go through the approval
+    // continuation so the SDK collects the approvals and runs them. An
+    // external runtime resumes the turn itself with the continuation.
+    if (this.hasApprovalResponseAwaitingExecution()) {
+      this._pendingSyntheticContinuation = { reason: 'error-retry' };
+      void this.runStep(true);
+      return;
+    }
+
+    this.state.commands.denyAllNonTerminalToolPartsInHistory({
+      approvalDenyReason:
+        'Tool call approval was cancelled because the agent hit an error.',
+      forceErrorText:
+        'Tool execution interrupted — the agent hit an error before the tool call finished.',
+    });
+
+    // When the failed step left no output, the user message is still the
+    // tail and is sent as is. External runtimes would otherwise receive
+    // only the synthetic continuation instead of the user's message.
+    if (this.state.get().history.at(-1)?.role !== 'user') {
+      this._pendingSyntheticContinuation = { reason: 'error-retry' };
+    }
+    void this.runStep(false, false);
+  }
+
+  private hasApprovalResponseAwaitingExecution(): boolean {
+    const lastMessage = this.state.get().history.at(-1);
+    if (lastMessage?.role !== 'assistant') return false;
+    return lastMessage.parts.some(
+      (part) =>
+        (part.type.startsWith('tool-') || part.type === 'dynamic-tool') &&
+        (part as AgentToolUIPart | DynamicToolUIPart).state ===
+          'approval-responded',
+    );
   }
 
   /**
@@ -1783,8 +1842,13 @@ export abstract class BaseAgent<
       providerInstanceId: stepProviderInstanceId,
       thinkingOverride: presetThinkingOverride,
     };
+    // External runtimes answer approvals themselves, so approval
+    // continuations stay internal. A retry after an error is the exception:
+    // the external runtime resumes the turn with the synthetic continuation.
+    const isErrorRetry =
+      this._pendingSyntheticContinuation?.reason === 'error-retry';
     if (
-      !isApprovalContinuation &&
+      (!isApprovalContinuation || isErrorRetry) &&
       this.externalRuntime?.handles(externalSelection)
     ) {
       await this.runExternalStep(externalSelection, stepGen, flushedIndex);
@@ -3308,7 +3372,8 @@ export abstract class BaseAgent<
     stopReason:
       | 'user-stopped'
       | 'user-flushed-queue'
-      | 'system-interrupted' = 'user-stopped',
+      | 'system-interrupted'
+      | 'error-retry' = 'user-stopped',
   ): Promise<void> {
     // Invalidate pending callbacks BEFORE firing abort — onAbort fires
     // synchronously and must see the new generation to be ignored.
@@ -3333,20 +3398,24 @@ export abstract class BaseAgent<
     const toolCallAbortReason =
       stopReason === 'system-interrupted'
         ? 'System was suspended or stalled before tool call finished.'
-        : stopReason === 'user-stopped'
-          ? (this.config.stopToolCallAbortReason ??
-            'User stopped agent before tool call finished.')
-          : (this.config.flushQueueToolCallAbortReason ??
-            'User sent new message before tool call finished.');
+        : stopReason === 'error-retry'
+          ? 'Tool execution interrupted — the agent hit an error before the tool call finished.'
+          : stopReason === 'user-stopped'
+            ? (this.config.stopToolCallAbortReason ??
+              'User stopped agent before tool call finished.')
+            : (this.config.flushQueueToolCallAbortReason ??
+              'User sent new message before tool call finished.');
 
     const toolCallRequestApprovalAbortReason =
       stopReason === 'system-interrupted'
         ? 'System was suspended or stalled before tool call approval was granted.'
-        : stopReason === 'user-stopped'
-          ? (this.config.stopToolCallRequestApprovalReason ??
-            'User stopped agent before tool call approval was granted.')
-          : (this.config.flushQueueToolCallRequestApprovalReason ??
-            'User sent new message before tool call approval was granted.');
+        : stopReason === 'error-retry'
+          ? 'Tool call approval was cancelled because the agent hit an error.'
+          : stopReason === 'user-stopped'
+            ? (this.config.stopToolCallRequestApprovalReason ??
+              'User stopped agent before tool call approval was granted.')
+            : (this.config.flushQueueToolCallRequestApprovalReason ??
+              'User sent new message before tool call approval was granted.');
 
     try {
       await this.externalRuntime?.stop(toolCallRequestApprovalAbortReason);

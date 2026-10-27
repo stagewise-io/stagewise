@@ -981,12 +981,9 @@ export const ChatHistory = ({ flushTop = false }: { flushTop?: boolean }) => {
     updateSpacerHeight,
   ]);
 
-  // Calculate if retry is possible (error exists, not working, and last message is user)
-  const canRetry = useMemo(() => {
-    if (!error || isWorking) return false;
-    const lastMessage = filteredMessages[filteredMessages.length - 1];
-    return lastMessage?.role === 'user';
-  }, [error, isWorking, filteredMessages]);
+  // Retry resumes from the current history, so it only needs an error and
+  // an idle agent.
+  const canRetry = !!error && !isWorking;
   canRetryRef.current = canRetry;
 
   // Render individual message item.
