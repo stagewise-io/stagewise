@@ -6,15 +6,15 @@ on:
       version:
         required: true
         type: string
-        description: "Version to release (e.g., 1.0.0-alpha.11)"
+        description: "Version to release (e.g., 1.30.1)"
       tag:
         required: true
         type: string
-        description: "Git tag to create (e.g., stagewise@1.0.0-alpha.11)"
+        description: "Git tag to create (e.g., stagewise@1.30.1)"
       channel:
         required: true
         type: string
-        description: "Release channel (alpha, beta, nightly, release)"
+        description: "Release channel (nightly or release)"
       ref:
         required: false
         type: string
@@ -69,6 +69,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Validate channel
+        if: inputs.channel != 'release' && inputs.channel != 'nightly'
+        run: |
+          echo "::error::Unsupported release channel '${{ inputs.channel }}'. Use 'release' or 'nightly'."
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -263,7 +269,7 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           # Release channel
-          RELEASE_CHANNEL: ${{ inputs.channel == 'release' && 'release' || inputs.channel == 'nightly' && 'nightly' || 'prerelease' }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
           APP_VERSION_OVERRIDE: ${{ inputs.version }}
 
       - name: List build output

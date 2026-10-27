@@ -24,7 +24,6 @@ const windowsSignConfig = getWindowsSignConfig();
  *
  * - 'dev': Local development or CI builds on non-release commits
  * - 'nightly': Nightly releases
- * - 'prerelease': Legacy alpha or beta releases (alphaNNN, betaNNN versions)
  * - 'release': Production releases (stable versions without prerelease suffix)
  */
 
@@ -32,17 +31,12 @@ const windowsSignConfig = getWindowsSignConfig();
 console.log(
   `[forge.config] Release channel: ${buildConstants.__APP_RELEASE_CHANNEL__}`,
 );
-const visualAssetChannel =
-  buildConstants.__APP_RELEASE_CHANNEL__ === 'prerelease'
-    ? 'nightly'
-    : buildConstants.__APP_RELEASE_CHANNEL__;
+const visualAssetChannel = buildConstants.__APP_RELEASE_CHANNEL__;
 
 const getAuthCallbackScheme = (): string => {
   switch (buildConstants.__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
-    case 'prerelease':
-      return 'stagewise-prerelease';
     case 'nightly':
       return 'stagewise-nightly';
     default:

@@ -16,7 +16,6 @@ export const packages: PackageConfig[] = [
     publishToNpm: false,
     createGithubRelease: true,
     tagPrefix: 'stagewise@',
-    prereleaseEnabled: true,
   },
   {
     name: 'karton',
@@ -25,7 +24,6 @@ export const packages: PackageConfig[] = [
     publishToNpm: true,
     createGithubRelease: false,
     tagPrefix: '@stagewise/karton@',
-    prereleaseEnabled: false,
   },
 ];
 

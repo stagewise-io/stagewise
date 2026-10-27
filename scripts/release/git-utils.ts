@@ -9,22 +9,7 @@ import type { ConventionalCommit } from './types.js';
 const exec = promisify(execCallback);
 
 /**
- * Get the most recent tag matching a prefix
- */
-export async function getLastTag(prefix: string): Promise<string | null> {
-  try {
-    const { stdout } = await exec(
-      `git tag --list "${prefix}*" --sort=-version:refname | head -n 1`,
-    );
-    const tag = stdout.trim();
-    return tag || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get the most recent stable (non-prerelease) tag matching a prefix
+ * Get the most recent stable tag matching a prefix, skipping nightly tags
  */
 export async function getLastStableTag(prefix: string): Promise<string | null> {
   try {
@@ -33,7 +18,7 @@ export async function getLastStableTag(prefix: string): Promise<string | null> {
     );
     const tags = stdout.trim().split('\n').filter(Boolean);
 
-    // Find the first tag without any prerelease suffix.
+    // Find the first tag without a suffix like `-nightly20261027c001`.
     for (const tag of tags) {
       const version = tag.replace(prefix, '');
       if (!version.includes('-')) {
@@ -41,25 +26,6 @@ export async function getLastStableTag(prefix: string): Promise<string | null> {
       }
     }
     return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get the first prerelease tag for the current version cycle
- * (i.e., the first alpha/beta tag with the same base version)
- */
-export async function getFirstPrereleaseTagForCycle(
-  prefix: string,
-  baseVersion: string,
-): Promise<string | null> {
-  try {
-    const { stdout } = await exec(
-      `git tag --list "${prefix}${baseVersion}-*" --sort=version:refname | head -n 1`,
-    );
-    const tag = stdout.trim();
-    return tag || null;
   } catch {
     return null;
   }

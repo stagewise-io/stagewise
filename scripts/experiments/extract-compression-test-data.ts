@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * Extracts history-compression test data from a stagewise prod/prerelease/dev
+ * Extracts history-compression test data from a stagewise prod/nightly/dev
  * SQLite database, producing per-compression files suitable for pasting into
  * LLM playgrounds (Google AI Studio, Claude, etc.).
  *
@@ -9,7 +9,7 @@
  * (compounding briefing). This lets you test the full compression chain.
  *
  * Usage:
- *   npx tsx scripts/experiments/extract-compression-test-data.ts [--channel release|prerelease|dev] [--min-messages 6]
+ *   npx tsx scripts/experiments/extract-compression-test-data.ts [--channel release|nightly|dev] [--min-messages 6]
  *
  * Output:
  *   experiments-data/history-compression/<channel>/<sanitised-title>/
@@ -40,13 +40,13 @@ import {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  let channel: 'release' | 'prerelease' | 'dev' = 'prerelease';
+  let channel: 'release' | 'nightly' | 'dev' = 'nightly';
   let minMessages = 6;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--channel' && args[i + 1]) {
       const val = args[i + 1] as typeof channel;
-      if (!['release', 'prerelease', 'dev'].includes(val)) {
+      if (!['release', 'nightly', 'dev'].includes(val)) {
         console.error(`Invalid channel: ${val}`);
         process.exit(1);
       }
@@ -63,18 +63,18 @@ function parseArgs() {
 
 // ─── Channel → DB path ──────────────────────────────────────────────────────
 
-function getAppBaseName(channel: 'release' | 'prerelease' | 'dev'): string {
+function getAppBaseName(channel: 'release' | 'nightly' | 'dev'): string {
   switch (channel) {
     case 'release':
       return 'stagewise';
-    case 'prerelease':
-      return 'stagewise-prerelease';
+    case 'nightly':
+      return 'stagewise-nightly';
     case 'dev':
       return 'stagewise-dev';
   }
 }
 
-function getDbPath(channel: 'release' | 'prerelease' | 'dev'): string {
+function getDbPath(channel: 'release' | 'nightly' | 'dev'): string {
   const appData =
     process.platform === 'darwin'
       ? path.join(os.homedir(), 'Library', 'Application Support')

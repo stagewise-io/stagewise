@@ -1,11 +1,4 @@
 import { useKartonState, useKartonProcedure } from '@ui/hooks/use-karton';
-import {
-  RadioGroup,
-  Radio,
-  RadioLabel,
-} from '@stagewise/stage-ui/components/radio';
-import { produceWithPatches, enablePatches } from 'immer';
-import type { UpdateChannel } from '@shared/karton-contracts/ui/shared-types';
 import { cn } from '@stagewise/stage-ui/lib/utils';
 import { buttonVariants } from '@stagewise/stage-ui/components/button';
 import { Button } from '@stagewise/stage-ui/components/button';
@@ -33,8 +26,6 @@ import {
   TooltipTrigger,
 } from '@stagewise/stage-ui/components/tooltip';
 import { ReleaseNotes } from '@ui/components/release-notes';
-
-enablePatches();
 
 interface LicenseEntry {
   name: string;
@@ -137,69 +128,6 @@ function AppUpdateStatus() {
           </ReleaseNotes>
         </div>
       )}
-    </div>
-  );
-}
-
-function UpdateChannelSetting() {
-  const preferences = useKartonState((s) => s.preferences);
-  const appInfo = useKartonState((s) => s.appInfo);
-  const channelLocked = useKartonState(
-    (s) =>
-      s.autoUpdate.status === 'downloading' || s.autoUpdate.status === 'ready',
-  );
-  const updatePreferences = useKartonProcedure((p) => p.preferences.update);
-
-  const inferredChannel: UpdateChannel = appInfo.version.includes('-alpha')
-    ? 'alpha'
-    : 'beta';
-
-  const currentChannel = preferences.updateChannel ?? inferredChannel;
-
-  const handleChannelChange = async (value: unknown) => {
-    const channel = value as UpdateChannel;
-    const [, patches] = produceWithPatches(preferences, (draft) => {
-      draft.updateChannel = channel;
-    });
-    await updatePreferences(patches);
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h3 className="font-medium text-base text-foreground">
-          Update Channel
-        </h3>
-        <p className="text-muted-foreground text-sm">
-          Choose which pre-release channel to receive updates from.
-        </p>
-      </div>
-
-      <RadioGroup
-        value={currentChannel}
-        onValueChange={handleChannelChange}
-        disabled={channelLocked}
-      >
-        <RadioLabel>
-          <Radio value="beta" />
-          <div className="flex flex-col">
-            <span className="font-medium text-foreground">Beta</span>
-            <span className="text-muted-foreground text-xs">
-              More stable pre-release updates
-            </span>
-          </div>
-        </RadioLabel>
-
-        <RadioLabel>
-          <Radio value="alpha" />
-          <div className="flex flex-col">
-            <span className="font-medium text-foreground">Alpha</span>
-            <span className="text-muted-foreground text-xs">
-              Bleeding-edge updates including alpha and beta releases
-            </span>
-          </div>
-        </RadioLabel>
-      </RadioGroup>
     </div>
   );
 }
@@ -518,14 +446,6 @@ export function AboutSection() {
 
           {/* Divider */}
           <hr className="border-border/30" />
-
-          {/* Update Channel Setting (only for prerelease builds) */}
-          {appInfo.releaseChannel === 'prerelease' && (
-            <>
-              <UpdateChannelSetting />
-              <hr className="border-border/30" />
-            </>
-          )}
 
           {/* Details Section */}
           <div className="flex flex-col gap-4">

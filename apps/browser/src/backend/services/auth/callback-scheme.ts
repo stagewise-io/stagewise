@@ -1,15 +1,9 @@
-type AuthCallbackScheme =
-  | 'stagewise'
-  | 'stagewise-prerelease'
-  | 'stagewise-nightly'
-  | 'stagewise-dev';
+type AuthCallbackScheme = 'stagewise' | 'stagewise-nightly' | 'stagewise-dev';
 
 function getDefaultAuthCallbackScheme(): AuthCallbackScheme {
   switch (__APP_RELEASE_CHANNEL__) {
     case 'release':
       return 'stagewise';
-    case 'prerelease':
-      return 'stagewise-prerelease';
     case 'nightly':
       return 'stagewise-nightly';
     case 'dev':
@@ -33,7 +27,6 @@ export const AUTH_CALLBACK_PROTOCOL = `${AUTH_CALLBACK_SCHEME}:`;
 // this app. handleAuthCallbackUrl must accept any of these.
 const ALL_CALLBACK_SCHEMES: readonly AuthCallbackScheme[] = [
   'stagewise',
-  'stagewise-prerelease',
   'stagewise-nightly',
   'stagewise-dev',
 ];

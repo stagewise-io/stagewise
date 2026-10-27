@@ -924,10 +924,6 @@ export {
   type ToolApprovalMode,
 } from '@stagewise/agent-core/types/tool-approval';
 
-/** Update channel for prerelease builds ('alpha' or 'beta') */
-export const updateChannelSchema = z.enum(['alpha', 'beta']);
-export type UpdateChannel = z.infer<typeof updateChannelSchema>;
-
 const agentListGroupingModeSchema = z.enum(['age', 'workspace']);
 export type AgentListGroupingMode = z.infer<typeof agentListGroupingModeSchema>;
 
@@ -1300,8 +1296,6 @@ export const userPreferencesSchema = z.object({
    * Migrated from `providerConfigs` / `customEndpoints` on first load.
    */
   providerInstances: z.array(providerInstanceSchema).default([]),
-  /** Preferred update channel for prerelease builds (alpha or beta). If not set, inferred from the installed version. */
-  updateChannel: updateChannelSchema.optional(),
 });
 
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;

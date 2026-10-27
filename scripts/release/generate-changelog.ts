@@ -5,13 +5,8 @@
 import { readFile, writeFile, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type {
-  ConventionalCommit,
-  PackageConfig,
-  ReleaseChannel,
-} from './types.js';
+import type { ConventionalCommit, PackageConfig } from './types.js';
 import { getRepoRoot } from './git-utils.js';
-import { parseVersion } from './bump-version.js';
 
 /**
  * Get the path to release notes file for a package
@@ -81,42 +76,6 @@ function formatCommit(commit: ConventionalCommit): string {
 }
 
 /**
- * Detect if version is a channel promotion (e.g., alpha→beta or prerelease→release)
- */
-function detectPromotion(version: string): {
-  isPromotion: boolean;
-  fromChannel: string | null;
-  toChannel: string;
-} {
-  const parsed = parseVersion(version);
-
-  // Determine the target channel from the version
-  let toChannel: string;
-  if (parsed.prerelease === 'alpha') {
-    toChannel = 'alpha';
-  } else if (parsed.prerelease === 'beta') {
-    toChannel = 'beta';
-  } else {
-    toChannel = 'release';
-  }
-
-  // For promotions, the previous channel is indicated by the prereleaseNum being 1
-  // (first of a new channel series)
-  const isFirstOfChannel = parsed.prereleaseNum === 1;
-
-  return {
-    isPromotion: isFirstOfChannel && toChannel !== 'alpha',
-    fromChannel:
-      isFirstOfChannel && toChannel === 'beta'
-        ? 'alpha'
-        : isFirstOfChannel && toChannel === 'release'
-          ? 'prerelease'
-          : null,
-    toChannel,
-  };
-}
-
-/**
  * Generate the changelog markdown for a new version
  */
 export function generateChangelogMarkdown(
@@ -135,14 +94,8 @@ export function generateChangelogMarkdown(
     markdown += `${customNotes}\n\n`;
   }
 
-  // Handle case when there are no commits (channel promotion)
   if (commits.length === 0) {
-    const promotion = detectPromotion(version);
-    if (promotion.isPromotion && promotion.fromChannel) {
-      markdown += `Promoted from ${promotion.fromChannel} to ${promotion.toChannel}.\n\n`;
-    } else {
-      markdown += `No changes in this release.\n\n`;
-    }
+    markdown += `No changes in this release.\n\n`;
     return markdown;
   }
 
@@ -245,103 +198,14 @@ export async function prependToChangelog(
 }
 
 /**
- * Consolidate prerelease entries when releasing
- * Finds all alpha/beta entries for the same base version and merges them
- */
-export async function consolidatePrereleaseEntries(
-  packageConfig: PackageConfig,
-  releaseVersion: string,
-  commits: ConventionalCommit[],
-  customNotes: string | null = null,
-): Promise<string> {
-  const repoRoot = await getRepoRoot();
-  const packageDir = path.dirname(path.join(repoRoot, packageConfig.path));
-  const changelogPath = path.join(packageDir, 'CHANGELOG.md');
-
-  const existing = await readExistingChangelog(changelogPath);
-
-  if (!existing) {
-    // No existing changelog, just generate new entry
-    return generateChangelogMarkdown(
-      releaseVersion,
-      commits,
-      new Date(),
-      customNotes,
-    );
-  }
-
-  // Find all prerelease entries for this version
-  const parsed = parseVersion(releaseVersion);
-  const baseVersion = parsed.base;
-
-  // Regex to match prerelease versions of the same base
-  const prereleasePattern = new RegExp(
-    `## ${escapeRegex(baseVersion)}-(alpha|beta)\\.\\d+[^#]*`,
-    'g',
-  );
-
-  // Remove prerelease entries from existing changelog
-  const cleanedChangelog = existing.replace(prereleasePattern, '');
-
-  // Generate consolidated release entry
-  const releaseEntry = generateChangelogMarkdown(
-    releaseVersion,
-    commits,
-    new Date(),
-    customNotes,
-  );
-
-  // Reconstruct changelog
-  const hasHeader = cleanedChangelog.startsWith('# Changelog');
-  let newContent: string;
-
-  if (hasHeader) {
-    const headerEnd = cleanedChangelog.indexOf('\n\n');
-    if (headerEnd !== -1) {
-      newContent =
-        cleanedChangelog.slice(0, headerEnd + 2) +
-        releaseEntry +
-        cleanedChangelog.slice(headerEnd + 2);
-    } else {
-      newContent = `${cleanedChangelog}\n\n${releaseEntry}`;
-    }
-  } else {
-    newContent = releaseEntry + cleanedChangelog;
-  }
-
-  await writeFile(changelogPath, `${newContent.trim()}\n`, 'utf-8');
-
-  return releaseEntry;
-}
-
-/**
- * Escape special regex characters in a string
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
  * Update changelog for a new release
  */
 export async function updateChangelog(
   packageConfig: PackageConfig,
   newVersion: string,
-  targetChannel: ReleaseChannel,
   commits: ConventionalCommit[],
   customNotes: string | null = null,
 ): Promise<string> {
-  // For stable releases, consolidate any prerelease entries
-  if (targetChannel === 'release') {
-    return await consolidatePrereleaseEntries(
-      packageConfig,
-      newVersion,
-      commits,
-      customNotes,
-    );
-  }
-
-  // For prerelease, just prepend the new entry
   const entry = generateChangelogMarkdown(
     newVersion,
     commits,
