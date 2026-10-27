@@ -36,6 +36,7 @@ import {
   getVendorForInstance,
   isModelEntryValid,
   isStagewiseInferenceAvailable,
+  isStagewiseRoutedSelection,
   type ModelSelectorEntry,
   withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
@@ -793,30 +794,67 @@ function UtilityModelList({
 
   // While signed out, entries routed through Stagewise Inference cannot
   // run and are hidden from the list. They stay stored (nothing is
-  // deleted) and reappear once the user signs in.
+  // deleted) and reappear once the user signs in. Implicit Stagewise
+  // routes (entries saved without an instance ID) are matched via
+  // `isStagewiseRoutedSelection` — `isModelEntryValid` alone would let
+  // another provider exposing the same model ID keep them visible.
   const visibleEntries = useMemo(
     () =>
       stagewiseAvailable
         ? modelEntries
-        : modelEntries.filter((entry) =>
-            isModelEntryValid(
-              selectionPreferences,
-              entry.modelId,
-              entry.providerInstanceId,
-            ),
+        : modelEntries.filter(
+            (entry) =>
+              !isStagewiseRoutedSelection(
+                preferences,
+                entry.providerInstanceId,
+              ) &&
+              isModelEntryValid(
+                selectionPreferences,
+                entry.modelId,
+                entry.providerInstanceId,
+              ),
           ),
-    [modelEntries, stagewiseAvailable, selectionPreferences],
+    [modelEntries, stagewiseAvailable, preferences, selectionPreferences],
   );
 
   const handleChange = useCallback(
     (next: UtilityModelEntry[]) => {
-      // Re-append the entries hidden above so that saving while signed
-      // out never removes the stored Stagewise Inference entries.
+      // Merge the entries hidden above back into their original positions
+      // so saving while signed out never removes the stored Stagewise
+      // Inference entries — and never reorders the configured fallback
+      // order either. Each hidden entry is anchored before the first
+      // surviving entry that followed it in the original list; entries
+      // the user removed were visible and are intentionally dropped.
+      const nextKeys = new Set(next.map(modelKey));
       const hiddenEntries = modelEntries.filter(
         (entry) => !visibleEntries.some((v) => modelKey(v) === modelKey(entry)),
       );
+      const merged = [...next];
+      for (const hidden of hiddenEntries) {
+        let anchorKey: string | null = null;
+        const hiddenIndex = modelEntries.findIndex(
+          (e) => modelKey(e) === modelKey(hidden),
+        );
+        for (let i = hiddenIndex + 1; i < modelEntries.length; i++) {
+          const following = modelEntries[i];
+          if (!following) continue;
+          const key = modelKey(following);
+          if (nextKeys.has(key)) {
+            anchorKey = key;
+            break;
+          }
+        }
+        if (anchorKey === null) {
+          merged.push(hidden);
+        } else {
+          const anchorIndex = merged.findIndex(
+            (e) => modelKey(e) === anchorKey,
+          );
+          merged.splice(anchorIndex, 0, hidden);
+        }
+      }
       const [, patches] = produceWithPatches(preferences, (draft) => {
-        draft.agent.utilityModels[task] = [...next, ...hiddenEntries];
+        draft.agent.utilityModels[task] = merged;
       });
       void updatePreferences(patches);
     },

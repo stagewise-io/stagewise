@@ -69,7 +69,9 @@ import {
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
   getVendorForInstance,
+  isModelEntryValid,
   isStagewiseInferenceAvailable,
+  isStagewiseRoutedSelection,
   type ModelSelectorEntry,
   withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
@@ -437,31 +439,58 @@ export const ModelSelect = memo(function ModelSelect({
 
   // Build preset entries for the dropdown
   const presetEntries = useMemo<PresetEntry[]>(() => {
-    return modelPresets.map((preset) => {
-      const mainModel = preset.models[0];
-      const display = mainModel
-        ? resolveModelDisplay(
-            selectableEntries,
-            mainModel.modelId,
-            mainModel.providerInstanceId,
-          )
-        : undefined;
-      let thinkingLabel: string | undefined;
-      if (mainModel?.thinkingOverride?.enabled) {
-        thinkingLabel = mainModel.thinkingOverride.value ?? 'Thinking';
-      }
-      return {
-        id: preset.id,
-        name: preset.name,
-        modelDisplayName:
-          display?.displayName ?? mainModel?.modelId ?? 'Unknown',
-        modelId: mainModel?.modelId ?? '',
-        providerInstanceId:
-          display?.instanceId ?? mainModel?.providerInstanceId,
-        thinkingLabel,
-      };
-    });
-  }, [modelPresets, selectableEntries]);
+    return modelPresets
+      .filter((preset) => {
+        if (stagewiseAvailable) return true;
+        // Selecting a preset activates its main model, so a preset whose
+        // main model routes through Stagewise Inference (or is otherwise
+        // unavailable) would trigger the same failing request as picking
+        // the hidden model directly. Hide such presets while signed out —
+        // the stored preset definitions are preserved untouched.
+        const mainModel = preset.models[0];
+        if (!mainModel) return true;
+        if (
+          isStagewiseRoutedSelection(preferences, mainModel.providerInstanceId)
+        ) {
+          return false;
+        }
+        return isModelEntryValid(
+          selectionPreferences,
+          mainModel.modelId,
+          mainModel.providerInstanceId,
+        );
+      })
+      .map((preset) => {
+        const mainModel = preset.models[0];
+        const display = mainModel
+          ? resolveModelDisplay(
+              selectableEntries,
+              mainModel.modelId,
+              mainModel.providerInstanceId,
+            )
+          : undefined;
+        let thinkingLabel: string | undefined;
+        if (mainModel?.thinkingOverride?.enabled) {
+          thinkingLabel = mainModel.thinkingOverride.value ?? 'Thinking';
+        }
+        return {
+          id: preset.id,
+          name: preset.name,
+          modelDisplayName:
+            display?.displayName ?? mainModel?.modelId ?? 'Unknown',
+          modelId: mainModel?.modelId ?? '',
+          providerInstanceId:
+            display?.instanceId ?? mainModel?.providerInstanceId,
+          thinkingLabel,
+        };
+      });
+  }, [
+    modelPresets,
+    selectableEntries,
+    stagewiseAvailable,
+    selectionPreferences,
+    preferences,
+  ]);
 
   const [open, setOpen] = useState(false);
 
