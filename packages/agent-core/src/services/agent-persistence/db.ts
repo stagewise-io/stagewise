@@ -333,23 +333,30 @@ export class AgentPersistenceDB {
     mountedWorkspaces: schema.StoredAgentInstance['mountedWorkspaces'];
     messageCount: number;
   } | null> {
-    const results = await this._db
-      .select({
-        id: schema.agentInstances.id,
-        type: schema.agentInstances.type,
-        title: schema.agentInstances.title,
-        createdAt: schema.agentInstances.createdAt,
-        lastMessageAt: schema.agentInstances.lastMessageAt,
-        activeModelId: schema.agentInstances.activeModelId,
-        activeProviderInstanceId:
-          schema.agentInstances.activeProviderInstanceId,
-        mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
-        messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
-      })
-      .from(schema.agentInstances)
-      .where(eq(schema.agentInstances.id, id))
-      .limit(1);
-    return results[0] ?? null;
+    try {
+      const results = await this._db
+        .select({
+          id: schema.agentInstances.id,
+          type: schema.agentInstances.type,
+          title: schema.agentInstances.title,
+          createdAt: schema.agentInstances.createdAt,
+          lastMessageAt: schema.agentInstances.lastMessageAt,
+          activeModelId: schema.agentInstances.activeModelId,
+          activeProviderInstanceId:
+            schema.agentInstances.activeProviderInstanceId,
+          mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
+          messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
+        })
+        .from(schema.agentInstances)
+        .where(eq(schema.agentInstances.id, id))
+        .limit(1);
+      return results[0] ?? null;
+    } catch (error) {
+      this._logger.error(
+        `[AgentPersistenceDB] Failed to fetch agent preview: ${error}`,
+      );
+      return null;
+    }
   }
 
   public async getStoredAgentInstanceById(
