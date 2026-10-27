@@ -69,7 +69,9 @@ import {
   getInstanceThinkingDefaultOptions,
   getSelectableModelEntries,
   getVendorForInstance,
+  isStagewiseInferenceAvailable,
   type ModelSelectorEntry,
+  withoutStagewiseInference,
 } from '@shared/provider-instance-helpers';
 import { resolveModelDisplay } from './model-presets-shared';
 import { enablePatches, produceWithPatches } from 'immer';
@@ -312,6 +314,8 @@ export const ModelSelect = memo(function ModelSelect({
   const openSettings = useKartonProcedure((p) => p.appScreen.openSettings);
   const updatePreferences = useKartonProcedure((p) => p.preferences.update);
   const preferences = useKartonState((s) => s.preferences);
+  const authStatus = useKartonState((s) => s.userAccount.status);
+  const stagewiseAvailable = isStagewiseInferenceAvailable(authStatus);
   const modelThinkingOverrides = useKartonState(
     (s) =>
       s.preferences.agent.modelThinkingOverrides ??
@@ -333,9 +337,18 @@ export const ModelSelect = memo(function ModelSelect({
     return map;
   }, [preferences.providerInstances]);
 
+  // Preferences used to build the selectable model entries. Stagewise
+  // Inference instances are excluded while the user is not signed in —
+  // their models must not appear as choices without a stagewise account.
+  // The unfiltered `preferences` are still used for all writes below.
+  const selectionPreferences = useMemo(
+    () => withoutStagewiseInference(preferences, stagewiseAvailable),
+    [preferences, stagewiseAvailable],
+  );
+
   // Build flat model options list from the aggregation utility
   const selectableEntries = useMemo<SelectableEntry[]>(() => {
-    const entries = getSelectableModelEntries(preferences);
+    const entries = getSelectableModelEntries(selectionPreferences);
     return entries.map((entry) => {
       let thinkingLabel: string | undefined;
       const instance = instanceMap.get(entry.instanceId);
@@ -377,7 +390,7 @@ export const ModelSelect = memo(function ModelSelect({
       };
     });
   }, [
-    preferences,
+    selectionPreferences,
     instanceMap,
     modelThinkingOverrides,
     runtimeContextWindow,

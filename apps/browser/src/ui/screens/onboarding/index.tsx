@@ -16,8 +16,6 @@ import { markCurrentReleaseNotesSeen } from '@ui/components/release-notes';
 import { useKartonProcedure, useKartonState } from '@ui/hooks/use-karton';
 import { useTrack } from '@ui/hooks/use-track';
 import { cn } from '@ui/utils';
-import { StepLogin } from './steps/01-login';
-import type { OnboardingAuthCompletion } from './steps/01-login';
 import type {
   OnboardingNavigationAction,
   OnboardingStep,
@@ -34,10 +32,8 @@ import {
 import { StepTheme } from './steps/07-theme';
 
 export function OnboardingWizard() {
-  const [screen, setScreen] = useState<OnboardingStep>('login');
+  const [screen, setScreen] = useState<OnboardingStep>('configure-providers');
   const [onboardingRunId] = useState(() => crypto.randomUUID());
-  const [authCompletion, setAuthCompletion] =
-    useState<OnboardingAuthCompletion | null>(null);
   const [skillSourceSelection, setSkillSourceSelection] =
     useState<ExternalSkillSourceSelection>({});
   const providerSummaryRef = useRef<ProviderStepSummary | null>(null);
@@ -52,10 +48,9 @@ export function OnboardingWizard() {
   );
   const runStartedAtRef = useRef(performance.now());
   const stepEnteredAtRef = useRef(runStartedAtRef.current);
-  const currentStepRef = useRef<OnboardingStep>('login');
+  const currentStepRef = useRef<OnboardingStep>('configure-providers');
   const previousStepRef = useRef<OnboardingStep | undefined>(undefined);
   const visitCountsRef = useRef<Record<OnboardingStep, number>>({
-    login: 0,
     'configure-providers': 0,
     'configure-skills': 0,
     personalization: 0,
@@ -122,7 +117,7 @@ export function OnboardingWizard() {
     markCurrentReleaseNotesSeen();
     setHasSeenOnboardingFlow({
       value: true,
-      auth: authCompletion ?? { auth_method: 'unknown' },
+      auth: { auth_method: 'unknown' },
       summary: {
         onboarding_run_id: onboardingRunId,
         total_duration_ms: performance.now() - runStartedAtRef.current,
@@ -133,7 +128,7 @@ export function OnboardingWizard() {
         personalization_changed: personalizationChangedRef.current,
       },
     });
-  }, [authCompletion, onboardingRunId, setHasSeenOnboardingFlow, track]);
+  }, [onboardingRunId, setHasSeenOnboardingFlow, track]);
 
   return (
     <div
@@ -146,16 +141,6 @@ export function OnboardingWizard() {
 
       {/* Screen content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {screen === 'login' && (
-          <StepLogin
-            onboardingRunId={onboardingRunId}
-            onSkip={() => navigate('configure-providers', 'skip')}
-            onAuthenticated={(completion) => {
-              setAuthCompletion(completion);
-              navigate('configure-providers', 'next');
-            }}
-          />
-        )}
         {screen === 'configure-providers' && (
           <StepConfigureProviders
             onboardingRunId={onboardingRunId}
@@ -174,7 +159,6 @@ export function OnboardingWizard() {
                 'next',
               )
             }
-            onBack={() => navigate('login', 'back')}
           />
         )}
         {screen === 'configure-skills' && (

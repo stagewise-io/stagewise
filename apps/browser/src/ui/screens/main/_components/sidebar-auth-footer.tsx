@@ -13,7 +13,6 @@ import {
   IconDownload4Outline18,
   IconGear3Outline18,
   IconHotDrinkOutline18,
-  IconOpenRectArrowInOutline18,
 } from '@stagewise/icons';
 
 function getPlanLabel(plan: string | undefined): string {
@@ -105,18 +104,10 @@ export function SidebarAuthFooter() {
             </div>
           </button>
         ) : (
-          <button
-            type="button"
-            className="app-no-drag flex h-9 min-w-0 flex-1 flex-row items-center gap-2 rounded-lg px-1 py-1 hover:bg-foreground/8 active:bg-foreground/12"
-            onClick={handleOpenAccount}
-          >
-            <div className="flex min-w-0 flex-row items-center gap-2">
-              <IconOpenRectArrowInOutline18 className="size-5 text-foreground" />
-              <span className="font-medium text-foreground text-sm leading-tight">
-                Not signed in
-              </span>
-            </div>
-          </button>
+          // Not signed in — render nothing. Stagewise account sign-in stays
+          // available through Settings > Account instead of being promoted
+          // in the sidebar.
+          <span className="min-w-0 flex-1" aria-hidden="true" />
         )}
 
         <div className="flex shrink-0 flex-row items-center gap-1">
