@@ -166,6 +166,8 @@ function parseRemoteBranchRef(
 // share them for a short time. Long enough to cover a scan over all managed
 // worktrees of one repository.
 const REPOSITORY_READ_CACHE_TTL_MS = 5_000;
+// `runGitStrict` operations that never change repository state.
+const READ_ONLY_GIT_OPERATIONS = new Set(['query', 'validation']);
 
 const defaultRunGitCommand: GitCommandRunner = async (cwd, args, env) => {
   const { stdout } = await execFileAsync('git', ['-C', cwd, ...args], {
@@ -1581,7 +1583,7 @@ export class GitService extends DisposableService {
     const result = await this.runGitMutationCommand(cwd, args, env);
     // Mutations can add, remove or switch worktrees and branches. Reads that
     // started before the mutation must not be shared with later callers.
-    if (operation !== 'query') {
+    if (!READ_ONLY_GIT_OPERATIONS.has(operation)) {
       this.repositoryReadCache.clear();
       this.inFlightReads.clear();
     }
