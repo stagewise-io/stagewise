@@ -149,8 +149,17 @@ export class AgentPersistenceDB {
     // WAL lets long history reads run alongside writes instead of blocking
     // them. The mode is stored in the database file, so it also applies to
     // the extra connections libsql opens for transactions.
+    // SQLite reports a refused switch by returning the mode it kept.
     try {
-      await instance._dbDriver.execute('PRAGMA journal_mode = WAL');
+      const result = await instance._dbDriver.execute(
+        'PRAGMA journal_mode = WAL',
+      );
+      const journalMode = String(result.rows[0]?.journal_mode ?? 'unknown');
+      if (journalMode.toLowerCase() !== 'wal') {
+        deps.logger.warn(
+          `[AgentPersistenceDB] Failed to enable WAL mode; SQLite kept ${journalMode}`,
+        );
+      }
     } catch (e) {
       deps.logger.warn(
         `[AgentPersistenceDB] Failed to enable WAL mode: ${(e as Error).message}`,
