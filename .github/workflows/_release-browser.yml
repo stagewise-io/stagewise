@@ -71,8 +71,10 @@ jobs:
     steps:
       - name: Validate channel
         if: inputs.channel != 'release' && inputs.channel != 'nightly'
+        env:
+          CHANNEL: ${{ inputs.channel }}
         run: |
-          echo "::error::Unsupported release channel '${{ inputs.channel }}'. Use 'release' or 'nightly'."
+          echo "::error::Unsupported release channel '${CHANNEL}'. Use 'release' or 'nightly'."
           exit 1
 
       - name: Checkout
