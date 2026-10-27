@@ -48,6 +48,11 @@ function createErroredAgent(
     commands: {
       denyAllNonTerminalToolPartsInHistory: vi.fn(),
       truncateHistoryAt: vi.fn(),
+      enqueueUserMessage: vi.fn().mockReturnValue({
+        queuedModelId: 'test-model',
+        queueLengthAfter: 1,
+      }),
+      appendHistoryMessage: vi.fn(),
     },
   };
   agent.host = {
@@ -173,6 +178,35 @@ describe('BaseAgent.retryLastUserMessage', () => {
 
     expect(agent.internalStop).toHaveBeenCalledOnce();
     expect(agent.runStep).toHaveBeenCalledOnce();
+  });
+
+  it('queues a user message sent while the retry is stopping the failed step', async () => {
+    const { agent } = createErroredAgent([
+      userMessage('user-1'),
+      assistantMessage('assistant-1'),
+    ]);
+    // Exercise the real sendUserMessage instead of the stub.
+    agent.sendUserMessage = ChatAgent.prototype.sendUserMessage;
+    let finishStop: () => void = () => {};
+    agent.internalStop.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStop = resolve;
+        }),
+    );
+
+    const retry = agent.retryLastUserMessage();
+    await agent.sendUserMessage(userMessage('user-2'));
+
+    expect(agent.state.commands.enqueueUserMessage).toHaveBeenCalledOnce();
+    expect(agent.state.commands.appendHistoryMessage).not.toHaveBeenCalled();
+    expect(agent.runStep).not.toHaveBeenCalled();
+
+    finishStop();
+    await retry;
+
+    expect(agent.runStep).toHaveBeenCalledOnce();
+    expect(agent.runStep).toHaveBeenCalledWith(false, false);
   });
 
   it('refuses to retry without an error', async () => {

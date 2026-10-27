@@ -811,10 +811,13 @@ export abstract class BaseAgent<
     const msg = { ...message, id: id };
 
     // Preserve queue order, and only let manual input interrupt a blocked
-    // interaction when no older message is waiting.
+    // interaction when no older message is waiting. A retry that is still
+    // stopping the failed step counts as working, so the message runs after
+    // the resumed step instead of racing it.
     const state = this.state.get();
     if (
       state.isWorking ||
+      this._retryInProgress ||
       state.queuedMessages.length > 0 ||
       (options.queueIfBlocked && !this.canRunStep())
     ) {
@@ -837,7 +840,8 @@ export abstract class BaseAgent<
         queue_length_after: queueLengthAfter,
       });
 
-      if (!state.isWorking && this.canRunStep()) void this.runStep();
+      if (!state.isWorking && !this._retryInProgress && this.canRunStep())
+        void this.runStep();
 
       return id;
     }
