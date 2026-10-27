@@ -679,9 +679,11 @@ export class GitService extends DisposableService {
 
   /**
    * Drops shared repository reads, for one repository or all of them. Call
-   * this when worktrees or branches change outside the app.
+   * this when worktrees or branches change outside the app, or before acting
+   * destructively on read results. Pending reads are not shared afterwards.
    */
   public invalidateRepositoryReads(commonGitDir?: string): void {
+    this.inFlightReads.clear();
     if (commonGitDir === undefined) {
       this.repositoryReadCache.clear();
       return;
