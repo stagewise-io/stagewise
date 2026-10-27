@@ -427,6 +427,30 @@ export function withoutStagewiseInference<
 }
 
 /**
+ * Whether a stored `(modelId, providerInstanceId)` selection routes
+ * through Stagewise Inference. Entries saved without an instance ID use
+ * the implicit `stagewise-default` instance (instance IDs are stripped
+ * on save), which is always the Stagewise Inference route — regardless
+ * of whether a seeded instance currently exists. Use this instead of
+ * `isModelEntryValid` when deciding whether a *stored* entry should be
+ * visible: `isModelEntryValid` performs an any-provider lookup for
+ * entries without an instance ID, so another provider exposing the same
+ * model ID can make an implicit Stagewise entry look selectable.
+ */
+export function isStagewiseRoutedSelection(
+  prefs: Pick<UserPreferences, 'providerInstances'>,
+  providerInstanceId: string | undefined,
+): boolean {
+  if (!providerInstanceId || providerInstanceId === DEFAULT_INSTANCE_ID) {
+    return true;
+  }
+  return (prefs.providerInstances ?? []).some(
+    (instance) =>
+      instance.id === providerInstanceId && instance.typeId === 'stagewise',
+  );
+}
+
+/**
  * Resolve thinking default options for a specific provider instance.
  * This replaces the vendor-based `getThinkingDefaultOptionsForModel`
  * with instance-aware resolution: given the instance serving a model,

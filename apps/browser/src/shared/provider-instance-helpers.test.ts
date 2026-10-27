@@ -15,6 +15,7 @@ import {
   getVendorInstanceId,
   getVendorMode,
   isStagewiseInferenceAvailable,
+  isStagewiseRoutedSelection,
   resolveModelThinkingOverride,
   vendorHasApiKey,
   withoutStagewiseInference,
@@ -672,5 +673,48 @@ describe('Stagewise Inference visibility', () => {
         (entry) => entry.typeId === 'stagewise',
       ),
     ).toEqual([]);
+  });
+
+  it('identifies stored selections that route through Stagewise Inference', () => {
+    const preferences = createPreferences();
+    preferences.providerInstances = [
+      ...(preferences.providerInstances ?? []),
+      stagewiseInstance,
+      anthropicInstance,
+      codexStagewiseInstance,
+    ];
+
+    // Entries saved without an instance ID use the implicit
+    // `stagewise-default` route — even when another provider exposes
+    // the same model ID, they still route through Stagewise.
+    expect(isStagewiseRoutedSelection(preferences, undefined)).toBe(true);
+    expect(isStagewiseRoutedSelection(preferences, 'stagewise-default')).toBe(
+      true,
+    );
+    // Explicit non-stagewise instances (including codex-stagewise, which
+    // uses Codex for inference) are not Stagewise Inference routes.
+    expect(isStagewiseRoutedSelection(preferences, 'anthropic-default')).toBe(
+      false,
+    );
+    expect(
+      isStagewiseRoutedSelection(preferences, 'codex-stagewise-default'),
+    ).toBe(false);
+    // Unknown instance IDs are not Stagewise routes; callers fall back to
+    // a validity check against the filtered preferences for those.
+    expect(isStagewiseRoutedSelection(preferences, 'missing-instance')).toBe(
+      false,
+    );
+  });
+
+  it('treats implicit routes as Stagewise even without a seeded instance', () => {
+    const preferences = createPreferences();
+    preferences.providerInstances = [anthropicInstance];
+
+    // The implicit route falls back to Stagewise Inference by default,
+    // regardless of whether a `stagewise-default` instance is seeded.
+    expect(isStagewiseRoutedSelection(preferences, undefined)).toBe(true);
+    expect(isStagewiseRoutedSelection(preferences, 'stagewise-default')).toBe(
+      true,
+    );
   });
 });
