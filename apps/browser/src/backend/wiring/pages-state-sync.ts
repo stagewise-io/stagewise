@@ -31,6 +31,7 @@ export async function wirePagesStateSync(deps: {
         pagesService.updatePendingAppMessageState(agentId, message);
       }
     },
+    { inputs: (state) => [state.toolbox] },
   );
 
   // --- Workspace mounts sync (uiKarton -> pages) ---
@@ -56,6 +57,7 @@ export async function wirePagesStateSync(deps: {
       }));
     },
     (mounts) => pagesService.syncWorkspaceMountsState(mounts),
+    { inputs: (state) => [state.toolbox] },
   );
 
   // --- Global plans sync (uiKarton -> pages) ---

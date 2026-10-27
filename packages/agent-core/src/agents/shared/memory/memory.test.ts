@@ -603,6 +603,145 @@ describe('agent memory writer', () => {
     });
   });
 
+  it('replaces a changed tail message without a full rewrite', async () => {
+    await withMemoryRoot(async (root, host) => {
+      const writer = new AgentMemoryWriter({
+        host,
+        agentInstanceId: 'agent-1',
+      });
+      let history = [
+        makeMessage('u1', 'user', 'question'),
+        makeMessage('a1', 'assistant', 'partial answer'),
+      ];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+      history.push(makeMessage('u2', 'user', 'follow-up'));
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'post-step',
+      });
+
+      // The tail message changes in place after it was archived.
+      history = [
+        ...history.slice(0, 2),
+        makeMessage('u2', 'user', 'follow-up with attachment'),
+        makeMessage('a2', 'assistant', 'final answer'),
+      ];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'post-step',
+      });
+
+      const metadata = await readMetadata(root);
+      expect(metadata.archive.appendsSinceRewrite).toBe(2);
+      expect(metadata.archive.archivedCount).toBe(4);
+      const markdown = await readFile(
+        agentFile(root, 'agent-1', 'history.md'),
+        'utf-8',
+      );
+      expect(markdown).toContain('follow-up with attachment');
+      expect(markdown).not.toMatch(/follow-up\n/);
+      expect(markdown.match(/Message 3: user/g)).toHaveLength(1);
+      const jsonl = await readFile(
+        agentFile(root, 'agent-1', 'history.jsonl'),
+        'utf-8',
+      );
+      const lines = jsonl
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      expect(lines.map((line) => line.sequence)).toEqual([1, 2, 3, 4]);
+      expect(lines[2].message.parts[0].text).toBe('follow-up with attachment');
+      expect(metadata.archive.mdBytes).toBe(Buffer.byteLength(markdown));
+      expect(metadata.archive.jsonlBytes).toBe(Buffer.byteLength(jsonl));
+    });
+  });
+
+  it('still rewrites fully when a message before the tail changes', async () => {
+    await withMemoryRoot(async (root, host) => {
+      const writer = new AgentMemoryWriter({
+        host,
+        agentInstanceId: 'agent-1',
+      });
+      let history = [
+        makeMessage('u1', 'user', 'one'),
+        makeMessage('a1', 'assistant', 'two'),
+        makeMessage('u2', 'user', 'three'),
+      ];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+      history.push(makeMessage('a2', 'assistant', 'four'));
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'post-step',
+      });
+      expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(1);
+
+      history = [
+        history[0]!,
+        makeMessage('a1', 'assistant', 'two (edited)'),
+        ...history.slice(2),
+      ];
+      await writer.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'post-step',
+      });
+      expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(0);
+      expect(
+        await readFile(agentFile(root, 'agent-1', 'history.md'), 'utf-8'),
+      ).toContain('two (edited)');
+    });
+  });
+
+  it('repairs a changed tail after restart', async () => {
+    await withMemoryRoot(async (root, host) => {
+      const history = [
+        makeMessage('u1', 'user', 'one'),
+        makeMessage('a1', 'assistant', 'streaming'),
+      ];
+      await new AgentMemoryWriter({ host, agentInstanceId: 'agent-1' }).flush({
+        title: 'A',
+        activeModelId: 'm',
+        history,
+        reason: 'user-message',
+      });
+
+      const restarted = new AgentMemoryWriter({
+        host,
+        agentInstanceId: 'agent-1',
+      });
+      await restarted.flush({
+        title: 'A',
+        activeModelId: 'm',
+        history: [history[0]!, makeMessage('a1', 'assistant', 'done')],
+        reason: 'post-step',
+      });
+      expect((await readMetadata(root)).archive.appendsSinceRewrite).toBe(1);
+      const markdown = await readFile(
+        agentFile(root, 'agent-1', 'history.md'),
+        'utf-8',
+      );
+      expect(markdown).toContain('done');
+      expect(markdown).not.toContain('streaming');
+    });
+  });
+
   it('resumes appends after restart and re-baselines invalid state', async () => {
     await withMemoryRoot(async (root, host) => {
       const history = [makeMessage('u1', 'user', 'one')];

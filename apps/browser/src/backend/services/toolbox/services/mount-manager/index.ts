@@ -1039,8 +1039,9 @@ export class MountManagerService extends DisposableService {
     );
     if (!summary?.isWorktree) return null;
 
-    const worktrees = await this.gitService.listWorktrees(
+    const worktrees = await this.gitService.listRepositoryWorktrees(
       resolvedWorkspacePath,
+      summary.commonGitDir,
     );
     let currentWorktree = null;
     for (const worktree of worktrees) {
@@ -1351,8 +1352,9 @@ export class MountManagerService extends DisposableService {
     );
     if (!summary?.isWorktree || !summary.branch) return null;
 
-    const worktrees = await this.gitService.listWorktrees(
+    const worktrees = await this.gitService.listRepositoryWorktrees(
       resolvedWorkspacePath,
+      summary.commonGitDir,
     );
     let currentWorktree = null;
     for (const worktree of worktrees) {

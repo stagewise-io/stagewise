@@ -429,18 +429,17 @@ export class WorktreeSetupSettingsService {
             ? normalizePathForKey(summaryMainWorktreePath)
             : null;
 
-          const worktreeInfo =
-            await this.gitService.getWorktreeInfo(managedPath);
-          const status = await this.gitService.getWorktreeStatus(managedPath);
-          const clean = status?.dirty === false;
+          // The summary already carries branch, HEAD and status, so no
+          // further git calls are needed per worktree.
+          const clean = summary.status?.dirty === false;
           const normalizedManagedPath = normalizePathForKey(managedPath);
-          const current = worktreeInfo?.isMainWorktree === true;
+          const current = !summary.isWorktree;
           let disabledReason: string | null = null;
           if (current) {
             disabledReason = 'Main worktree cannot be deleted.';
           } else if (mountedPaths.has(normalizedManagedPath)) {
             disabledReason = 'Worktree is currently mounted.';
-          } else if (!worktreeInfo?.branch || worktreeInfo.isDetached) {
+          } else if (!summary.branch) {
             disabledReason = 'Detached worktrees cannot be deleted.';
           } else if (!clean) {
             disabledReason = 'Worktree has uncommitted changes.';
@@ -449,8 +448,8 @@ export class WorktreeSetupSettingsService {
           return {
             path: managedPath,
             name: path.basename(managedPath),
-            branch: worktreeInfo?.branch ?? summary.branch,
-            headSha: worktreeInfo?.headSha ?? summary.headSha,
+            branch: summary.branch,
+            headSha: summary.headSha,
             lastUsedAt: lastUsedByPath.get(managedPath) ?? null,
             clean,
             current,

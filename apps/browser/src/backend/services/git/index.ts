@@ -160,6 +160,13 @@ function parseRemoteBranchRef(
   return { remoteName, branchName };
 }
 
+// Every spawn blocks the main process for a moment, and that cost grows with
+// the size of the process heap. Some reads return the same result for every
+// worktree of a repository (worktree list, local branches, origin HEAD), so
+// share them for a short time. Long enough to cover a scan over all managed
+// worktrees of one repository.
+const REPOSITORY_READ_CACHE_TTL_MS = 5_000;
+
 const defaultRunGitCommand: GitCommandRunner = async (cwd, args, env) => {
   const { stdout } = await execFileAsync('git', ['-C', cwd, ...args], {
     encoding: 'utf8',
@@ -212,6 +219,11 @@ export class GitService extends DisposableService {
 
   private resolvedEnv: Record<string, string> | null = null;
   private resolvedEnvSettled = false;
+  private readonly inFlightReads = new Map<string, Promise<string | null>>();
+  private readonly repositoryReadCache = new Map<
+    string,
+    { expiresAt: number; value: Promise<unknown> }
+  >();
 
   private constructor(deps: GitServiceDeps) {
     super();
@@ -248,7 +260,10 @@ export class GitService extends DisposableService {
     const repositoryInfo = await this.getWorkspaceRepositoryInfo(workspacePath);
     if (!repositoryInfo) return null;
 
-    const worktrees = await this.listWorktrees(workspacePath);
+    const worktrees = await this.listRepositoryWorktrees(
+      workspacePath,
+      repositoryInfo.commonGitDir,
+    );
     const worktreeInfo = await this.getWorktreeInfo(workspacePath, worktrees);
     if (!worktreeInfo) return null;
 
@@ -633,6 +648,42 @@ export class GitService extends DisposableService {
     };
   }
 
+  /**
+   * `listWorktrees` shared across the worktrees of one repository for a short
+   * time. Scanning many worktrees of the same repository would otherwise list
+   * (and stat) every worktree once per worktree.
+   */
+  public listRepositoryWorktrees(
+    workspacePath: string,
+    commonGitDir: string,
+  ): Promise<GitWorktreeInfo[]> {
+    return this.memoizeForRepository(commonGitDir, 'worktrees', () =>
+      this.listWorktrees(workspacePath),
+    );
+  }
+
+  private memoizeForRepository<T>(
+    commonGitDir: string,
+    key: string,
+    read: () => Promise<T>,
+  ): Promise<T> {
+    const cacheKey = `${commonGitDir}\0${key}`;
+    const now = Date.now();
+    const cached = this.repositoryReadCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) return cached.value as Promise<T>;
+
+    for (const [entryKey, entry] of this.repositoryReadCache) {
+      if (entry.expiresAt <= now) this.repositoryReadCache.delete(entryKey);
+    }
+    const value = read();
+    this.repositoryReadCache.set(cacheKey, {
+      expiresAt: now + REPOSITORY_READ_CACHE_TTL_MS,
+      value,
+    });
+    value.catch(() => this.repositoryReadCache.delete(cacheKey));
+    return value;
+  }
+
   public async listWorktrees(
     workspacePath: string,
   ): Promise<GitWorktreeInfo[]> {
@@ -702,16 +753,62 @@ export class GitService extends DisposableService {
       knownWorktrees?: GitWorktreeInfo[];
     },
   ): Promise<GitMergedTargetResult> {
-    const branches = await this.listBranches(workspacePath, options);
-    if (!branches) return { merged: false, target: null };
+    const summary =
+      options?.knownSummary !== undefined
+        ? options.knownSummary
+        : await this.getMountedWorkspaceSummary(workspacePath);
+    if (!summary) return { merged: false, target: null };
 
-    const availableBranches = new Set(
-      branches.branches
-        .filter((branch) => branch.kind === 'local')
-        .map((branch) => branch.name),
+    // Local branch names and origin HEAD are the same for every worktree of a
+    // repository; cleanup checks every managed worktree in a row.
+    const { localBranches, originHead } = await this.memoizeForRepository(
+      summary.commonGitDir,
+      'merge-targets',
+      async () => {
+        const [localResult, originHeadResult] = await Promise.all([
+          this.runGit(workspacePath, [
+            'for-each-ref',
+            '--format=%(refname:short)',
+            'refs/heads',
+          ]),
+          this.runGit(workspacePath, [
+            'symbolic-ref',
+            '--quiet',
+            '--short',
+            'refs/remotes/origin/HEAD',
+          ]),
+        ]);
+        return {
+          localBranches:
+            localResult === null
+              ? null
+              : localResult
+                  .split('\n')
+                  .map((line) => line.trim())
+                  .filter(Boolean),
+          originHead: originHeadResult,
+        };
+      },
     );
+    if (!localBranches) return { merged: false, target: null };
+
+    const availableBranches = new Set(localBranches);
+    // Same rules as `resolveDefaultBranch`.
+    const originDefaultBranch = originHead?.startsWith('origin/')
+      ? originHead.slice('origin/'.length)
+      : originHead;
+    const defaultBranch =
+      originDefaultBranch && availableBranches.has(originDefaultBranch)
+        ? originDefaultBranch
+        : availableBranches.has('main')
+          ? 'main'
+          : availableBranches.has('master')
+            ? 'master'
+            : summary.branch && availableBranches.has(summary.branch)
+              ? summary.branch
+              : (localBranches[0] ?? null);
     const candidateTargets = [
-      branches.defaultBranch,
+      defaultBranch,
       'main',
       'master',
       'develop',
@@ -1337,6 +1434,22 @@ export class GitService extends DisposableService {
 
   private async runGitRaw(cwd: string, args: string[]): Promise<string | null> {
     this.assertNotDisposed();
+    // Concurrent identical reads share one git process.
+    const key = `${cwd}\0${args.join('\0')}`;
+    const inFlight = this.inFlightReads.get(key);
+    if (inFlight) return inFlight;
+
+    const read = this.executeGitRead(cwd, args).finally(() => {
+      this.inFlightReads.delete(key);
+    });
+    this.inFlightReads.set(key, read);
+    return read;
+  }
+
+  private async executeGitRead(
+    cwd: string,
+    args: string[],
+  ): Promise<string | null> {
     try {
       // Always pass resolvedEnv through sanitizeEnv. When resolvedEnv is
       // available (from the user's login shell), sanitizeEnv preserves
@@ -1433,6 +1546,8 @@ export class GitService extends DisposableService {
     const resolvedEnv = await this.getResolvedEnv();
     const env = sanitizeEnv(resolvedEnv, undefined, { forAgent: false });
     const result = await this.runGitMutationCommand(cwd, args, env);
+    // Mutations can add, remove or switch worktrees and branches.
+    if (operation !== 'query') this.repositoryReadCache.clear();
     this.logger.debug(`[GitService] Git ${operation} finished`, {
       cwd,
       args,
@@ -1456,5 +1571,7 @@ export class GitService extends DisposableService {
   protected onTeardown(): void {
     this.resolvedEnv = null;
     this.resolvedEnvSettled = false;
+    this.inFlightReads.clear();
+    this.repositoryReadCache.clear();
   }
 }

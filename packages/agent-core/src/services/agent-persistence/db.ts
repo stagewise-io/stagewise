@@ -317,6 +317,41 @@ export class AgentPersistenceDB {
       .filter((entry): entry is AgentHistoryEntry => entry !== undefined);
   }
 
+  /**
+   * Returns an agent's metadata and message count without loading its
+   * history. Use this for previews; loading a long history blocks the main
+   * process for seconds.
+   */
+  public async getAgentPreviewById(id: string): Promise<{
+    id: string;
+    type: schema.StoredAgentInstance['type'];
+    title: string;
+    createdAt: Date;
+    lastMessageAt: Date;
+    activeModelId: string;
+    activeProviderInstanceId: string | null;
+    mountedWorkspaces: schema.StoredAgentInstance['mountedWorkspaces'];
+    messageCount: number;
+  } | null> {
+    const results = await this._db
+      .select({
+        id: schema.agentInstances.id,
+        type: schema.agentInstances.type,
+        title: schema.agentInstances.title,
+        createdAt: schema.agentInstances.createdAt,
+        lastMessageAt: schema.agentInstances.lastMessageAt,
+        activeModelId: schema.agentInstances.activeModelId,
+        activeProviderInstanceId:
+          schema.agentInstances.activeProviderInstanceId,
+        mountedWorkspaces: schema.agentInstances.mountedWorkspaces,
+        messageCount: sql<number>`(SELECT COUNT(*) FROM agentMessages WHERE agent_instance_id = ${schema.agentInstances.id})`,
+      })
+      .from(schema.agentInstances)
+      .where(eq(schema.agentInstances.id, id))
+      .limit(1);
+    return results[0] ?? null;
+  }
+
   public async getStoredAgentInstanceById(
     id: string,
   ): Promise<schema.StoredAgentInstance | null> {

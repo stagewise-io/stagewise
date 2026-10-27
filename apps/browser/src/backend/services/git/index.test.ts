@@ -350,6 +350,43 @@ describe('GitService', () => {
     });
   });
 
+  it('shares the worktree list across summaries of one repository', async () => {
+    const { service, readCalls } = await createGitService(baseReadResponses);
+
+    await service.getMountedWorkspaceSummary('/repo');
+    await service.getMountedWorkspaceSummary('/repo');
+
+    expect(
+      readCalls.filter((call) => call === 'worktree list --porcelain'),
+    ).toHaveLength(1);
+  });
+
+  it('runs concurrent identical reads once', async () => {
+    const { service, readCalls } = await createGitService(baseReadResponses);
+
+    const [first, second] = await Promise.all([
+      service.getWorktreeStatus('/repo'),
+      service.getWorktreeStatus('/repo'),
+    ]);
+
+    expect(first).toEqual(second);
+    expect(
+      readCalls.filter((call) => call === 'status --porcelain'),
+    ).toHaveLength(1);
+  });
+
+  it('lists worktrees again after a mutation', async () => {
+    const { service, readCalls } = await createGitService(baseReadResponses);
+
+    await service.getMountedWorkspaceSummary('/repo');
+    await service.removeWorktree('/repo-linked');
+    await service.getMountedWorkspaceSummary('/repo');
+
+    expect(
+      readCalls.filter((call) => call === 'worktree list --porcelain'),
+    ).toHaveLength(2);
+  });
+
   it('lists local branches with current, default, and checked-out metadata', async () => {
     const { service } = await createGitService({
       ...baseReadResponses,
@@ -897,8 +934,7 @@ describe('GitService', () => {
       {
         ...baseReadResponses,
         'rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nfeature-a\ndef456\n`,
-        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
-          'main\t\nfeature-a\t*',
+        'for-each-ref --format=%(refname:short) refs/heads': 'main\nfeature-a',
         'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
       },
       {
@@ -920,8 +956,7 @@ describe('GitService', () => {
       {
         ...baseReadResponses,
         'rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nfeature-a\ndef456\n`,
-        'for-each-ref --format=%(refname:short)%09%(HEAD) refs/heads':
-          'main\t\nfeature-a\t*',
+        'for-each-ref --format=%(refname:short) refs/heads': 'main\nfeature-a',
         'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
       },
       {
@@ -935,6 +970,43 @@ describe('GitService', () => {
       merged: false,
       target: null,
     });
+  });
+
+  it('shares merge target data across worktrees of one repository', async () => {
+    const { service, readCalls, mutationCalls } = await createGitService(
+      {
+        ...baseReadResponses,
+        'rev-parse --show-toplevel --abbrev-ref HEAD HEAD': `${repoPath}\nfeature-a\ndef456\n`,
+        'for-each-ref --format=%(refname:short) refs/heads':
+          'main\nfeature-a\nfeature-b',
+        'symbolic-ref --quiet --short refs/remotes/origin/HEAD': 'origin/main',
+      },
+      {
+        'merge-base --is-ancestor feature-a main': { exitCode: 0 },
+        'merge-base --is-ancestor feature-b main': { exitCode: 1 },
+      },
+    );
+
+    await expect(
+      service.findMergedTarget('/repo', 'feature-a'),
+    ).resolves.toEqual({ merged: true, target: 'main' });
+    await expect(
+      service.findMergedTarget('/repo', 'feature-b'),
+    ).resolves.toEqual({ merged: false, target: null });
+
+    expect(
+      readCalls.filter(
+        (call) => call === 'for-each-ref --format=%(refname:short) refs/heads',
+      ),
+    ).toHaveLength(1);
+    // The merge-base queries must not clear the shared worktree list.
+    expect(
+      readCalls.filter((call) => call === 'worktree list --porcelain'),
+    ).toHaveLength(1);
+    expect(mutationCalls).toEqual([
+      'merge-base --is-ancestor feature-a main',
+      'merge-base --is-ancestor feature-b main',
+    ]);
   });
 
   it('removes worktrees without force', async () => {

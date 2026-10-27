@@ -7,6 +7,7 @@ import {
   rename,
   rm,
   stat,
+  truncate,
   writeFile,
 } from '../../../fs';
 import type { AgentHost } from '../../../host/host';
@@ -67,6 +68,17 @@ export interface AgentMemoryArchiveState {
   mdBytes: number;
   jsonlBytes: number;
   appendsSinceRewrite: number;
+  /** Hashes of the first `archivedCount - 1` messages. */
+  prefixIdsHash?: string;
+  prefixContentHash?: string;
+  /** Byte offsets where the last archived message starts in each file. */
+  tailMdOffset?: number;
+  tailJsonlOffset?: number;
+}
+
+interface TailOffsets {
+  md: number;
+  jsonl: number;
 }
 
 export interface AgentMemoryMetadata {
@@ -121,13 +133,15 @@ function hashMessageIds(
   return hash.digest('hex');
 }
 
-async function hashMessageContent(
+async function hashMessageContentWithPrefix(
   history: readonly AgentMessage[],
   count: number,
-): Promise<string> {
+): Promise<{ prefix: string; full: string }> {
   const hash = createHash('sha256');
+  let prefix: string | null = null;
   let computedSinceYield = 0;
   for (let index = 0; index < count; index++) {
+    if (index === count - 1) prefix = hash.copy().digest('hex');
     const message = history[index];
     let digest = message ? messageContentDigests.get(message) : undefined;
     if (digest === undefined) {
@@ -145,7 +159,15 @@ async function hashMessageContent(
     hash.update(digest);
     hash.update('\n');
   }
-  return hash.digest('hex');
+  const full = hash.digest('hex');
+  return { prefix: prefix ?? full, full };
+}
+
+async function hashMessageContent(
+  history: readonly AgentMessage[],
+  count: number,
+): Promise<string> {
+  return (await hashMessageContentWithPrefix(history, count)).full;
 }
 
 function computeMetadata(
@@ -261,10 +283,13 @@ export class AgentMemoryWriter {
   private async flushInternal(options: AgentMemoryFlushOptions): Promise<void> {
     try {
       await mkdir(this.agentDir, { recursive: true });
-      await this.restoreArchiveState(options.history);
+      await this.restoreArchiveState();
 
       let state = this.archiveState;
-      if (!state || !(await this.isStateValid(state, options.history))) {
+      if (state && !(await this.isStateValid(state, options.history))) {
+        state = await this.truncateChangedTail(state, options.history);
+      }
+      if (!state) {
         state = await this.fullRewrite(options);
       } else if (options.reason === 'title') {
         await this.writeMetadataAndIndex(options, state, new Date());
@@ -285,25 +310,19 @@ export class AgentMemoryWriter {
     }
   }
 
-  private async restoreArchiveState(
-    history: readonly AgentMessage[],
-  ): Promise<void> {
+  private async restoreArchiveState(): Promise<void> {
     if (this.didRestoreState) return;
     this.didRestoreState = true;
     try {
       const raw = await readFile(this.metadataPath, 'utf-8');
       const parsed = JSON.parse(raw) as AgentMemoryMetadata;
       const archive = parsed.archive;
+      // Hashes and file sizes are validated by `flushInternal`, which can
+      // still repair a changed tail message from a restored state.
       if (
         parsed.schemaVersion === SCHEMA_VERSION &&
         parsed.agentInstanceId === this.agentInstanceId &&
-        isArchiveState(archive) &&
-        archive.archivedCount <= history.length &&
-        archive.archivedIdsHash ===
-          hashMessageIds(history, archive.archivedCount) &&
-        archive.archivedContentHash ===
-          (await hashMessageContent(history, archive.archivedCount)) &&
-        (await this.hasExpectedByteState(archive))
+        isArchiveState(archive)
       ) {
         this.archiveState = archive;
       }
@@ -348,6 +367,56 @@ export class AgentMemoryWriter {
     return this.hasExpectedByteState(state);
   }
 
+  /**
+   * The last archived message can change after it was written (streaming,
+   * attachments, path references). When everything before it is unchanged,
+   * cut the files back to where that message starts so it can be appended
+   * again, instead of rewriting the whole archive.
+   */
+  private async truncateChangedTail(
+    state: AgentMemoryArchiveState,
+    history: readonly AgentMessage[],
+  ): Promise<AgentMemoryArchiveState | null> {
+    const {
+      archivedCount,
+      prefixIdsHash,
+      prefixContentHash,
+      tailMdOffset,
+      tailJsonlOffset,
+    } = state;
+    if (
+      archivedCount < 1 ||
+      archivedCount > history.length ||
+      prefixIdsHash === undefined ||
+      prefixContentHash === undefined ||
+      tailMdOffset === undefined ||
+      tailJsonlOffset === undefined
+    ) {
+      return null;
+    }
+    const prefixCount = archivedCount - 1;
+    if (hashMessageIds(history, prefixCount) !== prefixIdsHash) return null;
+    if (
+      (await hashMessageContent(history, prefixCount)) !== prefixContentHash
+    ) {
+      return null;
+    }
+    if (!(await this.hasExpectedByteState(state))) return null;
+
+    await Promise.all([
+      truncate(this.historyMarkdownPath, tailMdOffset),
+      truncate(this.historyJsonlPath, tailJsonlOffset),
+    ]);
+    return {
+      archivedCount: prefixCount,
+      archivedIdsHash: prefixIdsHash,
+      archivedContentHash: prefixContentHash,
+      mdBytes: tailMdOffset,
+      jsonlBytes: tailJsonlOffset,
+      appendsSinceRewrite: state.appendsSinceRewrite,
+    };
+  }
+
   private shouldFullRewrite(
     reason: MemoryWriteReason,
     state: AgentMemoryArchiveState,
@@ -364,22 +433,46 @@ export class AgentMemoryWriter {
     options: AgentMemoryFlushOptions,
   ): Promise<AgentMemoryArchiveState> {
     const serializedAt = new Date();
+    const serializeOptions = {
+      agentInstanceId: this.agentInstanceId,
+      title: options.title,
+      serializedAt,
+    };
+    // The last message is written as its own slice so its start offset is
+    // known and it can be replaced later without a full rewrite.
+    const head = options.history.slice(0, -1) as readonly WideAgentMessage[];
+    const tail = options.history.slice(-1) as readonly WideAgentMessage[];
     const history = await serializeAgentMemoryHistoryChunked(
-      options.history as readonly WideAgentMessage[],
-      {
-        agentInstanceId: this.agentInstanceId,
-        title: options.title,
-        serializedAt,
-      },
+      head,
+      serializeOptions,
     );
+    const tailOptions = { ...serializeOptions, sequenceOffset: head.length };
+    const tailMarkdown =
+      tail.length > 0
+        ? serializeAgentMemoryMarkdownSlice(tail, tailOptions)
+        : '';
+    const tailJsonl =
+      tail.length > 0 ? serializeAgentMemoryJsonl(tail, tailOptions) : '';
 
     await Promise.all([
-      writeFileAtomic(this.historyMarkdownPath, history.markdown),
-      writeFileAtomic(this.historyJsonlPath, history.jsonl),
+      writeFileAtomic(
+        this.historyMarkdownPath,
+        history.markdown + tailMarkdown,
+      ),
+      writeFileAtomic(this.historyJsonlPath, history.jsonl + tailJsonl),
       rm(path.join(this.agentDir, 'README.md'), { force: true }),
     ]);
 
-    const state = await this.computeArchiveState(options.history, 0);
+    const state = await this.computeArchiveState(
+      options.history,
+      0,
+      tail.length > 0
+        ? {
+            md: Buffer.byteLength(history.markdown),
+            jsonl: Buffer.byteLength(history.jsonl),
+          }
+        : null,
+    );
     await this.writeMetadataAndIndex(options, state, serializedAt);
     return state;
   }
@@ -394,25 +487,34 @@ export class AgentMemoryWriter {
     }
 
     const serializedAt = new Date();
-    const newMessages = options.history.slice(previousState.archivedCount);
-    const markdown = serializeAgentMemoryMarkdownSlice(
-      newMessages as readonly WideAgentMessage[],
-      {
-        agentInstanceId: this.agentInstanceId,
-        title: options.title,
-        serializedAt,
-        sequenceOffset: previousState.archivedCount,
-      },
-    );
-    const jsonl = serializeAgentMemoryJsonl(
-      newMessages as readonly WideAgentMessage[],
-      {
-        agentInstanceId: this.agentInstanceId,
-        title: options.title,
-        serializedAt,
-        sequenceOffset: previousState.archivedCount,
-      },
-    );
+    const newMessages = options.history.slice(
+      previousState.archivedCount,
+    ) as readonly WideAgentMessage[];
+    const serializeOptions = {
+      agentInstanceId: this.agentInstanceId,
+      title: options.title,
+      serializedAt,
+    };
+    // Serialize the last message separately to record where it starts.
+    const head = newMessages.slice(0, -1);
+    const tail = newMessages.slice(-1);
+    const headOptions = {
+      ...serializeOptions,
+      sequenceOffset: previousState.archivedCount,
+    };
+    const tailOptions = {
+      ...serializeOptions,
+      sequenceOffset: previousState.archivedCount + head.length,
+    };
+    const headMarkdown =
+      head.length > 0
+        ? serializeAgentMemoryMarkdownSlice(head, headOptions)
+        : '';
+    const headJsonl =
+      head.length > 0 ? serializeAgentMemoryJsonl(head, headOptions) : '';
+    const markdown =
+      headMarkdown + serializeAgentMemoryMarkdownSlice(tail, tailOptions);
+    const jsonl = headJsonl + serializeAgentMemoryJsonl(tail, tailOptions);
 
     await Promise.all([
       appendFile(this.historyMarkdownPath, markdown, 'utf-8'),
@@ -422,6 +524,10 @@ export class AgentMemoryWriter {
     const state = await this.computeArchiveState(
       options.history,
       previousState.appendsSinceRewrite + 1,
+      {
+        md: previousState.mdBytes + Buffer.byteLength(headMarkdown),
+        jsonl: previousState.jsonlBytes + Buffer.byteLength(headJsonl),
+      },
     );
     await this.writeMetadataAndIndex(options, state, serializedAt);
     return state;
@@ -430,19 +536,28 @@ export class AgentMemoryWriter {
   private async computeArchiveState(
     history: readonly AgentMessage[],
     appendsSinceRewrite: number,
+    tailOffsets: TailOffsets | null,
   ): Promise<AgentMemoryArchiveState> {
-    const [markdownStats, jsonlStats] = await Promise.all([
+    const [markdownStats, jsonlStats, contentHashes] = await Promise.all([
       stat(this.historyMarkdownPath),
       stat(this.historyJsonlPath),
+      hashMessageContentWithPrefix(history, history.length),
     ]);
-    return {
+    const state: AgentMemoryArchiveState = {
       archivedCount: history.length,
       archivedIdsHash: hashMessageIds(history, history.length),
-      archivedContentHash: await hashMessageContent(history, history.length),
+      archivedContentHash: contentHashes.full,
       mdBytes: markdownStats.size,
       jsonlBytes: jsonlStats.size,
       appendsSinceRewrite,
     };
+    if (tailOffsets && history.length > 0) {
+      state.prefixIdsHash = hashMessageIds(history, history.length - 1);
+      state.prefixContentHash = contentHashes.prefix;
+      state.tailMdOffset = tailOffsets.md;
+      state.tailJsonlOffset = tailOffsets.jsonl;
+    }
+    return state;
   }
 
   private async writeMetadataAndIndex(
