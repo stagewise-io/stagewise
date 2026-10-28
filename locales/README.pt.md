@@ -46,7 +46,7 @@
 
 ## Primeiros passos
 
-Baixe o stagewise em [stagewise.io](https://ade.stagewise.io) e siga o breve guia de integração para configurar sua conta.
+Baixe o stagewise em [stagewise.io](https://ade.stagewise.io) e siga o breve guia de integração.
 
 ## Use sua assinatura de programação
 
@@ -63,32 +63,10 @@ Conecte qualquer uma das assinaturas abaixo com uma única chave de API para des
 | MiniMax | [MiniMax](https://platform.minimax.io) | MiniMax M3, MiniMax M2.7 | [Obter chave de API](https://platform.minimax.io/user-center/basic-information/interface-key) |
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5 | [Obter chave de API](https://platform.xiaomimimo.com/#/console/plan-manage) |
 
-### Conta stagewise
+### Conta stagewise (descontinuação)
 
-Para facilitar o uso e o acesso imediato a uma ampla biblioteca de modelos, basta criar uma conta stagewise.
-
-| **Plano** | **Preço**     | **Limites**                           |
-| -------- | -------------- | ------------------------------------- |
-| Free     | $0 / mês       | Acesso limitado a 3 modelos padrão (Default, Quick, Smart) |
-| Pro      | $20 / mês      | Acesso a todos os modelos, incluindo Frontier e Open-Weights |
-| Ultra    | $200 / mês     | Acesso a todos os modelos, limites 15x maiores que o Pro |
-
-Modelos incluídos:
-
-#### Modelos de pesos abertos
-
-- **Moonshot AI**: Kimi K3, Kimi K2.7 Code, Kimi K2.6, Kimi K2.5
-- **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
-- **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
-- **Z.ai**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
-- **MiniMax**: MiniMax M3, MiniMax M2.7, MiniMax M2
-- **Xiaomi MiMo**: MiMo-V2.5-Pro, MiMo-V2.5
-
-#### Modelos proprietários
-
-- **Anthropic**: Fable 5.1, Opus 5.5, Sonnet 5.5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 5, Sonnet 4.6, Haiku 4.5
-- **OpenAI**: GPT-6.1 Sol, GPT-6 Astra, GPT-6 Sol, GPT-6 Luna, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
-- **Google**: Gemini 3.5 Flash, Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
+> [!NOTE]
+> O serviço de contas do stagewise será descontinuado no final de novembro de 2026. Para continuar usando o stagewise, traga sua própria assinatura ou chaves de API — veja as opções acima.
 
 ## Licença
 
