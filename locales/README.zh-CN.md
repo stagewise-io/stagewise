@@ -46,7 +46,7 @@
 
 ## 快速开始
 
-从 [stagewise.io](https://ade.stagewise.io) 下载 stagewise，并按照简短的新手引导完成账号设置。
+从 [stagewise.io](https://ade.stagewise.io) 下载 stagewise，并按照简短的新手引导完成设置。
 
 ## 使用你的编程订阅
 
@@ -64,33 +64,10 @@
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro、MiMo-V2.5 | [获取 API 密钥](https://platform.xiaomimimo.com/#/console/plan-manage) |
 | Mistral | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5、Mistral Large 3、Mistral Small 4、Codestral | [获取 API 密钥](https://console.mistral.ai/api-keys) |
 
-### stagewise 账户
+### stagewise 账户（即将停用）
 
-如果想要开箱即用并访问更广泛的模型库，只需创建一个 stagewise 账户即可。
-
-| **套餐** | **价格**      | **限额**                    |
-| -------- | ------------- | --------------------------- |
-| 免费     | $0 / 月       | 3 个标准模型的有限访问 (Default, Quick, Smart) |
-| Pro      | $20 / 月      | 访问所有模型，包括 Frontier 和 Open-Weights |
-| Ultra    | $200 / 月     | 访问所有模型，比 Pro 高 15 倍限额 |
-
-包含模型：
-
-#### 开放权重模型
-
-- **Moonshot AI**：Kimi K3、Kimi K2.7 Code、Kimi K2.6、Kimi K2.5
-- **Alibaba**：Qwen 3-32B、Qwen 3-Coder 30B-A3B
-- **DeepSeek**：DeepSeek V4 Pro、DeepSeek V4 Flash
-- **Z.ai**：GLM 5.2、GLM 5.1、GLM 5V-Turbo
-- **MiniMax**：MiniMax M3、MiniMax M2.7、MiniMax M2
-- **Xiaomi MiMo**：MiMo-V2.5-Pro、MiMo-V2.5
-- **Mistral**：Mistral Medium 3.5、Mistral Large 3、Mistral Small 4、Codestral
-
-#### 专有模型
-
-- **Anthropic**：Fable 5.1、Opus 5.5、Sonnet 5.5、Fable 5、Opus 4.8、Opus 4.7、Opus 4.6、Sonnet 5、Sonnet 4.6、Haiku 4.5
-- **OpenAI**：GPT-6.1 Sol、GPT-6 Astra、GPT-6 Sol、GPT-6 Luna、GPT-5.6 Sol、GPT-5.6 Terra、GPT-5.6 Luna、GPT-5.5、GPT-5.4、GPT-5.3 Codex、GPT-5.3 Instant、GPT-5.4 mini、GPT-5.4 nano
-- **Google**：Gemini 3.5 Flash、Gemini 3.1 Pro（预览）、Gemini 3 Flash、Gemini 3.1 Flash Lite
+> [!NOTE]
+> stagewise 账户服务将于 2026 年 11 月底停止。要继续使用 stagewise，请改为自带订阅或 API 密钥——参见上方选项。
 
 ## 许可证
 
