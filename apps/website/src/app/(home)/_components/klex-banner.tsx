@@ -41,12 +41,13 @@ export function KlexBanner() {
               </p>
             </div>
 
-            <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col items-start gap-2 pt-1 sm:flex-row sm:items-center sm:gap-3">
                 <a
                   href="https://klex.bot"
                   className={cn(
                     buttonVariants({ size: 'sm', variant: 'primary' }),
+                    'h-auto min-h-8',
                   )}
                 >
                   Go to Klex Bots
@@ -56,6 +57,7 @@ export function KlexBanner() {
                   href="/news/say-hello-to-klex-bots"
                   className={cn(
                     buttonVariants({ size: 'sm', variant: 'ghost' }),
+                    'h-auto min-h-8',
                   )}
                 >
                   The story behind Klex Bots
@@ -63,7 +65,8 @@ export function KlexBanner() {
                 </Link>
               </div>
 
-              {/* Phone layout: image sits right of the buttons */}
+              {/* Phone layout: image stacks below the buttons, sits
+                  beside them from sm */}
               <Image
                 src={klexWink}
                 alt="Klex Bot"
