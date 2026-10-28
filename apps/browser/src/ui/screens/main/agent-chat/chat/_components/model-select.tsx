@@ -552,6 +552,15 @@ export const ModelSelect = memo(function ModelSelect({
     [filteredPresets],
   );
 
+  // Preset ids that passed the visibility filter above. handleValueChange
+  // consults the unfiltered stored presets, so it uses this set as its
+  // guard — a value referencing a hidden preset (stale combobox state,
+  // sign-out mid-session) must never activate it.
+  const allowedPresetIds = useMemo(
+    () => new Set(presetEntries.map((p) => p.id)),
+    [presetEntries],
+  );
+
   const filteredItemValues = useMemo(
     () =>
       query.trim() === ''
@@ -677,7 +686,7 @@ export const ModelSelect = memo(function ModelSelect({
       const presetId = decodePresetKey(value);
       if (presetId) {
         const preset = modelPresets.find((p) => p.id === presetId);
-        if (preset && openAgent) {
+        if (preset && allowedPresetIds.has(preset.id) && openAgent) {
           const mainModel = preset.models[0];
           if (mainModel) {
             setSelectedModel(
@@ -725,6 +734,7 @@ export const ModelSelect = memo(function ModelSelect({
       setSelectedModel,
       onModelChange,
       modelPresets,
+      allowedPresetIds,
       preferences,
       updatePreferences,
     ],
