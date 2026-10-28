@@ -4,6 +4,7 @@ import { IconArrowRightFill18 } from '@stagewise/icons';
 import { getAllNewsPosts } from '@/lib/source';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { HeroSection } from './_components/hero-section';
+import { KlexBanner } from './_components/klex-banner';
 import { ModelProviderShowcase } from './_components/model-provider-showcase';
 import { FeatureSection } from './_components/feature-section';
 import { NewsSection } from './_components/news-section';
@@ -64,7 +65,10 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppJsonLd) }}
       />
-      <div className="relative mx-auto mt-12 min-h-screen w-full max-w-7xl px-4">
+      <div className="relative mx-auto mt-6 min-h-screen w-full max-w-7xl px-4">
+        {/* Klex Bots banner */}
+        <KlexBanner />
+
         {/* Hero Section */}
         <HeroSection />
 
