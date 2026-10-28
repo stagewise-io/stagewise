@@ -9,7 +9,6 @@ import { MenuIcon, XIcon, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSession } from '@/lib/auth-client';
 import { IconDownload4FillDuo18 } from '@stagewise/icons';
 
 function NavDownloadButton() {
@@ -160,22 +159,6 @@ function ResourcesDropdown() {
   );
 }
 
-function NavbarAuthLink() {
-  const { data: session } = useSession();
-
-  return (
-    <Link
-      href="https://console.stagewise.io"
-      className={cn(
-        buttonVariants({ size: 'sm', variant: 'ghost' }),
-        'hidden sm:inline-flex',
-      )}
-    >
-      {session?.user ? 'Account' : 'Sign in'}
-    </Link>
-  );
-}
-
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
@@ -203,9 +186,8 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right side: Download + Auth + hamburger */}
+          {/* Right side: Download + hamburger */}
           <div className="flex items-center gap-2">
-            <NavbarAuthLink />
             <NavDownloadButton />
             <Button
               variant="ghost"
