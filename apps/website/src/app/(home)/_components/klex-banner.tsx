@@ -37,7 +37,9 @@ export function KlexBanner() {
                 The stagewise team is now building the digital coworker of the
                 future. Klex Bots take coding tasks end-to-end — from first plan
                 to merged PR — with their own identity, right in the tools you
-                already use. And yes — they're open source!
+                already use.
+                <br />
+                And yes — they're open source!
               </p>
             </div>
 
