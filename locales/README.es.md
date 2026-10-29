@@ -46,7 +46,7 @@
 
 ## Primeros pasos
 
-Descarga stagewise desde [stagewise.io](https://ade.stagewise.io) y sigue la breve guía de incorporación para configurar tu cuenta.
+Descarga stagewise desde [stagewise.io](https://ade.stagewise.io) y sigue la breve guía de incorporación.
 
 ## Usa tu suscripción de programación
 
@@ -64,33 +64,10 @@ Conecta cualquiera de las siguientes suscripciones con una sola clave de API par
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5 | [Obtener clave de API](https://platform.xiaomimimo.com/#/console/plan-manage) |
 | Mistral | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral | [Obtener clave de API](https://console.mistral.ai/api-keys) |
 
-### Cuenta stagewise
+### Cuenta stagewise (cierre del servicio)
 
-Para mayor comodidad y acceso inmediato a una amplia biblioteca de modelos, simplemente crea una cuenta stagewise.
-
-| **Plan** | **Precio**     | **Límites**                           |
-| -------- | -------------- | ------------------------------------- |
-| Free     | $0 / mes       | Acceso limitado a 3 modelos estándar (Default, Quick, Smart) |
-| Pro      | $20 / mes      | Acceso a todos los modelos, incluidos Frontier y Open-Weights |
-| Ultra    | $200 / mes     | Acceso a todos los modelos, límites 15x más altos que Pro |
-
-Modelos incluidos:
-
-#### Modelos de pesos abiertos
-
-- **Moonshot AI**: Kimi K3, Kimi K2.7 Code, Kimi K2.6, Kimi K2.5
-- **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
-- **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
-- **Z.ai**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
-- **MiniMax**: MiniMax M3, MiniMax M2.7, MiniMax M2
-- **Xiaomi MiMo**: MiMo-V2.5-Pro, MiMo-V2.5
-- **Mistral**: Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral
-
-#### Modelos propietarios
-
-- **Anthropic**: Fable 5.1, Opus 5.5, Sonnet 5.5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 5, Sonnet 4.6, Haiku 4.5
-- **OpenAI**: GPT-6.1 Sol, GPT-6 Astra, GPT-6 Sol, GPT-6 Luna, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
-- **Google**: Gemini 3.5 Flash, Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
+> [!NOTE]
+> El servicio de cuentas de stagewise se cerrará a finales de noviembre de 2026. Para seguir usando stagewise, trae tu propia suscripción o tus claves de API — mira las opciones de arriba.
 
 ## Licencia
 

@@ -46,7 +46,7 @@
 
 ## 시작하기
 
-[stagewise.io](https://ade.stagewise.io)에서 stagewise를 다운로드하고 짧은 온보딩 가이드를 따라 계정을 설정하세요.
+[stagewise.io](https://ade.stagewise.io)에서 stagewise를 다운로드하고 짧은 온보딩 가이드를 따르세요.
 
 ## 코딩 구독 활용하기
 
@@ -64,33 +64,10 @@
 | Xiaomi MiMo | [Xiaomi MiMo](https://platform.xiaomimimo.com) | MiMo-V2.5-Pro, MiMo-V2.5 | [API 키 받기](https://platform.xiaomimimo.com/#/console/plan-manage) |
 | Mistral | [Mistral](https://console.mistral.ai) | Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral | [API 키 받기](https://console.mistral.ai/api-keys) |
 
-### stagewise 계정
+### stagewise 계정 (서비스 종료)
 
-편리하게 시작하고 광범위한 모델 라이브러리에 즉시 접근하려면 stagewise 계정을 만들기만 하면 됩니다.
-
-| **플랜** | **가격**       | **제한**                          |
-| -------- | -------------- | --------------------------------- |
-| Free     | $0 / 월        | 3개 표준 모델 제한적 접근 (Default, Quick, Smart) |
-| Pro      | $20 / 월       | 모든 모델 접근 (Frontier, Open-Weights 포함) |
-| Ultra    | $200 / 월      | 모든 모델 접근, Pro 대비 15배 높은 제한 |
-
-포함된 모델:
-
-#### 오픈 웨이트 모델
-
-- **Moonshot AI**: Kimi K3, Kimi K2.7 Code, Kimi K2.6, Kimi K2.5
-- **Alibaba**: Qwen 3-32B, Qwen 3-Coder 30B-A3B
-- **DeepSeek**: DeepSeek V4 Pro, DeepSeek V4 Flash
-- **Z.ai**: GLM 5.2, GLM 5.1, GLM 5V-Turbo
-- **MiniMax**: MiniMax M3, MiniMax M2.7, MiniMax M2
-- **Xiaomi MiMo**: MiMo-V2.5-Pro, MiMo-V2.5
-- **Mistral**: Mistral Medium 3.5, Mistral Large 3, Mistral Small 4, Codestral
-
-#### 독점 모델
-
-- **Anthropic**: Fable 5.1, Opus 5.5, Sonnet 5.5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 5, Sonnet 4.6, Haiku 4.5
-- **OpenAI**: GPT-6.1 Sol, GPT-6 Astra, GPT-6 Sol, GPT-6 Luna, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.3 Instant, GPT-5.4 mini, GPT-5.4 nano
-- **Google**: Gemini 3.5 Flash, Gemini 3.1 Pro (Preview), Gemini 3 Flash, Gemini 3.1 Flash Lite
+> [!NOTE]
+> stagewise 계정 서비스는 2026년 11월 말에 종료됩니다. stagewise를 계속 사용하려면 자체 구독 또는 API 키를 사용하세요 — 위의 옵션을 참고하세요.
 
 ## 라이선스
 
