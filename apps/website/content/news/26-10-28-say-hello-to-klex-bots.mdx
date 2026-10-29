@@ -9,16 +9,14 @@ date: 2026-10-28
 <img
   src="/news/klex-welcome.webp"
   alt="Klex logo surrounded by welcoming Klex Bots"
-  className="max-w-none"
+  className="my-8 block h-auto w-full max-w-full rounded-xl border-2 border-derived-subtle shadow-sm"
   width={2400}
   height={900}
 />
 
 Hey everyone,
 
-It's been quite some time since we last posted something on this blog, but there's a good reason for that:
-
-Our team has been super busy working on the next generation of AI-powered products, and that meant we had to mostly halt our efforts on stagewise.
+It's been quite some time since we last posted something on this blog, but there's a good reason for that: Our team has been super busy working on the next generation of AI-powered products, and that meant we had to mostly halt our efforts on stagewise.
 
 Today, we're very excited to finally tell you what we've been working on: **[Klex Bots](https://klex.bot)**.
 
@@ -52,9 +50,7 @@ While building and improving the stagewise ADE, we kept running into a few probl
 
 Of course, there are plenty of ways to improve these things. No product is ever truly finished or perfect.
 
-But we started questioning whether we should keep improving the existing way of working with AI agents, or whether there was a fundamentally better approach.
-
-After all, we don't have unlimited resources, and we want to spend our time building things that will truly matter in the future.
+But we started questioning whether we should keep improving the existing way of working with AI agents, or whether there was a fundamentally better approach. After all, we don't have unlimited resources, and we want to spend our time building things that will truly matter in the future.
 
 This led us to think more deeply about where AI is going and how humans will work with it. We came to three realizations that fundamentally changed how we think about the products we're building.
 
@@ -80,9 +76,7 @@ In other words, **AI won't just help us use software. It will use software to wo
 
 ### Our software is already built for humans
 
-Sounds super obvious, right?
-
-Almost every SaaS product we use today is designed around how humans communicate, collaborate, and organize work.
+Sounds super obvious, right? Almost every SaaS product we use today is designed around how humans communicate, collaborate, and organize work.
 
 But if that's the case, why are we trying to build entirely new ways of working just for AI?
 
@@ -96,9 +90,7 @@ We think there's a much more natural approach: **make AI fit into human teams, r
 
 ### Humans are already very good at working with other humans
 
-We've spent our entire lives learning how to communicate, delegate, collaborate, and work with other people.
-
-Learning how to manage AI agents through prompts, slash commands, skills, and MCP servers, on the other hand, is something entirely new.
+We've spent our entire lives learning how to communicate, delegate, collaborate, and work with other people. Learning how to manage AI agents through prompts, slash commands, skills, and MCP servers, on the other hand, is something entirely new.
 
 Many of you reading this probably come from a technical background where these concepts are easy to understand. But a surprisingly huge part of the world's workforce is new to all of this, and frankly, not particularly interested in learning the ins and outs of prompting.
 
@@ -114,9 +106,7 @@ They have their own identities and memories, can use dedicated computers in the 
 
 Imagine creating a Klex Bot for software engineering, giving it access to Linear and GitHub, and assigning it an issue.
 
-Instead of opening an agent chat and telling it what to do, you simply assign the issue to your Bot in Linear.
-
-It picks up the work, implements the changes on its own computer, opens a pull request on GitHub, and attaches screenshots of the changes.
+Instead of opening an agent chat and telling it what to do, you simply assign the issue to your Bot in Linear. It picks up the work, implements the changes on its own computer, opens a pull request on GitHub, and attaches screenshots of the changes.
 
 If something needs clarification, it can ask your team. If the work is finished, you can review it just like you would review the work of a human coworker.
 
@@ -130,9 +120,7 @@ We're not building another tool that you have to open, prompt, and supervise in 
 
 ### Why Bots, and not agents?
 
-Technically speaking, Klex Bots are AI agents, too.
-
-But we think the term *agent* has become closely associated with AI tools that you open, instruct, and supervise to get a particular task done.
+Technically speaking, Klex Bots are AI agents, too. But we think the term *agent* has become closely associated with AI tools that you open, instruct, and supervise to get a particular task done.
 
 When we say *Bot*, we're talking about something a little different: a persistent digital coworker with its own identity, memory, and place in your team.
 
@@ -152,13 +140,17 @@ The Bots pick up the issues, clone the repository to their connected machines (o
 
 The PRs are linked to Linear, and we can clearly see which Bot was responsible for the work in both applications.
 
-For frontend work, we asked our Bots to always include screenshots of the changes in their pull requests.
+For frontend work, we asked our Bots to always include screenshots of the changes in their pull requests. And the cool thing is that you can just tell them to do this, and they'll learn and remember it. It's great!
 
-And the cool thing is that you can just tell them to do this, and they'll learn and remember it. It's great!
+<img
+  src="/news/klex-bot-workflow.webp"
+  alt="Illustrative Klex Bot workflow: assign an issue, the Bot implements it on its own machine, then review its pull request with before-and-after screenshots."
+  className="my-8 block h-auto w-full max-w-full rounded-xl border-2 border-derived-subtle shadow-sm"
+  width={2400}
+  height={1350}
+/>
 
-Of course, there are still tasks our human developers want to do directly. In those cases, they might use a classical code editor, stagewise, or Codex locally.
-
-But truth be told, this happens less and less.
+Of course, there are still tasks our human developers want to do directly. In those cases, they might use a classical code editor, stagewise, or Codex locally. But truth be told, this happens less and less.
 
 We increasingly spend our time in Linear, figuring out *what we actually want to build*, rather than personally managing every step of the implementation.
 
@@ -180,9 +172,7 @@ This is one of our most important architectural decisions.
 
 In many agent harnesses, the machine an agent works on is also the machine that runs the agent itself and stores its configuration, memory, and credentials.
 
-That creates an intrinsic risk: an agent that can access its own runtime environment might also be able to interfere with the systems controlling its behavior.
-
-Basically, you're giving the agent the possibility to fiddle with its own brain.
+That creates an intrinsic risk: an agent that can access its own runtime environment might also be able to interfere with the systems controlling its behavior. Basically, you're giving the agent the possibility to fiddle with its own brain.
 
 We wanted to avoid that, so we deliberately separated the environment a Klex Bot runs in from the machines it works with.
 
@@ -192,13 +182,19 @@ This architecture also means that a Bot can work with multiple machines, or none
 
 The Bot itself remains separate from all of them.
 
+<img
+  src="/news/klex-bot-runtime-separation.webp"
+  alt="Klex Bot runtime hosted locally or in Klex Cloud, separate from connected work machines at home, in the cloud, or on enterprise infrastructure."
+  className="my-8 block h-auto w-full max-w-full rounded-xl border-2 border-derived-subtle shadow-sm"
+  width={2400}
+  height={1350}
+/>
+
 ### Klex Bots have a sophisticated memory system
 
 We like to think of AI models as temporary sparks of intelligence that generate thoughts and actions, and of our Klex Bot harness as the brain that orchestrates those thoughts, actions, and memories.
 
-If we're building digital coworkers that should learn and improve over time, memory can't just be an afterthought.
-
-That's why we're building a memory system deeply integrated into the harness itself.
+If we're building digital coworkers that should learn and improve over time, memory can't just be an afterthought. That's why we're building a memory system deeply integrated into the harness itself.
 
 It includes two important kinds of memory:
 
@@ -209,9 +205,7 @@ The goal is that you can teach a Bot how your team works, and it will actually r
 
 ### Klex Bots are open source, but designed to work great out of the box
 
-We know that Bots could become a significant part of your workforce, and that requires trust.
-
-That's why we made Klex Bots open source, so everyone can understand how they work and what they do internally.
+We know that Bots could become a significant part of your workforce, and that requires trust. That's why we made Klex Bots open source, so everyone can understand how they work and what they do internally.
 
 **[Here's the Klex Bots repository on GitHub, licensed under Apache 2.0.](https://github.com/stagewise-io/klex)**
 
@@ -231,9 +225,7 @@ We strongly encourage giving each Klex Bot its own account in the applications i
 
 Instead of sharing your GitHub account with an agent, for example, your Bot gets its own identity. The same goes for Linear, Slack, Jira, Teams, Discord, and other platforms.
 
-We recognize that many services weren't designed for autonomous Bots to sign up for accounts, and that creating these identities isn't always straightforward.
-
-That's why we're making it easier to set up individual Bot identities through guides and integrations in [Klex Cloud](https://cloud.klex.bot).
+We recognize that many services weren't designed for autonomous Bots to sign up for accounts, and that creating these identities isn't always straightforward. That's why we're making it easier to set up individual Bot identities through guides and integrations in [Klex Cloud](https://cloud.klex.bot).
 
 Bots can also identify themselves through their configured names and avatars when using dynamic OAuth registration, rather than appearing as a generic "Klex Bot".
 
@@ -259,31 +251,26 @@ If you talk to the same Bot through Discord, Slack, and other applications, thos
 
 This is somewhat analogous to how humans work: we have one stream of consciousness that processes what we experience and guides our actions, even when we're dealing with multiple things throughout the day.
 
-Of course, a Bot can still use additional internal sessions for things like memory maintenance, cleanup, or other supporting work. But there's only one active consciousness responsible for interacting with the outside world and deciding what the Bot actually does.
+Of course, inside a bot, there still "subconsciously" run additional internal sessions for things like memory maintenance, cleanup, or other supporting work. But there's only one active consciousness responsible for interacting with the outside world and deciding what the Bot actually does.
 
-We deliberately chose this approach because we believe **consistency, auditability, and a coherent understanding of the world** are more important than having a single Bot independently execute dozens of unrelated conversations in parallel.
+We deliberately chose this approach because we believe **consistency, auditability, and a coherent understanding of the world the bot sees** are more important than having a single Bot independently execute dozens of unrelated conversations in parallel.
 
 Imagine starting a conversation with a Bot on Discord, asking it to send an email, and then replying to that email yourself. The Bot should understand how these events relate to each other, even though they happened in different applications.
 
 Having one consciousness makes this much more natural and avoids a whole range of problems around sharing context and maintaining consistent memory across independent sessions.
 
-Of course, this also limits how much work one Bot can actively do at a time.
-
-But if you need more parallelism, you can simply create more Bots and let them collaborate using the same tools your team already uses.
+Of course, this also limits how much work one Bot can actively do at a time. But if you need more parallelism, you can simply create more Bots and let them collaborate using the same tools your team already uses.
+This also has the nice advantage of being able to understand and design how Bots interact in the platforms you already know and love to communicate with your coworkers.
 
 *And to be clear, we're using consciousness as a metaphor for how a Bot processes information and makes decisions, not as a claim that AI experiences consciousness in the human sense.*
 
 ## Beyond software engineering
 
-While developing Klex Bots, we also started experimenting with using them for work outside software engineering.
-
-And we quickly realized that they're extraordinarily useful for all kinds of tasks.
+While developing Klex Bots, we also started experimenting with using them for work outside software engineering. And we quickly realized that they're extraordinarily useful for all kinds of tasks.
 
 Some of these are still technical, like reviewing pull requests or investigating issues. Others involve entirely different areas, such as finance or marketing.
 
-We know that stagewise has always focused on software engineering, and that's also where we started with Klex Bots.
-
-But the idea behind Klex is much bigger than coding.
+We know that stagewise has always focused on software engineering, and that's also where we started with Klex Bots. But the idea behind Klex is much bigger than coding.
 
 We believe digital coworkers can become useful members of almost any team, and we're excited to see what kinds of jobs people will give their Bots.
 
@@ -301,9 +288,7 @@ And who knows: maybe there's a chance for a renaissance of the stagewise ADE tha
 
 ## Where to get started
 
-If you want to try creating your first Klex Bot, head over to **[klex.bot](https://klex.bot)** and get started!
-
-All you need is an API key from one of the many AI model providers we support.
+If you want to try creating your first Klex Bot, head over to **[klex.bot](https://klex.bot)** and get started! All you need is an API key from one of the many AI model providers we support.
 
 You can also take a look at the [open-source Klex Bots repository](https://github.com/stagewise-io/klex), or join our brand-new [Klex World Discord server](https://discord.gg/zs5wCQ9hwx) to meet other users, share experiences, and talk about what you're building with your Bots.
 
