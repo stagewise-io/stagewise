@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  klexBotAnnouncementSchema,
+  type AnnouncementDismissal,
+} from '@shared/klex-bot-announcement';
 import type { ModelId } from '@shared/available-models';
 import type { PluginDefinition } from '@shared/plugins';
 import type { SkillDefinitionUI } from '@shared/skills';
@@ -434,6 +438,8 @@ export const storedExperienceDataSchema = z.object({
   firstUsedAt: z.number().nullable(),
   founderCallSurvey: founderCallSurveySchema,
   totalAgentCount: z.number(),
+  /** Null until profile experience data has loaded. */
+  klexBotAnnouncement: klexBotAnnouncementSchema.nullable(),
 });
 
 export type StoredExperienceData = z.infer<typeof storedExperienceDataSchema>;
@@ -1668,6 +1674,10 @@ export type KartonContract = {
         dismiss: () => Promise<void>;
         submitFeedback: (feedback: string) => Promise<void>;
       };
+      klexBotAnnouncement: {
+        claimInitialPresentation: () => Promise<boolean>;
+        dismiss: (choice: AnnouncementDismissal) => Promise<void>;
+      };
       founderCall: {
         survey: {
           open: () => Promise<void>;
@@ -2366,6 +2376,7 @@ export const defaultState: KartonContract['state'] = {
         answeredAt: null,
       },
       totalAgentCount: 0,
+      klexBotAnnouncement: null,
     },
     pendingOnboardingSuggestion: null,
     devAppPreview: {

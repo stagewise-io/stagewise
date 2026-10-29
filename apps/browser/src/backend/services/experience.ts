@@ -7,6 +7,12 @@
  */
 
 import { z } from 'zod';
+import {
+  ANNOUNCEMENT_REMINDER_MS,
+  announcementDismissalSchema,
+  klexBotAnnouncementSchema,
+  type KlexBotAnnouncementState,
+} from '@shared/klex-bot-announcement';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -91,6 +97,9 @@ export class UserExperienceService extends DisposableService {
   private readonly boundHandleServiceStateChange: () => void;
 
   // Flag to prevent re-entrant initialization
+  private klexBotAnnouncement: KlexBotAnnouncementState | null = null;
+  private announcementLock: Promise<unknown> = Promise.resolve();
+
   private isLoadingStoredExperienceData = false;
   private hasInitializedStoredExperienceData = false;
 
@@ -159,6 +168,11 @@ export class UserExperienceService extends DisposableService {
   }
 
   private async initialize() {
+    this.klexBotAnnouncement = await readPersistedData(
+      'experience-klex-bot',
+      klexBotAnnouncementSchema,
+      klexBotAnnouncementSchema.parse({}),
+    );
     const [
       hasSeenOnboarding,
       tutorialState,
@@ -175,6 +189,8 @@ export class UserExperienceService extends DisposableService {
       this.readAgentCount(),
     ]);
     this.uiKarton.setState((draft) => {
+      draft.userExperience.storedExperienceData.klexBotAnnouncement =
+        this.klexBotAnnouncement;
       draft.userExperience.storedExperienceData.hasSeenOnboardingFlow =
         hasSeenOnboarding;
       draft.userExperience.storedExperienceData.tutorialState = tutorialState;
@@ -262,6 +278,16 @@ export class UserExperienceService extends DisposableService {
       },
     );
     this.uiKarton.registerServerProcedureHandler(
+      'userExperience.klexBotAnnouncement.claimInitialPresentation',
+      async () => this.claimKlexBotAnnouncement(),
+    );
+    this.uiKarton.registerServerProcedureHandler(
+      'userExperience.klexBotAnnouncement.dismiss',
+      async (_callingClientId: string, choice: unknown) => {
+        await this.dismissKlexBotAnnouncement(choice);
+      },
+    );
+    this.uiKarton.registerServerProcedureHandler(
       'userExperience.survey.answer',
       async (_callingClientId: string, answer: 'yes' | 'no') => {
         await this.answerSurvey(answer);
@@ -294,6 +320,12 @@ export class UserExperienceService extends DisposableService {
   }
 
   protected onTeardown(): void {
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.klexBotAnnouncement.claimInitialPresentation',
+    );
+    this.uiKarton.removeServerProcedureHandler(
+      'userExperience.klexBotAnnouncement.dismiss',
+    );
     this.uiKarton.unregisterStateChangeCallback(
       this.boundHandleServiceStateChange,
     );
@@ -345,7 +377,10 @@ export class UserExperienceService extends DisposableService {
         this.isLoadingStoredExperienceData = false;
 
         this.uiKarton.setState((draft) => {
-          draft.userExperience.storedExperienceData = storedExperienceData;
+          draft.userExperience.storedExperienceData = {
+            ...storedExperienceData,
+            klexBotAnnouncement: this.klexBotAnnouncement,
+          };
           draft.userExperience.experienceSurvey =
             storedExperienceData.experienceSurvey;
           draft.userExperience.founderCallSurvey =
@@ -633,7 +668,10 @@ export class UserExperienceService extends DisposableService {
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
       });
       this.logger.debug(
         `[UserExperienceService] Saved recently opened workspace: ${workspacePath}`,
@@ -677,7 +715,60 @@ export class UserExperienceService extends DisposableService {
       firstUsedAt,
       founderCallSurvey,
       totalAgentCount,
+      // Read the authoritative in-memory value after the asynchronous reads;
+      // an unrelated experience refresh must not restore an older snapshot.
+      klexBotAnnouncement: this.klexBotAnnouncement,
     };
+  }
+
+  private serializeAnnouncement<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.announcementLock.then(operation);
+    this.announcementLock = result.catch(() => undefined);
+    return result;
+  }
+
+  private async saveKlexBotAnnouncement(state: KlexBotAnnouncementState) {
+    await writePersistedData(
+      'experience-klex-bot',
+      klexBotAnnouncementSchema,
+      state,
+    );
+    this.klexBotAnnouncement = state;
+    this.uiKarton.setState((draft) => {
+      draft.userExperience.storedExperienceData.klexBotAnnouncement = state;
+    });
+  }
+
+  public claimKlexBotAnnouncement(): Promise<boolean> {
+    return this.serializeAnnouncement(async () => {
+      const state = this.klexBotAnnouncement;
+      if (
+        !state ||
+        state.initialPresentationConsumed ||
+        state.permanentlyDismissed
+      )
+        return false;
+      await this.saveKlexBotAnnouncement({
+        ...state,
+        initialPresentationConsumed: true,
+      });
+      return true;
+    });
+  }
+
+  public dismissKlexBotAnnouncement(input: unknown): Promise<void> {
+    const choice = announcementDismissalSchema.parse(input);
+    return this.serializeAnnouncement(async () => {
+      const state = this.klexBotAnnouncement;
+      if (!state) throw new Error('Announcement state is not loaded');
+      if (state.permanentlyDismissed) return;
+      await this.saveKlexBotAnnouncement({
+        initialPresentationConsumed: true,
+        permanentlyDismissed: choice === 'never',
+        remindAt:
+          choice === 'remind' ? Date.now() + ANNOUNCEMENT_REMINDER_MS : null,
+      });
+    });
   }
 
   /**
@@ -733,7 +824,10 @@ export class UserExperienceService extends DisposableService {
       // Update UI state
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
         draft.userExperience.experienceSurvey = survey;
       });
 
@@ -760,7 +854,10 @@ export class UserExperienceService extends DisposableService {
 
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
         draft.userExperience.experienceSurvey = survey;
       });
 
@@ -842,7 +939,10 @@ export class UserExperienceService extends DisposableService {
 
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
         draft.userExperience.founderCallSurvey = survey;
       });
 
@@ -871,7 +971,10 @@ export class UserExperienceService extends DisposableService {
 
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
         draft.userExperience.founderCallSurvey = survey;
       });
 
@@ -985,7 +1088,10 @@ export class UserExperienceService extends DisposableService {
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
       });
       this.logger.debug(
         `[UserExperienceService] Set hasSeenOnboardingFlow to: ${value}`,
@@ -1078,7 +1184,10 @@ export class UserExperienceService extends DisposableService {
       // Update UI state with combined data
       const storedData = await this.getStoredExperienceData();
       this.uiKarton.setState((draft) => {
-        draft.userExperience.storedExperienceData = storedData;
+        draft.userExperience.storedExperienceData = {
+          ...storedData,
+          klexBotAnnouncement: this.klexBotAnnouncement,
+        };
       });
       this.logger.debug(
         `[UserExperienceService] Pruned recently opened workspaces. Kept ${filteredWorkspaces.length} entries`,

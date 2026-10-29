@@ -49,6 +49,7 @@ export type JsonName =
   | 'tutorial-state'
   | 'experience-survey'
   | 'experience-founder-call-survey'
+  | 'experience-klex-bot'
   | 'first-used-at';
 
 export const getJsonPath = (name: JsonName): string =>

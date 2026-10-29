@@ -7,7 +7,8 @@ import {
 import { Logo } from '@ui/components/ui/logo';
 import { WebContentsBoundsSyncer } from '@ui/components/web-contents-bounds-syncer';
 import { TutorialOverlay } from '@ui/components/tutorial/tutorial-overlay';
-import { WhatsNewDialog } from '@ui/components/release-notes';
+import { StartupDialogs } from '@ui/components/klex-bot-announcement/startup-dialogs';
+import { KlexBotAnnouncementProvider } from '@ui/components/klex-bot-announcement/controller';
 
 // Lazy-load the heavy screen trees. Both `DefaultLayout` and `OnboardingWizard`
 // only render *after* the karton connection is established, yet importing them
@@ -72,9 +73,11 @@ export function ScreenRouter() {
         <LoadingScreen reconnectState={reconnectState} />
       ) : hasSeenOnboarding ? (
         <Suspense fallback={<LoadingScreen reconnectState={reconnectState} />}>
-          <DefaultLayout show />
-          <WebContentsBoundsSyncer />
-          <WhatsNewDialog />
+          <KlexBotAnnouncementProvider>
+            <DefaultLayout show />
+            <WebContentsBoundsSyncer />
+            <StartupDialogs />
+          </KlexBotAnnouncementProvider>
         </Suspense>
       ) : (
         <Suspense fallback={<LoadingScreen reconnectState={reconnectState} />}>
