@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  ANNOUNCEMENT_REMINDER_MS,
+  klexBotAnnouncementSchema,
+} from '@shared/klex-bot-announcement';
+import { writePersistedData } from '../utils/persisted-data';
 import type { RecentlyOpenedWorkspace } from '@shared/karton-contracts/ui';
 
 vi.hoisted(() => {
@@ -179,6 +184,114 @@ function getRecentWorkspaces() {
     'recently-opened-workspaces',
   ) as RecentlyOpenedWorkspace[];
 }
+
+describe('Klex Bot announcement persistence', () => {
+  const key = 'experience-klex-bot';
+  beforeEach(() => {
+    persistedData.clear();
+    existingPaths.clear();
+    procedureHandlers.clear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('loads unseen defaults and claims only once, including concurrent calls and restart', async () => {
+    const service = await createService(createGitService({}));
+    expect(
+      (await service.getStoredExperienceData()).klexBotAnnouncement,
+    ).toEqual(klexBotAnnouncementSchema.parse({}));
+    expect(
+      await Promise.all([
+        service.claimKlexBotAnnouncement(),
+        service.claimKlexBotAnnouncement(),
+      ]),
+    ).toEqual([true, false]);
+    const restarted = await createService(createGitService({}));
+    expect(await restarted.claimKlexBotAnnouncement()).toBe(false);
+  });
+
+  it('calculates repeat snoozes using backend time and preserves them on refresh/restart', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const service = await createService(createGitService({}));
+    await service.dismissKlexBotAnnouncement('remind');
+    expect(persistedData.get(key)).toEqual({
+      initialPresentationConsumed: true,
+      permanentlyDismissed: false,
+      remindAt: 1_000_000 + ANNOUNCEMENT_REMINDER_MS,
+    });
+    vi.spyOn(Date, 'now').mockReturnValue(2_000_000);
+    await service.dismissKlexBotAnnouncement('remind');
+    const restarted = await createService(createGitService({}));
+    expect(
+      (await restarted.getStoredExperienceData()).klexBotAnnouncement?.remindAt,
+    ).toBe(2_000_000 + ANNOUNCEMENT_REMINDER_MS);
+  });
+
+  it('never overwrites permanent opt-out, including queued snoozes and claims', async () => {
+    const service = await createService(createGitService({}));
+    await Promise.all([
+      service.dismissKlexBotAnnouncement('never'),
+      service.dismissKlexBotAnnouncement('remind'),
+      service.claimKlexBotAnnouncement(),
+    ]);
+    const restarted = await createService(createGitService({}));
+    expect(await restarted.claimKlexBotAnnouncement()).toBe(false);
+    expect(
+      (await restarted.getStoredExperienceData()).klexBotAnnouncement,
+    ).toEqual({
+      initialPresentationConsumed: true,
+      permanentlyDismissed: true,
+      remindAt: null,
+    });
+  });
+
+  it('propagates write failures without publishing an unsaved choice and allows retry', async () => {
+    const service = await createService(createGitService({}));
+    const before = (await service.getStoredExperienceData())
+      .klexBotAnnouncement;
+    vi.mocked(writePersistedData).mockRejectedValueOnce(new Error('disk full'));
+    await expect(service.dismissKlexBotAnnouncement('never')).rejects.toThrow(
+      'disk full',
+    );
+    expect(
+      (await service.getStoredExperienceData()).klexBotAnnouncement,
+    ).toEqual(before);
+    vi.mocked(writePersistedData).mockRejectedValueOnce(new Error('disk full'));
+    await expect(service.claimKlexBotAnnouncement()).rejects.toThrow(
+      'disk full',
+    );
+    expect(await service.claimKlexBotAnnouncement()).toBe(true);
+    expect(() => service.dismissKlexBotAnnouncement('invalid')).toThrow();
+  });
+
+  it('sanitizes damaged fields independently without losing permanent opt-out', () => {
+    expect(
+      klexBotAnnouncementSchema.parse({
+        initialPresentationConsumed: 'invalid',
+        permanentlyDismissed: true,
+        remindAt: -10,
+      }),
+    ).toEqual({
+      initialPresentationConsumed: false,
+      permanentlyDismissed: true,
+      remindAt: null,
+    });
+    for (const remindAt of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      -1,
+      'tomorrow',
+      0.5,
+    ]) {
+      expect(klexBotAnnouncementSchema.parse({ remindAt }).remindAt).toBeNull();
+    }
+    expect(klexBotAnnouncementSchema.parse(null)).toEqual(
+      klexBotAnnouncementSchema.parse({}),
+    );
+  });
+});
 
 describe('UserExperienceService recent workspace normalization', () => {
   beforeEach(() => {

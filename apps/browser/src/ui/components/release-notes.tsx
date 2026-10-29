@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@stagewise/stage-ui/components/dialog';
 import { cn } from '@stagewise/stage-ui/lib/utils';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import releaseNotesMarkdown from '../../../../../.release-notes.md?raw';
 
@@ -66,10 +66,20 @@ export function ReleaseNotes({
   );
 }
 
-export function WhatsNewDialog() {
+export function WhatsNewDialog({
+  enabled = true,
+  onVisibilityChange,
+}: {
+  enabled?: boolean;
+  onVisibilityChange?: (visible: boolean) => void;
+} = {}) {
   const [open, setOpen] = useState(
     () => hasCurrentReleaseNotes && !wasCurrentVersionSeen(),
   );
+
+  useEffect(() => {
+    onVisibilityChange?.(enabled && open);
+  }, [enabled, open, onVisibilityChange]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -79,7 +89,7 @@ export function WhatsNewDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={enabled && open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[80vh] max-w-2xl gap-4 overflow-hidden">
         <DialogClose />
         <DialogHeader>

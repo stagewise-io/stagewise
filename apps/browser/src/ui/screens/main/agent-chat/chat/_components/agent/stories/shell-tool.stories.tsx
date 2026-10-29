@@ -59,6 +59,7 @@ const createStoryState = (
             dismissedCount: 0,
           },
           totalAgentCount: 0,
+          klexBotAnnouncement: null,
         },
         devAppPreview: {
           isFullScreen: false,

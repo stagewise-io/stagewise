@@ -15,6 +15,7 @@ import {
 import { NotificationBanners } from '../agent-chat/chat/_components/notification-banners';
 import { UsageWarningBadge } from '../agent-chat/chat/_components/usage-warning-badge';
 import { WorktreeCleanupBadge } from './worktree-cleanup-badge';
+import { KlexBotAnnouncementCard } from './klex-bot-announcement-card';
 import { SidebarAuthFooter } from '../_components/sidebar-auth-footer';
 import { SidebarExperienceSurvey } from '../_components/sidebar-experience-survey';
 import {
@@ -93,6 +94,7 @@ export function Sidebar() {
               <NotificationBanners />
               <UsageWarningBadge />
               <WorktreeCleanupBadge />
+              <KlexBotAnnouncementCard />
             </div>
 
             <SidebarAuthFooter />
