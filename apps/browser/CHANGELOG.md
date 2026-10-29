@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.31.0 (2026-10-29)
+
+### Features
+
+* add persistent Klex Bots announcement (d346236)
+* remove account-first onboarding and hide Stagewise Inference while signed out (3aaff4c)
+
+### Bug Fixes
+
+* guard preset activation against hidden stagewise routes (8025f09)
+* gate stagewise-routed presets and defaults while signed out (3b637d4)
+
 ## 1.30.2 (2026-10-27)
 
 ### Bug Fixes
