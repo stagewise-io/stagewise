@@ -48,7 +48,7 @@
     "concurrently": "^9.2.1",
     "culori": "^4.0.2",
     "esbuild": "^0.24.2",
-    "glob": "^11.0.0",
+    "glob": "^14.0.2",
     "nodemon": "^3.1.14",
     "postcss": "^8.5.26",
     "postcss-cli": "^11.0.1",
