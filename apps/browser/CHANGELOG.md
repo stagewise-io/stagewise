@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.31.1 (2026-11-04)
+
+### Bug Fixes
+
+* align desktop auth with patched API (2a378ba)
+
 ## 1.31.0 (2026-10-29)
 
 ### Features
