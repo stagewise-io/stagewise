@@ -612,6 +612,9 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+      undici:
+        specifier: ^7.29.0
+        version: 7.29.0
       utf-8-validate:
         specifier: ^6.0.5
         version: 6.0.6
@@ -24292,8 +24295,7 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici@7.29.0:
-    optional: true
+  undici@7.29.0: {}
 
   unicorn-magic@0.1.0: {}
 

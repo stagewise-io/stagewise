@@ -29,7 +29,11 @@ const TERMINAL_TOOL_STATES = new Set([
 export function denyAllNonTerminalToolPartsInHistory(
   store: AgentStore,
   agentInstanceId: string,
-  args: { approvalDenyReason: string; forceErrorText: string },
+  args: {
+    approvalDenyReason: string;
+    forceErrorText: string;
+    includeRespondedApprovals?: boolean;
+  },
 ): void {
   updateAgentInstanceState(store, agentInstanceId, (state) => {
     for (const historyMsg of state.history) {
@@ -40,7 +44,15 @@ export function denyAllNonTerminalToolPartsInHistory(
           continue;
         }
         const toolPart = p as AgentToolUIPart | DynamicToolUIPart;
-        if (TERMINAL_TOOL_STATES.has(toolPart.state)) continue;
+        if (
+          TERMINAL_TOOL_STATES.has(toolPart.state) &&
+          !(
+            args.includeRespondedApprovals &&
+            toolPart.state === 'approval-responded' &&
+            toolPart.approval?.approved !== false
+          )
+        )
+          continue;
 
         clearPendingApproval(state.pendingApprovals, toolPart.toolCallId);
 

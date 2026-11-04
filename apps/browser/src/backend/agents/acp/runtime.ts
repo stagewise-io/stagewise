@@ -64,6 +64,7 @@ interface PersistedSession {
   adapterId: AcpAdapter['id'];
   processKey: string;
   sessionId: string;
+  lastPromptMessageIds?: string[];
 }
 
 interface PendingPermission {
@@ -89,6 +90,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
   private canResumeSession = false;
   private promptCapabilities: PromptCapabilities = {};
   private sessionId: string | null = null;
+  private lastPromptMessageIds: string[] = [];
   private sessionOptions: SessionConfigOption[] = [];
   private stopped = true;
   private approvalMode = 'smart';
@@ -179,8 +181,12 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
       this.closeClient();
       try {
         await unlink(this.sessionFilePath);
-      } catch {}
-      this.historyDiverged = false;
+        this.historyDiverged = false;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          this.historyDiverged = false;
+        }
+      }
     }
 
     this.stopped = false;
@@ -202,14 +208,28 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     this.pendingPermissions.clear();
     this.imageIds.clear();
 
+    const userMessages =
+      args.isErrorRetry && !sessionCreated
+        ? args.userMessages.filter(
+            (message) => !this.lastPromptMessageIds.includes(message.id),
+          )
+        : args.userMessages;
     const promptBlocks = await buildAcpPrompt(
-      args.userMessages,
+      userMessages,
       this.context.getMountedPaths(),
       sessionCreated ? this.context.getState().history : [],
       this.promptCapabilities,
     );
     if (this.discardStaleSetup(generation)) return;
-    const turn = this.promptUntilSettled(promptBlocks, generation);
+    const turn = this.promptUntilSettled(
+      promptBlocks,
+      generation,
+      args.userMessages.map((message) => message.id),
+      args.isErrorRetry === true &&
+        args.userMessages.some((message) =>
+          this.lastPromptMessageIds.includes(message.id),
+        ),
+    );
     this.activePrompt = turn;
     try {
       await turn;
@@ -319,7 +339,8 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     if (
       persisted?.adapterId === adapter.id &&
       persisted.processKey === this.processKey &&
-      this.canResumeSession
+      this.canResumeSession &&
+      !this.historyDiverged
     ) {
       try {
         const resumed = await this.requireClient().resumeSession({
@@ -329,6 +350,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
           mcpServers,
         });
         this.sessionId = persisted.sessionId;
+        this.lastPromptMessageIds = persisted.lastPromptMessageIds ?? [];
         this.sessionOptions = resumed.configOptions ?? [];
         return false;
       } catch (error) {
@@ -343,8 +365,10 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
       _meta: adapter.newSessionMeta?.(this.approvalMode),
     });
     this.sessionId = created.sessionId;
+    this.lastPromptMessageIds = [];
     this.sessionOptions = created.configOptions ?? [];
     await this.persistSession();
+    this.historyDiverged = false;
     return true;
   }
 
@@ -394,9 +418,19 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     return result.configOptions;
   }
 
+  private promptAcknowledged = false;
+
   private handleSessionUpdate(notification: SessionNotification): void {
     if (notification.sessionId !== this.sessionId || this.stopped) return;
     const update = notification.update;
+    if (
+      update.sessionUpdate === 'agent_message_chunk' ||
+      update.sessionUpdate === 'agent_thought_chunk' ||
+      update.sessionUpdate === 'tool_call' ||
+      update.sessionUpdate === 'tool_call_update'
+    ) {
+      this.promptAcknowledged = true;
+    }
     switch (update.sessionUpdate) {
       case 'agent_message_chunk':
         if (update.content.type === 'image') this.appendImage(update.content);
@@ -578,6 +612,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     if (this.stopped || request.sessionId !== this.sessionId) {
       return { outcome: { outcome: 'cancelled' } };
     }
+    this.promptAcknowledged = true;
     const previous = this.toolStates.get(request.toolCall.toolCallId);
     const tool = mergeToolState(previous, request.toolCall);
     const hidden = isHiddenTool(
@@ -754,15 +789,31 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
   private async promptUntilSettled(
     initialPrompt: ContentBlock[],
     generation: number,
+    messageIds?: string[],
+    preserveSessionOnFailure = false,
   ): Promise<void> {
     let prompt = initialPrompt;
     let staleCommandRecoveries = 0;
     do {
       this.permissionRejected = false;
-      await this.requireClient().prompt({
-        sessionId: this.sessionId!,
-        prompt,
-      });
+      this.promptAcknowledged = false;
+      try {
+        await this.requireClient().prompt({
+          sessionId: this.sessionId!,
+          prompt,
+        });
+        this.promptAcknowledged = true;
+      } catch (error) {
+        if (!this.promptAcknowledged && !preserveSessionOnFailure) {
+          // Delivery is unknown. Never resume a session that might lack the
+          // task; a fresh session receives the request and retained history.
+          this.invalidateSession();
+        } else if (this.promptAcknowledged && messageIds) {
+          await this.recordPromptMessageIds(messageIds);
+        }
+        throw error;
+      }
+      if (messageIds) await this.recordPromptMessageIds(messageIds);
       if (!this.isCurrent(generation)) return;
 
       const continueAfterRejection =
@@ -885,14 +936,35 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
     this.pendingPermissions.clear();
   }
 
+  private invalidateSession(): void {
+    this.historyDiverged = true;
+    try {
+      unlinkSync(this.sessionFilePath);
+    } catch {}
+  }
+
+  private async recordPromptMessageIds(messageIds: string[]): Promise<void> {
+    this.lastPromptMessageIds = [
+      ...new Set([...this.lastPromptMessageIds, ...messageIds]),
+    ];
+    try {
+      await this.persistSession();
+    } catch (error) {
+      this.invalidateSession();
+      throw error;
+    }
+  }
+
   private async readPersistedSession(): Promise<PersistedSession | null> {
     try {
       const parsed = JSON.parse(
         await readFile(this.sessionFilePath, 'utf8'),
       ) as PersistedSession;
-      return parsed.version === 2 && ACP_ADAPTERS[parsed.adapterId]
-        ? parsed
-        : null;
+      if (parsed.version !== 2 || !ACP_ADAPTERS[parsed.adapterId]) return null;
+      parsed.lastPromptMessageIds = Array.isArray(parsed.lastPromptMessageIds)
+        ? parsed.lastPromptMessageIds.filter((id) => typeof id === 'string')
+        : [];
+      return parsed;
     } catch {
       return null;
     }
@@ -908,6 +980,7 @@ export class AcpAgentRuntime implements ExternalAgentRuntime {
         adapterId: this.adapter.id,
         processKey: this.processKey ?? `${this.adapter.id}:default`,
         sessionId: this.sessionId,
+        lastPromptMessageIds: this.lastPromptMessageIds,
       } satisfies PersistedSession),
       'utf8',
     );

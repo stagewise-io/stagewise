@@ -20,6 +20,8 @@ export interface ExternalAgentRuntime {
     selection: UtilityModelEntry;
     userMessages: Array<AgentMessage & { role: 'user' }>;
     approvalMode: string;
+    /** Retry must not resubmit user messages already sent to a resumed session. */
+    isErrorRetry?: boolean;
   }): Promise<void>;
   respondToApproval(response: ToolApprovalResponse): Promise<boolean>;
   stop(approvalDenyReason?: string): Promise<void>;

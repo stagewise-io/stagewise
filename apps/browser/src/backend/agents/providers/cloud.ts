@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import type { ApiSpec } from '@shared/karton-contracts/ui/shared-types';
 import { PROVIDER_TYPE_DISPLAY_INFO } from '@shared/karton-contracts/ui/shared-types';
 import type { ProviderType } from './types';
+import { modelFetch } from '../model-fetch';
 
 // ============================================================================
 // Azure OpenAI
@@ -34,6 +35,7 @@ export const azureProviderType: ProviderType<AzureConfig> = {
     model: LanguageModelV3;
   } {
     const provider = createAzure({
+      fetch: modelFetch,
       apiKey,
       baseURL,
       resourceName: config.resourceName,
@@ -106,6 +108,7 @@ function buildBedrockProvider(
       );
     }
     return createAmazonBedrock({
+      fetch: modelFetch,
       region: overrideRegion ?? resolveProfileRegion(config.awsProfileName),
       credentialProvider: fromIni({ profile: config.awsProfileName }),
     });
@@ -113,6 +116,7 @@ function buildBedrockProvider(
 
   if (mode === 'default-chain') {
     return createAmazonBedrock({
+      fetch: modelFetch,
       region: overrideRegion,
       credentialProvider: fromNodeProviderChain(),
     });
@@ -125,6 +129,7 @@ function buildBedrockProvider(
     );
   }
   return createAmazonBedrock({
+    fetch: modelFetch,
     region: overrideRegion ?? 'us-east-1',
     accessKeyId: apiKey,
     secretAccessKey: decryptedSecretKey,
@@ -173,6 +178,7 @@ export const vertexProviderType: ProviderType<VertexConfig> = {
   } {
     const decryptedCredentials = decryptedConfig.encryptedGoogleCredentials;
     const provider = createVertex({
+      fetch: modelFetch,
       project: config.projectId?.trim() || undefined,
       location: config.location ?? 'us-central1',
       googleAuthOptions: decryptedCredentials

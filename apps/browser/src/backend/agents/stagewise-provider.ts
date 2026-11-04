@@ -5,6 +5,7 @@ import {
   type OpenAICompatibleProvider,
 } from '@ai-sdk/openai-compatible';
 import { deepMergeProviderOptions } from './model-provider';
+import { modelFetch } from './model-fetch';
 
 declare const __APP_VERSION__: string;
 
@@ -16,7 +17,7 @@ function createClientFetch(): typeof globalThis.fetch {
   return async (input, init) => {
     const headers = new Headers(init?.headers);
     headers.set('X-Stagewise-Client', `electron/${__APP_VERSION__}`);
-    return globalThis.fetch(input, { ...init, headers });
+    return modelFetch(input, { ...init, headers });
   };
 }
 
