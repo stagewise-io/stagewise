@@ -88,6 +88,34 @@ describe('openrouterProviderType', () => {
     vi.restoreAllMocks();
   });
 
+  it('uses the shared transport for model streaming', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('data: [DONE]\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    const { model } = openrouterProviderType.createLanguageModel({
+      modelId: 'vendor/model',
+      apiKey: 'test-key',
+      baseURL: 'https://openrouter.test/v1',
+      config: {},
+      decryptedConfig: {},
+    });
+    const controller = new AbortController();
+    const result = await model.doStream({
+      prompt: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+      abortSignal: controller.signal,
+    });
+    await result.stream.pipeTo(new WritableStream());
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://openrouter.test/v1/chat/completions',
+      expect.objectContaining({
+        dispatcher: expect.any(Object),
+        signal: controller.signal,
+      }),
+    );
+  });
+
   // ── Provider type metadata ──────────────────────────────────────────────
 
   it('exposes the correct id, category, and apiSpec', () => {

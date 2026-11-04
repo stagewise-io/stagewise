@@ -3,6 +3,7 @@ import type { LanguageModelMiddleware } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { modelFetch } from '../model-fetch';
 import type {
   DiscoveredModel,
   ModelCapabilities,
@@ -69,7 +70,7 @@ export function createAnthropicModel(
   baseURL: string | undefined,
   modelId: string,
 ): LanguageModelV3 {
-  const p = createAnthropic({ apiKey, baseURL });
+  const p = createAnthropic({ apiKey, baseURL, fetch: modelFetch });
   return p(modelId as never);
 }
 
@@ -78,7 +79,7 @@ export function createOpenAIChatModel(
   baseURL: string | undefined,
   modelId: string,
 ): LanguageModelV3 {
-  const p = createOpenAI({ apiKey, baseURL });
+  const p = createOpenAI({ apiKey, baseURL, fetch: modelFetch });
   return p.chat(modelId as never);
 }
 
@@ -87,7 +88,7 @@ export function createOpenAIResponsesModel(
   baseURL: string | undefined,
   modelId: string,
 ): LanguageModelV3 {
-  const p = createOpenAI({ apiKey, baseURL });
+  const p = createOpenAI({ apiKey, baseURL, fetch: modelFetch });
   return p.responses(modelId as never);
 }
 
@@ -96,7 +97,7 @@ export function createGoogleModel(
   baseURL: string | undefined,
   modelId: string,
 ): LanguageModelV3 {
-  const p = createGoogleGenerativeAI({ apiKey, baseURL });
+  const p = createGoogleGenerativeAI({ apiKey, baseURL, fetch: modelFetch });
   return p(modelId as never);
 }
 

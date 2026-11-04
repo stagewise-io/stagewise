@@ -146,10 +146,207 @@ function createRuntime(
 }
 
 describe('AcpAgentRuntime translation', () => {
+  it.each([
+    false,
+    true,
+  ])('retry respects prior prompt dispatch (sent=%s)', async (sent) => {
+    const { runtime } = createRuntime();
+    const prompt = vi.fn().mockResolvedValue({});
+    Object.assign(runtime, {
+      ensureSession: vi.fn().mockResolvedValue(false),
+      applySessionOptions: vi.fn(),
+      persistSession: vi.fn(),
+      sessionId: 'resumed',
+      lastPromptMessageIds: sent ? ['original'] : [],
+      client: { prompt },
+    });
+    await runtime.runTurn({
+      selection: { modelId: 'default', providerInstanceId: 'provider-1' },
+      approvalMode: 'smart',
+      isErrorRetry: true,
+      userMessages: [
+        {
+          id: 'original',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Original task' }],
+        },
+        {
+          id: 'continuation',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Continue existing work' }],
+        },
+      ],
+    });
+    const text = JSON.stringify(prompt.mock.calls[0]);
+    expect(text.includes('Original task')).toBe(!sent);
+    expect(text).toContain('Continue existing work');
+  });
+
+  it.each([
+    false,
+    true,
+  ])('handles failed delivery with acknowledgment=%s', async (acknowledged) => {
+    const { runtime } = createRuntime();
+    const persist = vi.fn();
+    Object.assign(runtime, {
+      client: {
+        prompt: vi.fn().mockImplementation(async () => {
+          if (acknowledged)
+            runtime.handleSessionUpdate({
+              sessionId: 'session-1',
+              update: {
+                sessionUpdate: 'agent_message_chunk',
+                content: { type: 'text', text: 'Working' },
+              },
+            });
+          throw new Error('disconnected');
+        }),
+      },
+      persistSession: persist,
+      sessionId: 'session-1',
+    });
+    await expect(
+      (runtime as any).promptUntilSettled([], 0, ['original']),
+    ).rejects.toThrow('disconnected');
+    expect((runtime as any).lastPromptMessageIds).toEqual(
+      acknowledged ? ['original'] : [],
+    );
+    expect(persist).toHaveBeenCalledTimes(acknowledged ? 1 : 0);
+    expect(runtime.historyDiverged).toBe(!acknowledged);
+  });
+
+  it('preserves an acknowledged task session when a retry continuation fails', async () => {
+    const { runtime } = createRuntime();
+    Object.assign(runtime, {
+      client: { prompt: vi.fn().mockRejectedValue(new Error('disconnected')) },
+      sessionId: 'session-1',
+      lastPromptMessageIds: ['original'],
+    });
+    await expect(
+      (runtime as any).promptUntilSettled(
+        [],
+        0,
+        ['original', 'continuation'],
+        true,
+      ),
+    ).rejects.toThrow('disconnected');
+    expect(runtime.historyDiverged).toBe(false);
+    expect((runtime as any).lastPromptMessageIds).toEqual(['original']);
+  });
+
+  it.each([
+    'active',
+    'stopped',
+    'other-session',
+  ])('acknowledges permission requests only for the active session (%s)', async (state) => {
+    const { runtime } = createRuntime();
+    Object.assign(runtime, {
+      sessionId: 'session-1',
+      stopped: state === 'stopped',
+      approvalMode: 'alwaysAllow',
+    });
+    const request = commandPermissionRequest('Run', 'pwd');
+    if (state === 'other-session') request.sessionId = 'other';
+    await runtime.handlePermission(request);
+    expect((runtime as any).promptAcknowledged).toBe(state === 'active');
+  });
+
+  it('does not resume persisted sessions while history is invalidated', async () => {
+    const { runtime } = createRuntime();
+    const resumeSession = vi.fn();
+    const newSession = vi.fn().mockResolvedValue({ sessionId: 'fresh' });
+    Object.assign(runtime, {
+      historyDiverged: true,
+      sessionId: null,
+      processKey: 'codex:default',
+      canResumeSession: true,
+      client: {
+        isRunning: () => true,
+        getNodeExecutable: () => process.execPath,
+        resumeSession,
+        newSession,
+      },
+      stagewiseMcp: { start: vi.fn() },
+      readPersistedSession: vi.fn().mockResolvedValue({
+        adapterId: 'codex',
+        processKey: 'codex:default',
+        sessionId: 'stale',
+      }),
+      persistSession: vi.fn(),
+    });
+    expect(
+      await runtime.ensureSession(ACP_ADAPTERS.codex, '/repo', ['/repo']),
+    ).toBe(true);
+    expect(resumeSession).not.toHaveBeenCalled();
+    expect(newSession).toHaveBeenCalledOnce();
+    expect(runtime.historyDiverged).toBe(false);
+  });
+
+  it('retains earlier task IDs across synthetic continuations', async () => {
+    const { runtime } = createRuntime();
+    Object.assign(runtime, {
+      client: { prompt: vi.fn().mockResolvedValue({}) },
+      persistSession: vi.fn(),
+      sessionId: 'session-1',
+    });
+    await (runtime as any).promptUntilSettled([], 0, ['original']);
+    await (runtime as any).promptUntilSettled([], 0, ['continuation']);
+    expect((runtime as any).lastPromptMessageIds).toEqual([
+      'original',
+      'continuation',
+    ]);
+  });
+
+  it('invalidates the session if prompt ID persistence fails', async () => {
+    const { runtime } = createRuntime();
+    Object.assign(runtime, {
+      client: { prompt: vi.fn().mockResolvedValue({}) },
+      persistSession: vi.fn().mockRejectedValue(new Error('disk full')),
+      sessionId: 'session-1',
+    });
+    await expect(
+      (runtime as any).promptUntilSettled([], 0, ['original']),
+    ).rejects.toThrow('disk full');
+    expect(runtime.historyDiverged).toBe(true);
+  });
+
+  it.each([
+    null,
+    42,
+    'invalid',
+    ['valid', 42],
+  ])('validates persisted prompt IDs (%j)', async (ids) => {
+    const directory = mkdtempSync(nodePath.join(tmpdir(), 'acp-session-'));
+    try {
+      const { runtime } = createRuntime(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        directory,
+      );
+      writeFileSync(
+        (runtime as any).sessionFilePath,
+        JSON.stringify({
+          version: 2,
+          adapterId: 'codex',
+          lastPromptMessageIds: ids,
+        }),
+      );
+      const session = await (runtime as any).readPersistedSession();
+      expect(session.lastPromptMessageIds).toEqual(
+        Array.isArray(ids) ? ['valid'] : [],
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('discards a failed ACP process before retrying', async () => {
     const { runtime } = createRuntime();
     const close = vi.fn();
     Object.assign(runtime, {
+      persistSession: vi.fn(),
       client: {
         close,
         isRunning: () => true,

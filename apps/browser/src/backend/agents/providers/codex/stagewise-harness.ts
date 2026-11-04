@@ -11,6 +11,7 @@ import { getCodexChatGptAuth, type CodexChatGptAuth } from './chatgpt-auth';
 import { discoverCodexModels } from './models';
 import { getCodexUsageLimits } from './usage';
 import type { ProviderType } from '../types';
+import { modelFetch } from '../../model-fetch';
 
 const CODEX_RESPONSES_BASE_URL = 'https://chatgpt.com/backend-api/codex';
 type TextBlock = Extract<
@@ -20,7 +21,7 @@ type TextBlock = Extract<
 
 export function createCodexChatGptFetch(
   loadAuth: () => Promise<CodexChatGptAuth> = getCodexChatGptAuth,
-  fetchImplementation: typeof fetch = globalThis.fetch,
+  fetchImplementation: typeof fetch = modelFetch,
 ): typeof fetch {
   return async (input, init) => {
     const auth = await loadAuth();

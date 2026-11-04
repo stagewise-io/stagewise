@@ -178,6 +178,7 @@
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.8.3",
+    "undici": "^7.29.0",
     "utf-8-validate": "^6.0.5",
     "vite": "7.2.7",
     "vscode-jsonrpc": "^8.2.1",
