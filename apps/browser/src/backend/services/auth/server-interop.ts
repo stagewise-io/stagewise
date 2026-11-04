@@ -1,7 +1,10 @@
 import { createApiClient } from '@stagewise/api-client';
 import { createHash, randomBytes } from 'node:crypto';
 import { shell } from 'electron';
-import { createAuthClient } from 'better-auth/client';
+import {
+  createAuthClient,
+  type BetterAuthClientOptions as BaseBetterAuthClientOptions,
+} from 'better-auth/client';
 import { emailOTPClient } from 'better-auth/client/plugins';
 import { electronClient } from '@better-auth/electron/client';
 import type { Logger } from '../logger';
@@ -24,7 +27,7 @@ const STABLE_AUTH_CALLBACK_SCHEME = 'stagewise';
 // calling `authClient.authenticate({ token })`.
 const ELECTRON_AUTH_STORE = Symbol.for('better-auth:electron');
 
-type BetterAuthClientOptions = {
+type BetterAuthClientOptions = Omit<BaseBetterAuthClientOptions, 'plugins'> & {
   plugins: [
     ReturnType<typeof emailOTPClient>,
     ReturnType<typeof electronClient>,
@@ -167,7 +170,7 @@ export function createBetterAuthClient(
   getToken: () => string | null,
   onTokenReceived: (token: string) => void,
 ): BetterAuthClient {
-  return createAuthClient({
+  return createAuthClient<BetterAuthClientOptions>({
     baseURL: API_URL,
     basePath: '/v1/auth',
     disableDefaultFetchPlugins: true,
