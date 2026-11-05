@@ -81,7 +81,7 @@ export function MessageRuntimeError({
   onRetry: () => void;
   canRetry: boolean;
   /** Whether the agent is currently streaming. Used to suppress Retry in UIs
-   *  that bypass the `canRetry` last-message gate (e.g. upstream-overload). */
+   *  that bypass the `canRetry` gate (e.g. upstream-overload). */
   isWorking?: boolean;
 }) {
   const canShowRetry = canRetry || !isWorking;
@@ -413,12 +413,9 @@ function SubscriptionRequiredError({
  * Shows a formal, non-alarming card for upstream-provider overload errors
  * (429/502/503/529, Anthropic `overloaded_error`).
  *
- * Retry is shown whenever the agent is not currently streaming. We
- * intentionally bypass the shared `canRetry` gate (which requires the tail
- * of history to be a user message) because `onError` often fires after an
- * empty assistant message has been appended, yet the backend's
- * `retryLastUserMessage` walks history backward to find the last user
- * message and works regardless.
+ * Retry is shown whenever the agent is not currently streaming. The
+ * backend's `retryLastUserMessage` resumes from the current history, so
+ * work done before the error is kept.
  */
 function UpstreamOverloadError({
   error,
