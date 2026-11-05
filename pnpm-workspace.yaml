@@ -2,3 +2,7 @@ packages:
 - apps/*
 - packages/*
 - agent/*
+
+patchedDependencies:
+  electron-installer-redhat@3.4.0: patches/electron-installer-redhat@3.4.0.patch
+
