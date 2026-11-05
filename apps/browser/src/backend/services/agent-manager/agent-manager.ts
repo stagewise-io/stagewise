@@ -58,6 +58,7 @@ const AGENT_RPC_COMMANDS = [
   'agents.getAgentHistoryEntriesByIds',
   'agents.updateInputState',
   'agents.retryLastUserMessage',
+  'agents.compressHistory',
   'agents.storeAttachment',
   'agents.storeAttachmentByPath',
   'agents.getStoredInstance',

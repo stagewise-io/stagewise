@@ -775,6 +775,9 @@ export class AgentManager extends DisposableService {
         await this.retryLastUserMessage(instanceId);
       },
     );
+    this.wrapAgentRpc('agents.compressHistory', async (instanceId: string) => {
+      return await this.compressHistory(instanceId);
+    });
     this.wrapAgentRpc(
       'agents.storeAttachment',
       async (
@@ -1908,6 +1911,21 @@ export class AgentManager extends DisposableService {
     }
 
     await agent.retryLastUserMessage();
+  }
+
+  /**
+   * Manually trigger history compression for an active agent, bypassing
+   * the automatic token-threshold check. Returns the outcome so the UI
+   * can report success/no-op/failure.
+   */
+  public async compressHistory(instanceId: string) {
+    const agent = this.activeAgents.get(instanceId);
+
+    if (!agent) {
+      throw new Error(`Agent with instance id ${instanceId} not found`);
+    }
+
+    return await agent.requestHistoryCompression();
   }
 
   private async updateInputState(instanceId: string, inputString: string) {

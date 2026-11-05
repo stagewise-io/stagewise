@@ -28,13 +28,21 @@ export {
 
 // Re-export prompt pieces so existing imports from this module keep working.
 import {
+  COMPRESSION_MERGE_SYSTEM_PROMPT,
+  COMPRESSION_SEGMENT_SYSTEM_PROMPT,
   COMPRESSION_SYSTEM_PROMPT,
   COMPRESSION_TARGET_CHARS,
+  buildCompressionMergeUserMessage,
+  buildCompressionSegmentUserMessage,
   buildCompressionUserMessage,
 } from './prompt';
 export {
+  COMPRESSION_MERGE_SYSTEM_PROMPT,
+  COMPRESSION_SEGMENT_SYSTEM_PROMPT,
   COMPRESSION_SYSTEM_PROMPT,
   COMPRESSION_TARGET_CHARS,
+  buildCompressionMergeUserMessage,
+  buildCompressionSegmentUserMessage,
   buildCompressionUserMessage,
 };
 
@@ -72,6 +80,26 @@ const HISTORY_COMPRESSION_ABORT_GRACE_MS = 2_000;
 /** Minimum acceptable compression length; shorter results trigger a fallback. */
 const COMPRESSION_MIN_LENGTH = 30;
 
+/**
+ * Maximum serialized-input size (in estimated tokens, chars / 4) sent to a
+ * single compression model call.
+ *
+ * The compressed prefix can be hundreds of thousands of tokens on
+ * large-context models (everything before the kept-message budget is
+ * compressed at once). Sending that in one call exceeds provider limits and
+ * the 30s timeout, which is why compression silently failed on large-context
+ * models. Larger inputs are compressed segment-by-segment ("map") and the
+ * partial briefings merged ("reduce") so every request stays bounded.
+ */
+export const COMPRESSION_INPUT_TOKEN_BUDGET = 60_000;
+
+/** Character equivalent of {@link COMPRESSION_INPUT_TOKEN_BUDGET}. */
+const COMPRESSION_INPUT_CHAR_BUDGET = COMPRESSION_INPUT_TOKEN_BUDGET * 4;
+
+/** Matches one top-level serialized block (content is escaped, so no nesting). */
+const SERIALIZED_BLOCK_PATTERN =
+  /<(previous-chat-history|user|assistant)>[\s\S]*?<\/\1>/g;
+
 class HistoryCompressionUnsettledTimeoutError extends Error {
   constructor(modelId: string) {
     super(
@@ -89,8 +117,8 @@ const tryCompressWithModel = async (
   entry: UtilityModelEntry,
   hostModels: HostModels,
   agentInstanceId: string,
-  compactHistory: string,
-  previousBriefingChars: number,
+  systemPrompt: string,
+  userMessage: string,
   host?: AgentHost,
 ): Promise<string> => {
   const metadata: Record<string, unknown> = {
@@ -128,14 +156,11 @@ const tryCompressWithModel = async (
       messages: [
         {
           role: 'system',
-          content: COMPRESSION_SYSTEM_PROMPT,
+          content: systemPrompt,
         },
         {
           role: 'user',
-          content: buildCompressionUserMessage(
-            compactHistory,
-            previousBriefingChars,
-          ),
+          content: userMessage,
         },
       ],
       temperature: 0.1,
@@ -189,6 +214,201 @@ const tryCompressWithModel = async (
     if (abortGraceTimeout) clearTimeout(abortGraceTimeout);
   }
 };
+
+/**
+ * Truncates an oversized single block, keeping its head and tail so the
+ * start and the (most recent) end of the block survive the cut.
+ */
+function truncateOversizedBlock(block: string, limit: number): string {
+  if (block.length <= limit) return block;
+  const marker = `\n[... ${block.length - limit} characters omitted for length ...]\n`;
+  const keep = Math.max(0, limit - marker.length);
+  const head = Math.ceil(keep * 0.6);
+  const tail = keep - head;
+  return `${block.slice(0, head)}${marker}${block.slice(block.length - tail)}`;
+}
+
+/**
+ * Splits the serialized compact history into token-bounded chunks, cutting
+ * only at top-level block boundaries so no XML tag is ever broken. Oversized
+ * single blocks are head/tail-truncated to keep every call bounded.
+ */
+export function splitCompactHistoryIntoChunks(
+  compactHistory: string,
+  charBudget: number = COMPRESSION_INPUT_CHAR_BUDGET,
+): string[] {
+  if (compactHistory.length <= charBudget) return [compactHistory];
+
+  const blocks: string[] = [];
+  let cursor = 0;
+  for (const match of compactHistory.matchAll(SERIALIZED_BLOCK_PATTERN)) {
+    const start = match.index ?? 0;
+    // Preserve non-whitespace text between blocks rather than dropping it.
+    // Pure separators (newlines) are re-added when chunks are joined.
+    const gap = compactHistory.slice(cursor, start);
+    cursor = start + match[0].length;
+    blocks.push(gap.trim().length > 0 ? gap + match[0] : match[0]);
+  }
+  const trailing = compactHistory.slice(cursor);
+  if (trailing.trim().length > 0) {
+    if (blocks.length > 0) blocks[blocks.length - 1] += trailing;
+    else blocks.push(trailing);
+  }
+
+  // No recognizable blocks (should not happen) — fall back to raw slicing.
+  if (blocks.length === 0) {
+    const chunks: string[] = [];
+    for (let i = 0; i < compactHistory.length; i += charBudget) {
+      chunks.push(compactHistory.slice(i, i + charBudget));
+    }
+    return chunks;
+  }
+
+  const chunks: string[] = [];
+  let current = '';
+  for (const rawBlock of blocks) {
+    const block = truncateOversizedBlock(rawBlock, charBudget);
+    if (current.length > 0 && current.length + block.length + 1 > charBudget) {
+      chunks.push(current);
+      current = '';
+    }
+    current = current.length > 0 ? `${current}\n${block}` : block;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+/** Groups consecutive strings into batches that fit within `charBudget`. */
+function groupStringsByBudget(items: string[], charBudget: number): string[][] {
+  const groups: string[][] = [];
+  let current: string[] = [];
+  let currentChars = 0;
+  for (const item of items) {
+    const cost = item.length + 1;
+    if (current.length > 0 && currentChars + cost > charBudget) {
+      groups.push(current);
+      current = [];
+      currentChars = 0;
+    }
+    current.push(item);
+    currentChars += cost;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
+/**
+ * Reduces partial briefings to a single briefing by merging batches until one
+ * remains. Guarantees progress: if a pass cannot reduce the count (a single
+ * partial already fills the budget), everything is merged in one final call.
+ */
+async function mergePartialBriefings(
+  entry: UtilityModelEntry,
+  hostModels: HostModels,
+  agentInstanceId: string,
+  partials: string[],
+  previousBriefingChars: number,
+  host?: AgentHost,
+): Promise<string> {
+  if (partials.length === 1) return partials[0]!;
+
+  const batches = groupStringsByBudget(partials, COMPRESSION_INPUT_CHAR_BUDGET);
+  const canReduce = batches.length < partials.length;
+
+  const merged: string[] = [];
+  for (const batch of batches) {
+    if (batch.length === 1) {
+      merged.push(batch[0]!);
+      continue;
+    }
+    merged.push(
+      await tryCompressWithModel(
+        entry,
+        hostModels,
+        agentInstanceId,
+        COMPRESSION_MERGE_SYSTEM_PROMPT,
+        buildCompressionMergeUserMessage(batch, previousBriefingChars),
+        host,
+      ),
+    );
+  }
+
+  if (!canReduce || merged.length >= partials.length) {
+    return tryCompressWithModel(
+      entry,
+      hostModels,
+      agentInstanceId,
+      COMPRESSION_MERGE_SYSTEM_PROMPT,
+      buildCompressionMergeUserMessage(partials, previousBriefingChars),
+      host,
+    );
+  }
+
+  return mergePartialBriefings(
+    entry,
+    hostModels,
+    agentInstanceId,
+    merged,
+    previousBriefingChars,
+    host,
+  );
+}
+
+/**
+ * Compresses the serialized history with one model entry, using a single call
+ * when it fits the input budget and a map/reduce pass when it does not.
+ */
+async function compressWithEntry(
+  entry: UtilityModelEntry,
+  hostModels: HostModels,
+  agentInstanceId: string,
+  compactHistory: string,
+  previousBriefingChars: number,
+  host?: AgentHost,
+): Promise<string> {
+  const chunks = splitCompactHistoryIntoChunks(compactHistory);
+  if (chunks.length <= 1) {
+    // `chunks[0]` equals the input when it fits; it is the truncated block
+    // when a single oversized block forced truncation.
+    const singleInput = chunks[0] ?? compactHistory;
+    return tryCompressWithModel(
+      entry,
+      hostModels,
+      agentInstanceId,
+      COMPRESSION_SYSTEM_PROMPT,
+      buildCompressionUserMessage(singleInput, previousBriefingChars),
+      host,
+    );
+  }
+
+  host?.logger.debug(
+    `[history-compression] Input exceeds budget (${compactHistory.length} chars); ` +
+      `compressing ${chunks.length} segments with model "${entry.modelId}".`,
+  );
+
+  const partials: string[] = [];
+  for (const chunk of chunks) {
+    partials.push(
+      await tryCompressWithModel(
+        entry,
+        hostModels,
+        agentInstanceId,
+        COMPRESSION_SEGMENT_SYSTEM_PROMPT,
+        buildCompressionSegmentUserMessage(chunk),
+        host,
+      ),
+    );
+  }
+
+  return await mergePartialBriefings(
+    entry,
+    hostModels,
+    agentInstanceId,
+    partials,
+    previousBriefingChars,
+    host,
+  );
+}
 
 export const generateSimpleCompressedHistory = async (
   messages: WideAgentMessage[],
@@ -281,7 +501,7 @@ export const generateSimpleCompressedHistory = async (
     if (attemptedKeys.has(key)) continue;
     attemptedKeys.add(key);
     try {
-      return await tryCompressWithModel(
+      return await compressWithEntry(
         entry,
         hostModels,
         agentInstanceId,
@@ -312,7 +532,7 @@ export const generateSimpleCompressedHistory = async (
       `History compression: all preferred models failed, falling back to active model: ${fallbackModelId}`,
     );
     try {
-      return await tryCompressWithModel(
+      return await compressWithEntry(
         fallbackEntry ?? { modelId: fallbackModelId },
         hostModels,
         agentInstanceId,
