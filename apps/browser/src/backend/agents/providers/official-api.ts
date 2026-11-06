@@ -74,7 +74,7 @@ const VENDOR_VALIDATION_MODEL: Partial<Record<ModelProvider, string>> = {
   mistral: 'mistral-small-latest',
   'x-ai': 'grok-3-mini',
   openai: 'gpt-4o-mini',
-  google: 'gemini-2.0-flash',
+  google: 'gemini-3.5-flash-lite',
 };
 
 // ============================================================================
