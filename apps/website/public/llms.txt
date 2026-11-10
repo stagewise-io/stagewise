@@ -62,4 +62,4 @@ Self-hosted on your own infrastructure with your own models, compliance controls
 
 - [GitHub Repository](https://github.com/stagewise-io/stagewise)
 - [Documentation](https://ade.stagewise.io)
-- [Twitter / X](https://x.com/stagewise_io)
+- [Twitter / X](https://x.com/klexbot)

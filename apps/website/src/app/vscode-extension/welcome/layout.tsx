@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: 'Meet the new stagewise · stagewise',
     description:
       'The stagewise extension is retired. Download the standalone stagewise IDE for a more powerful experience — no extension required.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'technology',
 };

@@ -167,7 +167,7 @@ export function Footer() {
                 Discord
               </Link>
               <Link
-                href="https://x.com/stagewise_io"
+                href="https://x.com/klexbot"
                 className={cn(
                   buttonVariants({ variant: 'ghost', size: 'xs' }),
                   'justify-end',

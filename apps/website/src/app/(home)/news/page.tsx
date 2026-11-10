@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     title: 'Newsroom · stagewise',
     description:
       "Find out what we're up to, what we're thinking, and what we're doing at stagewise",
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'technology',
   alternates: {
@@ -81,7 +81,7 @@ export default async function BlogPage(props: {
               in
             </Link>
             <Link
-              href="https://x.com/stagewise_io"
+              href="https://x.com/klexbot"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="X page of stagewise"

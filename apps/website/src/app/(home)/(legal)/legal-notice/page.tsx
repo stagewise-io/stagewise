@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: 'Legal Notice · stagewise',
     description:
       'Read the legal notice for stagewise, including company information and legal disclosures.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'legal',
   alternates: {

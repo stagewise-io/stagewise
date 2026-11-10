@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: 'Privacy Policy · stagewise',
     description:
       'Read the stagewise Privacy Policy and learn how we collect, use, and protect your data.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'legal',
   alternates: {

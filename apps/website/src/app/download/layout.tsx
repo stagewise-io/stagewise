@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   twitter: {
     title: 'Download stagewise · The Open Source Agentic IDE',
     description: 'Download stagewise for macOS, Windows, and Linux.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'technology',
   alternates: {

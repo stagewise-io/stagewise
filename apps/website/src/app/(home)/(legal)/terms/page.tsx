@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: 'Terms of Service · stagewise',
     description:
       'Read the stagewise Terms of Service for using the website, product, and related services.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'legal',
   alternates: {
