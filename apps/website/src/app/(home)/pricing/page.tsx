@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: 'Pricing · stagewise',
     description:
       'Simple, transparent pricing for stagewise. The browser built for web developers.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'technology',
   alternates: {

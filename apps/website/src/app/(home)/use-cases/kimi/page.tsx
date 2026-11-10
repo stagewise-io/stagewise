@@ -22,7 +22,7 @@ export const metadata: Metadata = {
       'An Open-Source IDE & Coding Agent with First-Class Kimi Support · stagewise',
     description:
       "stagewise is an open-source IDE and coding agent with first-class support for Kimi K3, K2.7 Code, K2.6, and K2.5 from Moonshot AI. Kimi K3 is Moonshot's most capable flagship model, with 2.8T parameters, a 1M-token context, native visual understanding, and thinking mode always enabled. Run via stagewise Cloud Inference, your own Moonshot API key, or local inference.",
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   alternates: {
     canonical: 'https://ade.stagewise.io/use-cases/kimi',

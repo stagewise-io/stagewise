@@ -22,7 +22,7 @@ export const metadata: Metadata = {
       'An Open-Source IDE & Coding Agent with First-Class GLM Support · stagewise',
     description:
       'stagewise is an open-source IDE and coding agent with first-class support for GLM 5.2, 5.1, and 5V-Turbo from Z.AI. Run via stagewise Cloud Inference, your own Z.AI API key, or local inference. Near-Claude Opus 4.8 quality at a fraction of the cost.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   alternates: {
     canonical: 'https://ade.stagewise.io/use-cases/glm',

@@ -26,7 +26,7 @@
   <a href="https://github.com/stagewise-io/stagewise/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/stagewise" /></a>
   <a href="https://github.com/stagewise-io/stagewise/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/stagewise-io/stagewise" /></a>
   <a href="https://discord.gg/gkdGsDYaKA"><img alt="Unisciti su Discord" src="https://img.shields.io/discord/1229378372141056010?label=Discord&logo=discord&logoColor=white" /></a>
-  <a href="https://x.com/stagewise_io"><img alt="Segui su X (ex Twitter)" src="https://img.shields.io/twitter/follow/stagewise_io" /></a>
+  <a href="https://x.com/klexbot"><img alt="Segui su X (ex Twitter)" src="https://img.shields.io/twitter/follow/klexbot" /></a>
 </p>
 
 </div>

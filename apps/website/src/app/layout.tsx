@@ -21,7 +21,7 @@ const organizationJsonLd = {
   ],
   sameAs: [
     'https://github.com/stagewise-io/stagewise',
-    'https://x.com/stagewise_io',
+    'https://x.com/klexbot',
     'https://www.linkedin.com/company/stagewise',
   ],
 };

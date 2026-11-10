@@ -22,7 +22,7 @@ export const metadata: Metadata = {
       'An Open-Source IDE & Coding Agent with First-Class MiniMax Support · stagewise',
     description:
       'stagewise is an open-source IDE and coding agent with first-class support for MiniMax M3, M2.7, and M2. MiniMax M3 is state of the art among open-weight models with native vision, with precise instruction following and a low hallucination rate. Run via stagewise Cloud Inference, the MiniMax Token Plan, your own API key, or local inference.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   alternates: {
     canonical: 'https://ade.stagewise.io/use-cases/minimax',

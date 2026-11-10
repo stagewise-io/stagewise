@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     title: 'The Agentic IDE for Open-Source Models · stagewise',
     description:
       'stagewise is a next-gen agent orchestrator for software engineers, leveraging a frontier-grade agent harness. Full model sovereignty. Runs locally, connects to anything.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'technology',
   alternates: {

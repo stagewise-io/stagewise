@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: 'Trademark Policy · stagewise',
     description:
       'Read the stagewise Trademark Policy for guidance on using the stagewise name, brand, and assets.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'legal',
   alternates: {

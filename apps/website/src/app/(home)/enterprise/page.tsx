@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: 'stagewise for Enterprises · stagewise',
     description:
       'Leverage AI driven development in your organization with stagewise. Control, compliance and scale for teams that need it.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   category: 'technology',
   alternates: {

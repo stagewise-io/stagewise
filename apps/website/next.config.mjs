@@ -73,7 +73,7 @@ const config = {
       },
       {
         source: '/socials/x',
-        destination: 'https://x.com/stagewise_io',
+        destination: 'https://x.com/klexbot',
       },
       {
         source: '/socials/discord',

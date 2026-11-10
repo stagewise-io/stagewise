@@ -22,7 +22,7 @@ export const metadata: Metadata = {
       'An Open-Source IDE & Coding Agent with First-Class DeepSeek Support · stagewise',
     description:
       'stagewise is an open-source IDE and coding agent with first-class support for DeepSeek V4 Pro and V4 Flash. Run via stagewise Cloud Inference, your own API key, or local inference with Ollama — no lock-in.',
-    creator: '@stagewise_io',
+    creator: '@klexbot',
   },
   alternates: {
     canonical: 'https://ade.stagewise.io/use-cases/deepseek',
