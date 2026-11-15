@@ -87,7 +87,7 @@ const providerConfigs: Record<
     createAnthropic({ apiKey, baseURL })('claude-haiku-4-5'),
   openai: (apiKey, baseURL) => createOpenAI({ apiKey, baseURL })('gpt-5-nano'),
   google: (apiKey, baseURL) =>
-    createGoogleGenerativeAI({ apiKey, baseURL })('gemini-2.5-flash-lite'),
+    createGoogleGenerativeAI({ apiKey, baseURL })('gemini-3.5-flash-lite'),
   // OpenAI-compatible providers below must use `.chat(...)` rather than the
   // default `(id)` shorthand: `createOpenAI()(id)` targets the Responses API
   // (only OpenAI itself implements it), whereas these upstreams speak Chat
