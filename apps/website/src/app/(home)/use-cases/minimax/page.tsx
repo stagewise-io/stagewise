@@ -567,21 +567,14 @@ export default function MiniMaxUseCasePage() {
             question:
               'Can I connect an enterprise inference provider to use MiniMax models?',
             plainTextAnswer:
-              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference. See the stagewise enterprise page for more.',
+              'Yes. stagewise offers the option to connect Azure Foundry, AWS Bedrock, and Google Vertex endpoints for enterprise-grade inference.',
             answer: (
               <>
                 <p>
                   Yes. stagewise offers the option to connect{' '}
                   <strong>Azure Foundry</strong>, <strong>AWS Bedrock</strong>,
                   and <strong>Google Vertex</strong> endpoints for
-                  enterprise-grade inference. See the{' '}
-                  <Link
-                    href="/enterprise"
-                    className="text-primary underline-offset-4 hover:underline"
-                  >
-                    enterprise page
-                  </Link>{' '}
-                  for more.
+                  enterprise-grade inference.
                 </p>
               </>
             ),
