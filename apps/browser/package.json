@@ -93,6 +93,7 @@
     "@electron-forge/plugin-fuses": "7.11.1",
     "@electron-forge/plugin-vite": "7.11.2",
     "@electron/fuses": "^1.8.0",
+    "@electron/rebuild": "^3.7.2",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@posthog/ai": "7.18.1",
     "@posthog/cli": "^0.7.11",

@@ -1,5 +1,38 @@
-import type { JSONContent } from '@tiptap/core';
+import type { Content, JSONContent } from '@tiptap/core';
 import type { AttachmentMetadata } from '@shared/karton-contracts/ui/agent/metadata';
+
+/** Rehydrate path-based attachment metadata from a persisted composer draft. */
+export function getDraftAttachments(
+  content: Content,
+  liveAttachments: AttachmentMetadata[] = [],
+): AttachmentMetadata[] {
+  const liveByPath = new Map(liveAttachments.map((file) => [file.path, file]));
+  const attachments = new Map<string, AttachmentMetadata>();
+  function walk(node: JSONContent) {
+    const path =
+      node.type === 'attachment'
+        ? node.attrs?.id
+        : node.type === 'elementAttachment'
+          ? node.attrs?.blobPath
+          : undefined;
+    if (typeof path === 'string' && path) {
+      attachments.set(
+        path,
+        liveByPath.get(path) ?? {
+          path,
+          originalFileName:
+            typeof node.attrs?.label === 'string'
+              ? node.attrs.label
+              : undefined,
+        },
+      );
+    }
+    node.content?.forEach(walk);
+  }
+  if (Array.isArray(content)) content.forEach(walk);
+  else if (content && typeof content === 'object') walk(content);
+  return Array.from(attachments.values());
+}
 
 // Why a custom parser instead of TipTap's MarkdownManager?
 //

@@ -142,12 +142,14 @@ export class PreferencesService extends DisposableService {
     const legacyDisabledModelIds = await this.readLegacyDisabledModelIds();
     // Migration: convert old customBaseUrl configs to customProviderId
     await this.migrateCustomBaseUrlToProviderId();
-    // Migration: convert providerConfigs/customEndpoints into providerInstances
-    await this.migrateToProviderInstances(legacyDisabledModelIds);
-    // Older builds could populate providerInstances before mirroring a legacy
-    // coding-plan connection. Reconcile those records independently so the
-    // migration remains safe when the instance array is already non-empty.
-    await this.migrateLegacyCodingPlansToProviderInstances();
+    // Migrate legacy records once, including already-populated instance lists.
+    // An empty list after deletion must never replay retained API keys.
+    if (!this.preferences.providerInstancesMigrated) {
+      await this.migrateToProviderInstances(legacyDisabledModelIds);
+      await this.migrateLegacyCodingPlansToProviderInstances();
+      this.preferences.providerInstancesMigrated = true;
+      await this.save();
+    }
     await this.migrateLegacyQwenCodingPlanEndpoint();
     // Retire persisted managed-inference instances without touching external providers.
     const instances = this.preferences.providerInstances;
@@ -261,7 +263,11 @@ export class PreferencesService extends DisposableService {
   private async migrateToProviderInstances(
     legacyDisabled: string[] = [],
   ): Promise<void> {
-    if (this.preferences.providerInstances.length > 0) return;
+    if (
+      this.preferences.providerInstancesMigrated ||
+      this.preferences.providerInstances.length > 0
+    )
+      return;
 
     const VENDORS: ModelProvider[] = [
       'anthropic',

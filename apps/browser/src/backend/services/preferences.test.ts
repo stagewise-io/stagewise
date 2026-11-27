@@ -60,6 +60,56 @@ async function createServiceWithPreferences(
   return service;
 }
 
+describe('PreferencesService one-time provider migration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistedDataMock.writePersistedData.mockResolvedValue(undefined);
+  });
+
+  it('does not recreate the last deleted provider on restart', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerConfigs.openai = {
+      mode: 'official',
+      encryptedApiKey: 'retained-key',
+    };
+    const first = await createServiceWithPreferences(preferences);
+    expect(first.get().providerInstances).toContainEqual(
+      expect.objectContaining({ id: 'openai-api-default' }),
+    );
+    expect(first.get().providerInstancesMigrated).toBe(true);
+    await first.removeProviderInstance('openai-api-default');
+    const restarted = await createServiceWithPreferences(
+      structuredClone(first.get()),
+    );
+    expect(restarted.get().providerInstances).toEqual([]);
+  });
+
+  it('marks already migrated account-only preferences before removing the account', async () => {
+    const preferences = cloneDefaultPreferences();
+    preferences.providerInstances = [
+      {
+        id: 'stagewise-default',
+        typeId: 'stagewise',
+        name: 'Legacy',
+        config: {},
+        enabledModelIds: [],
+        disabledModelIds: [],
+        discoveredModels: [],
+      },
+    ];
+    preferences.providerConfigs.openai = {
+      mode: 'official',
+      encryptedApiKey: 'deleted-provider-key',
+    };
+    const first = await createServiceWithPreferences(preferences);
+    expect(first.get().providerInstances).toEqual([]);
+    const restarted = await createServiceWithPreferences(
+      structuredClone(first.get()),
+    );
+    expect(restarted.get().providerInstances).toEqual([]);
+  });
+});
+
 describe('PreferencesService provider instance names', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -610,10 +660,14 @@ describe('PreferencesService legacy provider migration', () => {
       ).toHaveLength(1);
     }
 
+    const writesAfterMigration =
+      persistedDataMock.writePersistedData.mock.calls.length;
     persistedDataMock.readPersistedData.mockResolvedValueOnce(service.get());
     const repeated = await PreferencesService.create(logger as any);
     expect(repeated.get().providerInstances).toHaveLength(instances.length);
-    expect(persistedDataMock.writePersistedData).toHaveBeenCalledTimes(1);
+    expect(persistedDataMock.writePersistedData).toHaveBeenCalledTimes(
+      writesAfterMigration,
+    );
   });
 
   it('retains the vendor for custom models migrated from Stagewise routing', async () => {

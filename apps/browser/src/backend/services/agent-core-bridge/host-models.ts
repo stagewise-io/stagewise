@@ -1,6 +1,7 @@
 import type { HostModels, ModelWithOptions } from '@stagewise/agent-core';
 import type { ModelCapabilities } from '@stagewise/agent-core/types';
 import type { ModelProviderService } from '@/agents/model-provider';
+import { isStagewiseRoutedSelection } from '@shared/provider-instance-helpers';
 import { getModelCapabilities, type ModelId } from '@shared/available-models';
 import {
   PROVIDER_INSTANCE_ID_METADATA_KEY,
@@ -52,6 +53,7 @@ function supportsUtilityCalls(
   entry: { providerInstanceId?: string },
   prefs: UtilityModelsSnapshot,
 ): boolean {
+  if (isStagewiseRoutedSelection(prefs, entry.providerInstanceId)) return false;
   const instance = prefs.providerInstances.find(
     (candidate) => candidate.id === entry.providerInstanceId,
   );

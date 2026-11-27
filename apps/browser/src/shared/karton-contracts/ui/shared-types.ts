@@ -1293,6 +1293,8 @@ export const userPreferencesSchema = z.object({
    * Migrated from `providerConfigs` / `customEndpoints` on first load.
    */
   providerInstances: z.array(providerInstanceSchema).default([]),
+  /** Prevent legacy configuration replay after the last provider is deleted. */
+  providerInstancesMigrated: z.boolean().default(false),
 });
 
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
@@ -1404,6 +1406,7 @@ export const defaultUserPreferences: UserPreferences = {
   customEndpoints: [],
   customModels: [],
   providerInstances: [],
+  providerInstancesMigrated: false,
 };
 
 /**

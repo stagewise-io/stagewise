@@ -7,6 +7,7 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { rebuild } from '@electron/rebuild';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { SquirrelInstallerNameFixPlugin } from './etc/forge-plugins/squirrel-installer-name-fix';
 import { getWindowsSignConfig } from './etc/windows/windowsSign';
@@ -68,6 +69,7 @@ const nativeDependencies = [
   '@img',
   'detect-libc',
   'node-pty',
+  'node-addon-api',
   '@xterm/headless',
   'semver',
   'web-tree-sitter',
@@ -91,6 +93,41 @@ const copyNativeDependencies = (
     }
   }
   callback();
+};
+
+/** Linux node-pty distributions may have no prebuild; build in the staging app. */
+const ensurePtyBinary = (
+  buildPath: string,
+  electronVersion: string,
+  platform: string,
+  arch: string,
+  callback: (error?: Error) => void,
+) => {
+  const ptyRoot = path.join(buildPath, 'node_modules', 'node-pty');
+  const candidates = [
+    path.join(ptyRoot, 'build', 'Release', 'pty.node'),
+    path.join(ptyRoot, 'prebuilds', `${platform}-${arch}`, 'pty.node'),
+  ];
+  if (platform !== 'linux' || candidates.some((file) => fs.existsSync(file))) {
+    callback();
+    return;
+  }
+  rebuild({
+    buildPath,
+    electronVersion,
+    arch,
+    platform,
+    onlyModules: ['node-pty'],
+    force: true,
+    buildFromSource: true,
+  })
+    .then(() => {
+      if (!candidates.some((file) => fs.existsSync(file))) {
+        throw new Error('node-pty rebuild produced no loadable Linux binary');
+      }
+      callback();
+    })
+    .catch(callback);
 };
 
 /**
@@ -336,6 +373,7 @@ const config: ForgeConfig = {
     prune: true,
     afterCopy: [
       copyNativeDependencies,
+      ensurePtyBinary,
       pruneNonPlatformPrebuilds,
       uploadSourceMapsAndCleanup,
     ],

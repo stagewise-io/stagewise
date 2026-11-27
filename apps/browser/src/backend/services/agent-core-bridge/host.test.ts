@@ -257,7 +257,7 @@ describe('createBrowserHostModels', () => {
           utilityModels: {
             titleGeneration: [
               { modelId: 'agent', providerInstanceId: 'codex-1' },
-              { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+              { modelId: 'utility', providerInstanceId: 'openai-1' },
             ],
             contextCompression: [],
           },
@@ -265,14 +265,40 @@ describe('createBrowserHostModels', () => {
           modelPresets: [],
           providerInstances: [
             { id: 'codex-1', typeId: 'codex' },
-            { id: 'stagewise-1', typeId: 'stagewise' },
+            { id: 'openai-1', typeId: 'openai-api' },
           ],
         }) as never,
     );
 
     expect(models.getUtilityModelEntries?.('title-generation')).toEqual([
-      { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+      { modelId: 'utility', providerInstanceId: 'openai-1' },
     ]);
+  });
+
+  it.each([
+    'title-generation',
+    'context-compression',
+  ] as const)('filters retired %s utility routes without deleting preferences', (task) => {
+    const retired = [
+      { modelId: 'implicit' },
+      { modelId: 'default', providerInstanceId: 'stagewise-default' },
+      { modelId: 'legacy', providerInstanceId: 'legacy-account' },
+    ];
+    const prefs = {
+      utilityModels: { titleGeneration: retired, contextCompression: retired },
+      modelPresets: [],
+      activePresetId: undefined,
+      providerInstances: [{ id: 'legacy-account', typeId: 'stagewise' }],
+    };
+    const models = createBrowserHostModels(
+      {
+        modelExists: vi.fn(),
+        getModelWithOptions: vi.fn(),
+      } as unknown as ModelProviderService,
+      () => prefs as never,
+    );
+    expect(models.getUtilityModelEntries?.(task)).toEqual([]);
+    expect(prefs.utilityModels.titleGeneration).toHaveLength(3);
   });
 
   it('uses global utilities for an external-only active preset', () => {
@@ -283,7 +309,7 @@ describe('createBrowserHostModels', () => {
         ({
           utilityModels: {
             titleGeneration: [
-              { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+              { modelId: 'utility', providerInstanceId: 'openai-1' },
             ],
             contextCompression: [],
           },
@@ -297,7 +323,7 @@ describe('createBrowserHostModels', () => {
           ],
           providerInstances: [
             { id: 'codex-1', typeId: 'codex' },
-            { id: 'stagewise-1', typeId: 'stagewise' },
+            { id: 'openai-1', typeId: 'openai-api' },
           ],
         }) as never,
     );
@@ -306,7 +332,7 @@ describe('createBrowserHostModels', () => {
       { modelId: 'agent', providerInstanceId: 'codex-1' },
     ]);
     expect(models.getUtilityModelEntries?.('title-generation')).toEqual([
-      { modelId: 'utility', providerInstanceId: 'stagewise-1' },
+      { modelId: 'utility', providerInstanceId: 'openai-1' },
     ]);
   });
 });

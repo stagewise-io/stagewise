@@ -199,8 +199,9 @@ export default function DeepSeekUseCasePage() {
                   inference
                 </h2>
                 <p>
-                  You can use DeepSeek V4 Flash and V4 Pro through a stagewise
-                  Account and start without managing a separate API key.
+                  Connect your DeepSeek API key in Models & Providers, or add an
+                  OpenAI-compatible endpoint serving DeepSeek V4 Flash or V4
+                  Pro.
                 </p>
                 <p>
                   If you already have DeepSeek access elsewhere, you can point
