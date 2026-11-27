@@ -171,7 +171,7 @@
     "recharts": "^3.8.1",
     "seti-icons": "^0.0.4",
     "shiki": "3.21.0",
-    "storybook": "^10.3.6",
+    "storybook": "^10.6.2",
     "streamdown": "^2.5.0",
     "superjson": "2.2.6",
     "tailwind-merge": "^3.6.0",
