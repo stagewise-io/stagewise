@@ -95,7 +95,7 @@ const copyNativeDependencies = (
   callback();
 };
 
-/** Linux node-pty distributions may have no prebuild; build in the staging app. */
+/** Rebuild Linux node-pty for Electron, not the Node.js used during install. */
 const ensurePtyBinary = (
   buildPath: string,
   electronVersion: string,
@@ -108,10 +108,15 @@ const ensurePtyBinary = (
     path.join(ptyRoot, 'build', 'Release', 'pty.node'),
     path.join(ptyRoot, 'prebuilds', `${platform}-${arch}`, 'pty.node'),
   ];
-  if (platform !== 'linux' || candidates.some((file) => fs.existsSync(file))) {
+  if (platform !== 'linux') {
     callback();
     return;
   }
+  // A binary copied from pnpm install can exist but still fail to load in
+  // Electron. File existence is not a compatibility check.
+  console.log(
+    '[forge.config] Rebuilding Linux node-pty from source for Electron',
+  );
   rebuild({
     buildPath,
     electronVersion,
