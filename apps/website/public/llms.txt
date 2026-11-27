@@ -14,7 +14,6 @@ stagewise is a next-gen agent orchestrator for software engineers. It leverages 
 ## Key Pages
 
 - [Homepage](https://ade.stagewise.io/)
-- [Pricing](https://ade.stagewise.io/pricing)
 - [Enterprise](https://ade.stagewise.io/enterprise)
 - [Company](https://ade.stagewise.io/company)
 - [Careers](https://ade.stagewise.io/careers)

@@ -180,7 +180,6 @@ export function Navbar() {
           {/* Desktop nav links — centered */}
           <div className="pointer-events-none absolute inset-x-0 hidden items-center justify-center sm:flex">
             <div className="pointer-events-auto flex items-center">
-              <NavLink href="/pricing">Pricing</NavLink>
               <NavLink href="/enterprise">Enterprise</NavLink>
               <ResourcesDropdown />
             </div>
@@ -221,9 +220,6 @@ export function Navbar() {
               id="mobile-navigation-menu"
               className="relative z-50 -mx-4 flex flex-col items-start gap-1 border-border border-t border-b bg-background px-4 pb-3 shadow-lg sm:hidden"
             >
-              <NavLink href="/pricing" onClick={() => setIsOpen(false)}>
-                Pricing
-              </NavLink>
               <NavLink href="/enterprise" onClick={() => setIsOpen(false)}>
                 Enterprise
               </NavLink>
